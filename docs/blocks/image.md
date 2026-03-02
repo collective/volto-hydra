@@ -7,22 +7,12 @@ This is a **built-in** block.
 ## Schema
 
 ```js
-{
-  blockSchema: {
-    properties: {
-      url: {
-        title: 'Image URL',
-        widget: 'image',
-      },
-      alt: {
-        title: 'Alt text',
-        type: 'string',
-      },
-      href: {
-        title: 'Link',
-        widget: 'object_browser',
-        mode: 'link',
-        allowExternals: true,
+blocks: {
+  image: {
+    schemaEnhancer: {
+      childBlockConfig: {
+        defaultsField: 'itemDefaults',
+        editableFields: ['url', 'alt', 'href'],
       },
     },
   },

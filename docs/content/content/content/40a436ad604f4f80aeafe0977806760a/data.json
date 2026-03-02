@@ -246,7 +246,7 @@
           "@id": "ref-image-schema-javascript-979df6",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  blockSchema: {\n    properties: {\n      url: {\n        title: 'Image URL',\n        widget: 'image',\n      },\n      alt: {\n        title: 'Alt text',\n        type: 'string',\n      },\n      href: {\n        title: 'Link',\n        widget: 'object_browser',\n        mode: 'link',\n        allowExternals: true,\n      },\n    },\n  },\n}"
+          "code": "blocks: {\n  image: {\n    schemaEnhancer: {\n      childBlockConfig: {\n        defaultsField: 'itemDefaults',\n        editableFields: ['url', 'alt', 'href'],\n      },\n    },\n  },\n}"
         }
       ]
     },

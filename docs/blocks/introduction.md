@@ -6,18 +6,7 @@ This is a **built-in** block.
 
 ## Schema
 
-```js
-{
-  blockSchema: {
-    properties: {
-      value: {
-        title: 'Body',
-        widget: 'slate',
-      },
-    },
-  },
-}
-```
+No block config needed — Introduction is a built-in Volto block.
 
 ## JSON Block Data
 

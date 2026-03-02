@@ -6,15 +6,7 @@ This is a **built-in** block.
 
 ## Schema
 
-```js
-{
-  blockSchema: {
-    properties: {},
-  },
-}
-```
-
-The TOC block has no user-editable properties. Its content is derived from the page structure.
+No block config needed — Table of Contents is a built-in Volto block.
 
 ## JSON Block Data
 

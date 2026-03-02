@@ -87,11 +87,87 @@ export default defineConfig({
     video: process.env.VIDEO ? 'retain-on-failure' : 'off',
   },
 
-  /* Configure projects for different frontends */
+  /* Configure projects for different test categories and frontends.
+   *
+   * Three test directories:
+   *   unit/        — Pure unit tests, run once (no frontend needed)
+   *   bridge/      — Mock-parent tests using hydra.js bridge protocol,
+   *                  run on ALL frontends (mock, nuxt, react, svelte, vue)
+   *   integration/ — Full Volto admin UI tests, run on mock + nuxt only
+   */
   projects: [
-    // Mock frontend (default) - tests run against mock HTML frontend on port 8888
+    // --- Unit tests (run once) ---
+    {
+      name: 'unit',
+      testDir: 'tests-playwright/unit',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+      },
+    },
+
+    // --- Bridge tests — run on all frontends ---
+    // Mock frontend (default, port 8888)
     {
       name: 'mock',
+      testDir: 'tests-playwright/bridge',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+      },
+    },
+    // Nuxt frontend (port 3003)
+    {
+      name: 'nuxt',
+      testDir: 'tests-playwright/bridge',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-nuxt.json',
+      },
+    },
+    // React Vite frontend (port 3004)
+    {
+      name: 'react',
+      testDir: 'tests-playwright/bridge',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-react.json',
+      },
+    },
+    // Svelte Vite frontend (port 3005)
+    {
+      name: 'svelte',
+      testDir: 'tests-playwright/bridge',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-svelte.json',
+      },
+    },
+    // Vue Vite frontend (port 3006)
+    {
+      name: 'vue',
+      testDir: 'tests-playwright/bridge',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-vue.json',
+      },
+    },
+
+    // --- Admin integration tests — fully implemented frontends only ---
+    // Mock frontend
+    {
+      name: 'admin-mock',
+      testDir: 'tests-playwright/integration',
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
@@ -101,65 +177,31 @@ export default defineConfig({
         /nuxt-.*\.spec\.ts/, // Skip nuxt-specific tests
       ],
     },
-    // Nuxt frontend - tests run against Nuxt frontend on port 3003
+    // Nuxt frontend
     {
-      name: 'nuxt',
+      name: 'admin-nuxt',
+      testDir: 'tests-playwright/integration',
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
-        // Pre-set iframe_url cookie to use Nuxt frontend
         storageState: 'tests-playwright/fixtures/storage-nuxt.json',
       },
       testIgnore: [
         /nuxt-.*\.spec\.ts/, // Skip nuxt-specific tests (they set their own cookie)
         /multifield.*\.spec\.ts/, // Skip multifield tests (hero block not in Nuxt)
-        /unit\/.*\.spec\.ts/, // Unit tests don't need to run per-frontend
       ],
     },
     // Nuxt-specific tests (nuxt-*.spec.ts) - set their own iframe_url cookie
     {
       name: 'nuxt-specific',
+      testDir: 'tests-playwright/integration',
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
       },
-      testMatch: /nuxt-.*\.spec\.ts/, // Only run nuxt-specific tests
-    },
-
-    // React doc examples - tests run against React Vite frontend on port 3004
-    {
-      name: 'react',
-      use: {
-        ...devices['Desktop Chrome'],
-        viewport: { width: 1280, height: 720 },
-        permissions: ['clipboard-read', 'clipboard-write'],
-        storageState: 'tests-playwright/fixtures/storage-react.json',
-      },
-      testMatch: /doc-examples\.spec\.ts/,
-    },
-    // Svelte doc examples - tests run against Svelte Vite frontend on port 3005
-    {
-      name: 'svelte',
-      use: {
-        ...devices['Desktop Chrome'],
-        viewport: { width: 1280, height: 720 },
-        permissions: ['clipboard-read', 'clipboard-write'],
-        storageState: 'tests-playwright/fixtures/storage-svelte.json',
-      },
-      testMatch: /doc-examples\.spec\.ts/,
-    },
-    // Vue doc examples - tests run against Vue Vite frontend on port 3006
-    {
-      name: 'vue',
-      use: {
-        ...devices['Desktop Chrome'],
-        viewport: { width: 1280, height: 720 },
-        permissions: ['clipboard-read', 'clipboard-write'],
-        storageState: 'tests-playwright/fixtures/storage-vue.json',
-      },
-      testMatch: /doc-examples\.spec\.ts/,
+      testMatch: /nuxt-.*\.spec\.ts/,
     },
   ],
 

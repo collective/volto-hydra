@@ -6,40 +6,7 @@ This is a **custom** block — register it via `initBridge`.
 
 ## Schema
 
-```js
-highlight: {
-  id: 'highlight',
-  title: 'Highlight',
-  group: 'common',
-  blockSchema: {
-    properties: {
-      title: {
-        title: 'Title',
-        type: 'string',
-      },
-      description: {
-        title: 'Description',
-        type: 'array',
-        widget: 'slate',
-      },
-      image: {
-        title: 'Background Image',
-        widget: 'image',
-      },
-      cta_title: {
-        title: 'CTA Text',
-        type: 'string',
-      },
-      cta_link: {
-        title: 'CTA Link',
-        widget: 'object_browser',
-        mode: 'link',
-        allowExternals: true,
-      },
-    },
-  },
-}
-```
+No block config needed — Highlight is a built-in Volto block.
 
 ## JSON Block Data
 

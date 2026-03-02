@@ -1,11 +1,13 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { initBridge, expandListingBlocks } from '$hydra';
+import { initBridge, expandListingBlocks, ploneFetchItems } from '$hydra';
 import { sharedBlocksConfig } from '$schemas';
 import App from './App.jsx';
 
-// Expose expandListingBlocks globally for doc example components
+// Expose hydra.js helpers globally for doc example components
 window._expandListingBlocks = expandListingBlocks;
+window._ploneFetchItems = ploneFetchItems;
+window._API_URL = 'http://localhost:8888';
 
 const root = createRoot(document.getElementById('root'));
 

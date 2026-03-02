@@ -6,19 +6,7 @@ This is a **built-in** block.
 
 ## Schema
 
-```js
-{
-  blockSchema: {
-    properties: {
-      url: {
-        title: 'Video URL',
-        type: 'string',
-        description: 'YouTube link or direct video file URL',
-      },
-    },
-  },
-}
-```
+No block config needed — Video is a built-in Volto block.
 
 ## JSON Block Data
 

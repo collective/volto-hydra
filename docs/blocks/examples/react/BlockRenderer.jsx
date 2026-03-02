@@ -20,6 +20,15 @@ function BlockRenderer({ block }) {
     case 'highlight':     return <HighlightBlock block={block} />;
     case 'video':         return <VideoBlock block={block} />;
     case 'toc':           return <TocBlock block={block} />;
+    case 'summary':
+    case 'default':
+      return (
+        <div data-block-uid={block['@uid']} className="listing-item">
+          {block.image && <img src={typeof block.image === 'string' ? block.image : block.image['@id']} alt="" />}
+          <h4><a href={block.href}>{block.title}</a></h4>
+          {block.description && <p>{block.description}</p>}
+        </div>
+      );
     default:              return <div data-block-uid={block['@uid']}>Unknown block: {type}</div>;
   }
 }

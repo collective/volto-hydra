@@ -6,24 +6,7 @@ This is a **built-in** block.
 
 ## Schema
 
-```js
-{
-  blockSchema: {
-    properties: {
-      title: {
-        title: 'Label',
-        type: 'string',
-      },
-      href: {
-        title: 'Link',
-        widget: 'object_browser',
-        mode: 'link',
-        allowExternals: true,
-      },
-    },
-  },
-}
-```
+No block config needed — Button is a built-in Volto block.
 
 ## JSON Block Data
 

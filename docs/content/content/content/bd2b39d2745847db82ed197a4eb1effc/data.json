@@ -179,7 +179,7 @@
           "@id": "ref-teaser-schema-javascript-bfff08",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  blockSchema: {\n    properties: {\n      href: {\n        title: 'Target',\n        widget: 'object_browser',\n        mode: 'link',\n      },\n      title: {\n        title: 'Title',\n        type: 'string',\n      },\n      description: {\n        title: 'Description',\n        type: 'string',\n      },\n      preview_image: {\n        title: 'Image',\n        widget: 'image',\n      },\n      overwrite: {\n        title: 'Overwrite',\n        type: 'boolean',\n        description: 'Override target content values with custom ones',\n      },\n    },\n  },\n}"
+          "code": "blocks: {\n  teaser: {\n    schemaEnhancer: {\n      childBlockConfig: {\n        defaultsField: 'itemDefaults',\n        editableFields: ['href', 'title', 'description', 'preview_image', 'overwrite'],\n      },\n    },\n  },\n}"
         }
       ]
     },

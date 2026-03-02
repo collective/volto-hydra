@@ -1,10 +1,12 @@
 import { createApp, reactive } from 'vue';
-import { initBridge, expandListingBlocks } from '$hydra';
+import { initBridge, expandListingBlocks, ploneFetchItems } from '$hydra';
 import { sharedBlocksConfig } from '$schemas';
 import App from './App.vue';
 
-// Expose expandListingBlocks globally for doc example components
+// Expose hydra.js helpers globally for doc example components
 window.expandListingBlocks = expandListingBlocks;
+window.ploneFetchItems = ploneFetchItems;
+window._API_URL = 'http://localhost:8888';
 
 const state = reactive({ items: [] });
 

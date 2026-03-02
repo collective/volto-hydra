@@ -2275,7 +2275,7 @@
           "@id": "ref-accordion-schema-javascript-105cd5",
           "label": "Schema",
           "language": "javascript",
-          "code": "accordion: {\n  id: 'accordion',\n  title: 'Accordion',\n  group: 'common',\n  blockSchema: {\n    properties: {\n      panels: {\n        title: 'Panels',\n        widget: 'object_list',\n        schema: {\n          fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'blocks_layout'] }],\n          properties: {\n            title: { title: 'Title', type: 'string' },\n            blocks_layout: {\n              title: 'Content',\n              widget: 'blocks_layout',\n              allowedBlocks: ['slate', 'image'],\n              defaultBlockType: 'slate',\n            },\n          },\n        },\n      },\n    },\n  },\n},"
+          "code": "blocks: {\n  accordion: {\n    blockSchema: {\n      properties: {\n        panels: {\n          title: 'Panels',\n          widget: 'object_list',\n          schema: {\n            properties: {\n              title:         { title: 'Title' },\n              blocks_layout: { title: 'Content', widget: 'blocks_layout', allowedBlocks: ['slate', 'image'], defaultBlockType: 'slate' },\n            },\n          },\n        },\n      },\n    },\n  },\n}"
         }
       ]
     },

@@ -7,34 +7,25 @@ This is a **custom** block — register it via `initBridge`.
 ## Schema
 
 ```js
-accordion: {
-  id: 'accordion',
-  title: 'Accordion',
-  group: 'common',
-  blockSchema: {
-    properties: {
-      panels: {
-        title: 'Panels',
-        widget: 'object_list',
-        schema: {
-          fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'blocks_layout'] }],
-          properties: {
-            title: { title: 'Title', type: 'string' },
-            blocks_layout: {
-              title: 'Content',
-              widget: 'blocks_layout',
-              allowedBlocks: ['slate', 'image'],
-              defaultBlockType: 'slate',
+blocks: {
+  accordion: {
+    blockSchema: {
+      properties: {
+        panels: {
+          title: 'Panels',
+          widget: 'object_list',
+          schema: {
+            properties: {
+              title:         { title: 'Title' },
+              blocks_layout: { title: 'Content', widget: 'blocks_layout', allowedBlocks: ['slate', 'image'], defaultBlockType: 'slate' },
             },
           },
         },
       },
     },
   },
-},
+}
 ```
-
-Each panel is an `object_list` item with a `title` string and a `blocks_layout` content area. Child blocks are stored in each panel's `blocks` dict.
 
 ## JSON Block Data
 

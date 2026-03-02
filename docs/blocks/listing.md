@@ -6,63 +6,51 @@ This is a **built-in** block.
 
 ## Schema
 
-The listing block's schema is built up by Hydra's `schemaEnhancer`. The key fields are:
+The listing block uses `inheritSchemaFrom` to let editors choose an item type. You also need to define the item type blocks (`summary`, `default`) with `fieldMappings['@default']` so the listing knows how to map query results to item fields.
 
 ```js
-{
-  blockSchema: {
-    properties: {
-      querystring: {
-        title: 'Query',
-        widget: 'query',
-      },
-      variation: {
+blocks: {
+  listing: {
+    schemaEnhancer: {
+      inheritSchemaFrom: {
+        typeField: 'variation',
+        mappingField: 'fieldMapping',
+        defaultsField: 'itemDefaults',
+        filterConvertibleFrom: '@default',
         title: 'Item Type',
-        // Choices are computed from allowedBlocks that have fieldMappings['@default']
-        // Built-in options: 'default', 'summary', 'teaser', 'image'
+        default: 'summary',
+      },
+    },
+  },
+  summary: {
+    fieldMappings: {
+      '@default': { '@id': 'href', title: 'title', description: 'description', image: 'image' },
+    },
+    blockSchema: {
+      properties: {
+        href:        { title: 'Link', widget: 'url' },
+        title:       { title: 'Title' },
+        description: { title: 'Description', widget: 'textarea' },
+        image:       { title: 'Image', widget: 'url' },
+      },
+    },
+  },
+  default: {
+    fieldMappings: {
+      '@default': { '@id': 'href', title: 'title', description: 'description' },
+    },
+    blockSchema: {
+      properties: {
+        href:        { title: 'Link', widget: 'url' },
+        title:       { title: 'Title' },
+        description: { title: 'Description', widget: 'textarea' },
       },
     },
   },
 }
 ```
 
-### Item Type Schemas
-
-The `variation` field selects which block type renders each result item. Each item type has its own schema:
-
-**`default`** — Title + description + link:
-```js
-{
-  properties: {
-    href:        { title: 'Link', widget: 'url' },
-    title:       { title: 'Title' },
-    description: { title: 'Description', widget: 'textarea' },
-  },
-}
-```
-
-**`summary`** — Title + description + image + link:
-```js
-{
-  properties: {
-    href:        { title: 'Link', widget: 'url' },
-    title:       { title: 'Title' },
-    description: { title: 'Description', widget: 'textarea' },
-    image:       { title: 'Image', widget: 'url' },
-  },
-}
-```
-
-### Field Mappings
-
-Query results are mapped to item fields via `fieldMappings['@default']`:
-
-| Query result field | `default` item field | `summary` item field |
-|-------------------|---------------------|---------------------|
-| `@id` | `href` | `href` |
-| `title` | `title` | `title` |
-| `description` | `description` | `description` |
-| `image` | — | `image` |
+The `filterConvertibleFrom: '@default'` means only block types with `fieldMappings['@default']` appear as item type choices. Other block types like `teaser` and `image` that already define `fieldMappings['@default']` will also be available as listing variations.
 
 ## JSON Block Data
 
@@ -109,35 +97,23 @@ function ListingBlock({ block, blockId }) {
   const [items, setItems] = useState([]);
 
   useEffect(() => {
-    // expandListingBlocks fetches from the API and maps fields
     async function load() {
-      const result = await expandListingBlocks(
-        { [blockId]: block },
-        [blockId],
-        blockId,
-      );
-      setItems(result.items);
+      const fetchItems = ploneFetchItems({ apiUrl: API_URL });
+      const result = await expandListingBlocks([blockId], {
+        blocks: { [blockId]: block },
+        fetchItems: { listing: fetchItems },
+        itemTypeField: 'variation',
+      });
+      setItems(result);
     }
     load();
   }, [block.querystring]);
 
   return (
     <div data-block-uid={blockId} className="listing-block">
-      {items.map(item => (
-        <ListingItem key={item['@uid']} item={item} variation={block.variation} />
+      {items.map((item, i) => (
+        <BlockRenderer key={i} block={item} />
       ))}
-    </div>
-  );
-}
-
-function ListingItem({ item, variation }) {
-  return (
-    <div data-block-uid={item['@uid']} className="listing-item">
-      {variation === 'summary' && item.image && (
-        <img src={item.image} alt="" />
-      )}
-      <h3><a href={item.href}>{item.title}</a></h3>
-      <p>{item.description}</p>
     </div>
   );
 }
@@ -149,11 +125,7 @@ function ListingItem({ item, variation }) {
 ```vue
 <template>
   <div :data-block-uid="blockId" class="listing-block">
-    <div v-for="item in items" :key="item['@uid']" :data-block-uid="item['@uid']" class="listing-item">
-      <img v-if="block.variation === 'summary' && item.image" :src="item.image" alt="" />
-      <h3><a :href="item.href">{{ item.title }}</a></h3>
-      <p>{{ item.description }}</p>
-    </div>
+    <BlockRenderer v-for="(item, i) in items" :key="i" :block="item" />
   </div>
 </template>
 
@@ -164,12 +136,13 @@ const props = defineProps({ block: Object, blockId: String });
 const items = ref([]);
 
 watch(() => props.block.querystring, async () => {
-  const result = await expandListingBlocks(
-    { [props.blockId]: props.block },
-    [props.blockId],
-    props.blockId,
-  );
-  items.value = result.items;
+  const fetchItems = ploneFetchItems({ apiUrl: API_URL });
+  const result = await expandListingBlocks([props.blockId], {
+    blocks: { [props.blockId]: props.block },
+    fetchItems: { listing: fetchItems },
+    itemTypeField: 'variation',
+  });
+  items.value = result;
 }, { immediate: true });
 </script>
 ```
@@ -179,6 +152,8 @@ watch(() => props.block.querystring, async () => {
 <!-- file: examples/svelte/ListingBlock.svelte -->
 ```svelte
 <script>
+  import BlockRenderer from './BlockRenderer.svelte';
+
   export let block;
   export let blockId;
 
@@ -187,24 +162,19 @@ watch(() => props.block.querystring, async () => {
   $: block.querystring, loadItems();
 
   async function loadItems() {
-    const result = await expandListingBlocks(
-      { [blockId]: block },
-      [blockId],
-      blockId,
-    );
-    items = result.items;
+    const fetchItems = ploneFetchItems({ apiUrl: API_URL });
+    const result = await expandListingBlocks([blockId], {
+      blocks: { [blockId]: block },
+      fetchItems: { listing: fetchItems },
+      itemTypeField: 'variation',
+    });
+    items = result;
   }
 </script>
 
 <div data-block-uid={blockId} class="listing-block">
-  {#each items as item (item['@uid'])}
-    <div data-block-uid={item['@uid']} class="listing-item">
-      {#if block.variation === 'summary' && item.image}
-        <img src={item.image} alt="" />
-      {/if}
-      <h3><a href={item.href}>{item.title}</a></h3>
-      <p>{item.description}</p>
-    </div>
+  {#each items as item, i (i)}
+    <BlockRenderer block={item} />
   {/each}
 </div>
 ```

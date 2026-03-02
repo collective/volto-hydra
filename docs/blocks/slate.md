@@ -6,22 +6,7 @@ This is a **built-in** block — no schema registration is needed. It's availabl
 
 ## Schema
 
-The slate block schema is registered internally by Hydra. If you wanted to reproduce it as a custom block, the schema would look like:
-
-```js
-{
-  blockSchema: {
-    properties: {
-      value: {
-        title: 'Body',
-        widget: 'slate',
-      },
-    },
-  },
-}
-```
-
-The `widget: 'slate'` field stores content as a Slate JSON tree (not HTML).
+No block config needed — Slate is a built-in Volto block.
 
 ## JSON Block Data
 

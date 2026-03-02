@@ -6,27 +6,7 @@ This is a **built-in** block.
 
 ## Schema
 
-```js
-{
-  blockSchema: {
-    properties: {
-      styles: {
-        title: 'Styles',
-        schema: {
-          properties: {
-            align: {
-              title: 'Alignment',
-              type: 'string',
-              default: 'full',
-              choices: [['full', 'Full'], ['left', 'Left'], ['center', 'Center'], ['right', 'Right']],
-            },
-          },
-        },
-      },
-    },
-  },
-}
-```
+No block config needed — Separator is a built-in Volto block.
 
 ## JSON Block Data
 

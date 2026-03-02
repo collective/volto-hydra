@@ -68,7 +68,7 @@
           "@id": "ref-grid-schema-javascript-af1095",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  blockSchema: {\n    properties: {\n      blocks: {\n        title: 'Blocks',\n        type: 'object',\n      },\n      blocks_layout: {\n        title: 'Layout',\n        type: 'object',\n      },\n    },\n  },\n}"
+          "code": "blocks: {\n  columns: {\n    blockSchema: {\n      properties: {\n        title:      { title: 'Title' },\n        top_images: { title: 'Top Images', widget: 'blocks_layout', allowedBlocks: ['image'] },\n        columns:    { title: 'Columns', widget: 'blocks_layout', allowedBlocks: ['column'], maxLength: 4 },\n      },\n    },\n  },\n  column: {\n    blockSchema: {\n      properties: {\n        title:         { title: 'Title' },\n        blocks_layout: { title: 'Content', widget: 'blocks_layout', allowedBlocks: ['slate', 'image'], defaultBlockType: 'slate' },\n      },\n    },\n  },\n}"
         }
       ]
     },

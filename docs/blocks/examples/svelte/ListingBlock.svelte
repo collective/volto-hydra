@@ -1,4 +1,6 @@
 <script>
+  import BlockRenderer from './BlockRenderer.svelte';
+
   export let block;
   export let blockId;
 
@@ -7,23 +9,18 @@
   $: block.querystring, loadItems();
 
   async function loadItems() {
-    const result = await expandListingBlocks(
-      { [blockId]: block },
-      [blockId],
-      blockId,
-    );
-    items = result.items;
+    const fetchItems = ploneFetchItems({ apiUrl: API_URL });
+    const result = await expandListingBlocks([blockId], {
+      blocks: { [blockId]: block },
+      fetchItems: { listing: fetchItems },
+      itemTypeField: 'variation',
+    });
+    items = result;
   }
 </script>
 
 <div data-block-uid={blockId} class="listing-block">
-  {#each items as item (item['@uid'])}
-    <div data-block-uid={item['@uid']} class="listing-item">
-      {#if block.variation === 'summary' && item.image}
-        <img src={item.image} alt="" />
-      {/if}
-      <h3><a href={item.href}>{item.title}</a></h3>
-      <p>{item.description}</p>
-    </div>
+  {#each items as item, i (i)}
+    <BlockRenderer block={item} />
   {/each}
 </div>

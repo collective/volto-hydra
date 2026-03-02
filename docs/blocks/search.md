@@ -6,33 +6,7 @@ This is a **built-in** block. The facet types are custom sub-blocks.
 
 ## Schema
 
-The search block combines a listing container with typed facets:
-
-```js
-// Search block (built-in, enhanced by Hydra)
-{
-  schemaEnhancer: ({ schema }) => {
-    // Listing container — holds one listing block for results
-    schema.properties.listing = {
-      title: 'Results Listing',
-      widget: 'blocks_layout',
-      allowedBlocks: ['listing', 'default', 'summary', 'teaser', 'image'],
-      maxLength: 1,
-      defaultBlockType: 'listing',
-    };
-
-    // Facets — typed object_list, each facet has its own schema
-    schema.properties.facets = {
-      title: 'Facets',
-      widget: 'object_list',
-      typeField: 'type',
-      allowedBlocks: ['checkboxFacet', 'selectFacet', 'daterangeFacet', 'toggleFacet'],
-    };
-
-    return schema;
-  },
-}
-```
+No block config needed — Search is a built-in Volto block.
 
 ### Facet Type Schemas
 

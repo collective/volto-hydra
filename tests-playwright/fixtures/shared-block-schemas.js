@@ -308,6 +308,47 @@ export const sharedBlocksConfig = {
     // allowedBlocks on config controls what children can be added
     // blocksField: 'blocks_layout' tells inheritSchemaFrom to derive choices from it
     // When variation is set, BlockChooser only shows that type
+    // Listing block: schema inheritance for item types (summary, default, teaser)
+    // filterConvertibleFrom: '@default' means only show types whose fieldMappings
+    // include @default as a source (i.e., can convert from catalog brain fields)
+    listing: {
+        schemaEnhancer: {
+            inheritSchemaFrom: {
+                typeField: 'variation',
+                mappingField: 'fieldMapping',
+                defaultsField: 'itemDefaults',
+                filterConvertibleFrom: '@default',
+                title: 'Item Type',
+                default: 'summary',
+            },
+        },
+    },
+    // Listing item types — rendered by BlockRenderer for each expanded listing result
+    summary: {
+        fieldMappings: {
+            '@default': { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'image' },
+        },
+        blockSchema: {
+            properties: {
+                href:        { title: 'Link', widget: 'url' },
+                title:       { title: 'Title' },
+                description: { title: 'Description', widget: 'textarea' },
+                image:       { title: 'Image', widget: 'url' },
+            },
+        },
+    },
+    default: {
+        fieldMappings: {
+            '@default': { '@id': 'href', 'title': 'title', 'description': 'description' },
+        },
+        blockSchema: {
+            properties: {
+                href:        { title: 'Link', widget: 'url' },
+                title:       { title: 'Title' },
+                description: { title: 'Description', widget: 'textarea' },
+            },
+        },
+    },
     gridBlock: {
         allowedBlocks: ['teaser', 'image'],
         schemaEnhancer: {

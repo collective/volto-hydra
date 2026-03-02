@@ -6,19 +6,22 @@ This is a **built-in** block.
 
 ## Schema
 
-The grid block uses `blocks` + `blocks_layout` as a flat container. Child blocks are stored in `blocks` and their order is defined by `blocks_layout.items`.
-
 ```js
-{
-  blockSchema: {
-    properties: {
-      blocks: {
-        title: 'Blocks',
-        type: 'object',
+blocks: {
+  columns: {
+    blockSchema: {
+      properties: {
+        title:      { title: 'Title' },
+        top_images: { title: 'Top Images', widget: 'blocks_layout', allowedBlocks: ['image'] },
+        columns:    { title: 'Columns', widget: 'blocks_layout', allowedBlocks: ['column'], maxLength: 4 },
       },
-      blocks_layout: {
-        title: 'Layout',
-        type: 'object',
+    },
+  },
+  column: {
+    blockSchema: {
+      properties: {
+        title:         { title: 'Title' },
+        blocks_layout: { title: 'Content', widget: 'blocks_layout', allowedBlocks: ['slate', 'image'], defaultBlockType: 'slate' },
       },
     },
   },

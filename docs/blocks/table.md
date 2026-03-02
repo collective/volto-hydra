@@ -6,41 +6,7 @@ This is a **built-in** block (registered as `slateTable`).
 
 ## Schema
 
-```js
-{
-  blockSchema: {
-    properties: {
-      rows: {
-        widget: 'object_list',
-        idField: 'key',
-        dataPath: ['table', 'rows'],  // data lives at block.table.rows
-        schema: {
-          properties: {
-            cells: {
-              widget: 'object_list',
-              idField: 'key',
-              schema: {
-                properties: {
-                  value: {
-                    title: 'Content',
-                    widget: 'slate',
-                    default: [{ type: 'p', children: [{ text: '' }] }],
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  },
-}
-```
-
-Key points:
-- `dataPath: ['table', 'rows']` tells Hydra the data lives at `block.table.rows` (not `block.rows`)
-- Each row has a `key` (used as its ID) and an array of `cells`
-- Each cell has a `key` and a `value` which is a Slate JSON tree
+No block config needed — Slate Table is a built-in Volto block.
 
 ## JSON Block Data
 

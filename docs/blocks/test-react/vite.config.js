@@ -63,9 +63,19 @@ function reactExamplesPlugin() {
         }
       }
 
-      // Add expandListingBlocks reference for listing/search blocks
+      // Add hydra.js helpers for listing/search blocks.
+      // Use arrow wrappers so these resolve at call time, not at module-import time
+      // (main.jsx sets window globals after the App import chain has been evaluated).
       if (code.includes('expandListingBlocks')) {
-        imports += `const expandListingBlocks = window._expandListingBlocks;\n`;
+        imports += `const expandListingBlocks = (...a) => window._expandListingBlocks(...a);\n`;
+      }
+      if (code.includes('ploneFetchItems')) {
+        imports += `const ploneFetchItems = (...a) => window._ploneFetchItems(...a);\n`;
+      }
+      if (code.includes('API_URL')) {
+        imports += `const _getApiUrl = () => window._API_URL;\n`;
+        // Replace bare API_URL references with _getApiUrl() calls
+        code = code.replace(/\bAPI_URL\b/g, '_getApiUrl()');
       }
 
       // Find all top-level function declarations and export the first as default

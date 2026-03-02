@@ -6,33 +6,13 @@ This is a **built-in** block.
 
 ## Schema
 
-The teaser block uses Volto's built-in TeaserSchema. It has an `href` field (object browser) that selects the target content, and an `overwrite` toggle that controls whether block-level title/description/image override the target page's values.
-
 ```js
-{
-  blockSchema: {
-    properties: {
-      href: {
-        title: 'Target',
-        widget: 'object_browser',
-        mode: 'link',
-      },
-      title: {
-        title: 'Title',
-        type: 'string',
-      },
-      description: {
-        title: 'Description',
-        type: 'string',
-      },
-      preview_image: {
-        title: 'Image',
-        widget: 'image',
-      },
-      overwrite: {
-        title: 'Overwrite',
-        type: 'boolean',
-        description: 'Override target content values with custom ones',
+blocks: {
+  teaser: {
+    schemaEnhancer: {
+      childBlockConfig: {
+        defaultsField: 'itemDefaults',
+        editableFields: ['href', 'title', 'description', 'preview_image', 'overwrite'],
       },
     },
   },

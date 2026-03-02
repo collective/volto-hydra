@@ -7,35 +7,49 @@ This is a **custom** block — register it via `initBridge`.
 ## Schema
 
 ```js
-slider: {
-  id: 'slider',
-  title: 'Slider',
-  group: 'common',
-  blockSchema: {
-    properties: {
-      slides: {
-        title: 'Slides',
-        widget: 'object_list',
-        schema: {
-          title: 'Slide',
-          properties: {
-            head_title:    { title: 'Kicker', type: 'string' },
-            title:         { title: 'Title', type: 'string' },
-            description:   { title: 'Description', type: 'string', widget: 'textarea' },
-            preview_image: { title: 'Image', widget: 'object_browser', mode: 'image', allowExternals: true },
-            buttonText:    { title: 'Button Text', type: 'string' },
-          },
+blocks: {
+  slider: {
+    schemaEnhancer: {
+      inheritSchemaFrom: {
+        typeField: 'variation',
+        defaultsField: 'itemDefaults',
+        blocksField: 'slides',
+        title: 'Item Type',
+      },
+    },
+    blockSchema: {
+      properties: {
+        slides: {
+          title: 'Slides',
+          widget: 'object_list',
+          allowedBlocks: ['slide', 'image', 'listing', 'teaser'],
+          typeField: '@type',
+          defaultBlockType: 'slide',
         },
+        autoplayEnabled: { title: 'Autoplay Enabled', type: 'boolean', default: false },
+        autoplayDelay:   { title: 'Autoplay Delay', type: 'integer', default: 4000 },
+        autoplayJump:    { title: 'Autoplay Jump', type: 'boolean', default: false },
       },
-      autoplayEnabled: {
-        title: 'Autoplay',
-        type: 'boolean',
-        default: false,
+    },
+  },
+  slide: {
+    fieldMappings: {
+      '@default': { '@id': 'href', title: 'title', description: 'description', image: 'preview_image' },
+    },
+    schemaEnhancer: {
+      childBlockConfig: {
+        defaultsField: 'itemDefaults',
+        editableFields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'],
       },
-      autoplayDelay: {
-        title: 'Autoplay Delay (ms)',
-        type: 'integer',
-        default: 4000,
+    },
+    blockSchema: {
+      properties: {
+        head_title:    { title: 'Kicker' },
+        title:         { title: 'Title' },
+        description:   { title: 'Description', widget: 'textarea' },
+        preview_image: { title: 'Image Override', widget: 'object_browser', mode: 'image', allowExternals: true },
+        buttonText:    { title: 'Button Text' },
+        hideButton:    { title: 'Hide Button', type: 'boolean' },
       },
     },
   },

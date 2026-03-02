@@ -7,40 +7,20 @@ This is a **custom** block — register it via `initBridge`.
 ## Schema
 
 ```js
-hero: {
-  id: 'hero',
-  title: 'Hero',
-  group: 'common',
-  blockSchema: {
-    properties: {
-      heading: {
-        title: 'Heading',
-        type: 'string',
+blocks: {
+  hero: {
+    blockSchema: {
+      properties: {
+        heading:     { title: 'Heading' },
+        subheading:  { title: 'Subheading', widget: 'textarea' },
+        buttonText:  { title: 'Button Text' },
+        buttonLink:  { title: 'Button Link', widget: 'object_browser', mode: 'link', allowExternals: true },
+        image:       { title: 'Image', widget: 'image' },
+        description: { title: 'Description', widget: 'slate' },
       },
-      subheading: {
-        title: 'Subheading',
-        type: 'string',
-        widget: 'textarea',
-      },
-      buttonText: {
-        title: 'Button Text',
-        type: 'string',
-      },
-      buttonLink: {
-        title: 'Button Link',
-        widget: 'object_browser',
-        mode: 'link',
-        allowExternals: true,
-      },
-      image: {
-        title: 'Image',
-        widget: 'image',
-      },
-      description: {
-        title: 'Description',
-        type: 'array',
-        widget: 'slate',
-      },
+    },
+    fieldMappings: {
+      '@default': { title: 'heading', description: 'subheading', '@id': 'buttonLink', image: 'image' },
     },
   },
 }

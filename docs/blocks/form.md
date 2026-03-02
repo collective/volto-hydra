@@ -7,31 +7,37 @@ This is a **custom** block — register it via `initBridge`.
 ## Schema
 
 ```js
-form: {
-  id: 'form',
-  title: 'Form',
-  group: 'common',
-  blockSchema: {
-    properties: {
-      title:           { title: 'Title', type: 'string' },
-      description:     { title: 'Description', type: 'textarea' },
-      subblocks: {
-        title: 'Fields',
-        widget: 'object_list',
-        idField: 'field_id',
-        typeField: 'field_type',
-        allowedBlocks: [
-          'text', 'textarea', 'number', 'select',
-          'single_choice', 'multiple_choice', 'checkbox',
-          'date', 'from', 'static_text', 'hidden', 'attachment',
-        ],
+blocks: {
+  form: {
+    blockSchema: {
+      fieldsets: [
+        { id: 'default', title: 'Default', fields: ['title', 'description', 'subblocks', 'default_to', 'default_from', 'default_subject', 'submit_label', 'show_cancel', 'cancel_label', 'mail_header', 'mail_footer', 'captcha', 'email_otp_verification'] },
+        { id: 'manage_data', title: 'Manage data', fields: ['store', 'remove_data_after_days', 'send', 'send_message'] },
+      ],
+      properties: {
+        title:       { title: 'Title' },
+        description: { title: 'Description', widget: 'textarea' },
+        subblocks: {
+          title: 'Fields',
+          widget: 'object_list',
+          idField: 'field_id',
+          typeField: 'field_type',
+          allowedBlocks: ['text', 'textarea', 'number', 'select', 'single_choice', 'multiple_choice', 'checkbox', 'date', 'from', 'static_text', 'hidden', 'attachment'],
+        },
+        default_to:      { title: 'Recipients' },
+        default_from:    { title: 'Default sender' },
+        default_subject: { title: 'Mail subject' },
+        submit_label:    { title: 'Submit button label' },
+        show_cancel:     { title: 'Show cancel button', type: 'boolean' },
+        cancel_label:    { title: 'Cancel button label' },
+        captcha:         { title: 'Captcha provider' },
       },
-      default_to:      { title: 'Recipients', type: 'string' },
-      default_from:    { title: 'Default sender', type: 'string' },
-      default_subject: { title: 'Mail subject', type: 'string' },
-      submit_label:    { title: 'Submit button label', type: 'string' },
     },
-    required: ['default_to', 'default_from', 'default_subject'],
+    schemaEnhancer: {
+      skiplogic: {
+        cancel_label: { field: 'show_cancel', is: true },
+      },
+    },
   },
 }
 ```
@@ -281,7 +287,7 @@ defineProps({ block: Object });
     <p>{block.description}</p>
   {/if}
 
-  {#each block.subblocks || [] as field (field['@id'])}
+  {#each block.subblocks || [] as field (field.field_id || field.id)}
     <div class="form-field">
       {#if field.field_type === 'text'}
         <label>{field.label} <input type="text" required={field.required} /></label>

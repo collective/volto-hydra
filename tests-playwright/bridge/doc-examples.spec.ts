@@ -12,25 +12,17 @@
  */
 import { test as base, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import { getFrontendUrl } from './fixtures';
 import * as fs from 'fs';
 import * as path from 'path';
-
-/**
- * Get frontend URL based on project name from Playwright config.
- */
-function getFrontendUrl(projectName: string): string {
-  if (projectName.includes('react')) return 'http://localhost:3004';
-  if (projectName.includes('svelte')) return 'http://localhost:3005';
-  if (projectName.includes('vue')) return 'http://localhost:3006';
-  throw new Error(`Unknown frontend project: ${projectName}`);
-}
 
 const test = base.extend<{ helper: AdminUIHelper }>({
   helper: async ({ page }, use, testInfo) => {
     const helper = new AdminUIHelper(page);
     const frontendUrl = getFrontendUrl(testInfo.project.name);
+    const frontend = frontendUrl ? `&frontend=${encodeURIComponent(frontendUrl)}` : '';
     await page.goto(
-      `http://localhost:8888/mock-parent.html?content=examples&frontend=${encodeURIComponent(frontendUrl)}`,
+      `http://localhost:8888/mock-parent.html?content=examples${frontend}`,
     );
     await helper.waitForIframeReady();
     await use(helper);
@@ -85,6 +77,7 @@ const examples = [
     type: 'listing',
     blockId: 'ex-listing',
     expectedText: null,
+    isListing: true,
   },
   {
     type: 'search',
@@ -137,6 +130,18 @@ test.describe('Doc example blocks', () => {
   for (const example of examples) {
     test(`${example.type} block renders`, async ({ helper }) => {
       const iframe = helper.getIframe();
+
+      // Listing blocks: expandListingBlocks sets @uid=parentId on all items,
+      // so multiple elements share the same data-block-uid. Use .first() for
+      // the container and verify child items rendered.
+      if (example.isListing) {
+        const block = iframe.locator(`[data-block-uid="${example.blockId}"]`).first();
+        await expect(block).toBeVisible({ timeout: 15000 });
+        // Verify at least one listing item rendered (summary or default variation)
+        const items = iframe.locator(`[data-block-uid="${example.blockId}"].listing-item`);
+        await expect(items.first()).toBeVisible({ timeout: 15000 });
+        return;
+      }
 
       // Wait for block to render in iframe
       const block = iframe.locator(`[data-block-uid="${example.blockId}"]`);
@@ -240,6 +245,7 @@ docBlockTest.describe('Doc page blocks render', () => {
   for (const docBlock of docBlocks) {
     docBlockTest(`${docBlock.name} (${docBlock.blockType}) renders`, async ({ page, helper }, testInfo) => {
       const frontendUrl = getFrontendUrl(testInfo.project.name);
+      const frontend = frontendUrl ? `&frontend=${encodeURIComponent(frontendUrl)}` : '';
 
       // Build minimal content with just this one block
       const contentData = {
@@ -262,14 +268,17 @@ docBlockTest.describe('Doc page blocks render', () => {
       });
 
       await page.goto(
-        `http://localhost:8888/mock-parent.html?content=docblock&frontend=${encodeURIComponent(frontendUrl)}`,
+        `http://localhost:8888/mock-parent.html?content=docblock${frontend}`,
       );
       await helper.waitForIframeReady();
 
       const iframe = helper.getIframe();
 
-      // Wait for the block to render
-      const block = iframe.locator(`[data-block-uid="${docBlock.blockId}"]`);
+      // Listing blocks: expandListingBlocks sets @uid=parentId on all items,
+      // so multiple elements share the same data-block-uid. Use .first().
+      const isListing = docBlock.blockType === 'listing';
+      const blockLocator = iframe.locator(`[data-block-uid="${docBlock.blockId}"]`);
+      const block = isListing ? blockLocator.first() : blockLocator;
       await expect(block).toBeVisible({ timeout: 15000 });
 
       // Verify no "Unknown block" error for this block

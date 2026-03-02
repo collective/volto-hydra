@@ -6,24 +6,7 @@ This is a **built-in** block.
 
 ## Schema
 
-```js
-{
-  blockSchema: {
-    properties: {
-      heading: {
-        title: 'Heading',
-        type: 'string',
-      },
-      tag: {
-        title: 'Tag',
-        type: 'string',
-        default: 'h2',
-        choices: [['h1','h1'], ['h2','h2'], ['h3','h3'], ['h4','h4'], ['h5','h5'], ['h6','h6']],
-      },
-    },
-  },
-}
-```
+No block config needed — Heading is a built-in Volto block.
 
 ## JSON Block Data
 

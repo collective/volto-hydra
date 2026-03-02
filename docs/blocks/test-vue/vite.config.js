@@ -10,6 +10,7 @@ const COMPONENT_IMPORTS = {
   SlateNode:         './SlateNode.vue',
   BlockRenderer:     './BlockRenderer.vue',
   ColumnBlock:       './ColumnBlock.vue',
+  ListingBlock:      './ListingBlock.vue',
 };
 
 /**
@@ -41,9 +42,18 @@ function vueExamplesPlugin() {
         }
       }
 
-      // Check for expandListingBlocks global reference
+      // Check for hydra.js global references.
+      // Use arrow wrappers so these resolve at call time, not at module-import time.
       if (code.includes('expandListingBlocks') && !code.includes('expandListingBlocks =')) {
-        neededImports.push(`const expandListingBlocks = window.expandListingBlocks;`);
+        neededImports.push(`const expandListingBlocks = (...a) => window.expandListingBlocks(...a);`);
+      }
+      if (code.includes('ploneFetchItems') && !code.includes('ploneFetchItems =')) {
+        neededImports.push(`const ploneFetchItems = (...a) => window.ploneFetchItems(...a);`);
+      }
+      if (code.includes('API_URL') && !code.includes('API_URL =')) {
+        neededImports.push(`const _getApiUrl = () => window._API_URL;`);
+        // Rewrite bare API_URL references to _getApiUrl() calls
+        code = code.replace(/\bAPI_URL\b/g, '_getApiUrl()');
       }
 
       if (neededImports.length === 0) return;

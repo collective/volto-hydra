@@ -26,6 +26,19 @@ import { h } from 'vue';
 
 defineProps({ block: Object, blockId: String });
 
+const ListingItemBlock = {
+  props: ['block'],
+  render() {
+    const b = this.block;
+    const imgSrc = b.image ? (typeof b.image === 'string' ? b.image : b.image['@id']) : null;
+    return h('div', { 'data-block-uid': b['@uid'], class: 'listing-item' }, [
+      imgSrc ? h('img', { src: imgSrc, alt: '' }) : null,
+      h('h4', null, [h('a', { href: b.href }, b.title)]),
+      b.description ? h('p', null, b.description) : null,
+    ]);
+  },
+};
+
 const typeMap = {
   slate: SlateBlock,
   introduction: IntroductionBlock,
@@ -46,6 +59,8 @@ const typeMap = {
   highlight: HighlightBlock,
   video: VideoBlock,
   toc: TocBlock,
+  summary: ListingItemBlock,
+  default: ListingItemBlock,
 };
 
 function componentFor(type) {
