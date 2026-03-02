@@ -1,26 +1,31 @@
 # Introduction Block
 
-A styled lead paragraph that introduces a page. Uses the same Slate rich text format as the slate block but is rendered with distinct styling to visually set it apart from body text.
+Displays the page's title and description as a styled header. The introduction block has no content of its own — it reads `title` and `description` from the page metadata.
 
 This is a **built-in** block.
 
 ## Schema
 
-No block config needed — Introduction is a built-in Volto block.
+```json
+{
+  "introduction": {
+    "blockSchema": {
+      "properties": {}
+    }
+  }
+}
+```
+
 
 ## JSON Block Data
 
 ```json
 {
-  "@type": "introduction",
-  "value": [
-    {
-      "type": "p",
-      "children": [{ "text": "This page explains how Hydra bridges your frontend with the Plone editor." }]
-    }
-  ]
+  "@type": "introduction"
 }
 ```
+
+The block itself has no content fields. The renderer should display the page's `title` and `description`.
 
 ## Rendering
 
@@ -28,12 +33,11 @@ No block config needed — Introduction is a built-in Volto block.
 
 <!-- file: examples/react/IntroductionBlock.jsx -->
 ```jsx
-function IntroductionBlock({ block }) {
+function IntroductionBlock({ block, content }) {
   return (
-    <div data-block-uid={block['@uid']} className="introduction-block" data-edit-text="value">
-      {(block.value || []).map((node, i) => (
-        <SlateNode key={i} node={node} />
-      ))}
+    <div data-block-uid={block['@uid']} className="introduction-block">
+      <h1 data-edit-text="/title">{content.title}</h1>
+      {content.description && <p data-edit-text="/description" className="description">{content.description}</p>}
     </div>
   );
 }
@@ -44,13 +48,14 @@ function IntroductionBlock({ block }) {
 <!-- file: examples/vue/IntroductionBlock.vue -->
 ```vue
 <template>
-  <div :data-block-uid="block['@uid']" class="introduction-block" data-edit-text="value">
-    <SlateNode v-for="(node, i) in block.value || []" :key="i" :node="node" />
+  <div :data-block-uid="block['@uid']" class="introduction-block">
+    <h1 data-edit-text="/title">{{ content.title }}</h1>
+    <p v-if="content.description" data-edit-text="/description" class="description">{{ content.description }}</p>
   </div>
 </template>
 
 <script setup>
-defineProps({ block: Object });
+defineProps({ block: Object, content: Object });
 </script>
 ```
 
@@ -59,19 +64,12 @@ defineProps({ block: Object });
 <!-- file: examples/svelte/IntroductionBlock.svelte -->
 ```svelte
 <script>
-  import SlateNode from './SlateNode.svelte';
   export let block;
+  export let content;
 </script>
 
-<div data-block-uid={block['@uid']} class="introduction-block" data-edit-text="value">
-  {#each block.value || [] as node, i (i)}
-    <SlateNode {node} />
-  {/each}
+<div data-block-uid={block['@uid']} class="introduction-block">
+  <h1 data-edit-text="/title">{content.title}</h1>
+  {#if content.description}<p data-edit-text="/description" class="description">{content.description}</p>{/if}
 </div>
 ```
-
-### Data Attributes
-
-| Attribute | Purpose |
-|-----------|---------|
-| `data-edit-text="value"` | Makes the rich text content inline-editable |

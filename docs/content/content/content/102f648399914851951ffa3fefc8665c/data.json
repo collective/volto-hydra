@@ -5203,7 +5203,7 @@
           "@id": "ref-table-schema-javascript-237d52",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  blockSchema: {\n    properties: {\n      rows: {\n        widget: 'object_list',\n        idField: 'key',\n        dataPath: ['table', 'rows'],  // data lives at block.table.rows\n        schema: {\n          properties: {\n            cells: {\n              widget: 'object_list',\n              idField: 'key',\n              schema: {\n                properties: {\n                  value: {\n                    title: 'Content',\n                    widget: 'slate',\n                    default: [{ type: 'p', children: [{ text: '' }] }],\n                  },\n                },\n              },\n            },\n          },\n        },\n      },\n    },\n  },\n}"
+          "code": "{\n  \"slateTable\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"table\": {\n          \"title\": \"Table\"\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },
@@ -5217,7 +5217,7 @@
           "@id": "ref-table-json-data-json-472dd4",
           "label": "JSON Block Data",
           "language": "json",
-          "code": "{\n  \"@type\": \"slateTable\",\n  \"table\": {\n    \"rows\": [\n      {\n        \"key\": \"row-1\",\n        \"cells\": [\n          {\n            \"key\": \"cell-1\",\n            \"value\": [{ \"type\": \"p\", \"children\": [{ \"text\": \"Name\" }] }]\n          },\n          {\n            \"key\": \"cell-2\",\n            \"value\": [{ \"type\": \"p\", \"children\": [{ \"text\": \"Role\" }] }]\n          }\n        ]\n      },\n      {\n        \"key\": \"row-2\",\n        \"cells\": [\n          {\n            \"key\": \"cell-3\",\n            \"value\": [{ \"type\": \"p\", \"children\": [{ \"text\": \"Alice\" }] }]\n          },\n          {\n            \"key\": \"cell-4\",\n            \"value\": [{ \"type\": \"p\", \"children\": [{ \"text\": \"Engineer\" }] }]\n          }\n        ]\n      }\n    ]\n  }\n}"
+          "code": "{\n  \"@type\": \"slateTable\",\n  \"table\": {\n    \"rows\": [\n      {\n        \"key\": \"row-1\",\n        \"cells\": [\n          {\n            \"key\": \"cell-1\",\n            \"value\": [\n              {\n                \"type\": \"p\",\n                \"children\": [\n                  {\n                    \"text\": \"Name\"\n                  }\n                ]\n              }\n            ]\n          },\n          {\n            \"key\": \"cell-2\",\n            \"value\": [\n              {\n                \"type\": \"p\",\n                \"children\": [\n                  {\n                    \"text\": \"Role\"\n                  }\n                ]\n              }\n            ]\n          }\n        ]\n      },\n      {\n        \"key\": \"row-2\",\n        \"cells\": [\n          {\n            \"key\": \"cell-3\",\n            \"value\": [\n              {\n                \"type\": \"p\",\n                \"children\": [\n                  {\n                    \"text\": \"Alice\"\n                  }\n                ]\n              }\n            ]\n          },\n          {\n            \"key\": \"cell-4\",\n            \"value\": [\n              {\n                \"type\": \"p\",\n                \"children\": [\n                  {\n                    \"text\": \"Engineer\"\n                  }\n                ]\n              }\n            ]\n          }\n        ]\n      }\n    ]\n  }\n}"
         }
       ]
     },

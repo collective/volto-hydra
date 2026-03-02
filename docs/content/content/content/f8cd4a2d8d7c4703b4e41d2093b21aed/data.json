@@ -2275,7 +2275,7 @@
           "@id": "ref-accordion-schema-javascript-105cd5",
           "label": "Schema",
           "language": "javascript",
-          "code": "blocks: {\n  accordion: {\n    blockSchema: {\n      properties: {\n        panels: {\n          title: 'Panels',\n          widget: 'object_list',\n          schema: {\n            properties: {\n              title:         { title: 'Title' },\n              blocks_layout: { title: 'Content', widget: 'blocks_layout', allowedBlocks: ['slate', 'image'], defaultBlockType: 'slate' },\n            },\n          },\n        },\n      },\n    },\n  },\n}"
+          "code": "{\n  \"accordion\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"panels\": {\n          \"title\": \"Panels\",\n          \"widget\": \"object_list\",\n          \"schema\": {\n            \"properties\": {\n              \"title\": {\n                \"title\": \"Title\"\n              },\n              \"blocks_layout\": {\n                \"title\": \"Content\",\n                \"widget\": \"blocks_layout\",\n                \"allowedBlocks\": [\n                  \"slate\",\n                  \"image\"\n                ],\n                \"defaultBlockType\": \"slate\"\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },
@@ -2289,7 +2289,7 @@
           "@id": "ref-accordion-json-data-json-f4f899",
           "label": "JSON Block Data",
           "language": "json",
-          "code": "{\n  \"@type\": \"accordion\",\n  \"panels\": [\n    {\n      \"@id\": \"panel-1\",\n      \"title\": \"Frequently Asked Questions\",\n      \"blocks\": {\n        \"text-1\": {\n          \"@type\": \"slate\",\n          \"value\": [{ \"type\": \"p\", \"children\": [{ \"text\": \"Here are the answers.\" }] }]\n        }\n      },\n      \"blocks_layout\": { \"items\": [\"text-1\"] }\n    },\n    {\n      \"@id\": \"panel-2\",\n      \"title\": \"Contact Us\",\n      \"blocks\": {\n        \"text-2\": {\n          \"@type\": \"slate\",\n          \"value\": [{ \"type\": \"p\", \"children\": [{ \"text\": \"Email us at hello@example.com\" }] }]\n        }\n      },\n      \"blocks_layout\": { \"items\": [\"text-2\"] }\n    }\n  ]\n}"
+          "code": "{\n  \"@type\": \"accordion\",\n  \"panels\": [\n    {\n      \"@id\": \"panel-1\",\n      \"title\": \"Frequently Asked Questions\",\n      \"blocks\": {\n        \"content-text-1\": {\n          \"@type\": \"slate\",\n          \"value\": [\n            {\n              \"type\": \"p\",\n              \"children\": [\n                {\n                  \"text\": \"Here are the answers to common questions.\"\n                }\n              ]\n            }\n          ]\n        }\n      },\n      \"blocks_layout\": {\n        \"items\": [\n          \"content-text-1\"\n        ]\n      }\n    }\n  ]\n}"
         }
       ]
     },

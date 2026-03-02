@@ -76,7 +76,7 @@ export default defineConfig({
     alias: {
       '$examples': path.resolve(__dirname, '../examples/vue'),
       '$hydra': path.resolve(__dirname, '../../../packages/hydra-js/hydra.js'),
-      '$schemas': path.resolve(__dirname, '../../../tests-playwright/fixtures/shared-block-schemas.js'),
+      '$schemas': path.resolve(__dirname, '../block-definitions.json'),
     },
   },
 });

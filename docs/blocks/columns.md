@@ -6,52 +6,115 @@ This is a **built-in** block.
 
 ## Schema
 
-```js
-blocks: {
-  columns: {
-    blockSchema: {
-      properties: {
-        title:      { title: 'Title' },
-        top_images: { title: 'Top Images', widget: 'blocks_layout', allowedBlocks: ['image'] },
-        columns:    { title: 'Columns', widget: 'blocks_layout', allowedBlocks: ['column'], maxLength: 4 },
-      },
-    },
+```json
+{
+  "columns": {
+    "blockSchema": {
+      "properties": {
+        "title": {
+          "title": "Title"
+        },
+        "top_images": {
+          "title": "Top Images",
+          "widget": "blocks_layout",
+          "allowedBlocks": [
+            "image"
+          ]
+        },
+        "columns": {
+          "title": "Columns",
+          "widget": "blocks_layout",
+          "allowedBlocks": [
+            "column"
+          ],
+          "maxLength": 4
+        }
+      }
+    }
   },
-  column: {
-    blockSchema: {
-      properties: {
-        title:         { title: 'Title' },
-        blocks_layout: { title: 'Content', widget: 'blocks_layout', allowedBlocks: ['slate', 'image'], defaultBlockType: 'slate' },
-      },
-    },
-  },
+  "column": {
+    "blockSchema": {
+      "properties": {
+        "title": {
+          "title": "Title"
+        },
+        "blocks_layout": {
+          "title": "Content",
+          "widget": "blocks_layout",
+          "allowedBlocks": [
+            "slate",
+            "image"
+          ],
+          "defaultBlockType": "slate"
+        }
+      }
+    }
+  }
 }
 ```
+
 
 ## JSON Block Data
 
 ```json
 {
-  "@type": "gridBlock",
-  "blocks": {
-    "cell-1": {
-      "@type": "teaser",
-      "title": "Getting Started",
-      "description": "Learn how to set up your first project",
-      "href": [{ "@id": "/getting-started" }]
-    },
-    "cell-2": {
-      "@type": "image",
-      "url": "/hero-image/@@images/image",
-      "alt": "Hero image"
-    },
-    "cell-3": {
-      "@type": "slate",
-      "value": [{ "type": "p", "children": [{ "text": "Additional content here." }] }]
+  "@type": "columns",
+  "title": "Our Services",
+  "columns": {
+    "items": [
+      "col-1",
+      "col-2"
+    ],
+    "blocks": {
+      "col-1": {
+        "@type": "column",
+        "title": "Design",
+        "blocks_layout": {
+          "items": [
+            "text-1"
+          ],
+          "blocks": {
+            "text-1": {
+              "@type": "slate",
+              "value": [
+                {
+                  "type": "p",
+                  "children": [
+                    {
+                      "text": "We craft beautiful interfaces."
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "col-2": {
+        "@type": "column",
+        "title": "Engineering",
+        "blocks_layout": {
+          "items": [
+            "text-2"
+          ],
+          "blocks": {
+            "text-2": {
+              "@type": "slate",
+              "value": [
+                {
+                  "type": "p",
+                  "children": [
+                    {
+                      "text": "We build robust systems."
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
     }
-  },
-  "blocks_layout": {
-    "items": ["cell-1", "cell-2", "cell-3"]
   }
 }
 ```

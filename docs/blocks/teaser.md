@@ -6,18 +6,49 @@ This is a **built-in** block.
 
 ## Schema
 
-```js
-blocks: {
-  teaser: {
-    schemaEnhancer: {
-      childBlockConfig: {
-        defaultsField: 'itemDefaults',
-        editableFields: ['href', 'title', 'description', 'preview_image', 'overwrite'],
-      },
+```json
+{
+  "teaser": {
+    "blockSchema": {
+      "properties": {
+        "href": {
+          "title": "Target",
+          "widget": "object_browser",
+          "mode": "link"
+        },
+        "title": {
+          "title": "Title"
+        },
+        "description": {
+          "title": "Description",
+          "widget": "textarea"
+        },
+        "preview_image": {
+          "title": "Preview Image",
+          "widget": "image"
+        },
+        "overwrite": {
+          "title": "Overwrite target content",
+          "type": "boolean"
+        }
+      }
     },
-  },
+    "schemaEnhancer": {
+      "childBlockConfig": {
+        "defaultsField": "itemDefaults",
+        "editableFields": [
+          "href",
+          "title",
+          "description",
+          "preview_image",
+          "overwrite"
+        ]
+      }
+    }
+  }
 }
 ```
+
 
 ## JSON Block Data
 
@@ -34,7 +65,7 @@ blocks: {
   ],
   "title": "Custom Title",
   "description": "Custom description overriding the target",
-  "preview_image": "/news/my-article/@@images/preview_image",
+  "preview_image": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2399bbdd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2718%27%3ETeaser%3C/text%3E%3C/svg%3E",
   "overwrite": true
 }
 ```

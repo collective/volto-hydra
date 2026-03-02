@@ -6,36 +6,49 @@ This is a **custom** block — register it via `initBridge`.
 
 ## Schema
 
-```js
-blocks: {
-  hero: {
-    blockSchema: {
-      properties: {
-        heading:     { title: 'Heading' },
-        subheading:  { title: 'Subheading', widget: 'textarea' },
-        buttonText:  { title: 'Button Text' },
-        buttonLink:  { title: 'Button Link', widget: 'object_browser', mode: 'link', allowExternals: true },
-        image:       { title: 'Image', widget: 'image' },
-        description: { title: 'Description', widget: 'slate' },
-      },
+```json
+{
+  "hero": {
+    "blockSchema": {
+      "properties": {
+        "heading": {
+          "title": "Heading"
+        },
+        "subheading": {
+          "title": "Subheading",
+          "widget": "textarea"
+        },
+        "buttonText": {
+          "title": "Button Text"
+        },
+        "buttonLink": {
+          "title": "Button Link",
+          "widget": "object_browser",
+          "mode": "link",
+          "allowExternals": true
+        },
+        "image": {
+          "title": "Image",
+          "widget": "image"
+        },
+        "description": {
+          "title": "Description",
+          "widget": "slate"
+        }
+      }
     },
-    fieldMappings: {
-      '@default': { title: 'heading', description: 'subheading', '@id': 'buttonLink', image: 'image' },
-    },
-  },
+    "fieldMappings": {
+      "@default": {
+        "title": "heading",
+        "description": "subheading",
+        "@id": "buttonLink",
+        "image": "image"
+      }
+    }
+  }
 }
 ```
 
-### Field Types Used
-
-| Field | Widget | Description |
-|-------|--------|-------------|
-| `heading` | `string` | Plain text, inline editable |
-| `subheading` | `textarea` | Multi-line plain text |
-| `buttonText` | `string` | Button label, inline editable |
-| `buttonLink` | `object_browser` | Content link or external URL |
-| `image` | `image` | Image picker (upload or browse) |
-| `description` | `slate` | Rich text (Slate JSON tree) |
 
 ## JSON Block Data
 
@@ -45,12 +58,20 @@ blocks: {
   "heading": "Welcome to Our Site",
   "subheading": "Discover amazing content\nacross multiple lines",
   "buttonText": "Get Started",
-  "buttonLink": [{ "@id": "/getting-started" }],
-  "image": "/hero-banner/@@images/image",
+  "buttonLink": [
+    {
+      "@id": "/getting-started"
+    }
+  ],
+  "image": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%234a90d9%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3EHero Image%3C/text%3E%3C/svg%3E",
   "description": [
     {
       "type": "p",
-      "children": [{ "text": "We build tools that make content editing delightful." }]
+      "children": [
+        {
+          "text": "We build tools that make content editing delightful."
+        }
+      ]
     }
   ]
 }

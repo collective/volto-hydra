@@ -272,7 +272,7 @@
           "@id": "ref-video-schema-javascript-104794",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  blockSchema: {\n    properties: {\n      url: {\n        title: 'Video URL',\n        type: 'string',\n        description: 'YouTube link or direct video file URL',\n      },\n    },\n  },\n}"
+          "code": "{\n  \"video\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"url\": {\n          \"title\": \"Video URL\"\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },

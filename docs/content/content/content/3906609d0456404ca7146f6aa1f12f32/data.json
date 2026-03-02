@@ -403,7 +403,7 @@
           "@id": "ref-toc-schema-javascript-496d15",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  blockSchema: {\n    properties: {},\n  },\n}"
+          "code": "{\n  \"toc\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"hide_title\": {\n          \"title\": \"Hide title\",\n          \"type\": \"boolean\"\n        },\n        \"ordered\": {\n          \"title\": \"Ordered\",\n          \"type\": \"boolean\"\n        },\n        \"levels\": {\n          \"title\": \"Entries\",\n          \"isMulti\": true,\n          \"choices\": [\n            [\n              \"h1\",\n              \"h1\"\n            ],\n            [\n              \"h2\",\n              \"h2\"\n            ],\n            [\n              \"h3\",\n              \"h3\"\n            ],\n            [\n              \"h4\",\n              \"h4\"\n            ],\n            [\n              \"h5\",\n              \"h5\"\n            ],\n            [\n              \"h6\",\n              \"h6\"\n            ]\n          ]\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },
@@ -417,7 +417,7 @@
           "@id": "ref-toc-json-data-json-aaa910",
           "label": "JSON Block Data",
           "language": "json",
-          "code": "{\n  \"@type\": \"toc\"\n}"
+          "code": "{\n  \"@type\": \"toc\",\n  \"title\": \"On this page\",\n  \"hide_title\": false,\n  \"ordered\": false,\n  \"levels\": [\n    \"h2\",\n    \"h3\"\n  ]\n}"
         }
       ]
     },
@@ -431,19 +431,19 @@
           "@id": "ref-toc-rendering-jsx-ee2124",
           "label": "React",
           "language": "jsx",
-          "code": "function TocBlock({ block }) {\n  // Table of Contents renders a placeholder.\n  // A real implementation scans sibling blocks for headings.\n  return (\n    <nav data-block-uid={block['@uid']} className=\"toc-block\">\n      <ul>\n        <li>Table of Contents (generated from page headings)</li>\n      </ul>\n    </nav>\n  );\n}"
+          "code": "function TocBlock({ block, content }) {\n  const entries = [];\n  if (content?.blocks && content?.blocks_layout?.items) {\n    for (const id of content.blocks_layout.items) {\n      const b = content.blocks[id];\n      if (!b) continue;\n      if (b['@type'] === 'heading' && b.heading) {\n        entries.push({ id, level: parseInt((b.tag || 'h2').slice(1)), text: b.heading });\n      } else if (b['@type'] === 'slate' && b.value?.[0]?.type?.match(/^h[1-6]$/)) {\n        const level = parseInt(b.value[0].type.slice(1));\n        const text = b.plaintext || b.value[0].children?.map(c => c.text).join('') || '';\n        if (text.trim()) entries.push({ id, level, text });\n      }\n    }\n  }\n\n  return (\n    <nav data-block-uid={block['@uid']} className=\"toc-block\">\n      {entries.length > 0 ? (\n        <ul>\n          {entries.map(e => (\n            <li key={e.id} style={{ marginLeft: `${(e.level - 2) * 1.5}em` }}>\n              <a href={`#${e.id}`}>{e.text}</a>\n            </li>\n          ))}\n        </ul>\n      ) : (\n        <p>Table of Contents</p>\n      )}\n    </nav>\n  );\n}"
         },
         {
           "@id": "ref-toc-rendering-vue-12aef2",
           "label": "Vue",
           "language": "vue",
-          "code": "<template>\n  <nav :data-block-uid=\"block['@uid']\" class=\"toc-block\">\n    <ul>\n      <li>Table of Contents (generated from page headings)</li>\n    </ul>\n  </nav>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"
+          "code": "<template>\n  <nav :data-block-uid=\"block['@uid']\" class=\"toc-block\">\n    <ul v-if=\"entries.length\">\n      <li v-for=\"e in entries\" :key=\"e.id\" :style=\"{ marginLeft: (e.level - 2) * 1.5 + 'em' }\">\n        <a :href=\"`#${e.id}`\">{{ e.text }}</a>\n      </li>\n    </ul>\n    <p v-else>Table of Contents</p>\n  </nav>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\n\nconst props = defineProps({ block: Object, content: Object });\n\nconst entries = computed(() => {\n  const result = [];\n  const c = props.content;\n  if (!c?.blocks || !c?.blocks_layout?.items) return result;\n  for (const id of c.blocks_layout.items) {\n    const b = c.blocks[id];\n    if (!b) continue;\n    if (b['@type'] === 'heading' && b.heading) {\n      result.push({ id, level: parseInt((b.tag || 'h2').slice(1)), text: b.heading });\n    } else if (b['@type'] === 'slate' && b.value?.[0]?.type?.match(/^h[1-6]$/)) {\n      const level = parseInt(b.value[0].type.slice(1));\n      const text = b.plaintext || b.value[0].children?.map(c => c.text).join('') || '';\n      if (text.trim()) result.push({ id, level, text });\n    }\n  }\n  return result;\n});\n</script>"
         },
         {
           "@id": "ref-toc-rendering-svelte-397c7f",
           "label": "Svelte",
           "language": "svelte",
-          "code": "<script>\n  export let block;\n</script>\n\n<nav data-block-uid={block['@uid']} class=\"toc-block\">\n  <ul>\n    <li>Table of Contents (generated from page headings)</li>\n  </ul>\n</nav>"
+          "code": "<script>\n  export let block;\n  export let content = {};\n\n  $: entries = (() => {\n    const result = [];\n    if (!content?.blocks || !content?.blocks_layout?.items) return result;\n    for (const id of content.blocks_layout.items) {\n      const b = content.blocks[id];\n      if (!b) continue;\n      if (b['@type'] === 'heading' && b.heading) {\n        result.push({ id, level: parseInt((b.tag || 'h2').slice(1)), text: b.heading });\n      } else if (b['@type'] === 'slate' && b.value?.[0]?.type?.match(/^h[1-6]$/)) {\n        const level = parseInt(b.value[0].type.slice(1));\n        const text = b.plaintext || b.value[0].children?.map(c => c.text).join('') || '';\n        if (text.trim()) result.push({ id, level, text });\n      }\n    }\n    return result;\n  })();\n</script>\n\n<nav data-block-uid={block['@uid']} class=\"toc-block\">\n  {#if entries.length > 0}\n    <ul>\n      {#each entries as e (e.id)}\n        <li style=\"margin-left: {(e.level - 2) * 1.5}em\">\n          <a href=\"#{e.id}\">{e.text}</a>\n        </li>\n      {/each}\n    </ul>\n  {:else}\n    <p>Table of Contents</p>\n  {/if}\n</nav>"
         }
       ]
     }

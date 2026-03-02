@@ -349,6 +349,27 @@ export const sharedBlocksConfig = {
             },
         },
     },
+    toc: {
+        id: 'toc',
+        title: 'Table of Contents',
+        blockSchema: {
+            title: 'Table of Contents',
+            fieldsets: [
+                { id: 'default', title: 'Default', fields: ['title', 'hide_title', 'ordered', 'levels'] },
+            ],
+            properties: {
+                title: { title: 'Title', type: 'string' },
+                hide_title: { title: 'Hide title', type: 'boolean' },
+                ordered: { title: 'Ordered', type: 'boolean' },
+                levels: {
+                    title: 'Entries',
+                    isMulti: true,
+                    choices: [['h1','h1'],['h2','h2'],['h3','h3'],['h4','h4'],['h5','h5'],['h6','h6']],
+                },
+            },
+            required: [],
+        },
+    },
     gridBlock: {
         allowedBlocks: ['teaser', 'image'],
         schemaEnhancer: {

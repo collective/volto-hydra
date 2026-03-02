@@ -6,62 +6,115 @@ This is a **built-in** block. The facet types are custom sub-blocks.
 
 ## Schema
 
-No block config needed — Search is a built-in Volto block.
-
-### Facet Type Schemas
-
-**`checkboxFacet`** — Multi-select filter:
-```js
+```json
 {
-  blockSchema: {
-    properties: {
-      title:    { title: 'Label', type: 'string' },
-      field:    { title: 'Field', widget: 'select_querystring_field' },
-      multiple: { title: 'Multiple choices?', type: 'boolean', default: false },
-      hidden:   { title: 'Hide facet?', type: 'boolean', default: false },
-    },
+  "search": {
+    "blockSchema": {
+      "properties": {
+        "facetsTitle": {
+          "title": "Facets Title"
+        },
+        "facets": {
+          "title": "Facets",
+          "widget": "object_list",
+          "typeField": "type",
+          "allowedBlocks": [
+            "checkboxFacet",
+            "selectFacet",
+            "daterangeFacet",
+            "toggleFacet"
+          ]
+        },
+        "listing": {
+          "title": "Listing",
+          "widget": "blocks_layout",
+          "allowedBlocks": [
+            "listing"
+          ]
+        }
+      }
+    }
   },
+  "checkboxFacet": {
+    "blockSchema": {
+      "properties": {
+        "title": {
+          "title": "Label"
+        },
+        "field": {
+          "title": "Field",
+          "widget": "select_querystring_field"
+        },
+        "multiple": {
+          "title": "Multiple choices?",
+          "type": "boolean",
+          "default": false
+        },
+        "hidden": {
+          "title": "Hide facet?",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "selectFacet": {
+    "blockSchema": {
+      "properties": {
+        "title": {
+          "title": "Label"
+        },
+        "field": {
+          "title": "Field",
+          "widget": "select_querystring_field"
+        },
+        "hidden": {
+          "title": "Hide facet?",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "daterangeFacet": {
+    "blockSchema": {
+      "properties": {
+        "title": {
+          "title": "Label"
+        },
+        "field": {
+          "title": "Field",
+          "widget": "select_querystring_field"
+        },
+        "hidden": {
+          "title": "Hide facet?",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "toggleFacet": {
+    "blockSchema": {
+      "properties": {
+        "title": {
+          "title": "Label"
+        },
+        "field": {
+          "title": "Field",
+          "widget": "select_querystring_field"
+        },
+        "hidden": {
+          "title": "Hide facet?",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
 }
 ```
 
-**`selectFacet`** — Dropdown filter:
-```js
-{
-  blockSchema: {
-    properties: {
-      title:  { title: 'Label', type: 'string' },
-      field:  { title: 'Field', widget: 'select_querystring_field' },
-      hidden: { title: 'Hide facet?', type: 'boolean', default: false },
-    },
-  },
-}
-```
-
-**`daterangeFacet`** — Date range filter:
-```js
-{
-  blockSchema: {
-    properties: {
-      title:  { title: 'Label', type: 'string' },
-      field:  { title: 'Field', widget: 'select_querystring_field' },
-      hidden: { title: 'Hide facet?', type: 'boolean', default: false },
-    },
-  },
-}
-```
-
-**`toggleFacet`** — Boolean toggle:
-```js
-{
-  blockSchema: {
-    properties: {
-      title:  { title: 'Label', type: 'string' },
-      field:  { title: 'Field', widget: 'select_querystring_field' },
-      hidden: { title: 'Hide facet?', type: 'boolean', default: false },
-    },
-  },
-}
-```
 
 ## JSON Block Data
 
@@ -87,7 +140,9 @@ No block config needed — Search is a built-in Volto block.
     }
   ],
   "listing": {
-    "items": ["listing-1"],
+    "items": [
+      "listing-1"
+    ],
     "blocks": {
       "listing-1": {
         "@type": "listing",
@@ -97,7 +152,10 @@ No block config needed — Search is a built-in Volto block.
             {
               "i": "portal_type",
               "o": "plone.app.querystring.operation.selection.any",
-              "v": ["Document", "News Item"]
+              "v": [
+                "Document",
+                "News Item"
+              ]
             }
           ]
         }

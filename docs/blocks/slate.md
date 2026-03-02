@@ -6,7 +6,21 @@ This is a **built-in** block — no schema registration is needed. It's availabl
 
 ## Schema
 
-No block config needed — Slate is a built-in Volto block.
+```json
+{
+  "slate": {
+    "blockSchema": {
+      "properties": {
+        "value": {
+          "title": "Text",
+          "widget": "slate"
+        }
+      }
+    }
+  }
+}
+```
+
 
 ## JSON Block Data
 
@@ -16,35 +30,83 @@ No block config needed — Slate is a built-in Volto block.
   "value": [
     {
       "type": "h2",
-      "children": [{ "text": "Welcome" }]
+      "children": [
+        {
+          "text": "Welcome"
+        }
+      ]
     },
     {
       "type": "p",
       "children": [
-        { "text": "This is " },
-        { "type": "strong", "children": [{ "text": "bold" }] },
-        { "text": " and " },
-        { "type": "em", "children": [{ "text": "italic" }] },
-        { "text": " text." }
+        {
+          "text": "This is "
+        },
+        {
+          "type": "strong",
+          "children": [
+            {
+              "text": "bold"
+            }
+          ]
+        },
+        {
+          "text": " and "
+        },
+        {
+          "type": "em",
+          "children": [
+            {
+              "text": "italic"
+            }
+          ]
+        },
+        {
+          "text": " text."
+        }
       ]
     },
     {
       "type": "ul",
       "children": [
-        { "type": "li", "children": [{ "text": "First item" }] },
-        { "type": "li", "children": [{ "text": "Second item" }] }
+        {
+          "type": "li",
+          "children": [
+            {
+              "text": "First item"
+            }
+          ]
+        },
+        {
+          "type": "li",
+          "children": [
+            {
+              "text": "Second item"
+            }
+          ]
+        }
       ]
     },
     {
       "type": "p",
       "children": [
-        { "text": "Visit " },
+        {
+          "text": "Visit "
+        },
         {
           "type": "link",
-          "data": { "url": "https://example.com" },
-          "children": [{ "text": "our site" }]
+          "data": {
+            "url": "https://example.com"
+          },
+          "children": [
+            {
+              "text": "our site"
+            }
+          ]
         },
-        { "text": " for more." }
+        {
+          "text": " for more."
+        }
       ]
     }
   ]

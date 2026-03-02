@@ -526,7 +526,7 @@
           "@id": "ref-highlight-schema-javascript-80590c",
           "label": "Schema",
           "language": "javascript",
-          "code": "highlight: {\n  id: 'highlight',\n  title: 'Highlight',\n  group: 'common',\n  blockSchema: {\n    properties: {\n      title: {\n        title: 'Title',\n        type: 'string',\n      },\n      description: {\n        title: 'Description',\n        type: 'array',\n        widget: 'slate',\n      },\n      image: {\n        title: 'Background Image',\n        widget: 'image',\n      },\n      cta_title: {\n        title: 'CTA Text',\n        type: 'string',\n      },\n      cta_link: {\n        title: 'CTA Link',\n        widget: 'object_browser',\n        mode: 'link',\n        allowExternals: true,\n      },\n    },\n  },\n}"
+          "code": "{\n  \"highlight\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"description\": {\n          \"title\": \"Description\",\n          \"widget\": \"slate\"\n        },\n        \"image\": {\n          \"title\": \"Background Image\",\n          \"widget\": \"image\"\n        },\n        \"cta_title\": {\n          \"title\": \"CTA Text\"\n        },\n        \"cta_link\": {\n          \"title\": \"CTA Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },
@@ -540,7 +540,7 @@
           "@id": "ref-highlight-json-data-json-a2bfa3",
           "label": "JSON Block Data",
           "language": "json",
-          "code": "{\n  \"@type\": \"highlight\",\n  \"title\": \"Featured Content\",\n  \"description\": [\n    {\n      \"type\": \"p\",\n      \"children\": [{ \"text\": \"Discover the latest updates and features available in this release.\" }]\n    }\n  ],\n  \"image\": \"/banner/@@images/image\",\n  \"cta_title\": \"Read More\",\n  \"cta_link\": [{ \"@id\": \"/news/latest\" }]\n}"
+          "code": "{\n  \"@type\": \"highlight\",\n  \"title\": \"Featured Content\",\n  \"description\": [\n    {\n      \"type\": \"p\",\n      \"children\": [\n        {\n          \"text\": \"Discover the latest updates and features available in this release.\"\n        }\n      ]\n    }\n  ],\n  \"image\": \"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%23334455%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3EHighlight BG%3C/text%3E%3C/svg%3E\",\n  \"cta_title\": \"Read More\",\n  \"cta_link\": [\n    {\n      \"@id\": \"/news/latest\"\n    }\n  ]\n}"
         }
       ]
     },

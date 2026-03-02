@@ -92,7 +92,7 @@ const examples = [
   {
     type: 'introduction',
     blockId: 'ex-introduction',
-    expectedText: 'Hydra bridges your frontend',
+    expectedText: null,
   },
   {
     type: 'heading',

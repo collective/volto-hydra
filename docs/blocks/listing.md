@@ -6,51 +6,76 @@ This is a **built-in** block.
 
 ## Schema
 
-The listing block uses `inheritSchemaFrom` to let editors choose an item type. You also need to define the item type blocks (`summary`, `default`) with `fieldMappings['@default']` so the listing knows how to map query results to item fields.
-
-```js
-blocks: {
-  listing: {
-    schemaEnhancer: {
-      inheritSchemaFrom: {
-        typeField: 'variation',
-        mappingField: 'fieldMapping',
-        defaultsField: 'itemDefaults',
-        filterConvertibleFrom: '@default',
-        title: 'Item Type',
-        default: 'summary',
-      },
-    },
+```json
+{
+  "listing": {
+    "schemaEnhancer": {
+      "inheritSchemaFrom": {
+        "typeField": "variation",
+        "mappingField": "fieldMapping",
+        "defaultsField": "itemDefaults",
+        "filterConvertibleFrom": "@default",
+        "title": "Item Type",
+        "default": "summary"
+      }
+    }
   },
-  summary: {
-    fieldMappings: {
-      '@default': { '@id': 'href', title: 'title', description: 'description', image: 'image' },
+  "summary": {
+    "fieldMappings": {
+      "@default": {
+        "@id": "href",
+        "title": "title",
+        "description": "description",
+        "image": "image"
+      }
     },
-    blockSchema: {
-      properties: {
-        href:        { title: 'Link', widget: 'url' },
-        title:       { title: 'Title' },
-        description: { title: 'Description', widget: 'textarea' },
-        image:       { title: 'Image', widget: 'url' },
-      },
-    },
+    "blockSchema": {
+      "properties": {
+        "href": {
+          "title": "Link",
+          "widget": "url"
+        },
+        "title": {
+          "title": "Title"
+        },
+        "description": {
+          "title": "Description",
+          "widget": "textarea"
+        },
+        "image": {
+          "title": "Image",
+          "widget": "url"
+        }
+      }
+    }
   },
-  default: {
-    fieldMappings: {
-      '@default': { '@id': 'href', title: 'title', description: 'description' },
+  "default": {
+    "fieldMappings": {
+      "@default": {
+        "@id": "href",
+        "title": "title",
+        "description": "description"
+      }
     },
-    blockSchema: {
-      properties: {
-        href:        { title: 'Link', widget: 'url' },
-        title:       { title: 'Title' },
-        description: { title: 'Description', widget: 'textarea' },
-      },
-    },
-  },
+    "blockSchema": {
+      "properties": {
+        "href": {
+          "title": "Link",
+          "widget": "url"
+        },
+        "title": {
+          "title": "Title"
+        },
+        "description": {
+          "title": "Description",
+          "widget": "textarea"
+        }
+      }
+    }
+  }
 }
 ```
 
-The `filterConvertibleFrom: '@default'` means only block types with `fieldMappings['@default']` appear as item type choices. Other block types like `teaser` and `image` that already define `fieldMappings['@default']` will also be available as listing variations.
 
 ## JSON Block Data
 
@@ -63,7 +88,9 @@ The `filterConvertibleFrom: '@default'` means only block types with `fieldMappin
       {
         "i": "portal_type",
         "o": "plone.app.querystring.operation.selection.any",
-        "v": ["Document"]
+        "v": [
+          "Document"
+        ]
       }
     ],
     "sort_on": "effective",

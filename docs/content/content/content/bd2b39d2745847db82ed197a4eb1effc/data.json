@@ -179,7 +179,7 @@
           "@id": "ref-teaser-schema-javascript-bfff08",
           "label": "Schema",
           "language": "javascript",
-          "code": "blocks: {\n  teaser: {\n    schemaEnhancer: {\n      childBlockConfig: {\n        defaultsField: 'itemDefaults',\n        editableFields: ['href', 'title', 'description', 'preview_image', 'overwrite'],\n      },\n    },\n  },\n}"
+          "code": "{\n  \"teaser\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"href\": {\n          \"title\": \"Target\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        },\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"description\": {\n          \"title\": \"Description\",\n          \"widget\": \"textarea\"\n        },\n        \"preview_image\": {\n          \"title\": \"Preview Image\",\n          \"widget\": \"image\"\n        },\n        \"overwrite\": {\n          \"title\": \"Overwrite target content\",\n          \"type\": \"boolean\"\n        }\n      }\n    },\n    \"schemaEnhancer\": {\n      \"childBlockConfig\": {\n        \"defaultsField\": \"itemDefaults\",\n        \"editableFields\": [\n          \"href\",\n          \"title\",\n          \"description\",\n          \"preview_image\",\n          \"overwrite\"\n        ]\n      }\n    }\n  }\n}"
         }
       ]
     },
@@ -193,7 +193,7 @@
           "@id": "ref-teaser-json-data-json-7f117c",
           "label": "JSON Block Data",
           "language": "json",
-          "code": "{\n  \"@type\": \"teaser\",\n  \"href\": [\n    {\n      \"@id\": \"/news/my-article\",\n      \"title\": \"My Article\",\n      \"description\": \"A short summary of the article\",\n      \"hasPreviewImage\": true\n    }\n  ],\n  \"title\": \"Custom Title\",\n  \"description\": \"Custom description overriding the target\",\n  \"preview_image\": \"/news/my-article/@@images/preview_image\",\n  \"overwrite\": true\n}"
+          "code": "{\n  \"@type\": \"teaser\",\n  \"href\": [\n    {\n      \"@id\": \"/news/my-article\",\n      \"title\": \"My Article\",\n      \"description\": \"A short summary of the article\",\n      \"hasPreviewImage\": true\n    }\n  ],\n  \"title\": \"Custom Title\",\n  \"description\": \"Custom description overriding the target\",\n  \"preview_image\": \"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2399bbdd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2718%27%3ETeaser%3C/text%3E%3C/svg%3E\",\n  \"overwrite\": true\n}"
         }
       ]
     },

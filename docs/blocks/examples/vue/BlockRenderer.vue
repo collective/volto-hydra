@@ -1,5 +1,5 @@
 <template>
-  <component :is="componentFor(block['@type'])" :block="block" :blockId="block['@uid']" />
+  <component :is="componentFor(block['@type'])" :block="block" :blockId="block['@uid']" :content="content" />
 </template>
 
 <script setup>
@@ -24,7 +24,7 @@ import VideoBlock from './VideoBlock.vue';
 import TocBlock from './TocBlock.vue';
 import { h } from 'vue';
 
-defineProps({ block: Object, blockId: String });
+defineProps({ block: Object, blockId: String, content: Object });
 
 const ListingItemBlock = {
   props: ['block'],

@@ -6,82 +6,135 @@ This is a **custom** block — register it via `initBridge`.
 
 ## Schema
 
-```js
-blocks: {
-  slider: {
-    schemaEnhancer: {
-      inheritSchemaFrom: {
-        typeField: 'variation',
-        defaultsField: 'itemDefaults',
-        blocksField: 'slides',
-        title: 'Item Type',
-      },
+```json
+{
+  "slider": {
+    "schemaEnhancer": {
+      "inheritSchemaFrom": {
+        "typeField": "variation",
+        "defaultsField": "itemDefaults",
+        "blocksField": "slides",
+        "title": "Item Type"
+      }
     },
-    blockSchema: {
-      properties: {
-        slides: {
-          title: 'Slides',
-          widget: 'object_list',
-          allowedBlocks: ['slide', 'image', 'listing', 'teaser'],
-          typeField: '@type',
-          defaultBlockType: 'slide',
+    "blockSchema": {
+      "properties": {
+        "slides": {
+          "title": "Slides",
+          "widget": "object_list",
+          "allowedBlocks": [
+            "slide",
+            "image",
+            "listing",
+            "teaser"
+          ],
+          "typeField": "@type",
+          "defaultBlockType": "slide"
         },
-        autoplayEnabled: { title: 'Autoplay Enabled', type: 'boolean', default: false },
-        autoplayDelay:   { title: 'Autoplay Delay', type: 'integer', default: 4000 },
-        autoplayJump:    { title: 'Autoplay Jump', type: 'boolean', default: false },
-      },
-    },
+        "autoplayEnabled": {
+          "title": "Autoplay Enabled",
+          "type": "boolean",
+          "default": false
+        },
+        "autoplayDelay": {
+          "title": "Autoplay Delay",
+          "type": "integer",
+          "default": 4000
+        },
+        "autoplayJump": {
+          "title": "Autoplay Jump",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
   },
-  slide: {
-    fieldMappings: {
-      '@default': { '@id': 'href', title: 'title', description: 'description', image: 'preview_image' },
+  "slide": {
+    "fieldMappings": {
+      "@default": {
+        "@id": "href",
+        "title": "title",
+        "description": "description",
+        "image": "preview_image"
+      }
     },
-    schemaEnhancer: {
-      childBlockConfig: {
-        defaultsField: 'itemDefaults',
-        editableFields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'],
-      },
+    "schemaEnhancer": {
+      "childBlockConfig": {
+        "defaultsField": "itemDefaults",
+        "editableFields": [
+          "head_title",
+          "title",
+          "description",
+          "preview_image",
+          "buttonText",
+          "hideButton"
+        ]
+      }
     },
-    blockSchema: {
-      properties: {
-        head_title:    { title: 'Kicker' },
-        title:         { title: 'Title' },
-        description:   { title: 'Description', widget: 'textarea' },
-        preview_image: { title: 'Image Override', widget: 'object_browser', mode: 'image', allowExternals: true },
-        buttonText:    { title: 'Button Text' },
-        hideButton:    { title: 'Hide Button', type: 'boolean' },
-      },
-    },
-  },
+    "blockSchema": {
+      "properties": {
+        "head_title": {
+          "title": "Kicker"
+        },
+        "title": {
+          "title": "Title"
+        },
+        "description": {
+          "title": "Description",
+          "widget": "textarea"
+        },
+        "preview_image": {
+          "title": "Image Override",
+          "widget": "object_browser",
+          "mode": "image",
+          "allowExternals": true
+        },
+        "buttonText": {
+          "title": "Button Text"
+        },
+        "hideButton": {
+          "title": "Hide Button",
+          "type": "boolean"
+        }
+      }
+    }
+  }
 }
 ```
 
-### Key Concept: `widget: 'object_list'`
-
-The `object_list` widget stores items as an array of objects (each with an `@id`). Unlike `blocks_layout` (which uses a `blocks` dict + `items` array), `object_list` stores everything inline in the array. Each item is editable by clicking it in the iframe.
 
 ## JSON Block Data
 
 ```json
 {
   "@type": "slider",
-  "autoplayEnabled": true,
+  "autoplayEnabled": false,
   "autoplayDelay": 5000,
   "slides": [
     {
       "@id": "slide-1",
+      "@type": "slide",
       "head_title": "New Release",
       "title": "Product Launch 2025",
       "description": "Discover our latest innovations.",
-      "preview_image": [{ "@id": "/images/slide1/@@images/image" }],
+      "preview_image": [
+        {
+          "@id": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%235577aa%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ESlide 1%3C/text%3E%3C/svg%3E"
+        }
+      ],
       "buttonText": "Learn More"
     },
     {
       "@id": "slide-2",
+      "@type": "slide",
       "head_title": "Featured",
       "title": "Award-Winning Design",
       "description": "Recognized for excellence in UX.",
-      "preview_image": [{ "@id": "/images/slide2/@@images/image" }],
+      "preview_image": [
+        {
+          "@id": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%23aa5577%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ESlide 2%3C/text%3E%3C/svg%3E"
+        }
+      ],
       "buttonText": "See Details"
     }
   ]

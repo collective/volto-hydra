@@ -1,7 +1,10 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { initBridge, expandListingBlocks, ploneFetchItems } from '$hydra';
-import { sharedBlocksConfig } from '$schemas';
+import docPageDefinitions from '$schemas';
+const docBlocksConfig = Object.fromEntries(
+  Object.values(docPageDefinitions).flatMap(page => Object.entries(page.blocks))
+);
 import App from './App.jsx';
 
 // Expose hydra.js helpers globally for doc example components
@@ -15,7 +18,7 @@ function renderApp(content) {
   const layout = content.blocks_layout?.items || [];
   const blocks = content.blocks || {};
   const items = layout.map(id => ({ ...blocks[id], '@uid': id }));
-  root.render(<App items={items} />);
+  root.render(<App items={items} content={content} />);
 }
 
 // Init bridge — Volto sends content via onEditChange, no API fetch needed
@@ -25,12 +28,12 @@ window.bridge = initBridge({
       properties: {
         blocks_layout: {
           title: 'Blocks',
-          allowedBlocks: Object.keys(sharedBlocksConfig),
+          allowedBlocks: Object.keys(docBlocksConfig),
         },
       },
     },
   },
-  blocks: { ...sharedBlocksConfig },
+  blocks: { ...docBlocksConfig },
   onEditChange: async (formData) => {
     if (formData.title) {
       document.getElementById('page-title').textContent = formData.title;

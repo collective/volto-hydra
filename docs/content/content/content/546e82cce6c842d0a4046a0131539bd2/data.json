@@ -296,7 +296,7 @@
           "@id": "ref-separator-schema-javascript-3157d9",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  blockSchema: {\n    properties: {\n      styles: {\n        title: 'Styles',\n        schema: {\n          properties: {\n            align: {\n              title: 'Alignment',\n              type: 'string',\n              default: 'full',\n              choices: [['full', 'Full'], ['left', 'Left'], ['center', 'Center'], ['right', 'Right']],\n            },\n          },\n        },\n      },\n    },\n  },\n}"
+          "code": "{\n  \"separator\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"styles\": {\n          \"title\": \"Styles\"\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },

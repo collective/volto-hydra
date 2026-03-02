@@ -6,7 +6,20 @@ This is a **built-in** block.
 
 ## Schema
 
-No block config needed — Video is a built-in Volto block.
+```json
+{
+  "video": {
+    "blockSchema": {
+      "properties": {
+        "url": {
+          "title": "Video URL"
+        }
+      }
+    }
+  }
+}
+```
+
 
 ## JSON Block Data
 

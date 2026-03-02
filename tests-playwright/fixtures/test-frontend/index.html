@@ -372,6 +372,9 @@
                                 previewImg.style.display = 'none';
                             }
 
+                            // Store formData globally so block renderers (e.g. TOC) can access page context
+                            window._currentFormData = formData;
+
                             // Re-render content with updated data
                             // Return promise so hydra.js can materialize comments after DOM is ready
                             if (formData.blocks && formData.blocks_layout) {

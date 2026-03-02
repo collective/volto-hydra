@@ -6,7 +6,25 @@ This is a **built-in** block.
 
 ## Schema
 
-No block config needed — Button is a built-in Volto block.
+```json
+{
+  "__button": {
+    "blockSchema": {
+      "properties": {
+        "title": {
+          "title": "Label"
+        },
+        "href": {
+          "title": "Link",
+          "widget": "object_browser",
+          "mode": "link"
+        }
+      }
+    }
+  }
+}
+```
+
 
 ## JSON Block Data
 
@@ -14,7 +32,11 @@ No block config needed — Button is a built-in Volto block.
 {
   "@type": "__button",
   "title": "Learn More",
-  "href": [{ "@id": "/about-us" }]
+  "href": [
+    {
+      "@id": "/about-us"
+    }
+  ]
 }
 ```
 

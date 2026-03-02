@@ -6,26 +6,37 @@ This is a **custom** block — register it via `initBridge`.
 
 ## Schema
 
-```js
-blocks: {
-  accordion: {
-    blockSchema: {
-      properties: {
-        panels: {
-          title: 'Panels',
-          widget: 'object_list',
-          schema: {
-            properties: {
-              title:         { title: 'Title' },
-              blocks_layout: { title: 'Content', widget: 'blocks_layout', allowedBlocks: ['slate', 'image'], defaultBlockType: 'slate' },
-            },
-          },
-        },
-      },
-    },
-  },
+```json
+{
+  "accordion": {
+    "blockSchema": {
+      "properties": {
+        "panels": {
+          "title": "Panels",
+          "widget": "object_list",
+          "schema": {
+            "properties": {
+              "title": {
+                "title": "Title"
+              },
+              "blocks_layout": {
+                "title": "Content",
+                "widget": "blocks_layout",
+                "allowedBlocks": [
+                  "slate",
+                  "image"
+                ],
+                "defaultBlockType": "slate"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }
 ```
+
 
 ## JSON Block Data
 
@@ -37,23 +48,25 @@ blocks: {
       "@id": "panel-1",
       "title": "Frequently Asked Questions",
       "blocks": {
-        "text-1": {
+        "content-text-1": {
           "@type": "slate",
-          "value": [{ "type": "p", "children": [{ "text": "Here are the answers." }] }]
+          "value": [
+            {
+              "type": "p",
+              "children": [
+                {
+                  "text": "Here are the answers to common questions."
+                }
+              ]
+            }
+          ]
         }
       },
-      "blocks_layout": { "items": ["text-1"] }
-    },
-    {
-      "@id": "panel-2",
-      "title": "Contact Us",
-      "blocks": {
-        "text-2": {
-          "@type": "slate",
-          "value": [{ "type": "p", "children": [{ "text": "Email us at hello@example.com" }] }]
-        }
-      },
-      "blocks_layout": { "items": ["text-2"] }
+      "blocks_layout": {
+        "items": [
+          "content-text-1"
+        ]
+      }
     }
   ]
 }

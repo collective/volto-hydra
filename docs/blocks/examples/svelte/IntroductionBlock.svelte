@@ -1,10 +1,9 @@
 <script>
-  import SlateNode from './SlateNode.svelte';
   export let block;
+  export let content;
 </script>
 
-<div data-block-uid={block['@uid']} class="introduction-block" data-edit-text="value">
-  {#each block.value || [] as node, i (i)}
-    <SlateNode {node} />
-  {/each}
+<div data-block-uid={block['@uid']} class="introduction-block">
+  <h1 data-edit-text="/title">{content.title}</h1>
+  {#if content.description}<p data-edit-text="/description" class="description">{content.description}</p>{/if}
 </div>

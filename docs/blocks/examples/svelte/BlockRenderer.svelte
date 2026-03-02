@@ -20,12 +20,13 @@
   import TocBlock from './TocBlock.svelte';
 
   export let block;
+  export let content = {};
 </script>
 
 {#if block['@type'] === 'slate'}
   <SlateBlock {block} />
 {:else if block['@type'] === 'introduction'}
-  <IntroductionBlock {block} />
+  <IntroductionBlock {block} {content} />
 {:else if block['@type'] === 'image'}
   <ImageBlock {block} />
 {:else if block['@type'] === 'hero'}
@@ -59,7 +60,7 @@
 {:else if block['@type'] === 'video'}
   <VideoBlock {block} />
 {:else if block['@type'] === 'toc'}
-  <TocBlock {block} />
+  <TocBlock {block} {content} />
 {:else if block['@type'] === 'summary' || block['@type'] === 'default'}
   <div data-block-uid={block['@uid']} class="listing-item">
     {#if block.image}

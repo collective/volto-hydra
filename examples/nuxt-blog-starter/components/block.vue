@@ -501,13 +501,12 @@
   <!-- Table of Contents block -->
   <nav v-else-if="block['@type'] == 'toc'" :data-block-uid="block_uid" class="toc-block my-6 p-4 bg-gray-50 rounded-lg">
     <h3 class="text-lg font-semibold mb-2">Table of Contents</h3>
-    <ul class="list-disc pl-5 space-y-1">
-      <template v-for="(b, bid) in data.blocks" :key="bid">
-        <li v-if="b['@type'] === 'heading' && b.heading">
-          <a :href="`#${bid}`" class="text-blue-600 hover:underline">{{ b.heading }}</a>
-        </li>
-      </template>
+    <ul v-if="tocEntries.length" class="list-disc pl-5 space-y-1">
+      <li v-for="e in tocEntries" :key="e.id" :style="{ marginLeft: (e.level - 2) * 1.5 + 'em' }">
+        <a :href="`#${e.id}`" class="text-blue-600 hover:underline">{{ e.text }}</a>
+      </li>
     </ul>
+    <p v-else class="text-gray-400 italic">No headings found</p>
   </nav>
 
   <!-- Default listing item: title + description -->
@@ -994,6 +993,26 @@ const currentSearchText = computed(() => {
   if (typeof window === 'undefined') return '';
   const params = new URLSearchParams(window.location.search);
   return params.get('SearchableText') || '';
+});
+
+// Extract TOC entries from page blocks (heading blocks + slate blocks with heading nodes)
+const tocEntries = computed(() => {
+  const result = [];
+  const blocks = data.value?.blocks;
+  const layout = data.value?.blocks_layout?.items;
+  if (!blocks || !layout) return result;
+  for (const id of layout) {
+    const b = blocks[id];
+    if (!b) continue;
+    if (b['@type'] === 'heading' && b.heading) {
+      result.push({ id, level: parseInt((b.tag || 'h2').slice(1)), text: b.heading });
+    } else if (b['@type'] === 'slate' && b.value?.[0]?.type?.match(/^h[1-6]$/)) {
+      const level = parseInt(b.value[0].type.slice(1));
+      const text = b.plaintext || b.value[0].children?.map(c => c.text).join('') || '';
+      if (text.trim()) result.push({ id, level, text });
+    }
+  }
+  return result;
 });
 
 const handleSearchSubmit = (event) => {

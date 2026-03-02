@@ -739,19 +739,20 @@ function renderVideoBlock(block) {
 }
 
 /**
- * Render an introduction block (styled lead text).
- * @param {Object} block - Introduction block data
+ * Render an introduction block (page title + description).
+ * The introduction block has no content of its own — it displays the page's
+ * title and description from metadata, making them inline-editable.
+ * @param {Object} block - Introduction block data (typically just @type)
  * @returns {string} HTML string
  */
 function renderIntroductionBlock(block) {
-    const value = block.value || [];
-    let html = '';
-    value.forEach((node) => {
-        const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
-        const text = renderChildren(node.children);
-        html += `<p data-edit-text="value"${nodeIdAttr} class="introduction-text" style="font-size:1.2em;color:#555;border-top:1px solid #ddd;border-bottom:1px solid #ddd;padding:1em 0;">${text}</p>`;
-    });
-    return html || '<p data-edit-text="value" class="introduction-text">Empty introduction</p>';
+    const title = document.getElementById('page-title')?.textContent || '';
+    const description = block._pageDescription || '';
+    let html = `<h1 data-edit-text="/title">${title}</h1>`;
+    if (description) {
+        html += `<p data-edit-text="/description" class="description" style="font-size:1.2em;color:#555;">${description}</p>`;
+    }
+    return html;
 }
 
 /**
@@ -826,7 +827,28 @@ function renderHighlightBlock(block) {
  * @returns {string} HTML string
  */
 function renderTocBlock(block) {
-    return `<nav class="toc-block"><ul><li>Table of Contents (generated from page headings)</li></ul></nav>`;
+    const formData = window._currentFormData;
+    const entries = [];
+    if (formData?.blocks && formData?.blocks_layout?.items) {
+        for (const id of formData.blocks_layout.items) {
+            const b = formData.blocks[id];
+            if (!b) continue;
+            if (b['@type'] === 'heading' && b.heading) {
+                entries.push({ id, level: parseInt((b.tag || 'h2').slice(1)), text: b.heading });
+            } else if (b['@type'] === 'slate' && b.value?.[0]?.type?.match(/^h[1-6]$/)) {
+                const level = parseInt(b.value[0].type.slice(1));
+                const text = b.plaintext || b.value[0].children?.map(c => c.text).join('') || '';
+                if (text.trim()) entries.push({ id, level, text });
+            }
+        }
+    }
+    if (entries.length === 0) {
+        return `<nav class="toc-block"><p>Table of Contents</p></nav>`;
+    }
+    const lis = entries.map(e =>
+        `<li style="margin-left:${(e.level - 2) * 1.5}em"><a href="#${e.id}">${e.text}</a></li>`
+    ).join('');
+    return `<nav class="toc-block"><ul>${lis}</ul></nav>`;
 }
 
 /**

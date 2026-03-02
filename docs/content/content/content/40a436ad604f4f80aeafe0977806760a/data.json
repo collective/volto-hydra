@@ -246,7 +246,7 @@
           "@id": "ref-image-schema-javascript-979df6",
           "label": "Schema",
           "language": "javascript",
-          "code": "blocks: {\n  image: {\n    schemaEnhancer: {\n      childBlockConfig: {\n        defaultsField: 'itemDefaults',\n        editableFields: ['url', 'alt', 'href'],\n      },\n    },\n  },\n}"
+          "code": "{\n  \"image\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"url\": {\n          \"title\": \"Image\",\n          \"widget\": \"image\"\n        },\n        \"alt\": {\n          \"title\": \"Alt Text\"\n        },\n        \"href\": {\n          \"title\": \"Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        }\n      }\n    },\n    \"schemaEnhancer\": {\n      \"childBlockConfig\": {\n        \"defaultsField\": \"itemDefaults\",\n        \"editableFields\": [\n          \"url\",\n          \"alt\",\n          \"href\"\n        ]\n      }\n    }\n  }\n}"
         }
       ]
     },
@@ -260,7 +260,7 @@
           "@id": "ref-image-json-data-json-ddd34d",
           "label": "JSON Block Data",
           "language": "json",
-          "code": "{\n  \"@type\": \"image\",\n  \"url\": \"/my-folder/my-image/@@images/image\",\n  \"alt\": \"A description of the image\",\n  \"href\": [{ \"@id\": \"/target-page\" }]\n}"
+          "code": "{\n  \"@type\": \"image\",\n  \"url\": \"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27600%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2377aadd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ETest Image%3C/text%3E%3C/svg%3E\",\n  \"alt\": \"A description of the image\",\n  \"href\": [\n    {\n      \"@id\": \"/target-page\"\n    }\n  ]\n}"
         }
       ]
     },

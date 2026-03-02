@@ -6,7 +6,20 @@ This is a **built-in** block (registered as `slateTable`).
 
 ## Schema
 
-No block config needed — Slate Table is a built-in Volto block.
+```json
+{
+  "slateTable": {
+    "blockSchema": {
+      "properties": {
+        "table": {
+          "title": "Table"
+        }
+      }
+    }
+  }
+}
+```
+
 
 ## JSON Block Data
 
@@ -20,11 +33,29 @@ No block config needed — Slate Table is a built-in Volto block.
         "cells": [
           {
             "key": "cell-1",
-            "value": [{ "type": "p", "children": [{ "text": "Name" }] }]
+            "value": [
+              {
+                "type": "p",
+                "children": [
+                  {
+                    "text": "Name"
+                  }
+                ]
+              }
+            ]
           },
           {
             "key": "cell-2",
-            "value": [{ "type": "p", "children": [{ "text": "Role" }] }]
+            "value": [
+              {
+                "type": "p",
+                "children": [
+                  {
+                    "text": "Role"
+                  }
+                ]
+              }
+            ]
           }
         ]
       },
@@ -33,11 +64,29 @@ No block config needed — Slate Table is a built-in Volto block.
         "cells": [
           {
             "key": "cell-3",
-            "value": [{ "type": "p", "children": [{ "text": "Alice" }] }]
+            "value": [
+              {
+                "type": "p",
+                "children": [
+                  {
+                    "text": "Alice"
+                  }
+                ]
+              }
+            ]
           },
           {
             "key": "cell-4",
-            "value": [{ "type": "p", "children": [{ "text": "Engineer" }] }]
+            "value": [
+              {
+                "type": "p",
+                "children": [
+                  {
+                    "text": "Engineer"
+                  }
+                ]
+              }
+            ]
           }
         ]
       }

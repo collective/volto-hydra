@@ -1,11 +1,34 @@
 <template>
   <nav :data-block-uid="block['@uid']" class="toc-block">
-    <ul>
-      <li>Table of Contents (generated from page headings)</li>
+    <ul v-if="entries.length">
+      <li v-for="e in entries" :key="e.id" :style="{ marginLeft: (e.level - 2) * 1.5 + 'em' }">
+        <a :href="`#${e.id}`">{{ e.text }}</a>
+      </li>
     </ul>
+    <p v-else>Table of Contents</p>
   </nav>
 </template>
 
 <script setup>
-defineProps({ block: Object });
+import { computed } from 'vue';
+
+const props = defineProps({ block: Object, content: Object });
+
+const entries = computed(() => {
+  const result = [];
+  const c = props.content;
+  if (!c?.blocks || !c?.blocks_layout?.items) return result;
+  for (const id of c.blocks_layout.items) {
+    const b = c.blocks[id];
+    if (!b) continue;
+    if (b['@type'] === 'heading' && b.heading) {
+      result.push({ id, level: parseInt((b.tag || 'h2').slice(1)), text: b.heading });
+    } else if (b['@type'] === 'slate' && b.value?.[0]?.type?.match(/^h[1-6]$/)) {
+      const level = parseInt(b.value[0].type.slice(1));
+      const text = b.plaintext || b.value[0].children?.map(c => c.text).join('') || '';
+      if (text.trim()) result.push({ id, level, text });
+    }
+  }
+  return result;
+});
 </script>

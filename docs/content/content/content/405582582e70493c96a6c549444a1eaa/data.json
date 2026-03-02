@@ -469,7 +469,7 @@
           "@id": "ref-button-schema-javascript-8aa182",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  blockSchema: {\n    properties: {\n      title: {\n        title: 'Label',\n        type: 'string',\n      },\n      href: {\n        title: 'Link',\n        widget: 'object_browser',\n        mode: 'link',\n        allowExternals: true,\n      },\n    },\n  },\n}"
+          "code": "{\n  \"__button\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Label\"\n        },\n        \"href\": {\n          \"title\": \"Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },
@@ -483,7 +483,7 @@
           "@id": "ref-button-json-data-json-ed3030",
           "label": "JSON Block Data",
           "language": "json",
-          "code": "{\n  \"@type\": \"__button\",\n  \"title\": \"Learn More\",\n  \"href\": [{ \"@id\": \"/about-us\" }]\n}"
+          "code": "{\n  \"@type\": \"__button\",\n  \"title\": \"Learn More\",\n  \"href\": [\n    {\n      \"@id\": \"/about-us\"\n    }\n  ]\n}"
         }
       ]
     },

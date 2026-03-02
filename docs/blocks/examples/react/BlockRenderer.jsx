@@ -1,8 +1,8 @@
-function BlockRenderer({ block }) {
+function BlockRenderer({ block, content }) {
   const type = block['@type'];
   switch (type) {
     case 'slate':         return <SlateBlock block={block} />;
-    case 'introduction':  return <IntroductionBlock block={block} />;
+    case 'introduction':  return <IntroductionBlock block={block} content={content} />;
     case 'image':         return <ImageBlock block={block} />;
     case 'hero':          return <HeroBlock block={block} />;
     case 'teaser':        return <TeaserBlock block={block} />;
@@ -19,7 +19,7 @@ function BlockRenderer({ block }) {
     case '__button':      return <ButtonBlock block={block} />;
     case 'highlight':     return <HighlightBlock block={block} />;
     case 'video':         return <VideoBlock block={block} />;
-    case 'toc':           return <TocBlock block={block} />;
+    case 'toc':           return <TocBlock block={block} content={content} />;
     case 'summary':
     case 'default':
       return (

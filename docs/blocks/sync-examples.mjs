@@ -21,6 +21,10 @@ import { readFileSync, writeFileSync, readdirSync, existsSync } from 'fs';
 import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 
+const docPageDefinitions = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'block-definitions.json'), 'utf-8')
+);
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const checkMode = process.argv.includes('--check');
 
@@ -30,6 +34,50 @@ const MARKER_RE = /^(<!-- file: (.+?) -->)\n```(\w+)\n([\s\S]*?)```/gm;
 let outOfSync = false;
 
 const mdFiles = readdirSync(__dirname).filter(f => f.endsWith('.md') && f !== 'README.md');
+
+// --- Phase 0: Generate Schema + JSON Block Data in markdown from block-definitions.json ---
+
+for (const mdFile of mdFiles) {
+  const pageName = mdFile.replace('.md', '');
+  const pageDef = docPageDefinitions[pageName];
+  if (!pageDef) continue;
+
+  const mdPath = join(__dirname, mdFile);
+  let md = readFileSync(mdPath, 'utf-8');
+
+  // Generate Schema section content — show the blocks config as JSON
+  const schemaBlock = '```json\n' + JSON.stringify(pageDef.blocks, null, 2) + '\n```';
+
+  // Generate JSON Block Data section content (first example only)
+  const firstExample = Object.values(pageDef.examples)[0];
+  const jsonBlock = '```json\n' + JSON.stringify(firstExample, null, 2) + '\n```';
+
+  // Replace ## Schema section's code block (everything between ## Schema and next ##)
+  const schemaRe = /(## Schema\n)[\s\S]*?(?=\n## )/;
+  const schemaMatch = md.match(schemaRe);
+  if (schemaMatch) {
+    const newSection = `## Schema\n\n${schemaBlock}\n\n`;
+    md = md.replace(schemaRe, newSection);
+  }
+
+  // Replace ## JSON Block Data section's first ```json block
+  const jsonRe = /(## JSON Block Data\n(?:[\s\S]*?\n)?)```json\n[\s\S]*?```/;
+  const jsonMatch = md.match(jsonRe);
+  if (jsonMatch) {
+    md = md.replace(jsonRe, `$1${jsonBlock}`);
+  }
+
+  const original = readFileSync(mdPath, 'utf-8');
+  if (md !== original) {
+    outOfSync = true;
+    if (checkMode) {
+      console.error(`OUT OF SYNC (definitions): ${mdFile}`);
+    } else {
+      writeFileSync(mdPath, md, 'utf-8');
+      console.log(`Updated from definitions: ${mdFile}`);
+    }
+  }
+}
 
 // --- Phase 1: Sync example files into markdown ---
 
@@ -133,9 +181,9 @@ function extractMdSections(mdContent) {
     if (heading) topSections[heading[1].trim()] = part;
   }
 
-  // Schema: all ```js``` blocks concatenated
+  // Schema: ```json``` or ```js``` blocks concatenated
   if (topSections['Schema']) {
-    const blocks = extractCodeBlocks(topSections['Schema']).filter(b => b.lang === 'js');
+    const blocks = extractCodeBlocks(topSections['Schema']).filter(b => b.lang === 'json' || b.lang === 'js');
     if (blocks.length > 0) {
       result.schema = blocks.map(b => b.content).join('\n\n');
     }
@@ -437,6 +485,49 @@ for (const mdFile of mdFiles) {
       }
     }
   }
+}
+
+// --- Phase 3: Generate examples.json from block-definitions.json ---
+
+function getExamplesContent() {
+  const blocks = {};
+  const items = [];
+  for (const page of Object.values(docPageDefinitions)) {
+    for (const [blockId, blockData] of Object.entries(page.examples)) {
+      blocks[blockId] = blockData;
+      items.push(blockId);
+    }
+  }
+  return {
+    '@id': '/_test_data/examples',
+    '@type': 'Document',
+    id: 'examples',
+    title: 'Block Examples',
+    description: 'Test page with one of each block type from doc examples',
+    blocks,
+    blocks_layout: { items },
+    is_folderish: false,
+    review_state: 'published',
+    '@components': { navigation: { items: [] } },
+  };
+}
+
+const examplesPath = join(__dirname, '..', '..', 'tests-playwright', 'fixtures', 'test-frontend', 'examples.json');
+const examplesContent = JSON.stringify(getExamplesContent(), null, 2) + '\n';
+if (existsSync(examplesPath)) {
+  const currentExamples = readFileSync(examplesPath, 'utf-8');
+  if (currentExamples !== examplesContent) {
+    outOfSync = true;
+    if (checkMode) {
+      console.error('OUT OF SYNC: examples.json');
+    } else {
+      writeFileSync(examplesPath, examplesContent, 'utf-8');
+      console.log('Updated: examples.json');
+    }
+  }
+} else if (!checkMode) {
+  writeFileSync(examplesPath, examplesContent, 'utf-8');
+  console.log('Created: examples.json');
 }
 
 if (checkMode && outOfSync) {

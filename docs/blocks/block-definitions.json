@@ -1,0 +1,1671 @@
+{
+  "hero": {
+    "blocks": {
+      "hero": {
+        "blockSchema": {
+          "properties": {
+            "heading": {
+              "title": "Heading"
+            },
+            "subheading": {
+              "title": "Subheading",
+              "widget": "textarea"
+            },
+            "buttonText": {
+              "title": "Button Text"
+            },
+            "buttonLink": {
+              "title": "Button Link",
+              "widget": "object_browser",
+              "mode": "link",
+              "allowExternals": true
+            },
+            "image": {
+              "title": "Image",
+              "widget": "image"
+            },
+            "description": {
+              "title": "Description",
+              "widget": "slate"
+            }
+          }
+        },
+        "fieldMappings": {
+          "@default": {
+            "title": "heading",
+            "description": "subheading",
+            "@id": "buttonLink",
+            "image": "image"
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-hero": {
+        "@type": "hero",
+        "heading": "Welcome to Our Site",
+        "subheading": "Discover amazing content\nacross multiple lines",
+        "buttonText": "Get Started",
+        "buttonLink": [
+          {
+            "@id": "/getting-started"
+          }
+        ],
+        "image": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%234a90d9%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3EHero Image%3C/text%3E%3C/svg%3E",
+        "description": [
+          {
+            "type": "p",
+            "children": [
+              {
+                "text": "We build tools that make content editing delightful."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "slate": {
+    "blocks": {
+      "slate": {
+        "blockSchema": {
+          "properties": {
+            "value": {
+              "title": "Text",
+              "widget": "slate"
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-slate": {
+        "@type": "slate",
+        "value": [
+          {
+            "type": "h2",
+            "children": [
+              {
+                "text": "Welcome"
+              }
+            ]
+          },
+          {
+            "type": "p",
+            "children": [
+              {
+                "text": "This is "
+              },
+              {
+                "type": "strong",
+                "children": [
+                  {
+                    "text": "bold"
+                  }
+                ]
+              },
+              {
+                "text": " and "
+              },
+              {
+                "type": "em",
+                "children": [
+                  {
+                    "text": "italic"
+                  }
+                ]
+              },
+              {
+                "text": " text."
+              }
+            ]
+          },
+          {
+            "type": "ul",
+            "children": [
+              {
+                "type": "li",
+                "children": [
+                  {
+                    "text": "First item"
+                  }
+                ]
+              },
+              {
+                "type": "li",
+                "children": [
+                  {
+                    "text": "Second item"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "p",
+            "children": [
+              {
+                "text": "Visit "
+              },
+              {
+                "type": "link",
+                "data": {
+                  "url": "https://example.com"
+                },
+                "children": [
+                  {
+                    "text": "our site"
+                  }
+                ]
+              },
+              {
+                "text": " for more."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "image": {
+    "blocks": {
+      "image": {
+        "blockSchema": {
+          "properties": {
+            "url": {
+              "title": "Image",
+              "widget": "image"
+            },
+            "alt": {
+              "title": "Alt Text"
+            },
+            "href": {
+              "title": "Link",
+              "widget": "object_browser",
+              "mode": "link"
+            }
+          }
+        },
+        "schemaEnhancer": {
+          "childBlockConfig": {
+            "defaultsField": "itemDefaults",
+            "editableFields": [
+              "url",
+              "alt",
+              "href"
+            ]
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-image": {
+        "@type": "image",
+        "url": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27600%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2377aadd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ETest Image%3C/text%3E%3C/svg%3E",
+        "alt": "A description of the image",
+        "href": [
+          {
+            "@id": "/target-page"
+          }
+        ]
+      }
+    }
+  },
+  "teaser": {
+    "blocks": {
+      "teaser": {
+        "blockSchema": {
+          "properties": {
+            "href": {
+              "title": "Target",
+              "widget": "object_browser",
+              "mode": "link"
+            },
+            "title": {
+              "title": "Title"
+            },
+            "description": {
+              "title": "Description",
+              "widget": "textarea"
+            },
+            "preview_image": {
+              "title": "Preview Image",
+              "widget": "image"
+            },
+            "overwrite": {
+              "title": "Overwrite target content",
+              "type": "boolean"
+            }
+          }
+        },
+        "schemaEnhancer": {
+          "childBlockConfig": {
+            "defaultsField": "itemDefaults",
+            "editableFields": [
+              "href",
+              "title",
+              "description",
+              "preview_image",
+              "overwrite"
+            ]
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-teaser": {
+        "@type": "teaser",
+        "href": [
+          {
+            "@id": "/news/my-article",
+            "title": "My Article",
+            "description": "A short summary of the article",
+            "hasPreviewImage": true
+          }
+        ],
+        "title": "Custom Title",
+        "description": "Custom description overriding the target",
+        "preview_image": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2399bbdd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2718%27%3ETeaser%3C/text%3E%3C/svg%3E",
+        "overwrite": true
+      }
+    }
+  },
+  "table": {
+    "blocks": {
+      "slateTable": {
+        "blockSchema": {
+          "properties": {
+            "table": {
+              "title": "Table"
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-table": {
+        "@type": "slateTable",
+        "table": {
+          "rows": [
+            {
+              "key": "row-1",
+              "cells": [
+                {
+                  "key": "cell-1",
+                  "value": [
+                    {
+                      "type": "p",
+                      "children": [
+                        {
+                          "text": "Name"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "key": "cell-2",
+                  "value": [
+                    {
+                      "type": "p",
+                      "children": [
+                        {
+                          "text": "Role"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "row-2",
+              "cells": [
+                {
+                  "key": "cell-3",
+                  "value": [
+                    {
+                      "type": "p",
+                      "children": [
+                        {
+                          "text": "Alice"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "key": "cell-4",
+                  "value": [
+                    {
+                      "type": "p",
+                      "children": [
+                        {
+                          "text": "Engineer"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "columns": {
+    "blocks": {
+      "columns": {
+        "blockSchema": {
+          "properties": {
+            "title": {
+              "title": "Title"
+            },
+            "top_images": {
+              "title": "Top Images",
+              "widget": "blocks_layout",
+              "allowedBlocks": [
+                "image"
+              ]
+            },
+            "columns": {
+              "title": "Columns",
+              "widget": "blocks_layout",
+              "allowedBlocks": [
+                "column"
+              ],
+              "maxLength": 4
+            }
+          }
+        }
+      },
+      "column": {
+        "blockSchema": {
+          "properties": {
+            "title": {
+              "title": "Title"
+            },
+            "blocks_layout": {
+              "title": "Content",
+              "widget": "blocks_layout",
+              "allowedBlocks": [
+                "slate",
+                "image"
+              ],
+              "defaultBlockType": "slate"
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-columns": {
+        "@type": "columns",
+        "title": "Our Services",
+        "columns": {
+          "items": [
+            "col-1",
+            "col-2"
+          ],
+          "blocks": {
+            "col-1": {
+              "@type": "column",
+              "title": "Design",
+              "blocks_layout": {
+                "items": [
+                  "text-1"
+                ],
+                "blocks": {
+                  "text-1": {
+                    "@type": "slate",
+                    "value": [
+                      {
+                        "type": "p",
+                        "children": [
+                          {
+                            "text": "We craft beautiful interfaces."
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "col-2": {
+              "@type": "column",
+              "title": "Engineering",
+              "blocks_layout": {
+                "items": [
+                  "text-2"
+                ],
+                "blocks": {
+                  "text-2": {
+                    "@type": "slate",
+                    "value": [
+                      {
+                        "type": "p",
+                        "children": [
+                          {
+                            "text": "We build robust systems."
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "accordion": {
+    "blocks": {
+      "accordion": {
+        "blockSchema": {
+          "properties": {
+            "panels": {
+              "title": "Panels",
+              "widget": "object_list",
+              "schema": {
+                "properties": {
+                  "title": {
+                    "title": "Title"
+                  },
+                  "blocks_layout": {
+                    "title": "Content",
+                    "widget": "blocks_layout",
+                    "allowedBlocks": [
+                      "slate",
+                      "image"
+                    ],
+                    "defaultBlockType": "slate"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-accordion": {
+        "@type": "accordion",
+        "panels": [
+          {
+            "@id": "panel-1",
+            "title": "Frequently Asked Questions",
+            "blocks": {
+              "content-text-1": {
+                "@type": "slate",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Here are the answers to common questions."
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "blocks_layout": {
+              "items": [
+                "content-text-1"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "slider": {
+    "blocks": {
+      "slider": {
+        "schemaEnhancer": {
+          "inheritSchemaFrom": {
+            "typeField": "variation",
+            "defaultsField": "itemDefaults",
+            "blocksField": "slides",
+            "title": "Item Type"
+          }
+        },
+        "blockSchema": {
+          "properties": {
+            "slides": {
+              "title": "Slides",
+              "widget": "object_list",
+              "allowedBlocks": [
+                "slide",
+                "image",
+                "listing",
+                "teaser"
+              ],
+              "typeField": "@type",
+              "defaultBlockType": "slide"
+            },
+            "autoplayEnabled": {
+              "title": "Autoplay Enabled",
+              "type": "boolean",
+              "default": false
+            },
+            "autoplayDelay": {
+              "title": "Autoplay Delay",
+              "type": "integer",
+              "default": 4000
+            },
+            "autoplayJump": {
+              "title": "Autoplay Jump",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      },
+      "slide": {
+        "fieldMappings": {
+          "@default": {
+            "@id": "href",
+            "title": "title",
+            "description": "description",
+            "image": "preview_image"
+          }
+        },
+        "schemaEnhancer": {
+          "childBlockConfig": {
+            "defaultsField": "itemDefaults",
+            "editableFields": [
+              "head_title",
+              "title",
+              "description",
+              "preview_image",
+              "buttonText",
+              "hideButton"
+            ]
+          }
+        },
+        "blockSchema": {
+          "properties": {
+            "head_title": {
+              "title": "Kicker"
+            },
+            "title": {
+              "title": "Title"
+            },
+            "description": {
+              "title": "Description",
+              "widget": "textarea"
+            },
+            "preview_image": {
+              "title": "Image Override",
+              "widget": "object_browser",
+              "mode": "image",
+              "allowExternals": true
+            },
+            "buttonText": {
+              "title": "Button Text"
+            },
+            "hideButton": {
+              "title": "Hide Button",
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-slider": {
+        "@type": "slider",
+        "autoplayEnabled": false,
+        "autoplayDelay": 5000,
+        "slides": [
+          {
+            "@id": "slide-1",
+            "@type": "slide",
+            "head_title": "New Release",
+            "title": "Product Launch 2025",
+            "description": "Discover our latest innovations.",
+            "preview_image": [
+              {
+                "@id": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%235577aa%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ESlide 1%3C/text%3E%3C/svg%3E"
+              }
+            ],
+            "buttonText": "Learn More"
+          },
+          {
+            "@id": "slide-2",
+            "@type": "slide",
+            "head_title": "Featured",
+            "title": "Award-Winning Design",
+            "description": "Recognized for excellence in UX.",
+            "preview_image": [
+              {
+                "@id": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%23aa5577%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ESlide 2%3C/text%3E%3C/svg%3E"
+              }
+            ],
+            "buttonText": "See Details"
+          }
+        ]
+      }
+    }
+  },
+  "listing": {
+    "blocks": {
+      "listing": {
+        "schemaEnhancer": {
+          "inheritSchemaFrom": {
+            "typeField": "variation",
+            "mappingField": "fieldMapping",
+            "defaultsField": "itemDefaults",
+            "filterConvertibleFrom": "@default",
+            "title": "Item Type",
+            "default": "summary"
+          }
+        }
+      },
+      "summary": {
+        "fieldMappings": {
+          "@default": {
+            "@id": "href",
+            "title": "title",
+            "description": "description",
+            "image": "image"
+          }
+        },
+        "blockSchema": {
+          "properties": {
+            "href": {
+              "title": "Link",
+              "widget": "url"
+            },
+            "title": {
+              "title": "Title"
+            },
+            "description": {
+              "title": "Description",
+              "widget": "textarea"
+            },
+            "image": {
+              "title": "Image",
+              "widget": "url"
+            }
+          }
+        }
+      },
+      "default": {
+        "fieldMappings": {
+          "@default": {
+            "@id": "href",
+            "title": "title",
+            "description": "description"
+          }
+        },
+        "blockSchema": {
+          "properties": {
+            "href": {
+              "title": "Link",
+              "widget": "url"
+            },
+            "title": {
+              "title": "Title"
+            },
+            "description": {
+              "title": "Description",
+              "widget": "textarea"
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-listing": {
+        "@type": "listing",
+        "variation": "summary",
+        "querystring": {
+          "query": [
+            {
+              "i": "portal_type",
+              "o": "plone.app.querystring.operation.selection.any",
+              "v": [
+                "Document"
+              ]
+            }
+          ],
+          "sort_on": "effective",
+          "sort_order": "descending"
+        }
+      }
+    }
+  },
+  "search": {
+    "blocks": {
+      "search": {
+        "blockSchema": {
+          "properties": {
+            "facetsTitle": {
+              "title": "Facets Title"
+            },
+            "facets": {
+              "title": "Facets",
+              "widget": "object_list",
+              "typeField": "type",
+              "allowedBlocks": [
+                "checkboxFacet",
+                "selectFacet",
+                "daterangeFacet",
+                "toggleFacet"
+              ]
+            },
+            "listing": {
+              "title": "Listing",
+              "widget": "blocks_layout",
+              "allowedBlocks": [
+                "listing"
+              ]
+            }
+          }
+        }
+      },
+      "checkboxFacet": {
+        "blockSchema": {
+          "properties": {
+            "title": {
+              "title": "Label"
+            },
+            "field": {
+              "title": "Field",
+              "widget": "select_querystring_field"
+            },
+            "multiple": {
+              "title": "Multiple choices?",
+              "type": "boolean",
+              "default": false
+            },
+            "hidden": {
+              "title": "Hide facet?",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      },
+      "selectFacet": {
+        "blockSchema": {
+          "properties": {
+            "title": {
+              "title": "Label"
+            },
+            "field": {
+              "title": "Field",
+              "widget": "select_querystring_field"
+            },
+            "hidden": {
+              "title": "Hide facet?",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      },
+      "daterangeFacet": {
+        "blockSchema": {
+          "properties": {
+            "title": {
+              "title": "Label"
+            },
+            "field": {
+              "title": "Field",
+              "widget": "select_querystring_field"
+            },
+            "hidden": {
+              "title": "Hide facet?",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      },
+      "toggleFacet": {
+        "blockSchema": {
+          "properties": {
+            "title": {
+              "title": "Label"
+            },
+            "field": {
+              "title": "Field",
+              "widget": "select_querystring_field"
+            },
+            "hidden": {
+              "title": "Hide facet?",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-search": {
+        "@type": "search",
+        "facetsTitle": "Filter by",
+        "facets": [
+          {
+            "@id": "facet-1",
+            "type": "checkboxFacet",
+            "title": "Content Type",
+            "field": "portal_type",
+            "multiple": true,
+            "hidden": false
+          },
+          {
+            "@id": "facet-2",
+            "type": "daterangeFacet",
+            "title": "Date Range",
+            "field": "effective",
+            "hidden": false
+          }
+        ],
+        "listing": {
+          "items": [
+            "listing-1"
+          ],
+          "blocks": {
+            "listing-1": {
+              "@type": "listing",
+              "variation": "summary",
+              "querystring": {
+                "query": [
+                  {
+                    "i": "portal_type",
+                    "o": "plone.app.querystring.operation.selection.any",
+                    "v": [
+                      "Document",
+                      "News Item"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "form": {
+    "blocks": {
+      "form": {
+        "blockSchema": {
+          "fieldsets": [
+            {
+              "id": "default",
+              "title": "Default",
+              "fields": [
+                "title",
+                "description",
+                "subblocks",
+                "default_to",
+                "default_from",
+                "default_subject",
+                "submit_label",
+                "show_cancel",
+                "cancel_label",
+                "captcha"
+              ]
+            },
+            {
+              "id": "manage_data",
+              "title": "Manage data",
+              "fields": [
+                "store",
+                "remove_data_after_days",
+                "send",
+                "send_message"
+              ]
+            }
+          ],
+          "properties": {
+            "title": {
+              "title": "Title"
+            },
+            "description": {
+              "title": "Description",
+              "widget": "textarea"
+            },
+            "subblocks": {
+              "title": "Fields",
+              "widget": "object_list",
+              "idField": "field_id",
+              "typeField": "field_type",
+              "allowedBlocks": [
+                "text",
+                "textarea",
+                "number",
+                "select",
+                "single_choice",
+                "multiple_choice",
+                "checkbox",
+                "date",
+                "from",
+                "static_text",
+                "hidden",
+                "attachment"
+              ]
+            },
+            "default_to": {
+              "title": "Recipients"
+            },
+            "default_from": {
+              "title": "Default sender"
+            },
+            "default_subject": {
+              "title": "Mail subject"
+            },
+            "submit_label": {
+              "title": "Submit button label"
+            },
+            "show_cancel": {
+              "title": "Show cancel button",
+              "type": "boolean"
+            },
+            "cancel_label": {
+              "title": "Cancel button label"
+            },
+            "captcha": {
+              "title": "Captcha provider"
+            },
+            "store": {
+              "title": "Store compiled data",
+              "type": "boolean"
+            },
+            "remove_data_after_days": {
+              "title": "Data wipe",
+              "type": "integer",
+              "default": -1
+            },
+            "send": {
+              "title": "Send email to recipient",
+              "type": "boolean"
+            },
+            "send_message": {
+              "title": "Message of sending confirmed",
+              "widget": "textarea"
+            }
+          }
+        },
+        "schemaEnhancer": {
+          "skiplogic": {
+            "cancel_label": {
+              "field": "show_cancel",
+              "is": true
+            }
+          }
+        }
+      },
+      "text": {
+        "restricted": true,
+        "fieldMappings": {
+          "select": {
+            "label": "label",
+            "description": "description",
+            "required": "required"
+          }
+        },
+        "blockSchema": {
+          "properties": {
+            "label": {
+              "title": "Label"
+            },
+            "description": {
+              "title": "Description"
+            },
+            "required": {
+              "title": "Required",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      },
+      "textarea": {
+        "restricted": true,
+        "fieldMappings": {
+          "select": {
+            "label": "label",
+            "description": "description",
+            "required": "required"
+          }
+        },
+        "blockSchema": {
+          "properties": {
+            "label": {
+              "title": "Label"
+            },
+            "description": {
+              "title": "Description"
+            },
+            "required": {
+              "title": "Required",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      },
+      "number": {
+        "restricted": true,
+        "fieldMappings": {
+          "select": {
+            "label": "label",
+            "description": "description",
+            "required": "required"
+          }
+        },
+        "blockSchema": {
+          "properties": {
+            "label": {
+              "title": "Label"
+            },
+            "description": {
+              "title": "Description"
+            },
+            "required": {
+              "title": "Required",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      },
+      "select": {
+        "restricted": true,
+        "fieldMappings": {
+          "text": {
+            "label": "label",
+            "description": "description",
+            "required": "required"
+          },
+          "textarea": {
+            "label": "label",
+            "description": "description",
+            "required": "required"
+          },
+          "number": {
+            "label": "label",
+            "description": "description",
+            "required": "required"
+          },
+          "single_choice": {
+            "label": "label",
+            "description": "description",
+            "required": "required",
+            "input_values": "input_values"
+          },
+          "multiple_choice": {
+            "label": "label",
+            "description": "description",
+            "required": "required",
+            "input_values": "input_values"
+          },
+          "checkbox": {
+            "label": "label",
+            "description": "description",
+            "required": "required"
+          },
+          "date": {
+            "label": "label",
+            "description": "description",
+            "required": "required"
+          },
+          "from": {
+            "label": "label",
+            "description": "description",
+            "required": "required"
+          },
+          "static_text": {
+            "label": "label",
+            "description": "description"
+          },
+          "hidden": {
+            "label": "label"
+          },
+          "attachment": {
+            "label": "label",
+            "description": "description",
+            "required": "required"
+          }
+        },
+        "blockSchema": {
+          "properties": {
+            "label": {
+              "title": "Label"
+            },
+            "description": {
+              "title": "Description"
+            },
+            "input_values": {
+              "title": "Possible values",
+              "type": "array",
+              "creatable": true
+            },
+            "required": {
+              "title": "Required",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      },
+      "single_choice": {
+        "restricted": true,
+        "fieldMappings": {
+          "select": {
+            "label": "label",
+            "description": "description",
+            "required": "required",
+            "input_values": "input_values"
+          }
+        },
+        "blockSchema": {
+          "properties": {
+            "label": {
+              "title": "Label"
+            },
+            "description": {
+              "title": "Description"
+            },
+            "input_values": {
+              "title": "Possible values",
+              "type": "array",
+              "creatable": true
+            },
+            "required": {
+              "title": "Required",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      },
+      "multiple_choice": {
+        "restricted": true,
+        "fieldMappings": {
+          "select": {
+            "label": "label",
+            "description": "description",
+            "required": "required",
+            "input_values": "input_values"
+          }
+        },
+        "blockSchema": {
+          "properties": {
+            "label": {
+              "title": "Label"
+            },
+            "description": {
+              "title": "Description"
+            },
+            "input_values": {
+              "title": "Possible values",
+              "type": "array",
+              "creatable": true
+            },
+            "required": {
+              "title": "Required",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      },
+      "checkbox": {
+        "restricted": true,
+        "fieldMappings": {
+          "select": {
+            "label": "label",
+            "description": "description",
+            "required": "required"
+          }
+        },
+        "blockSchema": {
+          "properties": {
+            "label": {
+              "title": "Label"
+            },
+            "description": {
+              "title": "Description"
+            },
+            "required": {
+              "title": "Required",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      },
+      "date": {
+        "restricted": true,
+        "fieldMappings": {
+          "select": {
+            "label": "label",
+            "description": "description",
+            "required": "required"
+          }
+        },
+        "blockSchema": {
+          "properties": {
+            "label": {
+              "title": "Label"
+            },
+            "description": {
+              "title": "Description"
+            },
+            "required": {
+              "title": "Required",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      },
+      "from": {
+        "restricted": true,
+        "fieldMappings": {
+          "select": {
+            "label": "label",
+            "description": "description",
+            "required": "required"
+          }
+        },
+        "blockSchema": {
+          "properties": {
+            "label": {
+              "title": "Label"
+            },
+            "description": {
+              "title": "Description"
+            },
+            "use_as_reply_to": {
+              "title": "Use as 'reply to'",
+              "type": "boolean",
+              "default": false
+            },
+            "use_as_bcc": {
+              "title": "Send a copy to this address",
+              "type": "boolean",
+              "default": false
+            },
+            "required": {
+              "title": "Required",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      },
+      "static_text": {
+        "restricted": true,
+        "fieldMappings": {
+          "select": {
+            "label": "label",
+            "description": "description"
+          }
+        },
+        "blockSchema": {
+          "properties": {
+            "label": {
+              "title": "Label"
+            },
+            "description": {
+              "title": "Description"
+            }
+          }
+        }
+      },
+      "hidden": {
+        "restricted": true,
+        "fieldMappings": {
+          "select": {
+            "label": "label"
+          }
+        },
+        "blockSchema": {
+          "properties": {
+            "label": {
+              "title": "Label"
+            },
+            "description": {
+              "title": "Description"
+            },
+            "value": {
+              "title": "Value for field"
+            }
+          }
+        }
+      },
+      "attachment": {
+        "restricted": true,
+        "fieldMappings": {
+          "select": {
+            "label": "label",
+            "description": "description",
+            "required": "required"
+          }
+        },
+        "blockSchema": {
+          "properties": {
+            "label": {
+              "title": "Label"
+            },
+            "description": {
+              "title": "Description"
+            },
+            "required": {
+              "title": "Required",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-form": {
+        "@type": "form",
+        "title": "Contact Us",
+        "description": "Fill out this form and we'll get back to you.",
+        "default_to": "admin@example.com",
+        "default_from": "noreply@example.com",
+        "default_subject": "New contact form submission",
+        "submit_label": "Send Message",
+        "subblocks": [
+          {
+            "@id": "field-1",
+            "field_id": "name",
+            "field_type": "text",
+            "label": "Your Name",
+            "required": true
+          },
+          {
+            "@id": "field-2",
+            "field_id": "email",
+            "field_type": "from",
+            "label": "Email Address",
+            "use_as_reply_to": true,
+            "required": true
+          },
+          {
+            "@id": "field-3",
+            "field_id": "department",
+            "field_type": "select",
+            "label": "Department",
+            "input_values": [
+              "Sales",
+              "Support",
+              "General"
+            ],
+            "required": false
+          },
+          {
+            "@id": "field-4",
+            "field_id": "message",
+            "field_type": "textarea",
+            "label": "Message",
+            "required": true
+          }
+        ]
+      }
+    }
+  },
+  "introduction": {
+    "blocks": {
+      "introduction": {
+        "blockSchema": {
+          "properties": {}
+        }
+      }
+    },
+    "examples": {
+      "ex-introduction": {
+        "@type": "introduction"
+      }
+    }
+  },
+  "heading": {
+    "blocks": {
+      "heading": {
+        "blockSchema": {
+          "properties": {
+            "heading": {
+              "title": "Heading"
+            },
+            "tag": {
+              "title": "Tag",
+              "widget": "select",
+              "choices": [
+                [
+                  "h1",
+                  "h1"
+                ],
+                [
+                  "h2",
+                  "h2"
+                ],
+                [
+                  "h3",
+                  "h3"
+                ],
+                [
+                  "h4",
+                  "h4"
+                ],
+                [
+                  "h5",
+                  "h5"
+                ],
+                [
+                  "h6",
+                  "h6"
+                ]
+              ]
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-heading": {
+        "@type": "heading",
+        "heading": "Getting Started",
+        "tag": "h2"
+      }
+    }
+  },
+  "separator": {
+    "blocks": {
+      "separator": {
+        "blockSchema": {
+          "properties": {
+            "styles": {
+              "title": "Styles"
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-separator": {
+        "@type": "separator",
+        "styles": {
+          "align": "center"
+        }
+      }
+    }
+  },
+  "button": {
+    "blocks": {
+      "__button": {
+        "blockSchema": {
+          "properties": {
+            "title": {
+              "title": "Label"
+            },
+            "href": {
+              "title": "Link",
+              "widget": "object_browser",
+              "mode": "link"
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-button": {
+        "@type": "__button",
+        "title": "Learn More",
+        "href": [
+          {
+            "@id": "/about-us"
+          }
+        ]
+      }
+    }
+  },
+  "highlight": {
+    "blocks": {
+      "highlight": {
+        "blockSchema": {
+          "properties": {
+            "title": {
+              "title": "Title"
+            },
+            "description": {
+              "title": "Description",
+              "widget": "slate"
+            },
+            "image": {
+              "title": "Background Image",
+              "widget": "image"
+            },
+            "cta_title": {
+              "title": "CTA Text"
+            },
+            "cta_link": {
+              "title": "CTA Link",
+              "widget": "object_browser",
+              "mode": "link"
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-highlight": {
+        "@type": "highlight",
+        "title": "Featured Content",
+        "description": [
+          {
+            "type": "p",
+            "children": [
+              {
+                "text": "Discover the latest updates and features available in this release."
+              }
+            ]
+          }
+        ],
+        "image": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%23334455%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3EHighlight BG%3C/text%3E%3C/svg%3E",
+        "cta_title": "Read More",
+        "cta_link": [
+          {
+            "@id": "/news/latest"
+          }
+        ]
+      }
+    }
+  },
+  "video": {
+    "blocks": {
+      "video": {
+        "blockSchema": {
+          "properties": {
+            "url": {
+              "title": "Video URL"
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-video": {
+        "@type": "video",
+        "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+      }
+    }
+  },
+  "toc": {
+    "blocks": {
+      "toc": {
+        "blockSchema": {
+          "properties": {
+            "title": {
+              "title": "Title"
+            },
+            "hide_title": {
+              "title": "Hide title",
+              "type": "boolean"
+            },
+            "ordered": {
+              "title": "Ordered",
+              "type": "boolean"
+            },
+            "levels": {
+              "title": "Entries",
+              "isMulti": true,
+              "choices": [
+                [
+                  "h1",
+                  "h1"
+                ],
+                [
+                  "h2",
+                  "h2"
+                ],
+                [
+                  "h3",
+                  "h3"
+                ],
+                [
+                  "h4",
+                  "h4"
+                ],
+                [
+                  "h5",
+                  "h5"
+                ],
+                [
+                  "h6",
+                  "h6"
+                ]
+              ]
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-toc": {
+        "@type": "toc",
+        "title": "On this page",
+        "hide_title": false,
+        "ordered": false,
+        "levels": [
+          "h2",
+          "h3"
+        ]
+      }
+    }
+  }
+}

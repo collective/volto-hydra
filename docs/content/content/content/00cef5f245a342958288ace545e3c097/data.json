@@ -144,7 +144,7 @@
           "@id": "ref-introduction-schema-javascript-e14a03",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  blockSchema: {\n    properties: {\n      value: {\n        title: 'Body',\n        widget: 'slate',\n      },\n    },\n  },\n}"
+          "code": "{\n  \"introduction\": {\n    \"blockSchema\": {\n      \"properties\": {}\n    }\n  }\n}"
         }
       ]
     },
@@ -158,7 +158,7 @@
           "@id": "ref-introduction-json-data-json-d959f7",
           "label": "JSON Block Data",
           "language": "json",
-          "code": "{\n  \"@type\": \"introduction\",\n  \"value\": [\n    {\n      \"type\": \"p\",\n      \"children\": [{ \"text\": \"This page explains how Hydra bridges your frontend with the Plone editor.\" }]\n    }\n  ]\n}"
+          "code": "{\n  \"@type\": \"introduction\"\n}"
         }
       ]
     },
@@ -172,19 +172,19 @@
           "@id": "ref-introduction-rendering-jsx-599242",
           "label": "React",
           "language": "jsx",
-          "code": "function IntroductionBlock({ block }) {\n  return (\n    <div data-block-uid={block['@uid']} className=\"introduction-block\" data-edit-text=\"value\">\n      {(block.value || []).map((node, i) => (\n        <SlateNode key={i} node={node} />\n      ))}\n    </div>\n  );\n}"
+          "code": "function IntroductionBlock({ block, content }) {\n  return (\n    <div data-block-uid={block['@uid']} className=\"introduction-block\">\n      <h1 data-edit-text=\"/title\">{content.title}</h1>\n      {content.description && <p data-edit-text=\"/description\" className=\"description\">{content.description}</p>}\n    </div>\n  );\n}"
         },
         {
           "@id": "ref-introduction-rendering-vue-53106b",
           "label": "Vue",
           "language": "vue",
-          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"introduction-block\" data-edit-text=\"value\">\n    <SlateNode v-for=\"(node, i) in block.value || []\" :key=\"i\" :node=\"node\" />\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"
+          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"introduction-block\">\n    <h1 data-edit-text=\"/title\">{{ content.title }}</h1>\n    <p v-if=\"content.description\" data-edit-text=\"/description\" class=\"description\">{{ content.description }}</p>\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object, content: Object });\n</script>"
         },
         {
           "@id": "ref-introduction-rendering-svelte-9e2b59",
           "label": "Svelte",
           "language": "svelte",
-          "code": "<script>\n  import SlateNode from './SlateNode.svelte';\n  export let block;\n</script>\n\n<div data-block-uid={block['@uid']} class=\"introduction-block\" data-edit-text=\"value\">\n  {#each block.value || [] as node, i (i)}\n    <SlateNode {node} />\n  {/each}\n</div>"
+          "code": "<script>\n  export let block;\n  export let content;\n</script>\n\n<div data-block-uid={block['@uid']} class=\"introduction-block\">\n  <h1 data-edit-text=\"/title\">{content.title}</h1>\n  {#if content.description}<p data-edit-text=\"/description\" class=\"description\">{content.description}</p>{/if}\n</div>"
         }
       ]
     }

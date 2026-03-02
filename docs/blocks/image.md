@@ -6,32 +6,52 @@ This is a **built-in** block.
 
 ## Schema
 
-```js
-blocks: {
-  image: {
-    schemaEnhancer: {
-      childBlockConfig: {
-        defaultsField: 'itemDefaults',
-        editableFields: ['url', 'alt', 'href'],
-      },
+```json
+{
+  "image": {
+    "blockSchema": {
+      "properties": {
+        "url": {
+          "title": "Image",
+          "widget": "image"
+        },
+        "alt": {
+          "title": "Alt Text"
+        },
+        "href": {
+          "title": "Link",
+          "widget": "object_browser",
+          "mode": "link"
+        }
+      }
     },
-  },
+    "schemaEnhancer": {
+      "childBlockConfig": {
+        "defaultsField": "itemDefaults",
+        "editableFields": [
+          "url",
+          "alt",
+          "href"
+        ]
+      }
+    }
+  }
 }
 ```
 
-### Field Widgets
-
-- **`widget: 'image'`** — opens the image picker (upload or select from content tree)
-- **`widget: 'object_browser'`** with `mode: 'link'` — browse content or enter an external URL
 
 ## JSON Block Data
 
 ```json
 {
   "@type": "image",
-  "url": "/my-folder/my-image/@@images/image",
+  "url": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27600%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2377aadd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ETest Image%3C/text%3E%3C/svg%3E",
   "alt": "A description of the image",
-  "href": [{ "@id": "/target-page" }]
+  "href": [
+    {
+      "@id": "/target-page"
+    }
+  ]
 }
 ```
 

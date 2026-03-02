@@ -1,5 +1,8 @@
 import { initBridge, expandListingBlocks, ploneFetchItems } from '$hydra';
-import { sharedBlocksConfig } from '$schemas';
+import docPageDefinitions from '$schemas';
+const docBlocksConfig = Object.fromEntries(
+  Object.values(docPageDefinitions).flatMap(page => Object.entries(page.blocks))
+);
 import App from './App.svelte';
 
 // Expose hydra.js helpers globally for doc example components
@@ -15,11 +18,11 @@ function renderApp(content) {
   const items = layout.map(id => ({ ...blocks[id], '@uid': id }));
 
   if (app) {
-    app.$set({ items });
+    app.$set({ items, content });
   } else {
     app = new App({
       target: document.getElementById('app'),
-      props: { items },
+      props: { items, content },
     });
   }
 }
@@ -31,12 +34,12 @@ window.bridge = initBridge({
       properties: {
         blocks_layout: {
           title: 'Blocks',
-          allowedBlocks: Object.keys(sharedBlocksConfig),
+          allowedBlocks: Object.keys(docBlocksConfig),
         },
       },
     },
   },
-  blocks: { ...sharedBlocksConfig },
+  blocks: { ...docBlocksConfig },
   onEditChange: async (formData) => {
     if (formData.title) {
       document.getElementById('page-title').textContent = formData.title;

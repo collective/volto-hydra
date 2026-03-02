@@ -6,7 +6,20 @@ This is a **built-in** block.
 
 ## Schema
 
-No block config needed — Separator is a built-in Volto block.
+```json
+{
+  "separator": {
+    "blockSchema": {
+      "properties": {
+        "styles": {
+          "title": "Styles"
+        }
+      }
+    }
+  }
+}
+```
+
 
 ## JSON Block Data
 

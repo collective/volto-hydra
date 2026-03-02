@@ -6,89 +6,485 @@ This is a **custom** block — register it via `initBridge`.
 
 ## Schema
 
-```js
-blocks: {
-  form: {
-    blockSchema: {
-      fieldsets: [
-        { id: 'default', title: 'Default', fields: ['title', 'description', 'subblocks', 'default_to', 'default_from', 'default_subject', 'submit_label', 'show_cancel', 'cancel_label', 'mail_header', 'mail_footer', 'captcha', 'email_otp_verification'] },
-        { id: 'manage_data', title: 'Manage data', fields: ['store', 'remove_data_after_days', 'send', 'send_message'] },
-      ],
-      properties: {
-        title:       { title: 'Title' },
-        description: { title: 'Description', widget: 'textarea' },
-        subblocks: {
-          title: 'Fields',
-          widget: 'object_list',
-          idField: 'field_id',
-          typeField: 'field_type',
-          allowedBlocks: ['text', 'textarea', 'number', 'select', 'single_choice', 'multiple_choice', 'checkbox', 'date', 'from', 'static_text', 'hidden', 'attachment'],
+```json
+{
+  "form": {
+    "blockSchema": {
+      "fieldsets": [
+        {
+          "id": "default",
+          "title": "Default",
+          "fields": [
+            "title",
+            "description",
+            "subblocks",
+            "default_to",
+            "default_from",
+            "default_subject",
+            "submit_label",
+            "show_cancel",
+            "cancel_label",
+            "captcha"
+          ]
         },
-        default_to:      { title: 'Recipients' },
-        default_from:    { title: 'Default sender' },
-        default_subject: { title: 'Mail subject' },
-        submit_label:    { title: 'Submit button label' },
-        show_cancel:     { title: 'Show cancel button', type: 'boolean' },
-        cancel_label:    { title: 'Cancel button label' },
-        captcha:         { title: 'Captcha provider' },
+        {
+          "id": "manage_data",
+          "title": "Manage data",
+          "fields": [
+            "store",
+            "remove_data_after_days",
+            "send",
+            "send_message"
+          ]
+        }
+      ],
+      "properties": {
+        "title": {
+          "title": "Title"
+        },
+        "description": {
+          "title": "Description",
+          "widget": "textarea"
+        },
+        "subblocks": {
+          "title": "Fields",
+          "widget": "object_list",
+          "idField": "field_id",
+          "typeField": "field_type",
+          "allowedBlocks": [
+            "text",
+            "textarea",
+            "number",
+            "select",
+            "single_choice",
+            "multiple_choice",
+            "checkbox",
+            "date",
+            "from",
+            "static_text",
+            "hidden",
+            "attachment"
+          ]
+        },
+        "default_to": {
+          "title": "Recipients"
+        },
+        "default_from": {
+          "title": "Default sender"
+        },
+        "default_subject": {
+          "title": "Mail subject"
+        },
+        "submit_label": {
+          "title": "Submit button label"
+        },
+        "show_cancel": {
+          "title": "Show cancel button",
+          "type": "boolean"
+        },
+        "cancel_label": {
+          "title": "Cancel button label"
+        },
+        "captcha": {
+          "title": "Captcha provider"
+        },
+        "store": {
+          "title": "Store compiled data",
+          "type": "boolean"
+        },
+        "remove_data_after_days": {
+          "title": "Data wipe",
+          "type": "integer",
+          "default": -1
+        },
+        "send": {
+          "title": "Send email to recipient",
+          "type": "boolean"
+        },
+        "send_message": {
+          "title": "Message of sending confirmed",
+          "widget": "textarea"
+        }
+      }
+    },
+    "schemaEnhancer": {
+      "skiplogic": {
+        "cancel_label": {
+          "field": "show_cancel",
+          "is": true
+        }
+      }
+    }
+  },
+  "text": {
+    "restricted": true,
+    "fieldMappings": {
+      "select": {
+        "label": "label",
+        "description": "description",
+        "required": "required"
+      }
+    },
+    "blockSchema": {
+      "properties": {
+        "label": {
+          "title": "Label"
+        },
+        "description": {
+          "title": "Description"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "textarea": {
+    "restricted": true,
+    "fieldMappings": {
+      "select": {
+        "label": "label",
+        "description": "description",
+        "required": "required"
+      }
+    },
+    "blockSchema": {
+      "properties": {
+        "label": {
+          "title": "Label"
+        },
+        "description": {
+          "title": "Description"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "number": {
+    "restricted": true,
+    "fieldMappings": {
+      "select": {
+        "label": "label",
+        "description": "description",
+        "required": "required"
+      }
+    },
+    "blockSchema": {
+      "properties": {
+        "label": {
+          "title": "Label"
+        },
+        "description": {
+          "title": "Description"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "select": {
+    "restricted": true,
+    "fieldMappings": {
+      "text": {
+        "label": "label",
+        "description": "description",
+        "required": "required"
       },
-    },
-    schemaEnhancer: {
-      skiplogic: {
-        cancel_label: { field: 'show_cancel', is: true },
+      "textarea": {
+        "label": "label",
+        "description": "description",
+        "required": "required"
       },
+      "number": {
+        "label": "label",
+        "description": "description",
+        "required": "required"
+      },
+      "single_choice": {
+        "label": "label",
+        "description": "description",
+        "required": "required",
+        "input_values": "input_values"
+      },
+      "multiple_choice": {
+        "label": "label",
+        "description": "description",
+        "required": "required",
+        "input_values": "input_values"
+      },
+      "checkbox": {
+        "label": "label",
+        "description": "description",
+        "required": "required"
+      },
+      "date": {
+        "label": "label",
+        "description": "description",
+        "required": "required"
+      },
+      "from": {
+        "label": "label",
+        "description": "description",
+        "required": "required"
+      },
+      "static_text": {
+        "label": "label",
+        "description": "description"
+      },
+      "hidden": {
+        "label": "label"
+      },
+      "attachment": {
+        "label": "label",
+        "description": "description",
+        "required": "required"
+      }
     },
+    "blockSchema": {
+      "properties": {
+        "label": {
+          "title": "Label"
+        },
+        "description": {
+          "title": "Description"
+        },
+        "input_values": {
+          "title": "Possible values",
+          "type": "array",
+          "creatable": true
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
   },
+  "single_choice": {
+    "restricted": true,
+    "fieldMappings": {
+      "select": {
+        "label": "label",
+        "description": "description",
+        "required": "required",
+        "input_values": "input_values"
+      }
+    },
+    "blockSchema": {
+      "properties": {
+        "label": {
+          "title": "Label"
+        },
+        "description": {
+          "title": "Description"
+        },
+        "input_values": {
+          "title": "Possible values",
+          "type": "array",
+          "creatable": true
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "multiple_choice": {
+    "restricted": true,
+    "fieldMappings": {
+      "select": {
+        "label": "label",
+        "description": "description",
+        "required": "required",
+        "input_values": "input_values"
+      }
+    },
+    "blockSchema": {
+      "properties": {
+        "label": {
+          "title": "Label"
+        },
+        "description": {
+          "title": "Description"
+        },
+        "input_values": {
+          "title": "Possible values",
+          "type": "array",
+          "creatable": true
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "checkbox": {
+    "restricted": true,
+    "fieldMappings": {
+      "select": {
+        "label": "label",
+        "description": "description",
+        "required": "required"
+      }
+    },
+    "blockSchema": {
+      "properties": {
+        "label": {
+          "title": "Label"
+        },
+        "description": {
+          "title": "Description"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "date": {
+    "restricted": true,
+    "fieldMappings": {
+      "select": {
+        "label": "label",
+        "description": "description",
+        "required": "required"
+      }
+    },
+    "blockSchema": {
+      "properties": {
+        "label": {
+          "title": "Label"
+        },
+        "description": {
+          "title": "Description"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "from": {
+    "restricted": true,
+    "fieldMappings": {
+      "select": {
+        "label": "label",
+        "description": "description",
+        "required": "required"
+      }
+    },
+    "blockSchema": {
+      "properties": {
+        "label": {
+          "title": "Label"
+        },
+        "description": {
+          "title": "Description"
+        },
+        "use_as_reply_to": {
+          "title": "Use as 'reply to'",
+          "type": "boolean",
+          "default": false
+        },
+        "use_as_bcc": {
+          "title": "Send a copy to this address",
+          "type": "boolean",
+          "default": false
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "static_text": {
+    "restricted": true,
+    "fieldMappings": {
+      "select": {
+        "label": "label",
+        "description": "description"
+      }
+    },
+    "blockSchema": {
+      "properties": {
+        "label": {
+          "title": "Label"
+        },
+        "description": {
+          "title": "Description"
+        }
+      }
+    }
+  },
+  "hidden": {
+    "restricted": true,
+    "fieldMappings": {
+      "select": {
+        "label": "label"
+      }
+    },
+    "blockSchema": {
+      "properties": {
+        "label": {
+          "title": "Label"
+        },
+        "description": {
+          "title": "Description"
+        },
+        "value": {
+          "title": "Value for field"
+        }
+      }
+    }
+  },
+  "attachment": {
+    "restricted": true,
+    "fieldMappings": {
+      "select": {
+        "label": "label",
+        "description": "description",
+        "required": "required"
+      }
+    },
+    "blockSchema": {
+      "properties": {
+        "label": {
+          "title": "Label"
+        },
+        "description": {
+          "title": "Description"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
 }
 ```
 
-### Form Field Sub-Blocks
-
-Each field type is a restricted block. Here are the most common:
-
-**`text`** — Single line input:
-```js
-{
-  blockSchema: {
-    properties: {
-      label:       { title: 'Label', type: 'string' },
-      description: { title: 'Description', type: 'string' },
-      required:    { title: 'Required', type: 'boolean', default: false },
-    },
-  },
-}
-```
-
-**`select`** — Dropdown with choices:
-```js
-{
-  blockSchema: {
-    properties: {
-      label:        { title: 'Label', type: 'string' },
-      description:  { title: 'Description', type: 'string' },
-      input_values: { title: 'Possible values', type: 'array', creatable: true },
-      required:     { title: 'Required', type: 'boolean', default: false },
-    },
-  },
-}
-```
-
-**`from`** — Email field:
-```js
-{
-  blockSchema: {
-    properties: {
-      label:            { title: 'Label', type: 'string' },
-      description:      { title: 'Description', type: 'string' },
-      use_as_reply_to:  { title: "Use as 'reply to'", type: 'boolean', default: false },
-      use_as_bcc:       { title: 'Send a copy to this address', type: 'boolean', default: false },
-      required:         { title: 'Required', type: 'boolean', default: false },
-    },
-  },
-}
-```
-
-All field types: `text`, `textarea`, `number`, `select`, `single_choice`, `multiple_choice`, `checkbox`, `date`, `from` (email), `static_text`, `hidden`, `attachment`.
 
 ## JSON Block Data
 
@@ -122,7 +518,11 @@ All field types: `text`, `textarea`, `number`, `select`, `single_choice`, `multi
       "field_id": "department",
       "field_type": "select",
       "label": "Department",
-      "input_values": ["Sales", "Support", "General"],
+      "input_values": [
+        "Sales",
+        "Support",
+        "General"
+      ],
       "required": false
     },
     {

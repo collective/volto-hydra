@@ -6,7 +6,36 @@ This is a **custom** block — register it via `initBridge`.
 
 ## Schema
 
-No block config needed — Highlight is a built-in Volto block.
+```json
+{
+  "highlight": {
+    "blockSchema": {
+      "properties": {
+        "title": {
+          "title": "Title"
+        },
+        "description": {
+          "title": "Description",
+          "widget": "slate"
+        },
+        "image": {
+          "title": "Background Image",
+          "widget": "image"
+        },
+        "cta_title": {
+          "title": "CTA Text"
+        },
+        "cta_link": {
+          "title": "CTA Link",
+          "widget": "object_browser",
+          "mode": "link"
+        }
+      }
+    }
+  }
+}
+```
+
 
 ## JSON Block Data
 
@@ -17,12 +46,20 @@ No block config needed — Highlight is a built-in Volto block.
   "description": [
     {
       "type": "p",
-      "children": [{ "text": "Discover the latest updates and features available in this release." }]
+      "children": [
+        {
+          "text": "Discover the latest updates and features available in this release."
+        }
+      ]
     }
   ],
-  "image": "/banner/@@images/image",
+  "image": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%23334455%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3EHighlight BG%3C/text%3E%3C/svg%3E",
   "cta_title": "Read More",
-  "cta_link": [{ "@id": "/news/latest" }]
+  "cta_link": [
+    {
+      "@id": "/news/latest"
+    }
+  ]
 }
 ```
 

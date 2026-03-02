@@ -10,12 +10,20 @@
       "heading": "Welcome to Our Site",
       "subheading": "Discover amazing content\nacross multiple lines",
       "buttonText": "Get Started",
-      "buttonLink": [{ "@id": "/getting-started" }],
-      "image": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect width='100%25' height='100%25' fill='%234a90d9'/%3E%3Ctext x='50%25' y='50%25' fill='white' text-anchor='middle' font-size='24'%3EHero Image%3C/text%3E%3C/svg%3E",
+      "buttonLink": [
+        {
+          "@id": "/getting-started"
+        }
+      ],
+      "image": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%234a90d9%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3EHero Image%3C/text%3E%3C/svg%3E",
       "description": [
         {
           "type": "p",
-          "children": [{ "text": "We build tools that make content editing delightful." }]
+          "children": [
+            {
+              "text": "We build tools that make content editing delightful."
+            }
+          ]
         }
       ]
     },
@@ -24,44 +32,96 @@
       "value": [
         {
           "type": "h2",
-          "children": [{ "text": "Welcome" }]
+          "children": [
+            {
+              "text": "Welcome"
+            }
+          ]
         },
         {
           "type": "p",
           "children": [
-            { "text": "This is " },
-            { "type": "strong", "children": [{ "text": "bold" }] },
-            { "text": " and " },
-            { "type": "em", "children": [{ "text": "italic" }] },
-            { "text": " text." }
+            {
+              "text": "This is "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "bold"
+                }
+              ]
+            },
+            {
+              "text": " and "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "italic"
+                }
+              ]
+            },
+            {
+              "text": " text."
+            }
           ]
         },
         {
           "type": "ul",
           "children": [
-            { "type": "li", "children": [{ "text": "First item" }] },
-            { "type": "li", "children": [{ "text": "Second item" }] }
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "First item"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Second item"
+                }
+              ]
+            }
           ]
         },
         {
           "type": "p",
           "children": [
-            { "text": "Visit " },
+            {
+              "text": "Visit "
+            },
             {
               "type": "link",
-              "data": { "url": "https://example.com" },
-              "children": [{ "text": "our site" }]
+              "data": {
+                "url": "https://example.com"
+              },
+              "children": [
+                {
+                  "text": "our site"
+                }
+              ]
             },
-            { "text": " for more." }
+            {
+              "text": " for more."
+            }
           ]
         }
       ]
     },
     "ex-image": {
       "@type": "image",
-      "url": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='400'%3E%3Crect width='100%25' height='100%25' fill='%2377aadd'/%3E%3Ctext x='50%25' y='50%25' fill='white' text-anchor='middle' font-size='24'%3ETest Image%3C/text%3E%3C/svg%3E",
+      "url": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27600%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2377aadd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ETest Image%3C/text%3E%3C/svg%3E",
       "alt": "A description of the image",
-      "href": [{ "@id": "/target-page" }]
+      "href": [
+        {
+          "@id": "/target-page"
+        }
+      ]
     },
     "ex-teaser": {
       "@type": "teaser",
@@ -75,7 +135,7 @@
       ],
       "title": "Custom Title",
       "description": "Custom description overriding the target",
-      "preview_image": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect width='100%25' height='100%25' fill='%2399bbdd'/%3E%3Ctext x='50%25' y='50%25' fill='white' text-anchor='middle' font-size='18'%3ETeaser%3C/text%3E%3C/svg%3E",
+      "preview_image": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2399bbdd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2718%27%3ETeaser%3C/text%3E%3C/svg%3E",
       "overwrite": true
     },
     "ex-table": {
@@ -87,11 +147,29 @@
             "cells": [
               {
                 "key": "cell-1",
-                "value": [{ "type": "p", "children": [{ "text": "Name" }] }]
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Name"
+                      }
+                    ]
+                  }
+                ]
               },
               {
                 "key": "cell-2",
-                "value": [{ "type": "p", "children": [{ "text": "Role" }] }]
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Role"
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           },
@@ -100,11 +178,29 @@
             "cells": [
               {
                 "key": "cell-3",
-                "value": [{ "type": "p", "children": [{ "text": "Alice" }] }]
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Alice"
+                      }
+                    ]
+                  }
+                ]
               },
               {
                 "key": "cell-4",
-                "value": [{ "type": "p", "children": [{ "text": "Engineer" }] }]
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Engineer"
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           }
@@ -115,17 +211,31 @@
       "@type": "columns",
       "title": "Our Services",
       "columns": {
-        "items": ["col-1", "col-2"],
+        "items": [
+          "col-1",
+          "col-2"
+        ],
         "blocks": {
           "col-1": {
             "@type": "column",
             "title": "Design",
             "blocks_layout": {
-              "items": ["text-1"],
+              "items": [
+                "text-1"
+              ],
               "blocks": {
                 "text-1": {
                   "@type": "slate",
-                  "value": [{ "type": "p", "children": [{ "text": "We craft beautiful interfaces." }] }]
+                  "value": [
+                    {
+                      "type": "p",
+                      "children": [
+                        {
+                          "text": "We craft beautiful interfaces."
+                        }
+                      ]
+                    }
+                  ]
                 }
               }
             }
@@ -134,11 +244,22 @@
             "@type": "column",
             "title": "Engineering",
             "blocks_layout": {
-              "items": ["text-2"],
+              "items": [
+                "text-2"
+              ],
               "blocks": {
                 "text-2": {
                   "@type": "slate",
-                  "value": [{ "type": "p", "children": [{ "text": "We build robust systems." }] }]
+                  "value": [
+                    {
+                      "type": "p",
+                      "children": [
+                        {
+                          "text": "We build robust systems."
+                        }
+                      ]
+                    }
+                  ]
                 }
               }
             }
@@ -155,10 +276,23 @@
           "blocks": {
             "content-text-1": {
               "@type": "slate",
-              "value": [{ "type": "p", "children": [{ "text": "Here are the answers to common questions." }] }]
+              "value": [
+                {
+                  "type": "p",
+                  "children": [
+                    {
+                      "text": "Here are the answers to common questions."
+                    }
+                  ]
+                }
+              ]
             }
           },
-          "blocks_layout": { "items": ["content-text-1"] }
+          "blocks_layout": {
+            "items": [
+              "content-text-1"
+            ]
+          }
         }
       ]
     },
@@ -173,7 +307,11 @@
           "head_title": "New Release",
           "title": "Product Launch 2025",
           "description": "Discover our latest innovations.",
-          "preview_image": [{ "@id": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect width='100%25' height='100%25' fill='%235577aa'/%3E%3Ctext x='50%25' y='50%25' fill='white' text-anchor='middle' font-size='24'%3ESlide 1%3C/text%3E%3C/svg%3E" }],
+          "preview_image": [
+            {
+              "@id": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%235577aa%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ESlide 1%3C/text%3E%3C/svg%3E"
+            }
+          ],
           "buttonText": "Learn More"
         },
         {
@@ -182,7 +320,11 @@
           "head_title": "Featured",
           "title": "Award-Winning Design",
           "description": "Recognized for excellence in UX.",
-          "preview_image": [{ "@id": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect width='100%25' height='100%25' fill='%23aa5577'/%3E%3Ctext x='50%25' y='50%25' fill='white' text-anchor='middle' font-size='24'%3ESlide 2%3C/text%3E%3C/svg%3E" }],
+          "preview_image": [
+            {
+              "@id": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%23aa5577%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ESlide 2%3C/text%3E%3C/svg%3E"
+            }
+          ],
           "buttonText": "See Details"
         }
       ]
@@ -195,7 +337,9 @@
           {
             "i": "portal_type",
             "o": "plone.app.querystring.operation.selection.any",
-            "v": ["Document"]
+            "v": [
+              "Document"
+            ]
           }
         ],
         "sort_on": "effective",
@@ -223,7 +367,9 @@
         }
       ],
       "listing": {
-        "items": ["listing-1"],
+        "items": [
+          "listing-1"
+        ],
         "blocks": {
           "listing-1": {
             "@type": "listing",
@@ -233,58 +379,16 @@
                 {
                   "i": "portal_type",
                   "o": "plone.app.querystring.operation.selection.any",
-                  "v": ["Document", "News Item"]
+                  "v": [
+                    "Document",
+                    "News Item"
+                  ]
                 }
               ]
             }
           }
         }
       }
-    },
-    "ex-introduction": {
-      "@type": "introduction",
-      "value": [
-        {
-          "type": "p",
-          "children": [{ "text": "This page explains how Hydra bridges your frontend with the Plone editor." }]
-        }
-      ]
-    },
-    "ex-heading": {
-      "@type": "heading",
-      "heading": "Getting Started",
-      "tag": "h2"
-    },
-    "ex-separator": {
-      "@type": "separator",
-      "styles": {
-        "align": "center"
-      }
-    },
-    "ex-button": {
-      "@type": "__button",
-      "title": "Learn More",
-      "href": [{ "@id": "/about-us" }]
-    },
-    "ex-highlight": {
-      "@type": "highlight",
-      "title": "Featured Content",
-      "description": [
-        {
-          "type": "p",
-          "children": [{ "text": "Discover the latest updates and features available in this release." }]
-        }
-      ],
-      "image": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect width='100%25' height='100%25' fill='%23334455'/%3E%3Ctext x='50%25' y='50%25' fill='white' text-anchor='middle' font-size='24'%3EHighlight BG%3C/text%3E%3C/svg%3E",
-      "cta_title": "Read More",
-      "cta_link": [{ "@id": "/news/latest" }]
-    },
-    "ex-video": {
-      "@type": "video",
-      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-    },
-    "ex-toc": {
-      "@type": "toc"
     },
     "ex-form": {
       "@type": "form",
@@ -315,7 +419,11 @@
           "field_id": "department",
           "field_type": "select",
           "label": "Department",
-          "input_values": ["Sales", "Support", "General"],
+          "input_values": [
+            "Sales",
+            "Support",
+            "General"
+          ],
           "required": false
         },
         {
@@ -325,6 +433,64 @@
           "label": "Message",
           "required": true
         }
+      ]
+    },
+    "ex-introduction": {
+      "@type": "introduction"
+    },
+    "ex-heading": {
+      "@type": "heading",
+      "heading": "Getting Started",
+      "tag": "h2"
+    },
+    "ex-separator": {
+      "@type": "separator",
+      "styles": {
+        "align": "center"
+      }
+    },
+    "ex-button": {
+      "@type": "__button",
+      "title": "Learn More",
+      "href": [
+        {
+          "@id": "/about-us"
+        }
+      ]
+    },
+    "ex-highlight": {
+      "@type": "highlight",
+      "title": "Featured Content",
+      "description": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Discover the latest updates and features available in this release."
+            }
+          ]
+        }
+      ],
+      "image": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%23334455%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3EHighlight BG%3C/text%3E%3C/svg%3E",
+      "cta_title": "Read More",
+      "cta_link": [
+        {
+          "@id": "/news/latest"
+        }
+      ]
+    },
+    "ex-video": {
+      "@type": "video",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    },
+    "ex-toc": {
+      "@type": "toc",
+      "title": "On this page",
+      "hide_title": false,
+      "ordered": false,
+      "levels": [
+        "h2",
+        "h3"
       ]
     }
   },
@@ -340,14 +506,14 @@
       "ex-slider",
       "ex-listing",
       "ex-search",
+      "ex-form",
       "ex-introduction",
       "ex-heading",
       "ex-separator",
       "ex-button",
       "ex-highlight",
       "ex-video",
-      "ex-toc",
-      "ex-form"
+      "ex-toc"
     ]
   },
   "is_folderish": false,
