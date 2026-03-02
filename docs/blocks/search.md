@@ -139,28 +139,28 @@ This is a **built-in** block. The facet types are custom sub-blocks.
       "hidden": false
     }
   ],
+  "blocks": {
+    "listing-1": {
+      "@type": "listing",
+      "variation": "summary",
+      "querystring": {
+        "query": [
+          {
+            "i": "portal_type",
+            "o": "plone.app.querystring.operation.selection.any",
+            "v": [
+              "Document",
+              "News Item"
+            ]
+          }
+        ]
+      }
+    }
+  },
   "listing": {
     "items": [
       "listing-1"
-    ],
-    "blocks": {
-      "listing-1": {
-        "@type": "listing",
-        "variation": "summary",
-        "querystring": {
-          "query": [
-            {
-              "i": "portal_type",
-              "o": "plone.app.querystring.operation.selection.any",
-              "v": [
-                "Document",
-                "News Item"
-              ]
-            }
-          ]
-        }
-      }
-    }
+    ]
   }
 }
 ```

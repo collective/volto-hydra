@@ -60,61 +60,61 @@ This is a **built-in** block.
 {
   "@type": "columns",
   "title": "Our Services",
+  "blocks": {
+    "col-1": {
+      "@type": "column",
+      "title": "Design",
+      "blocks": {
+        "text-1": {
+          "@type": "slate",
+          "value": [
+            {
+              "type": "p",
+              "children": [
+                {
+                  "text": "We craft beautiful interfaces."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "blocks_layout": {
+        "items": [
+          "text-1"
+        ]
+      }
+    },
+    "col-2": {
+      "@type": "column",
+      "title": "Engineering",
+      "blocks": {
+        "text-2": {
+          "@type": "slate",
+          "value": [
+            {
+              "type": "p",
+              "children": [
+                {
+                  "text": "We build robust systems."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "blocks_layout": {
+        "items": [
+          "text-2"
+        ]
+      }
+    }
+  },
   "columns": {
     "items": [
       "col-1",
       "col-2"
-    ],
-    "blocks": {
-      "col-1": {
-        "@type": "column",
-        "title": "Design",
-        "blocks_layout": {
-          "items": [
-            "text-1"
-          ],
-          "blocks": {
-            "text-1": {
-              "@type": "slate",
-              "value": [
-                {
-                  "type": "p",
-                  "children": [
-                    {
-                      "text": "We craft beautiful interfaces."
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        }
-      },
-      "col-2": {
-        "@type": "column",
-        "title": "Engineering",
-        "blocks_layout": {
-          "items": [
-            "text-2"
-          ],
-          "blocks": {
-            "text-2": {
-              "@type": "slate",
-              "value": [
-                {
-                  "type": "p",
-                  "children": [
-                    {
-                      "text": "We build robust systems."
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        }
-      }
-    }
+    ]
   }
 }
 ```

@@ -4,7 +4,7 @@
     <BlockRenderer
       v-for="id in block.blocks_layout?.items || []"
       :key="id"
-      :block="{ ...block.blocks_layout.blocks[id], '@uid': id }"
+      :block="{ ...block.blocks?.[id], '@uid': id }"
     />
   </div>
 </template>

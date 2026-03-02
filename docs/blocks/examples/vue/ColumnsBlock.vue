@@ -4,7 +4,7 @@
       <ColumnBlock
         v-for="id in block.columns?.items || []"
         :key="id"
-        :block="{ ...block.columns.blocks[id], '@uid': id }"
+        :block="{ ...block.blocks?.[id], '@uid': id }"
       />
     </div>
   </div>

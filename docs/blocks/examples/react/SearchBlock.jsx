@@ -4,7 +4,7 @@ function SearchBlock({ block, blockId }) {
   const facets = (block.facets || []).filter(f => !f.hidden);
   const listing = block.listing || {};
   const listingId = listing.items?.[0];
-  const listingBlock = listingId ? listing.blocks?.[listingId] : null;
+  const listingBlock = listingId ? (block.blocks?.[listingId]) : null;
 
   return (
     <div data-block-uid={blockId} className="search-block">

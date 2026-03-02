@@ -242,6 +242,9 @@ async function renderBlock(blockId, block) {
         case 'toc':
             wrapper.innerHTML = renderTocBlock(block);
             break;
+        case 'form':
+            wrapper.innerHTML = renderFormBlock(block);
+            break;
         case 'skiplogicTest':
             wrapper.innerHTML = renderSkiplogicTestBlock(block);
             break;
@@ -852,6 +855,47 @@ function renderTocBlock(block) {
 }
 
 /**
+ * Render a form block.
+ * @param {Object} block - Form block data
+ * @returns {string} HTML string
+ */
+function renderFormBlock(block) {
+    const title = block.title || '';
+    const description = block.description || '';
+    const subblocks = block.subblocks || [];
+    const submitLabel = block.submit_label || 'Submit';
+
+    let html = '<div class="form-block" style="padding: 20px; border: 1px solid #ddd; border-radius: 8px;">';
+    if (title) {
+        html += `<h2 data-edit-text="title">${title}</h2>`;
+    }
+    if (description) {
+        html += `<p data-edit-text="description" style="color: #666;">${description}</p>`;
+    }
+    for (const field of subblocks) {
+        const fieldId = field['@id'] || '';
+        const fieldType = field.field_type || 'text';
+        const label = field.label || '';
+        html += `<div class="form-field" data-block-uid="${fieldId}" data-block-add="bottom" style="margin-bottom: 12px;">`;
+        html += `<label data-edit-text="label" style="display: block; margin-bottom: 4px; font-weight: bold;">${label}</label>`;
+        if (fieldType === 'textarea') {
+            html += '<textarea style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" rows="3"></textarea>';
+        } else if (fieldType === 'select') {
+            const values = field.input_values || [];
+            html += '<select style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">';
+            for (const v of values) html += `<option>${v}</option>`;
+            html += '</select>';
+        } else {
+            html += `<input type="${fieldType === 'from' ? 'email' : fieldType}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" />`;
+        }
+        html += '</div>';
+    }
+    html += `<button type="submit" style="padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 4px;">${submitLabel}</button>`;
+    html += '</div>';
+    return html;
+}
+
+/**
  * Render a columns container block.
  * Has TWO container fields: top_images and columns (tests multi-field routing)
  * Calls window._expandListingBlocks for nested listings in columns.
@@ -859,7 +903,8 @@ function renderTocBlock(block) {
  * @returns {Promise<string>} HTML string
  */
 async function renderColumnsBlock(block) {
-    const blocks = block.blocks || {};
+    // Support both flat (block.blocks) and nested (block.columns.blocks) formats
+    const blocks = block.blocks || block.columns?.blocks || {};
     const topImagesItems = block.top_images?.items || [];
     const columnsItems = block.columns?.items || [];
     const title = block.title || '';
@@ -1511,9 +1556,10 @@ async function renderSearchBlock(block, blockId) {
     }
 
     // Facets (rendered from object_list - each has data-block-uid for selection)
+    const facetsTitle = block.facetsTitle || '';
     if (facets.length > 0) {
         html += '<div class="search-facets" style="margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 4px;">';
-        html += '<div style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">FACETS</div>';
+        html += `<div data-edit-text="facetsTitle" style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">${facetsTitle || 'FACETS'}</div>`;
         for (const facet of facets) {
             const facetId = facet['@id'] || facet.id || '';
             const facetType = facet.type || '';

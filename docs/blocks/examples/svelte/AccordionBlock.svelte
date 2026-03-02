@@ -2,7 +2,7 @@
   import BlockRenderer from './BlockRenderer.svelte';
   export let block;
 
-  let openPanels = {};
+  let openPanels = Object.fromEntries((block.panels || []).filter(p => !p.collapsed).map(p => [p['@id'], true]));
   function toggle(id) { openPanels[id] = !openPanels[id]; openPanels = openPanels; }
 </script>
 

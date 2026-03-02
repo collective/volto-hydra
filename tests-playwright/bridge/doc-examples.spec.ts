@@ -16,6 +16,49 @@ import { getFrontendUrl } from './fixtures';
 import * as fs from 'fs';
 import * as path from 'path';
 
+/**
+ * Recursively collect all sub-block IDs from block data.
+ * Finds IDs from:
+ * - Keys in `blocks` dicts (shared blocks dict containers)
+ * - `@id` fields in array items (object_list containers like accordion panels, slides)
+ * Then recurses into each sub-block to find nested IDs.
+ */
+function getSubBlockIds(obj: Record<string, unknown>): string[] {
+  const ids: string[] = [];
+  for (const [key, value] of Object.entries(obj)) {
+    if (key === 'blocks' && value && typeof value === 'object' && !Array.isArray(value)) {
+      // Shared blocks dict: keys are block IDs
+      for (const [subId, subBlock] of Object.entries(value as Record<string, unknown>)) {
+        ids.push(subId);
+        if (subBlock && typeof subBlock === 'object' && !Array.isArray(subBlock)) {
+          ids.push(...getSubBlockIds(subBlock as Record<string, unknown>));
+        }
+      }
+    } else if (Array.isArray(value)) {
+      // object_list: items are sub-blocks if they have @id + @type, blocks, or blocks_layout
+      for (const item of value) {
+        if (item && typeof item === 'object' && !Array.isArray(item)) {
+          const rec = item as Record<string, unknown>;
+          const id = rec['@id'] as string | undefined;
+          const isSubBlock = id && (rec['@type'] || rec['blocks'] || rec['blocks_layout']);
+          if (isSubBlock) {
+            ids.push(id);
+          }
+          ids.push(...getSubBlockIds(rec));
+        }
+      }
+    } else if (value && typeof value === 'object') {
+      ids.push(...getSubBlockIds(value as Record<string, unknown>));
+    }
+  }
+  return ids;
+}
+
+// Load examples.json to get block data for sub-block checks
+const examplesJson = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, '../fixtures/test-frontend/examples.json'), 'utf-8'),
+);
+
 const test = base.extend<{ helper: AdminUIHelper }>({
   helper: async ({ page }, use, testInfo) => {
     const helper = new AdminUIHelper(page);
@@ -122,7 +165,7 @@ const examples = [
   {
     type: 'toc',
     blockId: 'ex-toc',
-    expectedText: 'Table of Contents',
+    expectedText: 'Getting Started',
   },
 ];
 
@@ -135,11 +178,12 @@ test.describe('Doc example blocks', () => {
       // so multiple elements share the same data-block-uid. Use .first() for
       // the container and verify child items rendered.
       if (example.isListing) {
-        const block = iframe.locator(`[data-block-uid="${example.blockId}"]`).first();
-        await expect(block).toBeVisible({ timeout: 15000 });
-        // Verify at least one listing item rendered (summary or default variation)
-        const items = iframe.locator(`[data-block-uid="${example.blockId}"].listing-item`);
+        // Expanded listing items all share the parent's data-block-uid.
+        // Verify at least 2 elements rendered (i.e. items were fetched and expanded).
+        const items = iframe.locator(`[data-block-uid="${example.blockId}"]`);
         await expect(items.first()).toBeVisible({ timeout: 15000 });
+        const count = await items.count();
+        expect(count).toBeGreaterThanOrEqual(2);
         return;
       }
 
@@ -150,6 +194,21 @@ test.describe('Doc example blocks', () => {
       // Verify expected text content renders
       if (example.expectedText) {
         await expect(block).toContainText(example.expectedText);
+      }
+
+      // Verify sub-blocks: any block IDs found in `blocks` dicts should be in the DOM
+      const blockData = examplesJson.blocks?.[example.blockId];
+      if (blockData) {
+        const subIds = getSubBlockIds(blockData);
+        let anyVisible = false;
+        for (const subId of subIds) {
+          const loc = iframe.locator(`[data-block-uid="${subId}"]`).first();
+          await expect(loc).toBeAttached({ timeout: 5000 });
+          if (await loc.isVisible()) anyVisible = true;
+        }
+        if (subIds.length > 0) {
+          expect(anyVisible).toBe(true);
+        }
       }
     });
   }

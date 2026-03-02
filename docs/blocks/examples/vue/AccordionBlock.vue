@@ -23,7 +23,7 @@
 
 <script setup>
 import { reactive } from 'vue';
-defineProps({ block: Object });
-const openPanels = reactive({});
+const props = defineProps({ block: Object });
+const openPanels = reactive(Object.fromEntries((props.block.panels || []).filter(p => !p.collapsed).map(p => [p['@id'], true])));
 function toggle(id) { openPanels[id] = !openPanels[id]; }
 </script>

@@ -148,30 +148,12 @@ function SlateBlock({ block }) {
 <!-- file: examples/react/SlateNode.jsx -->
 ```jsx
 function SlateNode({ node }) {
-  const children = (node.children || []).map((child, i) => (
-    <SlateNode key={i} node={child} />
-  ));
-
-  switch (node.type) {
-    case 'p':         return <p>{children}</p>;
-    case 'h1':        return <h1>{children}</h1>;
-    case 'h2':        return <h2>{children}</h2>;
-    case 'h3':        return <h3>{children}</h3>;
-    case 'blockquote': return <blockquote>{children}</blockquote>;
-    case 'ul':        return <ul>{children}</ul>;
-    case 'ol':        return <ol>{children}</ol>;
-    case 'li':        return <li>{children}</li>;
-    case 'link':      return <a href={node.data?.url}>{children}</a>;
-    case 'strong':    return <strong>{children}</strong>;
-    case 'em':        return <em>{children}</em>;
-    case 'del':       return <del>{children}</del>;
-    case 'u':         return <u>{children}</u>;
-    case 'code':      return <code>{children}</code>;
-    default:
-      // Leaf text node
-      if (node.text !== undefined) return <>{node.text}</>;
-      return <span>{children}</span>;
-  }
+  if (node.text !== undefined) return <>{node.text}</>;
+  const children = (node.children || []).map((c, i) => <SlateNode key={i} node={c} />);
+  const Tag = node.type === 'link' ? 'a' : node.type;
+  const props = { 'data-node-id': node.nodeId };
+  if (node.type === 'link') props.href = node.data?.url;
+  return <Tag {...props}>{children}</Tag>;
 }
 ```
 
@@ -193,21 +175,13 @@ defineProps({ block: Object });
 <!-- file: examples/vue/SlateNode.vue -->
 ```vue
 <template>
-  <p v-if="node.type === 'p'"><SlateNode v-for="(c, i) in node.children" :key="i" :node="c" /></p>
-  <h1 v-else-if="node.type === 'h1'"><SlateNode v-for="(c, i) in node.children" :key="i" :node="c" /></h1>
-  <h2 v-else-if="node.type === 'h2'"><SlateNode v-for="(c, i) in node.children" :key="i" :node="c" /></h2>
-  <h3 v-else-if="node.type === 'h3'"><SlateNode v-for="(c, i) in node.children" :key="i" :node="c" /></h3>
-  <blockquote v-else-if="node.type === 'blockquote'"><SlateNode v-for="(c, i) in node.children" :key="i" :node="c" /></blockquote>
-  <ul v-else-if="node.type === 'ul'"><SlateNode v-for="(c, i) in node.children" :key="i" :node="c" /></ul>
-  <ol v-else-if="node.type === 'ol'"><SlateNode v-for="(c, i) in node.children" :key="i" :node="c" /></ol>
-  <li v-else-if="node.type === 'li'"><SlateNode v-for="(c, i) in node.children" :key="i" :node="c" /></li>
-  <a v-else-if="node.type === 'link'" :href="node.data?.url"><SlateNode v-for="(c, i) in node.children" :key="i" :node="c" /></a>
-  <strong v-else-if="node.type === 'strong'"><SlateNode v-for="(c, i) in node.children" :key="i" :node="c" /></strong>
-  <em v-else-if="node.type === 'em'"><SlateNode v-for="(c, i) in node.children" :key="i" :node="c" /></em>
-  <del v-else-if="node.type === 'del'"><SlateNode v-for="(c, i) in node.children" :key="i" :node="c" /></del>
-  <u v-else-if="node.type === 'u'"><SlateNode v-for="(c, i) in node.children" :key="i" :node="c" /></u>
-  <code v-else-if="node.type === 'code'"><SlateNode v-for="(c, i) in node.children" :key="i" :node="c" /></code>
-  <template v-else>{{ node.text }}</template>
+  <template v-if="!node.type">{{ node.text }}</template>
+  <a v-else-if="node.type === 'link'" :href="node.data?.url" :data-node-id="node.nodeId">
+    <SlateNode v-for="(c, i) in node.children" :key="i" :node="c" />
+  </a>
+  <component v-else :is="node.type" :data-node-id="node.nodeId">
+    <SlateNode v-for="(c, i) in node.children" :key="i" :node="c" />
+  </component>
 </template>
 
 <script setup>
@@ -237,35 +211,11 @@ defineProps({ node: Object });
   export let node;
 </script>
 
-{#if node.type === 'p'}
-  <p>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</p>
-{:else if node.type === 'h1'}
-  <h1>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</h1>
-{:else if node.type === 'h2'}
-  <h2>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</h2>
-{:else if node.type === 'h3'}
-  <h3>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</h3>
-{:else if node.type === 'blockquote'}
-  <blockquote>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</blockquote>
-{:else if node.type === 'ul'}
-  <ul>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</ul>
-{:else if node.type === 'ol'}
-  <ol>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</ol>
-{:else if node.type === 'li'}
-  <li>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</li>
-{:else if node.type === 'link'}
-  <a href={node.data?.url}>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</a>
-{:else if node.type === 'strong'}
-  <strong>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</strong>
-{:else if node.type === 'em'}
-  <em>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</em>
-{:else if node.type === 'del'}
-  <del>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</del>
-{:else if node.type === 'u'}
-  <u>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</u>
-{:else if node.type === 'code'}
-  <code>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</code>
-{:else}
+{#if node.text !== undefined}
   {node.text}
+{:else if node.type === 'link'}
+  <a href={node.data?.url} data-node-id={node.nodeId}>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</a>
+{:else}
+  <svelte:element this={node.type} data-node-id={node.nodeId}>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</svelte:element>
 {/if}
 ```

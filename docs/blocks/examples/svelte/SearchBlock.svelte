@@ -7,7 +7,7 @@
 
   $: visibleFacets = (block.facets || []).filter(f => !f.hidden);
   $: listingId = block.listing?.items?.[0];
-  $: listingBlock = listingId ? block.listing?.blocks?.[listingId] : null;
+  $: listingBlock = listingId ? block.blocks?.[listingId] : null;
 </script>
 
 <div data-block-uid={blockId} class="search-block">

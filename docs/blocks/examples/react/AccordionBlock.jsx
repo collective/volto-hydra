@@ -12,7 +12,7 @@ function AccordionBlock({ block }) {
 }
 
 function AccordionPanel({ panel, panelId }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!panel.collapsed);
   const contentBlocks = panel.blocks || {};
   const contentLayout = panel.blocks_layout?.items || [];
 

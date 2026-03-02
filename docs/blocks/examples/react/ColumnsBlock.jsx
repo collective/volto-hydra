@@ -1,7 +1,6 @@
 function ColumnsBlock({ block }) {
-  const columns = block.columns || {};
-  const items = columns.items || [];
-  const blocks = columns.blocks || {};
+  const items = block.columns?.items || [];
+  const blocks = block.blocks || {};
 
   return (
     <div data-block-uid={block['@uid']} className="columns-block">
@@ -15,9 +14,8 @@ function ColumnsBlock({ block }) {
 }
 
 function ColumnBlock({ block }) {
-  const layout = block.blocks_layout || {};
-  const items = layout.items || [];
-  const blocks = layout.blocks || {};
+  const items = block.blocks_layout?.items || [];
+  const blocks = block.blocks || {};
 
   return (
     <div data-block-uid={block['@uid']} style={{ flex: 1 }}>
