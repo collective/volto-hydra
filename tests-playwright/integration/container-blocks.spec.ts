@@ -4504,3 +4504,80 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     expect(await facetItems.last().getAttribute('data-block-uid')).toBe('facet-type');
   });
 });
+
+// ============================================================================
+// Accordion Block Tests (object_list with blocks_layout inside items)
+// ============================================================================
+test.describe('Accordion Block', () => {
+  test('accordion panel title is visible', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/accordion-test-page');
+
+    const iframe = helper.getIframe();
+    const accordion = iframe.locator('[data-block-uid="accordion-1"]');
+    await expect(accordion).toBeVisible();
+
+    // Panel title should be rendered
+    await expect(accordion).toContainText('Accordion Header Text');
+  });
+
+  test('accordion child blocks are visible', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/accordion-test-page');
+
+    const iframe = helper.getIframe();
+    const accordion = iframe.locator('[data-block-uid="accordion-1"]');
+    await expect(accordion).toBeVisible();
+
+    // Child slate blocks inside the panel should be rendered
+    await expect(accordion).toContainText('Accordion Content Text');
+    await expect(accordion).toContainText('More content');
+  });
+
+  test('accordion panel has data-block-uid', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/accordion-test-page');
+
+    const iframe = helper.getIframe();
+    const panel = iframe.locator('[data-block-uid="panel-1"]');
+    await expect(panel).toBeVisible();
+  });
+
+  test('clicking accordion child block selects it', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/accordion-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for content to render
+    await expect(iframe.locator('[data-block-uid="accordion-1"]')).toBeVisible();
+    await expect(iframe.locator('[data-block-uid="accordion-1"]')).toContainText('Accordion Content Text');
+
+    // Click child block
+    await helper.clickBlockInIframe('content-text-1');
+    const hasToolbar = await helper.isQuantaToolbarVisibleInIframe('content-text-1');
+    expect(hasToolbar).toBe(true);
+  });
+
+  test('accordion panel title is inline editable', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/accordion-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Wait for panel to render with title
+    const panel = iframe.locator('[data-block-uid="panel-1"]');
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText('Accordion Header Text');
+
+    // The title element should have data-edit-text="title"
+    const titleEl = panel.locator('[data-edit-text="title"]');
+    await expect(titleEl).toBeVisible();
+    await expect(titleEl).toContainText('Accordion Header Text');
+  });
+});

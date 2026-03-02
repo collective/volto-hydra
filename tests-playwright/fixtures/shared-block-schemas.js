@@ -214,35 +214,31 @@ export const sharedBlocksConfig = {
             required: [],
         },
     },
-    // Accordion block with header and content containers
+    // Accordion block — panels as object_list items, each with title + content blocks
     accordion: {
         id: 'accordion',
         title: 'Accordion',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>',
         group: 'common',
         blockSchema: {
-            fieldsets: [
-                {
-                    id: 'default',
-                    title: 'Default',
-                    fields: ['header', 'content'],
-                },
-            ],
             properties: {
-                header: {
-                    title: 'Header',
-                    widget: 'blocks_layout',
-                    allowedBlocks: ['slate'],
-                    defaultBlockType: 'slate',
-                },
-                content: {
-                    title: 'Content',
-                    widget: 'blocks_layout',
-                    allowedBlocks: ['slate', 'image'],
-                    defaultBlockType: 'slate',
+                panels: {
+                    title: 'Panels',
+                    widget: 'object_list',
+                    schema: {
+                        fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'blocks_layout'] }],
+                        properties: {
+                            title: { title: 'Title', type: 'string' },
+                            blocks_layout: {
+                                title: 'Content',
+                                widget: 'blocks_layout',
+                                allowedBlocks: ['slate', 'image'],
+                                defaultBlockType: 'slate',
+                            },
+                        },
+                    },
                 },
             },
-            required: [],
         },
     },
     // Code example block: tabbed code display with syntax highlighting

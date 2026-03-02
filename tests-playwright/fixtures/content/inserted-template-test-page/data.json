@@ -1,0 +1,79 @@
+{
+  "@id": "/inserted-template-test-page",
+  "@type": "Document",
+  "id": "inserted-template-test-page",
+  "title": "Inserted Template Test Page",
+  "description": "A page with an inserted template that is NOT in allowedLayouts",
+  "blocks": {
+    "regular-block-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Regular block before snippet" }]
+        }
+      ],
+      "plaintext": "Regular block before snippet"
+    },
+    "snippet-inst-header": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/snippet-template-uid",
+      "templateInstanceId": "snippet-inst-1",
+      "placeholder": "snippet-heading",
+      "value": [
+        {
+          "type": "h2",
+          "children": [{ "text": "Stale Snippet Header" }]
+        }
+      ],
+      "plaintext": "Stale Snippet Header"
+    },
+    "snippet-inst-content": {
+      "@type": "slate",
+      "templateId": "resolveuid/snippet-template-uid",
+      "templateInstanceId": "snippet-inst-1",
+      "placeholder": "snippet-body",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "User snippet content" }]
+        }
+      ],
+      "plaintext": "User snippet content"
+    },
+    "regular-block-2": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Regular block after snippet" }]
+        }
+      ],
+      "plaintext": "Regular block after snippet"
+    }
+  },
+  "blocks_layout": {
+    "items": ["regular-block-1", "snippet-inst-header", "snippet-inst-content", "regular-block-2"]
+  },
+  "@components": {
+    "actions": {
+      "@id": "/inserted-template-test-page/@actions",
+      "object": [
+        {
+          "@id": "/inserted-template-test-page/edit",
+          "id": "edit",
+          "title": "Edit"
+        }
+      ],
+      "object_buttons": []
+    },
+    "breadcrumbs": {
+      "@id": "/inserted-template-test-page/@breadcrumbs",
+      "items": [
+        { "@id": "/inserted-template-test-page", "title": "Inserted Template Test Page" }
+      ]
+    }
+  }
+}

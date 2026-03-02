@@ -103,6 +103,19 @@ export function getBlockSchema(blockType, intl, blocksConfig = null, blockPathMa
     }
   }
 
+  // Ensure nested widget: 'object' schemas also have fieldsets
+  // (ObjectWidget crashes if schema.fieldsets is missing)
+  if (schema?.properties) {
+    for (const fieldDef of Object.values(schema.properties)) {
+      if (fieldDef?.widget === 'object' && fieldDef.schema?.properties && !fieldDef.schema.fieldsets) {
+        fieldDef.schema = {
+          ...fieldDef.schema,
+          fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+        };
+      }
+    }
+  }
+
   // Run schemaEnhancer on top of base schema (if it exists)
   // Note: childBlockConfig reads blockPathMap/blockId from HydraSchemaContext
   if (blockConfig.schemaEnhancer) {
@@ -1599,12 +1612,14 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
  * @param {Object} options.properties - Form properties
  * @returns {Object} Block data with container fields initialized (if applicable)
  */
-export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator, options = {}) {
+export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator, options = {}, schema) {
   const { intl, metadata, properties, siblingData } = options;
-  const blockType = blockData['@type'];
 
-  // Get schema to find container fields
-  const schema = getBlockSchema(blockType, intl, blocksConfig);
+  // Get schema from block type if not provided (e.g., recursing into widget: 'object')
+  if (!schema) {
+    const blockType = blockData['@type'];
+    schema = getBlockSchema(blockType, intl, blocksConfig);
+  }
 
   if (!schema?.properties) {
     return blockData;
@@ -1614,6 +1629,15 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
   let result = { ...blockData };
 
   for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
+    // Descend into nested object fields (e.g., accordion's `data` wrapper)
+    if (fieldDef.widget === 'object' && fieldDef.schema?.properties) {
+      if (!result[fieldName]) result[fieldName] = {};
+      result[fieldName] = initializeContainerBlock(
+        result[fieldName], blocksConfig, uuidGenerator, options, fieldDef.schema,
+      );
+      continue;
+    }
+
     // Handle object_list containers (like cells in a row)
     if (fieldDef.widget === 'object_list') {
       const idField = fieldDef.idField || '@id';

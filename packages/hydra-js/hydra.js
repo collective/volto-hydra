@@ -11497,13 +11497,21 @@ function collectContentFromTree(container, instanceId, pendingContent, standalon
     return;
   }
 
-  // Look for blocks/layout pairs (any field name)
+  // Look for blocks maps (shared blocks format: one "blocks" dict + named layout fields)
   for (const [fieldName, value] of Object.entries(container)) {
     if (!isBlocksMap(value)) continue;
 
-    // Find corresponding layout
-    const layoutField = container[`${fieldName}_layout`];
-    const blockLayout = layoutField?.items || Object.keys(value);
+    // Collect block IDs from all layout fields ({ items: [...] }) in this container.
+    // In shared blocks format, layout fields are named (columns, top_images, blocks_layout, etc.)
+    // — there is no ${fieldName}_layout convention.
+    const layoutBlockIds = new Set();
+    for (const [key, val] of Object.entries(container)) {
+      if (key !== fieldName && val?.items && Array.isArray(val.items)) {
+        for (const id of val.items) layoutBlockIds.add(id);
+      }
+    }
+    // Fall back to all keys if no layout fields found
+    const blockLayout = layoutBlockIds.size > 0 ? layoutBlockIds : Object.keys(value);
 
     // Process in order
     for (const blockId of blockLayout) {
@@ -11908,9 +11916,23 @@ export function expandTemplatesSync(inputItems, options = {}) {
   const previousTemplateId = templateId;
 
   if (allowedLayouts?.length > 0) {
+    // Determine if this is a layout (all blocks belong to the template) or an
+    // inserted template (template blocks mixed with standalone blocks).
+    // allowedLayouts should only enforce on layouts, not on inserted templates.
+    const isLayout = templateId && layout.every(blockId => {
+      const block = blocks[blockId];
+      return block?.templateInstanceId === existingInstanceId;
+    });
+
     // Use path-normalised comparison: block templateId may be a full URL
     // (e.g. from Plone's resolveuid) while allowedLayouts may be paths.
-    if (!templateId || !allowedLayouts.some(l => templateIdsMatch(l, templateId))) {
+    if (isLayout && !allowedLayouts.some(l => templateIdsMatch(l, templateId))) {
+      templateId = allowedLayouts[0];
+      if (!filterInstanceId) {
+        existingInstanceId = null;
+      }
+    } else if (!templateId) {
+      // No template found — apply the forced layout
       templateId = allowedLayouts[0];
       if (!filterInstanceId) {
         existingInstanceId = null;
