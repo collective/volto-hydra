@@ -11,9 +11,6 @@ The listing block's schema is built up by Hydra's `schemaEnhancer`. The key fiel
 ```js
 {
   blockSchema: {
-    fieldsets: [
-      { id: 'default', title: 'Default', fields: ['querystring', 'variation'] }
-    ],
     properties: {
       querystring: {
         title: 'Query',

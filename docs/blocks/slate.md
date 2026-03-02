@@ -11,9 +11,6 @@ The slate block schema is registered internally by Hydra. If you wanted to repro
 ```js
 {
   blockSchema: {
-    fieldsets: [
-      { id: 'default', title: 'Default', fields: ['value'] }
-    ],
     properties: {
       value: {
         title: 'Body',
@@ -176,12 +173,13 @@ defineProps({ node: Object });
 <!-- file: examples/svelte/SlateBlock.svelte -->
 ```svelte
 <script>
+  import SlateNode from './SlateNode.svelte';
   export let block;
 </script>
 
 <div data-block-uid={block['@uid']} data-edit-text="value">
   {#each block.value || [] as node, i (i)}
-    <svelte:self node={node} />
+    <SlateNode {node} />
   {/each}
 </div>
 ```

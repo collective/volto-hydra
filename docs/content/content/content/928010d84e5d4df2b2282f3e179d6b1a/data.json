@@ -74,41 +74,75 @@
         }
       ]
     },
+    "ref-search-schema": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-search",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-search-schema-javascript-8711ec",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "// Search block (built-in, enhanced by Hydra)\n{\n  schemaEnhancer: ({ schema }) => {\n    // Listing container — holds one listing block for results\n    schema.properties.listing = {\n      title: 'Results Listing',\n      widget: 'blocks_layout',\n      allowedBlocks: ['listing', 'default', 'summary', 'teaser', 'image'],\n      maxLength: 1,\n      defaultBlockType: 'listing',\n    };\n\n    // Facets — typed object_list, each facet has its own schema\n    schema.properties.facets = {\n      title: 'Facets',\n      widget: 'object_list',\n      typeField: 'type',\n      allowedBlocks: ['checkboxFacet', 'selectFacet', 'daterangeFacet', 'toggleFacet'],\n    };\n\n    return schema;\n  },\n}\n\n{\n  blockSchema: {\n    properties: {\n      title:    { title: 'Label', type: 'string' },\n      field:    { title: 'Field', widget: 'select_querystring_field' },\n      multiple: { title: 'Multiple choices?', type: 'boolean', default: false },\n      hidden:   { title: 'Hide facet?', type: 'boolean', default: false },\n    },\n  },\n}\n\n{\n  blockSchema: {\n    properties: {\n      title:  { title: 'Label', type: 'string' },\n      field:  { title: 'Field', widget: 'select_querystring_field' },\n      hidden: { title: 'Hide facet?', type: 'boolean', default: false },\n    },\n  },\n}\n\n{\n  blockSchema: {\n    properties: {\n      title:  { title: 'Label', type: 'string' },\n      field:  { title: 'Field', widget: 'select_querystring_field' },\n      hidden: { title: 'Hide facet?', type: 'boolean', default: false },\n    },\n  },\n}\n\n{\n  blockSchema: {\n    properties: {\n      title:  { title: 'Label', type: 'string' },\n      field:  { title: 'Field', widget: 'select_querystring_field' },\n      hidden: { title: 'Hide facet?', type: 'boolean', default: false },\n    },\n  },\n}"
+        }
+      ]
+    },
+    "ref-search-json-data": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-search",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-search-json-data-json-155258",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"search\",\n  \"facetsTitle\": \"Filter by\",\n  \"facets\": [\n    {\n      \"@id\": \"facet-1\",\n      \"type\": \"checkboxFacet\",\n      \"title\": \"Content Type\",\n      \"field\": \"portal_type\",\n      \"multiple\": true,\n      \"hidden\": false\n    },\n    {\n      \"@id\": \"facet-2\",\n      \"type\": \"daterangeFacet\",\n      \"title\": \"Date Range\",\n      \"field\": \"effective\",\n      \"hidden\": false\n    }\n  ],\n  \"listing\": {\n    \"items\": [\"listing-1\"],\n    \"blocks\": {\n      \"listing-1\": {\n        \"@type\": \"listing\",\n        \"variation\": \"summary\",\n        \"querystring\": {\n          \"query\": [\n            {\n              \"i\": \"portal_type\",\n              \"o\": \"plone.app.querystring.operation.selection.any\",\n              \"v\": [\"Document\", \"News Item\"]\n            }\n          ]\n        }\n      }\n    }\n  }\n}"
+        }
+      ]
+    },
+    "ref-search-rendering": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-search",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-search-rendering-jsx-dd082e",
+          "label": "React",
+          "language": "jsx",
+          "code": "function SearchBlock({ block, blockId }) {\n  const [query, setQuery] = useState('');\n\n  const facets = (block.facets || []).filter(f => !f.hidden);\n  const listing = block.listing || {};\n  const listingId = listing.items?.[0];\n  const listingBlock = listingId ? listing.blocks?.[listingId] : null;\n\n  return (\n    <div data-block-uid={blockId} className=\"search-block\">\n      <input\n        type=\"search\"\n        placeholder=\"Search...\"\n        value={query}\n        onChange={e => setQuery(e.target.value)}\n      />\n\n      {facets.length > 0 && (\n        <div className=\"facets\">\n          <h4>{block.facetsTitle || 'Filter'}</h4>\n          {facets.map(facet => (\n            <FacetRenderer key={facet['@id']} facet={facet} />\n          ))}\n        </div>\n      )}\n\n      {listingBlock && (\n        <ListingBlock block={listingBlock} blockId={listingId} />\n      )}\n    </div>\n  );\n}\n\nfunction FacetRenderer({ facet }) {\n  switch (facet.type) {\n    case 'checkboxFacet':\n      return <fieldset><legend>{facet.title}</legend>{/* checkbox options */}</fieldset>;\n    case 'selectFacet':\n      return <label>{facet.title}<select>{/* options */}</select></label>;\n    case 'daterangeFacet':\n      return <label>{facet.title}<input type=\"date\" /> – <input type=\"date\" /></label>;\n    case 'toggleFacet':\n      return <label><input type=\"checkbox\" /> {facet.title}</label>;\n    default:\n      return null;\n  }\n}"
+        },
+        {
+          "@id": "ref-search-rendering-vue-3c1873",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<template>\n  <div :data-block-uid=\"blockId\" class=\"search-block\">\n    <input type=\"search\" placeholder=\"Search...\" v-model=\"query\" />\n\n    <div v-if=\"visibleFacets.length\" class=\"facets\">\n      <h4>{{ block.facetsTitle || 'Filter' }}</h4>\n      <template v-for=\"facet in visibleFacets\" :key=\"facet['@id']\">\n        <fieldset v-if=\"facet.type === 'checkboxFacet'\">\n          <legend>{{ facet.title }}</legend>\n          <!-- checkbox options -->\n        </fieldset>\n        <label v-else-if=\"facet.type === 'selectFacet'\">\n          {{ facet.title }}<select><!-- options --></select>\n        </label>\n        <label v-else-if=\"facet.type === 'daterangeFacet'\">\n          {{ facet.title }}<input type=\"date\" /> – <input type=\"date\" />\n        </label>\n        <label v-else-if=\"facet.type === 'toggleFacet'\">\n          <input type=\"checkbox\" /> {{ facet.title }}\n        </label>\n      </template>\n    </div>\n\n    <ListingBlock\n      v-if=\"listingBlock\"\n      :block=\"listingBlock\"\n      :block-id=\"listingId\"\n    />\n  </div>\n</template>\n\n<script setup>\nimport { ref, computed } from 'vue';\nconst props = defineProps({ block: Object, blockId: String });\nconst query = ref('');\nconst visibleFacets = computed(() => (props.block.facets || []).filter(f => !f.hidden));\nconst listingId = computed(() => props.block.listing?.items?.[0]);\nconst listingBlock = computed(() => listingId.value ? props.block.listing?.blocks?.[listingId.value] : null);\n</script>"
+        },
+        {
+          "@id": "ref-search-rendering-svelte-7ba7ad",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<script>\n  import ListingBlock from './ListingBlock.svelte';\n  export let block;\n  export let blockId;\n\n  let query = '';\n\n  $: visibleFacets = (block.facets || []).filter(f => !f.hidden);\n  $: listingId = block.listing?.items?.[0];\n  $: listingBlock = listingId ? block.listing?.blocks?.[listingId] : null;\n</script>\n\n<div data-block-uid={blockId} class=\"search-block\">\n  <input type=\"search\" placeholder=\"Search...\" bind:value={query} />\n\n  {#if visibleFacets.length}\n    <div class=\"facets\">\n      <h4>{block.facetsTitle || 'Filter'}</h4>\n      {#each visibleFacets as facet (facet['@id'])}\n        {#if facet.type === 'checkboxFacet'}\n          <fieldset><legend>{facet.title}</legend><!-- checkbox options --></fieldset>\n        {:else if facet.type === 'selectFacet'}\n          <label>{facet.title}<select><!-- options --></select></label>\n        {:else if facet.type === 'daterangeFacet'}\n          <label>{facet.title}<input type=\"date\" /> – <input type=\"date\" /></label>\n        {:else if facet.type === 'toggleFacet'}\n          <label><input type=\"checkbox\" /> {facet.title}</label>\n        {/if}\n      {/each}\n    </div>\n  {/if}\n\n  {#if listingBlock}\n    <ListingBlock block={listingBlock} blockId={listingId} />\n  {/if}\n</div>"
+        }
+      ]
+    },
     "ref-search-schema-heading": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-search",
-      "placeholder": "schema-heading",
-      "plaintext": "Schema",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "Schema"
-            }
-          ]
-        }
-      ]
+      "placeholder": "schema-heading"
     },
-    "ref-search-schema": {
+    "ref-search-schema-desc": {
       "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-search",
-      "placeholder": "schema",
-      "plaintext": "// Search block (built-in, enhanced by Hydra)\n{\n  schemaEnhancer: ({ schema }) => {\n    // Listing container — holds one listing block for results\n    schema.properties.listing = {\n      title: 'Resul",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "// Search block (built-in, enhanced by Hydra)\n{\n  schemaEnhancer: ({ schema }) => {\n    // Listing container — holds one listing block for results\n    schema.properties.listing = {\n      title: 'Results Listing',\n      widget: 'blocks_layout',\n      allowedBlocks: ['listing', 'default', 'summary', 'teaser', 'image'],\n      maxLength: 1,\n      defaultBlockType: 'listing',\n    };\n\n    // Facets — typed object_list, each facet has its own schema\n    schema.properties.facets = {\n      title: 'Facets',\n      widget: 'object_list',\n      typeField: 'type',\n      allowedBlocks: ['checkboxFacet', 'selectFacet', 'daterangeFacet', 'toggleFacet'],\n    };\n\n    return schema;\n  },\n}\n\n{\n  blockSchema: {\n    properties: {\n      title:    { title: 'Label', type: 'string' },\n      field:    { title: 'Field', widget: 'select_querystring_field' },\n      multiple: { title: 'Multiple choices?', type: 'boolean', default: false },\n      hidden:   { title: 'Hide facet?', type: 'boolean', default: false },\n    },\n  },\n}\n\n{\n  blockSchema: {\n    properties: {\n      title:  { title: 'Label', type: 'string' },\n      field:  { title: 'Field', widget: 'select_querystring_field' },\n      hidden: { title: 'Hide facet?', type: 'boolean', default: false },\n    },\n  },\n}\n\n{\n  blockSchema: {\n    properties: {\n      title:  { title: 'Label', type: 'string' },\n      field:  { title: 'Field', widget: 'select_querystring_field' },\n      hidden: { title: 'Hide facet?', type: 'boolean', default: false },\n    },\n  },\n}\n\n{\n  blockSchema: {\n    properties: {\n      title:  { title: 'Label', type: 'string' },\n      field:  { title: 'Field', widget: 'select_querystring_field' },\n      hidden: { title: 'Hide facet?', type: 'boolean', default: false },\n    },\n  },\n}"
-            }
-          ]
-        }
-      ]
+      "placeholder": "schema-desc"
     },
     "ref-search-json-heading": {
       "@type": "slate",
@@ -116,126 +150,31 @@
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-search",
-      "placeholder": "json-heading",
-      "plaintext": "JSON Block Data",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "JSON Block Data"
-            }
-          ]
-        }
-      ]
+      "placeholder": "json-heading"
     },
-    "ref-search-json-data": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-search",
-      "placeholder": "json-data",
-      "plaintext": "{\n  \"@type\": \"search\",\n  \"facetsTitle\": \"Filter by\",\n  \"facets\": [\n    {\n      \"@id\": \"facet-1\",\n      \"type\": \"checkboxFacet\",\n      \"title\": \"Content Type\",\n      \"field\": \"portal_type\",\n      \"mult",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "{\n  \"@type\": \"search\",\n  \"facetsTitle\": \"Filter by\",\n  \"facets\": [\n    {\n      \"@id\": \"facet-1\",\n      \"type\": \"checkboxFacet\",\n      \"title\": \"Content Type\",\n      \"field\": \"portal_type\",\n      \"multiple\": true,\n      \"hidden\": false\n    },\n    {\n      \"@id\": \"facet-2\",\n      \"type\": \"daterangeFacet\",\n      \"title\": \"Date Range\",\n      \"field\": \"effective\",\n      \"hidden\": false\n    }\n  ],\n  \"listing\": {\n    \"items\": [\"listing-1\"],\n    \"blocks\": {\n      \"listing-1\": {\n        \"@type\": \"listing\",\n        \"variation\": \"summary\",\n        \"querystring\": {\n          \"query\": [\n            {\n              \"i\": \"portal_type\",\n              \"o\": \"plone.app.querystring.operation.selection.any\",\n              \"v\": [\"Document\", \"News Item\"]\n            }\n          ]\n        }\n      }\n    }\n  }\n}"
-            }
-          ]
-        }
-      ]
-    },
-    "ref-search-react-heading": {
+    "ref-search-json-desc": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-search",
-      "placeholder": "react-heading",
-      "plaintext": "React",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "React"
-            }
-          ]
-        }
-      ]
+      "placeholder": "json-desc"
     },
-    "ref-search-react-code": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-search",
-      "placeholder": "react-code",
-      "plaintext": "function SearchBlock({ block, blockId }) {\n  const [query, setQuery] = useState('');\n\n  const facets = (block.facets || []).filter(f => !f.hidden);\n  const listing = block.listing || {};\n  const listi",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "function SearchBlock({ block, blockId }) {\n  const [query, setQuery] = useState('');\n\n  const facets = (block.facets || []).filter(f => !f.hidden);\n  const listing = block.listing || {};\n  const listingId = listing.items?.[0];\n  const listingBlock = listingId ? listing.blocks?.[listingId] : null;\n\n  return (\n    <div data-block-uid={blockId} className=\"search-block\">\n      <input\n        type=\"search\"\n        placeholder=\"Search...\"\n        value={query}\n        onChange={e => setQuery(e.target.value)}\n      />\n\n      {facets.length > 0 && (\n        <div className=\"facets\">\n          <h4>{block.facetsTitle || 'Filter'}</h4>\n          {facets.map(facet => (\n            <FacetRenderer key={facet['@id']} facet={facet} />\n          ))}\n        </div>\n      )}\n\n      {listingBlock && (\n        <ListingBlock block={listingBlock} blockId={listingId} />\n      )}\n    </div>\n  );\n}\n\nfunction FacetRenderer({ facet }) {\n  switch (facet.type) {\n    case 'checkboxFacet':\n      return <fieldset><legend>{facet.title}</legend>{/* checkbox options */}</fieldset>;\n    case 'selectFacet':\n      return <label>{facet.title}<select>{/* options */}</select></label>;\n    case 'daterangeFacet':\n      return <label>{facet.title}<input type=\"date\" /> – <input type=\"date\" /></label>;\n    case 'toggleFacet':\n      return <label><input type=\"checkbox\" /> {facet.title}</label>;\n    default:\n      return null;\n  }\n}"
-            }
-          ]
-        }
-      ]
-    },
-    "ref-search-vue-heading": {
+    "ref-search-rendering-heading": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-search",
-      "placeholder": "vue-heading",
-      "plaintext": "Vue",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "Vue"
-            }
-          ]
-        }
-      ]
+      "placeholder": "rendering-heading"
     },
-    "ref-search-vue-code": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-search",
-      "placeholder": "vue-code",
-      "plaintext": "<template>\n  <div :data-block-uid=\"blockId\" class=\"search-block\">\n    <input type=\"search\" placeholder=\"Search...\" v-model=\"query\" />\n\n    <div v-if=\"visibleFacets.length\" class=\"facets\">\n      <h4>{{",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "<template>\n  <div :data-block-uid=\"blockId\" class=\"search-block\">\n    <input type=\"search\" placeholder=\"Search...\" v-model=\"query\" />\n\n    <div v-if=\"visibleFacets.length\" class=\"facets\">\n      <h4>{{ block.facetsTitle || 'Filter' }}</h4>\n      <template v-for=\"facet in visibleFacets\" :key=\"facet['@id']\">\n        <fieldset v-if=\"facet.type === 'checkboxFacet'\">\n          <legend>{{ facet.title }}</legend>\n          <!-- checkbox options -->\n        </fieldset>\n        <label v-else-if=\"facet.type === 'selectFacet'\">\n          {{ facet.title }}<select><!-- options --></select>\n        </label>\n        <label v-else-if=\"facet.type === 'daterangeFacet'\">\n          {{ facet.title }}<input type=\"date\" /> – <input type=\"date\" />\n        </label>\n        <label v-else-if=\"facet.type === 'toggleFacet'\">\n          <input type=\"checkbox\" /> {{ facet.title }}\n        </label>\n      </template>\n    </div>\n\n    <ListingBlock\n      v-if=\"listingBlock\"\n      :block=\"listingBlock\"\n      :block-id=\"listingId\"\n    />\n  </div>\n</template>\n\n<script setup>\nimport { ref, computed } from 'vue';\nconst props = defineProps({ block: Object, blockId: String });\nconst query = ref('');\nconst visibleFacets = computed(() => (props.block.facets || []).filter(f => !f.hidden));\nconst listingId = computed(() => props.block.listing?.items?.[0]);\nconst listingBlock = computed(() => listingId.value ? props.block.listing?.blocks?.[listingId.value] : null);\n</script>"
-            }
-          ]
-        }
-      ]
-    },
-    "ref-search-desc": {
+    "ref-search-rendering-desc": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-search",
-      "placeholder": "examples-desc",
-      "plaintext": "The following examples show how to render a Search block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component.",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "The following examples show how to render a Search block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component."
-            }
-          ]
-        }
-      ]
+      "placeholder": "rendering-desc"
     }
   },
   "blocks_layout": {
@@ -245,15 +184,15 @@
       "42b7d589-4d35-4b81-9fe9-ea17437beb81",
       "ref-search-sep",
       "ref-search-heading",
-      "ref-search-desc",
       "ref-search-schema-heading",
+      "ref-search-schema-desc",
       "ref-search-schema",
       "ref-search-json-heading",
+      "ref-search-json-desc",
       "ref-search-json-data",
-      "ref-search-react-heading",
-      "ref-search-react-code",
-      "ref-search-vue-heading",
-      "ref-search-vue-code"
+      "ref-search-rendering-heading",
+      "ref-search-rendering-desc",
+      "ref-search-rendering"
     ]
   },
   "contributors": [],

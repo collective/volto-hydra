@@ -451,6 +451,124 @@
     },
     "af3c704a-1f80-48c8-843b-dc29368d43d9": {
       "@type": "title"
+    },
+    "ref-highlight-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "sep"
+    },
+    "ref-highlight-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "heading"
+    },
+    "ref-highlight-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "schema-heading"
+    },
+    "ref-highlight-schema-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "schema-desc"
+    },
+    "ref-highlight-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "json-heading"
+    },
+    "ref-highlight-json-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "json-desc"
+    },
+    "ref-highlight-rendering-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "rendering-heading"
+    },
+    "ref-highlight-rendering-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "rendering-desc"
+    },
+    "ref-highlight-schema": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-highlight-schema-javascript-80590c",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "highlight: {\n  id: 'highlight',\n  title: 'Highlight',\n  group: 'common',\n  blockSchema: {\n    properties: {\n      title: {\n        title: 'Title',\n        type: 'string',\n      },\n      description: {\n        title: 'Description',\n        type: 'array',\n        widget: 'slate',\n      },\n      image: {\n        title: 'Background Image',\n        widget: 'image',\n      },\n      cta_title: {\n        title: 'CTA Text',\n        type: 'string',\n      },\n      cta_link: {\n        title: 'CTA Link',\n        widget: 'object_browser',\n        mode: 'link',\n        allowExternals: true,\n      },\n    },\n  },\n}"
+        }
+      ]
+    },
+    "ref-highlight-json-data": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-highlight-json-data-json-a2bfa3",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"highlight\",\n  \"title\": \"Featured Content\",\n  \"description\": [\n    {\n      \"type\": \"p\",\n      \"children\": [{ \"text\": \"Discover the latest updates and features available in this release.\" }]\n    }\n  ],\n  \"image\": \"/banner/@@images/image\",\n  \"cta_title\": \"Read More\",\n  \"cta_link\": [{ \"@id\": \"/news/latest\" }]\n}"
+        }
+      ]
+    },
+    "ref-highlight-rendering": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-highlight-rendering-jsx-659b6c",
+          "label": "React",
+          "language": "jsx",
+          "code": "function HighlightBlock({ block }) {\n  const title = block.title || '';\n  const description = block.description || [];\n  const imageSrc = block.image || '';\n  const ctaText = block.cta_title || '';\n  const ctaLink = block.cta_link?.[0]?.['@id'] || '';\n\n  return (\n    <section\n      data-block-uid={block['@uid']}\n      className=\"highlight-block\"\n      style={{ backgroundImage: imageSrc ? `url(${imageSrc})` : undefined }}\n    >\n      <div className=\"highlight-overlay\">\n        <h2 data-edit-text=\"title\">{title}</h2>\n        <div className=\"highlight-body\">\n          {description.map((node, i) => (\n            <SlateNode key={i} node={node} />\n          ))}\n        </div>\n        {ctaText && (\n          <a href={ctaLink} data-edit-text=\"cta_title\" data-edit-link=\"cta_link\" className=\"highlight-cta\">\n            {ctaText}\n          </a>\n        )}\n      </div>\n    </section>\n  );\n}"
+        },
+        {
+          "@id": "ref-highlight-rendering-vue-dd8730",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<template>\n  <section\n    :data-block-uid=\"block['@uid']\"\n    class=\"highlight-block\"\n    :style=\"{ backgroundImage: block.image ? `url(${block.image})` : undefined }\"\n  >\n    <div class=\"highlight-overlay\">\n      <h2 data-edit-text=\"title\">{{ block.title }}</h2>\n      <div class=\"highlight-body\">\n        <SlateNode v-for=\"(node, i) in block.description || []\" :key=\"i\" :node=\"node\" />\n      </div>\n      <a\n        v-if=\"block.cta_title\"\n        :href=\"ctaLink\"\n        data-edit-text=\"cta_title\"\n        data-edit-link=\"cta_link\"\n        class=\"highlight-cta\"\n      >\n        {{ block.cta_title }}\n      </a>\n    </div>\n  </section>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nconst props = defineProps({ block: Object });\nconst ctaLink = computed(() => props.block.cta_link?.[0]?.['@id'] || '');\n</script>"
+        },
+        {
+          "@id": "ref-highlight-rendering-svelte-d3a4c8",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<script>\n  import SlateNode from './SlateNode.svelte';\n  export let block;\n  $: ctaLink = block.cta_link?.[0]?.['@id'] || '';\n</script>\n\n<section\n  data-block-uid={block['@uid']}\n  class=\"highlight-block\"\n  style={block.image ? `background-image: url(${block.image})` : ''}\n>\n  <div class=\"highlight-overlay\">\n    <h2 data-edit-text=\"title\">{block.title}</h2>\n    <div class=\"highlight-body\">\n      {#each block.description || [] as node, i (i)}\n        <SlateNode {node} />\n      {/each}\n    </div>\n    {#if block.cta_title}\n      <a href={ctaLink} data-edit-text=\"cta_title\" data-edit-link=\"cta_link\" class=\"highlight-cta\">\n        {block.cta_title}\n      </a>\n    {/if}\n  </div>\n</section>"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -460,7 +578,18 @@
       "417e7343-af04-4da4-96bf-29321a3e0fc6",
       "67a6a73a-5ae7-4e14-a11b-bd0139e56513",
       "25a0a1b5-3ce9-468f-8968-9a7f83ca4e53",
-      "94655cc3-817d-48ba-bc20-6e9f7796dc46"
+      "94655cc3-817d-48ba-bc20-6e9f7796dc46",
+      "ref-highlight-sep",
+      "ref-highlight-heading",
+      "ref-highlight-schema-heading",
+      "ref-highlight-schema-desc",
+      "ref-highlight-schema",
+      "ref-highlight-json-heading",
+      "ref-highlight-json-desc",
+      "ref-highlight-json-data",
+      "ref-highlight-rendering-heading",
+      "ref-highlight-rendering-desc",
+      "ref-highlight-rendering"
     ]
   },
   "contributors": [],

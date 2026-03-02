@@ -309,41 +309,75 @@
         }
       ]
     },
+    "ref-text-schema": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-text-schema-javascript-6ffd2e",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  blockSchema: {\n    properties: {\n      value: {\n        title: 'Body',\n        widget: 'slate',\n      },\n    },\n  },\n}"
+        }
+      ]
+    },
+    "ref-text-json-data": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-text-json-data-json-f6d82b",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"slate\",\n  \"value\": [\n    {\n      \"type\": \"h2\",\n      \"children\": [{ \"text\": \"Welcome\" }]\n    },\n    {\n      \"type\": \"p\",\n      \"children\": [\n        { \"text\": \"This is \" },\n        { \"type\": \"strong\", \"children\": [{ \"text\": \"bold\" }] },\n        { \"text\": \" and \" },\n        { \"type\": \"em\", \"children\": [{ \"text\": \"italic\" }] },\n        { \"text\": \" text.\" }\n      ]\n    },\n    {\n      \"type\": \"ul\",\n      \"children\": [\n        { \"type\": \"li\", \"children\": [{ \"text\": \"First item\" }] },\n        { \"type\": \"li\", \"children\": [{ \"text\": \"Second item\" }] }\n      ]\n    },\n    {\n      \"type\": \"p\",\n      \"children\": [\n        { \"text\": \"Visit \" },\n        {\n          \"type\": \"link\",\n          \"data\": { \"url\": \"https://example.com\" },\n          \"children\": [{ \"text\": \"our site\" }]\n        },\n        { \"text\": \" for more.\" }\n      ]\n    }\n  ]\n}"
+        }
+      ]
+    },
+    "ref-text-rendering": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-text-rendering-jsx-076433",
+          "label": "React",
+          "language": "jsx",
+          "code": "function SlateBlock({ block }) {\n  return (\n    <div data-block-uid={block['@uid']} data-edit-text=\"value\">\n      {(block.value || []).map((node, i) => (\n        <SlateNode key={i} node={node} />\n      ))}\n    </div>\n  );\n}\n\nfunction SlateNode({ node }) {\n  const children = (node.children || []).map((child, i) => (\n    <SlateNode key={i} node={child} />\n  ));\n\n  switch (node.type) {\n    case 'p':         return <p>{children}</p>;\n    case 'h1':        return <h1>{children}</h1>;\n    case 'h2':        return <h2>{children}</h2>;\n    case 'h3':        return <h3>{children}</h3>;\n    case 'blockquote': return <blockquote>{children}</blockquote>;\n    case 'ul':        return <ul>{children}</ul>;\n    case 'ol':        return <ol>{children}</ol>;\n    case 'li':        return <li>{children}</li>;\n    case 'link':      return <a href={node.data?.url}>{children}</a>;\n    case 'strong':    return <strong>{children}</strong>;\n    case 'em':        return <em>{children}</em>;\n    case 'del':       return <del>{children}</del>;\n    case 'u':         return <u>{children}</u>;\n    case 'code':      return <code>{children}</code>;\n    default:\n      // Leaf text node\n      if (node.text !== undefined) return <>{node.text}</>;\n      return <span>{children}</span>;\n  }\n}"
+        },
+        {
+          "@id": "ref-text-rendering-vue-54b4b7",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<!-- SlateBlock.vue -->\n<template>\n  <div :data-block-uid=\"block['@uid']\" data-edit-text=\"value\">\n    <SlateNode v-for=\"(node, i) in block.value || []\" :key=\"i\" :node=\"node\" />\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>\n\n<!-- SlateNode.vue -->\n<template>\n  <p v-if=\"node.type === 'p'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></p>\n  <h1 v-else-if=\"node.type === 'h1'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></h1>\n  <h2 v-else-if=\"node.type === 'h2'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></h2>\n  <h3 v-else-if=\"node.type === 'h3'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></h3>\n  <blockquote v-else-if=\"node.type === 'blockquote'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></blockquote>\n  <ul v-else-if=\"node.type === 'ul'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></ul>\n  <ol v-else-if=\"node.type === 'ol'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></ol>\n  <li v-else-if=\"node.type === 'li'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></li>\n  <a v-else-if=\"node.type === 'link'\" :href=\"node.data?.url\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></a>\n  <strong v-else-if=\"node.type === 'strong'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></strong>\n  <em v-else-if=\"node.type === 'em'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></em>\n  <del v-else-if=\"node.type === 'del'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></del>\n  <u v-else-if=\"node.type === 'u'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></u>\n  <code v-else-if=\"node.type === 'code'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></code>\n  <template v-else>{{ node.text }}</template>\n</template>\n\n<script setup>\ndefineProps({ node: Object });\n</script>"
+        },
+        {
+          "@id": "ref-text-rendering-svelte-2aa474",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<!-- SlateBlock.svelte -->\n<script>\n  import SlateNode from './SlateNode.svelte';\n  export let block;\n</script>\n\n<div data-block-uid={block['@uid']} data-edit-text=\"value\">\n  {#each block.value || [] as node, i (i)}\n    <SlateNode {node} />\n  {/each}\n</div>\n\n<!-- SlateNode.svelte -->\n<script>\n  export let node;\n</script>\n\n{#if node.type === 'p'}\n  <p>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</p>\n{:else if node.type === 'h1'}\n  <h1>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</h1>\n{:else if node.type === 'h2'}\n  <h2>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</h2>\n{:else if node.type === 'h3'}\n  <h3>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</h3>\n{:else if node.type === 'blockquote'}\n  <blockquote>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</blockquote>\n{:else if node.type === 'ul'}\n  <ul>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</ul>\n{:else if node.type === 'ol'}\n  <ol>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</ol>\n{:else if node.type === 'li'}\n  <li>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</li>\n{:else if node.type === 'link'}\n  <a href={node.data?.url}>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</a>\n{:else if node.type === 'strong'}\n  <strong>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</strong>\n{:else if node.type === 'em'}\n  <em>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</em>\n{:else if node.type === 'del'}\n  <del>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</del>\n{:else if node.type === 'u'}\n  <u>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</u>\n{:else if node.type === 'code'}\n  <code>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</code>\n{:else}\n  {node.text}\n{/if}"
+        }
+      ]
+    },
     "ref-text-schema-heading": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-text",
-      "placeholder": "schema-heading",
-      "plaintext": "Schema",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "Schema"
-            }
-          ]
-        }
-      ]
+      "placeholder": "schema-heading"
     },
-    "ref-text-schema": {
+    "ref-text-schema-desc": {
       "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-text",
-      "placeholder": "schema",
-      "plaintext": "{\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['value'] }\n    ],\n    properties: {\n      value: {\n        title: 'Body',\n        widget: 'slate',\n      },\n    },",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "{\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['value'] }\n    ],\n    properties: {\n      value: {\n        title: 'Body',\n        widget: 'slate',\n      },\n    },\n  },\n}"
-            }
-          ]
-        }
-      ]
+      "placeholder": "schema-desc"
     },
     "ref-text-json-heading": {
       "@type": "slate",
@@ -351,126 +385,31 @@
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-text",
-      "placeholder": "json-heading",
-      "plaintext": "JSON Block Data",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "JSON Block Data"
-            }
-          ]
-        }
-      ]
+      "placeholder": "json-heading"
     },
-    "ref-text-json-data": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-text",
-      "placeholder": "json-data",
-      "plaintext": "{\n  \"@type\": \"slate\",\n  \"value\": [\n    {\n      \"type\": \"h2\",\n      \"children\": [{ \"text\": \"Welcome\" }]\n    },\n    {\n      \"type\": \"p\",\n      \"children\": [\n        { \"text\": \"This is \" },\n        { \"ty",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "{\n  \"@type\": \"slate\",\n  \"value\": [\n    {\n      \"type\": \"h2\",\n      \"children\": [{ \"text\": \"Welcome\" }]\n    },\n    {\n      \"type\": \"p\",\n      \"children\": [\n        { \"text\": \"This is \" },\n        { \"type\": \"strong\", \"children\": [{ \"text\": \"bold\" }] },\n        { \"text\": \" and \" },\n        { \"type\": \"em\", \"children\": [{ \"text\": \"italic\" }] },\n        { \"text\": \" text.\" }\n      ]\n    },\n    {\n      \"type\": \"ul\",\n      \"children\": [\n        { \"type\": \"li\", \"children\": [{ \"text\": \"First item\" }] },\n        { \"type\": \"li\", \"children\": [{ \"text\": \"Second item\" }] }\n      ]\n    },\n    {\n      \"type\": \"p\",\n      \"children\": [\n        { \"text\": \"Visit \" },\n        {\n          \"type\": \"link\",\n          \"data\": { \"url\": \"https://example.com\" },\n          \"children\": [{ \"text\": \"our site\" }]\n        },\n        { \"text\": \" for more.\" }\n      ]\n    }\n  ]\n}"
-            }
-          ]
-        }
-      ]
-    },
-    "ref-text-react-heading": {
+    "ref-text-json-desc": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-text",
-      "placeholder": "react-heading",
-      "plaintext": "React",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "React"
-            }
-          ]
-        }
-      ]
+      "placeholder": "json-desc"
     },
-    "ref-text-react-code": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-text",
-      "placeholder": "react-code",
-      "plaintext": "function SlateBlock({ block }) {\n  return (\n    <div data-block-uid={block['@uid']} data-edit-text=\"value\">\n      {(block.value || []).map((node, i) => (\n        <SlateNode key={i} node={node} />\n    ",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "function SlateBlock({ block }) {\n  return (\n    <div data-block-uid={block['@uid']} data-edit-text=\"value\">\n      {(block.value || []).map((node, i) => (\n        <SlateNode key={i} node={node} />\n      ))}\n    </div>\n  );\n}\n\nfunction SlateNode({ node }) {\n  const children = (node.children || []).map((child, i) => (\n    <SlateNode key={i} node={child} />\n  ));\n\n  switch (node.type) {\n    case 'p':         return <p>{children}</p>;\n    case 'h1':        return <h1>{children}</h1>;\n    case 'h2':        return <h2>{children}</h2>;\n    case 'h3':        return <h3>{children}</h3>;\n    case 'blockquote': return <blockquote>{children}</blockquote>;\n    case 'ul':        return <ul>{children}</ul>;\n    case 'ol':        return <ol>{children}</ol>;\n    case 'li':        return <li>{children}</li>;\n    case 'link':      return <a href={node.data?.url}>{children}</a>;\n    case 'strong':    return <strong>{children}</strong>;\n    case 'em':        return <em>{children}</em>;\n    case 'del':       return <del>{children}</del>;\n    case 'u':         return <u>{children}</u>;\n    case 'code':      return <code>{children}</code>;\n    default:\n      // Leaf text node\n      if (node.text !== undefined) return <>{node.text}</>;\n      return <span>{children}</span>;\n  }\n}"
-            }
-          ]
-        }
-      ]
-    },
-    "ref-text-vue-heading": {
+    "ref-text-rendering-heading": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-text",
-      "placeholder": "vue-heading",
-      "plaintext": "Vue",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "Vue"
-            }
-          ]
-        }
-      ]
+      "placeholder": "rendering-heading"
     },
-    "ref-text-vue-code": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-text",
-      "placeholder": "vue-code",
-      "plaintext": "<!-- SlateBlock.vue -->\n<template>\n  <div :data-block-uid=\"block['@uid']\" data-edit-text=\"value\">\n    <SlateNode v-for=\"(node, i) in block.value || []\" :key=\"i\" :node=\"node\" />\n  </div>\n</template>\n\n<",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "<!-- SlateBlock.vue -->\n<template>\n  <div :data-block-uid=\"block['@uid']\" data-edit-text=\"value\">\n    <SlateNode v-for=\"(node, i) in block.value || []\" :key=\"i\" :node=\"node\" />\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>\n\n<!-- SlateNode.vue -->\n<template>\n  <p v-if=\"node.type === 'p'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></p>\n  <h1 v-else-if=\"node.type === 'h1'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></h1>\n  <h2 v-else-if=\"node.type === 'h2'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></h2>\n  <h3 v-else-if=\"node.type === 'h3'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></h3>\n  <blockquote v-else-if=\"node.type === 'blockquote'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></blockquote>\n  <ul v-else-if=\"node.type === 'ul'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></ul>\n  <ol v-else-if=\"node.type === 'ol'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></ol>\n  <li v-else-if=\"node.type === 'li'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></li>\n  <a v-else-if=\"node.type === 'link'\" :href=\"node.data?.url\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></a>\n  <strong v-else-if=\"node.type === 'strong'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></strong>\n  <em v-else-if=\"node.type === 'em'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></em>\n  <del v-else-if=\"node.type === 'del'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></del>\n  <u v-else-if=\"node.type === 'u'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></u>\n  <code v-else-if=\"node.type === 'code'\"><SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" /></code>\n  <template v-else>{{ node.text }}</template>\n</template>\n\n<script setup>\ndefineProps({ node: Object });\n</script>"
-            }
-          ]
-        }
-      ]
-    },
-    "ref-text-desc": {
+    "ref-text-rendering-desc": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-text",
-      "placeholder": "examples-desc",
-      "plaintext": "The following examples show how to render a Text block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component.",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "The following examples show how to render a Text block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component."
-            }
-          ]
-        }
-      ]
+      "placeholder": "rendering-desc"
     }
   },
   "blocks_layout": {
@@ -494,15 +433,15 @@
       "00146980-5c86-4ecd-a84e-d373183231ad",
       "ref-text-sep",
       "ref-text-heading",
-      "ref-text-desc",
       "ref-text-schema-heading",
+      "ref-text-schema-desc",
       "ref-text-schema",
       "ref-text-json-heading",
+      "ref-text-json-desc",
       "ref-text-json-data",
-      "ref-text-react-heading",
-      "ref-text-react-code",
-      "ref-text-vue-heading",
-      "ref-text-vue-code"
+      "ref-text-rendering-heading",
+      "ref-text-rendering-desc",
+      "ref-text-rendering"
     ]
   },
   "contributors": [],

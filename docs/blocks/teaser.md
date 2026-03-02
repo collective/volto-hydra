@@ -11,9 +11,6 @@ The teaser block uses Volto's built-in TeaserSchema. It has an `href` field (obj
 ```js
 {
   blockSchema: {
-    fieldsets: [
-      { id: 'default', title: 'Default', fields: ['href', 'title', 'description', 'preview_image', 'overwrite'] }
-    ],
     properties: {
       href: {
         title: 'Target',

@@ -69,7 +69,9 @@
         }
       },
       "blocks_layout": {
-        "items": ["grid-listing-1"]
+        "items": [
+          "grid-listing-1"
+        ]
       },
       "styles": {
         "backgroundColor": "transparent"
@@ -168,41 +170,75 @@
         }
       ]
     },
+    "ref-listing-schema": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-listing",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-listing-schema-javascript-bd0476",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  blockSchema: {\n    properties: {\n      querystring: {\n        title: 'Query',\n        widget: 'query',\n      },\n      variation: {\n        title: 'Item Type',\n        // Choices are computed from allowedBlocks that have fieldMappings['@default']\n        // Built-in options: 'default', 'summary', 'teaser', 'image'\n      },\n    },\n  },\n}\n\n{\n  properties: {\n    href:        { title: 'Link', widget: 'url' },\n    title:       { title: 'Title' },\n    description: { title: 'Description', widget: 'textarea' },\n  },\n}\n\n{\n  properties: {\n    href:        { title: 'Link', widget: 'url' },\n    title:       { title: 'Title' },\n    description: { title: 'Description', widget: 'textarea' },\n    image:       { title: 'Image', widget: 'url' },\n  },\n}"
+        }
+      ]
+    },
+    "ref-listing-json-data": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-listing",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-listing-json-data-json-829696",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"listing\",\n  \"variation\": \"summary\",\n  \"querystring\": {\n    \"query\": [\n      {\n        \"i\": \"portal_type\",\n        \"o\": \"plone.app.querystring.operation.selection.any\",\n        \"v\": [\"Document\"]\n      }\n    ],\n    \"sort_on\": \"effective\",\n    \"sort_order\": \"descending\"\n  }\n}\n\n{\n  \"@uid\": \"item-1\",\n  \"@type\": \"summary\",\n  \"href\": \"/news/my-article\",\n  \"title\": \"My Article\",\n  \"description\": \"Article summary text\",\n  \"image\": \"/news/my-article/@@images/image-800x600.jpg\"\n}"
+        }
+      ]
+    },
+    "ref-listing-rendering": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-listing",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-listing-rendering-jsx-f33c73",
+          "label": "React",
+          "language": "jsx",
+          "code": "function ListingBlock({ block, blockId }) {\n  const [items, setItems] = useState([]);\n\n  useEffect(() => {\n    // expandListingBlocks fetches from the API and maps fields\n    async function load() {\n      const result = await expandListingBlocks(\n        { [blockId]: block },\n        [blockId],\n        blockId,\n      );\n      setItems(result.items);\n    }\n    load();\n  }, [block.querystring]);\n\n  return (\n    <div data-block-uid={blockId} className=\"listing-block\">\n      {items.map(item => (\n        <ListingItem key={item['@uid']} item={item} variation={block.variation} />\n      ))}\n    </div>\n  );\n}\n\nfunction ListingItem({ item, variation }) {\n  return (\n    <div data-block-uid={item['@uid']} className=\"listing-item\">\n      {variation === 'summary' && item.image && (\n        <img src={item.image} alt=\"\" />\n      )}\n      <h3><a href={item.href}>{item.title}</a></h3>\n      <p>{item.description}</p>\n    </div>\n  );\n}"
+        },
+        {
+          "@id": "ref-listing-rendering-vue-3c4a00",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<template>\n  <div :data-block-uid=\"blockId\" class=\"listing-block\">\n    <div v-for=\"item in items\" :key=\"item['@uid']\" :data-block-uid=\"item['@uid']\" class=\"listing-item\">\n      <img v-if=\"block.variation === 'summary' && item.image\" :src=\"item.image\" alt=\"\" />\n      <h3><a :href=\"item.href\">{{ item.title }}</a></h3>\n      <p>{{ item.description }}</p>\n    </div>\n  </div>\n</template>\n\n<script setup>\nimport { ref, watch } from 'vue';\n\nconst props = defineProps({ block: Object, blockId: String });\nconst items = ref([]);\n\nwatch(() => props.block.querystring, async () => {\n  const result = await expandListingBlocks(\n    { [props.blockId]: props.block },\n    [props.blockId],\n    props.blockId,\n  );\n  items.value = result.items;\n}, { immediate: true });\n</script>"
+        },
+        {
+          "@id": "ref-listing-rendering-svelte-aca768",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<script>\n  export let block;\n  export let blockId;\n\n  let items = [];\n\n  $: block.querystring, loadItems();\n\n  async function loadItems() {\n    const result = await expandListingBlocks(\n      { [blockId]: block },\n      [blockId],\n      blockId,\n    );\n    items = result.items;\n  }\n</script>\n\n<div data-block-uid={blockId} class=\"listing-block\">\n  {#each items as item (item['@uid'])}\n    <div data-block-uid={item['@uid']} class=\"listing-item\">\n      {#if block.variation === 'summary' && item.image}\n        <img src={item.image} alt=\"\" />\n      {/if}\n      <h3><a href={item.href}>{item.title}</a></h3>\n      <p>{item.description}</p>\n    </div>\n  {/each}\n</div>"
+        }
+      ]
+    },
     "ref-listing-schema-heading": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "schema-heading",
-      "plaintext": "Schema",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "Schema"
-            }
-          ]
-        }
-      ]
+      "placeholder": "schema-heading"
     },
-    "ref-listing-schema": {
+    "ref-listing-schema-desc": {
       "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "schema",
-      "plaintext": "{\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['querystring', 'variation'] }\n    ],\n    properties: {\n      querystring: {\n        title: 'Query',\n        widget",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "{\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['querystring', 'variation'] }\n    ],\n    properties: {\n      querystring: {\n        title: 'Query',\n        widget: 'query',\n      },\n      variation: {\n        title: 'Item Type',\n        // Choices are computed from allowedBlocks that have fieldMappings['@default']\n        // Built-in options: 'default', 'summary', 'teaser', 'image'\n      },\n    },\n  },\n}\n\n{\n  properties: {\n    href:        { title: 'Link', widget: 'url' },\n    title:       { title: 'Title' },\n    description: { title: 'Description', widget: 'textarea' },\n  },\n}\n\n{\n  properties: {\n    href:        { title: 'Link', widget: 'url' },\n    title:       { title: 'Title' },\n    description: { title: 'Description', widget: 'textarea' },\n    image:       { title: 'Image', widget: 'url' },\n  },\n}"
-            }
-          ]
-        }
-      ]
+      "placeholder": "schema-desc"
     },
     "ref-listing-json-heading": {
       "@type": "slate",
@@ -210,126 +246,31 @@
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "json-heading",
-      "plaintext": "JSON Block Data",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "JSON Block Data"
-            }
-          ]
-        }
-      ]
+      "placeholder": "json-heading"
     },
-    "ref-listing-json-data": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "json-data",
-      "plaintext": "{\n  \"@type\": \"listing\",\n  \"variation\": \"summary\",\n  \"querystring\": {\n    \"query\": [\n      {\n        \"i\": \"portal_type\",\n        \"o\": \"plone.app.querystring.operation.selection.any\",\n        \"v\": [\"Doc",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "{\n  \"@type\": \"listing\",\n  \"variation\": \"summary\",\n  \"querystring\": {\n    \"query\": [\n      {\n        \"i\": \"portal_type\",\n        \"o\": \"plone.app.querystring.operation.selection.any\",\n        \"v\": [\"Document\"]\n      }\n    ],\n    \"sort_on\": \"effective\",\n    \"sort_order\": \"descending\"\n  }\n}\n\n{\n  \"@uid\": \"item-1\",\n  \"@type\": \"summary\",\n  \"href\": \"/news/my-article\",\n  \"title\": \"My Article\",\n  \"description\": \"Article summary text\",\n  \"image\": \"/news/my-article/@@images/image-800x600.jpg\"\n}"
-            }
-          ]
-        }
-      ]
-    },
-    "ref-listing-react-heading": {
+    "ref-listing-json-desc": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "react-heading",
-      "plaintext": "React",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "React"
-            }
-          ]
-        }
-      ]
+      "placeholder": "json-desc"
     },
-    "ref-listing-react-code": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "react-code",
-      "plaintext": "function ListingBlock({ block, blockId }) {\n  const [items, setItems] = useState([]);\n\n  useEffect(() => {\n    // expandListingBlocks fetches from the API and maps fields\n    async function load() {\n ",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "function ListingBlock({ block, blockId }) {\n  const [items, setItems] = useState([]);\n\n  useEffect(() => {\n    // expandListingBlocks fetches from the API and maps fields\n    async function load() {\n      const result = await expandListingBlocks(\n        { [blockId]: block },\n        [blockId],\n        blockId,\n      );\n      setItems(result.items);\n    }\n    load();\n  }, [block.querystring]);\n\n  return (\n    <div data-block-uid={blockId} className=\"listing-block\">\n      {items.map(item => (\n        <ListingItem key={item['@uid']} item={item} variation={block.variation} />\n      ))}\n    </div>\n  );\n}\n\nfunction ListingItem({ item, variation }) {\n  return (\n    <div data-block-uid={item['@uid']} className=\"listing-item\">\n      {variation === 'summary' && item.image && (\n        <img src={item.image} alt=\"\" />\n      )}\n      <h3><a href={item.href}>{item.title}</a></h3>\n      <p>{item.description}</p>\n    </div>\n  );\n}"
-            }
-          ]
-        }
-      ]
-    },
-    "ref-listing-vue-heading": {
+    "ref-listing-rendering-heading": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "vue-heading",
-      "plaintext": "Vue",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "Vue"
-            }
-          ]
-        }
-      ]
+      "placeholder": "rendering-heading"
     },
-    "ref-listing-vue-code": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "vue-code",
-      "plaintext": "<template>\n  <div :data-block-uid=\"blockId\" class=\"listing-block\">\n    <div v-for=\"item in items\" :key=\"item['@uid']\" :data-block-uid=\"item['@uid']\" class=\"listing-item\">\n      <img v-if=\"block.variat",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "<template>\n  <div :data-block-uid=\"blockId\" class=\"listing-block\">\n    <div v-for=\"item in items\" :key=\"item['@uid']\" :data-block-uid=\"item['@uid']\" class=\"listing-item\">\n      <img v-if=\"block.variation === 'summary' && item.image\" :src=\"item.image\" alt=\"\" />\n      <h3><a :href=\"item.href\">{{ item.title }}</a></h3>\n      <p>{{ item.description }}</p>\n    </div>\n  </div>\n</template>\n\n<script setup>\nimport { ref, watch } from 'vue';\n\nconst props = defineProps({ block: Object, blockId: String });\nconst items = ref([]);\n\nwatch(() => props.block.querystring, async () => {\n  const result = await expandListingBlocks(\n    { [props.blockId]: props.block },\n    [props.blockId],\n    props.blockId,\n  );\n  items.value = result.items;\n}, { immediate: true });\n</script>"
-            }
-          ]
-        }
-      ]
-    },
-    "ref-listing-desc": {
+    "ref-listing-rendering-desc": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "examples-desc",
-      "plaintext": "The following examples show how to render a Listing block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component.",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "The following examples show how to render a Listing block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component."
-            }
-          ]
-        }
-      ]
+      "placeholder": "rendering-desc"
     }
   },
   "blocks_layout": {
@@ -341,15 +282,15 @@
       "c2eaacd0-4e96-4344-a0ac-26ed644fc503",
       "ref-listing-sep",
       "ref-listing-heading",
-      "ref-listing-desc",
       "ref-listing-schema-heading",
+      "ref-listing-schema-desc",
       "ref-listing-schema",
       "ref-listing-json-heading",
+      "ref-listing-json-desc",
       "ref-listing-json-data",
-      "ref-listing-react-heading",
-      "ref-listing-react-code",
-      "ref-listing-vue-heading",
-      "ref-listing-vue-code"
+      "ref-listing-rendering-heading",
+      "ref-listing-rendering-desc",
+      "ref-listing-rendering"
     ]
   },
   "contributors": [],

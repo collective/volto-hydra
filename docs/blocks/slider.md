@@ -10,29 +10,14 @@ This is a **custom** block — register it via `initBridge`.
 slider: {
   id: 'slider',
   title: 'Slider',
-  icon: '<svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/></svg>',
   group: 'common',
   blockSchema: {
-    fieldsets: [
-      {
-        id: 'default',
-        title: 'Default',
-        fields: ['slides', 'autoplayEnabled', 'autoplayDelay'],
-      },
-    ],
     properties: {
       slides: {
         title: 'Slides',
         widget: 'object_list',
         schema: {
           title: 'Slide',
-          fieldsets: [
-            {
-              id: 'default',
-              title: 'Default',
-              fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText'],
-            },
-          ],
           properties: {
             head_title:    { title: 'Kicker', type: 'string' },
             title:         { title: 'Title', type: 'string' },

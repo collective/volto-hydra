@@ -55,20 +55,72 @@
         }
       ]
     },
-    "tpl-schema": {
+    "tpl-schema-desc": {
       "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "schema",
-      "plaintext": "",
+      "placeholder": "schema-desc",
+      "plaintext": "Pass this object inside the blocks option when calling initBridge() to register this block type with the admin UI. See Custom Blocks for the full setup guide.",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": ""
+              "text": "Pass this object inside the "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks"
+                }
+              ]
+            },
+            {
+              "text": " option when calling "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "initBridge()"
+                }
+              ]
+            },
+            {
+              "text": " to register this block type with the admin UI. See "
+            },
+            {
+              "type": "a",
+              "data": {
+                "url": "/concepts/integration-levels"
+              },
+              "children": [
+                {
+                  "text": "Custom Blocks"
+                }
+              ]
+            },
+            {
+              "text": " for the full setup guide."
             }
           ]
+        }
+      ]
+    },
+    "tpl-schema": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-block-ref-def",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "tpl-schema-javascript-000000",
+          "label": "Schema",
+          "language": "javascript",
+          "code": ""
         }
       ]
     },
@@ -91,111 +143,122 @@
         }
       ]
     },
-    "tpl-json": {
+    "tpl-json-desc": {
       "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-block-ref-def",
+      "placeholder": "json-desc",
+      "plaintext": "Example JSON as stored in the Plone content API. This is the data structure your component will receive in the block prop.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Example JSON as stored in the Plone content API. This is the data structure your component will receive in the "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "block"
+                }
+              ]
+            },
+            {
+              "text": " prop."
+            }
+          ]
+        }
+      ]
+    },
+    "tpl-json": {
+      "@type": "codeExample",
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
       "placeholder": "json-data",
-      "plaintext": "",
-      "value": [
+      "tabs": [
         {
-          "type": "p",
-          "children": [
-            {
-              "text": ""
-            }
-          ]
+          "@id": "tpl-json-json-000000",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": ""
         }
       ]
     },
-    "tpl-react-heading": {
+    "tpl-rendering-heading": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "react-heading",
-      "plaintext": "React",
+      "placeholder": "rendering-heading",
+      "plaintext": "Component",
       "value": [
         {
           "type": "h3",
           "children": [
             {
-              "text": "React"
+              "text": "Component"
             }
           ]
         }
       ]
     },
-    "tpl-react": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "react-code",
-      "plaintext": "",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": ""
-            }
-          ]
-        }
-      ]
-    },
-    "tpl-vue-heading": {
+    "tpl-rendering-desc": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "vue-heading",
-      "plaintext": "Vue",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "Vue"
-            }
-          ]
-        }
-      ]
-    },
-    "tpl-vue": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "vue-code",
-      "plaintext": "",
+      "placeholder": "rendering-desc",
+      "plaintext": "Render component for your frontend framework. Add this to your block renderer's switch/map so it handles this block type.",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": ""
+              "text": "Render component for your frontend framework. Add this to your block renderer's switch/map so it handles this "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "@type"
+                }
+              ]
+            },
+            {
+              "text": "."
             }
           ]
         }
       ]
     },
-    "tpl-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
+    "tpl-rendering": {
+      "@type": "codeExample",
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "examples-desc",
-      "plaintext": "The following examples show how to render this block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component.",
-      "value": [
+      "placeholder": "rendering",
+      "tabs": [
         {
-          "type": "p",
-          "children": [
-            {
-              "text": "The following examples show how to render this block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component."
-            }
-          ]
+          "@id": "tpl-rendering-jsx-000000",
+          "label": "React",
+          "language": "jsx",
+          "code": ""
+        },
+        {
+          "@id": "tpl-rendering-vue-000000",
+          "label": "Vue",
+          "language": "vue",
+          "code": ""
+        },
+        {
+          "@id": "tpl-rendering-svelte-000000",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": ""
         }
       ]
     }
@@ -204,15 +267,15 @@
     "items": [
       "tpl-sep",
       "tpl-examples-heading",
-      "tpl-desc",
       "tpl-schema-heading",
+      "tpl-schema-desc",
       "tpl-schema",
       "tpl-json-heading",
+      "tpl-json-desc",
       "tpl-json",
-      "tpl-react-heading",
-      "tpl-react",
-      "tpl-vue-heading",
-      "tpl-vue"
+      "tpl-rendering-heading",
+      "tpl-rendering-desc",
+      "tpl-rendering"
     ]
   }
 }

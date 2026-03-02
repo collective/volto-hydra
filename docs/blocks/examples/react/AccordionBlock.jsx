@@ -1,21 +1,31 @@
 function AccordionBlock({ block }) {
-  const [open, setOpen] = useState(false);
-
-  const header = block.header || {};
-  const content = block.content || {};
+  const panels = block.panels || [];
 
   return (
     <div data-block-uid={block['@uid']} className="accordion-block">
+      {panels.map(panel => {
+        const panelId = panel['@id'];
+        return <AccordionPanel key={panelId} panel={panel} panelId={panelId} />;
+      })}
+    </div>
+  );
+}
+
+function AccordionPanel({ panel, panelId }) {
+  const [open, setOpen] = useState(false);
+  const contentBlocks = panel.blocks || {};
+  const contentLayout = panel.blocks_layout?.items || [];
+
+  return (
+    <div data-block-uid={panelId} className="accordion-panel">
       <button onClick={() => setOpen(!open)} className="accordion-header">
-        {(header.items || []).map(id => (
-          <BlockRenderer key={id} block={{ ...header.blocks[id], '@uid': id }} />
-        ))}
+        <span data-edit-text="title">{panel.title}</span>
         <span>{open ? '▲' : '▼'}</span>
       </button>
       {open && (
         <div className="accordion-content">
-          {(content.items || []).map(id => (
-            <BlockRenderer key={id} block={{ ...content.blocks[id], '@uid': id }} />
+          {contentLayout.map(id => (
+            <BlockRenderer key={id} block={{ ...contentBlocks[id], '@uid': id }} />
           ))}
         </div>
       )}

@@ -69,6 +69,124 @@
           "type": "p"
         }
       ]
+    },
+    "ref-introduction-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-introduction",
+      "placeholder": "sep"
+    },
+    "ref-introduction-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-introduction",
+      "placeholder": "heading"
+    },
+    "ref-introduction-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-introduction",
+      "placeholder": "schema-heading"
+    },
+    "ref-introduction-schema-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-introduction",
+      "placeholder": "schema-desc"
+    },
+    "ref-introduction-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-introduction",
+      "placeholder": "json-heading"
+    },
+    "ref-introduction-json-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-introduction",
+      "placeholder": "json-desc"
+    },
+    "ref-introduction-rendering-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-introduction",
+      "placeholder": "rendering-heading"
+    },
+    "ref-introduction-rendering-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-introduction",
+      "placeholder": "rendering-desc"
+    },
+    "ref-introduction-schema": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-introduction",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-introduction-schema-javascript-e14a03",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  blockSchema: {\n    properties: {\n      value: {\n        title: 'Body',\n        widget: 'slate',\n      },\n    },\n  },\n}"
+        }
+      ]
+    },
+    "ref-introduction-json-data": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-introduction",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-introduction-json-data-json-d959f7",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"introduction\",\n  \"value\": [\n    {\n      \"type\": \"p\",\n      \"children\": [{ \"text\": \"This page explains how Hydra bridges your frontend with the Plone editor.\" }]\n    }\n  ]\n}"
+        }
+      ]
+    },
+    "ref-introduction-rendering": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-introduction",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-introduction-rendering-jsx-599242",
+          "label": "React",
+          "language": "jsx",
+          "code": "function IntroductionBlock({ block }) {\n  return (\n    <div data-block-uid={block['@uid']} className=\"introduction-block\" data-edit-text=\"value\">\n      {(block.value || []).map((node, i) => (\n        <SlateNode key={i} node={node} />\n      ))}\n    </div>\n  );\n}"
+        },
+        {
+          "@id": "ref-introduction-rendering-vue-53106b",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"introduction-block\" data-edit-text=\"value\">\n    <SlateNode v-for=\"(node, i) in block.value || []\" :key=\"i\" :node=\"node\" />\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"
+        },
+        {
+          "@id": "ref-introduction-rendering-svelte-9e2b59",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<script>\n  import SlateNode from './SlateNode.svelte';\n  export let block;\n</script>\n\n<div data-block-uid={block['@uid']} class=\"introduction-block\" data-edit-text=\"value\">\n  {#each block.value || [] as node, i (i)}\n    <SlateNode {node} />\n  {/each}\n</div>"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -78,7 +196,18 @@
       "d35f209e-12c1-4a30-ae36-52f84a4a0b7b",
       "cec08900-0334-4288-9ece-f5d15d4dd6f1",
       "26accd80-9715-43ea-9b7c-aa0b3be7d0da",
-      "177de529-ce72-4721-a58c-15feadaf285e"
+      "177de529-ce72-4721-a58c-15feadaf285e",
+      "ref-introduction-sep",
+      "ref-introduction-heading",
+      "ref-introduction-schema-heading",
+      "ref-introduction-schema-desc",
+      "ref-introduction-schema",
+      "ref-introduction-json-heading",
+      "ref-introduction-json-desc",
+      "ref-introduction-json-data",
+      "ref-introduction-rendering-heading",
+      "ref-introduction-rendering-desc",
+      "ref-introduction-rendering"
     ]
   },
   "contributors": [],

@@ -10,20 +10,8 @@ This is a **custom** block — register it via `initBridge`.
 form: {
   id: 'form',
   title: 'Form',
-  icon: '<svg viewBox="0 0 24 24"><path d="M4 4h16v2H4zm0 4h10v2H4zm0 4h16v2H4zm0 4h10v2H4z"/></svg>',
   group: 'common',
   blockSchema: {
-    fieldsets: [
-      {
-        id: 'default',
-        title: 'Default',
-        fields: [
-          'title', 'description', 'subblocks',
-          'default_to', 'default_from', 'default_subject',
-          'submit_label',
-        ],
-      },
-    ],
     properties: {
       title:           { title: 'Title', type: 'string' },
       description:     { title: 'Description', type: 'textarea' },

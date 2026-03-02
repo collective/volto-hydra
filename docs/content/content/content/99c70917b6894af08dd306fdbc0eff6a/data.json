@@ -58,41 +58,75 @@
         }
       ]
     },
+    "ref-grid-schema": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-grid",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-grid-schema-javascript-af1095",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  blockSchema: {\n    properties: {\n      blocks: {\n        title: 'Blocks',\n        type: 'object',\n      },\n      blocks_layout: {\n        title: 'Layout',\n        type: 'object',\n      },\n    },\n  },\n}"
+        }
+      ]
+    },
+    "ref-grid-json-data": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-grid",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-grid-json-data-json-5ff79e",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"gridBlock\",\n  \"blocks\": {\n    \"cell-1\": {\n      \"@type\": \"teaser\",\n      \"title\": \"Getting Started\",\n      \"description\": \"Learn how to set up your first project\",\n      \"href\": [{ \"@id\": \"/getting-started\" }]\n    },\n    \"cell-2\": {\n      \"@type\": \"image\",\n      \"url\": \"/hero-image/@@images/image\",\n      \"alt\": \"Hero image\"\n    },\n    \"cell-3\": {\n      \"@type\": \"slate\",\n      \"value\": [{ \"type\": \"p\", \"children\": [{ \"text\": \"Additional content here.\" }] }]\n    }\n  },\n  \"blocks_layout\": {\n    \"items\": [\"cell-1\", \"cell-2\", \"cell-3\"]\n  }\n}"
+        }
+      ]
+    },
+    "ref-grid-rendering": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-grid",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-grid-rendering-jsx-f30d80",
+          "label": "React",
+          "language": "jsx",
+          "code": "function GridBlock({ block }) {\n  const blocks = block.blocks || {};\n  const items = block.blocks_layout?.items || [];\n\n  return (\n    <div data-block-uid={block['@uid']} className=\"grid-block\">\n      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }}>\n        {items.map(id => {\n          const child = { ...blocks[id], '@uid': id };\n          return (\n            <div key={id} className=\"grid-cell\">\n              <BlockRenderer block={child} />\n            </div>\n          );\n        })}\n      </div>\n    </div>\n  );\n}"
+        },
+        {
+          "@id": "ref-grid-rendering-vue-1d61ab",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"grid-block\">\n    <div :style=\"{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }\">\n      <div v-for=\"id in items\" :key=\"id\" class=\"grid-cell\">\n        <BlockRenderer :block=\"{ ...block.blocks[id], '@uid': id }\" />\n      </div>\n    </div>\n  </div>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nconst props = defineProps({ block: Object });\nconst items = computed(() => props.block.blocks_layout?.items || []);\n</script>"
+        },
+        {
+          "@id": "ref-grid-rendering-svelte-8158ec",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<script>\n  import BlockRenderer from './BlockRenderer.svelte';\n  export let block;\n  $: blocks = block.blocks || {};\n  $: items = block.blocks_layout?.items || [];\n</script>\n\n<div data-block-uid={block['@uid']} class=\"grid-block\">\n  <div style=\"display: grid; grid-template-columns: repeat({items.length}, 1fr); gap: 1rem\">\n    {#each items as id (id)}\n      <div class=\"grid-cell\">\n        <BlockRenderer block={{ ...blocks[id], '@uid': id }} />\n      </div>\n    {/each}\n  </div>\n</div>"
+        }
+      ]
+    },
     "ref-grid-schema-heading": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-grid",
-      "placeholder": "schema-heading",
-      "plaintext": "Schema",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "Schema"
-            }
-          ]
-        }
-      ]
+      "placeholder": "schema-heading"
     },
-    "ref-grid-schema": {
+    "ref-grid-schema-desc": {
       "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-grid",
-      "placeholder": "schema",
-      "plaintext": "columns: {\n  id: 'columns',\n  title: 'Columns',\n  icon: '<svg viewBox=\"0 0 24 24\"><rect x=\"2\" y=\"3\" width=\"8\" height=\"18\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"8\" height=\"18\" rx=\"1\"/></svg>',\n  group: 'co",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "columns: {\n  id: 'columns',\n  title: 'Columns',\n  icon: '<svg viewBox=\"0 0 24 24\"><rect x=\"2\" y=\"3\" width=\"8\" height=\"18\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"8\" height=\"18\" rx=\"1\"/></svg>',\n  group: 'common',\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['title', 'top_images', 'columns'] },\n    ],\n    properties: {\n      title: {\n        title: 'Title',\n        type: 'string',\n      },\n      top_images: {\n        title: 'Top Images',\n        widget: 'blocks_layout',\n        allowedBlocks: ['image'],\n      },\n      columns: {\n        title: 'Columns',\n        widget: 'blocks_layout',\n        allowedBlocks: ['column'],\n        maxLength: 4,\n      },\n    },\n  },\n}\n\ncolumn: {\n  id: 'column',\n  title: 'Column',\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['title', 'blocks_layout'] },\n    ],\n    properties: {\n      title: {\n        title: 'Title',\n        type: 'string',\n      },\n      blocks_layout: {\n        title: 'Content',\n        widget: 'blocks_layout',\n        allowedBlocks: ['slate', 'image'],\n        defaultBlockType: 'slate',\n      },\n    },\n  },\n}"
-            }
-          ]
-        }
-      ]
+      "placeholder": "schema-desc"
     },
     "ref-grid-json-heading": {
       "@type": "slate",
@@ -100,126 +134,31 @@
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-grid",
-      "placeholder": "json-heading",
-      "plaintext": "JSON Block Data",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "JSON Block Data"
-            }
-          ]
-        }
-      ]
+      "placeholder": "json-heading"
     },
-    "ref-grid-json-data": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-grid",
-      "placeholder": "json-data",
-      "plaintext": "{\n  \"@type\": \"columns\",\n  \"title\": \"Our Services\",\n  \"columns\": {\n    \"items\": [\"col-1\", \"col-2\"],\n    \"blocks\": {\n      \"col-1\": {\n        \"@type\": \"column\",\n        \"title\": \"Design\",\n        \"block",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "{\n  \"@type\": \"columns\",\n  \"title\": \"Our Services\",\n  \"columns\": {\n    \"items\": [\"col-1\", \"col-2\"],\n    \"blocks\": {\n      \"col-1\": {\n        \"@type\": \"column\",\n        \"title\": \"Design\",\n        \"blocks_layout\": {\n          \"items\": [\"text-1\"],\n          \"blocks\": {\n            \"text-1\": {\n              \"@type\": \"slate\",\n              \"value\": [{ \"type\": \"p\", \"children\": [{ \"text\": \"We craft beautiful interfaces.\" }] }]\n            }\n          }\n        }\n      },\n      \"col-2\": {\n        \"@type\": \"column\",\n        \"title\": \"Engineering\",\n        \"blocks_layout\": {\n          \"items\": [\"text-2\"],\n          \"blocks\": {\n            \"text-2\": {\n              \"@type\": \"slate\",\n              \"value\": [{ \"type\": \"p\", \"children\": [{ \"text\": \"We build robust systems.\" }] }]\n            }\n          }\n        }\n      }\n    }\n  }\n}"
-            }
-          ]
-        }
-      ]
-    },
-    "ref-grid-react-heading": {
+    "ref-grid-json-desc": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-grid",
-      "placeholder": "react-heading",
-      "plaintext": "React",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "React"
-            }
-          ]
-        }
-      ]
+      "placeholder": "json-desc"
     },
-    "ref-grid-react-code": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-grid",
-      "placeholder": "react-code",
-      "plaintext": "function ColumnsBlock({ block }) {\n  const columns = block.columns || {};\n  const items = columns.items || [];\n  const blocks = columns.blocks || {};\n\n  return (\n    <div data-block-uid={block['@uid']",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "function ColumnsBlock({ block }) {\n  const columns = block.columns || {};\n  const items = columns.items || [];\n  const blocks = columns.blocks || {};\n\n  return (\n    <div data-block-uid={block['@uid']} className=\"columns-block\">\n      <div style={{ display: 'flex', gap: '1rem' }}>\n        {items.map(id => (\n          <ColumnBlock key={id} block={{ ...blocks[id], '@uid': id }} />\n        ))}\n      </div>\n    </div>\n  );\n}\n\nfunction ColumnBlock({ block }) {\n  const layout = block.blocks_layout || {};\n  const items = layout.items || [];\n  const blocks = layout.blocks || {};\n\n  return (\n    <div data-block-uid={block['@uid']} style={{ flex: 1 }}>\n      {block.title && <h4 data-edit-text=\"title\">{block.title}</h4>}\n      {items.map(id => (\n        <BlockRenderer key={id} block={{ ...blocks[id], '@uid': id }} />\n      ))}\n    </div>\n  );\n}"
-            }
-          ]
-        }
-      ]
-    },
-    "ref-grid-vue-heading": {
+    "ref-grid-rendering-heading": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-grid",
-      "placeholder": "vue-heading",
-      "plaintext": "Vue",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "Vue"
-            }
-          ]
-        }
-      ]
+      "placeholder": "rendering-heading"
     },
-    "ref-grid-vue-code": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-grid",
-      "placeholder": "vue-code",
-      "plaintext": "<!-- ColumnsBlock.vue -->\n<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"columns-block\">\n    <div style=\"display: flex; gap: 1rem\">\n      <ColumnBlock\n        v-for=\"id in block.columns?.ite",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "<!-- ColumnsBlock.vue -->\n<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"columns-block\">\n    <div style=\"display: flex; gap: 1rem\">\n      <ColumnBlock\n        v-for=\"id in block.columns?.items || []\"\n        :key=\"id\"\n        :block=\"{ ...block.columns.blocks[id], '@uid': id }\"\n      />\n    </div>\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>\n\n<!-- ColumnBlock.vue -->\n<template>\n  <div :data-block-uid=\"block['@uid']\" style=\"flex: 1\">\n    <h4 v-if=\"block.title\" data-edit-text=\"title\">{{ block.title }}</h4>\n    <BlockRenderer\n      v-for=\"id in block.blocks_layout?.items || []\"\n      :key=\"id\"\n      :block=\"{ ...block.blocks_layout.blocks[id], '@uid': id }\"\n    />\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"
-            }
-          ]
-        }
-      ]
-    },
-    "ref-grid-desc": {
+    "ref-grid-rendering-desc": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-grid",
-      "placeholder": "examples-desc",
-      "plaintext": "The following examples show how to render a Grid block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component.",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "The following examples show how to render a Grid block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component."
-            }
-          ]
-        }
-      ]
+      "placeholder": "rendering-desc"
     }
   },
   "blocks_layout": {
@@ -229,15 +168,15 @@
       "7624cf59-05d0-4055-8f55-5fd6597d84b0",
       "ref-grid-sep",
       "ref-grid-heading",
-      "ref-grid-desc",
       "ref-grid-schema-heading",
+      "ref-grid-schema-desc",
       "ref-grid-schema",
       "ref-grid-json-heading",
+      "ref-grid-json-desc",
       "ref-grid-json-data",
-      "ref-grid-react-heading",
-      "ref-grid-react-code",
-      "ref-grid-vue-heading",
-      "ref-grid-vue-code"
+      "ref-grid-rendering-heading",
+      "ref-grid-rendering-desc",
+      "ref-grid-rendering"
     ]
   },
   "contributors": [],

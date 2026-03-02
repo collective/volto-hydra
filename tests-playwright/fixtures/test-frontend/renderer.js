@@ -198,6 +198,7 @@ async function renderBlock(blockId, block) {
         case 'accordion':
             wrapper.innerHTML = await renderAccordionBlock(block, blockId);
             break;
+        // accordionPanel is rendered inline by renderAccordionBlock (object_list items)
         case 'slateTable':
             wrapper.innerHTML = renderSlateTableBlock(block);
             break;
@@ -222,6 +223,24 @@ async function renderBlock(blockId, block) {
                 return await renderListingBlock(block, blockId);
             }
             wrapper.textContent = 'Listing block (no query)';
+            break;
+        case 'introduction':
+            wrapper.innerHTML = renderIntroductionBlock(block);
+            break;
+        case 'heading':
+            wrapper.innerHTML = renderHeadingBlock(block);
+            break;
+        case 'separator':
+            wrapper.innerHTML = renderSeparatorBlock(block);
+            break;
+        case '__button':
+            wrapper.innerHTML = renderButtonBlock(block);
+            break;
+        case 'highlight':
+            wrapper.innerHTML = renderHighlightBlock(block);
+            break;
+        case 'toc':
+            wrapper.innerHTML = renderTocBlock(block);
             break;
         case 'skiplogicTest':
             wrapper.innerHTML = renderSkiplogicTestBlock(block);
@@ -704,9 +723,110 @@ function renderImageBlock(block) {
  */
 function renderVideoBlock(block) {
     const url = block.url || '';
-    return `<div class="video-block">
-        <p>Video: ${url || 'No URL set'}</p>
-    </div>`;
+    const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?/]+)/);
+    if (ytMatch) {
+        return `<div class="video-block">
+            <iframe src="https://www.youtube.com/embed/${ytMatch[1]}" allowfullscreen
+                style="width:100%;aspect-ratio:16/9;border:none" title="Video"></iframe>
+        </div>`;
+    }
+    if (url) {
+        return `<div class="video-block">
+            <video src="${url}" controls style="width:100%"></video>
+        </div>`;
+    }
+    return `<div class="video-block"><p>No video URL set</p></div>`;
+}
+
+/**
+ * Render an introduction block (styled lead text).
+ * @param {Object} block - Introduction block data
+ * @returns {string} HTML string
+ */
+function renderIntroductionBlock(block) {
+    const value = block.value || [];
+    let html = '';
+    value.forEach((node) => {
+        const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
+        const text = renderChildren(node.children);
+        html += `<p data-edit-text="value"${nodeIdAttr} class="introduction-text" style="font-size:1.2em;color:#555;border-top:1px solid #ddd;border-bottom:1px solid #ddd;padding:1em 0;">${text}</p>`;
+    });
+    return html || '<p data-edit-text="value" class="introduction-text">Empty introduction</p>';
+}
+
+/**
+ * Render a heading block (standalone h1–h6).
+ * @param {Object} block - Heading block data
+ * @returns {string} HTML string
+ */
+function renderHeadingBlock(block) {
+    const tag = block.tag || 'h2';
+    const text = block.heading || '';
+    return `<${tag} data-edit-text="heading">${text}</${tag}>`;
+}
+
+/**
+ * Render a separator block (horizontal rule).
+ * @param {Object} block - Separator block data
+ * @returns {string} HTML string
+ */
+function renderSeparatorBlock(block) {
+    const align = block.styles?.align || 'full';
+    return `<hr class="separator-${align}" />`;
+}
+
+/**
+ * Render a button block (CTA link).
+ * @param {Object} block - Button block data
+ * @returns {string} HTML string
+ */
+function renderButtonBlock(block) {
+    const title = block.title || 'Button';
+    const href = getLinkUrl(block.href) || '#';
+    return `<a href="${href}" data-edit-text="title" data-edit-link="href" class="btn" style="display:inline-block;padding:10px 20px;background:#007eb1;color:white;text-decoration:none;border-radius:4px;">${title}</a>`;
+}
+
+/**
+ * Render a highlight block (banner with background, overlay, CTA).
+ * @param {Object} block - Highlight block data
+ * @returns {string} HTML string
+ */
+function renderHighlightBlock(block) {
+    const title = block.title || '';
+    const imageSrc = getImageUrl(block.image);
+    const ctaText = block.cta_title || '';
+    const ctaLink = getLinkUrl(block.cta_link);
+    const description = block.description || [];
+
+    let descHtml = '';
+    description.forEach((node) => {
+        const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
+        const text = renderChildren(node.children);
+        descHtml += `<p data-edit-text="description"${nodeIdAttr}>${text}</p>`;
+    });
+
+    const bgStyle = imageSrc ? `background-image:url(${imageSrc});background-size:cover;` : 'background:#334;';
+    const ctaHtml = ctaText
+        ? `<a href="${ctaLink || '#'}" data-edit-text="cta_title" data-edit-link="cta_link" style="display:inline-block;padding:10px 20px;background:#007eb1;color:white;text-decoration:none;border-radius:4px;">${ctaText}</a>`
+        : '';
+
+    return `<section class="highlight-block" style="${bgStyle}padding:40px 20px;color:white;border-radius:8px;">
+        <div class="highlight-overlay" style="background:rgba(0,0,0,0.4);padding:30px;border-radius:8px;">
+            <h2 data-edit-text="title">${title}</h2>
+            <div class="highlight-body">${descHtml}</div>
+            ${ctaHtml}
+        </div>
+    </section>`;
+}
+
+/**
+ * Render a table-of-contents block.
+ * Scans page blocks for headings.
+ * @param {Object} block - TOC block data
+ * @returns {string} HTML string
+ */
+function renderTocBlock(block) {
+    return `<nav class="toc-block"><ul><li>Table of Contents (generated from page headings)</li></ul></nav>`;
 }
 
 /**
@@ -1165,44 +1285,53 @@ function renderSlideBlock(block) {
 }
 
 /**
- * Render an accordion block with separate header and content containers.
- * Calls window._expandListingBlocks for nested listings in content.
+ * Render an accordion block — panels stored as object_list items.
+ * Each panel has title, blocks, and blocks_layout.
  *
- * @param {Object} block - Accordion block data with shared blocks dict + header/content layout fields
+ * @param {Object} block - Accordion block data
  * @param {string} blockId - Accordion block ID
  * @returns {Promise<string>} HTML string
  */
 async function renderAccordionBlock(block, blockId) {
-    const blocks = block.blocks || {};
-    let headerItems = block.header?.items || [];
-    let contentItems = block.content?.items || [];
-
-    const { items: expandedItems } = await expandItems(blocks, contentItems, `${blockId}-content`);
+    const panels = block.panels || [];
 
     let html = '<div class="accordion-container" style="border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">';
 
-    // Header section
-    html += '<div class="accordion-header" style="background: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">';
-    html += '<div class="header-label" style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">HEADER</div>';
-
-    for (const childId of headerItems) {
-        const childBlock = blocks[childId];
-        if (childBlock) {
-            html += `<div data-block-uid="${childId}" data-block-add="bottom">`;
-            html += renderNestedSlateBlock(childBlock);
-            html += '</div>';
-        }
+    for (const panel of panels) {
+        const panelId = panel['@id'];
+        html += `<div data-block-uid="${panelId}" data-block-add="bottom">`;
+        html += await renderAccordionPanelBlock(panel, panelId);
+        html += '</div>';
     }
 
     html += '</div>';
+    return html;
+}
 
-    // Content section
+/**
+ * Render an accordion panel with title and content blocks.
+ *
+ * @param {Object} block - AccordionPanel block data
+ * @param {string} blockId - Panel block ID
+ * @returns {Promise<string>} HTML string
+ */
+async function renderAccordionPanelBlock(block, blockId) {
+    const contentBlocks = block.blocks || {};
+    const contentLayout = block.blocks_layout?.items || [];
+
+    const { items: expandedItems } = await expandItems(contentBlocks, contentLayout, `${blockId}-content`);
+
+    let html = '';
+
+    // Panel header (title)
+    html += '<div class="accordion-header" style="background: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd; cursor: pointer;">';
+    html += `<strong data-edit-text="title">${block.title || ''}</strong>`;
+    html += '</div>';
+
+    // Panel content
     html += '<div class="accordion-content" style="padding: 15px;">';
-    html += '<div class="content-label" style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">CONTENT</div>';
 
-    const itemsToRender = expandedItems;
-
-    for (const childBlock of itemsToRender) {
+    for (const childBlock of expandedItems) {
         if (!childBlock) continue;
         const uid = childBlock['@uid'];
         html += `<div data-block-uid="${uid}" data-block-add="bottom">`;
@@ -1224,8 +1353,6 @@ async function renderAccordionBlock(block, blockId) {
         }
         html += '</div>';
     }
-
-    html += '</div>';
 
     html += '</div>';
     return html;

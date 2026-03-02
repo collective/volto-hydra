@@ -9,9 +9,6 @@ This is a **built-in** block.
 ```js
 {
   blockSchema: {
-    fieldsets: [
-      { id: 'default', title: 'Default', fields: ['url', 'alt', 'href'] }
-    ],
     properties: {
       url: {
         title: 'Image URL',

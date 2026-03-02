@@ -197,6 +197,124 @@
           "type": "h3"
         }
       ]
+    },
+    "ref-video-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-video",
+      "placeholder": "sep"
+    },
+    "ref-video-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-video",
+      "placeholder": "heading"
+    },
+    "ref-video-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-video",
+      "placeholder": "schema-heading"
+    },
+    "ref-video-schema-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-video",
+      "placeholder": "schema-desc"
+    },
+    "ref-video-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-video",
+      "placeholder": "json-heading"
+    },
+    "ref-video-json-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-video",
+      "placeholder": "json-desc"
+    },
+    "ref-video-rendering-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-video",
+      "placeholder": "rendering-heading"
+    },
+    "ref-video-rendering-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-video",
+      "placeholder": "rendering-desc"
+    },
+    "ref-video-schema": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-video",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-video-schema-javascript-104794",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  blockSchema: {\n    properties: {\n      url: {\n        title: 'Video URL',\n        type: 'string',\n        description: 'YouTube link or direct video file URL',\n      },\n    },\n  },\n}"
+        }
+      ]
+    },
+    "ref-video-json-data": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-video",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-video-json-data-json-9ce28f",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"video\",\n  \"url\": \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\"\n}"
+        }
+      ]
+    },
+    "ref-video-rendering": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-video",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-video-rendering-jsx-b3c5ea",
+          "label": "React",
+          "language": "jsx",
+          "code": "function VideoBlock({ block }) {\n  const url = block.url || '';\n  const youtubeId = url.match(/(?:youtu\\.be\\/|youtube\\.com\\/(?:watch\\?v=|embed\\/))([^&?/]+)/)?.[1];\n\n  return (\n    <div data-block-uid={block['@uid']} className=\"video-block\">\n      {youtubeId ? (\n        <iframe\n          src={`https://www.youtube.com/embed/${youtubeId}`}\n          allowFullScreen\n          style={{ width: '100%', aspectRatio: '16/9', border: 'none' }}\n        />\n      ) : url ? (\n        <video src={url} controls style={{ width: '100%' }} />\n      ) : (\n        <p>No video URL set</p>\n      )}\n    </div>\n  );\n}"
+        },
+        {
+          "@id": "ref-video-rendering-vue-160de2",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"video-block\">\n    <iframe\n      v-if=\"youtubeId\"\n      :src=\"`https://www.youtube.com/embed/${youtubeId}`\"\n      allowfullscreen\n      style=\"width: 100%; aspect-ratio: 16/9; border: none\"\n    />\n    <video v-else-if=\"block.url\" :src=\"block.url\" controls style=\"width: 100%\" />\n    <p v-else>No video URL set</p>\n  </div>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nconst props = defineProps({ block: Object });\nconst youtubeId = computed(() => {\n  const url = props.block.url || '';\n  return url.match(/(?:youtu\\.be\\/|youtube\\.com\\/(?:watch\\?v=|embed\\/))([^&?/]+)/)?.[1];\n});\n</script>"
+        },
+        {
+          "@id": "ref-video-rendering-svelte-b4e8ba",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<script>\n  export let block;\n  $: url = block.url || '';\n  $: youtubeId = url.match(/(?:youtu\\.be\\/|youtube\\.com\\/(?:watch\\?v=|embed\\/))([^&?/]+)/)?.[1];\n</script>\n\n<div data-block-uid={block['@uid']} class=\"video-block\">\n  {#if youtubeId}\n    <iframe\n      src=\"https://www.youtube.com/embed/{youtubeId}\"\n      allowfullscreen\n      style=\"width: 100%; aspect-ratio: 16/9; border: none\"\n      title=\"Video\"\n    />\n  {:else if url}\n    <video src={url} controls style=\"width: 100%\">\n      <track kind=\"captions\" />\n    </video>\n  {:else}\n    <p>No video URL set</p>\n  {/if}\n</div>"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -218,7 +336,18 @@
       "5212b457-984a-4666-ab67-7c9f6429b2a7",
       "b75aeb62-6aca-440b-ab6d-66b063dbdab9",
       "19a3d50a-a683-4e59-ac7c-d2ba2149cdd7",
-      "49a61581-70ce-4810-84c2-1d91ac421197"
+      "49a61581-70ce-4810-84c2-1d91ac421197",
+      "ref-video-sep",
+      "ref-video-heading",
+      "ref-video-schema-heading",
+      "ref-video-schema-desc",
+      "ref-video-schema",
+      "ref-video-json-heading",
+      "ref-video-json-desc",
+      "ref-video-json-data",
+      "ref-video-rendering-heading",
+      "ref-video-rendering-desc",
+      "ref-video-rendering"
     ]
   },
   "contributors": [],

@@ -9,22 +9,17 @@ This is a **built-in** block (registered as `slateTable`).
 ```js
 {
   blockSchema: {
-    fieldsets: [
-      { id: 'default', title: 'Default', fields: ['rows'] }
-    ],
     properties: {
       rows: {
         widget: 'object_list',
         idField: 'key',
         dataPath: ['table', 'rows'],  // data lives at block.table.rows
         schema: {
-          fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
           properties: {
             cells: {
               widget: 'object_list',
               idField: 'key',
               schema: {
-                fieldsets: [{ id: 'default', title: 'Default', fields: ['value'] }],
                 properties: {
                   value: {
                     title: 'Content',

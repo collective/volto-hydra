@@ -328,6 +328,124 @@
           "type": "h3"
         }
       ]
+    },
+    "ref-toc-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-toc",
+      "placeholder": "sep"
+    },
+    "ref-toc-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-toc",
+      "placeholder": "heading"
+    },
+    "ref-toc-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-toc",
+      "placeholder": "schema-heading"
+    },
+    "ref-toc-schema-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-toc",
+      "placeholder": "schema-desc"
+    },
+    "ref-toc-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-toc",
+      "placeholder": "json-heading"
+    },
+    "ref-toc-json-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-toc",
+      "placeholder": "json-desc"
+    },
+    "ref-toc-rendering-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-toc",
+      "placeholder": "rendering-heading"
+    },
+    "ref-toc-rendering-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-toc",
+      "placeholder": "rendering-desc"
+    },
+    "ref-toc-schema": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-toc",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-toc-schema-javascript-496d15",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  blockSchema: {\n    properties: {},\n  },\n}"
+        }
+      ]
+    },
+    "ref-toc-json-data": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-toc",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-toc-json-data-json-aaa910",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"toc\"\n}"
+        }
+      ]
+    },
+    "ref-toc-rendering": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-toc",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-toc-rendering-jsx-ee2124",
+          "label": "React",
+          "language": "jsx",
+          "code": "function TocBlock({ block }) {\n  // Table of Contents renders a placeholder.\n  // A real implementation scans sibling blocks for headings.\n  return (\n    <nav data-block-uid={block['@uid']} className=\"toc-block\">\n      <ul>\n        <li>Table of Contents (generated from page headings)</li>\n      </ul>\n    </nav>\n  );\n}"
+        },
+        {
+          "@id": "ref-toc-rendering-vue-12aef2",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<template>\n  <nav :data-block-uid=\"block['@uid']\" class=\"toc-block\">\n    <ul>\n      <li>Table of Contents (generated from page headings)</li>\n    </ul>\n  </nav>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"
+        },
+        {
+          "@id": "ref-toc-rendering-svelte-397c7f",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<script>\n  export let block;\n</script>\n\n<nav data-block-uid={block['@uid']} class=\"toc-block\">\n  <ul>\n    <li>Table of Contents (generated from page headings)</li>\n  </ul>\n</nav>"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -349,7 +467,18 @@
       "c95cd0fd-f914-4dca-9adb-f7438b0a3112",
       "2b54caa5-1c1a-40f2-aacd-84abce141e79",
       "09460f92-723d-402d-a0a5-76a15f2678ad",
-      "3e036171-0a20-47d0-a06a-a7f493b65186"
+      "3e036171-0a20-47d0-a06a-a7f493b65186",
+      "ref-toc-sep",
+      "ref-toc-heading",
+      "ref-toc-schema-heading",
+      "ref-toc-schema-desc",
+      "ref-toc-schema",
+      "ref-toc-json-heading",
+      "ref-toc-json-desc",
+      "ref-toc-json-data",
+      "ref-toc-rendering-heading",
+      "ref-toc-rendering-desc",
+      "ref-toc-rendering"
     ]
   },
   "contributors": [],

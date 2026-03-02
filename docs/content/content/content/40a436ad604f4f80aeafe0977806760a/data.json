@@ -236,41 +236,75 @@
         }
       ]
     },
+    "ref-image-schema": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-image",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-image-schema-javascript-979df6",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  blockSchema: {\n    properties: {\n      url: {\n        title: 'Image URL',\n        widget: 'image',\n      },\n      alt: {\n        title: 'Alt text',\n        type: 'string',\n      },\n      href: {\n        title: 'Link',\n        widget: 'object_browser',\n        mode: 'link',\n        allowExternals: true,\n      },\n    },\n  },\n}"
+        }
+      ]
+    },
+    "ref-image-json-data": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-image",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-image-json-data-json-ddd34d",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"image\",\n  \"url\": \"/my-folder/my-image/@@images/image\",\n  \"alt\": \"A description of the image\",\n  \"href\": [{ \"@id\": \"/target-page\" }]\n}"
+        }
+      ]
+    },
+    "ref-image-rendering": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-image",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-image-rendering-jsx-a59bc5",
+          "label": "React",
+          "language": "jsx",
+          "code": "function ImageBlock({ block }) {\n  const src = block.url || '';\n  const alt = block.alt || '';\n  const href = block.href?.[0]?.['@id'] || block.href;\n\n  const img = (\n    <img data-edit-media=\"url\" src={src} alt={alt} />\n  );\n\n  return (\n    <div data-block-uid={block['@uid']}>\n      {href ? (\n        <a href={href} data-edit-link=\"href\">{img}</a>\n      ) : (\n        <>{img}</>\n      )}\n    </div>\n  );\n}"
+        },
+        {
+          "@id": "ref-image-rendering-vue-c3dead",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\">\n    <a v-if=\"href\" :href=\"href\" data-edit-link=\"href\">\n      <img data-edit-media=\"url\" :src=\"block.url\" :alt=\"block.alt\" />\n    </a>\n    <img v-else data-edit-media=\"url\" :src=\"block.url\" :alt=\"block.alt\" />\n  </div>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nconst props = defineProps({ block: Object });\nconst href = computed(() => props.block.href?.[0]?.['@id'] || props.block.href);\n</script>"
+        },
+        {
+          "@id": "ref-image-rendering-svelte-52a7e2",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<script>\n  export let block;\n  $: href = block.href?.[0]?.['@id'] || block.href;\n</script>\n\n<div data-block-uid={block['@uid']}>\n  {#if href}\n    <a {href} data-edit-link=\"href\">\n      <img data-edit-media=\"url\" src={block.url} alt={block.alt} />\n    </a>\n  {:else}\n    <img data-edit-media=\"url\" src={block.url} alt={block.alt} />\n  {/if}\n</div>"
+        }
+      ]
+    },
     "ref-image-schema-heading": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-image",
-      "placeholder": "schema-heading",
-      "plaintext": "Schema",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "Schema"
-            }
-          ]
-        }
-      ]
+      "placeholder": "schema-heading"
     },
-    "ref-image-schema": {
+    "ref-image-schema-desc": {
       "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-image",
-      "placeholder": "schema",
-      "plaintext": "{\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['url', 'alt', 'href'] }\n    ],\n    properties: {\n      url: {\n        title: 'Image URL',\n        widget: 'image',",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "{\n  blockSchema: {\n    fieldsets: [\n      { id: 'default', title: 'Default', fields: ['url', 'alt', 'href'] }\n    ],\n    properties: {\n      url: {\n        title: 'Image URL',\n        widget: 'image',\n      },\n      alt: {\n        title: 'Alt text',\n        type: 'string',\n      },\n      href: {\n        title: 'Link',\n        widget: 'object_browser',\n        mode: 'link',\n        allowExternals: true,\n      },\n    },\n  },\n}"
-            }
-          ]
-        }
-      ]
+      "placeholder": "schema-desc"
     },
     "ref-image-json-heading": {
       "@type": "slate",
@@ -278,126 +312,31 @@
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-image",
-      "placeholder": "json-heading",
-      "plaintext": "JSON Block Data",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "JSON Block Data"
-            }
-          ]
-        }
-      ]
+      "placeholder": "json-heading"
     },
-    "ref-image-json-data": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-image",
-      "placeholder": "json-data",
-      "plaintext": "{\n  \"@type\": \"image\",\n  \"url\": \"/my-folder/my-image/@@images/image\",\n  \"alt\": \"A description of the image\",\n  \"href\": [{ \"@id\": \"/target-page\" }]\n}",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "{\n  \"@type\": \"image\",\n  \"url\": \"/my-folder/my-image/@@images/image\",\n  \"alt\": \"A description of the image\",\n  \"href\": [{ \"@id\": \"/target-page\" }]\n}"
-            }
-          ]
-        }
-      ]
-    },
-    "ref-image-react-heading": {
+    "ref-image-json-desc": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-image",
-      "placeholder": "react-heading",
-      "plaintext": "React",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "React"
-            }
-          ]
-        }
-      ]
+      "placeholder": "json-desc"
     },
-    "ref-image-react-code": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-image",
-      "placeholder": "react-code",
-      "plaintext": "function ImageBlock({ block }) {\n  const src = block.url || '';\n  const alt = block.alt || '';\n  const href = block.href?.[0]?.['@id'] || block.href;\n\n  const img = (\n    <img data-edit-media=\"url\" sr",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "function ImageBlock({ block }) {\n  const src = block.url || '';\n  const alt = block.alt || '';\n  const href = block.href?.[0]?.['@id'] || block.href;\n\n  const img = (\n    <img data-edit-media=\"url\" src={src} alt={alt} />\n  );\n\n  return (\n    <div data-block-uid={block['@uid']}>\n      {href ? (\n        <a href={href} data-edit-link=\"href\">{img}</a>\n      ) : (\n        <>{img}</>\n      )}\n    </div>\n  );\n}"
-            }
-          ]
-        }
-      ]
-    },
-    "ref-image-vue-heading": {
+    "ref-image-rendering-heading": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-image",
-      "placeholder": "vue-heading",
-      "plaintext": "Vue",
-      "value": [
-        {
-          "type": "h3",
-          "children": [
-            {
-              "text": "Vue"
-            }
-          ]
-        }
-      ]
+      "placeholder": "rendering-heading"
     },
-    "ref-image-vue-code": {
-      "@type": "slate",
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-image",
-      "placeholder": "vue-code",
-      "plaintext": "<template>\n  <div :data-block-uid=\"block['@uid']\">\n    <a v-if=\"href\" :href=\"href\" data-edit-link=\"href\">\n      <img data-edit-media=\"url\" :src=\"block.url\" :alt=\"block.alt\" />\n    </a>\n    <img v-else",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "<template>\n  <div :data-block-uid=\"block['@uid']\">\n    <a v-if=\"href\" :href=\"href\" data-edit-link=\"href\">\n      <img data-edit-media=\"url\" :src=\"block.url\" :alt=\"block.alt\" />\n    </a>\n    <img v-else data-edit-media=\"url\" :src=\"block.url\" :alt=\"block.alt\" />\n  </div>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nconst props = defineProps({ block: Object });\nconst href = computed(() => props.block.href?.[0]?.['@id'] || props.block.href);\n</script>"
-            }
-          ]
-        }
-      ]
-    },
-    "ref-image-desc": {
+    "ref-image-rendering-desc": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-image",
-      "placeholder": "examples-desc",
-      "plaintext": "The following examples show how to render an Image block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component.",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "The following examples show how to render an Image block on your own frontend. Use the schema to register the block, the JSON as a reference for the data structure, and the React or Vue snippets as a starting point for your component."
-            }
-          ]
-        }
-      ]
+      "placeholder": "rendering-desc"
     }
   },
   "blocks_layout": {
@@ -421,15 +360,15 @@
       "b6bf35d7-7536-4a32-9821-4ae209de88fe",
       "ref-image-sep",
       "ref-image-heading",
-      "ref-image-desc",
       "ref-image-schema-heading",
+      "ref-image-schema-desc",
       "ref-image-schema",
       "ref-image-json-heading",
+      "ref-image-json-desc",
       "ref-image-json-data",
-      "ref-image-react-heading",
-      "ref-image-react-code",
-      "ref-image-vue-heading",
-      "ref-image-vue-code"
+      "ref-image-rendering-heading",
+      "ref-image-rendering-desc",
+      "ref-image-rendering"
     ]
   },
   "contributors": [],
