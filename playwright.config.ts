@@ -1,11 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 import * as path from 'path';
 
-// Check if we need Nuxt server (only for nuxt/nuxt-specific projects)
+// Check which extra servers we need based on --project arg
 const projectArgIndex = process.argv.indexOf('--project');
 const projectArg = process.argv.find(arg => arg.startsWith('--project='))?.split('=')[1]
   || (projectArgIndex !== -1 ? process.argv[projectArgIndex + 1] : undefined);
 const needsNuxt = !projectArg || projectArg.includes('nuxt');
+const needsReact = !projectArg || projectArg.includes('react');
+const needsSvelte = !projectArg || projectArg.includes('svelte');
+const needsVue = !projectArg || projectArg.includes('vue');
 
 // Only import coverage reporter when COVERAGE is enabled (CI)
 // This prevents V8 coverage collection overhead locally
@@ -125,15 +128,39 @@ export default defineConfig({
       testMatch: /nuxt-.*\.spec\.ts/, // Only run nuxt-specific tests
     },
 
-    // Uncomment to test on Firefox and WebKit
-    // {
-    //   name: 'firefox',
-    //   use: { ...devices['Desktop Firefox'] },
-    // },
-    // {
-    //   name: 'webkit',
-    //   use: { ...devices['Desktop Safari'] },
-    // },
+    // React doc examples - tests run against React Vite frontend on port 3004
+    {
+      name: 'react',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-react.json',
+      },
+      testMatch: /doc-examples\.spec\.ts/,
+    },
+    // Svelte doc examples - tests run against Svelte Vite frontend on port 3005
+    {
+      name: 'svelte',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-svelte.json',
+      },
+      testMatch: /doc-examples\.spec\.ts/,
+    },
+    // Vue doc examples - tests run against Vue Vite frontend on port 3006
+    {
+      name: 'vue',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-vue.json',
+      },
+      testMatch: /doc-examples\.spec\.ts/,
+    },
   ],
 
   /* Start mock API server and Volto dev server before running tests */
@@ -173,7 +200,7 @@ export default defineConfig({
             PORT: '3001',
             RAZZLE_API_PATH: 'http://localhost:8888',
             // Both mock frontend (8888) and Nuxt frontend (3003) available for switching
-            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003',
+            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006',
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
           },
         }
@@ -197,7 +224,7 @@ export default defineConfig({
             PORT: '3001',
             RAZZLE_API_PATH: 'http://localhost:8888',
             // Both mock frontend (8888) and Nuxt frontend (3003) available for switching
-            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003',
+            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006',
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
             // Prevent parcel from trying to access TTY (fixes segfault in background process)
             CI: process.env.CI || 'true',
@@ -211,6 +238,39 @@ export default defineConfig({
       timeout: 120 * 1000, // 2 minutes for Nuxt compilation
       reuseExistingServer: true, // CI starts server in advance, local dev starts manually
       cwd: path.join(process.cwd(), 'examples/nuxt-blog-starter'),
+      stdout: 'pipe',
+      stderr: 'pipe',
+    }] : []),
+    // React Vite frontend for doc example tests
+    ...(needsReact ? [{
+      name: 'React Frontend (Test)',
+      command: 'npx vite --port 3004 --strictPort',
+      url: 'http://localhost:3004',
+      timeout: 30 * 1000,
+      reuseExistingServer: true,
+      cwd: path.join(process.cwd(), 'docs/blocks/test-react'),
+      stdout: 'pipe',
+      stderr: 'pipe',
+    }] : []),
+    // Svelte Vite frontend for doc example tests
+    ...(needsSvelte ? [{
+      name: 'Svelte Frontend (Test)',
+      command: 'npx vite --port 3005 --strictPort',
+      url: 'http://localhost:3005',
+      timeout: 30 * 1000,
+      reuseExistingServer: true,
+      cwd: path.join(process.cwd(), 'docs/blocks/test-svelte'),
+      stdout: 'pipe',
+      stderr: 'pipe',
+    }] : []),
+    // Vue Vite frontend for doc example tests
+    ...(needsVue ? [{
+      name: 'Vue Frontend (Test)',
+      command: 'npx vite --port 3006 --strictPort',
+      url: 'http://localhost:3006',
+      timeout: 30 * 1000,
+      reuseExistingServer: true,
+      cwd: path.join(process.cwd(), 'docs/blocks/test-vue'),
       stdout: 'pipe',
       stderr: 'pipe',
     }] : []),

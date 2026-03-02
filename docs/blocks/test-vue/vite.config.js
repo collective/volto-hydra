@@ -1,0 +1,72 @@
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
+import path from 'path';
+
+/**
+ * Map of component names referenced in Vue example SFCs without explicit imports.
+ * The plugin auto-adds import statements for these.
+ */
+const COMPONENT_IMPORTS = {
+  SlateNode:         './SlateNode.vue',
+  BlockRenderer:     './BlockRenderer.vue',
+  ColumnBlock:       './ColumnBlock.vue',
+};
+
+/**
+ * Vite plugin to make doc example Vue SFCs importable as modules.
+ *
+ * The example files in docs/blocks/examples/vue/ are documentation snippets.
+ * Some reference other components (SlateNode, BlockRenderer, ColumnBlock) without
+ * importing them. This plugin auto-adds the missing imports to <script setup>.
+ */
+function vueExamplesPlugin() {
+  const examplesDir = path.resolve(__dirname, '../examples/vue');
+
+  return {
+    name: 'vue-examples',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!id.startsWith(examplesDir) || !id.endsWith('.vue')) return;
+
+      const fileName = path.basename(id);
+
+      // Find referenced components that aren't imported
+      const neededImports = [];
+      for (const [name, importPath] of Object.entries(COMPONENT_IMPORTS)) {
+        const importFile = path.basename(importPath);
+        if (importFile === fileName) continue;
+        // Check if the component is used in template or script
+        if (code.includes(name) && !code.includes(`import ${name}`)) {
+          neededImports.push(`import ${name} from '${importPath}';`);
+        }
+      }
+
+      // Check for expandListingBlocks global reference
+      if (code.includes('expandListingBlocks') && !code.includes('expandListingBlocks =')) {
+        neededImports.push(`const expandListingBlocks = window.expandListingBlocks;`);
+      }
+
+      if (neededImports.length === 0) return;
+
+      // Insert imports after <script setup> tag
+      const importBlock = neededImports.join('\n');
+      const transformed = code.replace(
+        /(<script\s+setup[^>]*>)/,
+        `$1\n${importBlock}`
+      );
+
+      return transformed;
+    },
+  };
+}
+
+export default defineConfig({
+  plugins: [vue(), vueExamplesPlugin()],
+  resolve: {
+    alias: {
+      '$examples': path.resolve(__dirname, '../examples/vue'),
+      '$hydra': path.resolve(__dirname, '../../../packages/hydra-js/hydra.js'),
+      '$schemas': path.resolve(__dirname, '../../../tests-playwright/fixtures/shared-block-schemas.js'),
+    },
+  },
+});
