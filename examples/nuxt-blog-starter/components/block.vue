@@ -478,24 +478,24 @@
   </div>
 
   <section v-else-if="block['@type'] == 'highlight'" :data-block-uid="block_uid"
-           class="relative overflow-hidden rounded-lg my-6">
-    <div v-for="props in [imageProps(block)]" :key="props.url"
-         class="absolute inset-0 bg-cover bg-center"
-         :style="props.url ? { backgroundImage: `url(${props.url})` } : {}" />
-    <div class="absolute inset-0 bg-black/50"></div>
-    <div class="relative py-16 px-4 mx-auto max-w-screen-xl text-center lg:py-24">
+           class="relative overflow-hidden rounded-lg my-6 isolate">
+    <div v-if="imageProps(block.image).url"
+         class="absolute inset-0 bg-cover bg-center z-0"
+         :style="{ backgroundImage: `url(${imageProps(block.image).url})` }" />
+    <div v-else class="absolute inset-0 z-0"
+         :class="highlightGradient(block.styles?.descriptionColor)"></div>
+    <div class="absolute inset-0 bg-black/50 z-10"></div>
+    <div class="relative z-20 py-16 px-4 mx-auto max-w-screen-xl text-center lg:py-24">
       <h2 class="mb-4 text-4xl font-extrabold text-white md:text-5xl lg:text-6xl">
         {{ block.title }}</h2>
       <div class="mb-8 text-lg text-gray-200 lg:text-xl sm:px-16 lg:px-48">
-        <RichText v-for="node in block['value']" :key="node" :node="node" />
+        <RichText v-for="node in (block.description || block['value'] || [])" :key="node" :node="node" />
       </div>
-      <NuxtLink v-if="block.button" :to="getUrl(block.buttonLink)"
+      <NuxtLink v-if="block.cta_title" :to="getUrl(block.cta_link)"
           class="py-3 px-5 text-sm font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800">
-        {{ block.buttonText }}
+        {{ block.cta_title }}
       </NuxtLink>
     </div>
-    <div v-if="!imageProps(block).url" class="absolute inset-0 -z-10"
-         :class="highlightGradient(block.styles?.descriptionColor)"></div>
   </section>
 
   <!-- Table of Contents block -->
@@ -526,6 +526,7 @@
         class="w-32 h-24 object-cover rounded shrink-0" />
     </template>
     <div class="flex-1">
+      <time v-if="block.date" class="block text-xs font-bold uppercase tracking-wide text-gray-800 mb-1">{{ new Date(block.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) }}</time>
       <NuxtLink :to="getUrl(block.href)" class="text-decoration-none">
         <h4 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white">{{ block.title }}</h4>
       </NuxtLink>

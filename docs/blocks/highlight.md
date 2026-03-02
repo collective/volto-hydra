@@ -69,20 +69,32 @@ This is a **custom** block — register it via `initBridge`.
 
 <!-- file: examples/react/HighlightBlock.jsx -->
 ```jsx
+const highlightGradients = {
+  'highlight-custom-color-1': 'linear-gradient(135deg, #1e3a5f, #2563eb)',
+  'highlight-custom-color-2': 'linear-gradient(135deg, #064e3b, #059669)',
+  'highlight-custom-color-3': 'linear-gradient(135deg, #581c87, #9333ea)',
+  'highlight-custom-color-4': 'linear-gradient(135deg, #78350f, #d97706)',
+  'highlight-custom-color-5': 'linear-gradient(135deg, #881337, #e11d48)',
+};
+
 function HighlightBlock({ block }) {
   const title = block.title || '';
   const description = block.description || [];
   const imageSrc = block.image || '';
   const ctaText = block.cta_title || '';
   const ctaLink = block.cta_link?.[0]?.['@id'] || '';
+  const gradient = highlightGradients[block.styles?.descriptionColor] || 'linear-gradient(135deg, #334, #556)';
+  const bgStyle = imageSrc
+    ? { backgroundImage: `url(${imageSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : { background: gradient };
 
   return (
     <section
       data-block-uid={block['@uid']}
       className="highlight-block"
-      style={{ backgroundImage: imageSrc ? `url(${imageSrc})` : undefined }}
+      style={{ ...bgStyle, padding: '40px 20px', color: 'white', borderRadius: '8px' }}
     >
-      <div className="highlight-overlay">
+      <div className="highlight-overlay" style={{ background: 'rgba(0,0,0,0.4)', padding: '30px', borderRadius: '8px' }}>
         <h2 data-edit-text="title">{title}</h2>
         <div className="highlight-body">
           {description.map((node, i) => (
@@ -90,7 +102,8 @@ function HighlightBlock({ block }) {
           ))}
         </div>
         {ctaText && (
-          <a href={ctaLink} data-edit-text="cta_title" data-edit-link="cta_link" className="highlight-cta">
+          <a href={ctaLink} data-edit-text="cta_title" data-edit-link="cta_link" className="highlight-cta"
+            style={{ display: 'inline-block', padding: '10px 20px', background: '#007eb1', color: 'white', textDecoration: 'none', borderRadius: '4px', marginTop: '16px' }}>
             {ctaText}
           </a>
         )}
@@ -108,9 +121,9 @@ function HighlightBlock({ block }) {
   <section
     :data-block-uid="block['@uid']"
     class="highlight-block"
-    :style="{ backgroundImage: block.image ? `url(${block.image})` : undefined }"
+    :style="{ ...bgStyle, padding: '40px 20px', color: 'white', borderRadius: '8px' }"
   >
-    <div class="highlight-overlay">
+    <div class="highlight-overlay" style="background:rgba(0,0,0,0.4);padding:30px;border-radius:8px">
       <h2 data-edit-text="title">{{ block.title }}</h2>
       <div class="highlight-body">
         <SlateNode v-for="(node, i) in block.description || []" :key="i" :node="node" />
@@ -121,6 +134,7 @@ function HighlightBlock({ block }) {
         data-edit-text="cta_title"
         data-edit-link="cta_link"
         class="highlight-cta"
+        style="display:inline-block;padding:10px 20px;background:#007eb1;color:white;text-decoration:none;border-radius:4px;margin-top:16px"
       >
         {{ block.cta_title }}
       </a>
@@ -132,6 +146,21 @@ function HighlightBlock({ block }) {
 import { computed } from 'vue';
 const props = defineProps({ block: Object });
 const ctaLink = computed(() => props.block.cta_link?.[0]?.['@id'] || '');
+
+const gradients = {
+  'highlight-custom-color-1': 'linear-gradient(135deg, #1e3a5f, #2563eb)',
+  'highlight-custom-color-2': 'linear-gradient(135deg, #064e3b, #059669)',
+  'highlight-custom-color-3': 'linear-gradient(135deg, #581c87, #9333ea)',
+  'highlight-custom-color-4': 'linear-gradient(135deg, #78350f, #d97706)',
+  'highlight-custom-color-5': 'linear-gradient(135deg, #881337, #e11d48)',
+};
+const bgStyle = computed(() => {
+  if (props.block.image) {
+    return { backgroundImage: `url(${props.block.image})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+  }
+  const gradient = gradients[props.block.styles?.descriptionColor] || 'linear-gradient(135deg, #334, #556)';
+  return { background: gradient };
+});
 </script>
 ```
 
@@ -143,14 +172,26 @@ const ctaLink = computed(() => props.block.cta_link?.[0]?.['@id'] || '');
   import SlateNode from './SlateNode.svelte';
   export let block;
   $: ctaLink = block.cta_link?.[0]?.['@id'] || '';
+
+  const gradients = {
+    'highlight-custom-color-1': 'linear-gradient(135deg, #1e3a5f, #2563eb)',
+    'highlight-custom-color-2': 'linear-gradient(135deg, #064e3b, #059669)',
+    'highlight-custom-color-3': 'linear-gradient(135deg, #581c87, #9333ea)',
+    'highlight-custom-color-4': 'linear-gradient(135deg, #78350f, #d97706)',
+    'highlight-custom-color-5': 'linear-gradient(135deg, #881337, #e11d48)',
+  };
+  $: gradient = gradients[block.styles?.descriptionColor] || 'linear-gradient(135deg, #334, #556)';
+  $: bgStyle = block.image
+    ? `background-image:url(${block.image});background-size:cover;background-position:center`
+    : `background:${gradient}`;
 </script>
 
 <section
   data-block-uid={block['@uid']}
   class="highlight-block"
-  style={block.image ? `background-image: url(${block.image})` : ''}
+  style="{bgStyle};padding:40px 20px;color:white;border-radius:8px"
 >
-  <div class="highlight-overlay">
+  <div class="highlight-overlay" style="background:rgba(0,0,0,0.4);padding:30px;border-radius:8px">
     <h2 data-edit-text="title">{block.title}</h2>
     <div class="highlight-body">
       {#each block.description || [] as node, i (i)}
@@ -158,7 +199,8 @@ const ctaLink = computed(() => props.block.cta_link?.[0]?.['@id'] || '');
       {/each}
     </div>
     {#if block.cta_title}
-      <a href={ctaLink} data-edit-text="cta_title" data-edit-link="cta_link" class="highlight-cta">
+      <a href={ctaLink} data-edit-text="cta_title" data-edit-link="cta_link" class="highlight-cta"
+        style="display:inline-block;padding:10px 20px;background:#007eb1;color:white;text-decoration:none;border-radius:4px;margin-top:16px">
         {block.cta_title}
       </a>
     {/if}

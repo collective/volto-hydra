@@ -326,6 +326,8 @@ function formatSearchItem(content, baseUrl) {
     'UID': content.UID,
     'is_folderish': content.is_folderish !== undefined ? content.is_folderish : true,
     'hasPreviewImage': hasPreviewImage,
+    'effective': content.effective || content.created || null,
+    'created': content.created || null,
     // Match real Plone API: image_field and image_scales for all items
     'image_field': 'image',
     'image_scales': getPlaceholderImageScales(content.title),

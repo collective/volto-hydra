@@ -679,6 +679,10 @@
             "image": {
               "title": "Image",
               "widget": "url"
+            },
+            "date": {
+              "title": "Date",
+              "widget": "date"
             }
           }
         }

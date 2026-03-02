@@ -9,13 +9,13 @@
       "blocks": {
         "3131582e-133c-49f1-8f8a-84178fa65bdf": {
           "@type": "teaser",
-          "description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten k\u00f6nnen mit Hilfe von Text, Bildern und Bl\u00f6cken strukturiert werden.",
+          "description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten können mit Hilfe von Text, Bildern und Blöcken strukturiert werden.",
           "head_title": null,
           "href": [
             {
               "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
               "@type": "Document",
-              "Description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten k\u00f6nnen mit Hilfe von Text, Bildern und Bl\u00f6cken strukturiert werden.",
+              "Description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten können mit Hilfe von Text, Bildern und Blöcken strukturiert werden.",
               "Title": "Inhaltstyp: Seite (Page)",
               "getRemoteUrl": null,
               "hasPreviewImage": true,
@@ -31,13 +31,13 @@
         },
         "f3719d15-b7aa-491b-951b-afe82762bc74": {
           "@type": "teaser",
-          "description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten k\u00f6nnen mit Hilfe von Text, Bildern und Bl\u00f6cken strukturiert werden.",
+          "description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten können mit Hilfe von Text, Bildern und Blöcken strukturiert werden.",
           "head_title": null,
           "href": [
             {
               "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
               "@type": "Document",
-              "Description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten k\u00f6nnen mit Hilfe von Text, Bildern und Bl\u00f6cken strukturiert werden.",
+              "Description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten können mit Hilfe von Text, Bildern und Blöcken strukturiert werden.",
               "Title": "Inhaltstyp: Seite (Page)",
               "getRemoteUrl": null,
               "hasPreviewImage": true,
@@ -65,73 +65,15 @@
       "allow_image_download": true,
       "alt": "",
       "blurhash": "1.3398:L89aT~e:0MMcRln3MwSiZ~EQs6x]",
-      "button": true,
-      "buttonLink": [
-        {
-          "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
-          "@type": "Document",
-          "CreationDate": "2023-07-06T23:35:20+02:00",
-          "Creator": "admin",
-          "Date": "2023-07-06T18:35:00+02:00",
-          "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-          "EffectiveDate": "2023-07-06T18:35:00+02:00",
-          "ExpirationDate": "None",
-          "ModificationDate": "2023-09-22T16:25:49+02:00",
-          "Subject": [],
-          "Title": "Page",
-          "Type": "Page",
-          "UID": "7ab9c48ede33415fa2a66a99549c8f70",
-          "author_name": null,
-          "cmf_uid": null,
-          "commentators": [],
-          "created": "2023-07-06T21:35:20+00:00",
-          "description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-          "effective": "2023-07-06T16:35:00+00:00",
-          "end": null,
-          "exclude_from_nav": false,
-          "expires": "2499-12-30T22:00:00+00:00",
-          "getIcon": null,
-          "getId": "page",
-          "getObjSize": "676.8 KB",
-          "getPath": "/Plone/content-types/page",
-          "getRemoteUrl": null,
-          "getURL": "http://localhost:8080/Plone/content-types/page",
-          "hasPreviewImage": true,
-          "head_title": null,
-          "id": "page",
-          "image_field": "preview_image",
-          "in_response_to": null,
-          "is_folderish": true,
-          "last_comment_date": null,
-          "listCreators": [
-            "admin"
-          ],
-          "location": null,
-          "mime_type": "text/plain",
-          "modified": "2023-09-22T14:25:49+00:00",
-          "nav_title": null,
-          "portal_type": "Document",
-          "review_state": "published",
-          "start": null,
-          "sync_uid": null,
-          "title": "Page",
-          "total_comments": 0,
-          "type_title": "Page"
-        }
-      ],
-      "buttonText": "Other button text",
       "credit": {
         "data": "<a href=\"/de/service/impressum\">DLR (CC BY-NC-ND 3.0)</a>"
       },
       "description_color": "blue3",
-      "image_field": "image",
-      "plaintext": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt.",
       "styles": {
         "descriptionColor": "highlight-custom-color-4"
       },
       "title": "Highlight-Block",
-      "url": "../../resolveuid/6cca02c5580d4f7c865af74835ceab9d",
-      "value": [
+      "description": [
         {
           "children": [
             {
@@ -140,7 +82,14 @@
           ],
           "type": "p"
         }
-      ]
+      ],
+      "cta_title": "Other button text",
+      "cta_link": [
+        {
+          "@id": "/content-types/page"
+        }
+      ],
+      "image": "/content-types/image/@@images/image"
     },
     "4974677f-f93a-41ba-9136-73c7b487754f": {
       "@type": "slate",
@@ -161,73 +110,15 @@
       "allow_image_download": true,
       "alt": "",
       "blurhash": "1.3398:L89aT~e:0MMcRln3MwSiZ~EQs6x]",
-      "button": true,
-      "buttonLink": [
-        {
-          "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
-          "@type": "Document",
-          "CreationDate": "2023-07-06T23:35:20+02:00",
-          "Creator": "admin",
-          "Date": "2023-07-06T18:35:00+02:00",
-          "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-          "EffectiveDate": "2023-07-06T18:35:00+02:00",
-          "ExpirationDate": "None",
-          "ModificationDate": "2023-09-22T16:25:49+02:00",
-          "Subject": [],
-          "Title": "Page",
-          "Type": "Page",
-          "UID": "7ab9c48ede33415fa2a66a99549c8f70",
-          "author_name": null,
-          "cmf_uid": null,
-          "commentators": [],
-          "created": "2023-07-06T21:35:20+00:00",
-          "description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-          "effective": "2023-07-06T16:35:00+00:00",
-          "end": null,
-          "exclude_from_nav": false,
-          "expires": "2499-12-30T22:00:00+00:00",
-          "getIcon": null,
-          "getId": "page",
-          "getObjSize": "676.8 KB",
-          "getPath": "/Plone/content-types/page",
-          "getRemoteUrl": null,
-          "getURL": "http://localhost:8080/Plone/content-types/page",
-          "hasPreviewImage": true,
-          "head_title": null,
-          "id": "page",
-          "image_field": "preview_image",
-          "in_response_to": null,
-          "is_folderish": true,
-          "last_comment_date": null,
-          "listCreators": [
-            "admin"
-          ],
-          "location": null,
-          "mime_type": "text/plain",
-          "modified": "2023-09-22T14:25:49+00:00",
-          "nav_title": null,
-          "portal_type": "Document",
-          "review_state": "published",
-          "start": null,
-          "sync_uid": null,
-          "title": "Page",
-          "total_comments": 0,
-          "type_title": "Page"
-        }
-      ],
-      "buttonText": "Mehr Infos",
       "credit": {
         "data": "<a href=\"/de/service/impressum\">DLR (CC BY-NC-ND 3.0)</a>"
       },
       "description_color": "blue3",
-      "image_field": "image",
-      "plaintext": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt.",
       "styles": {
         "descriptionColor": "highlight-custom-color-1"
       },
       "title": "Highlight-Block",
-      "url": "../../resolveuid/eec82559bf3242a6be4d43bc2096f399",
-      "value": [
+      "description": [
         {
           "children": [
             {
@@ -236,20 +127,27 @@
           ],
           "type": "p"
         }
-      ]
+      ],
+      "cta_title": "Mehr Infos",
+      "cta_link": [
+        {
+          "@id": "/content-types/page"
+        }
+      ],
+      "image": "/content-types/image/@@images/image"
     },
     "b249bf0e-2f21-4c54-bfac-d847a473bb0d": {
       "@type": "gridBlock",
       "blocks": {
         "3131582e-133c-49f1-8f8a-84178fa65bdf": {
           "@type": "teaser",
-          "description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten k\u00f6nnen mit Hilfe von Text, Bildern und Bl\u00f6cken strukturiert werden.",
+          "description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten können mit Hilfe von Text, Bildern und Blöcken strukturiert werden.",
           "head_title": null,
           "href": [
             {
               "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
               "@type": "Document",
-              "Description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten k\u00f6nnen mit Hilfe von Text, Bildern und Bl\u00f6cken strukturiert werden.",
+              "Description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten können mit Hilfe von Text, Bildern und Blöcken strukturiert werden.",
               "Title": "Inhaltstyp: Seite (Page)",
               "getRemoteUrl": null,
               "hasPreviewImage": true,
@@ -265,13 +163,13 @@
         },
         "f3719d15-b7aa-491b-951b-afe82762bc74": {
           "@type": "teaser",
-          "description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten k\u00f6nnen mit Hilfe von Text, Bildern und Bl\u00f6cken strukturiert werden.",
+          "description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten können mit Hilfe von Text, Bildern und Blöcken strukturiert werden.",
           "head_title": null,
           "href": [
             {
               "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
               "@type": "Document",
-              "Description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten k\u00f6nnen mit Hilfe von Text, Bildern und Bl\u00f6cken strukturiert werden.",
+              "Description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten können mit Hilfe von Text, Bildern und Blöcken strukturiert werden.",
               "Title": "Inhaltstyp: Seite (Page)",
               "getRemoteUrl": null,
               "hasPreviewImage": true,

@@ -92,7 +92,7 @@ function AccordionBlock({ block }) {
 }
 
 function AccordionPanel({ panel, panelId }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!panel.collapsed);
   const contentBlocks = panel.blocks || {};
   const contentLayout = panel.blocks_layout?.items || [];
 
@@ -143,8 +143,8 @@ function AccordionPanel({ panel, panelId }) {
 
 <script setup>
 import { reactive } from 'vue';
-defineProps({ block: Object });
-const openPanels = reactive({});
+const props = defineProps({ block: Object });
+const openPanels = reactive(Object.fromEntries((props.block.panels || []).filter(p => !p.collapsed).map(p => [p['@id'], true])));
 function toggle(id) { openPanels[id] = !openPanels[id]; }
 </script>
 ```
@@ -157,7 +157,7 @@ function toggle(id) { openPanels[id] = !openPanels[id]; }
   import BlockRenderer from './BlockRenderer.svelte';
   export let block;
 
-  let openPanels = {};
+  let openPanels = Object.fromEntries((block.panels || []).filter(p => !p.collapsed).map(p => [p['@id'], true]));
   function toggle(id) { openPanels[id] = !openPanels[id]; openPanels = openPanels; }
 </script>
 

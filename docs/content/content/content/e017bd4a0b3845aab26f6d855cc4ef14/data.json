@@ -129,7 +129,14 @@
       "styles": {
         "backgroundColor": "grey"
       },
-      "variation": "newsListing"
+      "variation": "summary",
+      "fieldMapping": {
+        "@id": "href",
+        "title": "title",
+        "description": "description",
+        "image": "image",
+        "effective": "date"
+      }
     },
     "93acf721-12a7-4902-8942-260201401830": {
       "@type": "listing",
@@ -174,7 +181,14 @@
       "styles": {
         "backgroundColor": "grey"
       },
-      "variation": "newsListing"
+      "variation": "summary",
+      "fieldMapping": {
+        "@id": "href",
+        "title": "title",
+        "description": "description",
+        "image": "image",
+        "effective": "date"
+      }
     },
     "a8adf4ff-d857-4caa-82a2-1d91321a22d0": {
       "@type": "listing",

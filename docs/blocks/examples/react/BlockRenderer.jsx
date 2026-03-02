@@ -25,6 +25,7 @@ function BlockRenderer({ block, content }) {
       return (
         <div data-block-uid={block['@uid']} className="listing-item">
           {block.image && <img src={typeof block.image === 'string' ? block.image : block.image['@id']} alt="" />}
+          {block.date && <time style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{new Date(block.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</time>}
           <h4><a href={block.href}>{block.title}</a></h4>
           {block.description && <p>{block.description}</p>}
         </div>

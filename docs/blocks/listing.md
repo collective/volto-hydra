@@ -45,6 +45,10 @@ This is a **built-in** block.
         "image": {
           "title": "Image",
           "widget": "url"
+        },
+        "date": {
+          "title": "Date",
+          "widget": "date"
         }
       }
     }

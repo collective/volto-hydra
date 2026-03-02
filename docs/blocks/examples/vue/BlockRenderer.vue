@@ -33,6 +33,7 @@ const ListingItemBlock = {
     const imgSrc = b.image ? (typeof b.image === 'string' ? b.image : b.image['@id']) : null;
     return h('div', { 'data-block-uid': b['@uid'], class: 'listing-item' }, [
       imgSrc ? h('img', { src: imgSrc, alt: '' }) : null,
+      b.date ? h('time', { style: 'font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em' }, new Date(b.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })) : null,
       h('h4', null, [h('a', { href: b.href }, b.title)]),
       b.description ? h('p', null, b.description) : null,
     ]);

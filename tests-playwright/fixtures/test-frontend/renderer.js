@@ -682,10 +682,15 @@ function renderSummaryItemBlock(block, blockUid) {
         ? `<img src="${imageSrc}" alt="" style="width: 80px; height: 60px; object-fit: cover; margin-right: 15px; border-radius: 4px;" />`
         : '';
 
+    const dateHtml = block.date
+        ? `<time style="display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #333; margin-bottom: 4px;">${new Date(block.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</time>`
+        : '';
+
     return `
         <div ${blockUidAttr} class="summary-item-block" style="padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: flex-start;">
             ${imageHtml}
             <div style="flex: 1;">
+                ${dateHtml}
                 <a href="${href || '#'}" data-edit-link="href" style="text-decoration: none; color: inherit;">
                     <h4 data-edit-text="title" style="margin: 0 0 5px 0;">${title}</h4>
                 </a>
@@ -809,7 +814,15 @@ function renderHighlightBlock(block) {
         descHtml += `<p data-edit-text="description"${nodeIdAttr}>${text}</p>`;
     });
 
-    const bgStyle = imageSrc ? `background-image:url(${imageSrc});background-size:cover;` : 'background:#334;';
+    const highlightGradients = {
+        'highlight-custom-color-1': 'linear-gradient(135deg, #1e3a5f, #2563eb)',
+        'highlight-custom-color-2': 'linear-gradient(135deg, #064e3b, #059669)',
+        'highlight-custom-color-3': 'linear-gradient(135deg, #581c87, #9333ea)',
+        'highlight-custom-color-4': 'linear-gradient(135deg, #78350f, #d97706)',
+        'highlight-custom-color-5': 'linear-gradient(135deg, #881337, #e11d48)',
+    };
+    const gradient = highlightGradients[block.styles?.descriptionColor] || 'linear-gradient(135deg, #334, #556)';
+    const bgStyle = imageSrc ? `background-image:url(${imageSrc});background-size:cover;` : `background:${gradient};`;
     const ctaHtml = ctaText
         ? `<a href="${ctaLink || '#'}" data-edit-text="cta_title" data-edit-link="cta_link" style="display:inline-block;padding:10px 20px;background:#007eb1;color:white;text-decoration:none;border-radius:4px;">${ctaText}</a>`
         : '';

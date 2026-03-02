@@ -177,7 +177,7 @@ function SearchBlock({ block, blockId }) {
   const facets = (block.facets || []).filter(f => !f.hidden);
   const listing = block.listing || {};
   const listingId = listing.items?.[0];
-  const listingBlock = listingId ? listing.blocks?.[listingId] : null;
+  const listingBlock = listingId ? (block.blocks?.[listingId]) : null;
 
   return (
     <div data-block-uid={blockId} className="search-block">
@@ -261,7 +261,7 @@ const props = defineProps({ block: Object, blockId: String });
 const query = ref('');
 const visibleFacets = computed(() => (props.block.facets || []).filter(f => !f.hidden));
 const listingId = computed(() => props.block.listing?.items?.[0]);
-const listingBlock = computed(() => listingId.value ? props.block.listing?.blocks?.[listingId.value] : null);
+const listingBlock = computed(() => listingId.value ? props.block.blocks?.[listingId.value] : null);
 </script>
 ```
 
@@ -278,7 +278,7 @@ const listingBlock = computed(() => listingId.value ? props.block.listing?.block
 
   $: visibleFacets = (block.facets || []).filter(f => !f.hidden);
   $: listingId = block.listing?.items?.[0];
-  $: listingBlock = listingId ? block.listing?.blocks?.[listingId] : null;
+  $: listingBlock = listingId ? block.blocks?.[listingId] : null;
 </script>
 
 <div data-block-uid={blockId} class="search-block">

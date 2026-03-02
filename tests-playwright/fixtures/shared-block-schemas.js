@@ -334,6 +334,7 @@ export const sharedBlocksConfig = {
                 title:       { title: 'Title' },
                 description: { title: 'Description', widget: 'textarea' },
                 image:       { title: 'Image', widget: 'url' },
+                date:        { title: 'Date', widget: 'date' },
             },
         },
     },
