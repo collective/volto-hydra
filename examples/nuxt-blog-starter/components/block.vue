@@ -244,30 +244,7 @@
 
 
 
-  <div v-else-if="block['@type'] == 'accordion'" data-accordion="collapse" :data-block-uid="block_uid">
-    <h2 :id="block_uid">
-      <button type="button"
-        class="flex items-center justify-between w-full p-5 font-medium rtl:text-right text-gray-500 border border-b-0 border-gray-200 rounded-t-xl focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 gap-3"
-        :data-accordion-target="`#accordion-collapse-body-${block_uid}`" aria-expanded="true"
-        :aria-controls="`accordion-collapse-body-${block_uid}`">
-        <span>
-          <Block v-for="item in expand(block.header?.items || [], block.blocks || {})"
-                 :key="item['@uid']" :block_uid="item['@uid']" :block="item" :data="data" />
-        </span>
-        <svg data-accordion-icon class="w-3 h-3 rotate-180 shrink-0" aria-hidden="true"
-          xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
-          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M9 5 5 1 1 5" />
-        </svg>
-      </button>
-    </h2>
-    <div :id="`accordion-collapse-body-${block_uid}`" class="hidden" :aria-labelledby="block_uid">
-      <div class="p-5 border border-b-0 border-gray-200 dark:border-gray-700 dark:bg-gray-900">
-        <Block v-for="item in expand(block.content?.items || [], block.blocks || {})"
-               :key="item['@uid']" :block_uid="item['@uid']" :block="item" :data="data" />
-      </div>
-    </div>
-  </div>
+  <AccordionBlock v-else-if="block['@type'] == 'accordion'" :block_uid="block_uid" :block="block" :data="data" />
 
 
 
@@ -517,8 +494,21 @@
         {{ block.buttonText }}
       </NuxtLink>
     </div>
-    <div v-if="!imageProps(block).url" class="absolute inset-0 bg-gradient-to-r from-blue-800 to-blue-600 -z-10"></div>
+    <div v-if="!imageProps(block).url" class="absolute inset-0 -z-10"
+         :class="highlightGradient(block.styles?.descriptionColor)"></div>
   </section>
+
+  <!-- Table of Contents block -->
+  <nav v-else-if="block['@type'] == 'toc'" :data-block-uid="block_uid" class="toc-block my-6 p-4 bg-gray-50 rounded-lg">
+    <h3 class="text-lg font-semibold mb-2">Table of Contents</h3>
+    <ul class="list-disc pl-5 space-y-1">
+      <template v-for="(b, bid) in data.blocks" :key="bid">
+        <li v-if="b['@type'] === 'heading' && b.heading">
+          <a :href="`#${bid}`" class="text-blue-600 hover:underline">{{ b.heading }}</a>
+        </li>
+      </template>
+    </ul>
+  </nav>
 
   <!-- Default listing item: title + description -->
   <div v-else-if="block['@type'] == 'default'" :data-block-uid="block_uid"
@@ -951,6 +941,18 @@ const getImageUrl = (value) => {
     return url + '/@@images/image';
   }
   return url;
+};
+
+// Map highlight descriptionColor styles to Tailwind gradient classes
+const highlightGradient = (colorClass) => {
+  const gradients = {
+    'highlight-custom-color-1': 'bg-gradient-to-r from-blue-800 to-blue-600',
+    'highlight-custom-color-2': 'bg-gradient-to-r from-emerald-800 to-emerald-600',
+    'highlight-custom-color-3': 'bg-gradient-to-r from-purple-800 to-purple-600',
+    'highlight-custom-color-4': 'bg-gradient-to-r from-amber-800 to-amber-600',
+    'highlight-custom-color-5': 'bg-gradient-to-r from-rose-800 to-rose-600',
+  };
+  return gradients[colorClass] || gradients['highlight-custom-color-1'];
 };
 
 // Teaser helpers: use block data if overwrite is set OR if hrefObj has no content data

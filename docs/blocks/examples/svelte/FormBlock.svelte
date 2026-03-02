@@ -8,7 +8,7 @@
     <p>{block.description}</p>
   {/if}
 
-  {#each block.subblocks || [] as field (field['@id'])}
+  {#each block.subblocks || [] as field (field.field_id || field.id)}
     <div class="form-field">
       {#if field.field_type === 'text'}
         <label>{field.label} <input type="text" required={field.required} /></label>

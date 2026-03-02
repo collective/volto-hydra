@@ -50,7 +50,7 @@ jobs:
           pnpm build
         env:
           RAZZLE_API_PATH: http://localhost:8888
-          RAZZLE_DEFAULT_IFRAME_URL: http://localhost:8888,http://localhost:3003
+          RAZZLE_DEFAULT_IFRAME_URL: http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006
           VOLTOCONFIG: ${{ github.workspace }}/volto.config.js
       - name: Install Nuxt dependencies
         run: |
@@ -61,11 +61,16 @@ jobs:
           node tests-playwright/fixtures/mock-api-server.js &
 
           # Start Volto production server
-          PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888,http://localhost:3003 \
+          PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006 \
             pnpm start:prod &
 
           # Start Nuxt test server
           cd examples/nuxt-blog-starter && npm run dev:test &
+
+          # Start doc-example Vite frontends (React, Svelte, Vue)
+          cd docs/blocks/test-react && npx vite --port 3004 --strictPort &
+          cd docs/blocks/test-svelte && npx vite --port 3005 --strictPort &
+          cd docs/blocks/test-vue && npx vite --port 3006 --strictPort &
 
           # Give servers a moment to start their processes
           sleep 5
@@ -98,6 +103,33 @@ jobs:
           for i in {1..90}; do
             if curl -s http://localhost:3003 > /dev/null; then
               echo "Nuxt ready"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "Waiting for React Vite frontend (3004)..."
+          for i in {1..30}; do
+            if curl -s http://localhost:3004 > /dev/null; then
+              echo "React frontend ready"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "Waiting for Svelte Vite frontend (3005)..."
+          for i in {1..30}; do
+            if curl -s http://localhost:3005 > /dev/null; then
+              echo "Svelte frontend ready"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "Waiting for Vue Vite frontend (3006)..."
+          for i in {1..30}; do
+            if curl -s http://localhost:3006 > /dev/null; then
+              echo "Vue frontend ready"
               break
             fi
             sleep 2
