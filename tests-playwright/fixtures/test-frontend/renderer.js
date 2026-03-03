@@ -244,6 +244,7 @@ async function renderBlock(blockId, block) {
             break;
         case 'form':
             wrapper.innerHTML = renderFormBlock(block);
+            attachFormValidation(wrapper.querySelector('form'), block);
             break;
         case 'skiplogicTest':
             wrapper.innerHTML = renderSkiplogicTestBlock(block);
@@ -877,8 +878,9 @@ function renderFormBlock(block) {
     const description = block.description || '';
     const subblocks = block.subblocks || [];
     const submitLabel = block.submit_label || 'Submit';
+    const successMessage = block.send_message || 'Thank you, your form has been submitted.';
 
-    let html = '<div class="form-block" style="padding: 20px; border: 1px solid #ddd; border-radius: 8px;">';
+    let html = '<form class="form-block" style="padding: 20px; border: 1px solid #ddd; border-radius: 8px;" novalidate>';
     if (title) {
         html += `<h2 data-edit-text="title">${title}</h2>`;
     }
@@ -886,26 +888,108 @@ function renderFormBlock(block) {
         html += `<p data-edit-text="description" style="color: #666;">${description}</p>`;
     }
     for (const field of subblocks) {
-        const fieldId = field['@id'] || '';
+        const fieldId = field['field_id'] || field['@id'] || '';
         const fieldType = field.field_type || 'text';
         const label = field.label || '';
+        const required = field.required || false;
         html += `<div class="form-field" data-block-uid="${fieldId}" data-block-add="bottom" style="margin-bottom: 12px;">`;
-        html += `<label data-edit-text="label" style="display: block; margin-bottom: 4px; font-weight: bold;">${label}</label>`;
+        html += `<label data-edit-text="label" style="display: block; margin-bottom: 4px; font-weight: bold;">${label}${required ? ' *' : ''}</label>`;
         if (fieldType === 'textarea') {
-            html += '<textarea style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" rows="3"></textarea>';
+            html += `<textarea name="${fieldId}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" rows="3"></textarea>`;
         } else if (fieldType === 'select') {
             const values = field.input_values || [];
-            html += '<select style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">';
-            for (const v of values) html += `<option>${v}</option>`;
+            html += `<select name="${fieldId}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">`;
+            html += '<option value="">-- Select --</option>';
+            for (const v of values) html += `<option value="${v}">${v}</option>`;
             html += '</select>';
+        } else if (fieldType === 'checkbox') {
+            html += `<input type="checkbox" name="${fieldId}" style="margin-right: 8px;" />`;
+        } else if (fieldType === 'single_choice') {
+            const values = field.input_values || [];
+            for (const v of values) {
+                html += `<label style="display: inline-flex; align-items: center; gap: 4px; margin-right: 16px;"><input type="radio" name="${fieldId}" value="${v}" /> ${v}</label>`;
+            }
         } else {
-            html += `<input type="${fieldType === 'from' ? 'email' : fieldType}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" />`;
+            const inputType = fieldType === 'from' ? 'email' : fieldType;
+            html += `<input type="${inputType}" name="${fieldId}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" />`;
         }
         html += '</div>';
     }
-    html += `<button type="submit" style="padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 4px;">${submitLabel}</button>`;
-    html += '</div>';
+    html += `<button type="button" class="form-submit" style="padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 4px;">${submitLabel}</button>`;
+    html += '</form>';
     return html;
+}
+
+/**
+ * Attach client-side validation to a rendered form block.
+ * Called after innerHTML is set so the DOM elements exist.
+ */
+function attachFormValidation(formEl, block) {
+    if (!formEl) return;
+    const subblocks = block.subblocks || [];
+    const submitBtn = formEl.querySelector('.form-submit');
+    if (!submitBtn) return;
+
+    submitBtn.addEventListener('click', function () {
+        // Clear previous errors
+        formEl.querySelectorAll('.form-error').forEach(el => el.remove());
+
+        let valid = true;
+
+        for (const field of subblocks) {
+            const fieldId = field['field_id'] || field['@id'] || '';
+            const fieldType = field.field_type || 'text';
+            if (!field.required) continue;
+
+            const fieldDiv = formEl.querySelector(`.form-field[data-block-uid="${fieldId}"]`);
+            if (!fieldDiv) continue;
+
+            let hasError = false;
+            let errorMsg = 'This field is required.';
+
+            if (fieldType === 'checkbox') {
+                const input = formEl.querySelector(`input[name="${fieldId}"]`);
+                if (input && !input.checked) hasError = true;
+            } else if (fieldType === 'from') {
+                const input = formEl.querySelector(`input[name="${fieldId}"]`);
+                if (input) {
+                    if (!input.value) {
+                        hasError = true;
+                    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.value)) {
+                        hasError = true;
+                        errorMsg = 'Please enter a valid email address.';
+                    }
+                }
+            } else if (fieldType === 'select') {
+                const select = formEl.querySelector(`select[name="${fieldId}"]`);
+                if (select && !select.value) hasError = true;
+            } else if (fieldType === 'textarea') {
+                const textarea = formEl.querySelector(`textarea[name="${fieldId}"]`);
+                if (textarea && !textarea.value.trim()) hasError = true;
+            } else {
+                const input = formEl.querySelector(`input[name="${fieldId}"]`);
+                if (input && !input.value.trim()) hasError = true;
+            }
+
+            if (hasError) {
+                valid = false;
+                const errorEl = document.createElement('div');
+                errorEl.className = 'form-error';
+                errorEl.style.cssText = 'color: red; font-size: 13px; margin-top: 4px;';
+                errorEl.textContent = errorMsg;
+                fieldDiv.appendChild(errorEl);
+            }
+        }
+
+        if (valid) {
+            const successMessage = block.send_message || 'Thank you, your form has been submitted.';
+            const successDiv = document.createElement('div');
+            successDiv.className = 'form-success';
+            successDiv.style.cssText = 'color: green; margin-top: 16px; padding: 12px; background: #f0fff0; border-radius: 4px;';
+            successDiv.textContent = successMessage;
+            formEl.appendChild(successDiv);
+        }
+    });
 }
 
 /**
