@@ -108,10 +108,10 @@ This is a **custom** block — register it via `initBridge`.
       }
     },
     "schemaEnhancer": {
-      "skiplogic": {
+      "fieldRules": {
         "cancel_label": {
-          "field": "show_cancel",
-          "is": true
+          "when": { "show_cancel": true },
+          "else": false
         }
       }
     }

@@ -10,10 +10,8 @@ import FieldMappingWidget from './components/Widgets/FieldMappingWidget';
 import TableSchema, { TableBlockSchema } from '@plone/volto-slate/blocks/Table/schema';
 import { ImageSchema } from '@plone/volto/components/manage/Blocks/Image/schema';
 import {
-  inheritSchemaFrom,
   QUERY_RESULT_FIELDS,
-  computeSmartDefaults,
-  getBlockSchema,
+  createSchemaEnhancerFromRecipe,
 } from './utils/schemaInheritance';
 import rowBeforeSVG from '@plone/volto/icons/row-before.svg';
 import rowAfterSVG from '@plone/volto/icons/row-after.svg';
@@ -113,11 +111,11 @@ const applyConfig = (config) => {
   // Sidebar titles are derived from field names: "rows" -> "Row", "cells" -> "Cell"
   // Note: We use dataPath to tell traversal where data lives WITHOUT nesting
   // inside widget: 'object', which would cause applySchemaDefaults to corrupt array data.
-  // sidebarSchemaOnly: TableBlockEdit expects specific data structures that don't
+  // disableCustomSidebarEditForm: TableBlockEdit expects specific data structures that don't
   // work well when rendered in sidebar - use schema form instead.
   config.blocks.blocksConfig.slateTable = {
     ...config.blocks.blocksConfig.slateTable,
-    sidebarSchemaOnly: true,
+    disableCustomSidebarEditForm: true,
     addMode: 'table', // Double-nested structure: rows contain cells, enables column add and row cell-count copying
     blockSchema: (props) => {
       const baseSchema = TableBlockSchema(props);
@@ -160,93 +158,43 @@ const applyConfig = (config) => {
   // Configure listing block to use variation as item type selector
   // The existing variation field is repurposed to select the block type for rendering items
   // expandListingBlocks reads from 'variation' field via itemTypeField option
+  //
+  // Fully declarative schemaEnhancer composed from recipe parts:
+  // - existingListingSchemaEnhancer: Volto's core listing enhancer (handles variations)
+  // - inheritSchemaFrom: type selector + schema inheritance
+  // - fieldRules: admin-only field modifications (hide b_size, add fieldMapping)
   const existingListingSchemaEnhancer =
     config.blocks.blocksConfig.listing?.schemaEnhancer;
-  const listingSchemaEnhancer = (args) => {
-    let { schema, formData } = args;
-
-    // Run existing schemaEnhancer first (handles variations, etc.)
-    if (existingListingSchemaEnhancer) {
-      schema = existingListingSchemaEnhancer(args);
-    }
-
-    // Remove variation from all fieldsets (inheritSchemaFrom will add it to inherited_fields)
-    schema.fieldsets = schema.fieldsets.map((fs) => ({
-      ...fs,
-      fields: fs.fields.filter((f) => f !== 'variation'),
-    }));
-
-    // Remove b_size from querystring widget (paging handled by frontend)
-    if (schema.properties.querystring) {
-      schema.properties.querystring = {
-        ...schema.properties.querystring,
-        schemaEnhancer: ({ schema: qsSchema }) => ({
-          ...qsSchema,
-          fieldsets: qsSchema.fieldsets.map((fs) => ({
-            ...fs,
-            fields: fs.fields.filter((f) => f !== 'b_size'),
-          })),
-        }),
-      };
-    }
-
-    // Add fieldMapping field (fieldset added after inheritSchemaFrom runs)
-    if (!schema.properties.fieldMapping) {
-      schema.properties.fieldMapping = {
-        title: 'Field Mapping',
-        widget: 'field_mapping',
-        sourceFields: QUERY_RESULT_FIELDS,
-        targetTypeField: 'variation',
-        description: 'Map query result fields to item block fields',
-      };
-    }
-
-    // Inject current variation (item type) into fieldMapping widget props
-    // Use default if variation isn't set yet (e.g., new block)
-    const itemType =
-      formData?.variation || 'summary';
-    if (schema.properties.fieldMapping && itemType) {
-      schema.properties.fieldMapping = {
-        ...schema.properties.fieldMapping,
-        targetType: itemType,
-      };
-    }
-
-    // Run schema inheritance for the referenced block type
-    // inheritSchemaFrom creates the variation field with computed choices
-    // and adds the inherited_fields fieldset (item type defaults, etc.)
-    // blocksField: '..' derives choices from sibling allowed types
-    // filterConvertibleFrom: '@default' filters to types with fieldMappings['@default']
-    schema = inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults', {
-      blocksField: '..',
-      filterConvertibleFrom: '@default',
-      title: 'Item Type',
-      default: 'summary',
-    })({
-      ...args,
-      schema,
-    });
-
-    // Add fieldMapping fieldset AFTER inherited fields (so order is: variation, defaults, mapping)
-    if (!schema.fieldsets.find((fs) => fs.id === 'mapping')) {
-      schema.fieldsets.push({
-        id: 'mapping',
-        title: 'Field Mapping',
-        fields: ['fieldMapping'],
-      });
-    }
-
-    return schema;
-  };
-  // Attach config so syncChildBlockTypes can detect this uses inheritSchemaFrom
-  listingSchemaEnhancer.config = {
-    typeField: 'variation',
-    defaultsField: 'itemDefaults',
-    blocksField: '..',
-    filterConvertibleFrom: '@default',
-  };
+  const listingSchemaEnhancer = createSchemaEnhancerFromRecipe([
+    existingListingSchemaEnhancer,
+    {
+      inheritSchemaFrom: {
+        mappingField: 'fieldMapping',
+        defaultsField: 'itemDefaults',
+        blocksField: '..',
+        filterConvertibleFrom: '@default',
+        title: 'Item Type',
+        default: 'summary',
+      },
+    },
+    {
+      fieldRules: {
+        'querystring.b_size': false,
+        fieldMapping: {
+          set: {
+            title: 'Field Mapping',
+            widget: 'field_mapping',
+            sourceFields: QUERY_RESULT_FIELDS,
+            description: 'Map query result fields to item block fields',
+            fieldset: { id: 'mapping', title: 'Field Mapping' },
+          },
+        },
+      },
+    },
+  ]);
   config.blocks.blocksConfig.listing = {
     ...config.blocks.blocksConfig.listing,
+    itemTypeField: 'variation',
     schemaEnhancer: listingSchemaEnhancer,
   };
 
@@ -479,7 +427,7 @@ const applyConfig = (config) => {
     // Skip Volto's SearchBlockEdit — it renders BlockDataForm without block prop,
     // causing onChangeBlock(undefined, data) when schema defaults are applied.
     // Our ParentBlocksWidget renders BlockDataForm with block={blockId} correctly.
-    sidebarSchemaOnly: true,
+    disableCustomSidebarEditForm: true,
     schemaEnhancer: (args) => {
       let { schema } = args;
 

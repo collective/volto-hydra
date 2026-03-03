@@ -7,6 +7,7 @@
  * Example: Map "title" from query results to "headline" field in teaser blocks.
  */
 import { useIntl } from 'react-intl';
+import config from '@plone/volto/registry';
 import FormFieldWrapper from '@plone/volto/components/manage/Widgets/FormFieldWrapper';
 import {
   customSelectStyles,
@@ -15,16 +16,18 @@ import {
 } from '@plone/volto/components/manage/Widgets/SelectStyling';
 import { injectLazyLibs } from '@plone/volto/helpers/Loadable/Loadable';
 import {
-  getBlockSchema,
+  getBlockTypeSchema,
   computeSmartDefaults,
   getFieldType,
 } from '../../utils/schemaInheritance';
+import { useHydraSchemaContext } from '../../context/HydraSchemaContext';
+import { getBlockById } from '../../utils/blockPath';
 
 /**
  * Get schema fields for a block type as options for a select
  */
-const getBlockSchemaFields = (blockType, intl) => {
-  const schema = getBlockSchema(blockType, intl);
+const getBlockSchemaFields = (blockType, intl, blocksConfig) => {
+  const schema = getBlockTypeSchema(blockType, intl, blocksConfig);
   if (!schema?.properties) return [];
 
   return Object.entries(schema.properties).map(([fieldName, fieldDef]) => ({
@@ -39,15 +42,33 @@ const FieldMappingWidget = (props) => {
     value = {},       // { sourceField: targetField, ... }
     onChange,
     sourceFields,     // { fieldName: { title: "Field Title" }, ... }
-    targetType,       // Target block type (injected by schemaEnhancer)
+    block,            // Block UID (passed by InlineForm)
     reactSelect,
   } = props;
+
+  // Get block data from HydraSchemaContext (InlineForm doesn't pass formData)
+  const hydraCtx = useHydraSchemaContext();
+  const blockData = (() => {
+    if (!hydraCtx || !block) return null;
+    // Check liveBlockDataRef first for fresh form data
+    if (hydraCtx.liveBlockDataRef?.current?.[block]) {
+      return hydraCtx.liveBlockDataRef.current[block];
+    }
+    // Fall back to page-level formData
+    return getBlockById(hydraCtx.formData, hydraCtx.blockPathMap, block);
+  })();
+
+  // Read itemTypeField from block-level config
+  const blockType = blockData?.['@type'];
+  const itemTypeField = config.blocks.blocksConfig[blockType]?.itemTypeField;
+  const targetType = blockData?.[itemTypeField];
 
   const intl = useIntl();
   const Select = reactSelect.default;
 
   // Get target schema and compute smart defaults
-  const targetSchema = getBlockSchema(targetType, intl);
+  const blocksConfig = config.blocks.blocksConfig;
+  const targetSchema = getBlockTypeSchema(targetType, intl, blocksConfig);
   const smartDefaults = sourceFields && targetSchema
     ? computeSmartDefaults(sourceFields, targetSchema)
     : {};
@@ -70,7 +91,7 @@ const FieldMappingWidget = (props) => {
   // Get available target fields from block schema
   const targetFieldOptions = [
     { value: '', label: '(none)' },
-    ...getBlockSchemaFields(targetType, intl),
+    ...getBlockSchemaFields(targetType, intl, blocksConfig),
   ];
 
   // Handle change for a specific source field

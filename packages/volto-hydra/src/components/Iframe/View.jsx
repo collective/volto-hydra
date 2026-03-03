@@ -88,7 +88,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance } from '../../utils/blockPath';
+import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance } from '../../utils/blockPath';
 import {
   applySchemaDefaultsToFormData,
   applyBlockDefaultsWithContext,
@@ -206,7 +206,7 @@ const extractBlockFieldTypes = (intl, contentTypeSchema = null) => {
           if (!config.blocks.blocksConfig[itemTypeKey]) {
             config.blocks.blocksConfig[itemTypeKey] = {
               blockSchema: field.schema,
-              sidebarSchemaOnly: true, // Virtual types use schema form in sidebar
+              disableCustomSidebarEditForm: true, // Virtual types use schema form in sidebar
             };
           }
 
@@ -223,7 +223,7 @@ const extractBlockFieldTypes = (intl, contentTypeSchema = null) => {
               if (!config.blocks.blocksConfig[nestedItemTypeKey]) {
                 config.blocks.blocksConfig[nestedItemTypeKey] = {
                   blockSchema: itemField.schema,
-                  sidebarSchemaOnly: true,
+                  disableCustomSidebarEditForm: true,
                 };
               }
 
@@ -558,7 +558,7 @@ const Iframe = (props) => {
   //   this is for toolbar→iframe flow (format completion, including selection-only changes)
   const [iframeSyncState, setIframeSyncState] = useState(() => ({
     formData: properties,
-    blockPathMap: buildBlockPathMap(properties, config.blocks.blocksConfig, intl),
+    blockPathMap: {}, // Built on INIT — no point computing here since INIT replaces it immediately
     selection: null,
     completedFlushRequestId: null, // For toolbar button click flow (FLUSH_BUFFER)
     transformAction: null, // For hotkey transform flow (format, paste, delete) - includes its own requestId
@@ -953,7 +953,7 @@ const Iframe = (props) => {
       const virtualType = blockPathMap[blockId]?.blockType; // e.g., 'slateTable:rows:cells'
       let cellData = { '@type': virtualType };
       cellData = applyBlockDefaults({ data: cellData, formData: cellData, intl, metadata, properties }, mergedBlocksConfig);
-      cellData = initializeContainerBlock(cellData, mergedBlocksConfig, uuid, { intl, metadata, properties });
+      cellData = initializeContainerBlock(cellData, mergedBlocksConfig, uuid, { intl, metadata, properties, blockType: virtualType });
       delete cellData['@type'];
 
       const result = insertTableColumn(
@@ -1037,7 +1037,7 @@ const Iframe = (props) => {
       }
 
       // Initialize nested containers (e.g., cells in a row)
-      blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, { intl, metadata, properties, siblingData });
+      blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, { intl, metadata, properties, siblingData, blockType: effectiveType });
 
       // Store type in typeField, clean up @type if typeField is different
       blockData[typeFieldName] = effectiveType;
@@ -1075,7 +1075,7 @@ const Iframe = (props) => {
 
       // Also apply regular applyBlockDefaults for non-context-aware schemas
       blockData = applyBlockDefaults({ data: blockData, formData: blockData, intl, metadata, properties });
-      blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, { intl, metadata, properties });
+      blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, { intl, metadata, properties, blockType });
     }
 
     // Insert and update state
@@ -1165,10 +1165,12 @@ const Iframe = (props) => {
     });
 
     // Initialize container blocks with default children (recursive)
+    // onMutateBlock replaces blocks in blocks_layout, so @type is the type field
     blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, {
       intl,
       metadata,
       properties,
+      blockType: value['@type'],
     });
 
     // Check if mutating inside a container (null means page-level)
@@ -1324,7 +1326,7 @@ const Iframe = (props) => {
                 type: 'INITIAL_DATA',
                 data: resendFormWithDefaults,
                 blockFieldTypes,
-                blockPathMap: resendBlockPathMap,
+                blockPathMap: stripBlockPathMapForPostMessage(resendBlockPathMap),
                 selectedBlockUid: selectedBlock,
                 slateConfig: {
                   hotkeys: config.settings.slate?.hotkeys || {},
@@ -2221,10 +2223,24 @@ const Iframe = (props) => {
               // Validate fieldMappings: warn about invalid @default keys
               validateFieldMappings(blockType, blockConfig);
             });
+            // Save existing function-type schemaEnhancers before deepMerge overwrites them.
+            // When the frontend sends a recipe object for a block that already has a function
+            // enhancer (e.g., listing's fieldMapping/b_size logic from our plugin), deepMerge
+            // would corrupt the function. We chain them back in step 1b.
+            const savedEnhancers = {};
+            for (const blockType of Object.keys(blocksConfig)) {
+              const existing = config.blocks.blocksConfig[blockType]?.schemaEnhancer;
+              if (typeof existing === 'function') {
+                savedEnhancers[blockType] = existing;
+              }
+            }
             recurseUpdateVoltoConfig({ blocks: { blocksConfig } });
 
             // 1b. Create schemaEnhancers from frontend recipes
-            const recipeKeys = ['inheritSchemaFrom', 'childBlockConfig', 'skiplogic'];
+            // When the frontend sends a recipe (e.g., { inheritSchemaFrom: {...} }),
+            // chain it with any existing function enhancer from admin plugins (e.g., listing's
+            // fieldMapping/b_size removal) rather than replacing it.
+            const recipeKeys = ['inheritSchemaFrom', 'childBlockConfig', 'fieldRules'];
             for (const [blockType, blockConfig] of Object.entries(blocksConfig)) {
               const recipe = blockConfig.schemaEnhancer;
               // Check if it's a recipe (has known enhancer keys, type property, or is array)
@@ -2235,10 +2251,14 @@ const Iframe = (props) => {
                   Array.isArray(recipe) || // array of recipes
                   recipeKeys.some((key) => key in recipe)); // new format
               if (isRecipe) {
-                const enhancer = createSchemaEnhancerFromRecipe(recipe);
+                // Pass savedEnhancer so createSchemaEnhancerFromRecipe can detect
+                // overlapping enhancerTypes (via .config.enhancerType) and skip
+                // duplicates while preserving the admin's extra logic.
+                const enhancer = createSchemaEnhancerFromRecipe(
+                  recipe, savedEnhancers[blockType],
+                );
                 if (enhancer) {
-                  config.blocks.blocksConfig[blockType].schemaEnhancer =
-                    enhancer;
+                  config.blocks.blocksConfig[blockType].schemaEnhancer = enhancer;
                 } else {
                   // Remove invalid recipe to prevent Volto from trying to use it
                   delete config.blocks.blocksConfig[blockType].schemaEnhancer;
@@ -2351,6 +2371,7 @@ const Iframe = (props) => {
 
           // 5b. Ensure empty page blocks fields have at least one empty block
           // No fieldName = process ALL page-level container fields (blocks, footer_blocks, etc.)
+          const preEnsureForm = formWithPageFields;
           formWithPageFields = ensureEmptyBlockIfEmpty(
             formWithPageFields,
             { parentId: PAGE_BLOCK_UID },
@@ -2359,12 +2380,14 @@ const Iframe = (props) => {
             config.blocks.blocksConfig,
             { intl, metadata, properties: formWithPageFields },
           );
-          // Rebuild blockPathMap if empty blocks were added
-          initialBlockPathMap = buildBlockPathMap(
-            formWithPageFields,
-            config.blocks.blocksConfig,
-            intl,
-          );
+          // Rebuild blockPathMap only if empty blocks were actually added
+          if (formWithPageFields !== preEnsureForm) {
+            initialBlockPathMap = buildBlockPathMap(
+              formWithPageFields,
+              config.blocks.blocksConfig,
+              intl,
+            );
+          }
 
           // 6. Apply schema defaults (handles schemaEnhancer-computed defaults like fieldMapping)
           const formWithDefaults = applySchemaDefaultsToFormData(
@@ -2486,7 +2509,7 @@ const Iframe = (props) => {
       const message = {
         type: 'FORM_DATA',
         data: formWithSequence,
-        blockPathMap: iframeSyncState.blockPathMap,
+        blockPathMap: stripBlockPathMapForPostMessage(iframeSyncState.blockPathMap),
         formatRequestId: iframeSyncState.toolbarRequestDone,
       };
       if (iframeSyncState.selection) {
@@ -2584,7 +2607,7 @@ const Iframe = (props) => {
             type: 'INITIAL_DATA',
             data: formDataToSend,
             blockFieldTypes,
-            blockPathMap,
+            blockPathMap: stripBlockPathMapForPostMessage(blockPathMap),
             slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
           }, origin);
           pendingInitialDataRef.current = null;
@@ -2668,7 +2691,7 @@ const Iframe = (props) => {
           type: 'INITIAL_DATA',
           data: formDataToSend,
           blockFieldTypes,
-          blockPathMap,
+          blockPathMap: stripBlockPathMapForPostMessage(blockPathMap),
           slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
         }, origin);
         pendingInitialDataRef.current = null;
@@ -2752,7 +2775,7 @@ const Iframe = (props) => {
     const message = {
       type: 'FORM_DATA',
       data: formWithSequence,
-      blockPathMap: newBlockPathMap,
+      blockPathMap: stripBlockPathMapForPostMessage(newBlockPathMap),
       ...(hasPendingSelect ? { selectedBlockUid: iframeSyncState.pendingSelectBlockUid } : {}),
       ...(hasPendingFormatRequest ? { formatRequestId: iframeSyncState.pendingFormatRequestId } : {}),
     };

@@ -379,13 +379,13 @@
           "@id": "custom-text-c1-javascript-7d81d7",
           "label": "JavaScript",
           "language": "javascript",
-          "code": "const bridge = initBridge({\n    page: {\n        schema: {\n            properties: {\n                blocks_layout: {\n                    title: 'Content',\n                    allowedBlocks: ['slate', 'image', 'video', 'slider'],\n                },\n            },\n        },\n    },\n    blocks: {\n        slider: {\n            id: 'slider',\n            title: 'Slider',\n            icon: 'data:...',\n            group: 'common',\n            restricted: false,\n            mostUsed: true,\n            sidebarSchemaOnly: false,\n            blockSchema: {\n                properties: {\n                    slider_timing: {\n                        title: 'Delay',\n                        widget: 'float',\n                    },\n                    slides: {\n                        title: 'Slides',\n                        widget: 'blocks_layout',\n                        allowedBlocks: ['slide', 'image'],\n                        defaultBlockType: 'slide',\n                    }\n                },\n            }\n        },\n        slide: {\n            id: 'slide',\n            title: 'Slide',\n            blockSchema: {\n                properties: {\n                    url: { title: 'Link', widget: 'url' },\n                    title: { title: 'Title' },\n                    image: { title: 'Image', widget: 'image' },\n                    description: { title: 'Description',\n                                   widget: 'slate' },\n                },\n            },\n        },\n    },\n});"
+          "code": "const bridge = initBridge({\n    page: {\n        schema: {\n            properties: {\n                blocks_layout: {\n                    title: 'Content',\n                    allowedBlocks: ['slate', 'image', 'video', 'slider'],\n                },\n            },\n        },\n    },\n    blocks: {\n        slider: {\n            id: 'slider',\n            title: 'Slider',\n            icon: 'data:...',\n            group: 'common',\n            restricted: false,\n            mostUsed: true,\n            disableCustomSidebarEditForm: false,\n            blockSchema: {\n                properties: {\n                    slider_timing: {\n                        title: 'Delay',\n                        widget: 'float',\n                    },\n                    slides: {\n                        title: 'Slides',\n                        widget: 'blocks_layout',\n                        allowedBlocks: ['slide', 'image'],\n                        defaultBlockType: 'slide',\n                    }\n                },\n            }\n        },\n        slide: {\n            id: 'slide',\n            title: 'Slide',\n            blockSchema: {\n                properties: {\n                    url: { title: 'Link', widget: 'url' },\n                    title: { title: 'Title' },\n                    image: { title: 'Image', widget: 'image' },\n                    description: { title: 'Description',\n                                   widget: 'slate' },\n                },\n            },\n        },\n    },\n});"
         }
       ]
     },
     "custom-text-t2": {
       "@type": "slate",
-      "plaintext": "Child block types (like 'slide' above) must be defined at the top level of blocks. You can also: Set restricted: true to hide a block from the block chooser (only usable as child blocks)Set mostUsed: true to pin a block to the top of the chooserSet sidebarSchemaOnly: true to use only the schema form in the sidebar (no custom edit component)Use fieldsets in the schema to organize fields into tabs",
+      "plaintext": "Child block types (like 'slide' above) must be defined at the top level of blocks. You can also: Set restricted: true to hide a block from the block chooser (only usable as child blocks)Set mostUsed: true to pin a block to the top of the chooserSet disableCustomSidebarEditForm: true to use only the schema form in the sidebar (no custom edit component)Use fieldsets in the schema to organize fields into tabs",
       "value": [
         {
           "children": [
@@ -443,7 +443,7 @@
                 {
                   "children": [
                     {
-                      "text": "sidebarSchemaOnly: true"
+                      "text": "disableCustomSidebarEditForm: true"
                     }
                   ],
                   "type": "strong"
@@ -513,26 +513,26 @@
           "@id": "enhancers-text-c1-javascript-92cb55",
           "label": "JavaScript",
           "language": "javascript",
-          "code": "const bridge = initBridge({\n    blocks: {\n        myBlock: {\n            blockSchema: {\n                properties: {\n                    mode: {\n                        title: 'Mode', widget: 'select',\n                        choices: [['simple', 'Simple'], ['advanced', 'Advanced']],\n                    },\n                    advancedOptions: { title: 'Advanced Options', type: 'string' },\n                },\n            },\n            schemaEnhancer: {\n                skiplogic: {\n                    advancedOptions: { field: 'mode', is: 'advanced' },\n                },\n            },\n        },\n    },\n});"
+          "code": "const bridge = initBridge({\n    blocks: {\n        myBlock: {\n            blockSchema: {\n                properties: {\n                    mode: {\n                        title: 'Mode', widget: 'select',\n                        choices: [['simple', 'Simple'], ['advanced', 'Advanced']],\n                    },\n                    advancedOptions: { title: 'Advanced Options', type: 'string' },\n                },\n            },\n            schemaEnhancer: {\n                fieldRules: {\n                    advancedOptions: { when: { mode: 'advanced' }, else: false },\n                },\n            },\n        },\n    },\n});"
         }
       ]
     },
     "enhancers-text-t2": {
       "@type": "slate",
-      "plaintext": "skiplogic: Conditionally show/hide fields based on other field values. field: Field to check (use ../field for parent/page fields)Operators: is, isNot, isSet, isNotSet, gt, gte, lt, lte",
+      "plaintext": "fieldRules: Add, remove, or conditionally modify field definitions. Condition operators: is, isNot, isSet, isNotSet, gt, gte, lt, lteField paths: ../field for parent block, /field for root",
       "value": [
         {
           "children": [
             {
               "children": [
                 {
-                  "text": "skiplogic"
+                  "text": "fieldRules"
                 }
               ],
               "type": "strong"
             },
             {
-              "text": ": Conditionally show/hide fields based on other field values."
+              "text": ": Add, remove, or conditionally modify field definitions."
             }
           ],
           "type": "p"
@@ -542,15 +542,7 @@
             {
               "children": [
                 {
-                  "children": [
-                    {
-                      "text": "field"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": ": Field to check (use ../field for parent/page fields)"
+                  "text": "Condition operators: is, isNot, isSet, isNotSet, gt, gte, lt, lte"
                 }
               ],
               "type": "li"
@@ -558,7 +550,7 @@
             {
               "children": [
                 {
-                  "text": "Operators: is, isNot, isSet, isNotSet, gt, gte, lt, lte"
+                  "text": "Field paths: ../field for parent block, /field for root"
                 }
               ],
               "type": "li"

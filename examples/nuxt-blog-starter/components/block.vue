@@ -23,14 +23,15 @@
     <NuxtImg v-else v-for="props in [imageProps(block)]" data-edit-media="url" data-edit-link="href" :src="props.url" :width="props.width"
       :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
   </div>
-  <div v-else-if="block['@type'] == 'image' && !contained" :data-block-uid="block_uid">
+  <div v-else-if="block['@type'] == 'image' && !contained" :data-block-uid="block_uid"
+       :class="['image-size-' + (block.size || 'l'), 'image-align-' + (block.align || 'center')]">
     <figure>
       <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-edit-link="href">
         <NuxtImg v-for="props in [imageProps(block)]" data-edit-media="url" :src="props.url" _width="props.width"
-          :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
+          :alt="block.alt" />
       </a>
       <NuxtImg v-else v-for="props in [imageProps(block)]" data-edit-media="url" data-edit-link="href" :src="props.url" _width="props.width"
-        :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
+        :alt="block.alt" />
     </figure>
   </div>
 
@@ -288,6 +289,7 @@
     <!-- Facets on top (default or facetsTopSide) -->
     <template v-if="!block.variation || block.variation === 'facetsTopSide'">
       <!-- Facets horizontal -->
+      <h3 v-if="block.facetsTitle" class="font-semibold mb-3 text-gray-700">{{ block.facetsTitle }}</h3>
       <div v-if="block.facets?.length" class="search-facets mb-4 p-4 bg-gray-50 rounded-lg flex flex-wrap gap-4">
         <template v-for="(facet, idx) in block.facets" :key="facet['@id'] || idx">
           <!-- Non-facet types (slate, image) rendered as generic blocks -->
@@ -486,12 +488,13 @@
          :class="highlightGradient(block.styles?.descriptionColor)"></div>
     <div class="absolute inset-0 bg-black/50 z-10"></div>
     <div class="relative z-20 py-16 px-4 mx-auto max-w-screen-xl text-center lg:py-24">
-      <h2 class="mb-4 text-4xl font-extrabold text-white md:text-5xl lg:text-6xl">
+      <h2 data-edit-text="title" class="mb-4 text-4xl font-extrabold text-white md:text-5xl lg:text-6xl">
         {{ block.title }}</h2>
       <div class="mb-8 text-lg text-gray-200 lg:text-xl sm:px-16 lg:px-48">
         <RichText v-for="node in (block.description || block['value'] || [])" :key="node" :node="node" />
       </div>
       <NuxtLink v-if="block.cta_title" :to="getUrl(block.cta_link)"
+          data-edit-text="cta_title" data-edit-link="cta_link"
           class="py-3 px-5 text-sm font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800">
         {{ block.cta_title }}
       </NuxtLink>

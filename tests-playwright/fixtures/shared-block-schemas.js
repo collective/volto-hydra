@@ -139,9 +139,9 @@ export const sharedBlocksConfig = {
         title: 'Slider',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/></svg>',
         group: 'common',
+        itemTypeField: 'variation',
         schemaEnhancer: {
             inheritSchemaFrom: {
-                typeField: 'variation',
                 defaultsField: 'itemDefaults',
                 blocksField: 'slides',
                 title: 'Item Type',
@@ -312,9 +312,9 @@ export const sharedBlocksConfig = {
     // filterConvertibleFrom: '@default' means only show types whose fieldMappings
     // include @default as a source (i.e., can convert from catalog brain fields)
     listing: {
+        itemTypeField: 'variation',
         schemaEnhancer: {
             inheritSchemaFrom: {
-                typeField: 'variation',
                 mappingField: 'fieldMapping',
                 defaultsField: 'itemDefaults',
                 filterConvertibleFrom: '@default',
@@ -373,9 +373,9 @@ export const sharedBlocksConfig = {
     },
     gridBlock: {
         allowedBlocks: ['teaser', 'image'],
+        itemTypeField: 'variation',
         schemaEnhancer: {
             inheritSchemaFrom: {
-                typeField: 'variation',
                 defaultsField: 'itemDefaults',
                 blocksField: 'blocks_layout',
                 title: 'Item Type',
@@ -524,9 +524,9 @@ export const sharedBlocksConfig = {
             required: ['default_to', 'default_from', 'default_subject', 'captcha'],
         },
         schemaEnhancer: {
-            skiplogic: {
+            fieldRules: {
                 // cancel_label only visible when show_cancel is checked
-                cancel_label: { field: 'show_cancel', is: true },
+                cancel_label: { when: { show_cancel: true }, else: false },
             },
         },
     },
@@ -736,10 +736,10 @@ export const sharedBlocksConfig = {
             },
         },
     },
-    // Skiplogic test block: demonstrates conditional field visibility
+    // fieldRules test block: demonstrates conditional field visibility
     skiplogicTest: {
         id: 'skiplogicTest',
-        title: 'Skiplogic Test',
+        title: 'Field Rules Test',
         group: 'common',
         blockSchema: {
             properties: {
@@ -778,11 +778,11 @@ export const sharedBlocksConfig = {
             },
         },
         schemaEnhancer: {
-            skiplogic: {
-                advancedOptions: { field: 'mode', is: 'advanced' },
-                simpleWarning: { field: 'mode', isNot: 'advanced' },
-                columnLayout: { field: 'columns', gte: 2 },
-                pageNotice: { field: '../description', isSet: true },
+            fieldRules: {
+                advancedOptions: { when: { mode: 'advanced' }, else: false },
+                simpleWarning: { when: { mode: { isNot: 'advanced' } }, else: false },
+                columnLayout: { when: { columns: { gte: 2 } }, else: false },
+                pageNotice: { when: { '../description': { isSet: true } }, else: false },
             },
         },
     },

@@ -984,10 +984,10 @@
           }
         },
         "schemaEnhancer": {
-          "skiplogic": {
+          "fieldRules": {
             "cancel_label": {
-              "field": "show_cancel",
-              "is": true
+              "when": { "show_cancel": true },
+              "else": false
             }
           }
         }

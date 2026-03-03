@@ -6,12 +6,12 @@
  * editable fields from a referenced block type.
  */
 import config from '@plone/volto/registry';
-import { getBlockSchema, getBlockById, updateBlockById, getChildBlockIds } from './blockPath';
+import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds } from './blockPath';
 import { PAGE_BLOCK_UID, convertFieldValue } from '@volto-hydra/hydra-js';
 import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context';
 
-// Re-export getBlockSchema from blockPath for convenience
-export { getBlockSchema };
+// Re-export getBlockTypeSchema from blockPath for convenience
+export { getBlockTypeSchema };
 
 /**
  * Generate a unique placeholder name based on block type.
@@ -220,7 +220,8 @@ export function applyBlockDefaultsWithContext(blockData, context) {
  * The referenced type's schema fields are added to the parent's sidebar,
  * minus any fields that are mapped to external data.
  *
- * @param {string} typeField - Field name containing the block type (e.g., 'itemType')
+ * @param {string|null} typeField - Field name containing the block type, or null to read from
+ *                                  blocksConfig[blockType].itemTypeField at call time
  * @param {string} mappingField - Field name containing field mappings (e.g., 'fieldMapping')
  *                                Can be null if no mapping is used
  * @param {string} defaultsField - Field name to store inherited values (e.g., 'itemDefaults')
@@ -233,16 +234,22 @@ export function applyBlockDefaultsWithContext(blockData, context) {
  *
  * @example
  * // In block config:
- * schemaEnhancer: inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults', {
- *   filterConvertibleFrom: '@default',
- *   title: 'Item Type',
- *   default: 'summary',
- * })
+ * config.blocks.blocksConfig.listing = {
+ *   itemTypeField: 'variation',
+ *   schemaEnhancer: { inheritSchemaFrom: { mappingField: 'fieldMapping' } },
+ * };
  */
 export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFieldOptions = {}) {
   return (args) => {
     let { formData, schema, intl } = args;
+
     const blocksConfig = config.blocks.blocksConfig;
+
+    // Read typeField from block-level config if not provided directly
+    if (!typeField) {
+      typeField = blocksConfig[formData?.['@type']]?.itemTypeField;
+      if (!typeField) return schema;
+    }
 
     // Get context for computing choices
     const hydraContext = getHydraSchemaContext();
@@ -258,6 +265,7 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
         blockPathMap,
         blockId,
         formData,  // Pass formData for blocksField lookup
+        intl,
       );
 
       // Create or update the typeField
@@ -289,7 +297,7 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
         const parentBlock = getLiveBlockData(pathInfo.parentId);
         if (parentBlock) {
           const parentConfig = blocksConfig?.[parentBlock['@type']];
-          const parentTypeField = parentConfig?.schemaEnhancer?.config?.typeField;
+          const parentTypeField = parentConfig?.itemTypeField;
           // If parent has a typeField AND has selected a value, it controls our type
           if (parentTypeField && parentBlock[parentTypeField]) {
             parentControlsType = true;
@@ -305,12 +313,12 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
       const pathInfo = blockPathMap[blockId];
       const parentBlock = getLiveBlockData(pathInfo.parentId);
       const parentConfig = blocksConfig?.[parentBlock?.['@type']];
-      const parentTypeField = parentConfig?.schemaEnhancer?.config?.typeField;
+      const parentTypeField = parentConfig?.itemTypeField;
       const parentSelectedType = parentBlock?.[parentTypeField];
 
       // Use parent's selected type for computing fieldMapping
       const effectiveType = parentSelectedType || referencedType;
-      const effectiveSchema = effectiveType ? getBlockSchema(effectiveType, intl, blocksConfig) : null;
+      const effectiveSchema = effectiveType ? getBlockTypeSchema(effectiveType, intl, blocksConfig) : null;
 
       // Clone schema and remove typeField
       let newSchema = {
@@ -392,7 +400,7 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
       };
       return newSchema;
     }
-    const referencedSchema = getBlockSchema(referencedType, intl, blocksConfig);
+    const referencedSchema = getBlockTypeSchema(referencedType, intl, blocksConfig);
     if (!referencedSchema?.properties) return schema;
 
     // Compute smart defaults for fieldMapping based on current target type
@@ -445,32 +453,30 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
       mappingField ? Object.values(effectiveMapping).map(getMappingTarget) : [],
     );
 
-    // Check if child block has editableFields or parentControlledFields in its schemaEnhancer config
+    // Resolve which fields belong to the child (shared logic with hideParentOwnedFields)
     const childConfig = blocksConfig[referencedType];
-    const childEnhancerConfig = childConfig?.schemaEnhancer?.config;
-    const editableFields = childEnhancerConfig?.editableFields;
-    const parentControlledFields = childEnhancerConfig?.parentControlledFields;
+    const childOwnFields = resolveChildOwnFields(childConfig);
+    const parentControlledFields = childConfig?.schemaEnhancer?.config?.parentControlledFields;
 
     // Get non-mapped fields from referenced type, filtered by field control settings
     // Use underscore separator for flat keys (Volto forms don't handle nested paths)
     const inheritedFields = Object.entries(referencedSchema.properties)
       .filter(([fieldName]) => {
         // Skip the typeField itself - it's on the parent, not inherited
-        // (e.g., if image block has 'variation' field, don't inherit it when parent uses 'variation' as typeField)
         if (fieldName === typeField) return false;
 
         // Skip mapped fields
         if (mappedFields.has(fieldName)) return false;
 
-        // If editableFields defined: only show fields NOT in that list (parent gets the rest)
-        if (editableFields) {
-          return !editableFields.includes(fieldName);
-        }
-        // If parentControlledFields defined: only show those fields
+        // If parentControlledFields defined: only inherit those specific fields
         if (parentControlledFields) {
           return parentControlledFields.includes(fieldName);
         }
-        // Default: show all non-mapped fields
+        // If child's own fields resolved: inherit everything NOT in that set
+        if (childOwnFields) {
+          return !childOwnFields.has(fieldName);
+        }
+        // Default: inherit all non-mapped fields
         return true;
       })
       .map(([fieldName, fieldDef]) => ({
@@ -498,7 +504,7 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
 
       // Add fieldset for inherited fields (includes typeField at the start)
       const inheritedFieldsetFields = inheritedFields.map((f) => f.name);
-      if (schema.properties[typeField]) {
+      if (schema.properties[typeField] && !typeFieldInFieldset) {
         inheritedFieldsetFields.unshift(typeField);
       }
       newSchema.fieldsets.push({
@@ -583,7 +589,7 @@ export function hideParentOwnedFields({ editableFields, parentControlledFields }
       const parentBlock = getLiveBlockData(pathInfo.parentId);
       if (parentBlock) {
         const parentConfig = blocksConfig[parentBlock['@type']];
-        const typeField = parentConfig?.schemaEnhancer?.config?.typeField;
+        const typeField = parentConfig?.itemTypeField;
         // If parent doesn't use schema inheritance (no typeField), or no type selected,
         // don't filter child fields - they're independent blocks
         if (!typeField || !parentBlock[typeField]) {
@@ -592,11 +598,11 @@ export function hideParentOwnedFields({ editableFields, parentControlledFields }
       }
     }
 
-    // Determine which fields to hide
+    // Determine which fields to hide using the shared child/parent split logic
     let fieldsToHide = new Set();
 
     if (editableFields) {
-      // Allowlist mode: hide everything except editableFields
+      // Explicit param overrides config (backward compat for direct callers)
       for (const fieldName of Object.keys(schema.properties || {})) {
         if (!editableFields.includes(fieldName)) {
           fieldsToHide.add(fieldName);
@@ -605,6 +611,34 @@ export function hideParentOwnedFields({ editableFields, parentControlledFields }
     } else if (parentControlledFields) {
       // Blocklist mode: hide only parentControlledFields
       fieldsToHide = new Set(parentControlledFields);
+    } else if (blocksConfig) {
+      // Resolve from child config (editableFields → fieldMappings['@default'])
+      const childBlock = getLiveBlockData(blockId);
+      const childType = childBlock?.['@type'];
+      let childOwnFields = childType ? resolveChildOwnFields(blocksConfig[childType]) : null;
+
+      // Last resort: parent's runtime fieldMapping widget targets
+      if (!childOwnFields) {
+        const parentBlock = getLiveBlockData(pathInfo.parentId);
+        if (parentBlock) {
+          const parentConfig = blocksConfig[parentBlock['@type']];
+          const mappingField = parentConfig?.schemaEnhancer?.config?.mappingField;
+          const fieldMapping = mappingField ? parentBlock[mappingField] : null;
+          if (fieldMapping && Object.keys(fieldMapping).length > 0) {
+            childOwnFields = new Set(
+              Object.values(fieldMapping).map(getMappingTarget).filter(Boolean)
+            );
+          }
+        }
+      }
+
+      if (childOwnFields) {
+        for (const fieldName of Object.keys(schema.properties || {})) {
+          if (!childOwnFields.has(fieldName)) {
+            fieldsToHide.add(fieldName);
+          }
+        }
+      }
     }
 
     if (fieldsToHide.size === 0) return schema;
@@ -681,6 +715,34 @@ export function getFieldType(fieldDef) {
  */
 export function getMappingTarget(mapping) {
   return typeof mapping === 'string' ? mapping : mapping?.field;
+}
+
+/**
+ * Get the set of target field names from a block config's fieldMappings['@default'].
+ * These are the fields the child block uses to receive mapped data (i.e., child-editable fields).
+ * Returns a Set of field names, or null if no @default mapping exists.
+ */
+export function getDefaultMappingTargets(blockConfig) {
+  const defaultMapping = blockConfig?.fieldMappings?.['@default'];
+  if (!defaultMapping || Object.keys(defaultMapping).length === 0) return null;
+  return new Set(Object.values(defaultMapping).map(getMappingTarget).filter(Boolean));
+}
+
+/**
+ * Resolve which fields belong to the child block (child-editable).
+ * Used by both inheritSchemaFrom (to skip child fields) and hideParentOwnedFields
+ * (to hide non-child fields) so the split is determined in one place.
+ *
+ * Fallback chain:
+ *   1. Explicit editableFields from childBlockConfig recipe
+ *   2. Child type's fieldMappings['@default'] targets
+ *
+ * Returns a Set of child-owned field names, or null if undetermined.
+ */
+export function resolveChildOwnFields(childBlockConfig) {
+  const enhancerConfig = childBlockConfig?.schemaEnhancer?.config;
+  if (enhancerConfig?.editableFields) return new Set(enhancerConfig.editableFields);
+  return getDefaultMappingTargets(childBlockConfig);
 }
 
 export function computeSmartDefaults(sourceFields, targetSchema, declaredMappings) {
@@ -1030,12 +1092,12 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
  * New format (supports combining multiple enhancers):
  *   { inheritSchemaFrom: { typeField, defaultsField, mappingField?, filterConvertibleFrom?, allowedBlocks?, title?, default? } }
  *   { childBlockConfig: { defaultsField, editableFields?, parentControlledFields? } }
- *   { skiplogic: { fieldName: { field, is?, isNot?, gt?, gte?, lt?, lte?, isSet?, isNotSet? } } }
+ *   { fieldRules: { fieldName: false | { set, when?, else? } | [rule, ...] } }
  *
  * Combined example:
  *   {
  *     inheritSchemaFrom: { typeField: 'variation', defaultsField: 'itemDefaults', filterConvertibleFrom: '@default' },
- *     skiplogic: { advancedOptions: { field: 'mode', is: 'advanced' } },
+ *     fieldRules: { advancedOptions: { when: { mode: 'advanced' }, else: false } },
  *   }
  *
  * Legacy format (still supported):
@@ -1047,16 +1109,30 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
  * @param {Object|Array} recipe - Recipe object or array of recipes
  * @returns {Function|null} - schemaEnhancer function or null if invalid
  */
-export function createSchemaEnhancerFromRecipe(recipe) {
-  if (!recipe || typeof recipe !== 'object') return null;
+/**
+ * @param {Object} recipe - Declarative recipe from frontend
+ * @param {Function} [existingEnhancer] - Admin-side enhancer already registered for this block.
+ *   If its .config.enhancerType matches a recipe type (e.g., both are 'inheritSchemaFrom'),
+ *   that recipe type is skipped (the admin enhancer already calls it internally).
+ *   The existing enhancer's .config is updated with the frontend's values (frontend wins).
+ */
+export function createSchemaEnhancerFromRecipe(recipe, existingEnhancer) {
+  // Plain functions pass through (used in arrays like [existingEnhancer, { recipe }])
+  if (typeof recipe === 'function') return recipe;
+  if (!recipe || typeof recipe !== 'object') return existingEnhancer || null;
 
-  // Handle array of recipes - compose them
+  // Handle array of recipes/functions - compose them
   if (Array.isArray(recipe)) {
-    const enhancers = recipe.map((r) => createSchemaEnhancerFromRecipe(r)).filter(Boolean);
-    if (enhancers.length === 0) return null;
+    const parts = recipe.map((r) => createSchemaEnhancerFromRecipe(r)).filter(Boolean);
+    if (parts.length === 0) return existingEnhancer || null;
+    if (parts.length === 1) {
+      parts[0]._parts = parts;
+      return parts[0];
+    }
     const composedFn = (args) =>
-      enhancers.reduce((schema, fn) => fn({ ...args, schema }), args.schema);
-    composedFn.config = enhancers.reduce((acc, fn) => ({ ...acc, ...fn.config }), {});
+      parts.reduce((schema, fn) => fn({ ...args, schema }), args.schema);
+    composedFn.config = parts.reduce((acc, fn) => ({ ...acc, ...fn.config }), {});
+    composedFn._parts = parts;
     return composedFn;
   }
 
@@ -1065,24 +1141,76 @@ export function createSchemaEnhancerFromRecipe(recipe) {
     return createSingleEnhancerLegacy(recipe);
   }
 
-  // New format: { inheritSchemaFrom: {...}, skiplogic: {...}, childBlockConfig: {...}, ... }
-  const enhancerTypes = ['inheritSchemaFrom', 'childBlockConfig', 'skiplogic'];
+  // New format: { inheritSchemaFrom: {...}, fieldRules: {...}, childBlockConfig: {...}, ... }
+  const enhancerTypes = ['inheritSchemaFrom', 'childBlockConfig', 'fieldRules'];
+
+  // If the existing enhancer has _parts, check each part for type overlap.
+  // When the frontend sends a recipe matching an existing part's type,
+  // replace that part with the frontend's version (frontend wins).
+  const existingParts = existingEnhancer?._parts;
+
   const enhancers = [];
   let mergedConfig = {};
+  const handledTypes = new Set();
 
   for (const type of enhancerTypes) {
-    if (recipe[type]) {
-      const enhancer = createEnhancerByType(type, recipe[type]);
-      if (enhancer) {
-        enhancers.push(enhancer);
-        if (enhancer.config) {
-          mergedConfig = { ...mergedConfig, ...enhancer.config };
+    if (!recipe[type]) continue;
+
+    // Check if existing enhancer already has a part with this type
+    if (existingParts) {
+      const matchIdx = existingParts.findIndex((p) => p.config?.enhancerType === type);
+      if (matchIdx >= 0) {
+        // Replace the existing part with the frontend's version
+        const replacement = createEnhancerByType(type, recipe[type]);
+        if (replacement) {
+          existingParts[matchIdx] = replacement;
         }
+        handledTypes.add(type);
+        continue;
+      }
+    } else if (existingEnhancer?.config?.enhancerType === type) {
+      // Single existing enhancer (no _parts) — replace its config
+      const replacement = createEnhancerByType(type, recipe[type]);
+      if (replacement) {
+        enhancers.push(replacement);
+        mergedConfig = { ...mergedConfig, ...replacement.config };
+      }
+      handledTypes.add(type);
+      continue;
+    }
+
+    const enhancer = createEnhancerByType(type, recipe[type]);
+    if (enhancer) {
+      enhancers.push(enhancer);
+      if (enhancer.config) {
+        mergedConfig = { ...mergedConfig, ...enhancer.config };
       }
     }
   }
 
-  if (enhancers.length === 0) return null;
+  // If existing had _parts and we replaced within them, recompose
+  if (existingParts && handledTypes.size > 0) {
+    // Add any new (non-replaced) enhancers to the parts
+    const allParts = [...existingParts, ...enhancers];
+    if (allParts.length === 1) {
+      allParts[0]._parts = allParts;
+      return allParts[0];
+    }
+    const composedFn = (args) =>
+      allParts.reduce((schema, fn) => fn({ ...args, schema }), args.schema);
+    composedFn.config = allParts.reduce((acc, fn) => ({ ...acc, ...fn.config }), {});
+    composedFn._parts = allParts;
+    return composedFn;
+  }
+
+  // If existing enhancer handled everything, return it
+  if (enhancers.length === 0) return existingEnhancer || null;
+
+  // Chain existing enhancer before new ones if present
+  if (existingEnhancer) {
+    enhancers.unshift(existingEnhancer);
+    mergedConfig = { ...existingEnhancer.config, ...mergedConfig };
+  }
 
   if (enhancers.length === 1) {
     return enhancers[0];
@@ -1092,6 +1220,7 @@ export function createSchemaEnhancerFromRecipe(recipe) {
   const composedFn = (args) =>
     enhancers.reduce((schema, fn) => fn({ ...args, schema }), args.schema);
   composedFn.config = mergedConfig;
+  composedFn._parts = enhancers;
   return composedFn;
 }
 
@@ -1105,23 +1234,24 @@ function createEnhancerByType(type, config) {
   switch (type) {
     case 'inheritSchemaFrom': {
       const { typeField, mappingField, defaultsField = 'itemDefaults', filterConvertibleFrom, allowedBlocks, blocksField, title, default: defaultValue } = config;
-      if (!typeField) return null;
-      // Pass typeFieldOptions if any type field config is provided
+      // typeField is optional — if not in recipe, inheritSchemaFrom reads
+      // blocksConfig[blockType].itemTypeField at call time
       const typeFieldOptions = (filterConvertibleFrom || allowedBlocks || blocksField || title || defaultValue)
         ? { filterConvertibleFrom, allowedBlocks, blocksField, title, default: defaultValue }
         : {};
-      enhancer = inheritSchemaFrom(typeField, mappingField || null, defaultsField, typeFieldOptions);
-      enhancer.config = config;
+      enhancer = inheritSchemaFrom(typeField || null, mappingField || null, defaultsField, typeFieldOptions);
+      enhancer.config = { ...config, enhancerType: 'inheritSchemaFrom' };
       break;
     }
     case 'childBlockConfig': {
       const { editableFields, parentControlledFields } = config;
       enhancer = hideParentOwnedFields({ editableFields, parentControlledFields });
-      enhancer.config = config;
+      enhancer.config = { ...config, enhancerType: 'childBlockConfig' };
       break;
     }
-    case 'skiplogic': {
-      enhancer = createSkiplogicEnhancer(config);
+    case 'fieldRules': {
+      enhancer = createFieldRulesEnhancer(config);
+      if (enhancer) enhancer.config = { ...enhancer.config, enhancerType: 'fieldRules' };
       break;
     }
     default:
@@ -1133,89 +1263,242 @@ function createEnhancerByType(type, config) {
 }
 
 /**
- * Create a skiplogic schemaEnhancer that conditionally hides fields.
+ * Create a fieldRules schemaEnhancer that adds, removes, or conditionally
+ * modifies field definitions in the schema.
  *
- * Config format: { fieldName: { field, is?, isNot?, gt?, gte?, lt?, lte?, isSet?, isNotSet? } }
+ * Config format: { fieldPath: rule, ... }
  *
- * Field path syntax:
- *   - 'field' - current block's field
- *   - '../field' - parent block's field
- *   - '/field' - root formData field
+ * Rule formats:
+ *   false                          — always hide the field
+ *   { set: <definition|false> }    — always set/hide
+ *   { when: <condition>, else?: <definition|false> }
+ *                                  — show when condition met, else hide/keep
+ *   { when: <condition>, set: <definition>, else?: <definition|false> }
+ *                                  — conditional definition override
+ *   [ rule, rule, ... ]            — switch: first matching rule wins
+ *
+ * Condition format (when):
+ *   { fieldName: value }           — equality: formData[fieldName] === value
+ *   { fieldName: { isNot: v } }    — inequality
+ *   { fieldName: { gte: n } }      — numeric comparison (gt, gte, lt, lte)
+ *   { fieldName: { isSet: true } } — truthy check
+ *   { '../field': value }          — parent/root field path
+ *
+ * Field definitions can include a `fieldset` property to specify placement:
+ *   { title: '...', widget: '...', fieldset: { id: 'fs', title: 'FS' } }
+ *   { title: '...', widget: '...', fieldset: 'existing-fieldset-id' }
+ *
+ * Nested field paths (e.g., 'querystring.b_size') target fields inside
+ * a widget's inner schema by adding a schemaEnhancer to the parent property.
  *
  * @private
  */
-function createSkiplogicEnhancer(config) {
+function createFieldRulesEnhancer(rulesConfig) {
   const enhancer = (args) => {
     const { schema, formData } = args;
     if (!schema?.properties) return schema;
 
     const fieldsToHide = new Set();
+    const fieldsToSet = {};    // fieldName → { definition, fieldset? }
+    const nestedHides = {};    // parentField → Set of child fields to hide
 
-    for (const [fieldName, condition] of Object.entries(config)) {
-      if (!schema.properties[fieldName]) continue;
+    for (const [fieldPath, rule] of Object.entries(rulesConfig)) {
+      // Handle nested field paths (e.g., 'querystring.b_size')
+      if (fieldPath.includes('.')) {
+        const [parentField, childField] = fieldPath.split('.', 2);
+        if (!schema.properties[parentField]) continue;
+        const result = evaluateFieldRule(rule, formData, args);
+        if (result === false) {
+          if (!nestedHides[parentField]) nestedHides[parentField] = new Set();
+          nestedHides[parentField].add(childField);
+        }
+        continue;
+      }
 
-      const shouldShow = evaluateSkiplogicCondition(condition, formData, args);
-      if (!shouldShow) {
-        fieldsToHide.add(fieldName);
+      const result = evaluateFieldRule(rule, formData, args);
+
+      if (result === false) {
+        fieldsToHide.add(fieldPath);
+      } else if (result && typeof result === 'object') {
+        const { fieldset, ...fieldDef } = result;
+        fieldsToSet[fieldPath] = { definition: fieldDef, fieldset };
+      }
+      // result === undefined → no change (keep current)
+    }
+
+    // No changes needed
+    if (fieldsToHide.size === 0 && Object.keys(fieldsToSet).length === 0 && Object.keys(nestedHides).length === 0) {
+      return schema;
+    }
+
+    let newProperties = { ...schema.properties };
+    let newFieldsets = schema.fieldsets.map((fs) => ({
+      ...fs,
+      fields: [...fs.fields],
+    }));
+
+    // Apply nested hides (add schemaEnhancer to parent property)
+    for (const [parentField, childFields] of Object.entries(nestedHides)) {
+      const existingEnhancer = newProperties[parentField]?.schemaEnhancer;
+      newProperties[parentField] = {
+        ...newProperties[parentField],
+        schemaEnhancer: (innerArgs) => {
+          const innerSchema = existingEnhancer ? existingEnhancer(innerArgs) : innerArgs.schema;
+          return {
+            ...innerSchema,
+            fieldsets: innerSchema.fieldsets.map((fs) => ({
+              ...fs,
+              fields: fs.fields.filter((f) => !childFields.has(f)),
+            })),
+          };
+        },
+      };
+    }
+
+    // Hide fields
+    if (fieldsToHide.size > 0) {
+      newFieldsets = newFieldsets
+        .map((fs) => ({
+          ...fs,
+          fields: fs.fields.filter((f) => !fieldsToHide.has(f)),
+        }))
+        .filter((fs) => fs.fields.length > 0 || fs.id === 'default');
+      for (const f of fieldsToHide) {
+        delete newProperties[f];
       }
     }
 
-    if (fieldsToHide.size === 0) return schema;
+    // Add/replace fields
+    for (const [fieldName, { definition, fieldset }] of Object.entries(fieldsToSet)) {
+      newProperties[fieldName] = { ...(newProperties[fieldName] || {}), ...definition };
 
-    // Clone and filter schema
-    const newSchema = {
-      ...schema,
-      fieldsets: schema.fieldsets
-        ?.map((fieldset) => ({
-          ...fieldset,
-          fields: fieldset.fields?.filter((f) => !fieldsToHide.has(f)) || [],
-        }))
-        .filter((fieldset) => fieldset.fields.length > 0 || fieldset.id === 'default'),
-      properties: { ...schema.properties },
-      required: schema.required || [],
-    };
+      if (fieldset) {
+        // Remove from any existing fieldset first (to avoid duplicates)
+        for (const fs of newFieldsets) {
+          fs.fields = fs.fields.filter((f) => f !== fieldName);
+        }
 
-    for (const fieldName of fieldsToHide) {
-      delete newSchema.properties[fieldName];
+        if (typeof fieldset === 'object') {
+          // Create or find fieldset
+          const existing = newFieldsets.find((fs) => fs.id === fieldset.id);
+          if (existing) {
+            existing.fields.push(fieldName);
+          } else {
+            newFieldsets.push({
+              id: fieldset.id,
+              title: fieldset.title || fieldset.id,
+              fields: [fieldName],
+            });
+          }
+        } else if (typeof fieldset === 'string') {
+          const existing = newFieldsets.find((fs) => fs.id === fieldset);
+          if (existing) {
+            existing.fields.push(fieldName);
+          }
+        }
+      } else if (!newFieldsets.some((fs) => fs.fields.includes(fieldName))) {
+        // New field without explicit fieldset — add to default
+        const defaultFs = newFieldsets.find((fs) => fs.id === 'default');
+        if (defaultFs) {
+          defaultFs.fields.push(fieldName);
+        }
+      }
     }
 
-    return newSchema;
+    // Clean up empty fieldsets (except default)
+    newFieldsets = newFieldsets.filter((fs) => fs.fields.length > 0 || fs.id === 'default');
+
+    return {
+      ...schema,
+      properties: newProperties,
+      fieldsets: newFieldsets,
+      required: schema.required || [],
+    };
   };
 
-  enhancer.config = { skiplogic: config };
+  enhancer.config = { fieldRules: rulesConfig };
   return enhancer;
 }
 
 /**
- * Evaluate a skiplogic condition against form data.
- * Returns true if field should be shown, false if hidden.
+ * Evaluate a field rule and return the resulting field definition.
+ * Returns: false (hide), object (field definition), or undefined (no change).
  * @private
  */
-function evaluateSkiplogicCondition(condition, formData, args) {
-  const { field: fieldPath, is, isNot, gt, gte, lt, lte, isSet, isNotSet } = condition;
+function evaluateFieldRule(rule, formData, args) {
+  // false → always hide
+  if (rule === false) return false;
 
-  // Resolve field value based on path
-  const value = resolveFieldPath(fieldPath, formData, args);
+  // Array → switch: first matching rule wins
+  if (Array.isArray(rule)) {
+    for (const r of rule) {
+      if (!r.when || evaluateWhenCondition(r.when, formData, args)) {
+        if ('set' in r) return r.set;
+        return undefined; // matched but no set → keep current
+      }
+    }
+    return undefined; // no match → keep current
+  }
 
-  // isSet / isNotSet operators
+  // Object with 'when' or 'set' → single rule
+  if (rule && typeof rule === 'object' && ('when' in rule || 'set' in rule)) {
+    if (!rule.when || evaluateWhenCondition(rule.when, formData, args)) {
+      // Condition met (or no condition)
+      return 'set' in rule ? rule.set : undefined;
+    }
+    // Condition not met → use else (default: undefined = keep current)
+    return 'else' in rule ? rule.else : undefined;
+  }
+
+  // Plain object without 'when'/'set' → it's a field definition (always apply)
+  if (rule && typeof rule === 'object') {
+    return rule;
+  }
+
+  return undefined;
+}
+
+/**
+ * Evaluate a 'when' condition against form data.
+ * Format: { fieldPath: expectedValue, ... } or { fieldPath: { operator: value }, ... }
+ * All entries must match (AND logic).
+ * @private
+ */
+function evaluateWhenCondition(when, formData, args) {
+  for (const [fieldPath, expected] of Object.entries(when)) {
+    const value = resolveFieldPath(fieldPath, formData, args);
+
+    // Object with operators: { isNot: v, gte: n, isSet: true, ... }
+    if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
+      if (!evaluateOperators(value, expected)) return false;
+      continue;
+    }
+
+    // Simple equality
+    if (value !== expected) return false;
+  }
+  return true;
+}
+
+/**
+ * Evaluate operator conditions against a value.
+ * Operators: is, isNot, gt, gte, lt, lte, isSet, isNotSet
+ * @private
+ */
+function evaluateOperators(value, operators) {
+  const { is, isNot, gt, gte, lt, lte, isSet, isNotSet } = operators;
+
   if (isSet !== undefined) {
     const hasValue = value !== undefined && value !== null && value !== '';
-    return isSet ? hasValue : !hasValue;
+    if (isSet ? !hasValue : hasValue) return false;
   }
   if (isNotSet !== undefined) {
     const hasValue = value !== undefined && value !== null && value !== '';
-    return isNotSet ? !hasValue : hasValue;
+    if (isNotSet ? hasValue : !hasValue) return false;
   }
+  if (is !== undefined && value !== is) return false;
+  if (isNot !== undefined && value === isNot) return false;
 
-  // Equality operators
-  if (is !== undefined) {
-    return value === is;
-  }
-  if (isNot !== undefined) {
-    return value !== isNot;
-  }
-
-  // Numeric comparison operators
   const numValue = typeof value === 'number' ? value : parseFloat(value);
   if (!isNaN(numValue)) {
     if (gt !== undefined && !(numValue > gt)) return false;
@@ -1246,11 +1529,11 @@ function resolveFieldPath(fieldPath, formData, args) {
   // Parent path: ../field
   if (fieldPath.startsWith('../')) {
     const parentField = fieldPath.slice(3);
-    // Get parent data from hydra context
+    // Get parent data from hydra context (live UI) or pageFormData (during buildBlockPathMap)
     const hydraContext = getHydraSchemaContext?.();
     if (hydraContext?.blockPathMap && hydraContext?.currentBlockId) {
       const pathInfo = hydraContext.blockPathMap[hydraContext.currentBlockId];
-      if (pathInfo?.parentId) {
+      if (pathInfo?.parentId && pathInfo.parentId !== PAGE_BLOCK_UID) {
         // Nested block - get parent block data
         const parentBlock = getLiveBlockData?.(pathInfo.parentId);
         return parentBlock?.[parentField];
@@ -1259,7 +1542,8 @@ function resolveFieldPath(fieldPath, formData, args) {
         return hydraContext.formData?.[parentField];
       }
     }
-    return undefined;
+    // Fallback for schema builds outside live UI (e.g., buildBlockPathMap)
+    return args?.pageFormData?.[parentField];
   }
 
   // Current block path: field
@@ -1316,7 +1600,7 @@ function getFirstBlocksField(blockId, blockPathMap) {
   return undefined;
 }
 
-export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId, formData) {
+export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId, formData, intl) {
   if (!blocksConfig) return [];
 
   const { allowedBlocks, blocksField, filterConvertibleFrom } = options || {};
@@ -1346,7 +1630,7 @@ export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId
     } else if (formData) {
       // Regular field name - look at container's own field
       const blockType = formData['@type'];
-      const blockSchema = getBlockSchema(blockType, null, blocksConfig);
+      const blockSchema = getBlockTypeSchema(blockType, intl, blocksConfig);
       const fieldDef = blockSchema?.properties?.[effectiveBlocksField];
       if (fieldDef?.allowedBlocks) {
         // Get allowedBlocks from the field definition in schema
@@ -1727,16 +2011,13 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
   const blockType = newBlockData['@type'];
   const blockConfig = blocksConfig?.[blockType];
 
-  // Check if block has inheritSchemaFrom enhancer with typeField
-  const enhancerConfig = blockConfig?.schemaEnhancer?.config;
-  const typeField = enhancerConfig?.typeField;
-  console.log('[syncChildBlockTypes] blockId:', blockId, 'blockType:', blockType, 'typeField:', typeField);
+  // Check if block has itemTypeField configured
+  const typeField = blockConfig?.itemTypeField;
   if (!typeField) return formData;
 
   // Check if typeField value changed
   const oldType = oldBlockData?.[typeField];
   const newType = newBlockData[typeField];
-  console.log('[syncChildBlockTypes] oldType:', oldType, 'newType:', newType);
   if (oldType === newType || !newType) return formData;
 
   let result = formData;
@@ -1749,14 +2030,14 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
     // Get the current block with the new variation and reset its fieldMapping
     const currentBlock = getBlockById(result, blockPathMap, blockId);
     if (currentBlock) {
-      console.log('[syncChildBlockTypes] Resetting fieldMapping from', currentBlock.fieldMapping, 'to', defaultFieldMapping);
       const updatedBlock = { ...currentBlock, fieldMapping: defaultFieldMapping };
       result = updateBlockById(result, blockPathMap, blockId, updatedBlock);
     }
   }
 
   // Determine which blocks field to sync
-  // Use configured blocksField or default to first blocks field from pathMap
+  // Use configured blocksField from enhancer or default to first blocks field from pathMap
+  const enhancerConfig = blockConfig?.schemaEnhancer?.config;
   const configuredBlocksField = enhancerConfig?.blocksField;
   const effectiveBlocksField = configuredBlocksField ?? getFirstBlocksField(blockId, blockPathMap);
 
@@ -1775,8 +2056,7 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
 
     const childType = childBlock['@type'];
     const childConfig = blocksConfig?.[childType];
-    const childEnhancerConfig = childConfig?.schemaEnhancer?.config;
-    const childTypeField = childEnhancerConfig?.typeField;
+    const childTypeField = childConfig?.itemTypeField;
 
     if (childTypeField) {
       // Child has its own inheritSchemaFrom - change its typeField, not @type
