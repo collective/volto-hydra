@@ -220,8 +220,8 @@ onMounted(() => {
                 },
                 ...sharedBlocksConfig,
             };
-            // Page-level blocks (column is only allowed inside columns, not at page level)
-            const pageLevelBlocks = Object.keys(newBlocks).filter(k => k !== 'column');
+            // Page-level blocks: exclude restricted types and column (only allowed inside columns)
+            const pageLevelBlocks = Object.keys(newBlocks).filter(k => k !== 'column' && !newBlocks[k]?.restricted);
             const bridge = initBridge({
                 debug: new URLSearchParams(window.location.search).has('_hydra_debug'),
                 page: {

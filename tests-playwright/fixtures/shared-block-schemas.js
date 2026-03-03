@@ -323,8 +323,9 @@ export const sharedBlocksConfig = {
             },
         },
     },
-    // Listing item types — rendered by BlockRenderer for each expanded listing result
+    // Listing item types — restricted child blocks, only usable inside listing containers
     summary: {
+        restricted: true,
         fieldMappings: {
             '@default': { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'image' },
         },
@@ -339,6 +340,7 @@ export const sharedBlocksConfig = {
         },
     },
     default: {
+        restricted: true,
         fieldMappings: {
             '@default': { '@id': 'href', 'title': 'title', 'description': 'description' },
         },
