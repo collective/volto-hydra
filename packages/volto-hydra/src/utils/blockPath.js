@@ -68,7 +68,12 @@ function stripFunctionsFromSchema(obj, seen = new WeakSet()) {
  * @returns {Object} - New blockPathMap with non-serializable values removed from schemas
  */
 export function stripBlockPathMapForPostMessage(blockPathMap) {
-  return stripFunctionsFromSchema(blockPathMap);
+  // Strip each entry independently so shared array/object references (e.g., the same
+  // fieldDef.allowedBlocks array used by multiple blocks) aren't falsely detected as
+  // circular by the seen set and stripped to undefined.
+  return Object.fromEntries(
+    Object.entries(blockPathMap).map(([key, value]) => [key, stripFunctionsFromSchema(value)])
+  );
 }
 
 // Cache for getBlockTypeSchema — keyed by blockType, cleared on HMR
