@@ -110,7 +110,9 @@ This is a **custom** block — register it via `initBridge`.
     "schemaEnhancer": {
       "fieldRules": {
         "cancel_label": {
-          "when": { "show_cancel": true },
+          "when": {
+            "show_cancel": true
+          },
           "else": false
         }
       }
