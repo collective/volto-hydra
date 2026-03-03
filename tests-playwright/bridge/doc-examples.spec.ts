@@ -59,6 +59,69 @@ const examplesJson = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, '../fixtures/test-frontend/examples.json'), 'utf-8'),
 );
 
+/**
+ * Check edit annotations on a rendered block:
+ * - All <a href> links must have data-edit-link (except in-page anchors)
+ * - All <img> must have data-edit-media
+ * - Simple string fields in block data (title, heading, etc.) that appear in the DOM
+ *   must have a data-edit-text ancestor
+ */
+async function checkEditAnnotations(
+  block: import('@playwright/test').Locator,
+  blockData: Record<string, unknown> | undefined,
+) {
+  // All content links must have data-edit-link or data-linkable-allow.
+  // Exclude links inside [data-edit-text] — those are inside rich text (slate) and
+  // are managed by the rich text editor, not by a separate link field picker.
+  const linksWithout = await block.locator('a[href]').evaluateAll(
+    (els: Element[]) => (els as HTMLAnchorElement[])
+      .filter(el => !el.getAttribute('href')!.startsWith('#'))
+      .filter(el => !el.closest('[data-edit-text]'))
+      .filter(el => !el.hasAttribute('data-edit-link') && !el.hasAttribute('data-linkable-allow'))
+      .map(el => el.getAttribute('href')),
+  );
+  expect(linksWithout, 'All content links should have data-edit-link or data-linkable-allow').toEqual([]);
+
+  // No link href should point to the API URL — links must use frontend-relative paths
+  const apiLinks = await block.locator('a[href]').evaluateAll(
+    (els: Element[]) => (els as HTMLAnchorElement[])
+      .map(el => el.getAttribute('href'))
+      .filter(h => h?.includes('localhost:8888')),
+  );
+  expect(apiLinks, 'No links should point to the API URL').toEqual([]);
+
+  // All images must have data-edit-media
+  const imagesWithout = await block.locator('img').evaluateAll(
+    (els: Element[]) => (els as HTMLImageElement[])
+      .filter(el => !el.hasAttribute('data-edit-media'))
+      .map(el => el.getAttribute('src')),
+  );
+  expect(imagesWithout, 'All images should have data-edit-media').toEqual([]);
+
+  // Simple string fields in block data must appear with data-edit-text
+  if (blockData) {
+    const TEXT_FIELDS = ['title', 'heading', 'description', 'head_title', 'label'];
+    for (const field of TEXT_FIELDS) {
+      const value = blockData[field];
+      if (typeof value !== 'string' || !value) continue;
+      const hasEditText = await block.evaluate(
+        (el, v) => {
+          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          let node: Node | null;
+          while ((node = walker.nextNode())) {
+            if (node.textContent?.includes(v)) {
+              return !!(node.parentElement?.closest('[data-edit-text]'));
+            }
+          }
+          return true; // text not found in DOM — skip
+        },
+        value,
+      );
+      expect(hasEditText, `"${value}" (${field}) should be inside [data-edit-text]`).toBe(true);
+    }
+  }
+}
+
 const test = base.extend<{ helper: AdminUIHelper }>({
   helper: async ({ page }, use, testInfo) => {
     const helper = new AdminUIHelper(page);
@@ -184,6 +247,7 @@ test.describe('Doc example blocks', () => {
         await expect(items.first()).toBeVisible({ timeout: 15000 });
         const count = await items.count();
         expect(count).toBeGreaterThanOrEqual(2);
+        await checkEditAnnotations(items.first(), examplesJson.blocks?.[example.blockId]);
         return;
       }
 
@@ -196,8 +260,11 @@ test.describe('Doc example blocks', () => {
         await expect(block).toContainText(example.expectedText);
       }
 
-      // Verify sub-blocks: any block IDs found in `blocks` dicts should be in the DOM
+      // Verify edit annotations and that no links point to the API URL
       const blockData = examplesJson.blocks?.[example.blockId];
+      await checkEditAnnotations(block, blockData);
+
+      // Verify sub-blocks: any block IDs found in `blocks` dicts should be in the DOM
       if (blockData) {
         const subIds = getSubBlockIds(blockData);
         let anyVisible = false;

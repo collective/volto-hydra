@@ -374,27 +374,6 @@ This will enable an Editor to :-
 
 - Note either hashbang ```/#!/path``` or normal ```/path``` style paths are supported.
 
-#### Path Transformation (pathToApiPath)
-
-If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS.
-
-```js
-const bridge = initBridge({
-  page: {
-    schema: {
-      properties: {
-        blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
-      },
-    },
-  },
-  // Transform frontend path to API path by stripping paging segments
-  // e.g., /test-page/@pg_block-8-grid_1 -> /test-page
-  pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
-});
-```
-
-The `pathToApiPath` function is called whenever hydra.js sends a `PATH_CHANGE` message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state).
-
 ### Level 2: Block Definitions
 
 During the initialisation you can have full control over the blocks that will be stored,
@@ -1455,6 +1434,15 @@ async function PagingWhenReady({ paging }) {
 | `fetchItems` | — | `{ blockType: async (block, { start, size }) => { items, total } }` |
 | `itemTypeField` | `'itemType'` | Field on the listing block that holds the item type |
 | `defaultItemType` | `'summary'` | Fallback type when field is not set |
+
+#### Path transformation
+
+If paging embeds state in the URL path, pass `pathToApiPath` to `initBridge` so hydra.js reports the correct CMS path to the admin:
+
+```js
+// e.g. /test-page/@pg_block-8-grid_1 → /test-page
+pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
+```
 
 ## Templates
 

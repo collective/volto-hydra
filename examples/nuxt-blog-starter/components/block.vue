@@ -515,25 +515,25 @@
   <!-- Default listing item: title + description -->
   <div v-else-if="block['@type'] == 'default'" :data-block-uid="block_uid"
        class="default-item-block py-4 border-b border-gray-200 hover:bg-gray-50 transition-colors">
-    <NuxtLink :to="getUrl(block.href)" class="text-decoration-none">
-      <h4 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white">{{ block.title }}</h4>
+    <NuxtLink :to="getUrl(block.href)" class="text-decoration-none" data-edit-link="href">
+      <h4 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white" data-edit-text="title">{{ block.title }}</h4>
     </NuxtLink>
-    <p v-if="block.description" class="text-gray-600 dark:text-gray-400 text-sm">{{ block.description }}</p>
+    <p v-if="block.description" class="text-gray-600 dark:text-gray-400 text-sm" data-edit-text="description">{{ block.description }}</p>
   </div>
 
   <!-- Summary listing item: image thumbnail + title + description -->
   <div v-else-if="block['@type'] == 'summary'" :data-block-uid="block_uid"
        class="summary-item-block py-4 border-b border-gray-200 flex items-start gap-4 hover:bg-gray-50 transition-colors">
     <template v-if="block.image" v-for="props in [imageProps(block.image)]" :key="props.url">
-      <NuxtImg v-if="props.url" :src="props.url" alt=""
+      <NuxtImg v-if="props.url" :src="props.url" alt="" data-edit-media="image"
         class="w-32 h-24 object-cover rounded shrink-0" />
     </template>
     <div class="flex-1">
       <time v-if="block.date" class="block text-xs font-bold uppercase tracking-wide text-gray-800 mb-1">{{ new Date(block.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) }}</time>
-      <NuxtLink :to="getUrl(block.href)" class="text-decoration-none">
-        <h4 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white">{{ block.title }}</h4>
+      <NuxtLink :to="getUrl(block.href)" class="text-decoration-none" data-edit-link="href">
+        <h4 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white" data-edit-text="title">{{ block.title }}</h4>
       </NuxtLink>
-      <p v-if="block.description" class="text-gray-600 dark:text-gray-400 text-sm">{{ block.description }}</p>
+      <p v-if="block.description" class="text-gray-600 dark:text-gray-400 text-sm" data-edit-text="description">{{ block.description }}</p>
     </div>
   </div>
 

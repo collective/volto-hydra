@@ -13,6 +13,9 @@ export default function getUrl(href) {
     }
     href = href?.value ? href?.value : href;
     if (typeof href === 'string') {
+      if (href.startsWith(backendBaseUrl)) {
+        return href.replace(backendBaseUrl, '');
+      }
       return href;
     }
     else if ("url" in href) {
