@@ -621,7 +621,7 @@ test.describe('Quanta Toolbar - Overflow', () => {
   test('overflow menu contains buttons that do not fit inline', async ({
     page,
   }, testInfo) => {
-    test.skip(testInfo.project.name === 'nuxt', 'Columns block not supported in Nuxt frontend');
+    test.skip(testInfo.project.name.includes('nuxt'), 'Columns block not supported in Nuxt frontend');
 
     // Use a narrow viewport to force buttons into overflow
     await page.setViewportSize({ width: 800, height: 768 });
@@ -662,7 +662,7 @@ test.describe('Quanta Toolbar - Overflow', () => {
   test('clicking overflow button applies formatting', async ({
     page,
   }, testInfo) => {
-    test.skip(testInfo.project.name === 'nuxt', 'Columns block not supported in Nuxt frontend');
+    test.skip(testInfo.project.name.includes('nuxt'), 'Columns block not supported in Nuxt frontend');
 
     // Use narrow viewport to force link button into overflow
     await page.setViewportSize({ width: 800, height: 768 });
@@ -814,7 +814,7 @@ test.describe('Quanta Toolbar - Auto-fade', () => {
   });
 
   test('arrow keys navigate past fixed blocks without editable fields', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'nuxt', 'Skipping on nuxt - template merge uses different block IDs');
+    test.skip(testInfo.project.name.includes('nuxt'), 'Skipping on nuxt - template merge uses different block IDs');
 
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -851,7 +851,7 @@ test.describe('Quanta Toolbar - Auto-fade', () => {
   });
 
   test('arrow keys navigate across page block field boundaries', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'nuxt', 'Skipping on nuxt');
+    test.skip(testInfo.project.name.includes('nuxt'), 'Skipping on nuxt');
 
     const helper = new AdminUIHelper(page);
     await helper.login();

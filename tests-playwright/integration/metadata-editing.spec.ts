@@ -11,7 +11,7 @@ test.describe('Page Metadata Editing', () => {
     await helper.login();
 
     // Use different pages for different frontends
-    const isNuxt = testInfo.project.name === 'nuxt';
+    const isNuxt = testInfo.project.name.includes('nuxt');
     const testPath = isNuxt ? '/carousel-test-page' : '/test-page';
     const expectedInitialTitle = isNuxt ? 'Carousel Test Page' : 'Test Page';
 
@@ -65,7 +65,7 @@ test.describe('Page Metadata Editing', () => {
     await helper.login();
 
     // Use different pages for different frontends
-    const isNuxt = testInfo.project.name === 'nuxt';
+    const isNuxt = testInfo.project.name.includes('nuxt');
     const testPath = isNuxt ? '/carousel-test-page' : '/test-page';
     const blockToClick = isNuxt ? 'slider-1' : 'block-1-uuid';
 
@@ -100,7 +100,7 @@ test.describe('Page Metadata Editing', () => {
   });
 
   test('can click page-level preview_image and change it inline', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'nuxt', 'Nuxt frontend needs preview_image element added');
+    test.skip(testInfo.project.name.includes('nuxt'), 'Nuxt frontend needs preview_image element added');
 
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -174,7 +174,7 @@ test.describe('Page Metadata Editing', () => {
   });
 
   test('page-level preview_image outline tracks on scroll', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'nuxt', 'Nuxt frontend needs preview_image element added');
+    test.skip(testInfo.project.name.includes('nuxt'), 'Nuxt frontend needs preview_image element added');
 
     const helper = new AdminUIHelper(page);
     await helper.login();
