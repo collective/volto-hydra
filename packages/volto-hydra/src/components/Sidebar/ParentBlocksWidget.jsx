@@ -134,9 +134,9 @@ const getFilteredBlockSchema = (blockType, intl, blockPathMap, blockId, blockDat
   }
 
   // Use cached enhanced schema from pathMap (built during buildBlockPathMap)
-  const schema = pathInfo?.blockSchema;
+  const schema = pathInfo?.resolvedBlockSchema;
   if (!schema) {
-    console.error(`[getFilteredBlockSchema] No cached blockSchema for '${blockId}' (type: ${blockType})`);
+    console.error(`[getFilteredBlockSchema] No cached resolvedBlockSchema for '${blockId}' (type: ${blockType})`);
     return null;
   }
 

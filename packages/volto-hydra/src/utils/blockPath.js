@@ -545,7 +545,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
         parentId: effectiveParentId,
         containerField: fieldName,
         blockType, // Block type for uniform lookups (single source of truth)
-        blockSchema, // Full schema with functions — stripped only when sending to iframe
+        resolvedBlockSchema: blockSchema, // Full schema with functions — stripped only when sending to iframe
         allowedSiblingTypes: fieldDef.allowedBlocks || defaultPageAllowedBlocks,
         allowedTemplates: fieldDef.allowedTemplates || null,
         maxSiblings: fieldDef.maxLength || null,
@@ -670,7 +670,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
         isObjectListItem: true,
         idField,
         ...(typeField && { typeField }), // Only set if typed object_list
-        blockSchema, // Full schema with functions — stripped only when sending to iframe
+        resolvedBlockSchema: blockSchema, // Full schema with functions — stripped only when sending to iframe
         itemSchema: effectiveItemSchema, // null for typed items (schema from blocksConfig)
         dataPath: effectiveDataPath, // Store for later use
         allowedSiblingTypes: hasAllowedBlocks ? fieldDef.allowedBlocks : [virtualType],
@@ -695,6 +695,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl) {
     parentId: null, // Page has no parent
     containerField: null,
     blockType: '_page',
+    resolvedBlockSchema: pageSchema,
   };
 
   // Start traversal with page as root container
@@ -829,7 +830,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
     parentId = parentPathInfo.parentId;
   }
 
-  const schema = blockPathMap[parentId]?.blockSchema;
+  const schema = blockPathMap[parentId]?.resolvedBlockSchema;
   const fieldDef = schema?.properties?.[fieldName];
 
   // For object_list items, we already have most info in pathInfo
@@ -988,7 +989,7 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
 
   const blockType = blockId === PAGE_BLOCK_UID ? '_page' : pathInfo?.blockType;
   if (!blockType) return [];
-  const schema = pathInfo?.blockSchema;
+  const schema = pathInfo?.resolvedBlockSchema;
 
   // Compute default allowed blocks (used when field doesn't specify allowedBlocks)
   const blockConfig = blocksConfig?.[blockType];
@@ -1874,7 +1875,7 @@ export function reorderBlocksInContainer(
   }
 
   // Detect if this is an object_list field
-  const schema = blockPathMap[effectiveParentId]?.blockSchema;
+  const schema = blockPathMap[effectiveParentId]?.resolvedBlockSchema;
   const fieldDef = schema?.properties?.[fieldName];
   const isObjectList = fieldDef?.widget === 'object_list';
 
