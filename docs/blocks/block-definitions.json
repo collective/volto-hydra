@@ -170,6 +170,13 @@
   "image": {
     "blocks": {
       "image": {
+        "fieldMappings": {
+          "@default": {
+            "image": "url",
+            "@id": "href",
+            "title": "alt"
+          }
+        },
         "blockSchema": {
           "properties": {
             "url": {
@@ -188,12 +195,7 @@
         },
         "schemaEnhancer": {
           "childBlockConfig": {
-            "defaultsField": "itemDefaults",
-            "editableFields": [
-              "url",
-              "alt",
-              "href"
-            ]
+            "defaultsField": "itemDefaults"
           }
         }
       }
@@ -214,6 +216,14 @@
   "teaser": {
     "blocks": {
       "teaser": {
+        "fieldMappings": {
+          "@default": {
+            "@id": "href",
+            "title": "title",
+            "description": "description",
+            "image": "preview_image"
+          }
+        },
         "blockSchema": {
           "properties": {
             "href": {
@@ -240,14 +250,7 @@
         },
         "schemaEnhancer": {
           "childBlockConfig": {
-            "defaultsField": "itemDefaults",
-            "editableFields": [
-              "href",
-              "title",
-              "description",
-              "preview_image",
-              "overwrite"
-            ]
+            "defaultsField": "itemDefaults"
           }
         }
       }
@@ -513,9 +516,9 @@
   "slider": {
     "blocks": {
       "slider": {
+        "itemTypeField": "variation",
         "schemaEnhancer": {
           "inheritSchemaFrom": {
-            "typeField": "variation",
             "defaultsField": "itemDefaults",
             "blocksField": "slides",
             "title": "Item Type"
@@ -643,9 +646,9 @@
   "listing": {
     "blocks": {
       "listing": {
+        "itemTypeField": "variation",
         "schemaEnhancer": {
           "inheritSchemaFrom": {
-            "typeField": "variation",
             "mappingField": "fieldMapping",
             "defaultsField": "itemDefaults",
             "filterConvertibleFrom": "@default",

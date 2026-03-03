@@ -9,6 +9,14 @@ This is a **built-in** block.
 ```json
 {
   "teaser": {
+    "fieldMappings": {
+      "@default": {
+        "@id": "href",
+        "title": "title",
+        "description": "description",
+        "image": "preview_image"
+      }
+    },
     "blockSchema": {
       "properties": {
         "href": {
@@ -35,14 +43,7 @@ This is a **built-in** block.
     },
     "schemaEnhancer": {
       "childBlockConfig": {
-        "defaultsField": "itemDefaults",
-        "editableFields": [
-          "href",
-          "title",
-          "description",
-          "preview_image",
-          "overwrite"
-        ]
+        "defaultsField": "itemDefaults"
       }
     }
   }

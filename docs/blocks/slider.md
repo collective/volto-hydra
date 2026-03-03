@@ -9,9 +9,9 @@ This is a **custom** block — register it via `initBridge`.
 ```json
 {
   "slider": {
+    "itemTypeField": "variation",
     "schemaEnhancer": {
       "inheritSchemaFrom": {
-        "typeField": "variation",
         "defaultsField": "itemDefaults",
         "blocksField": "slides",
         "title": "Item Type"

@@ -9,9 +9,9 @@ This is a **built-in** block.
 ```json
 {
   "listing": {
+    "itemTypeField": "variation",
     "schemaEnhancer": {
       "inheritSchemaFrom": {
-        "typeField": "variation",
         "mappingField": "fieldMapping",
         "defaultsField": "itemDefaults",
         "filterConvertibleFrom": "@default",
