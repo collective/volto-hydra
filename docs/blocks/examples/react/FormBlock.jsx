@@ -3,8 +3,8 @@ function FormBlock({ block }) {
 
   return (
     <form data-block-uid={block['@uid']} className="form-block" onSubmit={e => e.preventDefault()}>
-      <h3>{block.title}</h3>
-      {block.description && <p>{block.description}</p>}
+      <h3 data-edit-text="title">{block.title}</h3>
+      {block.description && <p data-edit-text="description">{block.description}</p>}
 
       {fields.map(field => (
         <FormField key={field['@id']} field={field} />

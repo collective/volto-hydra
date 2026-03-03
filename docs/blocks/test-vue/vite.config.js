@@ -55,6 +55,9 @@ function vueExamplesPlugin() {
         // Rewrite bare API_URL references to _getApiUrl() calls
         code = code.replace(/\bAPI_URL\b/g, '_getApiUrl()');
       }
+      if (code.includes('contentPath') && !code.includes('contentPath =')) {
+        neededImports.push(`const contentPath = (...a) => window._contentPath(...a);`);
+      }
 
       if (neededImports.length === 0) return;
 

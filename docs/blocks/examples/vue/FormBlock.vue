@@ -1,7 +1,7 @@
 <template>
   <form :data-block-uid="block['@uid']" class="form-block" @submit.prevent>
-    <h3>{{ block.title }}</h3>
-    <p v-if="block.description">{{ block.description }}</p>
+    <h3 data-edit-text="title">{{ block.title }}</h3>
+    <p v-if="block.description" data-edit-text="description">{{ block.description }}</p>
 
     <div v-for="field in block.subblocks || []" :key="field['@id']" class="form-field">
       <template v-if="field.field_type === 'text'">

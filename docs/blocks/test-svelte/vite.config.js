@@ -14,6 +14,7 @@ import path from 'path';
 const GLOBAL_INJECTIONS = {
   expandListingBlocks: { inject: '(...a) => window.expandListingBlocks(...a)' },
   ploneFetchItems: { inject: '(...a) => window.ploneFetchItems(...a)' },
+  contentPath: { inject: '(...a) => window._contentPath(...a)' },
   API_URL: { inject: '() => window._API_URL', rewrite: true, getterName: '_getApiUrl' },
 };
 

@@ -3,9 +3,9 @@
 </script>
 
 <form data-block-uid={block['@uid']} class="form-block" on:submit|preventDefault>
-  <h3>{block.title}</h3>
+  <h3 data-edit-text="title">{block.title}</h3>
   {#if block.description}
-    <p>{block.description}</p>
+    <p data-edit-text="description">{block.description}</p>
   {/if}
 
   {#each block.subblocks || [] as field (field.field_id || field.id)}

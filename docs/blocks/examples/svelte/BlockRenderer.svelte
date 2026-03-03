@@ -64,11 +64,11 @@
 {:else if block['@type'] === 'summary' || block['@type'] === 'default'}
   <div data-block-uid={block['@uid']} class="listing-item">
     {#if block.image}
-      <img src={typeof block.image === 'string' ? block.image : block.image['@id']} alt="" />
+      <img data-edit-media="image" src={typeof block.image === 'string' ? block.image : block.image['@id']} alt="" />
     {/if}
     {#if block.date}<time style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">{new Date(block.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</time>{/if}
-    <h4><a href={block.href}>{block.title}</a></h4>
-    {#if block.description}<p>{block.description}</p>{/if}
+    <h4><a href={contentPath(block.href)} data-edit-link="href">{block.title}</a></h4>
+    {#if block.description}<p data-edit-text="description">{block.description}</p>{/if}
   </div>
 {:else}
   <div data-block-uid={block['@uid']}>Unknown block: {block['@type']}</div>

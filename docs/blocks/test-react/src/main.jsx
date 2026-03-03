@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { initBridge, expandListingBlocks, ploneFetchItems } from '$hydra';
+import { initBridge, expandListingBlocks, ploneFetchItems, contentPath } from '$hydra';
 import docPageDefinitions from '$schemas';
 const docBlocksConfig = Object.fromEntries(
   Object.values(docPageDefinitions).flatMap(page => Object.entries(page.blocks))
@@ -11,6 +11,7 @@ import App from './App.jsx';
 window._expandListingBlocks = expandListingBlocks;
 window._ploneFetchItems = ploneFetchItems;
 window._API_URL = 'http://localhost:8888';
+window._contentPath = (url) => contentPath(url, window._API_URL);
 
 const root = createRoot(document.getElementById('root'));
 

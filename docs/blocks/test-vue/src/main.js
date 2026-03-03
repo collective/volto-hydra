@@ -1,5 +1,5 @@
 import { createApp, reactive } from 'vue';
-import { initBridge, expandListingBlocks, ploneFetchItems } from '$hydra';
+import { initBridge, expandListingBlocks, ploneFetchItems, contentPath } from '$hydra';
 import docPageDefinitions from '$schemas';
 const docBlocksConfig = Object.fromEntries(
   Object.values(docPageDefinitions).flatMap(page => Object.entries(page.blocks))
@@ -10,6 +10,7 @@ import App from './App.vue';
 window.expandListingBlocks = expandListingBlocks;
 window.ploneFetchItems = ploneFetchItems;
 window._API_URL = 'http://localhost:8888';
+window._contentPath = (url) => contentPath(url, window._API_URL);
 
 const state = reactive({ items: [], content: {} });
 

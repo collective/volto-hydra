@@ -10035,6 +10035,27 @@ export function getAccessToken() {
 }
 
 /**
+ * Convert an absolute API URL to a frontend-relative path.
+ *
+ * Content URLs from the Plone REST API (e.g. @id fields in listing items)
+ * use the API base URL. Pass your API base URL to convert them to
+ * frontend-relative paths. Note: the bridge may not be initialised in
+ * non-edit mode, so the API URL must be provided by the frontend itself.
+ *
+ * @param {string} url - URL to convert (absolute or relative)
+ * @param {string} apiUrl - API base URL (e.g. 'https://api.example.com')
+ * @returns {string} Relative path if url starts with apiUrl, otherwise url unchanged
+ */
+export function contentPath(url, apiUrl) {
+  if (!url || !apiUrl || typeof url !== 'string') return url || '';
+  if (url.startsWith(apiUrl)) {
+    const rel = url.slice(apiUrl.length);
+    return rel.startsWith('/') ? rel : '/' + rel;
+  }
+  return url;
+}
+
+/**
  * Check if we're in edit mode (hydra iframe connected to admin for editing).
  * Uses window.name (set by admin) and _edit URL param as signals.
  * @returns {boolean} True if in edit mode

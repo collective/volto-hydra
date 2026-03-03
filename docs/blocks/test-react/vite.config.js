@@ -77,6 +77,9 @@ function reactExamplesPlugin() {
         // Replace bare API_URL references with _getApiUrl() calls
         code = code.replace(/\bAPI_URL\b/g, '_getApiUrl()');
       }
+      if (code.includes('contentPath')) {
+        imports += `const contentPath = (...a) => window._contentPath(...a);\n`;
+      }
 
       // Find all top-level function declarations and export the first as default
       const fnNames = [];
