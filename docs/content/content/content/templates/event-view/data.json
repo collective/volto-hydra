@@ -1,0 +1,36 @@
+{
+  "@id": "/templates/event-view",
+  "@type": "Document",
+  "UID": "tpl-ct-event-view",
+  "id": "event-view",
+  "title": "Event View",
+  "description": "Layout template for Event content type pages",
+  "blocks": {
+    "tpl-ev-title": {
+      "@type": "title",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-ct-event-view",
+      "templateInstanceId": "tpl-ev-def",
+      "placeholder": "title"
+    },
+    "tpl-ev-metadata": {
+      "@type": "eventMetadata",
+      "fixed": true,
+      "templateId": "resolveuid/tpl-ct-event-view",
+      "templateInstanceId": "tpl-ev-def",
+      "placeholder": "event-metadata"
+    },
+    "tpl-ev-content": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-ct-event-view",
+      "templateInstanceId": "tpl-ev-def",
+      "placeholder": "content",
+      "plaintext": "",
+      "value": [{ "type": "p", "children": [{ "text": "" }] }]
+    }
+  },
+  "blocks_layout": {
+    "items": ["tpl-ev-title", "tpl-ev-metadata", "tpl-ev-content"]
+  }
+}

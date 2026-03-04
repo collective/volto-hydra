@@ -17,7 +17,10 @@
           ],
           "type": "p"
         }
-      ]
+      ],
+      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateInstanceId": "tpl-ni-def",
+      "placeholder": "content"
     },
     "8c686422-757e-4519-ae6a-ffcb4d107e22": {
       "@type": "introduction",
@@ -31,14 +34,26 @@
           ],
           "type": "p"
         }
-      ]
+      ],
+      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateInstanceId": "tpl-ni-def",
+      "placeholder": "content"
     },
     "944cfb1b-3ef7-425f-a5ef-eb9242429bfd": {
       "@type": "leadimage",
-      "align": "center"
+      "align": "center",
+      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateInstanceId": "tpl-ni-def",
+      "fixed": true,
+      "placeholder": "lead-image"
     },
     "a0ac0f60-667b-4b22-a49f-989f2ae8c3cc": {
-      "@type": "title"
+      "@type": "title",
+      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateInstanceId": "tpl-ni-def",
+      "fixed": true,
+      "readOnly": true,
+      "placeholder": "title"
     }
   },
   "blocks_layout": {

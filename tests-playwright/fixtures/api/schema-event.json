@@ -1,0 +1,66 @@
+{
+  "title": "Event",
+  "description": "An event",
+  "properties": {
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "description": {
+      "title": "Summary",
+      "type": "string",
+      "widget": "textarea"
+    },
+    "start": {
+      "title": "Event Start",
+      "type": "string",
+      "widget": "datetime"
+    },
+    "end": {
+      "title": "Event End",
+      "type": "string",
+      "widget": "datetime"
+    },
+    "location": {
+      "title": "Location",
+      "type": "string"
+    },
+    "contact_name": {
+      "title": "Contact Name",
+      "type": "string"
+    },
+    "contact_email": {
+      "title": "Contact Email",
+      "type": "string"
+    },
+    "contact_phone": {
+      "title": "Contact Phone",
+      "type": "string"
+    },
+    "event_url": {
+      "title": "Event URL",
+      "type": "string"
+    },
+    "blocks": {
+      "title": "Blocks",
+      "type": "object"
+    },
+    "blocks_layout": {
+      "title": "Blocks Layout",
+      "type": "object"
+    }
+  },
+  "required": ["title"],
+  "fieldsets": [
+    {
+      "id": "default",
+      "title": "Default",
+      "fields": ["title", "description"]
+    },
+    {
+      "id": "event",
+      "title": "Event",
+      "fields": ["start", "end", "location", "contact_name", "contact_email", "contact_phone", "event_url"]
+    }
+  ]
+}

@@ -36,7 +36,7 @@
   </div>
 
   <div v-else-if="block['@type'] == 'leadimage'" :data-block-uid="block_uid" class="mb-6">
-    <NuxtImg v-for="props in [imageProps(data)]" :src="props.url"
+    <NuxtImg v-for="props in [imageProps(data)]" :src="props.url" data-edit-media="preview_image"
       class="w-full rounded-lg object-cover max-h-96" loading="lazy" decoding="async" />
   </div>
 
@@ -715,6 +715,36 @@
   <div v-else-if="block['@type'] == 'empty'" :data-block-uid="block_uid" class="empty-block min-h-[60px]">
   </div>
 
+  <!-- Event Metadata block: renders page-level event fields (start, end, location, contact) -->
+  <div v-else-if="block['@type'] == 'eventMetadata'" :data-block-uid="block_uid"
+       class="event-metadata my-6 p-4 bg-gray-50 rounded-lg border border-gray-200 text-sm">
+    <dl class="grid grid-cols-1 gap-2">
+      <div v-if="data.start" class="flex gap-2">
+        <dt class="font-semibold text-gray-600 min-w-24">When</dt>
+        <dd>
+          <span data-edit-text="/start">{{ formatDate(data.start) }}</span>
+          <span v-if="data.end"> – <span data-edit-text="/end">{{ formatDate(data.end) }}</span></span>
+        </dd>
+      </div>
+      <div v-if="data.location" class="flex gap-2">
+        <dt class="font-semibold text-gray-600 min-w-24">Where</dt>
+        <dd data-edit-text="/location">{{ data.location }}</dd>
+      </div>
+      <div v-if="data.event_url" class="flex gap-2">
+        <dt class="font-semibold text-gray-600 min-w-24">Website</dt>
+        <dd><a :href="data.event_url" class="text-blue-600 underline">{{ data.event_url }}</a></dd>
+      </div>
+      <div v-if="data.contact_name || data.contact_email || data.contact_phone" class="flex gap-2">
+        <dt class="font-semibold text-gray-600 min-w-24">Contact</dt>
+        <dd>
+          <span v-if="data.contact_name" data-edit-text="/contact_name">{{ data.contact_name }}</span>
+          <span v-if="data.contact_email"> · <a :href="`mailto:${data.contact_email}`">{{ data.contact_email }}</a></span>
+          <span v-if="data.contact_phone" data-edit-text="/contact_phone"> · {{ data.contact_phone }}</span>
+        </dd>
+      </div>
+    </dl>
+  </div>
+
   <div v-else :data-block-uid="block_uid">
     {{ 'Not implemented Block: @type=' + block['@type'] }}
     <pre>{{ block }}</pre>
@@ -779,6 +809,14 @@ const effectiveContextPath = computed(() => {
 
 
 const route = useRoute();
+
+// Format an ISO date string for display
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString(undefined, {
+    year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+}
 
 // Sync fallback for templates not in the pre-loaded map
 function syncLoadTemplate(templateId) {

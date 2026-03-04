@@ -180,6 +180,13 @@ const footerExpandedItems = computed(() => {
     });
 });
 
+// Content-type-specific layout templates (enforced in edit mode via initBridge allowedLayouts).
+// Document is the default case — no entry needed.
+const CONTENT_TYPE_LAYOUTS = {
+    'Event': ['/templates/event-view'],
+    'News Item': ['/templates/newsitem-view'],
+};
+
 // Initialize Flowbite components based on data attribute selectors.
 // Safe to call initFlowbite() (which includes initCarousels) because block.vue
 // removes data-carousel after init, so initCarousels() finds no elements here.
@@ -218,10 +225,29 @@ onMounted(() => {
                         },
                     },
                 },
+                eventMetadata: {
+                    id: 'eventMetadata',
+                    title: 'Event Metadata',
+                    group: 'common',
+                    restricted: true,  // Not in add-block picker — part of event layout template
+                    blockSchema: {
+                        fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+                        properties: {},
+                    },
+                },
                 ...sharedBlocksConfig,
             };
-            // Page-level blocks: exclude restricted types and column (only allowed inside columns)
-            const pageLevelBlocks = Object.keys(newBlocks).filter(k => k !== 'column' && !newBlocks[k]?.restricted);
+            // Content-type-aware page-level blocks:
+            // - Always exclude 'column' (only inside columns block)
+            // - Restricted blocks are excluded unless they match the current content type
+            const pageType = data.value?.page?.['@type'];
+            const pageLevelBlocks = Object.keys(newBlocks).filter(k => {
+                if (k === 'column') return false;
+                if (newBlocks[k]?.restricted) {
+                    return k === 'eventMetadata' && pageType === 'Event';
+                }
+                return true;
+            });
             const bridge = initBridge({
                 debug: new URLSearchParams(window.location.search).has('_hydra_debug'),
                 page: {
@@ -231,7 +257,7 @@ onMounted(() => {
                                 title: 'Blocks',
                                 allowedBlocks: [...new Set(['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', ...pageLevelBlocks])],
                                 allowedTemplates: ['/_test_data/templates/test-layout'],
-                                allowedLayouts: [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
+                                allowedLayouts: CONTENT_TYPE_LAYOUTS[pageType] || [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
                             },
                             footer_blocks: {
                                 title: 'Footer',
@@ -265,8 +291,14 @@ const footerAllowedLayouts = computed(() => {
     return normalizedPath === '/_test_data/another-page' ? ['/_test_data/templates/footer-layout'] : null;
 });
 
-// Main blocks allowedLayouts (same as bridge config)
+// Main blocks allowedLayouts for expandTemplatesSync (view mode / SSR)
+// Content-type pages use null — their blocks_layout already contains the right blocks.
+// The CONTENT_TYPE_LAYOUTS templates are enforced in edit mode via initBridge only.
 const mainBlocksAllowedLayouts = computed(() => {
+    const pageType = data.value?.page?.['@type'];
+    if (CONTENT_TYPE_LAYOUTS[pageType]) {
+        return null;  // Use page's own blocks_layout directly
+    }
     return [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'];
 });
 

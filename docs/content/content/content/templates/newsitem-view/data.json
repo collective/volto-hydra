@@ -1,0 +1,36 @@
+{
+  "@id": "/templates/newsitem-view",
+  "@type": "Document",
+  "UID": "tpl-ct-newsitem-view",
+  "id": "newsitem-view",
+  "title": "News Item View",
+  "description": "Layout template for News Item content type pages",
+  "blocks": {
+    "tpl-ni-title": {
+      "@type": "title",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateInstanceId": "tpl-ni-def",
+      "placeholder": "title"
+    },
+    "tpl-ni-leadimage": {
+      "@type": "leadimage",
+      "fixed": true,
+      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateInstanceId": "tpl-ni-def",
+      "placeholder": "lead-image"
+    },
+    "tpl-ni-content": {
+      "@type": "slate",
+      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateInstanceId": "tpl-ni-def",
+      "placeholder": "content",
+      "plaintext": "",
+      "value": [{ "type": "p", "children": [{ "text": "" }] }]
+    }
+  },
+  "blocks_layout": {
+    "items": ["tpl-ni-title", "tpl-ni-leadimage", "tpl-ni-content"]
+  }
+}

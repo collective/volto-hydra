@@ -1,0 +1,46 @@
+{
+  "@id": "/_test_data/event-test-page",
+  "@type": "Event",
+  "UID": "event-test-page-uid",
+  "id": "event-test-page",
+  "title": "Test Event",
+  "description": "An event for testing the eventMetadata block.",
+  "start": "2025-06-15T10:00:00+00:00",
+  "end": "2025-06-15T18:00:00+00:00",
+  "location": "Conference Centre, 42 Main Street, Berlin",
+  "event_url": "https://example.com/event",
+  "contact_name": "Jane Smith",
+  "contact_email": "jane@example.com",
+  "contact_phone": "+49 30 1234 5678",
+  "open_end": false,
+  "whole_day": false,
+  "layout": "event_view",
+  "blocks": {
+    "ev-title-1": {
+      "@type": "title",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-ct-event-view",
+      "templateInstanceId": "tpl-ev-def",
+      "placeholder": "title"
+    },
+    "ev-metadata-1": {
+      "@type": "eventMetadata",
+      "fixed": true,
+      "templateId": "resolveuid/tpl-ct-event-view",
+      "templateInstanceId": "tpl-ev-def",
+      "placeholder": "event-metadata"
+    },
+    "ev-body-1": {
+      "@type": "slate",
+      "value": [{ "type": "p", "children": [{ "text": "Event description goes here." }] }],
+      "plaintext": "Event description goes here.",
+      "templateId": "resolveuid/tpl-ct-event-view",
+      "templateInstanceId": "tpl-ev-def",
+      "placeholder": "content"
+    }
+  },
+  "blocks_layout": {
+    "items": ["ev-title-1", "ev-metadata-1", "ev-body-1"]
+  }
+}
