@@ -16,22 +16,28 @@ import { getFrontendUrl } from './fixtures';
 import * as fs from 'fs';
 import * as path from 'path';
 
+interface SubBlock {
+  id: string;
+  data: Record<string, unknown>;
+}
+
 /**
- * Recursively collect all sub-block IDs from block data.
- * Finds IDs from:
+ * Recursively collect all sub-blocks (id + data) from block data.
+ * Finds sub-blocks from:
  * - Keys in `blocks` dicts (shared blocks dict containers)
  * - `@id` fields in array items (object_list containers like accordion panels, slides)
- * Then recurses into each sub-block to find nested IDs.
+ * Then recurses into each sub-block to find nested sub-blocks.
  */
-function getSubBlockIds(obj: Record<string, unknown>): string[] {
-  const ids: string[] = [];
+function getSubBlocks(obj: Record<string, unknown>): SubBlock[] {
+  const result: SubBlock[] = [];
   for (const [key, value] of Object.entries(obj)) {
     if (key === 'blocks' && value && typeof value === 'object' && !Array.isArray(value)) {
       // Shared blocks dict: keys are block IDs
       for (const [subId, subBlock] of Object.entries(value as Record<string, unknown>)) {
-        ids.push(subId);
         if (subBlock && typeof subBlock === 'object' && !Array.isArray(subBlock)) {
-          ids.push(...getSubBlockIds(subBlock as Record<string, unknown>));
+          const subData = subBlock as Record<string, unknown>;
+          result.push({ id: subId, data: subData });
+          result.push(...getSubBlocks(subData));
         }
       }
     } else if (Array.isArray(value)) {
@@ -42,16 +48,16 @@ function getSubBlockIds(obj: Record<string, unknown>): string[] {
           const id = rec['@id'] as string | undefined;
           const isSubBlock = id && (rec['@type'] || rec['blocks'] || rec['blocks_layout']);
           if (isSubBlock) {
-            ids.push(id);
+            result.push({ id, data: rec });
           }
-          ids.push(...getSubBlockIds(rec));
+          result.push(...getSubBlocks(rec));
         }
       }
     } else if (value && typeof value === 'object') {
-      ids.push(...getSubBlockIds(value as Record<string, unknown>));
+      result.push(...getSubBlocks(value as Record<string, unknown>));
     }
   }
-  return ids;
+  return result;
 }
 
 // Load examples.json to get block data for sub-block checks
@@ -264,16 +270,20 @@ test.describe('Doc example blocks', () => {
       const blockData = examplesJson.blocks?.[example.blockId];
       await checkEditAnnotations(block, blockData);
 
-      // Verify sub-blocks: any block IDs found in `blocks` dicts should be in the DOM
+      // Verify sub-blocks: any block IDs found in `blocks` dicts / object_list arrays
+      // should be in the DOM, and visible ones should pass edit annotation checks.
       if (blockData) {
-        const subIds = getSubBlockIds(blockData);
+        const subBlocks = getSubBlocks(blockData);
         let anyVisible = false;
-        for (const subId of subIds) {
-          const loc = iframe.locator(`[data-block-uid="${subId}"]`).first();
+        for (const { id, data } of subBlocks) {
+          const loc = iframe.locator(`[data-block-uid="${id}"]`).first();
           await expect(loc).toBeAttached({ timeout: 5000 });
-          if (await loc.isVisible()) anyVisible = true;
+          if (await loc.isVisible()) {
+            anyVisible = true;
+            await checkEditAnnotations(loc, data);
+          }
         }
-        if (subIds.length > 0) {
+        if (subBlocks.length > 0) {
           expect(anyVisible).toBe(true);
         }
       }
