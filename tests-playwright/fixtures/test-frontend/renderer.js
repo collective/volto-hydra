@@ -20,6 +20,7 @@
 // Global render counter for testing re-render behavior
 window.hydraRenderCount = window.hydraRenderCount || 0;
 
+
 // Test-frontend log with run ID prefix (matches hydra.js log pattern)
 function tfLog(...args) {
   const runId = window.__testRunId;
@@ -649,7 +650,7 @@ function renderTeaserBlock(block, blockUid) {
  */
 function renderDefaultItemBlock(block, blockUid) {
     const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
-    const href = typeof block.href === 'string' ? block.href : (hrefObj?.['@id'] || '');
+    const href = window._contentPath(typeof block.href === 'string' ? block.href : (hrefObj?.['@id'] || ''));
     const title = block.title || hrefObj?.title || '';
     const description = block.description || hrefObj?.description || '';
     const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
@@ -672,15 +673,15 @@ function renderDefaultItemBlock(block, blockUid) {
  */
 function renderSummaryItemBlock(block, blockUid) {
     const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
-    const href = typeof block.href === 'string' ? block.href : (hrefObj?.['@id'] || '');
+    const href = window._contentPath(typeof block.href === 'string' ? block.href : (hrefObj?.['@id'] || ''));
     const title = block.title || hrefObj?.title || '';
     const description = block.description || hrefObj?.description || '';
     const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
 
-    const imageSrc = block.image ? getImageUrl(block.image) : '';
+    const imageSrc = block.image ? window._contentPath(getImageUrl(block.image)) : '';
 
     const imageHtml = imageSrc
-        ? `<img src="${imageSrc}" alt="" style="width: 80px; height: 60px; object-fit: cover; margin-right: 15px; border-radius: 4px;" />`
+        ? `<img data-edit-media="image" src="${imageSrc}" alt="" style="width: 80px; height: 60px; object-fit: cover; margin-right: 15px; border-radius: 4px;" />`
         : '';
 
     const dateHtml = block.date
