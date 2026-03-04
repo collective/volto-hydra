@@ -86,7 +86,9 @@
     <div class="log-entry"><span style="font-weight: bold">Message Log:</strong></div>
   </div>
 
-  <script>
+  <script type="module">
+    import { buildBlockPathMap } from '/build-block-path-map.js';
+
     // Configure iframe frontend from ?frontend= URL param (default: mock frontend on 8888)
     const params = new URLSearchParams(window.location.search);
     const frontendOrigin = params.get('frontend') || 'http://localhost:8888';
@@ -115,86 +117,82 @@
     // when it receives FORM_DATA, so the mock parent (acting as admin) should
     // send plain Slate JSON without nodeIds, just like the real admin does.
 
-    // Helper to build blockPathMap from mockFormData (recursive for nested blocks)
-    function buildBlockPathMap() {
-      const pathMap = {};
+    // blocksConfig for schema-driven buildBlockPathMap (no Volto deps)
+    const mockBlocksConfig = {
+      _page: {
+        schema: () => ({
+          properties: { blocks_layout: { widget: 'blocks_layout' } },
+        }),
+      },
+      slate: { id: 'slate', blockSchema: { properties: { value: { widget: 'slate' } } } },
+      hero: {
+        id: 'hero',
+        blockSchema: {
+          properties: {
+            heading: { type: 'string' },
+            subheading: { type: 'string', widget: 'textarea' },
+            buttonText: { type: 'string' },
+            description: { widget: 'slate' },
+          },
+        },
+      },
+      image: { id: 'image', blockSchema: { properties: {} } },
+      columns: {
+        id: 'columns',
+        blockSchema: {
+          properties: {
+            columns: { widget: 'blocks_layout', allowedBlocks: ['column'] },
+          },
+        },
+      },
+      column: {
+        id: 'column',
+        blockSchema: {
+          properties: {
+            blocks_layout: { widget: 'blocks_layout' },
+          },
+        },
+      },
+      slateTable: {
+        id: 'slateTable',
+        addMode: 'table',
+        blockSchema: {
+          properties: {
+            table: {
+              widget: 'object',
+              schema: {
+                properties: {
+                  rows: {
+                    widget: 'object_list',
+                    idField: 'key',
+                    addMode: 'table',
+                    schema: {
+                      properties: {
+                        cells: {
+                          widget: 'object_list',
+                          idField: 'key',
+                          schema: {
+                            properties: {
+                              value: { widget: 'slate' },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
 
-      function processContainer(container, parentId, basePath, addMode) {
-        const layout = container.blocks_layout?.items || [];
-        layout.forEach(blockId => {
-          const block = container.blocks?.[blockId];
-          if (!block) return;
-          const path = [...basePath, 'blocks', blockId];
-          const blockType = block['@type'];
-          const entry = {
-            path,
-            parentId,
-            blockType,
-          };
-          if (addMode === 'table') {
-            entry.parentAddMode = 'table';
-          }
-          pathMap[blockId] = entry;
-
-          // Recurse into nested blocks
-          if (block.blocks && block.blocks_layout) {
-            processContainer(block, blockId, path, null);
-          }
-
-          // Handle extra layout fields (columns, top_images, etc.)
-          // In shared blocks dict format, these are { items: [...] } pointing to block.blocks entries.
-          const knownNonLayout = new Set(['blocks', 'blocks_layout', '@type', 'title', 'table', 'description']);
-          for (const [key, value] of Object.entries(block)) {
-            if (knownNonLayout.has(key)) continue;
-            if (value?.items && Array.isArray(value.items) && block.blocks) {
-              value.items.forEach(childId => {
-                const child = block.blocks[childId];
-                if (!child) return;
-                const childPath = [...path, 'blocks', childId];
-                pathMap[childId] = {
-                  path: childPath,
-                  parentId: blockId,
-                  blockType: child['@type'] || key,
-                };
-                // Recurse if child has blocks/blocks_layout
-                if (child.blocks && child.blocks_layout) {
-                  processContainer(child, childId, childPath, null);
-                }
-              });
-            }
-          }
-
-          // Handle slateTable: rows and cells use .key as blockId
-          if (blockType === 'slateTable' && block.table?.rows) {
-            block.table.rows.forEach(row => {
-              pathMap[row.key] = {
-                path: [...path, 'table', 'rows', row.key],
-                parentId: blockId,
-                blockType: 'slateTable:row',
-                addMode: 'table',
-              };
-              (row.cells || []).forEach(cell => {
-                pathMap[cell.key] = {
-                  path: [...path, 'table', 'rows', row.key, 'cells', cell.key],
-                  parentId: row.key,
-                  blockType: 'slateTable:cell',
-                  parentAddMode: 'table',
-                };
-              });
-            });
-          }
-        });
-      }
-
-      processContainer(mockFormData, null, [], null);
-      return pathMap;
-    }
-
-    // Block field types metadata (constant)
+    // Block field types metadata (constant) — virtual type for table cells from schema-driven pathMap
     const blockFieldTypes = {
       'slate': { value: 'slate' },
       'hero': { heading: 'string', subheading: 'string:textarea', buttonText: 'string', description: 'slate' },
-      'slateTable:cell': { value: 'slate' },
+      'slateTable:rows:cells': { value: 'slate' },
     };
 
     // Simple Slate transformation without needing full Slate library
@@ -480,7 +478,7 @@
           // Respond with FORM_DATA including blockPathMap
           console.log('[MOCK_PARENT] Received INIT message:', message);
 
-          const blockPathMap = buildBlockPathMap();
+          const blockPathMap = buildBlockPathMap(mockFormData, mockBlocksConfig);
 
           const response = {
             type: 'INITIAL_DATA',
@@ -534,7 +532,7 @@
           // Legacy handler for backwards compatibility
           console.log('[MOCK_PARENT] Received legacy GET_INITIAL_DATA');
 
-          const blockPathMap = buildBlockPathMap();
+          const blockPathMap = buildBlockPathMap(mockFormData, mockBlocksConfig);
 
           const response = {
             type: 'INITIAL_DATA',
@@ -655,7 +653,7 @@
             const response = {
               type: 'FORM_DATA',
               data: mockFormData,
-              blockPathMap: buildBlockPathMap(),
+              blockPathMap: buildBlockPathMap(mockFormData, mockBlocksConfig),
               blockFieldTypes,
               formatRequestId: requestId,
               transformedSelection,
@@ -671,7 +669,7 @@
                 const dupeResponse = {
                   type: 'FORM_DATA',
                   data: mockFormData,
-                  blockPathMap: buildBlockPathMap(),
+                  blockPathMap: buildBlockPathMap(mockFormData, mockBlocksConfig),
                   blockFieldTypes,
                 };
                 event.source.postMessage(dupeResponse, event.origin);
@@ -709,7 +707,7 @@
               iframe.contentWindow.postMessage({
                 type: 'FORM_DATA',
                 data: echoData,
-                blockPathMap: buildBlockPathMap(),
+                blockPathMap: buildBlockPathMap(mockFormData, mockBlocksConfig),
                 blockFieldTypes,
               }, '*');
               console.log('[MOCK_PARENT] Echoed FORM_DATA back');
@@ -771,7 +769,7 @@
     window.mockParent = {
       getFormData: () => mockFormData,
       getBlock: (blockId) => mockFormData.blocks[blockId],
-      buildBlockPathMap,
+      buildBlockPathMap: () => buildBlockPathMap(mockFormData, mockBlocksConfig),
       getBlockFieldTypes: () => blockFieldTypes,
       setTransformDelay: (delay) => { window.mockTransformDelay = delay; },
       setEchoFormData: (enabled) => { window.mockEchoFormData = enabled; },
@@ -780,7 +778,7 @@
       selectBlock: (blockId) => {
         const iframe = document.getElementById('previewIframe');
         if (!iframe?.contentWindow) return;
-        const blockPathMap = buildBlockPathMap();
+        const blockPathMap = buildBlockPathMap(mockFormData, mockBlocksConfig);
         iframe.contentWindow.postMessage({
           type: 'SELECT_BLOCK',
           uid: blockId,

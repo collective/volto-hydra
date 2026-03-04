@@ -2027,6 +2027,13 @@ app.get('/hydra.js', (req, res) => {
   res.sendFile(hydraJsPath);
 });
 
+// Serve buildBlockPathMap utility (Volto-free, used by mock-parent.html)
+app.get('/build-block-path-map.js', (req, res) => {
+  const filePath = path.join(__dirname, '../../packages/hydra-js/buildBlockPathMap.js');
+  res.setHeader('Content-Type', 'text/javascript; charset=UTF-8');
+  res.sendFile(filePath);
+});
+
 // Serve shared block schemas (used by test frontend via import)
 app.get('/shared-block-schemas.js', (req, res) => {
   const filePath = path.join(__dirname, 'shared-block-schemas.js');
