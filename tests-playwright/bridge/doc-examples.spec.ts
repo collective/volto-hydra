@@ -21,15 +21,41 @@ interface SubBlock {
   data: Record<string, unknown>;
 }
 
+// Load block-definitions.json to build a schema-aware map of object_list fields.
+// Maps blockType → fieldName → idField (the item property used as data-block-uid).
+const blockDefs = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, '../../docs/blocks/block-definitions.json'), 'utf-8'),
+);
+
+/** Map of blockType → (fieldName → idField) for every object_list field in the schema. */
+const objectListFields: Map<string, Map<string, string>> = new Map();
+for (const pageDef of Object.values(blockDefs) as Record<string, unknown>[]) {
+  const blocks = (pageDef as Record<string, unknown>).blocks as Record<string, unknown> | undefined;
+  if (!blocks) continue;
+  for (const [blockType, blockDef] of Object.entries(blocks)) {
+    const props = (blockDef as Record<string, unknown>)?.blockSchema as Record<string, unknown> | undefined;
+    if (!props?.properties) continue;
+    for (const [fieldName, fieldDef] of Object.entries(props.properties as Record<string, unknown>)) {
+      if ((fieldDef as Record<string, unknown>)?.widget === 'object_list') {
+        if (!objectListFields.has(blockType)) objectListFields.set(blockType, new Map());
+        const idField = ((fieldDef as Record<string, unknown>).idField as string | undefined) || '@id';
+        objectListFields.get(blockType)!.set(fieldName, idField);
+      }
+    }
+  }
+}
+
 /**
  * Recursively collect all sub-blocks (id + data) from block data.
- * Finds sub-blocks from:
- * - Keys in `blocks` dicts (shared blocks dict containers)
- * - `@id` fields in array items (object_list containers like accordion panels, slides)
- * Then recurses into each sub-block to find nested sub-blocks.
+ *
+ * Uses block-definitions.json schema to identify object_list fields and their
+ * idField (the item property used as data-block-uid). Falls back to a
+ * heuristic (@id + @type/blocks/blocks_layout) for blocks not in the schema.
  */
-function getSubBlocks(obj: Record<string, unknown>): SubBlock[] {
+function getSubBlocks(obj: Record<string, unknown>, blockType?: string): SubBlock[] {
   const result: SubBlock[] = [];
+  const knownListFields = blockType ? (objectListFields.get(blockType) || new Map<string, string>()) : new Map<string, string>();
+
   for (const [key, value] of Object.entries(obj)) {
     if (key === 'blocks' && value && typeof value === 'object' && !Array.isArray(value)) {
       // Shared blocks dict: keys are block IDs
@@ -37,20 +63,30 @@ function getSubBlocks(obj: Record<string, unknown>): SubBlock[] {
         if (subBlock && typeof subBlock === 'object' && !Array.isArray(subBlock)) {
           const subData = subBlock as Record<string, unknown>;
           result.push({ id: subId, data: subData });
-          result.push(...getSubBlocks(subData));
+          result.push(...getSubBlocks(subData, subData['@type'] as string | undefined));
         }
       }
     } else if (Array.isArray(value)) {
-      // object_list: items are sub-blocks if they have @id + @type, blocks, or blocks_layout
+      const idField = knownListFields.get(key);
       for (const item of value) {
         if (item && typeof item === 'object' && !Array.isArray(item)) {
           const rec = item as Record<string, unknown>;
-          const id = rec['@id'] as string | undefined;
-          const isSubBlock = id && (rec['@type'] || rec['blocks'] || rec['blocks_layout']);
-          if (isSubBlock) {
-            result.push({ id, data: rec });
+          if (idField) {
+            // Schema-defined object_list: use the declared idField
+            const id = rec[idField] as string | undefined;
+            if (id) {
+              result.push({ id, data: rec });
+              result.push(...getSubBlocks(rec, rec['@type'] as string | undefined));
+            }
+          } else {
+            // Fallback heuristic: @id + (@type or blocks or blocks_layout)
+            const id = rec['@id'] as string | undefined;
+            const isSubBlock = id && (rec['@type'] || rec['blocks'] || rec['blocks_layout']);
+            if (isSubBlock) {
+              result.push({ id, data: rec });
+            }
+            result.push(...getSubBlocks(rec, rec['@type'] as string | undefined));
           }
-          result.push(...getSubBlocks(rec));
         }
       }
     } else if (value && typeof value === 'object') {
@@ -273,7 +309,7 @@ test.describe('Doc example blocks', () => {
       // Verify sub-blocks: any block IDs found in `blocks` dicts / object_list arrays
       // should be in the DOM, and visible ones should pass edit annotation checks.
       if (blockData) {
-        const subBlocks = getSubBlocks(blockData);
+        const subBlocks = getSubBlocks(blockData, blockData['@type'] as string);
         let anyVisible = false;
         for (const { id, data } of subBlocks) {
           const loc = iframe.locator(`[data-block-uid="${id}"]`).first();

@@ -549,7 +549,7 @@
              class="form-field">
           <!-- Text -->
           <template v-if="field.field_type === 'text'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
               {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
             </label>
             <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -561,7 +561,7 @@
           </template>
           <!-- Textarea -->
           <template v-else-if="field.field_type === 'textarea'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
               {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
             </label>
             <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -573,7 +573,7 @@
           </template>
           <!-- Number -->
           <template v-else-if="field.field_type === 'number'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
               {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
             </label>
             <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -585,7 +585,7 @@
           </template>
           <!-- Select (List) -->
           <template v-else-if="field.field_type === 'select'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
               {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
             </label>
             <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -601,7 +601,7 @@
           <!-- Single Choice (Radio) -->
           <template v-else-if="field.field_type === 'single_choice'">
             <fieldset>
-              <legend class="block text-sm font-medium text-gray-700 mb-1">
+              <legend class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
                 {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
               </legend>
               <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -619,7 +619,7 @@
           <!-- Multiple Choice (Checkboxes) -->
           <template v-else-if="field.field_type === 'multiple_choice'">
             <fieldset>
-              <legend class="block text-sm font-medium text-gray-700 mb-1">
+              <legend class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
                 {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
               </legend>
               <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -642,14 +642,14 @@
                      :checked="!!getFormValue(block_uid, field.field_id)"
                      @change="setFormValue(block_uid, field.field_id, $event.target.checked)"
                      class="rounded border-gray-300" />
-              {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
+              <span data-edit-text="label">{{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span></span>
             </label>
             <p v-if="field.description" class="text-xs text-gray-500 mt-0.5">{{ field.description }}</p>
             <p v-if="formFieldError(block_uid, field.field_id)" class="form-error text-red-500 text-xs mt-1">{{ formFieldError(block_uid, field.field_id) }}</p>
           </template>
           <!-- Date -->
           <template v-else-if="field.field_type === 'date'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
               {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
             </label>
             <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -661,7 +661,7 @@
           </template>
           <!-- Email (from) -->
           <template v-else-if="field.field_type === 'from'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
               {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
             </label>
             <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -673,7 +673,7 @@
           </template>
           <!-- Attachment -->
           <template v-else-if="field.field_type === 'attachment'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
               {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
             </label>
             <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -685,7 +685,7 @@
           <!-- Static text -->
           <template v-else-if="field.field_type === 'static_text'">
             <div class="text-sm text-gray-600">
-              <strong v-if="field.label">{{ field.label }}</strong>
+              <strong v-if="field.label" data-edit-text="label">{{ field.label }}</strong>
               <p v-if="field.description">{{ field.description }}</p>
             </div>
           </template>

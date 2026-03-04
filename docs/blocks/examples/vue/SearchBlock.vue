@@ -5,18 +5,18 @@
     <div v-if="visibleFacets.length" class="facets">
       <h4>{{ block.facetsTitle || 'Filter' }}</h4>
       <template v-for="facet in visibleFacets" :key="facet['@id']">
-        <fieldset v-if="facet.type === 'checkboxFacet'">
-          <legend>{{ facet.title }}</legend>
+        <fieldset v-if="facet.type === 'checkboxFacet'" :data-block-uid="facet['@id']">
+          <legend data-edit-text="title">{{ facet.title }}</legend>
           <!-- checkbox options -->
         </fieldset>
-        <label v-else-if="facet.type === 'selectFacet'">
-          {{ facet.title }}<select><!-- options --></select>
+        <label v-else-if="facet.type === 'selectFacet'" :data-block-uid="facet['@id']">
+          <span data-edit-text="title">{{ facet.title }}</span><select><!-- options --></select>
         </label>
-        <label v-else-if="facet.type === 'daterangeFacet'">
-          {{ facet.title }}<input type="date" /> – <input type="date" />
+        <label v-else-if="facet.type === 'daterangeFacet'" :data-block-uid="facet['@id']">
+          <span data-edit-text="title">{{ facet.title }}</span><input type="date" /> – <input type="date" />
         </label>
-        <label v-else-if="facet.type === 'toggleFacet'">
-          <input type="checkbox" /> {{ facet.title }}
+        <label v-else-if="facet.type === 'toggleFacet'" :data-block-uid="facet['@id']">
+          <input type="checkbox" /> <span data-edit-text="title">{{ facet.title }}</span>
         </label>
       </template>
     </div>

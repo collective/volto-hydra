@@ -34,13 +34,13 @@ function SearchBlock({ block, blockId }) {
 function FacetRenderer({ facet }) {
   switch (facet.type) {
     case 'checkboxFacet':
-      return <fieldset><legend>{facet.title}</legend>{/* checkbox options */}</fieldset>;
+      return <fieldset data-block-uid={facet['@id']}><legend data-edit-text="title">{facet.title}</legend>{/* checkbox options */}</fieldset>;
     case 'selectFacet':
-      return <label>{facet.title}<select>{/* options */}</select></label>;
+      return <label data-block-uid={facet['@id']}><span data-edit-text="title">{facet.title}</span><select>{/* options */}</select></label>;
     case 'daterangeFacet':
-      return <label>{facet.title}<input type="date" /> – <input type="date" /></label>;
+      return <label data-block-uid={facet['@id']}><span data-edit-text="title">{facet.title}</span><input type="date" /> – <input type="date" /></label>;
     case 'toggleFacet':
-      return <label><input type="checkbox" /> {facet.title}</label>;
+      return <label data-block-uid={facet['@id']}><input type="checkbox" /> <span data-edit-text="title">{facet.title}</span></label>;
     default:
       return null;
   }

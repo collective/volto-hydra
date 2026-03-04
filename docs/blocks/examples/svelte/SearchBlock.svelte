@@ -18,13 +18,13 @@
       <h4>{block.facetsTitle || 'Filter'}</h4>
       {#each visibleFacets as facet (facet['@id'])}
         {#if facet.type === 'checkboxFacet'}
-          <fieldset><legend>{facet.title}</legend><!-- checkbox options --></fieldset>
+          <fieldset data-block-uid={facet['@id']}><legend data-edit-text="title">{facet.title}</legend><!-- checkbox options --></fieldset>
         {:else if facet.type === 'selectFacet'}
-          <label>{facet.title}<select><!-- options --></select></label>
+          <label data-block-uid={facet['@id']}><span data-edit-text="title">{facet.title}</span><select><!-- options --></select></label>
         {:else if facet.type === 'daterangeFacet'}
-          <label>{facet.title}<input type="date" /> – <input type="date" /></label>
+          <label data-block-uid={facet['@id']}><span data-edit-text="title">{facet.title}</span><input type="date" /> – <input type="date" /></label>
         {:else if facet.type === 'toggleFacet'}
-          <label><input type="checkbox" /> {facet.title}</label>
+          <label data-block-uid={facet['@id']}><input type="checkbox" /> <span data-edit-text="title">{facet.title}</span></label>
         {/if}
       {/each}
     </div>
