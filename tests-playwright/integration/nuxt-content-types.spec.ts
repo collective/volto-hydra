@@ -151,4 +151,31 @@ test.describe('News Item content type', () => {
     await expect(imageButton.first()).toBeVisible({ timeout: 5000 });
   });
 
+  test('dateField block renders effective date above title', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    const iframe = helper.getIframe();
+
+    await helper.login();
+    await helper.navigateToEdit('/news-test-page');
+    await helper.waitForIframeReady();
+
+    const dateBlock = iframe.locator('[data-block-uid="ni-date-1"]');
+    await expect(dateBlock).toBeVisible({ timeout: 10000 });
+
+    // Should show the effective date with data-edit-text="/effective"
+    const dateEl = dateBlock.locator('[data-edit-text="/effective"]');
+    await expect(dateEl).toBeVisible();
+
+    // Date text should contain year from effective date "2023-01-15"
+    const dateText = await dateEl.textContent();
+    expect(dateText?.trim()).toContain('2023');
+
+    // dateField block should appear before the title block in the DOM
+    const titleBlock = iframe.locator('[data-block-uid="ni-title-1"]');
+    await expect(titleBlock).toBeVisible();
+    const dateY = (await dateBlock.boundingBox())?.y ?? 0;
+    const titleY = (await titleBlock.boundingBox())?.y ?? 0;
+    expect(dateY).toBeLessThan(titleY);
+  });
+
 });

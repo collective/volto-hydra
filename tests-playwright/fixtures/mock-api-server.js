@@ -1321,11 +1321,17 @@ function getTypeSchema(typeName) {
     `schema-${typeName.toLowerCase()}.json`
   );
 
+  const baseSchemaPath = path.join(__dirname, 'api', 'schema-base.json');
+  const base = fs.existsSync(baseSchemaPath)
+    ? JSON.parse(fs.readFileSync(baseSchemaPath, 'utf-8'))
+    : { properties: {}, fieldsets: [] };
+
+  let schema;
   if (fs.existsSync(schemaPath)) {
-    return JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
+    schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
   } else {
     // Return default Document schema
-    return {
+    schema = {
       title: typeName,
       properties: {
         title: {
@@ -1355,6 +1361,17 @@ function getTypeSchema(typeName) {
       ],
     };
   }
+
+  // Merge base schema fields (only add fields not already defined)
+  schema.properties = { ...base.properties, ...schema.properties };
+  const existingFieldsetIds = new Set((schema.fieldsets || []).map((f) => f.id));
+  for (const fs_ of base.fieldsets || []) {
+    if (!existingFieldsetIds.has(fs_.id)) {
+      schema.fieldsets = [...(schema.fieldsets || []), fs_];
+    }
+  }
+
+  return schema;
 }
 
 app.get('/@types/:typeName', (req, res) => {

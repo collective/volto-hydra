@@ -788,10 +788,21 @@
       "templateId": "resolveuid/tpl-ct-newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
+    },
+    "ni-date-m3i1uy1k": {
+      "@type": "dateField",
+      "dateField": "effective",
+      "showTime": false,
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateInstanceId": "tpl-ni-def",
+      "placeholder": "date"
     }
   },
   "blocks_layout": {
     "items": [
+      "ni-date-m3i1uy1k",
       "d3f1c443-583f-4e8e-a682-3bf25752a300",
       "f16a700c-3b02-47aa-9d08-ade7dea4f683",
       "b5b151a1-fb13-458a-8232-4a87bb8c2904",

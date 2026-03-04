@@ -235,6 +235,34 @@ onMounted(() => {
                         properties: {},
                     },
                 },
+                dateField: {
+                    id: 'dateField',
+                    title: 'Date',
+                    group: 'common',
+                    restricted: true,  // Not in add-block picker — added via content-type templates
+                    blockSchema: {
+                        fieldsets: [{ id: 'default', title: 'Default', fields: ['dateField', 'showTime'] }],
+                        properties: {
+                            dateField: {
+                                title: 'Date field',
+                                type: 'string',
+                                widget: 'select',
+                                choices: [
+                                    ['effective', 'Publication date'],
+                                    ['expires', 'Expiration date'],
+                                    ['created', 'Creation date'],
+                                    ['modified', 'Last modified date'],
+                                    ['start', 'Event start'],
+                                    ['end', 'Event end'],
+                                ],
+                            },
+                            showTime: {
+                                title: 'Show time',
+                                type: 'boolean',
+                            },
+                        },
+                    },
+                },
                 ...sharedBlocksConfig,
             };
             // Content-type-aware page-level blocks:
@@ -244,7 +272,9 @@ onMounted(() => {
             const pageLevelBlocks = Object.keys(newBlocks).filter(k => {
                 if (k === 'column') return false;
                 if (newBlocks[k]?.restricted) {
-                    return k === 'eventMetadata' && pageType === 'Event';
+                    if (k === 'eventMetadata') return pageType === 'Event';
+                    if (k === 'dateField') return pageType === 'News Item';
+                    return false;
                 }
                 return true;
             });

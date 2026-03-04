@@ -9,7 +9,6 @@
     "tpl-ev-title": {
       "@type": "title",
       "fixed": true,
-      "readOnly": true,
       "templateId": "resolveuid/tpl-ct-event-view",
       "templateInstanceId": "tpl-ev-def",
       "placeholder": "title"

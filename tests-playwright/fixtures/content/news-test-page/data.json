@@ -5,6 +5,7 @@
   "id": "news-test-page",
   "title": "Test News Item",
   "description": "A news item for testing the leadimage block.",
+  "effective": "2023-01-15T00:00:00",
   "layout": "newsitem_view",
   "preview_image": {
     "download": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect width='100%25' height='100%25' fill='%234a90d9'/%3E%3Ctext x='50%25' y='50%25' fill='white' text-anchor='middle' font-size='24'%3ELead Image%3C/text%3E%3C/svg%3E",
@@ -16,6 +17,16 @@
     }
   },
   "blocks": {
+    "ni-date-1": {
+      "@type": "dateField",
+      "dateField": "effective",
+      "showTime": false,
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateInstanceId": "tpl-ni-def",
+      "placeholder": "date"
+    },
     "ni-title-1": {
       "@type": "title",
       "fixed": true,
@@ -41,6 +52,6 @@
     }
   },
   "blocks_layout": {
-    "items": ["ni-title-1", "ni-leadimage-1", "ni-body-1"]
+    "items": ["ni-date-1", "ni-title-1", "ni-leadimage-1", "ni-body-1"]
   }
 }

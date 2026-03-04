@@ -6,10 +6,18 @@
   "title": "News Item View",
   "description": "Layout template for News Item content type pages",
   "blocks": {
+    "tpl-ni-date": {
+      "@type": "dateField",
+      "dateField": "effective",
+      "showTime": false,
+      "fixed": true,
+      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateInstanceId": "tpl-ni-def",
+      "placeholder": "date"
+    },
     "tpl-ni-title": {
       "@type": "title",
       "fixed": true,
-      "readOnly": true,
       "templateId": "resolveuid/tpl-ct-newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "title"
@@ -31,6 +39,6 @@
     }
   },
   "blocks_layout": {
-    "items": ["tpl-ni-title", "tpl-ni-leadimage", "tpl-ni-content"]
+    "items": ["tpl-ni-date", "tpl-ni-title", "tpl-ni-leadimage", "tpl-ni-content"]
   }
 }

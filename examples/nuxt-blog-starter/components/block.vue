@@ -40,6 +40,14 @@
       class="w-full rounded-lg object-cover max-h-96" loading="lazy" decoding="async" />
   </div>
 
+  <!-- dateField block: renders a configurable page-level date field -->
+  <div v-else-if="block['@type'] == 'dateField'" :data-block-uid="block_uid"
+       class="text-sm text-gray-500 my-2">
+    <span :data-edit-text="`/${block.dateField || 'effective'}`">
+      {{ formatDateField(data[block.dateField || 'effective'], block.showTime) }}
+    </span>
+  </div>
+
   <!-- Hero block - uses comment syntax for field selectors (tests hydra comment parser) -->
   <!-- hydra edit-text=heading(.hero-heading) edit-text=subheading(.hero-subheading) edit-media=image(.hero-image) edit-text=buttonText(.hero-button) edit-link=buttonLink(.hero-button) -->
   <div v-else-if="block['@type'] == 'hero'" :data-block-uid="block_uid"
@@ -810,12 +818,20 @@ const effectiveContextPath = computed(() => {
 
 const route = useRoute();
 
-// Format an ISO date string for display
+// Format an ISO date string for display (date + time)
 function formatDate(dateStr) {
   if (!dateStr) return '';
   return new Date(dateStr).toLocaleDateString(undefined, {
     year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
   });
+}
+
+// Format a page-level date field, optionally including time
+function formatDateField(dateStr, showTime) {
+  if (!dateStr) return '';
+  const opts = { year: 'numeric', month: 'long', day: 'numeric' };
+  if (showTime) { opts.hour = '2-digit'; opts.minute = '2-digit'; }
+  return new Date(dateStr).toLocaleDateString(undefined, opts);
 }
 
 // Sync fallback for templates not in the pre-loaded map
