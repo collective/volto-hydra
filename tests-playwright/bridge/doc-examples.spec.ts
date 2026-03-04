@@ -102,6 +102,46 @@ const examplesJson = JSON.parse(
 );
 
 /**
+ * Click each [data-edit-text] element in the block and verify no
+ * "Missing data-node-id attributes" warning appears in the iframe.
+ *
+ * This catches blocks that put data-edit-text on Slate-rendered content
+ * but don't add data-node-id attributes on the individual nodes — the bridge
+ * cannot sync the cursor position and shows a developer warning overlay.
+ */
+async function checkDataEditTextClicks(
+  page: import('@playwright/test').Page,
+  iframe: import('@playwright/test').FrameLocator,
+  block: import('@playwright/test').Locator,
+) {
+  const editTextEls = block.locator('[data-edit-text]');
+  const count = await editTextEls.count();
+  if (count === 0) return;
+
+  for (let i = 0; i < count; i++) {
+    const el = editTextEls.nth(i);
+    if (!await el.isVisible()) continue;
+
+    await el.click();
+    await page.waitForTimeout(300);
+
+    const warning = iframe.locator('#hydra-dev-warning');
+    await expect(
+      warning,
+      `Clicking [data-edit-text] #${i} should not trigger "Missing data-node-id attributes" warning`,
+    ).not.toBeVisible();
+
+    // Dismiss overlay if it somehow appeared (don't pollute subsequent checks)
+    if (await warning.isVisible()) {
+      await iframe.locator('#hydra-warning-close').click();
+    }
+
+    await page.keyboard.press('Escape');
+    break; // One click per block is sufficient
+  }
+}
+
+/**
  * Check edit annotations on a rendered block:
  * - All <a href> links must have data-edit-link (except in-page anchors)
  * - All <img> must have data-edit-media
@@ -276,7 +316,7 @@ const examples = [
 
 test.describe('Doc example blocks', () => {
   for (const example of examples) {
-    test(`${example.type} block renders`, async ({ helper }) => {
+    test(`${example.type} block renders`, async ({ helper, page }) => {
       const iframe = helper.getIframe();
 
       // Listing blocks: expandListingBlocks sets @uid=parentId on all items,
@@ -305,6 +345,9 @@ test.describe('Doc example blocks', () => {
       // Verify edit annotations and that no links point to the API URL
       const blockData = examplesJson.blocks?.[example.blockId];
       await checkEditAnnotations(block, blockData);
+
+      // Click each data-edit-text and verify no "Missing data-node-id" warning appears
+      await checkDataEditTextClicks(page, iframe, block);
 
       // Verify sub-blocks: any block IDs found in `blocks` dicts / object_list arrays
       // should be in the DOM, and visible ones should pass edit annotation checks.
@@ -468,6 +511,9 @@ docBlockTest.describe('Doc page blocks render', () => {
         });
         expect(hasEditAttr).toBe(true);
       }
+
+      // Click each data-edit-text and verify no "Missing data-node-id" warning appears
+      await checkDataEditTextClicks(page, iframe, block);
     });
   }
 });
