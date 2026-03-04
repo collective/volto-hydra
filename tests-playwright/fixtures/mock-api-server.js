@@ -1903,7 +1903,8 @@ app.get('*', (req, res, next) => {
   }
 
   const urlPath = req.path;
-  const cleanPath = urlPath.replace('/++api++', '');
+  // Normalize: remove ++api++ prefix and strip trailing slash (except root)
+  const cleanPath = (urlPath.replace('/++api++', '') || '/').replace(/\/+$/, '') || '/';
   const sessionId = getSessionId(req);
 
   // Debug logging for template/page requests

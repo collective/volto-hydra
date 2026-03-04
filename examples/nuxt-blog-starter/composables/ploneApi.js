@@ -19,7 +19,7 @@ export default async function ploneApi({
   if (token) {
     headers['Authorization'] = 'Bearer ' + token;
   }
-  var api = path?.join ? path.join('/') : path;
+  var api = path?.join ? path.filter(Boolean).join('/') : path;
   if (!api.startsWith('http')) {
     api = `${runtimeConfig.public.backendBaseUrl}/++api++/${api}`;
   }
