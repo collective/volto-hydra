@@ -3947,6 +3947,13 @@ export class Bridge {
         return null;
       }
 
+      // Skip error if the field is not contenteditable — the user clicked on a
+      // display-only field (e.g. a plain text field not yet activated for editing).
+      // The data-node-id warning only matters when the field is actually being edited.
+      if (container && container.getAttribute('contenteditable') !== 'true') {
+        return null;
+      }
+
       // Check if this field is supposed to be a Slate field
       // Use getFieldType which handles page-level fields (blockUid === null) correctly
       const fieldType = this.getFieldType(blockUid, fieldName);
@@ -3989,8 +3996,12 @@ export class Bridge {
       // Get container innerHTML for debugging (truncated)
       const containerHtml = container?.innerHTML?.slice(0, 200) || 'N/A';
 
+      const fieldTypeDesc = fieldType
+        ? `"${fieldType}" (registered but no data-node-id rendered)`
+        : 'undefined — field not registered in blockSchema.properties; if this is a Slate field, add it with widget: "slate"; if plain text, add type: "string"';
+
       const errorMsg =
-        `Block: ${blockUid}, Field: ${fieldName}\n\n` +
+        `Block: ${blockUid}, Field: ${fieldName}\nField type: ${fieldTypeDesc}\n\n` +
         'DOM path (text node → container):\n' +
         domPath.map((p, i) => '  '.repeat(i) + p).join('\n') +
         '\n\nContainer HTML:\n' + containerHtml + (container?.innerHTML?.length > 200 ? '...' : '');

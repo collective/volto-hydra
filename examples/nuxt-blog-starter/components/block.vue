@@ -4,8 +4,8 @@
   </div>
 
   <div v-else-if="block['@type'] == 'introduction'" :data-block-uid="block_uid"
-       data-edit-text="value" class="text-xl text-gray-600 leading-relaxed my-6 border-t border-b border-gray-200 py-4">
-    <RichText v-for="node in block['value']" :key="node" :node="node" />
+       data-edit-text="/description" class="text-xl text-gray-600 leading-relaxed my-6 border-t border-b border-gray-200 py-4">
+    {{ data.description }}
   </div>
 
   <h1 v-else-if="block['@type'] == 'title'" :data-block-uid="block_uid" data-edit-text="/title">{{ data.title }}
