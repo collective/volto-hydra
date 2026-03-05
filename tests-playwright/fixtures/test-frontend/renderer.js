@@ -159,6 +159,9 @@ async function renderBlock(blockId, block) {
         case 'video':
             wrapper.innerHTML = renderVideoBlock(block);
             break;
+        case 'maps':
+            wrapper.innerHTML = renderMapsBlock(block);
+            break;
         case 'multifield':
             wrapper.innerHTML = renderMultiFieldBlock(block);
             break;
@@ -731,6 +734,18 @@ function renderImageBlock(block) {
  * @param {Object} block - Video block data with url
  * @returns {string} HTML string
  */
+function renderMapsBlock(block) {
+    const url = block.url || '';
+    const title = block.title || 'Map';
+    if (url) {
+        return `<div class="maps-block">
+            <iframe src="${url}" title="${title}" allowfullscreen loading="lazy"
+                style="width:100%;height:450px;border:none"></iframe>
+        </div>`;
+    }
+    return `<div class="maps-block"><p>No map URL set</p></div>`;
+}
+
 function renderVideoBlock(block) {
     const url = block.url || '';
     const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?/]+)/);

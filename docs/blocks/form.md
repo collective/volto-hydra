@@ -549,11 +549,13 @@ function FormBlock({ block }) {
 
   return (
     <form data-block-uid={block['@uid']} className="form-block" onSubmit={e => e.preventDefault()}>
-      <h3>{block.title}</h3>
-      {block.description && <p>{block.description}</p>}
+      <h3 data-edit-text="title">{block.title}</h3>
+      {block.description && <p data-edit-text="description">{block.description}</p>}
 
       {fields.map(field => (
-        <FormField key={field['@id']} field={field} />
+        <div key={field['@id']} data-block-uid={field.field_id} className="form-field">
+          <FormField field={field} />
+        </div>
       ))}
 
       <button type="submit">{block.submit_label || 'Submit'}</button>
@@ -567,20 +569,20 @@ function FormField({ field }) {
 
   switch (field.field_type) {
     case 'text':
-      return <label>{label} <input type="text" required={required} /></label>;
+      return <label><span data-edit-text="label">{label}</span> <input type="text" required={required} /></label>;
     case 'textarea':
-      return <label>{label} <textarea required={required} /></label>;
+      return <label><span data-edit-text="label">{label}</span> <textarea required={required} /></label>;
     case 'number':
-      return <label>{label} <input type="number" required={required} /></label>;
+      return <label><span data-edit-text="label">{label}</span> <input type="number" required={required} /></label>;
     case 'from':
-      return <label>{label} <input type="email" required={required} /></label>;
+      return <label><span data-edit-text="label">{label}</span> <input type="email" required={required} /></label>;
     case 'date':
-      return <label>{label} <input type="date" required={required} /></label>;
+      return <label><span data-edit-text="label">{label}</span> <input type="date" required={required} /></label>;
     case 'checkbox':
-      return <label><input type="checkbox" required={required} /> {label}</label>;
+      return <label><input type="checkbox" required={required} /> <span data-edit-text="label">{label}</span></label>;
     case 'select':
       return (
-        <label>{label}
+        <label><span data-edit-text="label">{label}</span>
           <select required={required}>
             <option value="">Choose...</option>
             {(field.input_values || []).map(v => <option key={v} value={v}>{v}</option>)}
@@ -590,7 +592,7 @@ function FormField({ field }) {
     case 'single_choice':
       return (
         <fieldset>
-          <legend>{label}</legend>
+          <legend data-edit-text="label">{label}</legend>
           {(field.input_values || []).map(v => (
             <label key={v}><input type="radio" name={field.field_id} value={v} /> {v}</label>
           ))}
@@ -599,20 +601,20 @@ function FormField({ field }) {
     case 'multiple_choice':
       return (
         <fieldset>
-          <legend>{label}</legend>
+          <legend data-edit-text="label">{label}</legend>
           {(field.input_values || []).map(v => (
             <label key={v}><input type="checkbox" value={v} /> {v}</label>
           ))}
         </fieldset>
       );
     case 'static_text':
-      return <p>{label}</p>;
+      return <p data-edit-text="label">{label}</p>;
     case 'hidden':
       return <input type="hidden" name={field.field_id} value={field.value || ''} />;
     case 'attachment':
-      return <label>{label} <input type="file" required={required} /></label>;
+      return <label><span data-edit-text="label">{label}</span> <input type="file" required={required} /></label>;
     default:
-      return <label>{label} <input type="text" /></label>;
+      return <label><span data-edit-text="label">{label}</span> <input type="text" /></label>;
   }
 }
 ```
@@ -623,21 +625,21 @@ function FormField({ field }) {
 ```vue
 <template>
   <form :data-block-uid="block['@uid']" class="form-block" @submit.prevent>
-    <h3>{{ block.title }}</h3>
-    <p v-if="block.description">{{ block.description }}</p>
+    <h3 data-edit-text="title">{{ block.title }}</h3>
+    <p v-if="block.description" data-edit-text="description">{{ block.description }}</p>
 
-    <div v-for="field in block.subblocks || []" :key="field['@id']" class="form-field">
+    <div v-for="field in block.subblocks || []" :key="field['@id']" class="form-field" :data-block-uid="field.field_id">
       <template v-if="field.field_type === 'text'">
-        <label>{{ field.label }} <input type="text" :required="field.required" /></label>
+        <label><span data-edit-text="label">{{ field.label }}</span> <input type="text" :required="field.required" /></label>
       </template>
       <template v-else-if="field.field_type === 'textarea'">
-        <label>{{ field.label }} <textarea :required="field.required" /></label>
+        <label><span data-edit-text="label">{{ field.label }}</span> <textarea :required="field.required" /></label>
       </template>
       <template v-else-if="field.field_type === 'from'">
-        <label>{{ field.label }} <input type="email" :required="field.required" /></label>
+        <label><span data-edit-text="label">{{ field.label }}</span> <input type="email" :required="field.required" /></label>
       </template>
       <template v-else-if="field.field_type === 'select'">
-        <label>{{ field.label }}
+        <label><span data-edit-text="label">{{ field.label }}</span>
           <select :required="field.required">
             <option value="">Choose...</option>
             <option v-for="v in field.input_values || []" :key="v" :value="v">{{ v }}</option>
@@ -646,23 +648,23 @@ function FormField({ field }) {
       </template>
       <template v-else-if="field.field_type === 'single_choice'">
         <fieldset>
-          <legend>{{ field.label }}</legend>
+          <legend data-edit-text="label">{{ field.label }}</legend>
           <label v-for="v in field.input_values || []" :key="v">
             <input type="radio" :name="field.field_id" :value="v" /> {{ v }}
           </label>
         </fieldset>
       </template>
       <template v-else-if="field.field_type === 'checkbox'">
-        <label><input type="checkbox" :required="field.required" /> {{ field.label }}</label>
+        <label><input type="checkbox" :required="field.required" /> <span data-edit-text="label">{{ field.label }}</span></label>
       </template>
       <template v-else-if="field.field_type === 'static_text'">
-        <p>{{ field.label }}</p>
+        <p data-edit-text="label">{{ field.label }}</p>
       </template>
       <template v-else-if="field.field_type === 'hidden'">
         <input type="hidden" :name="field.field_id" :value="field.value" />
       </template>
       <template v-else>
-        <label>{{ field.label }} <input type="text" :required="field.required" /></label>
+        <label><span data-edit-text="label">{{ field.label }}</span> <input type="text" :required="field.required" /></label>
       </template>
     </div>
 
@@ -684,27 +686,27 @@ defineProps({ block: Object });
 </script>
 
 <form data-block-uid={block['@uid']} class="form-block" on:submit|preventDefault>
-  <h3>{block.title}</h3>
+  <h3 data-edit-text="title">{block.title}</h3>
   {#if block.description}
-    <p>{block.description}</p>
+    <p data-edit-text="description">{block.description}</p>
   {/if}
 
   {#each block.subblocks || [] as field (field.field_id || field.id)}
-    <div class="form-field">
+    <div class="form-field" data-block-uid={field.field_id}>
       {#if field.field_type === 'text'}
-        <label>{field.label} <input type="text" required={field.required} /></label>
+        <label><span data-edit-text="label">{field.label}</span> <input type="text" required={field.required} /></label>
       {:else if field.field_type === 'textarea'}
-        <label>{field.label} <textarea required={field.required} /></label>
+        <label><span data-edit-text="label">{field.label}</span> <textarea required={field.required} /></label>
       {:else if field.field_type === 'number'}
-        <label>{field.label} <input type="number" required={field.required} /></label>
+        <label><span data-edit-text="label">{field.label}</span> <input type="number" required={field.required} /></label>
       {:else if field.field_type === 'from'}
-        <label>{field.label} <input type="email" required={field.required} /></label>
+        <label><span data-edit-text="label">{field.label}</span> <input type="email" required={field.required} /></label>
       {:else if field.field_type === 'date'}
-        <label>{field.label} <input type="date" required={field.required} /></label>
+        <label><span data-edit-text="label">{field.label}</span> <input type="date" required={field.required} /></label>
       {:else if field.field_type === 'checkbox'}
-        <label><input type="checkbox" required={field.required} /> {field.label}</label>
+        <label><input type="checkbox" required={field.required} /> <span data-edit-text="label">{field.label}</span></label>
       {:else if field.field_type === 'select'}
-        <label>{field.label}
+        <label><span data-edit-text="label">{field.label}</span>
           <select required={field.required}>
             <option value="">Choose...</option>
             {#each field.input_values || [] as v}
@@ -714,26 +716,26 @@ defineProps({ block: Object });
         </label>
       {:else if field.field_type === 'single_choice'}
         <fieldset>
-          <legend>{field.label}</legend>
+          <legend data-edit-text="label">{field.label}</legend>
           {#each field.input_values || [] as v}
             <label><input type="radio" name={field.field_id} value={v} /> {v}</label>
           {/each}
         </fieldset>
       {:else if field.field_type === 'multiple_choice'}
         <fieldset>
-          <legend>{field.label}</legend>
+          <legend data-edit-text="label">{field.label}</legend>
           {#each field.input_values || [] as v}
             <label><input type="checkbox" value={v} /> {v}</label>
           {/each}
         </fieldset>
       {:else if field.field_type === 'static_text'}
-        <p>{field.label}</p>
+        <p data-edit-text="label">{field.label}</p>
       {:else if field.field_type === 'hidden'}
         <input type="hidden" name={field.field_id} value={field.value || ''} />
       {:else if field.field_type === 'attachment'}
-        <label>{field.label} <input type="file" required={field.required} /></label>
+        <label><span data-edit-text="label">{field.label}</span> <input type="file" required={field.required} /></label>
       {:else}
-        <label>{field.label} <input type="text" /></label>
+        <label><span data-edit-text="label">{field.label}</span> <input type="text" /></label>
       {/if}
     </div>
   {/each}

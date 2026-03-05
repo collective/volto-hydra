@@ -2239,31 +2239,17 @@
       "@type": "separator",
       "fixed": true,
       "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
+      "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-accordion",
-      "placeholder": "sep",
-      "styles": {
-        "align": "full"
-      }
+      "placeholder": "sep"
     },
     "ref-accordion-heading": {
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
+      "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-accordion",
-      "placeholder": "examples-heading",
-      "plaintext": "Developer Reference",
-      "value": [
-        {
-          "type": "h2",
-          "children": [
-            {
-              "text": "Developer Reference"
-            }
-          ]
-        }
-      ]
+      "placeholder": "heading"
     },
     "ref-accordion-schema": {
       "@type": "codeExample",
@@ -2373,6 +2359,15 @@
       "fec13476-1231-42fc-84d5-b110e8e3c6e7",
       "41a82a93-c00c-4a40-bac8-53a3e3420c8e",
       "8f68209e-220e-4230-9d42-8b0602573bd9",
+      "ref-accordion-schema-heading",
+      "ref-accordion-schema-desc",
+      "ref-accordion-schema",
+      "ref-accordion-json-heading",
+      "ref-accordion-json-desc",
+      "ref-accordion-json-data",
+      "ref-accordion-rendering-heading",
+      "ref-accordion-rendering-desc",
+      "ref-accordion-rendering",
       "ref-accordion-sep",
       "ref-accordion-heading",
       "ref-accordion-schema-heading",

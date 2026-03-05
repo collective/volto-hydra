@@ -129,6 +129,7 @@ const MD_TO_CONTENT_UID = {
   'table.md': '102f648399914851951ffa3fefc8665c',
   'teaser.md': 'bd2b39d2745847db82ed197a4eb1effc',
   'toc.md': '3906609d0456404ca7146f6aa1f12f32',
+  'maps.md': 'e090d954d0a448bca81c1a646e673a12',
   'video.md': '6d37dd19ef754344aaa254fa288e44b4',
 };
 

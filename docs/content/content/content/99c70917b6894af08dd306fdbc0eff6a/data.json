@@ -159,6 +159,124 @@
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-grid",
       "placeholder": "rendering-desc"
+    },
+    "ref-columns-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-columns",
+      "placeholder": "sep"
+    },
+    "ref-columns-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-columns",
+      "placeholder": "heading"
+    },
+    "ref-columns-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-columns",
+      "placeholder": "schema-heading"
+    },
+    "ref-columns-schema-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-columns",
+      "placeholder": "schema-desc"
+    },
+    "ref-columns-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-columns",
+      "placeholder": "json-heading"
+    },
+    "ref-columns-json-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-columns",
+      "placeholder": "json-desc"
+    },
+    "ref-columns-rendering-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-columns",
+      "placeholder": "rendering-heading"
+    },
+    "ref-columns-rendering-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-columns",
+      "placeholder": "rendering-desc"
+    },
+    "ref-columns-schema": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-columns",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-columns-schema-javascript-fc2b91",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  \"columns\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"top_images\": {\n          \"title\": \"Top Images\",\n          \"widget\": \"blocks_layout\",\n          \"allowedBlocks\": [\n            \"image\"\n          ]\n        },\n        \"columns\": {\n          \"title\": \"Columns\",\n          \"widget\": \"blocks_layout\",\n          \"allowedBlocks\": [\n            \"column\"\n          ],\n          \"maxLength\": 4\n        }\n      }\n    }\n  },\n  \"column\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"blocks_layout\": {\n          \"title\": \"Content\",\n          \"widget\": \"blocks_layout\",\n          \"allowedBlocks\": [\n            \"slate\",\n            \"image\"\n          ],\n          \"defaultBlockType\": \"slate\"\n        }\n      }\n    }\n  }\n}"
+        }
+      ]
+    },
+    "ref-columns-json-data": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-columns",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-columns-json-data-json-b525fc",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"columns\",\n  \"title\": \"Our Services\",\n  \"blocks\": {\n    \"col-1\": {\n      \"@type\": \"column\",\n      \"title\": \"Design\",\n      \"blocks\": {\n        \"text-1\": {\n          \"@type\": \"slate\",\n          \"value\": [\n            {\n              \"type\": \"p\",\n              \"children\": [\n                {\n                  \"text\": \"We craft beautiful interfaces.\"\n                }\n              ]\n            }\n          ]\n        }\n      },\n      \"blocks_layout\": {\n        \"items\": [\n          \"text-1\"\n        ]\n      }\n    },\n    \"col-2\": {\n      \"@type\": \"column\",\n      \"title\": \"Engineering\",\n      \"blocks\": {\n        \"text-2\": {\n          \"@type\": \"slate\",\n          \"value\": [\n            {\n              \"type\": \"p\",\n              \"children\": [\n                {\n                  \"text\": \"We build robust systems.\"\n                }\n              ]\n            }\n          ]\n        }\n      },\n      \"blocks_layout\": {\n        \"items\": [\n          \"text-2\"\n        ]\n      }\n    }\n  },\n  \"columns\": {\n    \"items\": [\n      \"col-1\",\n      \"col-2\"\n    ]\n  }\n}"
+        }
+      ]
+    },
+    "ref-columns-rendering": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-columns",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-columns-rendering-jsx-4200f0",
+          "label": "React",
+          "language": "jsx",
+          "code": "function GridBlock({ block }) {\n  const blocks = block.blocks || {};\n  const items = block.blocks_layout?.items || [];\n\n  return (\n    <div data-block-uid={block['@uid']} className=\"grid-block\">\n      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }}>\n        {items.map(id => {\n          const child = { ...blocks[id], '@uid': id };\n          return (\n            <div key={id} className=\"grid-cell\">\n              <BlockRenderer block={child} />\n            </div>\n          );\n        })}\n      </div>\n    </div>\n  );\n}"
+        },
+        {
+          "@id": "ref-columns-rendering-vue-e466de",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"grid-block\">\n    <div :style=\"{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }\">\n      <div v-for=\"id in items\" :key=\"id\" class=\"grid-cell\">\n        <BlockRenderer :block=\"{ ...block.blocks[id], '@uid': id }\" />\n      </div>\n    </div>\n  </div>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nconst props = defineProps({ block: Object });\nconst items = computed(() => props.block.blocks_layout?.items || []);\n</script>"
+        },
+        {
+          "@id": "ref-columns-rendering-svelte-b515b8",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<script>\n  import BlockRenderer from './BlockRenderer.svelte';\n  export let block;\n  $: blocks = block.blocks || {};\n  $: items = block.blocks_layout?.items || [];\n</script>\n\n<div data-block-uid={block['@uid']} class=\"grid-block\">\n  <div style=\"display: grid; grid-template-columns: repeat({items.length}, 1fr); gap: 1rem\">\n    {#each items as id (id)}\n      <div class=\"grid-cell\">\n        <BlockRenderer block={{ ...blocks[id], '@uid': id }} />\n      </div>\n    {/each}\n  </div>\n</div>"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -176,7 +294,18 @@
       "ref-grid-json-data",
       "ref-grid-rendering-heading",
       "ref-grid-rendering-desc",
-      "ref-grid-rendering"
+      "ref-grid-rendering",
+      "ref-columns-sep",
+      "ref-columns-heading",
+      "ref-columns-schema-heading",
+      "ref-columns-schema-desc",
+      "ref-columns-schema",
+      "ref-columns-json-heading",
+      "ref-columns-json-desc",
+      "ref-columns-json-data",
+      "ref-columns-rendering-heading",
+      "ref-columns-rendering-desc",
+      "ref-columns-rendering"
     ]
   },
   "contributors": [],

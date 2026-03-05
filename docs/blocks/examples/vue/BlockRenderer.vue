@@ -21,6 +21,7 @@ import SeparatorBlock from './SeparatorBlock.vue';
 import ButtonBlock from './ButtonBlock.vue';
 import HighlightBlock from './HighlightBlock.vue';
 import VideoBlock from './VideoBlock.vue';
+import MapsBlock from './MapsBlock.vue';
 import TocBlock from './TocBlock.vue';
 import { h } from 'vue';
 
@@ -59,6 +60,7 @@ const typeMap = {
   __button: ButtonBlock,
   highlight: HighlightBlock,
   video: VideoBlock,
+  maps: MapsBlock,
   toc: TocBlock,
   summary: ListingItemBlock,
   default: ListingItemBlock,

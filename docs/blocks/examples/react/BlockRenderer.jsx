@@ -19,6 +19,7 @@ function BlockRenderer({ block, content }) {
     case '__button':      return <ButtonBlock block={block} />;
     case 'highlight':     return <HighlightBlock block={block} />;
     case 'video':         return <VideoBlock block={block} />;
+    case 'maps':          return <MapsBlock block={block} />;
     case 'toc':           return <TocBlock block={block} content={content} />;
     case 'summary':
     case 'default':

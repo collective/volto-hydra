@@ -28,6 +28,7 @@ const COMPONENT_IMPORTS = {
   ButtonBlock:       './ButtonBlock.jsx',
   HighlightBlock:    './HighlightBlock.jsx',
   VideoBlock:        './VideoBlock.jsx',
+  MapsBlock:         './MapsBlock.jsx',
   TocBlock:          './TocBlock.jsx',
 };
 

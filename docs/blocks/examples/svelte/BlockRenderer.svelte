@@ -17,6 +17,7 @@
   import ButtonBlock from './ButtonBlock.svelte';
   import HighlightBlock from './HighlightBlock.svelte';
   import VideoBlock from './VideoBlock.svelte';
+  import MapsBlock from './MapsBlock.svelte';
   import TocBlock from './TocBlock.svelte';
 
   export let block;
@@ -59,6 +60,8 @@
   <HighlightBlock {block} />
 {:else if block['@type'] === 'video'}
   <VideoBlock {block} />
+{:else if block['@type'] === 'maps'}
+  <MapsBlock {block} />
 {:else if block['@type'] === 'toc'}
   <TocBlock {block} {content} />
 {:else if block['@type'] === 'summary' || block['@type'] === 'default'}

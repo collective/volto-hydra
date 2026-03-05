@@ -322,6 +322,11 @@ const examples = [
     blockId: 'ex-toc',
     expectedText: 'Getting Started',
   },
+  {
+    type: 'maps',
+    blockId: 'ex-maps',
+    expectedText: null,
+  },
 ];
 
 test.describe('Doc example blocks', () => {
