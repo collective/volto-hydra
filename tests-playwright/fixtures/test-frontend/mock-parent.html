@@ -188,13 +188,6 @@
       },
     };
 
-    // Block field types metadata (constant) — virtual type for table cells from schema-driven pathMap
-    const blockFieldTypes = {
-      'slate': { value: 'slate' },
-      'hero': { heading: 'string', subheading: 'string:textarea', buttonText: 'string', description: 'slate' },
-      'slateTable:rows:cells': { value: 'slate' },
-    };
-
     // Simple Slate transformation without needing full Slate library
     // This manually creates the expected structure for testing
     function applySlateTransform(value, selection, format, action) {
@@ -475,8 +468,15 @@
       switch (message.type) {
         case 'INIT': {
           // New INIT message format from hydra.js
-          // Respond with FORM_DATA including blockPathMap
+          // Merge frontend's blocksConfig (sent via bridge, just like View.jsx does)
           console.log('[MOCK_PARENT] Received INIT message:', message);
+          if (message.blocks) {
+            for (const [blockType, blockDef] of Object.entries(message.blocks)) {
+              if (!mockBlocksConfig[blockType]) {
+                mockBlocksConfig[blockType] = blockDef;
+              }
+            }
+          }
 
           const blockPathMap = buildBlockPathMap(mockFormData, mockBlocksConfig);
 
@@ -484,7 +484,7 @@
             type: 'INITIAL_DATA',
             data: mockFormData,
             blockPathMap,
-            blockFieldTypes,
+
             slateConfig: {
               hotkeys: {
                 'mod+b': { type: 'inline', format: 'strong' },
@@ -538,7 +538,7 @@
             type: 'INITIAL_DATA',
             data: mockFormData,
             blockPathMap,
-            blockFieldTypes,
+
             slateConfig: {
               hotkeys: {
                 'mod+b': { type: 'inline', format: 'strong' },
@@ -654,7 +654,7 @@
               type: 'FORM_DATA',
               data: mockFormData,
               blockPathMap: buildBlockPathMap(mockFormData, mockBlocksConfig),
-              blockFieldTypes,
+  
               formatRequestId: requestId,
               transformedSelection,
             };
@@ -670,7 +670,7 @@
                   type: 'FORM_DATA',
                   data: mockFormData,
                   blockPathMap: buildBlockPathMap(mockFormData, mockBlocksConfig),
-                  blockFieldTypes,
+      
                 };
                 event.source.postMessage(dupeResponse, event.origin);
                 console.log('[MOCK_PARENT] Sent duplicate FORM_DATA (Redux echo)');
@@ -708,7 +708,7 @@
                 type: 'FORM_DATA',
                 data: echoData,
                 blockPathMap: buildBlockPathMap(mockFormData, mockBlocksConfig),
-                blockFieldTypes,
+    
               }, '*');
               console.log('[MOCK_PARENT] Echoed FORM_DATA back');
             };
@@ -770,7 +770,6 @@
       getFormData: () => mockFormData,
       getBlock: (blockId) => mockFormData.blocks[blockId],
       buildBlockPathMap: () => buildBlockPathMap(mockFormData, mockBlocksConfig),
-      getBlockFieldTypes: () => blockFieldTypes,
       setTransformDelay: (delay) => { window.mockTransformDelay = delay; },
       setEchoFormData: (enabled) => { window.mockEchoFormData = enabled; },
       setDuplicateFormData: (enabled) => { window.mockDuplicateFormData = enabled; },

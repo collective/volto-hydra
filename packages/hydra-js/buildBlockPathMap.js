@@ -60,7 +60,7 @@ export function getBlockTypeSchema(blockType, intl, blocksConfig) {
     };
   }
 
-  if (blockConfig.schemaEnhancer) {
+  if (typeof blockConfig.schemaEnhancer === 'function') {
     schema = blockConfig.schemaEnhancer({
       schema,
       formData: {},
@@ -131,8 +131,8 @@ export function getBlockSchema(blockType, intl, blocksConfig, formData, pageForm
     }
   }
 
-  // Run schemaEnhancer with instance data
-  if (blockConfig.schemaEnhancer) {
+  // Run schemaEnhancer with instance data (skip recipe objects — only admin converts those)
+  if (typeof blockConfig.schemaEnhancer === 'function') {
     schema = blockConfig.schemaEnhancer({
       schema,
       formData: effectiveFormData,

@@ -1325,7 +1325,6 @@ const Iframe = (props) => {
               {
                 type: 'INITIAL_DATA',
                 data: resendFormWithDefaults,
-                blockFieldTypes,
                 blockPathMap: stripBlockPathMapForPostMessage(resendBlockPathMap),
                 selectedBlockUid: selectedBlock,
                 slateConfig: {
@@ -2327,9 +2326,13 @@ const Iframe = (props) => {
           }
 
           // 3. Register _page as virtual block type in blocksConfig
+          // Merge content-type field definitions (title, description, etc.) alongside
+          // blocks_layout fields so buildBlockPathMap includes them in resolvedBlockSchema.
+          // This lets hydra.js derive page-level field types from blockPathMap['_page'].
+          const contentTypeFields = schema?.properties || {};
           config.blocks.blocksConfig['_page'] = {
             id: '_page',
-            schema: () => ({ properties: pageBlocksFieldsDef }),
+            schema: () => ({ properties: { ...contentTypeFields, ...pageBlocksFieldsDef } }),
             restricted: true, // Can't be added as a child block
           };
 
@@ -2430,7 +2433,6 @@ const Iframe = (props) => {
           pendingInitialDataRef.current = {
             source: event.source,
             origin: event.origin,
-            blockFieldTypes: initialBlockFieldTypes,
             // Store prepared formData with empty blocks already added
             formData: formWithDefaults,
             blockPathMap: initialBlockPathMap,
@@ -2549,7 +2551,7 @@ const Iframe = (props) => {
     // INITIAL_DATA sending - consolidated to this ONE place
     // Handles: no templates, templates loading, templates already cached
     if (pendingInitialDataRef.current) {
-      const { source, origin, blockFieldTypes, formData: preparedFormData, blockPathMap: preparedBlockPathMap } = pendingInitialDataRef.current;
+      const { source, origin, formData: preparedFormData, blockPathMap: preparedBlockPathMap } = pendingInitialDataRef.current;
       const templateIds = getUniqueTemplateIds(preparedFormData);
       const unloadedTemplates = templateIds.filter(id => templateCacheRef.current[id] === undefined);
 
@@ -2606,7 +2608,6 @@ const Iframe = (props) => {
           source.postMessage({
             type: 'INITIAL_DATA',
             data: formDataToSend,
-            blockFieldTypes,
             blockPathMap: stripBlockPathMapForPostMessage(blockPathMap),
             slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
           }, origin);
@@ -2641,7 +2642,7 @@ const Iframe = (props) => {
           return;
         }
 
-        const { source, origin, blockFieldTypes, formData: baseFormData } = pendingInitialDataRef.current;
+        const { source, origin, formData: baseFormData } = pendingInitialDataRef.current;
         const toolbarButtons = config.settings.slate?.toolbarButtons || [];
 
         // Update template cache
@@ -2690,7 +2691,6 @@ const Iframe = (props) => {
         source.postMessage({
           type: 'INITIAL_DATA',
           data: formDataToSend,
-          blockFieldTypes,
           blockPathMap: stripBlockPathMapForPostMessage(blockPathMap),
           slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
         }, origin);

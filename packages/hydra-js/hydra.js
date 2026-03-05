@@ -1733,9 +1733,6 @@ export class Bridge {
         const receiveInitialData = (e) => {
           if (e.origin === this.adminOrigin) {
             if (e.data.type === 'INITIAL_DATA') {
-              // Store block field types metadata (blockId -> fieldName -> fieldType)
-              this.blockFieldTypes = e.data.blockFieldTypes || {};
-
               // Central method sets formData, lastReceivedFormData, and blockPathMap
               this.setFormDataFromAdmin(e.data.data, 'INITIAL_DATA', e.data.blockPathMap);
 
@@ -6847,9 +6844,9 @@ export class Bridge {
 
           // Focus the contenteditable element for blocks with editable fields
           // This includes slate, string, and textarea field types
-          const blockType = this.getBlockType(uid);
-          const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-          const hasEditableFields = Object.keys(blockTypeFields).length > 0 || blockType === 'slate';
+          const pathInfo = this.blockPathMap?.[uid];
+          const schemaProps = pathInfo?.resolvedBlockSchema?.properties;
+          const hasEditableFields = schemaProps && Object.keys(schemaProps).length > 0;
 
           if (hasEditableFields) {
             // Use double requestAnimationFrame to wait for ALL DOM updates including Quanta toolbar
@@ -7896,28 +7893,12 @@ export class Bridge {
       const block = this.getBlockData(blockId);
       if (!block) return;
 
-      // For object_list items, use itemSchema from pathMap
-      if (pathInfo.itemSchema?.properties) {
-        Object.entries(pathInfo.itemSchema.properties).forEach(([fieldName, fieldDef]) => {
-          if (fieldDef?.widget === 'slate' && block[fieldName]) {
-            block[fieldName] = this.addNodeIds(block[fieldName]);
-          }
-        });
-        return;
-      }
+      const schema = pathInfo.resolvedBlockSchema;
+      if (!schema?.properties) return;
 
-      // For regular blocks, use blockFieldTypes
-      const blockType = pathInfo.blockType;
-      const fieldTypes = this.blockFieldTypes?.[blockType] || {};
-      if (blockType === 'slate') {
-        log('addNodeIdsToAllSlateFields:', blockId, 'blockType:', blockType, 'fieldTypes:', Object.keys(fieldTypes), 'hasValue:', !!block.value);
-      }
-      Object.keys(fieldTypes).forEach((fieldName) => {
-        if (this.fieldTypeIsSlate(fieldTypes[fieldName]) && block[fieldName]) {
+      Object.entries(schema.properties).forEach(([fieldName, fieldDef]) => {
+        if (isSlateFieldType(getFieldTypeString(fieldDef)) && block[fieldName]) {
           block[fieldName] = this.addNodeIds(block[fieldName]);
-          if (blockType === 'slate') {
-            log('addNodeIdsToAllSlateFields: added nodeIds to', blockId, fieldName, 'value:', JSON.stringify(block[fieldName]));
-          }
         }
       });
     });
@@ -8617,12 +8598,11 @@ export class Bridge {
       if (!blocks || typeof blocks !== 'object') return;
       for (const blockId of Object.keys(blocks)) {
         const block = blocks[blockId];
-        const blockType = this.getBlockType(blockId);
-        if (block && blockType) {
-          // Check if this block has slate fields and strip nodeIds from them
-          const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-          for (const [fieldName, fieldType] of Object.entries(blockTypeFields)) {
-            if (this.fieldTypeIsSlate(fieldType) && block[fieldName]) {
+        const pathInfo = this.blockPathMap?.[blockId];
+        const schema = pathInfo?.resolvedBlockSchema;
+        if (block && schema?.properties) {
+          for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
+            if (isSlateFieldType(getFieldTypeString(fieldDef)) && block[fieldName]) {
               this.resetJsonNodeIds(block[fieldName]);
             }
           }
@@ -8708,16 +8688,11 @@ export class Bridge {
    */
   getFieldType(blockUid, fieldName) {
     const resolved = this.resolveFieldPath(fieldName, blockUid);
-
-    // Page-level field
-    if (resolved.blockId === PAGE_BLOCK_UID) {
-      return this.blockFieldTypes?._page?.[resolved.fieldName];
-    }
-
-    // Block field
-    const blockType = this.getBlockType(resolved.blockId);
-    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-    return blockTypeFields[resolved.fieldName];
+    const pathInfo = this.blockPathMap?.[resolved.blockId];
+    const schema = pathInfo?.resolvedBlockSchema;
+    const fieldDef = schema?.properties?.[resolved.fieldName];
+    if (!fieldDef) return undefined;
+    return getFieldTypeString(fieldDef);
   }
 
   /**
@@ -10756,6 +10731,21 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
 // ============================================================================
 // Field Type Utilities (exported for use by volto-hydra admin side)
 // ============================================================================
+
+/**
+ * Convert a schema field definition to a "type:widget" string.
+ * Mirrors the format used by extractBlockFieldTypes in View.jsx.
+ * @param {Object} field - Schema field definition with optional type and widget
+ * @returns {string} Field type string like "string", "array:slate", "string:textarea", ":object_browser"
+ */
+export function getFieldTypeString(field) {
+  const type = field.type;
+  const widget = field.widget;
+  if (type && widget) return `${type}:${widget}`;
+  if (widget) return `:${widget}`;
+  if (type) return type;
+  return 'string';
+}
 
 /**
  * Check if a field type indicates a Slate field.

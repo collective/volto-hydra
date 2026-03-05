@@ -16,6 +16,16 @@ import { getFrontendUrl } from './fixtures';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// Doc-example tests only run on doc-example frontends (react, svelte, vue)
+// which load schemas from block-definitions.json. Mock and nuxt use
+// sharedBlocksConfig which is for other tests.
+base.beforeEach(({}, testInfo) => {
+  const project = testInfo.project.name;
+  if (project === 'mock' || project === 'nuxt') {
+    testInfo.skip(true, `Doc-examples only run on doc-example frontends (not ${project})`);
+  }
+});
+
 interface SubBlock {
   id: string;
   data: Record<string, unknown>;
