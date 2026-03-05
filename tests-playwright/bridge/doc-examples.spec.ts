@@ -346,11 +346,8 @@ test.describe('Doc example blocks', () => {
       const blockData = examplesJson.blocks?.[example.blockId];
       await checkEditAnnotations(block, blockData);
 
-      // Click each data-edit-text and verify no "Missing data-node-id" warning appears
-      await checkDataEditTextClicks(page, iframe, block);
-
-      // Verify sub-blocks: any block IDs found in `blocks` dicts / object_list arrays
-      // should be in the DOM, and visible ones should pass edit annotation checks.
+      // Verify sub-blocks first (before clicking, which may toggle interactive
+      // containers like accordions closed).
       if (blockData) {
         const subBlocks = getSubBlocks(blockData, blockData['@type'] as string);
         let anyVisible = false;
@@ -366,6 +363,9 @@ test.describe('Doc example blocks', () => {
           expect(anyVisible).toBe(true);
         }
       }
+
+      // Click each data-edit-text and verify no "Missing data-node-id" warning appears
+      await checkDataEditTextClicks(page, iframe, block);
     });
   }
 });
