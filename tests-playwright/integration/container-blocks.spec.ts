@@ -884,16 +884,16 @@ test.describe('Hierarchical Sidebar', () => {
     await expect(columnsTitle).toBeVisible();
     await expect(columnsTitle).toHaveValue('My Columns Section');
 
-    // Clear and fill with new value
-    await columnsTitle.clear();
+    // fill() clears then types — avoid separate clear() which triggers a
+    // re-render that can replace the input before fill() on slow CI
     await columnsTitle.fill('Edited Columns Title');
-    await columnsTitle.press('Tab'); // Trigger blur to save
+    await columnsTitle.blur();
 
     // Verify the iframe updated with the new Columns title
     await expect(
       iframe.locator('[data-block-uid="columns-1"] .columns-title'),
       'Columns title should update in iframe after sidebar edit',
-    ).toHaveText('Edited Columns Title');
+    ).toHaveText('Edited Columns Title', { timeout: 10000 });
 
     // ===== Edit Level 2: Column block (parent) =====
     // Re-query inputs after the re-render from first edit
@@ -904,16 +904,14 @@ test.describe('Hierarchical Sidebar', () => {
     await expect(columnTitle).toBeVisible();
     await expect(columnTitle).toHaveValue('Left Column');
 
-    // Clear and fill with new value
-    await columnTitle.clear();
     await columnTitle.fill('Edited Column Title');
-    await columnTitle.press('Tab'); // Trigger blur to save
+    await columnTitle.blur();
 
     // Verify the iframe updated with the new Column title
     await expect(
       iframe.locator('[data-block-uid="col-1"] .column-title'),
       'Column title should update in iframe after sidebar edit',
-    ).toHaveText('Edited Column Title');
+    ).toHaveText('Edited Column Title', { timeout: 10000 });
 
     // ===== Verify Level 3: Current block (Slate/Text) has settings =====
     // The current block's settings should render in #sidebar-properties inside the current block section
