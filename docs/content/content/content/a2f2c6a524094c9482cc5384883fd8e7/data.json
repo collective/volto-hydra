@@ -7,7 +7,7 @@
   "blocks": {
     "1a9dbeac-4f8e-4a75-9859-fd8012bd2c1a": {
       "@type": "slate",
-      "templateId": "resolveuid/tpl-ct-event-view",
+      "templateId": "/templates/event-view",
       "templateInstanceId": "tpl-ev-def",
       "placeholder": "content"
     },
@@ -25,7 +25,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-event-view",
+      "templateId": "/templates/event-view",
       "templateInstanceId": "tpl-ev-def",
       "placeholder": "content"
     },
@@ -33,7 +33,7 @@
       "@type": "eventMetadata",
       "fixed": true,
       "required": true,
-      "templateId": "resolveuid/tpl-ct-event-view",
+      "templateId": "/templates/event-view",
       "templateInstanceId": "tpl-ev-def",
       "placeholder": "event-metadata"
     },
@@ -51,7 +51,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-event-view",
+      "templateId": "/templates/event-view",
       "templateInstanceId": "tpl-ev-def",
       "placeholder": "content"
     },
@@ -68,13 +68,13 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-event-view",
+      "templateId": "/templates/event-view",
       "templateInstanceId": "tpl-ev-def",
       "placeholder": "content"
     },
     "dd8d27df-ded3-49f5-afdf-239623a6adba": {
       "@type": "title",
-      "templateId": "resolveuid/tpl-ct-event-view",
+      "templateId": "/templates/event-view",
       "templateInstanceId": "tpl-ev-def",
       "fixed": true,
       "readOnly": true,

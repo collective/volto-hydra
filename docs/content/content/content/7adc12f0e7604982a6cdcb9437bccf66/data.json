@@ -19,20 +19,20 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-event-view",
+      "templateId": "/templates/event-view",
       "templateInstanceId": "tpl-ev-def",
       "placeholder": "content"
     },
     "b539ed36-442b-4c7d-8b9b-8af01963c206": {
       "@type": "eventMetadata",
-      "templateId": "resolveuid/tpl-ct-event-view",
+      "templateId": "/templates/event-view",
       "templateInstanceId": "tpl-ev-def",
       "fixed": true,
       "placeholder": "event-metadata"
     },
     "d3f1c443-583f-4e8e-a682-3bf25752a300": {
       "@type": "title",
-      "templateId": "resolveuid/tpl-ct-event-view",
+      "templateId": "/templates/event-view",
       "templateInstanceId": "tpl-ev-def",
       "fixed": true,
       "readOnly": true,

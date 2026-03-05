@@ -86,7 +86,10 @@
     "concepts/templates/data.json",
     "concepts/deployment/data.json",
     "concepts/advanced/data.json",
-    "templates/block-reference-layout/data.json"
+    "templates/data.json",
+    "templates/block-reference-layout/data.json",
+    "templates/event-view/data.json",
+    "templates/newsitem-view/data.json"
   ],
   "default_page": {},
   "local_roles": {
@@ -530,6 +533,27 @@
           "Owner"
         ]
       }
+    },
+    "tpl-folder-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "tpl-ct-event-view": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "tpl-ct-newsitem-view": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
     }
   },
   "ordering": {
@@ -587,7 +611,10 @@
     "f51777793dab4a61982e35dfa71d0575": 6,
     "f8cd4a2d8d7c4703b4e41d2093b21aed": 0,
     "fb086a3d1d3d4a9ebf9bc864d2172e79": 3,
-    "tpl-block-reference-layout": 0
+    "tpl-folder-001": 44,
+    "tpl-block-reference-layout": 0,
+    "tpl-ct-event-view": 1,
+    "tpl-ct-newsitem-view": 2
   },
   "relations": []
 }

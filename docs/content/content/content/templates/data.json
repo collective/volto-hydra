@@ -1,0 +1,11 @@
+{
+  "UID": "tpl-folder-001",
+  "@type": "Folder",
+  "id": "templates",
+  "title": "Templates",
+  "description": "Layout and block templates",
+  "@id": "/templates",
+  "review_state": "published",
+  "is_folderish": true,
+  "exclude_from_nav": true
+}

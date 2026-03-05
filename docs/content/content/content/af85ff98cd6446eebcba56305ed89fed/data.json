@@ -18,7 +18,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -35,21 +35,21 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
     "944cfb1b-3ef7-425f-a5ef-eb9242429bfd": {
       "@type": "leadimage",
       "align": "center",
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "fixed": true,
       "placeholder": "lead-image"
     },
     "a0ac0f60-667b-4b22-a49f-989f2ae8c3cc": {
       "@type": "title",
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "fixed": true,
       "readOnly": true,
@@ -61,7 +61,7 @@
       "showTime": false,
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "date"
     }

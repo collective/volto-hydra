@@ -17,7 +17,7 @@
           "type": "h3"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -34,7 +34,7 @@
           "type": "h3"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -43,7 +43,7 @@
       "styles": {
         "align": "left"
       },
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -56,7 +56,7 @@
       "size": "l",
       "title": "Image - Light",
       "url": "/content-types/image-light",
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -73,7 +73,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -119,7 +119,7 @@
           "type": "ol"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -136,7 +136,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -149,7 +149,7 @@
       "size": "l",
       "title": "Image - Light",
       "url": "/content-types/image-light",
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -189,7 +189,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -221,7 +221,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -234,7 +234,7 @@
       "size": "l",
       "title": "Image - Light",
       "url": "/content-types/image-light",
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -259,7 +259,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -276,7 +276,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -293,7 +293,7 @@
           "type": "h3"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -310,7 +310,7 @@
           "type": "h3"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -327,7 +327,7 @@
           "type": "h3"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -344,7 +344,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -360,7 +360,7 @@
       },
       "title": "Image - Light",
       "url": "/content-types/image-light",
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -378,7 +378,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -387,7 +387,7 @@
       "styles": {
         "align": "full"
       },
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -433,7 +433,7 @@
           "type": "ul"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -449,7 +449,7 @@
       },
       "title": "Image - Light",
       "url": "/content-types/image-light",
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -466,7 +466,7 @@
           "type": "h2"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -483,7 +483,7 @@
           "type": "h3"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -501,7 +501,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -517,7 +517,7 @@
       },
       "title": "Image - Light",
       "url": "/content-types/image-light",
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -534,7 +534,7 @@
           "type": "h3"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -543,7 +543,7 @@
       "styles": {
         "align": "full"
       },
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -560,7 +560,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -569,7 +569,7 @@
       "styles": {
         "align": "left"
       },
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -585,7 +585,7 @@
       },
       "title": "Image - Light",
       "url": "/content-types/image-light",
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -594,7 +594,7 @@
       "styles": {
         "align": "full"
       },
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -611,7 +611,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -628,7 +628,7 @@
           "type": "h3"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -645,7 +645,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -677,7 +677,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -694,13 +694,13 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
     "d3f1c443-583f-4e8e-a682-3bf25752a300": {
       "@type": "title",
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "fixed": true,
       "readOnly": true,
@@ -719,7 +719,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -737,7 +737,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -746,7 +746,7 @@
       "styles": {
         "align": "full"
       },
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -755,7 +755,7 @@
       "styles": {
         "align": "left"
       },
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -768,7 +768,7 @@
       "size": "l",
       "title": "Inhaltstyp: Image-1",
       "url": "/content-types/image",
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -785,7 +785,7 @@
           "type": "p"
         }
       ],
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"
     },
@@ -795,7 +795,7 @@
       "showTime": false,
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-ct-newsitem-view",
+      "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "date"
     }
