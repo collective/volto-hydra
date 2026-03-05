@@ -2,6 +2,17 @@
   command = "bash scripts/netlify-build.sh"
   publish = ".output/public"
 
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+
+# Disable pretty URLs (trailing slash redirects) — breaks Nuxt SSG payload resolution
+[build.processing]
+  skip_processing = false
+[build.processing.html]
+  pretty_urls = false
+
 # SPA fallback for edit mode (client-side routing)
 [[redirects]]
   from = "/edit/*"

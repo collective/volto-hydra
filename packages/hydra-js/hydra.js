@@ -11694,9 +11694,10 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
  * @param {Object} data - Page data to scan for template references
  * @param {Function} loadTemplate - Async function: (templateId) => Promise<templateData>
  * @param {Object} preloadedTemplates - Already-loaded templates: { templateId: templateData }. Caller owns the cache.
+ * @param {Array} extraTemplateIds - Additional template IDs to fetch (e.g. forced layouts not referenced in page data)
  * @returns {Promise<Object>} Map of templateId -> template data (includes preloaded + newly fetched)
  */
-export async function loadTemplates(data, loadTemplate, preloadedTemplates = {}) {
+export async function loadTemplates(data, loadTemplate, preloadedTemplates = {}, extraTemplateIds = []) {
   // Start with caller-provided templates (caller owns the cache)
   const templates = { ...preloadedTemplates };
   const loaded = new Set(Object.keys(preloadedTemplates));
@@ -11729,8 +11730,11 @@ export async function loadTemplates(data, loadTemplate, preloadedTemplates = {})
     return ids;
   }
 
-  // Collect template IDs referenced in the page data.
+  // Collect template IDs referenced in the page data, plus any extra forced layouts.
   let pending = collectTemplateIds(data);
+  for (const id of extraTemplateIds) {
+    if (id) pending.add(id);
+  }
 
   // Keep loading until no new templates found
   while (pending.size > 0) {

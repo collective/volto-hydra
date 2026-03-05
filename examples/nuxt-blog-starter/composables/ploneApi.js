@@ -78,7 +78,7 @@ export default async function ploneApi({
           }
           return response.json();
         };
-        const templates = await loadTemplates(data, loadTemplate, preloadTemplates);
+        const templates = await loadTemplates(data, loadTemplate, {}, preloadTemplates);
 
         return {
           page: data,

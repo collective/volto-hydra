@@ -132,7 +132,7 @@ export default defineNuxtConfig({
     }
   },
   experimental: {
-      payloadExtraction: false
+      payloadExtraction: true
   },
 
   // How to prerender dynamic routes?

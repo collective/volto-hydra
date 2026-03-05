@@ -36,8 +36,10 @@
   </div>
 
   <div v-else-if="block['@type'] == 'leadimage'" :data-block-uid="block_uid" class="mb-6">
-    <NuxtImg v-for="props in [imageProps(data)]" :src="props.url" data-edit-media="preview_image"
-      class="w-full rounded-lg object-cover max-h-96" loading="lazy" decoding="async" />
+    <template v-for="props in [imageProps(data)]">
+      <NuxtImg v-if="props.url" :src="props.url" data-edit-media="preview_image"
+        class="w-full rounded-lg object-cover max-h-96" loading="lazy" decoding="async" />
+    </template>
   </div>
 
   <!-- dateField block: renders a configurable page-level date field -->
