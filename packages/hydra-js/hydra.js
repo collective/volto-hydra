@@ -11621,6 +11621,7 @@ export async function loadTemplates(data, loadTemplate, preloadedTemplates = {},
       if (template) {
         loaded.add(id);
         templates[id] = template;
+        preloadedTemplates[id] = template;  // Write back to caller's cache
 
         // Scan this template for nested template references
         const nestedIds = collectTemplateIds(template);
