@@ -11341,154 +11341,6 @@ export function getUniqueTemplateIds(formData) {
 }
 
 /**
- * Merge templates into page data using expandTemplates.
- * Processes each blocks field with its allowedLayouts, then recursively handles containers.
- *
- * @param {Object} page - Page data with blocks
- * @param {Object} options - Configuration
- * @param {Function} options.loadTemplate - Async function to load template: (templateId) => Promise<templateData>
- * @param {Object} options.pageBlocksFields - Field configs { fieldName: { allowedLayouts, ... } }
- * @param {Object} options.preloadedTemplates - Already-loaded templates: { templateId: templateData }. Caller owns the cache.
- * @param {Function} options.uuidGenerator - UUID generator function (default: generateUUID)
- * @returns {Promise<{merged: Object, newTemplateIds: string[]}>}
- */
-export async function mergeTemplatesIntoPage(page, options = {}) {
-  const {
-    loadTemplate,
-    pageBlocksFields = { blocks_layout: {} },
-    uuidGenerator = generateUUID,
-    filterInstanceId,
-    preloadedTemplates = {},
-  } = options;
-
-  let result = { ...page };
-  const allNewTemplateIds = new Set();
-
-  // Helper to expand templates at one level, then recurse into nested containers.
-  // Only the top call for each blocks field does template expansion;
-  // nested containers just need their inner containers processed (templates
-  // inside containers were already merged by expandTemplatesSync).
-  async function processBlocksRecursive(blocks, layout, allowedLayouts, templateState, skipExpand = false) {
-    let items;
-    if (skipExpand) {
-      // Already expanded — just convert layout IDs to block objects
-      items = layout.map(id => blocks[id] ? { ...blocks[id], '@uid': id } : null).filter(Boolean);
-    } else {
-      items = await expandTemplates(layout, {
-        blocks,
-        templateState,
-        loadTemplate,
-        preloadedTemplates,
-        allowedLayouts,
-        uuidGenerator,
-        filterInstanceId,
-      });
-    }
-
-    // Convert items back to blocks/layout format
-    const newBlocks = {};
-    const newLayout = [];
-
-    for (const item of items) {
-      const { '@uid': blockId, ...block } = item;
-      newLayout.push(blockId);
-
-      // Check for nested container blocks and process recursively
-      // In shared blocks format: block.blocks is the shared dict, layout fields are { items: [...] }
-      const processedBlock = { ...block };
-      if (isBlocksMap(block.blocks)) {
-        let mergedBlocks = {};
-        // Process each layout field separately (columns, top_images, blocks_layout, etc.)
-        for (const [key, value] of Object.entries(block)) {
-          if (key !== 'blocks' && value?.items && Array.isArray(value.items)) {
-            // This is a layout field — extract its blocks subset and process
-            const fieldBlocks = {};
-            for (const id of value.items) {
-              if (block.blocks[id]) fieldBlocks[id] = block.blocks[id];
-            }
-            // skipExpand=true: nested containers' templates were already merged
-            const { blocks: newFieldBlocks, layout: newFieldLayout } = await processBlocksRecursive(
-              fieldBlocks,
-              value.items,
-              null, // No forced layouts for nested containers
-              templateState,
-              true, // skip template expansion — already done
-            );
-            Object.assign(mergedBlocks, newFieldBlocks);
-            processedBlock[key] = { items: newFieldLayout };
-          }
-        }
-        // Keep any blocks not referenced by layout fields (orphaned/utility blocks)
-        for (const [id, blockData] of Object.entries(block.blocks)) {
-          if (!mergedBlocks[id]) mergedBlocks[id] = blockData;
-        }
-        processedBlock.blocks = mergedBlocks;
-      }
-
-      newBlocks[blockId] = processedBlock;
-    }
-
-    // Collect new template IDs
-    for (const tid of templateState.newTemplateIds || []) {
-      allNewTemplateIds.add(tid);
-    }
-
-    return { blocks: newBlocks, layout: newLayout };
-  }
-
-  // Process each page-level blocks field
-  // All fields share result.blocks; each field has its own layout (fieldName: { items: [...] })
-  const fieldsToProcess = Object.keys(pageBlocksFields).length > 0
-    ? pageBlocksFields
-    : { blocks_layout: {} }; // Default to main blocks_layout field
-
-  for (const [fieldName, fieldDef] of Object.entries(fieldsToProcess)) {
-    const blocksData = result.blocks || {};
-    const layoutData = result[fieldName];
-    const layout = layoutData?.items || [];
-    const allowedLayouts = fieldDef?.allowedLayouts || null;
-
-    if (layout.length === 0 && !allowedLayouts) {
-      // No layout items and no forced layout - skip this field
-      continue;
-    }
-
-    // Build a blocks subset for this field (only blocks referenced by this field's layout)
-    const fieldBlocks = {};
-    for (const blockId of layout) {
-      if (blocksData[blockId]) {
-        fieldBlocks[blockId] = blocksData[blockId];
-      }
-    }
-
-    const templateState = {};
-    const { blocks: newBlocks, layout: newLayout } = await processBlocksRecursive(
-      fieldBlocks,
-      layout,
-      allowedLayouts,
-      templateState
-    );
-
-    // Remove old field blocks that were dropped during template processing,
-    // then merge in the new blocks. Other fields' blocks must remain.
-    const updatedBlocks = { ...result.blocks };
-    for (const oldId of Object.keys(fieldBlocks)) {
-      if (!newBlocks[oldId]) {
-        delete updatedBlocks[oldId];
-      }
-    }
-    result.blocks = { ...updatedBlocks, ...newBlocks };
-    result[fieldName] = { items: newLayout };
-  }
-
-  return {
-    merged: result,
-    newTemplateIds: Array.from(allNewTemplateIds),
-  };
-}
-
-
-/**
  * Check if an object looks like a blocks map (string keys -> objects with @type).
  */
 function isBlocksMap(obj) {
@@ -11644,7 +11496,7 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
         blockId
       );
 
-      // Register further nested containers
+      // Register further nested containers (blocks_layout and object_list)
       if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
         const nestedLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
         templateState.nestedContainers.set(tplBlock.blocks, {
@@ -11652,6 +11504,16 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
           templateBlocks: tplBlock.blocks,
           templateLayout: nestedLayout,
         });
+      }
+      for (const val of Object.values(tplBlock)) {
+        if (Array.isArray(val) && val.length > 0 && val[0]?.templateId) {
+          const itemIdField = '@id';
+          templateState.nestedContainers.set(val, {
+            templateBlockId: tplBlockId,
+            templateBlocks: Object.fromEntries(val.map(item => [item[itemIdField], item])),
+            templateLayout: val.map(item => item[itemIdField]),
+          });
+        }
       }
     } else if (tplBlock.placeholder) {
       // Placeholder slot - emit document content that goes here
@@ -11864,6 +11726,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
     uuidGenerator,
     filterInstanceId,
     loadTemplate,
+    idField,  // For object_list arrays: field name used as item ID (e.g. '@id', 'key')
   } = options;
 
   if (!templates) {
@@ -11883,6 +11746,11 @@ export function expandTemplatesSync(inputItems, options = {}) {
         const block = blocksDict?.[item];
         return block ? { ...block, '@uid': item } : null;
       }
+      // Object_list items: map idField → @uid
+      if (idField && item && !item['@uid']) {
+        const id = item[idField];
+        if (id) return { ...item, '@uid': id };
+      }
       return item;
     }).filter(Boolean);
   }
@@ -11896,6 +11764,11 @@ export function expandTemplatesSync(inputItems, options = {}) {
         return null;
       }
       return { ...block, '@uid': item };
+    }
+    // Object_list items: map idField → @uid
+    if (idField && item && !item['@uid']) {
+      const id = item[idField];
+      if (id) return { ...item, '@uid': id };
     }
     return item;
   }).filter(Boolean);
@@ -11914,9 +11787,13 @@ export function expandTemplatesSync(inputItems, options = {}) {
     templateState.generatedInstanceIds = new WeakMap(); // blocksDict -> generated instanceId
   }
 
-  // Check if inside a registered nested container
+  // Check if inside a registered nested container (blocks_layout or object_list)
   if (blocksDict && templateState.nestedContainers.has(blocksDict)) {
     const nestedInfo = templateState.nestedContainers.get(blocksDict);
+    return processNestedTemplateLevel(blocks, layout, nestedInfo, templateState, options, addItem, items);
+  }
+  if (inputItems && templateState.nestedContainers.has(inputItems)) {
+    const nestedInfo = templateState.nestedContainers.get(inputItems);
     return processNestedTemplateLevel(blocks, layout, nestedInfo, templateState, options, addItem, items);
   }
 
@@ -12003,6 +11880,10 @@ export function expandTemplatesSync(inputItems, options = {}) {
       }
     }
   }
+
+  // Store for processNestedTemplateLevel (called from nested expandTemplatesSync calls)
+  templateState.templateId = templateId;
+  templateState.instanceId = instanceId;
 
   // Get or create instance context.
   // Always rebuild ctx when the instanceId is re-encountered (e.g. after save,
@@ -12221,6 +12102,17 @@ export function expandTemplatesSync(inputItems, options = {}) {
           templateBlocks: filteredBlocks,
           templateLayout: filteredLayout.items,
         });
+      }
+      // Register object_list arrays (arrays of objects with templateId)
+      for (const val of Object.values(tplBlock)) {
+        if (Array.isArray(val) && val.length > 0 && val[0]?.templateId) {
+          const itemIdField = '@id';
+          templateState.nestedContainers.set(val, {
+            templateBlockId: tplBlockId,
+            templateBlocks: Object.fromEntries(val.map(item => [item[itemIdField], item])),
+            templateLayout: val.map(item => item[itemIdField]),
+          });
+        }
       }
     } else {
       const placeholder = tplBlock.placeholder || 'default';

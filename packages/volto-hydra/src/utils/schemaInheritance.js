@@ -44,19 +44,38 @@ function generatePlaceholder(blockType, allBlocks) {
  * This ensures that inserting after a non-template block stays outside the template,
  * even if the next block is a template block.
  */
+/**
+ * Resolve a neighbor's block data from the container.
+ * Supports both blocks_layout (layoutItems + allBlocks map) and object_list (items array).
+ */
+function getNeighborData(index, context) {
+  const { layoutItems, allBlocks, items } = context;
+  if (items) {
+    // object_list: items is an array of objects
+    return (index >= 0 && index < items.length) ? items[index] : null;
+  }
+  // blocks_layout: layoutItems is array of IDs, allBlocks is the map
+  const neighborId = (index >= 0 && index < layoutItems.length) ? layoutItems[index] : null;
+  return neighborId ? allBlocks[neighborId] : null;
+}
+
 function getTemplateInfoFromNeighbors(context) {
-  const { position, layoutItems, allBlocks, insertAfter, containerId, field } = context;
-  if (!allBlocks || !layoutItems || layoutItems.length === 0) {
+  const { position, layoutItems, allBlocks, insertAfter, containerId, field, items } = context;
+  const containerLength = items ? items.length : layoutItems?.length || 0;
+
+  if (containerLength === 0) {
     // Empty container — check if parent container has childPlaceholders for this field.
     // This handles the case where all blocks in a placeholder region inside a container
     // have been deleted, leaving the container field empty.
-    if (containerId && field) {
+    if (containerId && field && allBlocks) {
       const parentBlock = allBlocks?.[containerId];
       if (parentBlock?.templateId && parentBlock?.childPlaceholders?.[field]) {
         return {
           templateId: parentBlock.templateId,
           templateInstanceId: parentBlock.templateInstanceId,
           placeholder: parentBlock.childPlaceholders[field],
+          fixed: true,
+          readOnly: true,
         };
       }
     }
@@ -66,12 +85,11 @@ function getTemplateInfoFromNeighbors(context) {
   // Determine the primary neighbor based on insertion direction
   // insertAfter=true: we're inserting AFTER the block at position-1, so inherit from it
   // insertAfter=false: we're inserting BEFORE the block at position, so inherit from it
-  const prevNeighborId = position > 0 ? layoutItems[position - 1] : null;
-  const nextNeighborId = position < layoutItems.length ? layoutItems[position] : null;
+  const prevNeighbor = getNeighborData(position - 1, context);
+  const nextNeighbor = getNeighborData(position, context);
 
   // The "target" block determines template membership
-  const primaryNeighborId = insertAfter ? prevNeighborId : nextNeighborId;
-  const primaryNeighbor = primaryNeighborId ? allBlocks[primaryNeighborId] : null;
+  const primaryNeighbor = insertAfter ? prevNeighbor : nextNeighbor;
 
   // If the primary neighbor (target of insertion) is not in a template, stay outside
   if (!primaryNeighbor?.templateId) {
@@ -82,13 +100,14 @@ function getTemplateInfoFromNeighbors(context) {
   const templateInfo = {
     templateId: primaryNeighbor.templateId,
     templateInstanceId: primaryNeighbor.templateInstanceId,
+    fixed: primaryNeighbor.fixed || false,
+    readOnly: primaryNeighbor.readOnly || false,
   };
 
   // Inherit placeholder from the primary neighbor if it's not fixed
   // For placeholder inheritance, also check the secondary neighbor
   let inheritedPlaceholder = null;
-  const secondaryNeighborId = insertAfter ? nextNeighborId : prevNeighborId;
-  const secondaryNeighbor = secondaryNeighborId ? allBlocks[secondaryNeighborId] : null;
+  const secondaryNeighbor = insertAfter ? nextNeighbor : prevNeighbor;
 
   for (const neighbor of [primaryNeighbor, secondaryNeighbor].filter(Boolean)) {
     if (neighbor?.templateId === templateInfo.templateId) {
@@ -173,6 +192,12 @@ export function applyBlockDefaultsWithContext(blockData, context) {
     schema.properties.placeholder = {
       choices: [derivedPlaceholder],
       default: derivedPlaceholder,
+    };
+    schema.properties.fixed = {
+      default: neighborTemplateInfo.fixed,
+    };
+    schema.properties.readOnly = {
+      default: neighborTemplateInfo.readOnly,
     };
   } else {
     // Outside a template - values should be undefined

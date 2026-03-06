@@ -1338,7 +1338,11 @@ function renderCarouselBlock(block) {
  * @returns {string} HTML string
  */
 function renderSliderBlock(block, blockId) {
-    const slides = block.slides || [];
+    // Expand slides through template system (handles templateInstanceId, fixed, etc.)
+    const rawSlides = block.slides || [];
+    const slides = window._expandTemplatesSync
+        ? window._expandTemplatesSync(rawSlides, { templateState: window._templateState || {}, templates: {}, idField: '@id' })
+        : rawSlides;
     const prevCount = sliderSlideCount[blockId] || 0;
     const newCount = slides.length;
 

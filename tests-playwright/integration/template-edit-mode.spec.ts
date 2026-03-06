@@ -350,6 +350,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await helper.waitForSidebarOpen();
     const placeholderFieldBefore = page.locator('.field-wrapper-placeholder input');
     await expect(placeholderFieldBefore).toBeVisible({ timeout: 5000 });
+    await helper.expectTemplateSettingsCount(1);
 
     // Drag user-content-1 outside the template (after standalone-block-1)
     await helper.dragBlockAfter(USER_CONTENT_1, STANDALONE_BLOCK_1);
@@ -437,6 +438,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     // Placeholder field should still be visible (block is still in template)
     const placeholderFieldAfter = page.locator('.field-wrapper-placeholder input');
     await expect(placeholderFieldAfter).toBeVisible({ timeout: 5000 });
+    await helper.expectTemplateSettingsCount(1);
 
     // Block should be editable (not readonly, since it's in the template being edited)
     const editor = helper.getSlateField(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`));
@@ -486,6 +488,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     // Block should now show placeholder field (it's now in template)
     const placeholderFieldAfter = page.locator('.field-wrapper-placeholder input');
     await expect(placeholderFieldAfter).toBeVisible({ timeout: 5000 });
+    await helper.expectTemplateSettingsCount(1);
 
     // Block should be editable (since we're in template edit mode)
     const editor = helper.getSlateField(iframe.locator(`[data-block-uid="${STANDALONE_BLOCK_1}"]`));
@@ -755,6 +758,7 @@ test.describe('Template Edit Mode - Block Settings', () => {
     // placeholder input should be visible and have initial value from block data
     const placeholderInput = page.locator('.field-wrapper-placeholder input');
     await expect(placeholderInput).toHaveValue('primary', { timeout: 5000 });
+    await helper.expectTemplateSettingsCount(1);
     // Now clear and fill with new value
     await placeholderInput.clear();
     await placeholderInput.fill('new-slot-name');
@@ -797,6 +801,7 @@ test.describe('Template Edit Mode - Block Settings', () => {
     const fixedLabel = page.locator('.field-wrapper-fixed label[for="field-fixed"]');
     const fixedCheckbox = page.locator('.field-wrapper-fixed input[type="checkbox"]');
     await expect(fixedLabel).toBeVisible({ timeout: 5000 });
+    await helper.expectTemplateSettingsCount(1);
 
     const wasChecked = await fixedCheckbox.isChecked();
     await fixedLabel.click();
@@ -807,6 +812,146 @@ test.describe('Template Edit Mode - Block Settings', () => {
     } else {
       await expect(fixedCheckbox).toBeChecked({ timeout: 5000 });
     }
+  });
+});
+
+test.describe('Template Edit Mode - Object List Items', () => {
+  // Object_list items (e.g., slider slides) inside a fixed/readOnly template block
+  // should inherit readOnly status — they can't be edited until template edit mode is on.
+
+  // Content to find the template slider's slide (random UUID after merge)
+  const TEMPLATE_SLIDE_CONTENT = 'Template Slide 1';
+
+  test('object_list items inside readOnly template block are locked', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Find the slide by its content (inside a readOnly template slider)
+    const { blockId: slideBlockId } = await helper.waitForBlockByContent(TEMPLATE_SLIDE_CONTENT);
+
+    // The slide should have hydra-locked class because its parent slider is readOnly
+    await helper.waitForBlockReadonly(slideBlockId);
+
+    // Click the slide to show its sidebar form
+    await helper.clickBlockInIframe(slideBlockId);
+    await helper.waitForSidebarOpen();
+
+    // Sidebar form should NOT have interactive inputs (readOnly slide)
+    const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]), #sidebar-properties textarea, #sidebar-properties [contenteditable="true"]');
+    await expect(sidebarInputs).toHaveCount(0, { timeout: 3000 });
+  });
+
+  test('readOnly parent block sidebar form should not be interactive', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Find the slide (inside readOnly slider) and click it
+    const { blockId: slideBlockId } = await helper.waitForBlockByContent(TEMPLATE_SLIDE_CONTENT);
+    await helper.clickBlockInIframe(slideBlockId);
+    await helper.waitForSidebarOpen();
+
+    // Navigate up to the parent slider block
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    // The parent slider's sidebar form should NOT have interactive inputs
+    // (the slider block is readOnly — its settings like autoplayEnabled should be disabled)
+    const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]), #sidebar-properties textarea, #sidebar-properties [contenteditable="true"]');
+    await expect(sidebarInputs).toHaveCount(0, { timeout: 3000 });
+  });
+
+  test('object_list items become editable in template edit mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    const iframe = helper.getIframe();
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Find the slide and a template block for navigation
+    const { blockId: slideBlockId } = await helper.waitForBlockByContent(TEMPLATE_SLIDE_CONTENT);
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
+
+    // Initially locked
+    await helper.waitForBlockReadonly(slideBlockId);
+
+    // Enter template edit mode via the header block
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar(templateBlockIds);
+
+    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    await expect(editToggle).toBeVisible({ timeout: 10000 });
+    await editToggle.click();
+
+    // Wait for template edit mode to activate
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+
+    // Now the slide should be editable (no longer locked)
+    await helper.waitForBlockEditable(slideBlockId);
+
+    // Click the slide — sidebar form should now have interactive inputs
+    await helper.clickBlockInIframe(slideBlockId);
+    await helper.waitForSidebarOpen();
+    const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]), #sidebar-properties textarea, #sidebar-properties [contenteditable="true"]');
+    await expect(sidebarInputs.first()).toBeVisible({ timeout: 5000 });
+
+    // Object_list items should NOT show their own TEMPLATE SETTINGS —
+    // only the parent block's template settings should appear
+    await helper.expectTemplateSettingsCount(1);
+  });
+
+  test('new object_list item added in template edit mode inherits template settings', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Find template blocks and enter template edit mode
+    const { blockId: slideBlockId } = await helper.waitForBlockByContent(TEMPLATE_SLIDE_CONTENT);
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
+
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar(templateBlockIds);
+
+    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    await expect(editToggle).toBeVisible({ timeout: 10000 });
+    await editToggle.click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+
+    // Click a slide, then click the [+] in the iframe to add a new slide
+    await helper.waitForBlockEditable(slideBlockId);
+    await helper.clickBlockInIframe(slideBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.clickAddBlockButton();
+
+    // Wait for the new slide to be selected
+    const sidebar = page.locator('.sidebar-container');
+    await helper.waitForSidebarCurrentBlock('Slide');
+
+    // The new slide should be editable (we're in template edit mode)
+    const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]), #sidebar-properties textarea, #sidebar-properties [contenteditable="true"]');
+    await expect(sidebarInputs.first()).toBeVisible({ timeout: 5000 });
+
+    // The new slide should inherit template settings from its neighbor (fixed, readOnly)
+    // so it should have a template settings section with fixed=true
+    await helper.expectTemplateSettingsCount(1);
+    const fixedCheckbox = page.locator('#sidebar-template-settings .field-wrapper-fixed input[type="checkbox"]');
+    await expect(fixedCheckbox).toBeChecked({ timeout: 5000 });
+
+    // The iframe [+] add button should still be visible on the new slide
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible({ timeout: 5000 });
   });
 });
 
@@ -858,6 +1003,50 @@ test.describe('Template Edit Mode - UI Restrictions', () => {
     const mediaButton = toolbar.locator('button[title*="image" i]');
     await expect(linkButton).toHaveCount(0);
     await expect(mediaButton).toHaveCount(0);
+  });
+
+  test('readonly block sidebar form should not be interactive', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Find and click readonly template header block
+    const headerBlockId = await helper.clickBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.waitForSidebarOpen();
+
+    // Sidebar form should not have interactive inputs (readonly block)
+    const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]), #sidebar-properties textarea, #sidebar-properties [contenteditable="true"]');
+    await expect(sidebarInputs).toHaveCount(0, { timeout: 3000 });
+  });
+
+  test('readonly block sidebar form becomes interactive in template edit mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
+
+    // Enter template edit mode
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await page.keyboard.press('Escape');
+    await helper.waitForQuantaToolbar(templateBlockIds);
+
+    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    await editToggle.click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+
+    // Click header block again — now in template edit mode
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+
+    // Sidebar form should now have interactive inputs
+    const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]), #sidebar-properties textarea, #sidebar-properties [contenteditable="true"]');
+    await expect(sidebarInputs.first()).toBeVisible({ timeout: 5000 });
   });
 
   test('fixed blocks should not show Remove option in dropdown menu', async ({ page }) => {

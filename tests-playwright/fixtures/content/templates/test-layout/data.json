@@ -60,6 +60,36 @@
       ],
       "plaintext": "Default placeholder content"
     },
+    "slider-block": {
+      "@type": "slider",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "test-layout-def-instance",
+      "placeholder": "slider",
+      "slides": [
+        {
+          "@id": "tpl-slide-1",
+          "@type": "slide",
+          "fixed": true,
+          "readOnly": true,
+          "templateId": "resolveuid/test-layout-template-uid",
+          "templateInstanceId": "test-layout-def-instance",
+          "title": "Template Slide 1",
+          "description": "First template slide"
+        },
+        {
+          "@id": "tpl-slide-2",
+          "@type": "slide",
+          "fixed": true,
+          "readOnly": true,
+          "templateId": "resolveuid/test-layout-template-uid",
+          "templateInstanceId": "test-layout-def-instance",
+          "title": "Template Slide 2",
+          "description": "Second template slide"
+        }
+      ]
+    },
     "footer-block": {
       "@type": "slate",
       "fixed": true,
@@ -77,6 +107,6 @@
     }
   },
   "blocks_layout": {
-    "items": ["header-block", "grid-block", "main-placeholder", "footer-block"]
+    "items": ["header-block", "grid-block", "main-placeholder", "slider-block", "footer-block"]
   }
 }

@@ -446,7 +446,7 @@ const ParentBlockSection = ({
       )}
 
       {/* Fallback: If no Edit component but has schema, render BlockDataForm directly */}
-      {!BlockEdit && schema && !pathInfo?.isTemplateInstance && (() => {
+      {!BlockEdit && schema && !isReadonly && !pathInfo?.isTemplateInstance && (() => {
         const formContent = (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
             <BlockDataForm
@@ -463,7 +463,6 @@ const ParentBlockSection = ({
               formData={blockData}
               block={blockId}
               applySchemaEnhancers={true}
-              editable={!isReadonly}
             />
           </HydraSchemaProvider>
         );
@@ -507,6 +506,7 @@ const ParentBlockSection = ({
         // Check if this block is inside the template being edited
         const isBlockInEditedTemplate = templateEditMode &&
           !pathInfo?.isTemplateInstance &&
+          !pathInfo?.isObjectListItem &&
           blockData &&
           blockData.templateId &&
           blockData.templateInstanceId === templateEditMode;

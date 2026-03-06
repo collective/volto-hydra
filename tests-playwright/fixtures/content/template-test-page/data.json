@@ -56,6 +56,36 @@
       "templateInstanceId": "tpl-instance-1",
       "placeholder": "primary"
     },
+    "template-slider": {
+      "@type": "slider",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "tpl-instance-1",
+      "placeholder": "slider",
+      "slides": [
+        {
+          "@id": "tpl-slide-1",
+          "@type": "slide",
+          "fixed": true,
+          "readOnly": true,
+          "templateId": "resolveuid/test-layout-template-uid",
+          "templateInstanceId": "tpl-instance-1",
+          "title": "Template Slide 1",
+          "description": "First template slide"
+        },
+        {
+          "@id": "tpl-slide-2",
+          "@type": "slide",
+          "fixed": true,
+          "readOnly": true,
+          "templateId": "resolveuid/test-layout-template-uid",
+          "templateInstanceId": "tpl-instance-1",
+          "title": "Template Slide 2",
+          "description": "Second template slide"
+        }
+      ]
+    },
     "template-footer": {
       "@type": "slate",
       "fixed": true,
@@ -83,7 +113,7 @@
     }
   },
   "blocks_layout": {
-    "items": ["standalone-block-1", "template-header", "user-content-1", "user-content-2", "template-footer", "standalone-block-2"]
+    "items": ["standalone-block-1", "template-header", "user-content-1", "user-content-2", "template-slider", "template-footer", "standalone-block-2"]
   },
   "@components": {
     "actions": {

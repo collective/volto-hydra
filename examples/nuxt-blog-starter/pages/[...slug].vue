@@ -43,25 +43,11 @@
     <!-- </div> -->
     </main>
     <footer class="bg-white rounded-lg shadow m-4 dark:bg-gray-800">
-        <!-- Dynamic footer_blocks content (sync - templates pre-loaded) -->
-        <div id="footer-content" class="w-full mx-auto max-w-screen-xl p-4">
+        <div id="footer-content" class="w-full mx-auto max-w-screen-xl p-4 text-center text-sm text-gray-500 dark:text-gray-400">
             <template v-if="(data.page?.footer_blocks || footerAllowedLayouts) && shouldRenderBlocks">
                 <Block v-for="item in footerExpandedItems" :key="item['@uid']"
                        :block_uid="item['@uid']" :block="item" :data="data.page" :api-url="apiUrl" />
             </template>
-        </div>
-        <!-- Static footer content -->
-        <div class="w-full mx-auto max-w-screen-xl p-4 md:flex md:items-center md:justify-between">
-        <span class="text-sm text-gray-500 sm:text-center dark:text-gray-400">© 2023 <a href="https://flowbite.com/" class="hover:underline">Flowbite™</a>. All Rights Reserved.
-        </span>
-        <ul class="flex flex-wrap items-center mt-3 text-sm font-medium text-gray-500 dark:text-gray-400 sm:mt-0">
-            <li>
-                <a href="https://github.com/collective/volto-hydra" class="hover:underline me-4 md:me-6">About</a>
-            </li>
-            <li>
-                <a href="https://github.com/collective/volto-hydra" class="hover:underline">Contact</a>
-            </li>
-        </ul>
         </div>
     </footer>   
 </template>
@@ -170,7 +156,9 @@ const mainStyleGroups = computed(() => groupByStyle(mainExpandedItems.value));
 const footerExpandedItems = computed(() => {
     const layout = data.value?.page?.footer_blocks?.items || [];
     const blocks = data.value?.page?.blocks || {};
-    if (!layout.length) return [];
+    // Don't early-return on empty layout — allowedLayouts forces a template
+    // even when the page has no footer_blocks content yet.
+    if (!layout.length && !footerAllowedLayouts.value) return [];
     return expandTemplatesSync(layout, {
         blocks,
         templateState,
@@ -263,6 +251,25 @@ onMounted(() => {
                         },
                     },
                 },
+                socialLinks: {
+                    restricted: true,  // Only used in footer template
+                    blockSchema: {
+                        properties: {
+                            links: {
+                                title: 'Links',
+                                widget: 'object_list',
+                                schema: {
+                                    properties: {
+                                        url: {
+                                            title: 'URL',
+                                            widget: 'url',
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
                 ...sharedBlocksConfig,
             };
             // Content-type-aware page-level blocks:
@@ -291,8 +298,10 @@ onMounted(() => {
                             },
                             footer_blocks: {
                                 title: 'Footer',
-                                allowedBlocks: ['slate', 'image'],
-                                allowedLayouts: route.path === '/_test_data/another-page' ? ['/_test_data/templates/footer-layout'] : null,
+                                allowedBlocks: ['slate', 'image', 'socialLinks'],
+                                allowedLayouts: route.path === '/_test_data/another-page'
+                                    ? ['/_test_data/templates/footer-layout']
+                                    : ['/templates/site-footer'],
                             },
                         },
                     },
@@ -316,9 +325,13 @@ onMounted(() => {
 
 // Determine footer allowedLayouts based on path (same as mock frontend)
 const footerAllowedLayouts = computed(() => {
-    // Use startsWith to handle trailing slashes and normalize
     const normalizedPath = route.path.replace(/\/$/, '');
-    return normalizedPath === '/_test_data/another-page' ? ['/_test_data/templates/footer-layout'] : null;
+    // Test page uses its own test footer layout
+    if (normalizedPath === '/_test_data/another-page') {
+        return ['/_test_data/templates/footer-layout'];
+    }
+    // All other pages get the site footer
+    return ['/templates/site-footer'];
 });
 
 // Main blocks allowedLayouts for expandTemplatesSync (view mode / SSR)

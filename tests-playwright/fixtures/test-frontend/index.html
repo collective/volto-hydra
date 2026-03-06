@@ -62,7 +62,7 @@
 
     <script src="/renderer.js"></script>
     <script type="module">
-        import { initBridge, expandListingBlocks, ploneFetchItems, expandTemplates, getAccessToken, contentPath } from '/hydra.js';
+        import { initBridge, expandListingBlocks, ploneFetchItems, expandTemplates, expandTemplatesSync, getAccessToken, contentPath } from '/hydra.js';
         import { sharedBlocksConfig } from '/shared-block-schemas.js';
 
         // Parse page numbers from URL query params (format: ?pg_{blockId}={pageNumber})
@@ -287,6 +287,10 @@
                 const expandedBlocksMap = Object.fromEntries(expandedItems.map(item => [item['@uid'], item]));
                 content.blocks = { ...content.blocks, ...expandedBlocksMap };
                 content.blocks_layout = { items: expandedItems.map(item => item['@uid']) };
+
+                // Expose template expansion for renderer.js (object_list arrays)
+                window._expandTemplatesSync = expandTemplatesSync;
+                window._templateState = templateState;
 
                 // Render navigation from @components.navigation.items
                 const navItems = content['@components']?.navigation?.items || [];

@@ -177,7 +177,7 @@
     <div class="relative w-full">
       <!-- Carousel wrapper -->
       <div class="relative h-56 overflow-hidden rounded-lg md:h-96">
-        <div v-for="(slide, index) in block.slides" :key="slide['@id']" :data-block-uid="slide['@id']"
+        <div v-for="(slide, index) in expand(block.slides, null, '@id')" :key="slide['@uid']" :data-block-uid="slide['@uid']"
           class="slide duration-700 ease-linear bg-center items-center absolute inset-0"
           :class="[
             { 'bg-gray-700': !slide.preview_image, 'bg-blend-multiply': !slide.preview_image, 'bg-no-repeat': !slide.preview_image, 'bg-cover': slide.preview_image }
@@ -191,26 +191,26 @@
             class="max-w-sm p-6 bg-slate-200/90 border border-gray-200 m-12 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 absolute"
             :class="{ 'right-0': slide.flagAlign == 'right' }" style="z-index: 2;">
             <div data-edit-text="head_title">{{ slide.head_title }}</div>
-            <h5 :id="`heading-${slide['@id']}`"
+            <h5 :id="`heading-${slide['@uid']}`"
               class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-edit-text="title">
               {{ slide.title }}</h5>
             <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-edit-text="description">
               {{ slide.description }}</p>
             <NuxtLink v-if="slide.href" :to="getUrl(slide.href[0])" data-edit-text="buttonText" data-edit-link="href"
               class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-              :aria-describedby="`heading-${slide['@id']}`">
+              :aria-describedby="`heading-${slide['@uid']}`">
               {{ slide.buttonText || 'Read More' }}</NuxtLink>
             <a v-else href="#" data-edit-text="buttonText" data-edit-link="href"
               class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-              :aria-describedby="`heading-${slide['@id']}`">
+              :aria-describedby="`heading-${slide['@uid']}`">
               {{ slide.buttonText || 'Read More' }}</a>
           </div>
         </div>
       </div>
       <!-- Slider indicators -->
       <div class="absolute z-30 flex -translate-x-1/2 bottom-5 left-1/2 space-x-3 rtl:space-x-reverse">
-        <button v-for="(slide, index) in block.slides" :key="slide['@id']" type="button" class="w-3 h-3 rounded-full" aria-current="true"
-          :aria-label="`Slide ${index + 1}`" :data-carousel-slide-to="index" :data-block-selector="slide['@id']"></button>
+        <button v-for="(slide, index) in expand(block.slides, null, '@id')" :key="slide['@uid']" type="button" class="w-3 h-3 rounded-full" aria-current="true"
+          :aria-label="`Slide ${index + 1}`" :data-carousel-slide-to="index" :data-block-selector="slide['@uid']"></button>
       </div>
       <!-- Slider controls -->
       <button type="button"
@@ -301,15 +301,15 @@
       <!-- Facets horizontal -->
       <h3 v-if="block.facetsTitle" class="font-semibold mb-3 text-gray-700">{{ block.facetsTitle }}</h3>
       <div v-if="block.facets?.length" class="search-facets mb-4 p-4 bg-gray-50 rounded-lg flex flex-wrap gap-4">
-        <template v-for="(facet, idx) in block.facets" :key="facet['@id'] || idx">
+        <template v-for="(facet, idx) in expand(block.facets, null, '@id')" :key="facet['@uid'] || idx">
           <!-- Non-facet types (slate, image) rendered as generic blocks -->
           <template v-if="facet.type === 'slate' || facet.type === 'image'">
-            <div :data-block-uid="facet['@id']" data-block-add="bottom" class="p-3 border border-gray-200 rounded min-w-48">
-              <Block :block="facet" :block_uid="facet['@id']" :data="data" :api-url="effectiveApiUrl" />
+            <div :data-block-uid="facet['@uid']" data-block-add="bottom" class="p-3 border border-gray-200 rounded min-w-48">
+              <Block :block="facet" :block_uid="facet['@uid']" :data="data" :api-url="effectiveApiUrl" />
             </div>
           </template>
           <!-- Facet types -->
-          <div v-else :data-block-uid="facet['@id']" :data-block-type="facet.type" data-block-add="bottom"
+          <div v-else :data-block-uid="facet['@uid']" :data-block-type="facet.type" data-block-add="bottom"
                class="facet-item p-3 border border-gray-200 rounded min-w-48">
             <div data-edit-text="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
             <template v-if="facet.type === 'selectFacet'">
@@ -375,16 +375,16 @@
         <aside v-if="block.facets?.length" class="search-facets w-full md:w-64 shrink-0">
           <div class="p-4 bg-gray-50 rounded-lg sticky top-4">
             <h3 v-if="block.facetsTitle" class="font-semibold mb-3 text-gray-700">{{ block.facetsTitle }}</h3>
-            <template v-for="(facet, idx) in block.facets" :key="facet['@id'] || idx">
+            <template v-for="(facet, idx) in expand(block.facets, null, '@id')" :key="facet['@uid'] || idx">
               <!-- Non-facet types (slate, image) rendered as generic blocks -->
               <template v-if="facet.type === 'slate' || facet.type === 'image'">
-                <div :data-block-uid="facet['@id']" data-block-add="bottom"
+                <div :data-block-uid="facet['@uid']" data-block-add="bottom"
                      class="mb-4 pb-4 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0">
-                  <Block :block="facet" :block_uid="facet['@id']" :data="data" :api-url="effectiveApiUrl" />
+                  <Block :block="facet" :block_uid="facet['@uid']" :data="data" :api-url="effectiveApiUrl" />
                 </div>
               </template>
               <!-- Facet types -->
-              <div v-else :data-block-uid="facet['@id']" :data-block-type="facet.type" data-block-add="bottom"
+              <div v-else :data-block-uid="facet['@uid']" :data-block-type="facet.type" data-block-add="bottom"
                    class="facet-item mb-4 pb-4 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0">
                 <div data-edit-text="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
                 <template v-if="facet.type === 'selectFacet'">
@@ -452,12 +452,12 @@
 
   <div v-else-if="block['@type'] == 'slateTable'" class="data-table" :data-block-uid="block_uid">
     <table>
-      <tr v-for="(row) in block.table?.rows" :key="row.key" :data-block-uid="row.key" data-block-add="bottom">
+      <tr v-for="(row) in expand(block.table?.rows, null, 'key')" :key="row['@uid']" :data-block-uid="row['@uid']" data-block-add="bottom">
         <component
-          v-for="(cell) in row.cells"
-          :key="cell.key"
+          v-for="(cell) in expand(row.cells, null, 'key')"
+          :key="cell['@uid']"
           :is="(cell.type == 'header') ? 'th' : 'td'"
-          :data-block-uid="cell.key"
+          :data-block-uid="cell['@uid']"
           data-block-add="right"
         >
           <RichText v-for="(node, idx) in cell.value" :key="idx" :node="node" data-edit-text="value" />
@@ -554,8 +554,8 @@
       {{ block.send_message || 'Form submitted successfully.' }}
     </div>
     <form v-else @submit.prevent="handleFormSubmit($event, block)" novalidate class="space-y-4">
-      <template v-for="field in block.subblocks" :key="field.field_id">
-        <div :data-block-uid="field.field_id" :data-block-type="field.field_type" data-block-add="bottom"
+      <template v-for="field in expand(block.subblocks, null, 'field_id')" :key="field['@uid']">
+        <div :data-block-uid="field['@uid']" :data-block-type="field.field_type" data-block-add="bottom"
              class="form-field">
           <!-- Text -->
           <template v-if="field.field_type === 'text'">
@@ -755,6 +755,20 @@
     </dl>
   </div>
 
+  <!-- Social Links: auto-detects icons from URL domains -->
+  <div v-else-if="block['@type'] == 'socialLinks'" :data-block-uid="block_uid"
+       class="flex items-center justify-center gap-4 py-2">
+    <span class="text-sm text-gray-500 dark:text-gray-400">Follow us:</span>
+    <a v-for="link in expand(block.links || [], null, '@id')" :key="link['@uid']"
+       :data-block-uid="link['@uid']" data-block-add="right"
+       :href="link.url" target="_blank" rel="noopener"
+       data-edit-link="url"
+       :title="socialInfo(link.url).name"
+       class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+      <span v-html="socialInfo(link.url).svg" />
+    </a>
+  </div>
+
   <div v-else :data-block-uid="block_uid">
     {{ 'Not implemented Block: @type=' + block['@type'] }}
     <pre>{{ block }}</pre>
@@ -836,6 +850,59 @@ function formatDateField(dateStr, showTime) {
   return new Date(dateStr).toLocaleDateString(undefined, opts);
 }
 
+// Social links: map URL domains to SVG icons (24x24)
+const SOCIAL_ICONS = {
+  'github.com': {
+    name: 'GitHub',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>',
+  },
+  'discord.gg': {
+    name: 'Discord',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189z"/></svg>',
+  },
+  'discord.com': {
+    name: 'Discord',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189z"/></svg>',
+  },
+  'plone.org': {
+    name: 'Plone',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><text x="12" y="16" text-anchor="middle" font-size="12" font-weight="bold" fill="currentColor">P</text></svg>',
+  },
+  'youtube.com': {
+    name: 'YouTube',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>',
+  },
+  'mastodon.social': {
+    name: 'Mastodon',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M23.268 5.313c-.35-2.578-2.617-4.61-5.304-5.004C17.51.242 15.792 0 11.813 0h-.03c-3.98 0-4.835.242-5.288.309C3.882.692 1.496 2.518.917 5.127.64 6.412.61 7.837.661 9.143c.074 1.874.088 3.745.26 5.611.118 1.24.325 2.47.62 3.68.55 2.237 2.777 4.098 4.96 4.857 2.336.792 4.849.923 7.256.38.265-.061.527-.132.786-.213.585-.184 1.27-.39 1.774-.753a.057.057 0 0 0 .023-.043v-1.809a.052.052 0 0 0-.02-.041.053.053 0 0 0-.046-.01 20.282 20.282 0 0 1-4.709.547c-2.73 0-3.463-1.284-3.674-1.818a5.593 5.593 0 0 1-.319-1.433.053.053 0 0 1 .066-.054 19.648 19.648 0 0 0 4.636.536c.397 0 .794 0 1.192-.013 1.99-.059 4.088-.163 5.985-.67a.175.175 0 0 0 .023-.006c2.298-.665 4.48-2.688 4.623-7.828.006-.238.046-2.476.046-2.717 0-.833.31-5.907-.046-7.172zM19.903 13.24h-2.558v-5.9c0-1.243-.525-1.875-1.575-1.875-1.16 0-1.74.749-1.74 2.23v3.227h-2.544V7.695c0-1.481-.58-2.23-1.74-2.23-1.05 0-1.576.632-1.576 1.875v5.9H5.612V7.514c0-1.243.317-2.232.954-2.965.657-.733 1.517-1.108 2.584-1.108 1.234 0 2.17.474 2.795 1.423L12 4.958l.055.906c.625-.95 1.56-1.423 2.795-1.423 1.066 0 1.926.375 2.583 1.108.637.733.955 1.722.955 2.965v5.726z"/></svg>',
+  },
+  'x.com': {
+    name: 'X',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>',
+  },
+  'twitter.com': {
+    name: 'X',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>',
+  },
+  'bsky.app': {
+    name: 'Bluesky',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.785 2.627 3.6 3.494 6.67 3.06-4.576.78-5.865 3.36-3.397 5.94 3.006 3.144 5.434-1.056 6.103-3.26.079-.26.114-.39.114-.26 0-.13.035 0 .114.26.669 2.204 3.097 6.404 6.103 3.26 2.468-2.58 1.179-5.16-3.397-5.94 3.07.434 5.885-.433 6.67-3.06.246-.828.624-5.79.624-6.479 0-.688-.139-1.86-.902-2.203-.66-.299-1.664-.621-4.3 1.24C12.046 4.747 9.087 8.686 8 10.8z"/></svg>',
+  },
+};
+const DEFAULT_LINK_ICON = {
+  name: 'Link',
+  svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+};
+
+function socialInfo(url) {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, '');
+    return SOCIAL_ICONS[hostname] || { ...DEFAULT_LINK_ICON, name: hostname };
+  } catch {
+    return DEFAULT_LINK_ICON;
+  }
+}
+
 // Sync fallback for templates not in the pre-loaded map
 function syncLoadTemplate(templateId) {
   const tplPath = templateId.startsWith('http')
@@ -851,8 +918,11 @@ function syncLoadTemplate(templateId) {
 }
 
 // Expand child blocks: wraps expandTemplatesSync with injected context
-const expand = (layout, blocks) => expandTemplatesSync(layout, {
+// For blocks dicts: expand(layout, blocks)
+// For object_list arrays: expand(items, null, '@id')
+const expand = (layout, blocks, idField) => expandTemplatesSync(layout, {
   blocks, templateState, templates: injectedTemplates, loadTemplate: syncLoadTemplate,
+  ...(idField && { idField }),
 });
 
 // Grid block: combined paging across all children (mirrors README Grid pattern)

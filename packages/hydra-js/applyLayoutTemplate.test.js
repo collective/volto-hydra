@@ -1,4 +1,5 @@
-import { expandTemplates, expandTemplatesSync, mergeTemplatesIntoPage } from './hydra.js';
+import { expandTemplates, expandTemplatesSync } from './hydra.js';
+import { mergeTemplatesIntoPage } from '../volto-hydra/src/utils/blockPath.js';
 
 // Wrapper to match old applyLayoutTemplate signature for existing tests
 async function applyLayoutTemplate(pageData, templateData, uuidGenerator) {

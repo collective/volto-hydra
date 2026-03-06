@@ -797,6 +797,17 @@ export class AdminUIHelper {
   }
 
   /**
+   * Assert that the sidebar shows exactly `expected` template settings sections.
+   * Each block in the hierarchy can portal a "Template Settings" form into
+   * #sidebar-template-settings. Object_list items should NOT render one.
+   */
+  async expectTemplateSettingsCount(expected: number, timeout: number = 5000): Promise<void> {
+    const container = this.page.locator('#sidebar-template-settings');
+    const sections = container.locator('.field-wrapper-placeholder');
+    await expect(sections).toHaveCount(expected, { timeout });
+  }
+
+  /**
    * Wait for the sidebar to show a specific block type as the current block.
    * The current block in the sidebar has data-is-current="true" on its header.
    *

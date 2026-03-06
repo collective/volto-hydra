@@ -228,6 +228,19 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
   // Compute default page-level allowed blocks from restricted (used when field doesn't specify allowedBlocks)
   const defaultPageAllowedBlocks = getPageAllowedBlocksFromRestricted(blocksConfig, { properties: formData });
 
+  // Insert restriction logic for fixed block/item boundaries.
+  // Can't insert between two adjacent fixed items, or at container edges next to a fixed item.
+  function getInsertRestrictions(item, index, count, prevIsFixed, nextIsFixed) {
+    const isFixed = item.fixed === true;
+    const atStart = index === 0;
+    const atEnd = index === count - 1;
+    const hasNextPlaceholder = item.nextPlaceholder != null;
+    return {
+      canInsertBefore: !(isFixed && (atStart || prevIsFixed)),
+      canInsertAfter: !(isFixed && (atEnd || nextIsFixed)) || hasNextPlaceholder,
+    };
+  }
+
   // Helper to find empty required fields for starter UI
   // Returns array of { fieldName, fieldDef } for required fields that are empty
   function getEmptyRequiredFields(blockData, schema) {
@@ -337,23 +350,14 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       const isFixed = block.fixed === true;        // Volto standard: position locked
       const isReadonly = block.readOnly === true;  // Volto standard: content locked
 
-      // Check if inserting before/after this block is allowed
-      // Can't insert:
-      // 1. Between two adjacent fixed blocks
-      // 2. Before a fixed block at container start (no placeholder there)
-      // 3. After a fixed block at container end (no placeholder there)
+      // Insert restrictions based on fixed block boundaries
       const prevBlockId = layout[index - 1];
       const nextBlockId = layout[index + 1];
-      const prevBlockIsFixed = prevBlockId ? blockFixedStatus[prevBlockId] : false;
-      const nextBlockIsFixed = nextBlockId ? blockFixedStatus[nextBlockId] : false;
-      const atContainerStart = index === 0;
-      const atContainerEnd = index === layout.length - 1;
-      // Fixed block at edge OR between two fixed blocks = can't insert
-      // Exception: if the block has nextPlaceholder, there's a placeholder region after it
-      // that may be empty — always allow inserting after it.
-      const hasNextPlaceholder = block.nextPlaceholder != null;
-      const canInsertBefore = !(isFixed && (atContainerStart || prevBlockIsFixed));
-      const canInsertAfter = !(isFixed && (atContainerEnd || nextBlockIsFixed)) || hasNextPlaceholder;
+      const { canInsertBefore, canInsertAfter } = getInsertRestrictions(
+        block, index, layout.length,
+        prevBlockId ? blockFixedStatus[prevBlockId] : false,
+        nextBlockId ? blockFixedStatus[nextBlockId] : false,
+      );
 
       // Template instance virtual container
       // Only FIRST-LEVEL template blocks get the virtual instance as parent
@@ -525,6 +529,17 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         };
       }
 
+      // Check template properties on the item itself (same as regular blocks)
+      const itemIsFixed = item.fixed === true;
+      const itemIsReadonly = item.readOnly === true;
+
+      // Insert restrictions based on fixed item boundaries
+      const { canInsertBefore, canInsertAfter } = getInsertRestrictions(
+        item, index, itemsArray.length,
+        itemsArray[index - 1]?.fixed === true,
+        itemsArray[index + 1]?.fixed === true,
+      );
+
       pathMap[itemId] = {
         path: itemPath,
         parentId,
@@ -533,10 +548,16 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         isObjectListItem: true,
         idField,
         ...(typeField && { typeField }), // Only set if typed object_list
+        ...(itemIsFixed && { isFixed: true }),
+        ...(itemIsReadonly && { isReadonly: true }),
+        ...(!canInsertBefore && { canInsertBefore: false }),
+        ...(!canInsertAfter && { canInsertAfter: false }),
         resolvedBlockSchema: blockSchema, // Full schema with functions — stripped only when sending to iframe
         itemSchema: effectiveItemSchema, // null for typed items (schema from blocksConfig)
         dataPath: effectiveDataPath, // Store for later use
         allowedSiblingTypes: hasAllowedBlocks ? fieldDef.allowedBlocks : [virtualType],
+        maxSiblings: fieldDef.maxLength || null,
+        siblingCount: itemsArray.length,
         addMode, // Table mode for this container (e.g., rows)
         parentAddMode, // Inherited from parent (e.g., cells inherit 'table' from rows)
         actions, // Available actions for toolbar/dropdown

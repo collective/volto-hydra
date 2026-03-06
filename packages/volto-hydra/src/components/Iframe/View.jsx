@@ -9,7 +9,7 @@ import {
 import { validateAndLog, validateTemplatePlaceholders } from '../../utils/formDataValidation';
 import { toast } from 'react-toastify';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
-import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, mergeTemplatesIntoPage, getBlockAddability } from '@volto-hydra/hydra-js';
+import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, getBlockAddability } from '@volto-hydra/hydra-js';
 import Api from '@plone/volto/helpers/Api/Api';
 
 import { createLog } from '../../utils/log';
@@ -88,7 +88,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance } from '../../utils/blockPath';
+import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, mergeTemplatesIntoPage, getContainerItems } from '../../utils/blockPath';
 import {
   applySchemaDefaultsToFormData,
   applyBlockDefaultsWithContext,
@@ -696,6 +696,8 @@ const Iframe = (props) => {
       mergeTemplatesIntoPage(template, {
         loadTemplate: async () => formData,
         filterInstanceId: prevInstanceId,
+        blocksConfig: config.blocks.blocksConfig,
+        intl,
       }).then(({ merged: updatedTemplate }) => {
         log('REVERSE MERGE: Updated template blocks:', Object.keys(updatedTemplate.blocks || {}));
         // Log first block's value to check if edit is captured
@@ -873,6 +875,8 @@ const Iframe = (props) => {
               return response.json();
             },
             pageBlocksFields: { blocks_layout: { allowedLayouts: [templateConfig.templateUrl] } },
+            blocksConfig: config.blocks.blocksConfig,
+            intl,
           });
 
           // Merge with existing formData (preserve other fields like title, description)
@@ -1038,6 +1042,26 @@ const Iframe = (props) => {
 
       // Initialize nested containers (e.g., cells in a row)
       blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, { intl, metadata, properties, siblingData, blockType: effectiveType });
+
+      // Inherit template fields from neighbors (same logic as blocks_layout)
+      if (action !== 'inside') {
+        const parentId = blockPathMap[blockId]?.parentId;
+        const parentBlock = parentId === PAGE_BLOCK_UID
+          ? formData
+          : getBlockById(formData, blockPathMap, parentId);
+        const existingItems = parentBlock ? getContainerItems(parentBlock, containerConfig) : [];
+        const idFld = containerConfig?.idField || fieldDef?.idField || '@id';
+        const refIndex = existingItems.findIndex(item => item[idFld] === blockId);
+        const position = action === 'after' ? refIndex + 1 : refIndex;
+
+        blockData = applyBlockDefaultsWithContext(blockData, {
+          position,
+          insertAfter: action === 'after',
+          items: existingItems,
+          blocksConfig: mergedBlocksConfig,
+          intl,
+        });
+      }
 
       // Store type in typeField, clean up @type if typeField is different
       blockData[typeFieldName] = effectiveType;
@@ -2207,6 +2231,7 @@ const Iframe = (props) => {
               }
               // Auto-generate default fieldset if missing (only for new blocks, not overrides)
               // Also ensure required is an array (Volto expects this)
+              // Recurse into object_list inner schemas too (Volto's InlineForm needs fieldsets).
               const schema = blockConfig?.blockSchema;
               const isNewBlock = !config.blocks.blocksConfig[blockType];
               if (isNewBlock && schema?.properties && !schema.fieldsets) {
@@ -2218,6 +2243,21 @@ const Iframe = (props) => {
               }
               if (schema && !schema.required) {
                 schema.required = [];
+              }
+              // Auto-generate fieldsets on nested object_list inner schemas
+              if (schema?.properties) {
+                Object.values(schema.properties).forEach((prop) => {
+                  if (prop?.widget === 'object_list' && prop?.schema?.properties && !prop.schema.fieldsets) {
+                    prop.schema.fieldsets = [{
+                      id: 'default',
+                      title: 'Default',
+                      fields: Object.keys(prop.schema.properties),
+                    }];
+                  }
+                  if (prop?.widget === 'object_list' && prop?.schema && !prop.schema.required) {
+                    prop.schema.required = [];
+                  }
+                });
               }
               // Validate fieldMappings: warn about invalid @default keys
               validateFieldMappings(blockType, blockConfig);
@@ -2586,6 +2626,8 @@ const Iframe = (props) => {
             loadTemplate,
             preloadedTemplates: templateCacheRef.current,
             pageBlocksFields,
+            blocksConfig: config.blocks.blocksConfig,
+            intl,
           });
           let blockPathMap = buildBlockPathMap(mergedFormData, config.blocks.blocksConfig, intl);
 
@@ -2667,6 +2709,8 @@ const Iframe = (props) => {
           loadTemplate,
           preloadedTemplates: templateCacheRef.current,
           pageBlocksFields,
+          blocksConfig: config.blocks.blocksConfig,
+          intl,
         });
         if (moreTemplateIds.length > 0) {
           log('[INITIAL_DATA] Discovered nested templates:', moreTemplateIds);
