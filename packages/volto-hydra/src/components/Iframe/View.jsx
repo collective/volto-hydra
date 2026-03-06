@@ -88,7 +88,8 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, mergeTemplatesIntoPage, getContainerItems } from '../../utils/blockPath';
+import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems } from '../../utils/blockPath';
+import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
   applyBlockDefaultsWithContext,
@@ -696,6 +697,7 @@ const Iframe = (props) => {
       mergeTemplatesIntoPage(template, {
         loadTemplate: async () => formData,
         filterInstanceId: prevInstanceId,
+        uuidGenerator: uuid,
         blocksConfig: config.blocks.blocksConfig,
         intl,
       }).then(({ merged: updatedTemplate }) => {
@@ -875,6 +877,7 @@ const Iframe = (props) => {
               return response.json();
             },
             pageBlocksFields: { blocks_layout: { allowedLayouts: [templateConfig.templateUrl] } },
+            uuidGenerator: uuid,
             blocksConfig: config.blocks.blocksConfig,
             intl,
           });
@@ -2626,6 +2629,7 @@ const Iframe = (props) => {
             loadTemplate,
             preloadedTemplates: templateCacheRef.current,
             pageBlocksFields,
+            uuidGenerator: uuid,
             blocksConfig: config.blocks.blocksConfig,
             intl,
           });
@@ -2709,6 +2713,7 @@ const Iframe = (props) => {
           loadTemplate,
           preloadedTemplates: templateCacheRef.current,
           pageBlocksFields,
+          uuidGenerator: uuid,
           blocksConfig: config.blocks.blocksConfig,
           intl,
         });
