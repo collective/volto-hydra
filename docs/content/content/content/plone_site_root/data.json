@@ -141,73 +141,163 @@
         "align": "full"
       }
     },
-    "0c91e9dd-842e-4764-a4f1-8a62c85b731a": {
+    "why-hydra-heading": {
       "@type": "slate",
-      "plaintext": "Quick to enable Visual editing of frontend blocks regardless of framework. Switch between multiple frontends mid visual edit. Enterprise features such as versioning, i18n, workflow and automated content rules. Customisable Administration Interface. Scalable and Secure with a mature battle hardened backend. Open source means flexibility to host where and how you want.",
+      "plaintext": "Why Hydra",
       "styles": {},
       "value": [
         {
           "children": [
             {
-              "children": [
-                {
-                  "text": "Quick to enable Visual editing of frontend blocks regardless of framework by just using tags. No required React or Vue in your frontend."
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Switch between multiple frontends mid visual edit. Perfect for omni-channel."
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Enterprise features such as versioning, i18n, workflow and automated content rules."
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Easier to implement design systems that enforce governance of content and design."
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Customisable Administration Interface. Choice of Python or JavaScript for your server."
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Scalable and Secure with a mature battle hardened backend."
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Open source means flexibility to host where and how you want and optimise costs and security."
-                }
-              ],
-              "type": "li"
+              "text": "Why Hydra"
             }
           ],
-          "type": "ul"
+          "type": "h2"
         }
       ]
+    },
+    "why-hydra-tagline": {
+      "@type": "slate",
+      "plaintext": "Most CMS platforms force a trade-off: visual editing or frontend freedom. Hydra gives you both.",
+      "styles": {},
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Most CMS platforms force a trade-off: visual editing or frontend freedom. Hydra gives you both."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "why-hydra-quadrant": {
+      "@type": "image",
+      "align": "center",
+      "size": "l",
+      "url": "/images/quadrant/@@images/image"
+    },
+    "why-hydra-grid": {
+      "@type": "gridBlock",
+      "blocks": {
+        "box-visual": {
+          "@type": "slate",
+          "plaintext": "Visual Editing. True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes.",
+          "value": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Visual Editing"
+                    }
+                  ],
+                  "type": "strong"
+                }
+              ],
+              "type": "p"
+            },
+            {
+              "children": [
+                {
+                  "text": "True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes."
+                }
+              ],
+              "type": "p"
+            }
+          ]
+        },
+        "box-frontend": {
+          "@type": "slate",
+          "plaintext": "Any Frontend. Use React, Vue, Nuxt, Next.js, or any stack. Switch between frontends mid-edit for omni-channel delivery.",
+          "value": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Any Frontend"
+                    }
+                  ],
+                  "type": "strong"
+                }
+              ],
+              "type": "p"
+            },
+            {
+              "children": [
+                {
+                  "text": "Use React, Vue, Nuxt, Next.js, or any stack. Switch between frontends mid-edit for omni-channel delivery."
+                }
+              ],
+              "type": "p"
+            }
+          ]
+        },
+        "box-enterprise": {
+          "@type": "slate",
+          "plaintext": "Enterprise Ready. Versioning, i18n, workflow, automated content rules, and design governance built in.",
+          "value": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Enterprise Ready"
+                    }
+                  ],
+                  "type": "strong"
+                }
+              ],
+              "type": "p"
+            },
+            {
+              "children": [
+                {
+                  "text": "Versioning, i18n, workflow, automated content rules, and design governance built in."
+                }
+              ],
+              "type": "p"
+            }
+          ]
+        },
+        "box-opensource": {
+          "@type": "slate",
+          "plaintext": "Open Source. Secure, scalable Plone backend. Host anywhere, control your costs and security.",
+          "value": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Open Source"
+                    }
+                  ],
+                  "type": "strong"
+                }
+              ],
+              "type": "p"
+            },
+            {
+              "children": [
+                {
+                  "text": "Secure, scalable Plone backend. Host anywhere, control your costs and security."
+                }
+              ],
+              "type": "p"
+            }
+          ]
+        }
+      },
+      "blocks_layout": {
+        "items": [
+          "box-visual",
+          "box-frontend",
+          "box-enterprise",
+          "box-opensource"
+        ]
+      },
+      "styles": {}
     },
     "0d0c0506-f9bb-48d8-af0a-1352d81b45de": {
       "@type": "slate",
@@ -561,7 +651,7 @@
                 }
               ],
               "type": "li"
-            },            
+            },
             {
               "children": [
                 {
@@ -633,21 +723,6 @@
         }
       ]
     },
-    "dd34a386-6054-4a91-83e0-c7b3a6f391cf": {
-      "@type": "slate",
-      "plaintext": "Why Hydra",
-      "styles": {},
-      "value": [
-        {
-          "children": [
-            {
-              "text": "Why Hydra"
-            }
-          ],
-          "type": "h2"
-        }
-      ]
-    },
     "e972541f-b114-494b-a51e-cc8b11c8207d": {
       "@type": "slate",
       "plaintext": "Frontends for this content",
@@ -660,21 +735,6 @@
             }
           ],
           "type": "h2"
-        }
-      ]
-    },
-    "eadb0f33-16da-4974-9f87-69206f0a1db8": {
-      "@type": "slate",
-      "plaintext": "A unique CMS by being Visual, true Headless, and Open Source.",
-      "styles": {},
-      "value": [
-        {
-          "children": [
-            {
-              "text": "A unique CMS by being Visual, true Headless, and Open Source."
-            }
-          ],
-          "type": "p"
         }
       ]
     },
@@ -858,9 +918,10 @@
     "items": [
       "303984b4-693a-408f-83f7-5a88b243d7db",
       "fae599f3-e7d4-451b-a413-84355c796b7e",
-      "dd34a386-6054-4a91-83e0-c7b3a6f391cf",
-      "eadb0f33-16da-4974-9f87-69206f0a1db8",
-      "0c91e9dd-842e-4764-a4f1-8a62c85b731a",
+      "why-hydra-heading",
+      "why-hydra-tagline",
+      "why-hydra-quadrant",
+      "why-hydra-grid",
       "0ab1a8f7-2d26-4933-800c-2f10474afe63",
       "quickstart-heading",
       "quickstart-text",

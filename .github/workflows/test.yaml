@@ -52,9 +52,9 @@ jobs:
           RAZZLE_API_PATH: http://localhost:8888
           RAZZLE_DEFAULT_IFRAME_URL: http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006
           VOLTOCONFIG: ${{ github.workspace }}/volto.config.js
-      - name: Install Nuxt dependencies
+      - name: Install and build Nuxt
         run: |
-          cd examples/nuxt-blog-starter && npm install
+          cd examples/nuxt-blog-starter && npm install && npm run build:test
       - name: Start servers in background
         run: |
           # Start mock API server
@@ -64,8 +64,8 @@ jobs:
           PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006 \
             pnpm start:prod &
 
-          # Start Nuxt test server
-          cd examples/nuxt-blog-starter && npm run dev:test &
+          # Start Nuxt test server (preview mode — stable, no Vite dev quirks)
+          cd examples/nuxt-blog-starter && npm run preview:test &
 
           # Start doc-example Vite frontends (React, Svelte, Vue)
           cd docs/blocks/test-react && npx vite --port 3004 --strictPort &

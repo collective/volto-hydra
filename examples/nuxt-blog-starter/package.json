@@ -11,6 +11,8 @@
     "predev_edit": "npm run sync-hydra",
     "dev_edit": "nuxt dev --envName edit",
     "dev:test": "NUXT_ENV_NAME=test nuxt dev --envName test --port 3003",
+    "build:test": "NUXT_ENV_NAME=test nuxt build --envName test",
+    "preview:test": "nuxt preview --port 3003",
     "pregenerate": "npm run sync-hydra",
     "generate": "nuxt generate",
     "preedit": "npm run sync-hydra",
