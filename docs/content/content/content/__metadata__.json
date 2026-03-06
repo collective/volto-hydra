@@ -89,7 +89,8 @@
     "templates/data.json",
     "templates/block-reference-layout/data.json",
     "templates/event-view/data.json",
-    "templates/newsitem-view/data.json"
+    "templates/newsitem-view/data.json",
+    "templates/site-footer/data.json"
   ],
   "default_page": {},
   "local_roles": {
@@ -554,6 +555,13 @@
           "Owner"
         ]
       }
+    },
+    "site-footer-uid": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
     }
   },
   "ordering": {
@@ -614,7 +622,8 @@
     "tpl-folder-001": 44,
     "tpl-block-reference-layout": 0,
     "tpl-ct-event-view": 1,
-    "tpl-ct-newsitem-view": 2
+    "tpl-ct-newsitem-view": 2,
+    "site-footer-uid": 3
   },
   "relations": []
 }

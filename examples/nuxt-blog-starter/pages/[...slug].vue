@@ -329,6 +329,7 @@ const mainBlocksAllowedLayouts = computed(() => {
 
 // Templates to eagerly pre-load (forced layouts that won't appear in page data)
 const preloadTemplates = [
+    '/templates/site-footer',
     ...(footerAllowedLayouts.value || []).filter(Boolean),
     // Content-type forced layouts (not referenced in page data but applied by expandTemplatesSync)
     ...Object.values(CONTENT_TYPE_LAYOUTS).flat(),
