@@ -21,7 +21,8 @@
     "05bace45294c45d5ab93de883e7ce702/image/penguin2.jpg",
     "7de78fea55354a29ad78b909efb07436/image/penguin3.jpg",
     "0c351dd841c34c6da9c313b1bc551e34/image/penguin4.jpg",
-    "a5bf990b119747c4b2855fedc1ea0185/image/image.png"
+    "a5bf990b119747c4b2855fedc1ea0185/image/image.png",
+    "quadrant-svg/image/quadrant.svg"
   ],
   "_data_files_": [
     "plone_site_root/data.json",
@@ -90,7 +91,8 @@
     "templates/block-reference-layout/data.json",
     "templates/event-view/data.json",
     "templates/newsitem-view/data.json",
-    "templates/site-footer/data.json"
+    "templates/site-footer/data.json",
+    "quadrant-svg/data.json"
   ],
   "default_page": {},
   "local_roles": {
@@ -562,6 +564,13 @@
           "Owner"
         ]
       }
+    },
+    "quadrant-svg": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
     }
   },
   "ordering": {
@@ -623,7 +632,8 @@
     "tpl-block-reference-layout": 0,
     "tpl-ct-event-view": 1,
     "tpl-ct-newsitem-view": 2,
-    "site-footer-uid": 3
+    "site-footer-uid": 3,
+    "quadrant-svg": 4
   },
   "relations": []
 }
