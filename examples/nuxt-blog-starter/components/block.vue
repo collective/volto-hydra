@@ -903,25 +903,11 @@ function socialInfo(url) {
   }
 }
 
-// Sync fallback for templates not in the pre-loaded map
-function syncLoadTemplate(templateId) {
-  const tplPath = templateId.startsWith('http')
-    ? new URL(templateId).pathname
-    : `/${templateId.replace(/^\//, '')}`;
-  const url = `${effectiveApiUrl.value}${tplPath}`;
-  const xhr = new XMLHttpRequest();
-  xhr.open('GET', url, false);
-  xhr.setRequestHeader('Accept', 'application/json');
-  xhr.send();
-  if (xhr.status === 200) return JSON.parse(xhr.responseText);
-  throw new Error(`Sync template load failed: ${templateId} (${xhr.status})`);
-}
-
 // Expand child blocks: wraps expandTemplatesSync with injected context
 // For blocks dicts: expand(layout, blocks)
 // For object_list arrays: expand(items, null, '@id')
 const expand = (layout, blocks, idField) => expandTemplatesSync(layout, {
-  blocks, templateState, templates: injectedTemplates, loadTemplate: syncLoadTemplate,
+  blocks, templateState, templates: injectedTemplates,
   ...(idField && { idField }),
 });
 

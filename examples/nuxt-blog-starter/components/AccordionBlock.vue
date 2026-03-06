@@ -38,25 +38,11 @@ const props = defineProps({
 });
 
 // Inject template context for child block expansion (same as Block.vue)
-const injectedApiUrl = inject('apiUrl', '');
 const injectedTemplates = inject('templates', {});
 const templateState = inject('templateState', {});
 
-function syncLoadTemplate(templateId) {
-  const tplPath = templateId.startsWith('http')
-    ? new URL(templateId).pathname
-    : `/${templateId.replace(/^\//, '')}`;
-  const url = `${injectedApiUrl}${tplPath}`;
-  const xhr = new XMLHttpRequest();
-  xhr.open('GET', url, false);
-  xhr.setRequestHeader('Accept', 'application/json');
-  xhr.send();
-  if (xhr.status === 200) return JSON.parse(xhr.responseText);
-  throw new Error(`Sync template load failed: ${templateId} (${xhr.status})`);
-}
-
 const expand = (layout, blocks, idField) => expandTemplatesSync(layout, {
-  blocks, templateState, templates: injectedTemplates, loadTemplate: syncLoadTemplate,
+  blocks, templateState, templates: injectedTemplates,
   ...(idField && { idField }),
 });
 

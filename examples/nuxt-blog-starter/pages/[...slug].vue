@@ -122,22 +122,6 @@ function groupByStyle(items) {
 // Shared templateState for all expandTemplatesSync calls (page + nested containers)
 const templateState = {};
 
-// Template expansion for main blocks (page-level only, because of style grouping)
-function syncLoadTemplate(templateId) {
-    const tplPath = templateId.startsWith('http')
-        ? new URL(templateId).pathname
-        : `/${templateId.replace(/^\//, '')}`;
-    const url = `${apiUrl}${tplPath}`;
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', url, false);
-    xhr.setRequestHeader('Accept', 'application/json');
-    xhr.send();
-    if (xhr.status === 200) {
-        return JSON.parse(xhr.responseText);
-    }
-    throw new Error(`Sync template load failed: ${templateId} (${xhr.status})`);
-}
-
 const mainExpandedItems = computed(() => {
     const layout = data.value?.page?.blocks_layout?.items || [];
     const blocks = data.value?.page?.blocks || {};
@@ -147,7 +131,6 @@ const mainExpandedItems = computed(() => {
         templateState,
         templates: data.value?.templates || {},
         allowedLayouts: mainBlocksAllowedLayouts.value,
-        loadTemplate: syncLoadTemplate,
     });
 });
 
@@ -164,7 +147,6 @@ const footerExpandedItems = computed(() => {
         templateState,
         templates: data.value?.templates || {},
         allowedLayouts: footerAllowedLayouts.value,
-        loadTemplate: syncLoadTemplate,
     });
 });
 

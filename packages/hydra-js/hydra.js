@@ -11665,16 +11665,15 @@ export async function expandTemplates(inputItems, options = {}) {
   // Load templates referenced in the page data, seeded with caller's cache
   const templates = await loadTemplates(data, loadTemplate, preloadedTemplates);
 
-  // Delegate to sync version with loaded templates.
-  // expandTemplatesSync will load missing templates on demand via loadTemplate
-  // (e.g. forced layouts from allowedLayouts not referenced in page data).
-  // Since loadTemplate is async, we retry when expandTemplatesSync reports
-  // a missing template so we can await the load.
+  // Delegate to sync version with pre-loaded templates.
+  // Don't pass loadTemplate — it's async and expandTemplatesSync requires
+  // sync loaders. Instead, catch "not found" errors and retry after awaiting.
+  const { loadTemplate: _drop, ...syncOptions } = options;
   const loaded = new Set(Object.keys(templates));
   while (true) {
     try {
       return expandTemplatesSync(inputItems, {
-        ...options,
+        ...syncOptions,
         templates,
       });
     } catch (e) {
@@ -11697,8 +11696,9 @@ export async function expandTemplates(inputItems, options = {}) {
 /**
  * Synchronous version of expandTemplates.
  * Requires all templates to be pre-loaded in options.templates.
- * Falls back to options.loadTemplate (sync) if a required template is not in the
- * pre-loaded map. Throws if the template still can't be found.
+ * Falls back to options.loadTemplate (must be synchronous) if a required template
+ * is not in the pre-loaded map. Throws if loadTemplate returns a Promise or if
+ * the template still can't be found.
  *
  * This function is called recursively: the top-level BlocksRenderer calls it for
  * the page layout, and the expanded result may contain container blocks (columns,
@@ -11977,17 +11977,14 @@ export function expandTemplatesSync(inputItems, options = {}) {
   }
 
   // Load template from pre-loaded map, falling back to sync loadTemplate callback.
-  // Async callers should use expandTemplates() which retries on missing templates.
   if (!ctx.template) {
     let template = templates[templateId];
     if (!template && loadTemplate) {
-      const result = loadTemplate(templateId);
-      // Only use sync results — async loadTemplate returns a Promise which
-      // expandTemplates() handles via its retry loop.
-      if (result && typeof result.then !== 'function') {
-        template = result;
-        templates[templateId] = template;
+      template = loadTemplate(templateId);
+      if (!template || typeof template.then === 'function') {
+        throw new Error(`loadTemplate for "${templateId}" must return data synchronously, not a Promise. Use expandTemplates() for async loading, or pre-load templates via loadTemplates().`);
       }
+      templates[templateId] = template;
     }
     if (!template) {
       throw new Error(`Template "${templateId}" not found in pre-loaded templates. Available: ${Object.keys(templates).join(', ')}`);
