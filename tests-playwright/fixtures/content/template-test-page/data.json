@@ -32,6 +32,8 @@
     },
     "user-content-1": {
       "@type": "slate",
+      "fixed": false,
+      "readOnly": false,
       "value": [
         {
           "type": "p",
@@ -45,6 +47,8 @@
     },
     "user-content-2": {
       "@type": "slate",
+      "fixed": false,
+      "readOnly": false,
       "value": [
         {
           "type": "p",
