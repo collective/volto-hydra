@@ -109,6 +109,7 @@ function getTemplateInfoFromNeighbors(context) {
   let inheritedPlaceholder = null;
   const secondaryNeighbor = insertAfter ? nextNeighbor : prevNeighbor;
 
+  let fromNextPlaceholder = false;
   for (const neighbor of [primaryNeighbor, secondaryNeighbor].filter(Boolean)) {
     if (neighbor?.templateId === templateInfo.templateId) {
       // Same template - can inherit placeholder
@@ -119,8 +120,16 @@ function getTemplateInfoFromNeighbors(context) {
       // This preserves placeholder info even when all placeholder blocks are deleted.
       if (neighbor.fixed && neighbor.nextPlaceholder && !inheritedPlaceholder) {
         inheritedPlaceholder = neighbor.nextPlaceholder;
+        fromNextPlaceholder = true;
       }
     }
+  }
+
+  // nextPlaceholder overrides: the new block is in a placeholder region,
+  // so it should not inherit fixed/readOnly from the fixed neighbor.
+  if (fromNextPlaceholder) {
+    templateInfo.fixed = false;
+    templateInfo.readOnly = false;
   }
 
   return {

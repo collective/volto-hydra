@@ -822,16 +822,30 @@ test.describe('Quanta Toolbar - Auto-fade', () => {
 
     // Template-test-page layout (after merge):
     // standalone-block-1 (editable slate)
-    // [template instance: template-header (fixed), ..., user-content-2, template-footer (fixed)]
+    // [template instance: template-header (fixed), grid (fixed), user-content-1, user-content-2, slider (fixed), template-footer (fixed)]
     // standalone-block-2 (editable slate)
 
     const { blockId: footerBlockId } = await helper.waitForBlockByContent('Template Footer');
+
+    // Find the slider container's block ID from block order (it's between user-content-2 and footer)
+    const blockOrder = await helper.getBlockOrder();
+    const uc2Idx = blockOrder.indexOf('user-content-2');
+    const footerIdx = blockOrder.indexOf(footerBlockId);
+    // The slider container is the first top-level block after user-content-2
+    // (slides are nested inside it but also appear in DOM order)
+    const sliderBlockId = blockOrder[uc2Idx + 1];
+    expect(sliderBlockId).toBeTruthy();
+    expect(blockOrder.indexOf(sliderBlockId)).toBeLessThan(footerIdx);
 
     // Start at the last user content block inside the template
     await helper.clickBlockInIframe('user-content-2');
     await helper.waitForQuantaToolbar('user-content-2');
 
-    // ArrowDown from user-content-2 reaches fixed template-footer (selected but not editable)
+    // ArrowDown from user-content-2 reaches fixed slider (selected but not editable)
+    await page.keyboard.press('ArrowDown');
+    await helper.waitForQuantaToolbar(sliderBlockId);
+
+    // ArrowDown from slider reaches fixed template-footer
     await page.keyboard.press('ArrowDown');
     await helper.waitForQuantaToolbar(footerBlockId);
 
@@ -845,7 +859,11 @@ test.describe('Quanta Toolbar - Auto-fade', () => {
     await page.keyboard.press('ArrowUp');
     await helper.waitForQuantaToolbar(footerBlockId);
 
-    // ArrowUp from template-footer returns to user-content-2
+    // ArrowUp from template-footer reaches slider
+    await page.keyboard.press('ArrowUp');
+    await helper.waitForQuantaToolbar(sliderBlockId);
+
+    // ArrowUp from slider returns to user-content-2
     await page.keyboard.press('ArrowUp');
     await helper.waitForQuantaToolbar('user-content-2');
   });

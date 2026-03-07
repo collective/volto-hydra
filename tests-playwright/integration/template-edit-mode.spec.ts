@@ -818,41 +818,59 @@ test.describe('Template Edit Mode - Block Settings', () => {
 test.describe('Template Edit Mode - Object List Items', () => {
   // Object_list items (e.g., slider slides) inside a fixed/readOnly template block
   // should inherit readOnly status — they can't be edited until template edit mode is on.
-
-  // Content to find the template slider's slide (random UUID after merge)
-  const TEMPLATE_SLIDE_CONTENT = 'Template Slide 1';
+  //
+  // Carousel slides: only the first slide is visible by default.
+  // Use carousel next button (data-block-selector="+1") to navigate to subsequent slides.
+  const SLIDER_BLOCK_ID = 'template-slider';
+  const SLIDE_1_ID = 'tpl-slide-1';
+  const SLIDE_2_ID = 'tpl-slide-2';
 
   test('object_list items inside readOnly template block are locked', async ({ page }) => {
     const helper = new AdminUIHelper(page);
+    const iframe = helper.getIframe();
 
     await helper.login();
     await helper.navigateToEdit('/template-test-page');
+    await helper.getStableBlockCount();
 
-    // Find the slide by its content (inside a readOnly template slider)
-    const { blockId: slideBlockId } = await helper.waitForBlockByContent(TEMPLATE_SLIDE_CONTENT);
+    // Wait for slider container to be visible
+    await expect(iframe.locator(`[data-block-uid="${SLIDER_BLOCK_ID}"]`)).toBeVisible({ timeout: 10000 });
 
-    // The slide should have hydra-locked class because its parent slider is readOnly
-    await helper.waitForBlockReadonly(slideBlockId);
+    // Verify slides have hydra-locked class (readOnly from template)
+    await helper.waitForBlockReadonly(SLIDE_1_ID);
 
-    // Click the slide to show its sidebar form
-    await helper.clickBlockInIframe(slideBlockId);
-    await helper.waitForSidebarOpen();
+    // Use carousel indicator to select slide 1 (slide itself may be hidden due to hydra-locked CSS)
+    const slide1Indicator = iframe.locator(`[data-block-selector="${SLIDE_1_ID}"]`);
+    await slide1Indicator.click();
+    // hydra-locked breaks absolute positioning so toolbar position check fails — use sidebar instead
+    await helper.waitForSidebarCurrentBlock('Slide');
 
     // Sidebar form should NOT have interactive inputs (readOnly slide)
     const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]), #sidebar-properties textarea, #sidebar-properties [contenteditable="true"]');
     await expect(sidebarInputs).toHaveCount(0, { timeout: 3000 });
+
+    // Navigate to slide 2 via carousel next button and verify it's also locked
+    const nextButton = iframe.locator('[data-block-selector="+1"]');
+    await nextButton.click();
+    await helper.waitForSidebarCurrentBlock('Slide');
+    await helper.waitForBlockReadonly(SLIDE_2_ID);
   });
 
   test('readOnly parent block sidebar form should not be interactive', async ({ page }) => {
     const helper = new AdminUIHelper(page);
+    const iframe = helper.getIframe();
 
     await helper.login();
     await helper.navigateToEdit('/template-test-page');
+    await helper.getStableBlockCount();
 
-    // Find the slide (inside readOnly slider) and click it
-    const { blockId: slideBlockId } = await helper.waitForBlockByContent(TEMPLATE_SLIDE_CONTENT);
-    await helper.clickBlockInIframe(slideBlockId);
-    await helper.waitForSidebarOpen();
+    // Wait for slider container to be visible
+    await expect(iframe.locator(`[data-block-uid="${SLIDER_BLOCK_ID}"]`)).toBeVisible({ timeout: 10000 });
+
+    // Use carousel indicator to select slide 1
+    const slide1Indicator = iframe.locator(`[data-block-selector="${SLIDE_1_ID}"]`);
+    await slide1Indicator.click();
+    await helper.waitForSidebarCurrentBlock('Slide');
 
     // Navigate up to the parent slider block
     await page.keyboard.press('Escape');
@@ -870,15 +888,14 @@ test.describe('Template Edit Mode - Object List Items', () => {
 
     await helper.login();
     await helper.navigateToEdit('/template-test-page');
+    await helper.getStableBlockCount();
 
-    // Find the slide and a template block for navigation
-    const { blockId: slideBlockId } = await helper.waitForBlockByContent(TEMPLATE_SLIDE_CONTENT);
     const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
     const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
     const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
 
     // Initially locked
-    await helper.waitForBlockReadonly(slideBlockId);
+    await helper.waitForBlockReadonly(SLIDE_1_ID);
 
     // Enter template edit mode via the header block
     await helper.clickBlockInIframe(headerBlockId);
@@ -893,28 +910,36 @@ test.describe('Template Edit Mode - Object List Items', () => {
     // Wait for template edit mode to activate
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
-    // Now the slide should be editable (no longer locked)
-    await helper.waitForBlockEditable(slideBlockId);
+    // Now the first slide should be editable (no longer locked)
+    await helper.waitForBlockEditable(SLIDE_1_ID);
 
-    // Click the slide — sidebar form should now have interactive inputs
-    await helper.clickBlockInIframe(slideBlockId);
-    await helper.waitForSidebarOpen();
+    // Select slide 1 via carousel indicator — sidebar form should now have interactive inputs
+    const slide1Indicator = iframe.locator(`[data-block-selector="${SLIDE_1_ID}"]`);
+    await slide1Indicator.click();
+    await helper.waitForSidebarCurrentBlock('Slide');
     const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]), #sidebar-properties textarea, #sidebar-properties [contenteditable="true"]');
     await expect(sidebarInputs.first()).toBeVisible({ timeout: 5000 });
 
     // Object_list items should NOT show their own TEMPLATE SETTINGS —
     // only the parent block's template settings should appear
     await helper.expectTemplateSettingsCount(1);
+
+    // Navigate to slide 2 and verify it's also editable
+    const nextButton = iframe.locator('[data-block-selector="+1"]');
+    await nextButton.click();
+    await helper.waitForSidebarCurrentBlock('Slide');
+    await helper.waitForBlockEditable(SLIDE_2_ID);
   });
 
   test('new object_list item added in template edit mode inherits template settings', async ({ page }) => {
     const helper = new AdminUIHelper(page);
+    const iframe = helper.getIframe();
 
     await helper.login();
     await helper.navigateToEdit('/template-test-page');
+    await helper.getStableBlockCount();
 
     // Find template blocks and enter template edit mode
-    const { blockId: slideBlockId } = await helper.waitForBlockByContent(TEMPLATE_SLIDE_CONTENT);
     const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
     const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
     const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
@@ -929,14 +954,14 @@ test.describe('Template Edit Mode - Object List Items', () => {
     await editToggle.click();
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
-    // Click a slide, then click the [+] in the iframe to add a new slide
-    await helper.waitForBlockEditable(slideBlockId);
-    await helper.clickBlockInIframe(slideBlockId);
-    await helper.waitForSidebarOpen();
+    // Select slide 1 via carousel indicator, then click the [+] to add a new slide
+    await helper.waitForBlockEditable(SLIDE_1_ID);
+    const slide1Indicator = iframe.locator(`[data-block-selector="${SLIDE_1_ID}"]`);
+    await slide1Indicator.click();
+    await helper.waitForSidebarCurrentBlock('Slide');
     await helper.clickAddBlockButton();
 
     // Wait for the new slide to be selected
-    const sidebar = page.locator('.sidebar-container');
     await helper.waitForSidebarCurrentBlock('Slide');
 
     // The new slide should be editable (we're in template edit mode)

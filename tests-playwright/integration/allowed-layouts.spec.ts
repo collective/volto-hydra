@@ -24,8 +24,8 @@ test.describe('allowedLayouts', () => {
       // Click to deselect blocks and show page-level sidebar
       await page.keyboard.press('Escape');
 
-      // Verify Layout dropdown is visible in sidebar
-      const layoutSelector = page.locator('.layout-selector');
+      // Verify Layout dropdown is visible in sidebar (first one is the page-level layout)
+      const layoutSelector = page.locator('.layout-selector').first();
       await expect(layoutSelector).toBeVisible();
     });
 
