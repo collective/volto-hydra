@@ -5,7 +5,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    X-Frame-Options = "SAMEORIGIN"
+    Content-Security-Policy = "frame-ancestors https://hydra.pretagov.com https://*.pretagov.com http://localhost:*"
 
 # Disable pretty URLs (trailing slash redirects) — breaks Nuxt SSG payload resolution
 [build.processing]

@@ -460,6 +460,152 @@
           "code": "rows: {\n    widget: 'object_list',\n    idField: 'key',\n    addMode: 'table',\n    dataPath: ['table', 'rows'],\n    schema: {\n        properties: {\n            cells: {\n                widget: 'object_list',\n                idField: 'key',\n                schema: {\n                    properties: {\n                        value: { title: 'Content',\n                                 widget: 'slate' }\n                    }\n                }\n            }\n        }\n    }\n}"
         }
       ]
+    },
+    "inherit-heading": {
+      "@type": "slate",
+      "plaintext": "Synchronised Block Types in a Container",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Synchronised Block Types in a Container"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "inherit-text-t0": {
+      "@type": "slate",
+      "plaintext": "You might want one container type that holds different block types but constrains them to all be the same type with synchronised settings. A field on the parent lets the editor select the type and all blocks get converted using fieldMappings:",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "You might want one container type that holds different block types but constrains them to all be the same type with synchronised settings. A field on the parent lets the editor select the type and all blocks get converted using fieldMappings:"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "inherit-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "inherit-text-c1-javascript-96ec67",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "blocks: {\n    gridBlock: {\n        allowedBlocks: ['teaser', 'image'],\n        schemaEnhancer: {\n            inheritSchemaFrom: {\n                typeField: 'variation',\n            },\n        },\n    },\n    teaser: {\n        schemaEnhancer: {\n            childBlockConfig: {\n                editableFields: ['href', 'title', 'description'],\n            },\n        },\n        fieldMappings: {\n            default: { '@id': 'href', 'title': 'title', 'image': 'preview_image' },\n        },\n    },\n}"
+        }
+      ]
+    },
+    "inherit-text-t2": {
+      "@type": "slate",
+      "plaintext": "inheritSchemaFrom: Parent inherits schema from selected child type. When the type field changes, child blocks sync to new type.typeField: Field name for selecting child type (e.g., 'variation')defaultsField: Field name for storing inherited defaults (e.g., 'itemDefaults')blocksField: Which blocks field the sub-blocks are in. Set to \"..\" to use the parent's allowedBlocks.filterConvertibleFrom: Only allow selecting a block type which can convert from the specified type.childBlockConfig: Child hides fields except editableFields when inside a parent with inheritSchemaFrom.",
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "inheritSchemaFrom"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": ": Parent inherits schema from selected child type. When the type field changes, child blocks sync to new type."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "typeField"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": ": Field name for selecting child type (e.g., 'variation')"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "defaultsField"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": ": Field name for storing inherited defaults (e.g., 'itemDefaults')"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "blocksField"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": ": Which blocks field the sub-blocks are in. Set to \"..\" to use the parent's allowedBlocks."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "filterConvertibleFrom"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": ": Only allow selecting a block type which can convert from the specified type."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "childBlockConfig"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": ": Child hides fields except editableFields when inside a parent with inheritSchemaFrom."
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -486,7 +632,11 @@
       "table-text",
       "table-text-c1",
       "empty-heading",
-      "empty-text"
+      "empty-text",
+      "inherit-heading",
+      "inherit-text-t0",
+      "inherit-text-c1",
+      "inherit-text-t2"
     ]
   },
   "contributors": [],

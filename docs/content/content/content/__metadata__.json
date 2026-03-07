@@ -82,6 +82,8 @@
     "concepts/data.json",
     "concepts/architecture/data.json",
     "concepts/integration-levels/data.json",
+    "concepts/visual-editing/data.json",
+    "concepts/custom-blocks/data.json",
     "concepts/container-blocks/data.json",
     "concepts/listings/data.json",
     "concepts/templates/data.json",
@@ -489,6 +491,20 @@
       }
     },
     "concepts-integration-levels-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-visual-editing-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-custom-blocks-001": {
       "local_roles": {
         "admin": [
           "Owner"
