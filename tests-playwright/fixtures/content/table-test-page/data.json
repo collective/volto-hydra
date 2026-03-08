@@ -42,6 +42,21 @@
                 "value": [{"type": "p", "children": [{"text": "Data 2"}]}]
               }
             ]
+          },
+          {
+            "key": "row-3",
+            "cells": [
+              {
+                "key": "cell-3-1",
+                "type": "data",
+                "value": [{"type": "p", "children": [{"text": "Data 3"}]}]
+              },
+              {
+                "key": "cell-3-2",
+                "type": "data",
+                "value": [{"type": "p", "children": [{"text": "Data 4"}]}]
+              }
+            ]
           }
         ]
       }

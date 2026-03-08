@@ -8,7 +8,10 @@ const fixturesPath = resolve(__dirname, '../../tests-playwright/fixtures')
 
 export default defineNuxtConfig({
   nitro: {
-    preset: 'static'
+    preset: 'static',
+    prerender: {
+      failOnError: false, // IPX image routes may 500 during local build
+    },
   },
   app: {
     head: {
@@ -34,6 +37,9 @@ export default defineNuxtConfig({
   $env: {
     edit: {
       ssr: false, // "npm run generate -- --envName edit" == SPA
+      app: {
+        baseURL: process.env.NUXT_EDIT_BASE_URL || '/',
+      },
       nitro: {
         preset: 'static'
       },
@@ -59,7 +65,7 @@ export default defineNuxtConfig({
         }
       },
       image: {
-        provider: 'netlify',
+        provider: 'none',
       }
     },
     test: {
@@ -126,7 +132,7 @@ export default defineNuxtConfig({
     }
   },
   experimental: {
-      payloadExtraction: false
+      payloadExtraction: true
   },
 
   // How to prerender dynamic routes?

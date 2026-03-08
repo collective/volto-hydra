@@ -1,0 +1,14 @@
+{
+  "name": "test-vue",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:test": "vite --port 3006 --strictPort"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "^6.0.4",
+    "vite": "^5.0.0",
+    "vue": "^3.5.29"
+  }
+}

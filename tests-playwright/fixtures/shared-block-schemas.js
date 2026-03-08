@@ -139,6 +139,14 @@ export const sharedBlocksConfig = {
         title: 'Slider',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/></svg>',
         group: 'common',
+        itemTypeField: 'variation',
+        schemaEnhancer: {
+            inheritSchemaFrom: {
+                defaultsField: 'itemDefaults',
+                blocksField: 'slides',
+                title: 'Item Type',
+            },
+        },
         blockSchema: {
             fieldsets: [
                 {
@@ -151,18 +159,9 @@ export const sharedBlocksConfig = {
                 slides: {
                     title: 'Slides',
                     widget: 'object_list',
-                    schema: {
-                        title: 'Slide',
-                        fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'] }],
-                        properties: {
-                            head_title: { title: 'Kicker', type: 'string' },
-                            title: { title: 'Title', type: 'string' },
-                            description: { title: 'Description', type: 'string', widget: 'textarea' },
-                            preview_image: { title: 'Image Override', widget: 'object_browser', mode: 'image', allowExternals: true },
-                            buttonText: { title: 'Button Text', type: 'string' },
-                            hideButton: { title: 'Hide Button', type: 'boolean' },
-                        },
-                    },
+                    allowedBlocks: ['slide', 'image', 'listing', 'teaser'],
+                    typeField: '@type',
+                    defaultBlockType: 'slide',
                 },
                 autoplayEnabled: {
                     title: 'Autoplay Enabled',
@@ -183,60 +182,122 @@ export const sharedBlocksConfig = {
             required: [],
         },
     },
-    // Slide block: child of carousel
+    // Slide block: default child type for slider's typed object_list.
+    // Same schema as the slider's original inline item schema.
     slide: {
         id: 'slide',
         title: 'Slide',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
         group: 'common',
+        mostUsed: true,
+        fieldMappings: {
+            '@default': { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'preview_image' },
+            image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },
+        },
+        schemaEnhancer: {
+            childBlockConfig: {
+                defaultsField: 'itemDefaults',
+                editableFields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'],
+            },
+        },
         blockSchema: {
-            fieldsets: [
-                {
-                    id: 'default',
-                    title: 'Default',
-                    fields: ['title', 'content'],
-                },
-            ],
+            title: 'Slide',
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'] }],
             properties: {
-                title: {
-                    title: 'Title',
-                    type: 'string',
-                },
-                content: {
-                    title: 'Content',
-                    type: 'string',
-                    widget: 'textarea',
-                },
+                head_title: { title: 'Kicker', type: 'string' },
+                title: { title: 'Title', type: 'string' },
+                description: { title: 'Description', type: 'string', widget: 'textarea' },
+                preview_image: { title: 'Image Override', widget: 'object_browser', mode: 'image', allowExternals: true },
+                buttonText: { title: 'Button Text', type: 'string' },
+                hideButton: { title: 'Hide Button', type: 'boolean' },
             },
             required: [],
         },
     },
-    // Accordion block with header and content containers
+    // Accordion block — panels as object_list items, each with title + content blocks
     accordion: {
         id: 'accordion',
         title: 'Accordion',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>',
         group: 'common',
         blockSchema: {
+            properties: {
+                panels: {
+                    title: 'Panels',
+                    widget: 'object_list',
+                    schema: {
+                        fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'blocks_layout'] }],
+                        properties: {
+                            title: { title: 'Title', type: 'string' },
+                            blocks_layout: {
+                                title: 'Content',
+                                widget: 'blocks_layout',
+                                allowedBlocks: ['slate', 'image'],
+                                defaultBlockType: 'slate',
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+    // Code example block: tabbed code display with syntax highlighting
+    codeExample: {
+        id: 'codeExample',
+        title: 'Code Example',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+        group: 'common',
+        blockSchema: {
             fieldsets: [
                 {
                     id: 'default',
                     title: 'Default',
-                    fields: ['header', 'content'],
+                    fields: ['tabs'],
                 },
             ],
             properties: {
-                header: {
-                    title: 'Header',
-                    widget: 'blocks_layout',
-                    allowedBlocks: ['slate'],
-                    defaultBlockType: 'slate',
-                },
-                content: {
-                    title: 'Content',
-                    widget: 'blocks_layout',
-                    allowedBlocks: ['slate', 'image'],
-                    defaultBlockType: 'slate',
+                tabs: {
+                    title: 'Code Tabs',
+                    widget: 'object_list',
+                    schema: {
+                        fieldsets: [
+                            {
+                                id: 'default',
+                                title: 'Default',
+                                fields: ['label', 'language', 'code'],
+                            },
+                        ],
+                        properties: {
+                            label: {
+                                title: 'Tab Label',
+                                type: 'string',
+                            },
+                            language: {
+                                title: 'Language',
+                                widget: 'select',
+                                choices: [
+                                    ['javascript', 'JavaScript'],
+                                    ['jsx', 'JSX'],
+                                    ['typescript', 'TypeScript'],
+                                    ['python', 'Python'],
+                                    ['json', 'JSON'],
+                                    ['html', 'HTML'],
+                                    ['css', 'CSS'],
+                                    ['bash', 'Bash'],
+                                    ['xml', 'XML'],
+                                ],
+                            },
+                            code: {
+                                title: 'Code',
+                                type: 'string',
+                                widget: 'textarea',
+                            },
+                        },
+                        required: [],
+                    },
+                    default: [
+                        { '@id': 'tab-1', label: 'JavaScript', language: 'javascript', code: '' },
+                    ],
                 },
             },
             required: [],
@@ -247,11 +308,76 @@ export const sharedBlocksConfig = {
     // allowedBlocks on config controls what children can be added
     // blocksField: 'blocks_layout' tells inheritSchemaFrom to derive choices from it
     // When variation is set, BlockChooser only shows that type
-    gridBlock: {
-        allowedBlocks: ['teaser', 'image'],
+    // Listing block: schema inheritance for item types (summary, default, teaser)
+    // filterConvertibleFrom: '@default' means only show types whose fieldMappings
+    // include @default as a source (i.e., can convert from catalog brain fields)
+    listing: {
+        itemTypeField: 'variation',
         schemaEnhancer: {
             inheritSchemaFrom: {
-                typeField: 'variation',
+                mappingField: 'fieldMapping',
+                defaultsField: 'itemDefaults',
+                filterConvertibleFrom: '@default',
+                title: 'Item Type',
+                default: 'summary',
+            },
+        },
+    },
+    // Listing item types — restricted child blocks, only usable inside listing containers
+    summary: {
+        restricted: true,
+        fieldMappings: {
+            '@default': { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'image' },
+        },
+        blockSchema: {
+            properties: {
+                href:        { title: 'Link', widget: 'url' },
+                title:       { title: 'Title' },
+                description: { title: 'Description', widget: 'textarea' },
+                image:       { title: 'Image', widget: 'url' },
+                date:        { title: 'Date', widget: 'date' },
+            },
+        },
+    },
+    default: {
+        restricted: true,
+        fieldMappings: {
+            '@default': { '@id': 'href', 'title': 'title', 'description': 'description' },
+        },
+        blockSchema: {
+            properties: {
+                href:        { title: 'Link', widget: 'url' },
+                title:       { title: 'Title' },
+                description: { title: 'Description', widget: 'textarea' },
+            },
+        },
+    },
+    toc: {
+        id: 'toc',
+        title: 'Table of Contents',
+        blockSchema: {
+            title: 'Table of Contents',
+            fieldsets: [
+                { id: 'default', title: 'Default', fields: ['title', 'hide_title', 'ordered', 'levels'] },
+            ],
+            properties: {
+                title: { title: 'Title', type: 'string' },
+                hide_title: { title: 'Hide title', type: 'boolean' },
+                ordered: { title: 'Ordered', type: 'boolean' },
+                levels: {
+                    title: 'Entries',
+                    isMulti: true,
+                    choices: [['h1','h1'],['h2','h2'],['h3','h3'],['h4','h4'],['h5','h5'],['h6','h6']],
+                },
+            },
+            required: [],
+        },
+    },
+    gridBlock: {
+        allowedBlocks: ['teaser', 'image'],
+        itemTypeField: 'variation',
+        schemaEnhancer: {
+            inheritSchemaFrom: {
                 defaultsField: 'itemDefaults',
                 blocksField: 'blocks_layout',
                 title: 'Item Type',
@@ -400,9 +526,9 @@ export const sharedBlocksConfig = {
             required: ['default_to', 'default_from', 'default_subject', 'captcha'],
         },
         schemaEnhancer: {
-            skiplogic: {
+            fieldRules: {
                 // cancel_label only visible when show_cancel is checked
-                cancel_label: { field: 'show_cancel', is: true },
+                cancel_label: { when: { show_cancel: true }, else: false },
             },
         },
     },
@@ -612,10 +738,10 @@ export const sharedBlocksConfig = {
             },
         },
     },
-    // Skiplogic test block: demonstrates conditional field visibility
+    // fieldRules test block: demonstrates conditional field visibility
     skiplogicTest: {
         id: 'skiplogicTest',
-        title: 'Skiplogic Test',
+        title: 'Field Rules Test',
         group: 'common',
         blockSchema: {
             properties: {
@@ -654,11 +780,11 @@ export const sharedBlocksConfig = {
             },
         },
         schemaEnhancer: {
-            skiplogic: {
-                advancedOptions: { field: 'mode', is: 'advanced' },
-                simpleWarning: { field: 'mode', isNot: 'advanced' },
-                columnLayout: { field: 'columns', gte: 2 },
-                pageNotice: { field: '../description', isSet: true },
+            fieldRules: {
+                advancedOptions: { when: { mode: 'advanced' }, else: false },
+                simpleWarning: { when: { mode: { isNot: 'advanced' } }, else: false },
+                columnLayout: { when: { columns: { gte: 2 } }, else: false },
+                pageNotice: { when: { '../description': { isSet: true } }, else: false },
             },
         },
     },

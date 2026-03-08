@@ -15,10 +15,12 @@
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
+// Nuxt-specific: uses Nuxt iframe which has full form block implementation
+test.use({
+  storageState: 'tests-playwright/fixtures/storage-nuxt.json',
+});
+
 test.describe('Form Block', () => {
-  test.beforeEach(({}, testInfo) => {
-    test.skip(testInfo.project.name === 'mock', 'Form block not rendered by mock frontend');
-  });
 
   test('renders form fields and validates required fields on submit', async ({ page }) => {
     const helper = new AdminUIHelper(page);

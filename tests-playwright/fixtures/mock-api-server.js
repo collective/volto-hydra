@@ -326,6 +326,8 @@ function formatSearchItem(content, baseUrl) {
     'UID': content.UID,
     'is_folderish': content.is_folderish !== undefined ? content.is_folderish : true,
     'hasPreviewImage': hasPreviewImage,
+    'effective': content.effective || content.created || null,
+    'created': content.created || null,
     // Match real Plone API: image_field and image_scales for all items
     'image_field': 'image',
     'image_scales': getPlaceholderImageScales(content.title),
@@ -1319,11 +1321,17 @@ function getTypeSchema(typeName) {
     `schema-${typeName.toLowerCase()}.json`
   );
 
+  const baseSchemaPath = path.join(__dirname, 'api', 'schema-base.json');
+  const base = fs.existsSync(baseSchemaPath)
+    ? JSON.parse(fs.readFileSync(baseSchemaPath, 'utf-8'))
+    : { properties: {}, fieldsets: [] };
+
+  let schema;
   if (fs.existsSync(schemaPath)) {
-    return JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
+    schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
   } else {
     // Return default Document schema
-    return {
+    schema = {
       title: typeName,
       properties: {
         title: {
@@ -1353,6 +1361,17 @@ function getTypeSchema(typeName) {
       ],
     };
   }
+
+  // Merge base schema fields (only add fields not already defined)
+  schema.properties = { ...base.properties, ...schema.properties };
+  const existingFieldsetIds = new Set((schema.fieldsets || []).map((f) => f.id));
+  for (const fs_ of base.fieldsets || []) {
+    if (!existingFieldsetIds.has(fs_.id)) {
+      schema.fieldsets = [...(schema.fieldsets || []), fs_];
+    }
+  }
+
+  return schema;
 }
 
 app.get('/@types/:typeName', (req, res) => {
@@ -1901,7 +1920,8 @@ app.get('*', (req, res, next) => {
   }
 
   const urlPath = req.path;
-  const cleanPath = urlPath.replace('/++api++', '');
+  // Normalize: remove ++api++ prefix and strip trailing slash (except root)
+  const cleanPath = (urlPath.replace('/++api++', '') || '/').replace(/\/+$/, '') || '/';
   const sessionId = getSessionId(req);
 
   // Debug logging for template/page requests
@@ -2005,6 +2025,13 @@ app.get('/hydra.js', (req, res) => {
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
   res.sendFile(hydraJsPath);
+});
+
+// Serve buildBlockPathMap utility (Volto-free, used by mock-parent.html)
+app.get('/build-block-path-map.js', (req, res) => {
+  const filePath = path.join(__dirname, '../../packages/hydra-js/buildBlockPathMap.js');
+  res.setHeader('Content-Type', 'text/javascript; charset=UTF-8');
+  res.sendFile(filePath);
 });
 
 // Serve shared block schemas (used by test frontend via import)

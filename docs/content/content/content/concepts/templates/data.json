@@ -41,9 +41,9 @@
         }
       ]
     },
-    "concepts-text": {
+    "concepts-text-t0": {
       "@type": "slate",
-      "plaintext": "Templates are created from blocks, edited in-context, and saved as content with permission control.",
+      "plaintext": "Templates: Can be created from any blocksAre always edited in-context in the current page (user can switch in and out of template edit mode)Are saved alongside the page into normal content so editing template permissions can use content permissionsallowedTemplates and allowedLayouts in the blocks schema let the developer control which templates are available and how they are applied Templates are analogous to blocks themselves but are made up of blocks with special properties: Fixed + ReadOnly: Can't be edited or moved (e.g., branded headers/footers)Fixed: Can be edited but not moved (e.g., required sections)Placeholder: Named slots where editors can add their own blocks. The \"default\" placeholder receives leftover content.",
       "value": [
         {
           "children": [
@@ -150,14 +150,17 @@
             }
           ],
           "type": "ul"
-        },
+        }
+      ]
+    },
+    "concepts-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "{\n  \"blocks\": {\n    \"header\": { \"@type\": \"slate\", \"fixed\": true,\n               \"readOnly\": true, \"placeholder\": \"header\" },\n    \"content\": { \"@type\": \"slate\", \"placeholder\": \"default\" },\n    \"footer\": { \"@type\": \"slate\", \"fixed\": true,\n               \"readOnly\": true, \"placeholder\": \"footer\" }\n  }\n}"
-            }
-          ],
-          "type": "p"
+          "@id": "concepts-text-c1-json-805199",
+          "label": "JSON",
+          "language": "json",
+          "code": "{\n  \"blocks\": {\n    \"header\": { \"@type\": \"slate\", \"fixed\": true,\n               \"readOnly\": true, \"placeholder\": \"header\" },\n    \"content\": { \"@type\": \"slate\", \"placeholder\": \"default\" },\n    \"footer\": { \"@type\": \"slate\", \"fixed\": true,\n               \"readOnly\": true, \"placeholder\": \"footer\" }\n  }\n}"
         }
       ]
     },
@@ -175,9 +178,9 @@
         }
       ]
     },
-    "config-text": {
+    "config-text-t0": {
       "@type": "slate",
-      "plaintext": "Configure templates in page.schema.properties on the blocks field.",
+      "plaintext": "Configure templates in page.schema.properties on the blocks field:",
       "value": [
         {
           "children": [
@@ -197,15 +200,24 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "config-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "initBridge({\n    page: {\n        schema: {\n            properties: {\n                blocks_layout: {\n                    allowedTemplates: ['/templates/form-snippet'],\n                    allowedLayouts: ['/templates/article-layout'],\n                },\n            },\n        },\n    },\n});"
-            }
-          ],
-          "type": "p"
-        },
+          "@id": "config-text-c1-javascript-00cba7",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "initBridge({\n    page: {\n        schema: {\n            properties: {\n                blocks_layout: {\n                    allowedTemplates: ['/templates/form-snippet'],\n                    allowedLayouts: ['/templates/article-layout'],\n                },\n            },\n        },\n    },\n});"
+        }
+      ]
+    },
+    "config-text-t2": {
+      "@type": "slate",
+      "plaintext": "allowedTemplates \u2014 Templates shown in the BlockChooser's \"Templates\" group, inserted as blocks.allowedLayouts \u2014 Templates shown in the Layout dropdown. They replace/merge the entire container content. A value of null allows for a no-template option. If none of those templates are already set as the layout then during editing, the first is applied automatically.",
+      "value": [
         {
           "children": [
             {
@@ -219,7 +231,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Templates shown in the BlockChooser's \"Templates\" group, inserted as blocks."
+                  "text": " \u2014 Templates shown in the BlockChooser's \"Templates\" group, inserted as blocks."
                 }
               ],
               "type": "li"
@@ -235,7 +247,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Templates shown in the Layout dropdown. They replace/merge the entire container content. A value of null allows for a no-template option. If none of those templates are already set as the layout then during editing, the first is applied automatically."
+                  "text": " \u2014 Templates shown in the Layout dropdown. They replace/merge the entire container content. A value of null allows for a no-template option. If none of those templates are already set as the layout then during editing, the first is applied automatically."
                 }
               ],
               "type": "li"
@@ -322,7 +334,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": ": On SSR (no window), isEditMode() returns false so templates are expanded — this is correct since edit mode only exists in the browser iframe."
+                  "text": ": On SSR (no window), isEditMode() returns false so templates are expanded \u2014 this is correct since edit mode only exists in the browser iframe."
                 }
               ],
               "type": "li"
@@ -359,7 +371,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Use when templates are pre-fetched at page load. Better for Vue computed properties since it's synchronous."
+                  "text": " \u2014 Use when templates are pre-fetched at page load. Better for Vue computed properties since it's synchronous."
                 }
               ],
               "type": "li"
@@ -375,7 +387,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Use when you need to lazy-load templates on demand. Handles on-demand loading of forced layouts not in page data."
+                  "text": " \u2014 Use when you need to lazy-load templates on demand. Handles on-demand loading of forced layouts not in page data."
                 }
               ],
               "type": "li"
@@ -399,9 +411,9 @@
         }
       ]
     },
-    "load-text": {
+    "load-text-t0": {
       "@type": "slate",
-      "plaintext": "loadTemplates scans page data for templateId references and loads them all in parallel.",
+      "plaintext": "loadTemplates(data, loadTemplate) scans page data for templateId references and loads them all in parallel. It follows nested references (templates referencing other templates) and has a 5s per-template timeout. It only loads templates actually in the page data \u2014 allowedLayouts options are loaded on demand when a forced layout is applied.",
       "value": [
         {
           "children": [
@@ -414,19 +426,28 @@
               "type": "strong"
             },
             {
-              "text": " scans page data for templateId references and loads them all in parallel. It follows nested references (templates referencing other templates) and has a 5s per-template timeout. It only loads templates actually in the page data — allowedLayouts options are loaded on demand when a forced layout is applied."
+              "text": " scans page data for templateId references and loads them all in parallel. It follows nested references (templates referencing other templates) and has a 5s per-template timeout. It only loads templates actually in the page data \u2014 allowedLayouts options are loaded on demand when a forced layout is applied."
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "load-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "import { loadTemplates, expandTemplatesSync, expandTemplates }\n    from '@hydra-js/hydra.js';\n\nconst loadTemplate = async (id) =>\n    fetch(`${apiBase}${id}`).then(r => r.json());\n\n// Sync approach: pre-fetch templates, use in computed properties\nconst templates = await loadTemplates(pageData, loadTemplate);\nconst templateState = {};  // Share across all expandTemplatesSync calls\nconst items = expandTemplatesSync(layout, {\n    blocks, templateState, templates,\n});\n\n// Async approach: load templates on demand\nconst items = await expandTemplates(layout, {\n    blocks,\n    templateState: {},\n    loadTemplate: async (id) => fetch(id).then(r => r.json()),\n});\n\n// Render items - each has @uid for the block ID\nfor (const item of items) {\n    renderBlock(item['@uid'], item);\n}"
-            }
-          ],
-          "type": "p"
-        },
+          "@id": "load-text-c1-javascript-d93ba9",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "import { loadTemplates, expandTemplatesSync, expandTemplates }\n    from '@hydra-js/hydra.js';\n\nconst loadTemplate = async (id) =>\n    fetch(`${apiBase}${id}`).then(r => r.json());\n\n// Sync approach: pre-fetch templates, use in computed properties\nconst templates = await loadTemplates(pageData, loadTemplate);\nconst templateState = {};  // Share across all expandTemplatesSync calls\nconst items = expandTemplatesSync(layout, {\n    blocks, templateState, templates,\n});\n\n// Async approach: load templates on demand\nconst items = await expandTemplates(layout, {\n    blocks,\n    templateState: {},\n    loadTemplate: async (id) => fetch(id).then(r => r.json()),\n});\n\n// Render items - each has @uid for the block ID\nfor (const item of items) {\n    renderBlock(item['@uid'], item);\n}"
+        }
+      ]
+    },
+    "load-text-t2": {
+      "@type": "slate",
+      "plaintext": "Options: blocks: Map of blockId -> block datatemplateState: Pass {} and share across calls \u2014 tracks state for nested containerstemplates: (sync only) Pre-fetched map of templateId -> template dataloadTemplate(id): (async only) Function to fetch template contentallowedLayouts: Force a layout when container has no template applied",
+      "value": [
         {
           "children": [
             {
@@ -464,7 +485,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": ": Pass {} and share across calls — tracks state for nested containers"
+                  "text": ": Pass {} and share across calls \u2014 tracks state for nested containers"
                 }
               ],
               "type": "li"
@@ -536,9 +557,9 @@
         }
       ]
     },
-    "merge-text": {
+    "merge-text-t0": {
       "@type": "slate",
-      "plaintext": "The merge algorithm replaces template blocks with user content matched by placeholder name.",
+      "plaintext": "The merge algorithm follows these rules: Remove the blocks with the templateId to replace, storing any that aren't fixed and readOnly by placeholder name.Insert in their place the template content: if fixed and readOnly, just insert it; if fixed, copy block content (not including block fields) from a page block with the same placeholder name; if a placeholder, don't insert it, but insert the previous blocks with the same placeholder name.Recursively replace any block fields using the same rules.Any placeholder blocks left over are inserted at the end of a special placeholder called \"default\" if it exists, otherwise are dropped. When a layout is applied, the rules are the same but applied across a whole blocks field. Content without a placeholder name ends up: In the \"default\" placeholder if it existsIn the bottom placeholder outside the last fixed template blockIn the top placeholder outside the first fixed template blockOtherwise it is dropped",
       "value": [
         {
           "children": [
@@ -629,14 +650,17 @@
             }
           ],
           "type": "ul"
-        },
+        }
+      ]
+    },
+    "merge-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "Before:  [User Block A] [User Block B]\nLayout:  [Fixed Header] [default] [Fixed Footer] [post_footer]\nAfter:   [Fixed Header] [User Block A] [User Block B] [Fixed Footer]"
-            }
-          ],
-          "type": "p"
+          "@id": "merge-text-c1-bash-1e8145",
+          "label": "Diagram",
+          "language": "bash",
+          "code": "Before:  [User Block A] [User Block B]\nLayout:  [Fixed Header] [default] [Fixed Footer] [post_footer]\nAfter:   [Fixed Header] [User Block A] [User Block B] [Fixed Footer]"
         }
       ]
     },
@@ -654,9 +678,9 @@
         }
       ]
     },
-    "force-text": {
+    "force-text-t0": {
       "@type": "slate",
-      "plaintext": "Pass allowedLayouts to ensure a layout is always applied, even when none is saved.",
+      "plaintext": "Your frontend might want to force a layout to apply regardless of whether one is saved, for example to ensure a footer layout. Pass allowedLayouts:",
       "value": [
         {
           "children": [
@@ -676,15 +700,24 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "force-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "// Sync (with pre-fetched templates)\nconst items = expandTemplatesSync(layout, {\n    blocks, templateState, templates,\n    allowedLayouts: ['/templates/footer-layout'],\n});\n\n// Async\nconst items = await expandTemplates(layout, {\n    blocks, templateState: {}, loadTemplate,\n    allowedLayouts: ['/templates/footer-layout'],\n});"
-            }
-          ],
-          "type": "p"
-        },
+          "@id": "force-text-c1-javascript-8a2277",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "// Sync (with pre-fetched templates)\nconst items = expandTemplatesSync(layout, {\n    blocks, templateState, templates,\n    allowedLayouts: ['/templates/footer-layout'],\n});\n\n// Async\nconst items = await expandTemplates(layout, {\n    blocks, templateState: {}, loadTemplate,\n    allowedLayouts: ['/templates/footer-layout'],\n});"
+        }
+      ]
+    },
+    "force-text-t2": {
+      "@type": "slate",
+      "plaintext": "Note: during editing the admin side will load the templates so in order to apply the same rules of forcing a layout you will need to set allowedLayouts in page.schema.properties to ensure the page loads with the right template.",
+      "value": [
         {
           "children": [
             {
@@ -702,17 +735,25 @@
       "intro-1",
       "sep-1",
       "concepts-heading",
-      "concepts-text",
+      "concepts-text-t0",
+      "concepts-text-c1",
       "config-heading",
-      "config-text",
+      "config-text-t0",
+      "config-text-c1",
+      "config-text-t2",
       "render-heading",
       "render-text",
       "load-heading",
-      "load-text",
+      "load-text-t0",
+      "load-text-c1",
+      "load-text-t2",
       "merge-heading",
-      "merge-text",
+      "merge-text-t0",
+      "merge-text-c1",
       "force-heading",
-      "force-text"
+      "force-text-t0",
+      "force-text-c1",
+      "force-text-t2"
     ]
   },
   "contributors": [],

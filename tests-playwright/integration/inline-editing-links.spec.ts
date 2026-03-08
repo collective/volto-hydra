@@ -313,28 +313,8 @@ test.describe('Inline Editing - Links', () => {
 
     // Verify focus returns to editor automatically after cancelling LinkEditor
     // This is the key test - focus should be restored without user action
-    // Wait for both focus AND non-collapsed selection to be stable before typing
-    await expect(async () => {
-      const selectionInfo = await helper.getSelectionInfo(editor);
-      if (!selectionInfo.editorHasFocus || selectionInfo.isCollapsed) {
-        const debugInfo = await page.evaluate(() => {
-          const active = document.activeElement;
-          const iframeEl = document.getElementById('previewIframe') as HTMLIFrameElement | null;
-          const iframeActive = iframeEl?.contentDocument?.activeElement;
-          return {
-            runId: (window as any).__testRunId,
-            topActive: active?.tagName + (active?.id ? '#' + active.id : ''),
-            topIsFocused: document.hasFocus(),
-            iframeActive: iframeActive?.tagName + (iframeActive?.className ? '.' + iframeActive.className.split(' ')[0] : ''),
-            iframeContentEditable: iframeActive?.getAttribute('contenteditable'),
-          };
-        });
-        const prefix = debugInfo.runId != null ? `[link-cancel][RUN-${debugInfo.runId}]` : '[link-cancel]';
-        console.log(prefix, 'focus debug:', JSON.stringify(debugInfo), 'selectionInfo:', JSON.stringify({ editorHasFocus: selectionInfo.editorHasFocus, isCollapsed: selectionInfo.isCollapsed, activeElementTag: selectionInfo.activeElementTag }));
-      }
-      expect(selectionInfo.editorHasFocus).toBe(true);
-      expect(selectionInfo.isCollapsed).toBe(false);
-    }).toPass({ timeout: 10000 });
+    // Wait for selection to be stable (not disrupted by re-renders) before typing
+    await helper.waitForStableSelection(editor, { editorHasFocus: true, isCollapsed: false });
 
     // Type to verify editor accepts input - will replace selected text
     await editor.pressSequentially('replaced', { delay: 10 });

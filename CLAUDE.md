@@ -196,4 +196,4 @@ lsof -ti:8888,3001,3002 2>/dev/null | xargs kill -9 2>/dev/null
 - **NEVER** kill all node processes haphazardly. check if you really need to kill a process as some tests reload
 - to check volto is compiling use http://localhost:3002/health
 - custom schemas are registered in the renderer.js on init.
-- node ids are added dynamically by hydra.js
+- hydra.js adds nodeIds into slate JSON data, but `data-block-uid` and slate node `data-node-id` attributes are the renderer's responsibility to add to the rendered HTML when in edit mode

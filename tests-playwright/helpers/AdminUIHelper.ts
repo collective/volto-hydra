@@ -797,6 +797,17 @@ export class AdminUIHelper {
   }
 
   /**
+   * Assert that the sidebar shows exactly `expected` template settings sections.
+   * Each block in the hierarchy can portal a "Template Settings" form into
+   * #sidebar-template-settings. Object_list items should NOT render one.
+   */
+  async expectTemplateSettingsCount(expected: number, timeout: number = 5000): Promise<void> {
+    const container = this.page.locator('#sidebar-template-settings');
+    const sections = container.locator('.field-wrapper-placeholder');
+    await expect(sections).toHaveCount(expected, { timeout });
+  }
+
+  /**
    * Wait for the sidebar to show a specific block type as the current block.
    * The current block in the sidebar has data-is-current="true" on its header.
    *
@@ -1365,6 +1376,39 @@ export class AdminUIHelper {
         console.log(`[waitForEditorFocus] Focus NOT in editor. activeElementTag=${sel.activeElementTag} topActiveEl=${topActiveEl}`);
       }
       expect(sel.editorHasFocus).toBe(true);
+    }).toPass({ timeout });
+  }
+
+  /**
+   * Wait for the selection in the editor to be stable (not changing between polls).
+   * Catches races where a re-render disrupts the selection between a check and typing.
+   * @param editor - The editor locator
+   * @param expected - Expected selection properties to match
+   * @param options - Options including timeout and stability gap
+   */
+  async waitForStableSelection(
+    editor: Locator,
+    expected: { editorHasFocus?: boolean; isCollapsed?: boolean },
+    options: { timeout?: number; stabilityMs?: number } = {}
+  ): Promise<void> {
+    const timeout = options.timeout ?? 10000;
+    const stabilityMs = options.stabilityMs ?? 200;
+    await expect(async () => {
+      const sel1 = await this.getSelectionInfo(editor);
+      // Check expected properties
+      if (expected.editorHasFocus !== undefined) {
+        expect(sel1.editorHasFocus).toBe(expected.editorHasFocus);
+      }
+      if (expected.isCollapsed !== undefined) {
+        expect(sel1.isCollapsed).toBe(expected.isCollapsed);
+      }
+      // Wait and check again — selection must be stable
+      await this.page.waitForTimeout(stabilityMs);
+      const sel2 = await this.getSelectionInfo(editor);
+      expect(sel2.editorHasFocus).toBe(sel1.editorHasFocus);
+      expect(sel2.isCollapsed).toBe(sel1.isCollapsed);
+      expect(sel2.anchorOffset).toBe(sel1.anchorOffset);
+      expect(sel2.focusOffset).toBe(sel1.focusOffset);
     }).toPass({ timeout });
   }
 
@@ -2624,8 +2668,9 @@ export class AdminUIHelper {
    * Set the value of a text field in the sidebar.
    * Matches Cypress pattern: #sidebar-properties #field-{fieldname}
    */
-  async setSidebarFieldValue(fieldName: string, value: string): Promise<void> {
-    const fieldWrapper = this.page.locator(`#sidebar-properties .field-wrapper-${fieldName}`);
+  async setSidebarFieldValue(fieldName: string, value: string, options: { container?: string } = {}): Promise<void> {
+    const container = options.container || '#sidebar-properties';
+    const fieldWrapper = this.page.locator(`${container} .field-wrapper-${fieldName}`);
 
     // Try text input
     const input = fieldWrapper.locator('input[type="text"], input[type="url"], textarea');

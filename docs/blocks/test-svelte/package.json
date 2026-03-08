@@ -1,0 +1,9 @@
+{
+  "name": "test-svelte",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:test": "vite --port 3005 --strictPort"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "@id": "http://localhost:8888/code-example-test-page",
+  "@type": "Document",
+  "UID": "code-example-test-page-uid",
+  "id": "code-example-test-page",
+  "title": "Code Example Test Page",
+  "description": "A test page with code example blocks",
+  "review_state": "published",
+  "parent": {
+    "@id": "http://localhost:8888",
+    "@type": "Plone Site",
+    "title": "Site"
+  },
+  "blocks": {
+    "title-block": {
+      "@type": "title"
+    },
+    "single-tab": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "tab-1",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "const greeting = 'Hello, World!';\nconsole.log(greeting);"
+        }
+      ]
+    },
+    "multi-tab": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "tab-js",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "const x = 1;\nconst y = 2;\nconsole.log(x + y);"
+        },
+        {
+          "@id": "tab-py",
+          "label": "Python",
+          "language": "python",
+          "code": "x = 1\ny = 2\nprint(x + y)"
+        },
+        {
+          "@id": "tab-bash",
+          "label": "Bash",
+          "language": "bash",
+          "code": "echo $((1 + 2))"
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": ["title-block", "single-tab", "multi-tab"]
+  }
+}

@@ -1,6 +1,23 @@
 [build]
-  command = "npm run generate"
+  command = "bash scripts/netlify-build.sh"
   publish = ".output/public"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "frame-ancestors https://hydra.pretagov.com https://*.pretagov.com http://localhost:*"
+
+# Disable pretty URLs (trailing slash redirects) — breaks Nuxt SSG payload resolution
+[build.processing]
+  skip_processing = false
+[build.processing.html]
+  pretty_urls = false
+
+# SPA fallback for edit mode (client-side routing)
+[[redirects]]
+  from = "/edit/*"
+  to = "/edit/index.html"
+  status = 200
 
 [images]
   remote_images = ["https://hydra-api.pretagov.com/.*"]

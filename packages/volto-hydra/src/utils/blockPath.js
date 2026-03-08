@@ -8,18 +8,46 @@ import { get } from 'lodash';
 import { applyBlockDefaults } from '@plone/volto/helpers';
 import config from '@plone/volto/registry';
 import { PAGE_BLOCK_UID, isBlockReadonly } from '@volto-hydra/hydra-js';
+import {
+  buildBlockPathMap as _buildBlockPathMap,
+  getBlockTypeSchema,
+  getBlockSchema,
+  getPageAllowedBlocksFromRestricted,
+} from '../../../hydra-js/buildBlockPathMap.js';
 
 /**
- * Strip functions from a schema object for postMessage serialization.
- * Widget callbacks like filterOptions can't be cloned for postMessage.
- * @param {any} obj - Schema object to strip functions from
+ * Extract text content from a React element (JSX).
+ * React elements have $$typeof: Symbol(react.element), props.children contains content.
+ * Returns the concatenated text of all children, recursively.
+ */
+function jsxToText(node) {
+  if (node == null) return '';
+  if (typeof node === 'string') return node;
+  if (typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(jsxToText).join('');
+  if (typeof node === 'object' && node.$$typeof && typeof node.$$typeof === 'symbol') {
+    return jsxToText(node.props?.children);
+  }
+  return '';
+}
+
+/**
+ * Strip non-serializable values from an object for postMessage.
+ * Removes functions, Symbols, and React elements ($$typeof: Symbol).
+ * ONLY call this when sending data to the iframe — never for local storage.
+ * @param {any} obj - Object to strip
  * @param {WeakSet} seen - Set of already-seen objects (circular reference detection)
- * @returns {any} - Schema with functions removed
+ * @returns {any} - Object with non-serializable values removed
  */
 function stripFunctionsFromSchema(obj, seen = new WeakSet()) {
   if (obj === null || obj === undefined) return obj;
   if (typeof obj === 'function') return undefined;
+  if (typeof obj === 'symbol') return undefined;
   if (typeof obj !== 'object') return obj;
+
+  // React elements ($$typeof: Symbol(react.element)) — convert to text content
+  // instead of removing, so field descriptions survive as plain strings
+  if (obj.$$typeof && typeof obj.$$typeof === 'symbol') return jsxToText(obj);
 
   // Handle circular references
   if (seen.has(obj)) return undefined;
@@ -40,88 +68,23 @@ function stripFunctionsFromSchema(obj, seen = new WeakSet()) {
 }
 
 /**
- * Get the schema for a block type, including schemaEnhancer modifications.
- * Also handles object_list items (like table rows/cells) which have itemSchema in blockPathMap.
- *
- * @param {string} blockType - The block type ID
- * @param {Object} intl - The intl object from react-intl (required for i18n schemas)
- * @param {Object} blocksConfig - Optional blocksConfig override (defaults to config.blocks.blocksConfig)
- * @param {Object} blockPathMap - Optional blockPathMap for object_list item lookup
- * @param {string} blockId - Optional block ID for object_list item lookup
- * @param {Object} formData - Optional block data to pass to schemaEnhancer (required for dynamic enhancers like inheritSchemaFrom)
- * @returns {Object|null} - The block schema or null
+ * Strip non-serializable values from a blockPathMap before sending via postMessage.
+ * Call this ONLY at the point of sending to the iframe, not when building/storing the map.
+ * @param {Object} blockPathMap - The blockPathMap to strip
+ * @returns {Object} - New blockPathMap with non-serializable values removed from schemas
  */
-export function getBlockSchema(blockType, intl, blocksConfig = null, blockPathMap = null, blockId = null, formData = null) {
-  // For object_list items (like table rows/cells), use itemSchema from blockPathMap
-  if (blockPathMap && blockId) {
-    const pathInfo = blockPathMap[blockId];
-    if (pathInfo?.isObjectListItem && pathInfo.itemSchema?.fieldsets) {
-      return {
-        ...pathInfo.itemSchema,
-        required: pathInfo.itemSchema.required || [],
-      };
-    }
-  }
-
-  if (!blockType) return null;
-
-  const effectiveBlocksConfig = blocksConfig || config.blocks?.blocksConfig;
-  const blockConfig = effectiveBlocksConfig?.[blockType];
-  if (!blockConfig) return null;
-
-  // Get base schema from blockSchema or schema property
-  const schemaSource = blockConfig.blockSchema || blockConfig.schema;
-  let schema = null;
-
-  // Use provided formData or empty object
-  const effectiveFormData = formData || {};
-
-  if (schemaSource) {
-    try {
-      schema = typeof schemaSource === 'function'
-        ? schemaSource({ formData: effectiveFormData, data: effectiveFormData, intl })
-        : schemaSource;
-    } catch {
-      schema = null;
-    }
-  }
-
-  // Ensure schema has required structure
-  if (!schema) {
-    schema = {
-      fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
-      properties: {},
-      required: [],
-    };
-  } else {
-    // Ensure fieldsets exists (frontend blockSchema may only define properties)
-    if (!schema.fieldsets) {
-      schema = {
-        ...schema,
-        fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
-      };
-    }
-  }
-
-  // Run schemaEnhancer on top of base schema (if it exists)
-  // Note: childBlockConfig reads blockPathMap/blockId from HydraSchemaContext
-  if (blockConfig.schemaEnhancer) {
-    try {
-      schema = blockConfig.schemaEnhancer({
-        schema,
-        formData: effectiveFormData,
-        intl,
-      });
-    } catch {
-      // Keep the base schema if enhancer fails
-    }
-  }
-
-  // Only return if we have properties
-  return schema?.properties && Object.keys(schema.properties).length > 0
-    ? schema
-    : null;
+export function stripBlockPathMapForPostMessage(blockPathMap) {
+  // Strip each entry independently so shared array/object references (e.g., the same
+  // fieldDef.allowedBlocks array used by multiple blocks) aren't falsely detected as
+  // circular by the seen set and stripped to undefined.
+  return Object.fromEntries(
+    Object.entries(blockPathMap).map(([key, value]) => [key, stripFunctionsFromSchema(value)])
+  );
 }
+
+// getBlockTypeSchema, getBlockSchema, getPageAllowedBlocksFromRestricted are imported
+// from buildBlockPathMap.js (Volto-free shared module) above.
+export { getBlockTypeSchema, getBlockSchema };
 
 /**
  * Get items array from a container (works for both object_list and blocks containers).
@@ -129,7 +92,7 @@ export function getBlockSchema(blockType, intl, blocksConfig = null, blockPathMa
  * @param {Object} containerConfig - Container configuration with fieldName, isObjectList, dataPath
  * @returns {Array} The items array (copy for object_list, items array for blocks)
  */
-function getContainerItems(parentBlock, containerConfig) {
+export function getContainerItems(parentBlock, containerConfig) {
   const { fieldName, isObjectList, dataPath } = containerConfig;
 
   if (isObjectList) {
@@ -194,423 +157,20 @@ function setContainerItems(parentBlock, containerConfig, items, blocksObj = null
 }
 
 /**
- * Compute page-level allowed block types from blocksConfig's `restricted` property.
- * A block is allowed at page level if restricted is false or if restricted(context) returns false.
- *
- * @param {Object} blocksConfig - Block configuration from registry
- * @param {Object} context - Context for restricted functions { properties, navRoot, contentType }
- * @returns {Array} Array of block type IDs allowed at page level
- */
-function getPageAllowedBlocksFromRestricted(blocksConfig, context = {}) {
-  if (!blocksConfig) return null;
-
-  const allowedTypes = [];
-  for (const [blockType, blockConfig] of Object.entries(blocksConfig)) {
-    // Skip blocks without proper config
-    if (!blockConfig || !blockConfig.id) continue;
-
-    const restricted = blockConfig.restricted;
-    if (restricted === undefined || restricted === false) {
-      // Not restricted - allowed at page level
-      allowedTypes.push(blockType);
-    } else if (typeof restricted === 'function') {
-      // Dynamic restriction - evaluate with context
-      try {
-        const isRestricted = restricted({ ...context, block: blockConfig });
-        if (!isRestricted) {
-          allowedTypes.push(blockType);
-        }
-      } catch (e) {
-        // If function throws, treat as restricted
-        console.warn(`[BLOCKPATH] Error evaluating restricted for ${blockType}:`, e);
-      }
-    }
-    // If restricted === true, block is not allowed at page level
-  }
-  return allowedTypes.length > 0 ? allowedTypes : null;
-}
-
-/**
  * Build a map of blockId -> path for all blocks in formData.
- * Uses unified traversal for both `widget: 'blocks_layout'` and `widget: 'object_list'` containers.
+ * Delegates to the Volto-free implementation in buildBlockPathMap.js,
+ * forwarding the intl object for i18n schema support.
  *
  * @param {Object} formData - The form data with blocks
- * @param {Object} blocksConfig - Block configuration from registry (must have _page registered for multiple page fields)
+ * @param {Object} blocksConfig - Block configuration from registry
  * @param {Object} intl - The intl object from react-intl (required for i18n schemas)
  * @returns {Object} Map of blockId -> { path: string[], parentId: string, containerField: string|null, ... }
- *
- * Path format examples:
- * - Page block: ['blocks', 'text-1']
- * - Nested block: ['blocks', 'columns-1', 'columns', 'col-1', 'blocks', 'text-1a']
- * - Object list item: ['blocks', 'slider-1', 'slides', 0]
- * - Nested object list: ['blocks', 'table-1', 'table', 'rows', 0, 'cells', 1]
- * - Multiple page fields: ['header_blocks', 'header-1'], ['footer_blocks', 'footer-1']
  */
 export function buildBlockPathMap(formData, blocksConfig, intl) {
   if (!intl) {
     throw new Error('buildBlockPathMap requires intl parameter');
   }
-
-  const pathMap = {};
-  // Track created virtual containers for template instances
-  const createdTemplateInstances = new Set();
-
-  // Get page schema from _page block type (registered at INIT time)
-  // This contains the blocks container fields (blocks, footer_blocks, etc.)
-  const rootConfig = blocksConfig?.['_page'];
-  const pageSchema = rootConfig?.schema?.({ intl }) || {
-    // Fallback before INIT: default to single 'blocks_layout' field
-    properties: { blocks_layout: { widget: 'blocks_layout' } },
-  };
-
-  // Get field names from page schema to check for data
-  const pageFieldNames = Object.keys(pageSchema.properties || {})
-    .filter(fieldName => pageSchema.properties[fieldName]?.widget === 'blocks_layout');
-
-  // Check if any page fields have data
-  // All layout fields use fieldName.items; blocks are in shared formData.blocks
-  const hasAnyPageData = pageFieldNames.some(
-    fieldName => formData?.[fieldName]?.items?.length > 0
-  );
-  if (!hasAnyPageData) {
-    return pathMap;
-  }
-
-  // Compute default page-level allowed blocks from restricted (used when field doesn't specify allowedBlocks)
-  const defaultPageAllowedBlocks = getPageAllowedBlocksFromRestricted(blocksConfig, { properties: formData });
-
-  // Helper to find empty required fields for starter UI
-  // Returns array of { fieldName, fieldDef } for required fields that are empty
-  function getEmptyRequiredFields(blockData, schema) {
-    if (!schema?.required || !schema?.properties) return null;
-
-    const emptyFields = [];
-    for (const fieldName of schema.required) {
-      const fieldDef = schema.properties[fieldName];
-      if (!fieldDef) continue;
-
-      // Check if field is empty
-      const fieldValue = blockData[fieldName];
-      const isEmpty = !fieldValue ||
-        (Array.isArray(fieldValue) && fieldValue.length === 0) ||
-        (typeof fieldValue === 'string' && fieldValue === '');
-
-      if (isEmpty) {
-        // Strip functions from fieldDef for postMessage serialization
-        emptyFields.push({ fieldName, fieldDef: stripFunctionsFromSchema(fieldDef) });
-      }
-    }
-    return emptyFields.length > 0 ? emptyFields : null;
-  }
-
-  /**
-   * Process container fields in an item (block or object_list item).
-   * Scans schema for container fields and processes each one.
-   * This is the single recursion point for all container types.
-   */
-  function processItem(item, itemId, itemPath, schema) {
-    if (!schema?.properties) return;
-
-    Object.entries(schema.properties).forEach(([fieldName, fieldDef]) => {
-      // Nested object widget (e.g., slateTable.table with widget: 'object')
-      // Descend into the nested schema
-      if (fieldDef.widget === 'object' && fieldDef.schema?.properties) {
-        if (item[fieldName]) {
-          processItem(item[fieldName], itemId, [...itemPath, fieldName], fieldDef.schema);
-        }
-        return;
-      }
-
-      // Nested object property (legacy: has properties but no widget/type)
-      if (fieldDef.properties && !fieldDef.widget && !fieldDef.type) {
-        if (item[fieldName]) {
-          processItem(item[fieldName], itemId, [...itemPath, fieldName], fieldDef);
-        }
-        return;
-      }
-
-      // Container field - process its contents
-      if (fieldDef.widget === 'blocks_layout') {
-        processBlocksContainer(item, itemId, itemPath, fieldName, fieldDef);
-      } else if (fieldDef.widget === 'object_list') {
-        // Use dataPath if provided to find data in a different location
-        const dataPath = fieldDef.dataPath || [fieldName];
-        let fieldData = item;
-        for (const key of dataPath) {
-          fieldData = fieldData?.[key];
-        }
-        if (fieldData) {
-          processObjectListContainer(item, itemId, itemPath, fieldName, fieldDef, dataPath);
-        }
-      }
-    });
-
-    // Also check for implicit container fields (blocks/blocks_layout without schema definition)
-    // This handles Volto's built-in container blocks like Grid
-    const firstBlockId = Object.keys(item.blocks || {})[0];
-    if (item.blocks && item.blocks_layout?.items && firstBlockId && !pathMap[firstBlockId]) {
-      const blockType = item['@type'];
-      const blockConfig = blocksConfig?.[blockType];
-      processBlocksContainer(item, itemId, itemPath, 'blocks_layout', {
-        allowedBlocks: blockConfig?.allowedBlocks || null,
-        maxLength: blockConfig?.maxLength || null,
-      });
-    }
-  }
-
-  /**
-   * Process a widget: 'blocks_layout' container field.
-   * Blocks are in shared parent.blocks dict; layout is parent[fieldName].items.
-   */
-  function processBlocksContainer(parent, parentId, parentPath, fieldName, fieldDef) {
-    const blocks = parent.blocks;
-    const layout = parent[fieldName]?.items;
-    if (!blocks || !layout) return;
-
-    // First pass: collect fixed status for all blocks to determine insert restrictions
-    const blockFixedStatus = {};
-    layout.forEach(blockId => {
-      const block = blocks[blockId];
-      if (block) {
-        blockFixedStatus[blockId] = block.fixed === true;
-      }
-    });
-
-    layout.forEach((blockId, index) => {
-      const block = blocks[blockId];
-      if (!block) return;
-
-      const blockPath = [...parentPath, 'blocks', blockId];
-      const blockType = block['@type'];
-      const blockSchema = getBlockSchema(blockType, intl, blocksConfig);
-
-      // Check Volto's standard block properties
-      const isFixed = block.fixed === true;        // Volto standard: position locked
-      const isReadonly = block.readOnly === true;  // Volto standard: content locked
-
-      // Check if inserting before/after this block is allowed
-      // Can't insert:
-      // 1. Between two adjacent fixed blocks
-      // 2. Before a fixed block at container start (no placeholder there)
-      // 3. After a fixed block at container end (no placeholder there)
-      const prevBlockId = layout[index - 1];
-      const nextBlockId = layout[index + 1];
-      const prevBlockIsFixed = prevBlockId ? blockFixedStatus[prevBlockId] : false;
-      const nextBlockIsFixed = nextBlockId ? blockFixedStatus[nextBlockId] : false;
-      const atContainerStart = index === 0;
-      const atContainerEnd = index === layout.length - 1;
-      // Fixed block at edge OR between two fixed blocks = can't insert
-      // Exception: if the block has nextPlaceholder, there's a placeholder region after it
-      // that may be empty — always allow inserting after it.
-      const hasNextPlaceholder = block.nextPlaceholder != null;
-      const canInsertBefore = !(isFixed && (atContainerStart || prevBlockIsFixed));
-      const canInsertAfter = !(isFixed && (atContainerEnd || nextBlockIsFixed)) || hasNextPlaceholder;
-
-      // Template instance virtual container
-      // Only FIRST-LEVEL template blocks get the virtual instance as parent
-      // Nested blocks (inside containers that are part of the template) keep their actual parent
-      let effectiveParentId = parentId;
-      if (block.templateInstanceId) {
-        const instanceId = block.templateInstanceId;
-
-        // Check if parent container is also part of this template instance
-        // If so, this is a nested block - keep actual parent
-        const parentInSameInstance = parent.templateInstanceId === instanceId;
-
-        if (!parentInSameInstance) {
-          // First-level template block - create/use virtual instance as parent
-          if (!createdTemplateInstances.has(instanceId)) {
-            createdTemplateInstances.add(instanceId);
-
-            // Derive display name from templateId path (e.g., "/templates/test-layout" -> "test-layout")
-            const templatePath = block.templateId || '';
-            const templateName = templatePath.split('/').filter(Boolean).pop() || 'unknown';
-
-            // Nested: parent container belongs to the same template (different instanceId
-            // because merge assigns new IDs to top-level but children keep original)
-            const isNestedInTemplate = parent.templateId === block.templateId;
-
-            const instanceBlockType = isNestedInTemplate
-              ? 'Template blocks'
-              : `Template: ${templateName}`;
-            pathMap[instanceId] = {
-              path: null, // Virtual - no actual storage path
-              parentId, // Template instance's parent is the original container
-              containerField: fieldName,
-              blockType: instanceBlockType, // Virtual type for sidebar display
-              isTemplateInstance: true,
-              ...(isNestedInTemplate && { isNestedTemplateInstance: true }),
-              templateId: block.templateId,
-              // Virtual block data for components that need blockData (e.g., ParentBlocksWidget)
-              blockData: { '@type': instanceBlockType, '@uid': instanceId },
-              // Template instances can be moved/deleted as a unit (TODO: implement group operations)
-            };
-          }
-
-          // Block's parent is the template instance, not the original container
-          effectiveParentId = instanceId;
-        }
-      }
-
-      pathMap[blockId] = {
-        path: blockPath,
-        parentId: effectiveParentId,
-        containerField: fieldName,
-        blockType, // Block type for uniform lookups (single source of truth)
-        allowedSiblingTypes: fieldDef.allowedBlocks || defaultPageAllowedBlocks,
-        allowedTemplates: fieldDef.allowedTemplates || null,
-        maxSiblings: fieldDef.maxLength || null,
-        siblingCount: layout.length, // Total siblings in this container
-        emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
-        ...(isFixed && { isFixed: true }), // Fixed template blocks can't be moved/deleted
-        ...(isReadonly && { isReadonly: true }), // Readonly template blocks can't be edited
-        // Insert restrictions for fixed block boundaries
-        ...(!canInsertBefore && { canInsertBefore: false }),
-        ...(!canInsertAfter && { canInsertAfter: false }),
-      };
-
-      // RECURSE: process this block's container fields
-      if (blockSchema) {
-        processItem(block, blockId, blockPath, blockSchema);
-      }
-    });
-  }
-
-  /**
-   * Process a widget: 'object_list' container field.
-   * Items are stored as array with configurable ID field.
-   * @param {Array} dataPath - Path to actual data location (defaults to [fieldName])
-   */
-  function processObjectListContainer(parent, parentId, parentPath, fieldName, fieldDef, dataPath = null) {
-    // Navigate to actual data location using dataPath
-    const effectiveDataPath = dataPath || [fieldName];
-    let items = parent;
-    for (const key of effectiveDataPath) {
-      items = items?.[key];
-    }
-
-    // Handle both arrays and objects (Volto's form state can convert arrays to objects)
-    let itemsArray;
-    if (Array.isArray(items)) {
-      itemsArray = items;
-    } else if (items && typeof items === 'object') {
-      // Convert object with numeric keys to array (e.g., {"0": {...}, "1": {...}})
-      itemsArray = Object.values(items);
-    } else {
-      return;
-    }
-
-    const idField = fieldDef.idField || '@id';
-    const itemSchema = fieldDef.schema;
-    const typeField = fieldDef.typeField || null; // e.g., '@type' - which attribute stores the item's type
-    const hasAllowedBlocks = !!fieldDef.allowedBlocks; // Typed items mode (multi-type container)
-
-    // Compute virtual type for items in this container (used when no typeField/allowedBlocks)
-    // Parent type is either a real block type or a virtual type (for nested object_list)
-    const parentPathInfo = pathMap[parentId];
-    const parentType = parentPathInfo?.blockType || parent['@type'];
-    const virtualType = `${parentType}:${fieldName}`;
-
-    // Track addMode for table-aware behavior
-    // addMode comes from block config (e.g., blocksConfig.slateTable.addMode = 'table')
-    // - First-level items (rows) get addMode from block config
-    // - Second-level items (cells) get parentAddMode from their parent row
-    const parentAddMode = parentPathInfo?.addMode || parentPathInfo?.parentAddMode || null;
-
-    // Get addMode from the actual block config if this is first-level (parent is a block, not an object_list item)
-    let addMode = null;
-    if (!parentPathInfo?.isObjectListItem) {
-      // Parent is a real block - check its config for addMode
-      const blockType = parent['@type'];
-      const blockConfig = blocksConfig?.[blockType];
-      addMode = blockConfig?.addMode || null;
-    }
-
-    itemsArray.forEach((item, index) => {
-      const itemId = item[idField];
-      if (!itemId) return;
-
-      // Build path using the actual data path (not schema field name)
-      const itemPath = [...parentPath, ...effectiveDataPath, index];
-
-      // Determine block type:
-      // - If typeField is set, read type from item[typeField] (typed object_list)
-      // - Otherwise, use virtual type like 'slateTable:rows' (single-schema object_list)
-      const itemBlockType = typeField ? (item[typeField] || virtualType) : virtualType;
-
-      // Determine schema for this item:
-      // - If allowedBlocks is set (typed mode), use blocksConfig schema (looked up via blockType)
-      // - Otherwise, use shared itemSchema from field definition
-      const effectiveItemSchema = hasAllowedBlocks
-        ? null // Schema comes from blocksConfig via getBlockSchema(itemBlockType)
-        : stripFunctionsFromSchema(itemSchema);
-
-      // Get block schema for typed items (for emptyRequiredFields check)
-      const blockSchema = hasAllowedBlocks
-        ? getBlockSchema(itemBlockType, intl, blocksConfig)
-        : itemSchema;
-
-      // Compute available actions based on table mode
-      // Primary remove is hardcoded in DropdownMenu based on addDirection
-      // These are ADDITIONAL actions beyond the primary
-      let actions = null;
-      if (addMode === 'table') {
-        // First-level items in table mode (rows): insert row before/after
-        // Primary remove (Remove Row) is hardcoded based on addDirection
-        actions = {
-          toolbar: ['addRowBefore', 'addRowAfter'],
-          dropdown: [],
-        };
-      } else if (parentAddMode === 'table') {
-        // Second-level items in table mode (cells): all insert actions + delete row
-        // Primary remove (Remove Column) is hardcoded based on addDirection
-        actions = {
-          toolbar: ['addColumnBefore', 'addColumnAfter', 'addRowBefore', 'addRowAfter'],
-          dropdown: ['deleteRow'], // Additional action: delete parent row
-        };
-      }
-
-      pathMap[itemId] = {
-        path: itemPath,
-        parentId,
-        containerField: fieldName,
-        blockType: itemBlockType, // Real type (from typeField) or virtual type (from parent:field)
-        isObjectListItem: true,
-        idField,
-        ...(typeField && { typeField }), // Only set if typed object_list
-        itemSchema: effectiveItemSchema, // null for typed items (schema from blocksConfig)
-        dataPath: effectiveDataPath, // Store for later use
-        allowedSiblingTypes: hasAllowedBlocks ? fieldDef.allowedBlocks : [virtualType],
-        addMode, // Table mode for this container (e.g., rows)
-        parentAddMode, // Inherited from parent (e.g., cells inherit 'table' from rows)
-        actions, // Available actions for toolbar/dropdown
-        emptyRequiredFields: getEmptyRequiredFields(item, blockSchema),
-      };
-
-      // RECURSE: process this item's container fields (same pattern!)
-      const recurseSchema = hasAllowedBlocks ? blockSchema : itemSchema;
-      if (recurseSchema) {
-        processItem(item, itemId, itemPath, recurseSchema);
-      }
-    });
-  }
-
-  // Add entry for the page itself (PAGE_BLOCK_UID virtual block)
-  // This allows getBlockById, getParentChain, etc. to handle PAGE_BLOCK_UID consistently
-  pathMap[PAGE_BLOCK_UID] = {
-    path: [],
-    parentId: null, // Page has no parent
-    containerField: null,
-    blockType: '_page',
-  };
-
-  // Start traversal with page as root container
-  // pageSchema was retrieved from blocksConfig['_page'] at the top of this function
-  // parentId=PAGE_BLOCK_UID means page-level blocks have the page as parent
-  // parentPath=[] means paths start with [fieldName, blockId]
-  processItem(formData, PAGE_BLOCK_UID, [], pageSchema);
-
-  return pathMap;
+  return _buildBlockPathMap(formData, blocksConfig, intl);
 }
 
 /**
@@ -665,9 +225,14 @@ export function getBlockById(formData, blockPathMap, blockId) {
     // Virtual blocks (like template instances) have blockData in pathMap instead of formData
     return pathInfo?.blockData;
   }
-  // Return the raw block data - no @type injection
-  // Callers should use blockPathMap[blockId].blockType for the block type
-  return getBlockByPath(formData, pathInfo.path);
+  const block = getBlockByPath(formData, pathInfo.path);
+  // For typed object_list items missing @type (e.g., old slider data without @type
+  // that resolves via defaultBlockType), inject the resolved blockType so that
+  // consumers like withBlockExtensions can find the correct block config.
+  if (block && !block['@type'] && pathInfo.isObjectListItem && pathInfo.typeField) {
+    return { ...block, '@type': pathInfo.blockType };
+  }
+  return block;
 }
 
 /**
@@ -731,9 +296,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
     parentId = parentPathInfo.parentId;
   }
 
-  // Determine parent type: '_page' for page-level blocks, otherwise from blockPathMap
-  const parentType = parentId === PAGE_BLOCK_UID ? '_page' : blockPathMap[parentId]?.blockType;
-  const schema = getBlockSchema(parentType, intl, blocksConfig);
+  const schema = blockPathMap[parentId]?.resolvedBlockSchema;
   const fieldDef = schema?.properties?.[fieldName];
 
   // For object_list items, we already have most info in pathInfo
@@ -745,7 +308,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
       defaultBlockType: pathInfo.blockType,
       maxLength: pathInfo.maxSiblings,
       isObjectList: true,
-      itemSchema: pathInfo.typeField ? null : stripFunctionsFromSchema(fieldDef?.schema), // null for typed items
+      itemSchema: pathInfo.typeField ? null : fieldDef?.schema, // null for typed items
       itemIndex: pathInfo.path[pathInfo.path.length - 1], // Last element is index
       idField: pathInfo.idField,
       typeField: pathInfo.typeField || null, // Attribute name for item type (typed object_list)
@@ -763,6 +326,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
     return null;
   }
 
+  const parentType = blockPathMap[parentId]?.blockType;
   const parentConfig = blocksConfig?.[parentType];
 
   // Check schema-defined container field
@@ -889,11 +453,9 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   // Check if parent block is readonly (can't add to readonly containers)
   const parentIsReadonly = isBlockReadonly(block, templateEditMode);
 
-  // Use blockPathMap for type lookup (single source of truth)
-  // For page-level, use '_page' as the type
   const blockType = blockId === PAGE_BLOCK_UID ? '_page' : pathInfo?.blockType;
   if (!blockType) return [];
-  const schema = getBlockSchema(blockType, intl, blocksConfig);
+  const schema = pathInfo?.resolvedBlockSchema;
 
   // Compute default allowed blocks (used when field doesn't specify allowedBlocks)
   const blockConfig = blocksConfig?.[blockType];
@@ -955,7 +517,7 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
           currentCount,
           canAdd: !parentIsReadonly && maxLengthOk,
           isObjectList: true,
-          itemSchema: hasAllowedBlocks ? null : stripFunctionsFromSchema(fieldDef.schema), // null for typed (schema from blocksConfig)
+          itemSchema: hasAllowedBlocks ? null : fieldDef.schema, // null for typed (schema from blocksConfig)
           idField: fieldDef.idField || '@id', // ID field name for items
           typeField: fieldDef.typeField || null, // Attribute name for item type (e.g., '@type')
           dataPath,
@@ -1549,7 +1111,8 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
 
     // Initialize nested containers
     if (intl && blocksConfig && containerConfig.defaultBlockType) {
-      blockData = initializeContainerBlock(blockData, blocksConfig, uuidGenerator, { intl, metadata, properties });
+      const emptyBlockType = getEmptyBlockType(containerConfig);
+      blockData = initializeContainerBlock(blockData, blocksConfig, uuidGenerator, { intl, metadata, properties, blockType: emptyBlockType });
     }
 
     // For typed object_list, clean up @type if typeField is different
@@ -1591,12 +1154,14 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
  * @param {Object} options.properties - Form properties
  * @returns {Object} Block data with container fields initialized (if applicable)
  */
-export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator, options = {}) {
-  const { intl, metadata, properties, siblingData } = options;
-  const blockType = blockData['@type'];
+export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator, options = {}, schema) {
+  const { intl, metadata, properties, siblingData, blockType } = options;
 
-  // Get schema to find container fields
-  const schema = getBlockSchema(blockType, intl, blocksConfig);
+  // Get schema from block type if not provided (e.g., recursing into widget: 'object')
+  // Use type-level cache since we're initializing an empty new block — no instance data yet.
+  if (!schema) {
+    schema = getBlockTypeSchema(blockType, intl, blocksConfig);
+  }
 
   if (!schema?.properties) {
     return blockData;
@@ -1606,6 +1171,15 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
   let result = { ...blockData };
 
   for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
+    // Descend into nested object fields (e.g., accordion's `data` wrapper)
+    if (fieldDef.widget === 'object' && fieldDef.schema?.properties) {
+      if (!result[fieldName]) result[fieldName] = {};
+      result[fieldName] = initializeContainerBlock(
+        result[fieldName], blocksConfig, uuidGenerator, options, fieldDef.schema,
+      );
+      continue;
+    }
+
     // Handle object_list containers (like cells in a row)
     if (fieldDef.widget === 'object_list') {
       const idField = fieldDef.idField || '@id';
@@ -1639,7 +1213,7 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
         childData = applyBlockDefaults({ data: childData, intl }, blocksConfig);
 
         // Recursively initialize nested containers
-        childData = initializeContainerBlock(childData, blocksConfig, uuidGenerator, options);
+        childData = initializeContainerBlock(childData, blocksConfig, uuidGenerator, { ...options, blockType: childType });
 
         if (hasAllowedBlocks && typeFieldName) {
           // Typed object_list: store type in the specified typeField attribute
@@ -1709,7 +1283,7 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
     }
 
     // Recursively initialize the child if it's also a container
-    childBlockData = initializeContainerBlock(childBlockData, blocksConfig, uuidGenerator, options);
+    childBlockData = initializeContainerBlock(childBlockData, blocksConfig, uuidGenerator, { ...options, blockType: childBlockType });
 
     // Add child to shared blocks dict + layout field
     result = {
@@ -1767,9 +1341,7 @@ export function reorderBlocksInContainer(
   }
 
   // Detect if this is an object_list field
-  // For page-level, parent type is '_page'
-  const parentType = effectiveParentId === PAGE_BLOCK_UID ? '_page' : parentBlock['@type'];
-  const schema = getBlockSchema(parentType, intl, blocksConfig);
+  const schema = blockPathMap[effectiveParentId]?.resolvedBlockSchema;
   const fieldDef = schema?.properties?.[fieldName];
   const isObjectList = fieldDef?.widget === 'object_list';
 
@@ -1984,3 +1556,4 @@ function getInsertionIndex(formData, blockPathMap, targetBlockId, insertAfter, c
 
   return insertAfter ? targetIndex + 1 : targetIndex;
 }
+

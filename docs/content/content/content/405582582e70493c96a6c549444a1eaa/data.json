@@ -14,7 +14,7 @@
       "@type": "__button",
       "href": [
         {
-          "@id": "../../resolveuid/2647c16486eb4c42857e46c2988013e4",
+          "@id": "/",
           "Description": "example",
           "Title": "Example",
           "hasPreviewImage": null,
@@ -32,7 +32,7 @@
       "@type": "__button",
       "href": [
         {
-          "@id": "../../resolveuid/2647c16486eb4c42857e46c2988013e4",
+          "@id": "/",
           "Description": "example",
           "Title": "Example",
           "hasPreviewImage": null,
@@ -116,7 +116,7 @@
       "@type": "__button",
       "href": [
         {
-          "@id": "../../resolveuid/2647c16486eb4c42857e46c2988013e4",
+          "@id": "/",
           "Description": "example",
           "Title": "Example",
           "hasPreviewImage": null,
@@ -205,7 +205,7 @@
       "@type": "__button",
       "href": [
         {
-          "@id": "../../resolveuid/2647c16486eb4c42857e46c2988013e4",
+          "@id": "/",
           "Description": "example",
           "Title": "Example",
           "hasPreviewImage": null,
@@ -232,7 +232,7 @@
       "@type": "__button",
       "href": [
         {
-          "@id": "../../resolveuid/2647c16486eb4c42857e46c2988013e4",
+          "@id": "/",
           "Description": "example",
           "Title": "Example",
           "hasPreviewImage": null,
@@ -249,7 +249,7 @@
       "@type": "__button",
       "href": [
         {
-          "@id": "../../resolveuid/2647c16486eb4c42857e46c2988013e4",
+          "@id": "/",
           "Description": "example",
           "Title": "Example",
           "hasPreviewImage": null,
@@ -266,7 +266,7 @@
       "@type": "__button",
       "href": [
         {
-          "@id": "../../resolveuid/2647c16486eb4c42857e46c2988013e4",
+          "@id": "/",
           "Description": "example",
           "Title": "Example",
           "hasPreviewImage": null,
@@ -281,7 +281,7 @@
       "@type": "__button",
       "href": [
         {
-          "@id": "../../resolveuid/2647c16486eb4c42857e46c2988013e4",
+          "@id": "/",
           "Description": "example",
           "Title": "Example",
           "hasPreviewImage": null,
@@ -299,7 +299,7 @@
       "@type": "__button",
       "href": [
         {
-          "@id": "../../resolveuid/2647c16486eb4c42857e46c2988013e4",
+          "@id": "/",
           "Description": "example",
           "Title": "Example",
           "hasPreviewImage": null,
@@ -314,7 +314,7 @@
       "@type": "__button",
       "href": [
         {
-          "@id": "../../resolveuid/2647c16486eb4c42857e46c2988013e4",
+          "@id": "/",
           "Description": "example",
           "Title": "Example",
           "hasPreviewImage": null,
@@ -356,7 +356,7 @@
       "@type": "__button",
       "href": [
         {
-          "@id": "../../resolveuid/2647c16486eb4c42857e46c2988013e4",
+          "@id": "/",
           "Description": "example",
           "Title": "Example",
           "hasPreviewImage": null,
@@ -381,7 +381,7 @@
       "@type": "__button",
       "href": [
         {
-          "@id": "../../resolveuid/2647c16486eb4c42857e46c2988013e4",
+          "@id": "/",
           "Description": "example",
           "Title": "Example",
           "hasPreviewImage": null,
@@ -394,6 +394,124 @@
         "buttonAlign": "center"
       },
       "title": "Button"
+    },
+    "ref-button-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-button",
+      "placeholder": "sep"
+    },
+    "ref-button-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-button",
+      "placeholder": "heading"
+    },
+    "ref-button-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-button",
+      "placeholder": "schema-heading"
+    },
+    "ref-button-schema-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-button",
+      "placeholder": "schema-desc"
+    },
+    "ref-button-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-button",
+      "placeholder": "json-heading"
+    },
+    "ref-button-json-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-button",
+      "placeholder": "json-desc"
+    },
+    "ref-button-rendering-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-button",
+      "placeholder": "rendering-heading"
+    },
+    "ref-button-rendering-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-button",
+      "placeholder": "rendering-desc"
+    },
+    "ref-button-schema": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-button",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-button-schema-javascript-8aa182",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  \"__button\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Label\"\n        },\n        \"href\": {\n          \"title\": \"Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        }\n      }\n    }\n  }\n}"
+        }
+      ]
+    },
+    "ref-button-json-data": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-button",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-button-json-data-json-ed3030",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"__button\",\n  \"title\": \"Learn More\",\n  \"href\": [\n    {\n      \"@id\": \"/about-us\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    "ref-button-rendering": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-button",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-button-rendering-jsx-ab4e0b",
+          "label": "React",
+          "language": "jsx",
+          "code": "function ButtonBlock({ block }) {\n  const title = block.title || 'Button';\n  const href = block.href?.[0]?.['@id'] || block.href || '#';\n\n  return (\n    <div data-block-uid={block['@uid']} className=\"button-block\">\n      <a href={href} data-edit-text=\"title\" data-edit-link=\"href\" className=\"btn\">\n        {title}\n      </a>\n    </div>\n  );\n}"
+        },
+        {
+          "@id": "ref-button-rendering-vue-e704dd",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"button-block\">\n    <a :href=\"href\" data-edit-text=\"title\" data-edit-link=\"href\" class=\"btn\">\n      {{ block.title || 'Button' }}\n    </a>\n  </div>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nconst props = defineProps({ block: Object });\nconst href = computed(() => props.block.href?.[0]?.['@id'] || props.block.href || '#');\n</script>"
+        },
+        {
+          "@id": "ref-button-rendering-svelte-a8e495",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<script>\n  export let block;\n  $: href = block.href?.[0]?.['@id'] || block.href || '#';\n</script>\n\n<div data-block-uid={block['@uid']} class=\"button-block\">\n  <a {href} data-edit-text=\"title\" data-edit-link=\"href\" class=\"btn\">\n    {block.title || 'Button'}\n  </a>\n</div>"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -429,7 +547,27 @@
       "e20c3c62-3c1d-4e45-a5c4-649b81b47a46",
       "7760c976-1716-45d0-a22b-527bed9e8de9",
       "2fa5b869-89cd-4d15-aee9-80b4e1bf11a2",
-      "fc0ddcf5-4acc-4f9b-8c5c-992db47399ce"
+      "fc0ddcf5-4acc-4f9b-8c5c-992db47399ce",
+      "ref-button-schema-heading",
+      "ref-button-schema-desc",
+      "ref-button-schema",
+      "ref-button-json-heading",
+      "ref-button-json-desc",
+      "ref-button-json-data",
+      "ref-button-rendering-heading",
+      "ref-button-rendering-desc",
+      "ref-button-rendering",
+      "ref-button-sep",
+      "ref-button-heading",
+      "ref-button-schema-heading",
+      "ref-button-schema-desc",
+      "ref-button-schema",
+      "ref-button-json-heading",
+      "ref-button-json-desc",
+      "ref-button-json-data",
+      "ref-button-rendering-heading",
+      "ref-button-rendering-desc",
+      "ref-button-rendering"
     ]
   },
   "contributors": [],

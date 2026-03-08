@@ -6,7 +6,7 @@
 </template>
 
 <script setup>
-import { inject } from 'vue';
+import { inject, ref, watch } from 'vue';
 import { expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';
 
 const props = defineProps({
@@ -22,13 +22,16 @@ const props = defineProps({
 const DEFAULT_PAGE_SIZE = 6;
 const injectedPages = inject('pages', {});
 
-// Read facet/search params from URL to pass as extraCriteria
 const route = useRoute();
-const extraCriteria = {};
-for (const [key, value] of Object.entries(route.query)) {
-  if (key === 'SearchableText' || key === 'sort_on' || key.startsWith('facet.')) {
-    extraCriteria[key] = value;
+
+function buildExtraCriteria(query) {
+  const criteria = {};
+  for (const [key, value] of Object.entries(query)) {
+    if (key === 'SearchableText' || key === 'sort_on' || key.startsWith('facet.')) {
+      criteria[key] = value;
+    }
   }
+  return criteria;
 }
 
 // Create own paging if none shared
@@ -39,11 +42,22 @@ const listingPage = ownsPaging
   : 0;
 const paging = props.paging || { start: listingPage * listingPageSize, size: listingPageSize };
 
-const items = await expandListingBlocks([props.id], {
-  blocks: { [props.id]: props.block },
-  fetchItems: { listing: ploneFetchItems({ apiUrl: props.apiUrl, contextPath: props.contextPath, extraCriteria }) },
-  paging,
-  itemTypeField: 'variation',
+async function fetchItems(extraCriteria) {
+  // Create fresh paging object each call — expandListingBlocks mutates it
+  const fetchPaging = { start: paging.start, size: paging.size };
+  return await expandListingBlocks([props.id], {
+    blocks: { [props.id]: props.block },
+    fetchItems: { listing: ploneFetchItems({ apiUrl: props.apiUrl, contextPath: props.contextPath, extraCriteria }) },
+    paging: fetchPaging,
+    itemTypeField: 'variation',
+  });
+}
+
+const items = ref(await fetchItems(buildExtraCriteria(route.query)));
+
+// Re-fetch when route query changes (e.g. header search on search page)
+watch(() => route.query, async (newQuery) => {
+  items.value = await fetchItems(buildExtraCriteria(newQuery));
 });
 
 // Build paging URL for own paging (per-listing)

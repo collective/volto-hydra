@@ -393,7 +393,7 @@ test.describe('Block Drag and Drop', () => {
   });
 
   test('footer blocks can be reordered via drag and drop', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'nuxt', 'Skipping on nuxt - no footer_blocks configured');
+    test.skip(testInfo.project.name.includes('nuxt'), 'Skipping on nuxt - no footer_blocks configured');
 
     const helper = new AdminUIHelper(page);
 
@@ -428,7 +428,7 @@ test.describe('Block Drag and Drop', () => {
   });
 
   test('can drag content block to footer and back', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'nuxt', 'Skipping on nuxt - no footer_blocks configured');
+    test.skip(testInfo.project.name.includes('nuxt'), 'Skipping on nuxt - no footer_blocks configured');
 
     const helper = new AdminUIHelper(page);
 

@@ -1,0 +1,15 @@
+{
+  "@type": "teaser",
+  "href": [
+    {
+      "@id": "/news/my-article",
+      "title": "My Article",
+      "description": "A short summary of the article",
+      "hasPreviewImage": true
+    }
+  ],
+  "title": "Custom Title",
+  "description": "Custom description overriding the target",
+  "preview_image": "/news/my-article/@@images/preview_image",
+  "overwrite": true
+}

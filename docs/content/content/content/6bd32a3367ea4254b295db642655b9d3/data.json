@@ -38,36 +38,44 @@
       "variation": "default"
     },
     "2a597dde-dd2b-4c66-816c-09e243a188f5": {
-      "@type": "listing",
-      "block": "24280e07-e962-4414-8ee5-cdaf58ca5f35",
-      "headline": "Listing: Grid",
+      "@type": "gridBlock",
+      "headline": "Listing: Grid (Teaser)",
       "headlineTag": "h2",
-      "query": [],
-      "querystring": {
-        "limit": "5",
-        "query": [
-          {
-            "i": "portal_type",
-            "o": "plone.app.querystring.operation.selection.any",
-            "v": [
-              "Document"
-            ]
+      "blocks": {
+        "grid-listing-1": {
+          "@type": "listing",
+          "querystring": {
+            "limit": "6",
+            "query": [
+              {
+                "i": "portal_type",
+                "o": "plone.app.querystring.operation.selection.any",
+                "v": [
+                  "Document"
+                ]
+              },
+              {
+                "i": "Subject",
+                "o": "plone.app.querystring.operation.selection.none",
+                "v": [
+                  "main folder"
+                ]
+              }
+            ],
+            "sort_on": "getId",
+            "sort_order": "ascending"
           },
-          {
-            "i": "Subject",
-            "o": "plone.app.querystring.operation.selection.none",
-            "v": [
-              "main folder"
-            ]
-          }
-        ],
-        "sort_on": "getId",
-        "sort_order": "ascending"
+          "variation": "teaser"
+        }
+      },
+      "blocks_layout": {
+        "items": [
+          "grid-listing-1"
+        ]
       },
       "styles": {
         "backgroundColor": "transparent"
-      },
-      "variation": "grid"
+      }
     },
     "43068b6d-d8e9-4acc-912b-eabcdc650939": {
       "@type": "title"
@@ -105,25 +113,150 @@
       "variation": "summary"
     },
     "c2eaacd0-4e96-4344-a0ac-26ed644fc503": {
-      "@type": "listing",
-      "block": "c2eaacd0-4e96-4344-a0ac-26ed644fc503",
-      "headline": "Listing: Bilder-Slider",
+      "@type": "slider",
+      "headline": "Listing: Image Slider",
       "headlineTag": "h2",
-      "query": [],
-      "querystring": {
-        "query": [
-          {
-            "i": "portal_type",
-            "o": "plone.app.querystring.operation.selection.any",
-            "v": [
-              "Image"
-            ]
-          }
-        ],
-        "sort_order": "ascending"
-      },
-      "styles": {},
-      "variation": "imageGallery"
+      "autoplayDelay": 4000,
+      "autoplayEnabled": false,
+      "autoplayJump": false,
+      "slides": [
+        {
+          "@id": "slider-listing-1",
+          "@type": "listing",
+          "querystring": {
+            "query": [
+              {
+                "i": "portal_type",
+                "o": "plone.app.querystring.operation.selection.any",
+                "v": [
+                  "Image"
+                ]
+              }
+            ],
+            "sort_order": "ascending"
+          },
+          "variation": "image"
+        }
+      ],
+      "styles": {}
+    },
+    "ref-listing-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-listing",
+      "placeholder": "sep"
+    },
+    "ref-listing-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-listing",
+      "placeholder": "heading"
+    },
+    "ref-listing-schema": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-listing",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-listing-schema-javascript-bd0476",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  \"listing\": {\n    \"itemTypeField\": \"variation\",\n    \"schemaEnhancer\": {\n      \"inheritSchemaFrom\": {\n        \"mappingField\": \"fieldMapping\",\n        \"defaultsField\": \"itemDefaults\",\n        \"filterConvertibleFrom\": \"@default\",\n        \"title\": \"Item Type\",\n        \"default\": \"summary\"\n      }\n    }\n  },\n  \"summary\": {\n    \"fieldMappings\": {\n      \"@default\": {\n        \"@id\": \"href\",\n        \"title\": \"title\",\n        \"description\": \"description\",\n        \"image\": \"image\"\n      }\n    },\n    \"blockSchema\": {\n      \"properties\": {\n        \"href\": {\n          \"title\": \"Link\",\n          \"widget\": \"url\"\n        },\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"description\": {\n          \"title\": \"Description\",\n          \"widget\": \"textarea\"\n        },\n        \"image\": {\n          \"title\": \"Image\",\n          \"widget\": \"url\"\n        },\n        \"date\": {\n          \"title\": \"Date\",\n          \"widget\": \"date\"\n        }\n      }\n    }\n  },\n  \"default\": {\n    \"fieldMappings\": {\n      \"@default\": {\n        \"@id\": \"href\",\n        \"title\": \"title\",\n        \"description\": \"description\"\n      }\n    },\n    \"blockSchema\": {\n      \"properties\": {\n        \"href\": {\n          \"title\": \"Link\",\n          \"widget\": \"url\"\n        },\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"description\": {\n          \"title\": \"Description\",\n          \"widget\": \"textarea\"\n        }\n      }\n    }\n  }\n}"
+        }
+      ]
+    },
+    "ref-listing-json-data": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-listing",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-listing-json-data-json-829696",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"listing\",\n  \"variation\": \"summary\",\n  \"querystring\": {\n    \"query\": [\n      {\n        \"i\": \"portal_type\",\n        \"o\": \"plone.app.querystring.operation.selection.any\",\n        \"v\": [\n          \"Document\"\n        ]\n      }\n    ],\n    \"sort_on\": \"effective\",\n    \"sort_order\": \"descending\"\n  }\n}\n\n{\n  \"@uid\": \"item-1\",\n  \"@type\": \"summary\",\n  \"href\": \"/news/my-article\",\n  \"title\": \"My Article\",\n  \"description\": \"Article summary text\",\n  \"image\": \"/news/my-article/@@images/image-800x600.jpg\"\n}"
+        }
+      ]
+    },
+    "ref-listing-rendering": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-listing",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-listing-rendering-jsx-f33c73",
+          "label": "React",
+          "language": "jsx",
+          "code": "function ListingBlock({ block, blockId }) {\n  const [items, setItems] = useState([]);\n\n  useEffect(() => {\n    async function load() {\n      const fetchItems = ploneFetchItems({ apiUrl: API_URL });\n      const result = await expandListingBlocks([blockId], {\n        blocks: { [blockId]: block },\n        fetchItems: { listing: fetchItems },\n        itemTypeField: 'variation',\n      });\n      setItems(result);\n    }\n    load();\n  }, [block.querystring]);\n\n  return (\n    <div data-block-uid={blockId} className=\"listing-block\">\n      {items.map((item, i) => (\n        <BlockRenderer key={i} block={item} />\n      ))}\n    </div>\n  );\n}"
+        },
+        {
+          "@id": "ref-listing-rendering-vue-3c4a00",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<template>\n  <div :data-block-uid=\"blockId\" class=\"listing-block\">\n    <BlockRenderer v-for=\"(item, i) in items\" :key=\"i\" :block=\"item\" />\n  </div>\n</template>\n\n<script setup>\nimport { ref, watch } from 'vue';\n\nconst props = defineProps({ block: Object, blockId: String });\nconst items = ref([]);\n\nwatch(() => props.block.querystring, async () => {\n  const fetchItems = ploneFetchItems({ apiUrl: API_URL });\n  const result = await expandListingBlocks([props.blockId], {\n    blocks: { [props.blockId]: props.block },\n    fetchItems: { listing: fetchItems },\n    itemTypeField: 'variation',\n  });\n  items.value = result;\n}, { immediate: true });\n</script>"
+        },
+        {
+          "@id": "ref-listing-rendering-svelte-aca768",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<script>\n  import BlockRenderer from './BlockRenderer.svelte';\n\n  export let block;\n  export let blockId;\n\n  let items = [];\n\n  $: block.querystring, loadItems();\n\n  async function loadItems() {\n    const fetchItems = ploneFetchItems({ apiUrl: API_URL });\n    const result = await expandListingBlocks([blockId], {\n      blocks: { [blockId]: block },\n      fetchItems: { listing: fetchItems },\n      itemTypeField: 'variation',\n    });\n    items = result;\n  }\n</script>\n\n<div data-block-uid={blockId} class=\"listing-block\">\n  {#each items as item, i (i)}\n    <BlockRenderer block={item} />\n  {/each}\n</div>"
+        }
+      ]
+    },
+    "ref-listing-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-listing",
+      "placeholder": "schema-heading"
+    },
+    "ref-listing-schema-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-listing",
+      "placeholder": "schema-desc"
+    },
+    "ref-listing-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-listing",
+      "placeholder": "json-heading"
+    },
+    "ref-listing-json-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-listing",
+      "placeholder": "json-desc"
+    },
+    "ref-listing-rendering-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-listing",
+      "placeholder": "rendering-heading"
+    },
+    "ref-listing-rendering-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-listing",
+      "placeholder": "rendering-desc"
     }
   },
   "blocks_layout": {
@@ -132,7 +265,27 @@
       "24280e07-e962-4414-8ee5-cdaf58ca5f35",
       "53ececaa-4219-42a9-861d-862be364fd60",
       "2a597dde-dd2b-4c66-816c-09e243a188f5",
-      "c2eaacd0-4e96-4344-a0ac-26ed644fc503"
+      "c2eaacd0-4e96-4344-a0ac-26ed644fc503",
+      "ref-listing-schema-heading",
+      "ref-listing-schema-desc",
+      "ref-listing-schema",
+      "ref-listing-json-heading",
+      "ref-listing-json-desc",
+      "ref-listing-json-data",
+      "ref-listing-rendering-heading",
+      "ref-listing-rendering-desc",
+      "ref-listing-rendering",
+      "ref-listing-sep",
+      "ref-listing-heading",
+      "ref-listing-schema-heading",
+      "ref-listing-schema-desc",
+      "ref-listing-schema",
+      "ref-listing-json-heading",
+      "ref-listing-json-desc",
+      "ref-listing-json-data",
+      "ref-listing-rendering-heading",
+      "ref-listing-rendering-desc",
+      "ref-listing-rendering"
     ]
   },
   "contributors": [],

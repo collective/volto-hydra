@@ -4,3 +4,6 @@ packages:
   - 'examples/*'
   - '!examples/hydra-vue-f7'
   - '!examples/nuxt-blog-starter'
+  - 'docs/blocks/test-react'
+  - 'docs/blocks/test-svelte'
+  - 'docs/blocks/test-vue'

@@ -14,9 +14,11 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "start": "VOLTOCONFIG=$(pwd)/volto.config.js razzle start",
-    "start:test": "PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888,http://localhost:3003 VOLTOCONFIG=$(pwd)/volto.config.js razzle start",
+    "start:test": "PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005 VOLTOCONFIG=$(pwd)/volto.config.js razzle start",
     "start:mock-api": "CONTENT_MOUNTS='/:docs/content/content/content,/_test_data:tests-playwright/fixtures/content' node --watch --watch-path=tests-playwright/fixtures --watch-path=packages/hydra-js --watch-path=docs/content tests-playwright/fixtures/mock-api-server.js",
     "start:nuxt:test": "cd examples/nuxt-blog-starter && pnpm run dev:test",
+    "start:react:test": "cd docs/blocks/test-react && pnpm run dev:test",
+    "start:svelte:test": "cd docs/blocks/test-svelte && pnpm run dev:test",
     "start:prod": "NODE_ENV=production node build/server.js",
     "build": "VOLTOCONFIG=$(pwd)/volto.config.js razzle build --noninteractive",
     "i18n": "pnpm --filter volto-hydra i18n",
@@ -27,6 +29,9 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "test:api": "node --test tests-playwright/fixtures/mock-api-server.test.js",
+    "check:docs": "node docs/blocks/check-examples.mjs",
+    "sync:docs": "node docs/blocks/sync-examples.mjs",
+    "sync:docs:check": "node docs/blocks/sync-examples.mjs --check",
     "lint": "eslint --max-warnings=0 'packages/**/src/**/*.{js,jsx,ts,tsx}'",
     "lint:fix": "eslint --fix 'packages/**/src/**/*.{js,jsx,ts,tsx}'",
     "prettier": "prettier --check 'packages/**/src/**/*.{js,jsx,ts,tsx}'",
@@ -89,7 +94,14 @@
     "svgo-loader": "3.0.3",
     "webpack": "5.90.1",
     "webpack-dev-server": "4.11.1",
-    "webpack-node-externals": "3.0.0"
+    "webpack-node-externals": "3.0.0",
+    "svelte": "^4.0.0",
+    "@sveltejs/vite-plugin-svelte": "^3.0.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "vite": "^5.0.0",
+    "@vue/compiler-sfc": "^3.4.0",
+    "acorn": "^8.11.0",
+    "acorn-jsx": "^5.3.2"
   },
   "packageManager": "pnpm@9.1.1",
   "files": [

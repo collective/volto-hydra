@@ -512,7 +512,7 @@ test.describe('Inline Editing with Mock Parent', () => {
           type: 'FORM_DATA',
           data: formData,
           blockPathMap: window.mockParent.buildBlockPathMap(),
-          blockFieldTypes: window.mockParent.getBlockFieldTypes(),
+
         }, '*');
         i++;
       }, 15);
@@ -569,7 +569,7 @@ test.describe('Inline Editing with Mock Parent', () => {
           type: 'FORM_DATA',
           data: formData,
           blockPathMap: window.mockParent.buildBlockPathMap(),
-          blockFieldTypes: window.mockParent.getBlockFieldTypes(),
+
         }, '*');
       }, { partialText });
     }

@@ -1,0 +1,37 @@
+{
+  "properties": {
+    "effective": {
+      "title": "Publication date",
+      "description": "Date when the content becomes visible to the public.",
+      "type": "string",
+      "widget": "datetime"
+    },
+    "expires": {
+      "title": "Expiration date",
+      "description": "Date when the content will no longer be visible.",
+      "type": "string",
+      "widget": "datetime"
+    },
+    "created": {
+      "title": "Creation date",
+      "description": "Date the content was created.",
+      "type": "string",
+      "widget": "datetime",
+      "readonly": true
+    },
+    "modified": {
+      "title": "Modification date",
+      "description": "Date the content was last modified.",
+      "type": "string",
+      "widget": "datetime",
+      "readonly": true
+    }
+  },
+  "fieldsets": [
+    {
+      "id": "dates",
+      "title": "Dates",
+      "fields": ["effective", "expires", "created", "modified"]
+    }
+  ]
+}

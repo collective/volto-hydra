@@ -1,0 +1,36 @@
+function BlockRenderer({ block, content }) {
+  const type = block['@type'];
+  switch (type) {
+    case 'slate':         return <SlateBlock block={block} />;
+    case 'introduction':  return <IntroductionBlock block={block} content={content} />;
+    case 'image':         return <ImageBlock block={block} />;
+    case 'hero':          return <HeroBlock block={block} />;
+    case 'teaser':        return <TeaserBlock block={block} />;
+    case 'slateTable':    return <TableBlock block={block} />;
+    case 'columns':       return <ColumnsBlock block={block} />;
+    case 'gridBlock':     return <GridBlock block={block} />;
+    case 'accordion':     return <AccordionBlock block={block} />;
+    case 'slider':        return <SliderBlock block={block} />;
+    case 'listing':       return <ListingBlock block={block} blockId={block['@uid']} />;
+    case 'search':        return <SearchBlock block={block} blockId={block['@uid']} />;
+    case 'form':          return <FormBlock block={block} />;
+    case 'heading':       return <HeadingBlock block={block} />;
+    case 'separator':     return <SeparatorBlock block={block} />;
+    case '__button':      return <ButtonBlock block={block} />;
+    case 'highlight':     return <HighlightBlock block={block} />;
+    case 'video':         return <VideoBlock block={block} />;
+    case 'maps':          return <MapsBlock block={block} />;
+    case 'toc':           return <TocBlock block={block} content={content} />;
+    case 'summary':
+    case 'default':
+      return (
+        <div data-block-uid={block['@uid']} className="listing-item">
+          {block.image && <img data-edit-media="image" src={typeof block.image === 'string' ? block.image : block.image['@id']} alt="" />}
+          {block.date && <time style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{new Date(block.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</time>}
+          <h4><a href={contentPath(block.href)} data-edit-link="href">{block.title}</a></h4>
+          {block.description && <p data-edit-text="description">{block.description}</p>}
+        </div>
+      );
+    default:              return <div data-block-uid={block['@uid']}>Unknown block: {type}</div>;
+  }
+}

@@ -374,27 +374,6 @@ This will enable an Editor to :-
 
 - Note either hashbang ```/#!/path``` or normal ```/path``` style paths are supported.
 
-#### Path Transformation (pathToApiPath)
-
-If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS.
-
-```js
-const bridge = initBridge({
-  page: {
-    schema: {
-      properties: {
-        blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'video'] },
-      },
-    },
-  },
-  // Transform frontend path to API path by stripping paging segments
-  // e.g., /test-page/@pg_block-8-grid_1 -> /test-page
-  pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
-});
-```
-
-The `pathToApiPath` function is called whenever hydra.js sends a `PATH_CHANGE` message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state).
-
 ### Level 2: Block Definitions
 
 During the initialisation you can have full control over the blocks that will be stored,
@@ -439,7 +418,7 @@ const bridge = initBridge({
       group: 'common', // The group (blocks can be grouped, displayed in the chooser)
       restricted: false,
       mostUsed: true, // A meta group `most used`, appearing at the top of the chooser
-      sidebarSchemaOnly: false, // Some volto plugins might Set true to disable Edit component in sidebar (use schema form only)
+      disableCustomSidebarEditForm: false, // Set true to disable the block's custom Edit component in sidebar (use schema form only)
       blockSchema: {
         properties: {
           slider_timing: {
@@ -678,8 +657,8 @@ const bridge = initBridge({
         },
       },
       schemaEnhancer: {
-        skiplogic: {
-          advancedOptions: { field: 'mode', is: 'advanced' },
+        fieldRules: {
+          advancedOptions: { when: { mode: 'advanced' }, else: false },
         },
       },
     },
@@ -687,9 +666,15 @@ const bridge = initBridge({
 });
 ```
 
-**`skiplogic`**: Conditionally show/hide fields based on other field values.
-- `field`: Field to check (use `../field` for parent/page fields)
-- Operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`
+**`fieldRules`**: Add, remove, or conditionally modify field definitions.
+- `false` — always hide the field
+- `{ set: { title: '...', widget: '...' } }` — always add/replace a field definition
+- `{ when: { fieldName: value }, else: false }` — show only when condition met
+- `{ when: { fieldName: { gte: 2 } }, set: { ... } }` — conditional definition override
+- `[rule, rule, ...]` — switch: first matching rule wins
+- `'parent.child': false` — hide a field inside a widget's inner schema
+- Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`
+- Field paths: `../field` for parent block, `/field` for root
 
 #### Block conversion and fieldMappings
 
@@ -753,45 +738,56 @@ When `type` is specified, the value is converted at runtime:
 | `array` | Non-arrays wrapped in `[value]` |
 | _(none)_ | Copied as-is |
 
-**FieldMappingWidget** — the admin UI provides a widget that lets editors configure field mappings visually. When a listing selects an item type (e.g., `teaser`), the widget shows the `@default` source fields and lets the editor map each one to a field on the target type's schema. It auto-detects the `type` from the target field definition — e.g., an `object_browser` field with `mode=link` becomes `type: "link"`. The resulting `fieldMapping` (singular) is saved on the block data so it can be applied at render time without access to the block registry.
+**FieldMappingWidget** — when a parent block has `mappingField` set in its `inheritSchemaFrom` recipe, the admin sidebar shows a widget that lets editors configure field mappings visually:
+
+- Shows the `@default` source fields (canonical content fields: `@id`, `title`, `description`, `image`) on the left
+- For each source field, lets the editor pick a field from the selected child type's schema
+- Auto-detects the conversion `type` from the target field definition (e.g. `object_browser` with `mode=link` → `type: "link"`)
+- Saves the result as `fieldMapping` (singular) on the block data
+
+The saved `fieldMapping` is read at render time by `expandListingBlocks` — no block registry access needed at render time.
 
 #### Synchronised block types in a container
 
-A parent container can control the type of all its children. A field on the parent lets the editor select the type, and all child blocks get converted using `fieldMappings`.
+A parent container can control the type of all its children. Setting `itemTypeField` on the parent's block config tells the system which field drives the child type. When the editor changes that field, all children are converted using `fieldMappings`, and new children added to the container default to that type.
 
 ```js
 const bridge = initBridge({
   blocks: {
     gridBlock: {
+      itemTypeField: 'variation',   // field that drives child type syncing
       allowedBlocks: ['teaser', 'image'],
       schemaEnhancer: {
         inheritSchemaFrom: {
-          typeField: 'variation',
+          blocksField: 'blocks',    // which blocks field to sync children in
         },
       },
     },
     teaser: {
-      schemaEnhancer: {
-        childBlockConfig: {
-          editableFields: ['href', 'title', 'description'],
-        },
-      },
       fieldMappings: {
         '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
       },
+      // childBlockConfig not needed — editableFields auto-derived from fieldMappings['@default'] targets
     },
   },
 });
 ```
 
-**`inheritSchemaFrom`**: Parent inherits schema from selected child type. When `variation` changes, child blocks sync to new type.
-- `typeField`: Field name for selecting child type (e.g., `'variation'`)
-- `defaultsField`: Field name for storing inherited defaults (e.g., `'itemDefaults'`)
-- `blocksField`: Which blocks field the sub-blocks will be in. Used to get the list
-     of `allowedBlocks`. It can be set to `".."` to use the parent's `allowedBlocks`
-- `filterConvertibleFrom`: only allow selecting a block type which can convert from the specified type
+**`itemTypeField`** (block config, not recipe) — field name on the block that selects the child type (e.g., `'variation'`). Setting this enables child type syncing when the value changes. If omitted, no syncing happens.
 
-**`childBlockConfig`**: Child hides fields except `editableFields` when inside a parent with `inheritSchemaFrom`.
+**`inheritSchemaFrom`** recipe options:
+
+- `blocksField`: which blocks field the sub-blocks live in. Required for child type syncing and for deriving `allowedBlocks` choices. Set to `".."` to use the parent's own `allowedBlocks`. Omit for standalone schema defaults with no sub-block syncing.
+- `mappingField`: field name where the `FieldMappingWidget` saves its output (e.g., `'fieldMapping'`). Enables the mapping widget in the sidebar.
+- `defaultsField`: where to store inherited default values so they don't collide with other fields (e.g., `'itemDefaults'`).
+- `filterConvertibleFrom`: only offer child types that can convert from this source type. Use `'@default'` for listings where all items must be populatable from catalog query results.
+- `title`: label for the type selector field in the sidebar.
+- `default`: default type value when none is selected.
+
+**`childBlockConfig`** recipe options (on the child block type):
+
+- `editableFields`: allowlist of fields that stay on the child block's sidebar form — everything else is moved to the parent's "Defaults" fieldset. **Optional**: if omitted, the fields are derived automatically from `fieldMappings['@default']` targets (the fields that receive mapped data stay on the child). Specify explicitly when the desired split differs from what the mapping targets suggest.
+- `parentControlledFields`: blocklist alternative — only these fields are moved to the parent. Use when you want to specify the parent-owned fields rather than the child-owned ones.
 
 #### HTML Paste support (TODO)
 
@@ -1256,9 +1252,11 @@ The steps involved in creating a frontend are roughly the same for all these fra
     - handle thank you page
 
 
-## Listings and dynamic blocks
+## Listings and dynamic repeating blocks
 
-A listing block fetches content from a query (e.g. latest news) and renders each result as a separate block. `expandListingBlocks` handles fetching, paging, and mapping results to block objects:
+A listing block fetches content from a query (e.g. latest news) and renders each result as a separate block, repeating each block with one result entry. This allows a listing to
+be moved between containers and reuse normal blocks for what it repeats.
+`expandListingBlocks` is a helper in hydra.js which handles fetching, paging, and mapping results to block objects:
 
 ```js
 import { expandListingBlocks, ploneFetchItems } from '@volto-hydra/hydra-js';
@@ -1329,7 +1327,7 @@ Each listing block stores a `fieldMapping` on its block data that maps query res
 
 When no `fieldMapping` is saved, a built-in default is used: `{ "@id": "href", "title": "title", "description": "description", "image": "image" }`.
 
-Each item block gets `@type` from the listing's `variation` field, defaulting to `'summary'`. Built-in item types:
+Each item block gets `@type` from the listing's item type field (configured via `itemTypeField` on the block config), defaulting to `'summary'` when unset. Built-in item types:
 
 | Type | Fields |
 |------|--------|
@@ -1337,19 +1335,24 @@ Each item block gets `@type` from the listing's `variation` field, defaulting to
 | `summary` | `title`, `description`, `href`, `image` |
 | `teaser` | `title`, `description`, `href`, `preview_image` |
 
-To let editors choose item types and configure mappings, use `inheritSchemaFrom` on the listing block config:
+To let editors choose item types and configure mappings, set `itemTypeField` on the listing config and use the `inheritSchemaFrom` recipe with `mappingField`:
 
 ```js
 listing: {
-  schemaEnhancer: inheritSchemaFrom('variation', 'fieldMapping', 'itemDefaults', {
-    filterConvertibleFrom: '@default',
-    title: 'Item Type',
-    default: 'summaryItem',
-  }),
+  itemTypeField: 'variation',   // field that holds the selected item type
+  schemaEnhancer: {
+    inheritSchemaFrom: {
+      mappingField: 'fieldMapping',           // enables the FieldMappingWidget
+      defaultsField: 'itemDefaults',          // where to store defaults
+      filterConvertibleFrom: '@default',      // only show types with @default mappings
+      title: 'Item Type',
+      default: 'summary',
+    },
+  },
 }
 ```
 
-This adds a type selector to the listing's sidebar. When the editor picks a type, the `FieldMappingWidget` maps `@default` source fields to the chosen type's schema and saves the result as `fieldMapping`.
+This adds a type selector and `FieldMappingWidget` to the listing's sidebar. When the editor picks a type, the widget maps `@default` source fields to the chosen type's schema fields and saves the result as `fieldMapping` on the block data.
 
 ### Paging
 
@@ -1431,6 +1434,15 @@ async function PagingWhenReady({ paging }) {
 | `fetchItems` | — | `{ blockType: async (block, { start, size }) => { items, total } }` |
 | `itemTypeField` | `'itemType'` | Field on the listing block that holds the item type |
 | `defaultItemType` | `'summary'` | Fallback type when field is not set |
+
+#### Path transformation
+
+If paging embeds state in the URL path, pass `pathToApiPath` to `initBridge` so hydra.js reports the correct CMS path to the admin:
+
+```js
+// e.g. /test-page/@pg_block-8-grid_1 → /test-page
+pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
+```
 
 ## Templates
 

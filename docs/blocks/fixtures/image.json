@@ -1,0 +1,6 @@
+{
+  "@type": "image",
+  "url": "/my-folder/my-image/@@images/image",
+  "alt": "A description of the image",
+  "href": [{ "@id": "/target-page" }]
+}

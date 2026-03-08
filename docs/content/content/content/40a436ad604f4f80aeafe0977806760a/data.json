@@ -205,6 +205,124 @@
           "type": "h2"
         }
       ]
+    },
+    "ref-image-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-image",
+      "placeholder": "sep"
+    },
+    "ref-image-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-image",
+      "placeholder": "heading"
+    },
+    "ref-image-schema": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-image",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-image-schema-javascript-979df6",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  \"image\": {\n    \"fieldMappings\": {\n      \"@default\": {\n        \"image\": \"url\",\n        \"@id\": \"href\",\n        \"title\": \"alt\"\n      }\n    },\n    \"blockSchema\": {\n      \"properties\": {\n        \"url\": {\n          \"title\": \"Image\",\n          \"widget\": \"image\"\n        },\n        \"alt\": {\n          \"title\": \"Alt Text\"\n        },\n        \"href\": {\n          \"title\": \"Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        }\n      }\n    },\n    \"schemaEnhancer\": {\n      \"childBlockConfig\": {\n        \"defaultsField\": \"itemDefaults\"\n      }\n    }\n  }\n}"
+        }
+      ]
+    },
+    "ref-image-json-data": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-image",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-image-json-data-json-ddd34d",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"image\",\n  \"url\": \"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27600%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2377aadd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ETest Image%3C/text%3E%3C/svg%3E\",\n  \"alt\": \"A description of the image\",\n  \"href\": [\n    {\n      \"@id\": \"/target-page\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    "ref-image-rendering": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-image",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-image-rendering-jsx-a59bc5",
+          "label": "React",
+          "language": "jsx",
+          "code": "function ImageBlock({ block }) {\n  const src = block.url || '';\n  const alt = block.alt || '';\n  const href = block.href?.[0]?.['@id'] || block.href;\n\n  const img = (\n    <img data-edit-media=\"url\" src={src} alt={alt} />\n  );\n\n  return (\n    <div data-block-uid={block['@uid']}>\n      {href ? (\n        <a href={href} data-edit-link=\"href\">{img}</a>\n      ) : (\n        <>{img}</>\n      )}\n    </div>\n  );\n}"
+        },
+        {
+          "@id": "ref-image-rendering-vue-c3dead",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\">\n    <a v-if=\"href\" :href=\"href\" data-edit-link=\"href\">\n      <img data-edit-media=\"url\" :src=\"block.url\" :alt=\"block.alt\" />\n    </a>\n    <img v-else data-edit-media=\"url\" :src=\"block.url\" :alt=\"block.alt\" />\n  </div>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nconst props = defineProps({ block: Object });\nconst href = computed(() => props.block.href?.[0]?.['@id'] || props.block.href);\n</script>"
+        },
+        {
+          "@id": "ref-image-rendering-svelte-52a7e2",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<script>\n  export let block;\n  $: href = block.href?.[0]?.['@id'] || block.href;\n</script>\n\n<div data-block-uid={block['@uid']}>\n  {#if href}\n    <a {href} data-edit-link=\"href\">\n      <img data-edit-media=\"url\" src={block.url} alt={block.alt} />\n    </a>\n  {:else}\n    <img data-edit-media=\"url\" src={block.url} alt={block.alt} />\n  {/if}\n</div>"
+        }
+      ]
+    },
+    "ref-image-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-image",
+      "placeholder": "schema-heading"
+    },
+    "ref-image-schema-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-image",
+      "placeholder": "schema-desc"
+    },
+    "ref-image-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-image",
+      "placeholder": "json-heading"
+    },
+    "ref-image-json-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-image",
+      "placeholder": "json-desc"
+    },
+    "ref-image-rendering-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-image",
+      "placeholder": "rendering-heading"
+    },
+    "ref-image-rendering-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-image",
+      "placeholder": "rendering-desc"
     }
   },
   "blocks_layout": {
@@ -225,7 +343,27 @@
       "5ea2e916-7224-43ad-adc8-7bd6b4fadf53",
       "bd53c8f5-d1eb-49e1-ac9d-463e0c50d4ce",
       "b7d57c29-c082-4b41-b6e0-7ccf83d46b97",
-      "b6bf35d7-7536-4a32-9821-4ae209de88fe"
+      "b6bf35d7-7536-4a32-9821-4ae209de88fe",
+      "ref-image-schema-heading",
+      "ref-image-schema-desc",
+      "ref-image-schema",
+      "ref-image-json-heading",
+      "ref-image-json-desc",
+      "ref-image-json-data",
+      "ref-image-rendering-heading",
+      "ref-image-rendering-desc",
+      "ref-image-rendering",
+      "ref-image-sep",
+      "ref-image-heading",
+      "ref-image-schema-heading",
+      "ref-image-schema-desc",
+      "ref-image-schema",
+      "ref-image-json-heading",
+      "ref-image-json-desc",
+      "ref-image-json-data",
+      "ref-image-rendering-heading",
+      "ref-image-rendering-desc",
+      "ref-image-rendering"
     ]
   },
   "contributors": [],

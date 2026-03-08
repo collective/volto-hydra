@@ -46,7 +46,8 @@ test.describe('Inline editing - linkable/media fields', () => {
 
     // The hero block has an image with data-edit-media="image"
     const iframe = helper.getIframe();
-    const mediaElement = iframe.locator('[data-edit-media="image"]');
+    const heroBlock = iframe.locator('[data-block-uid="block-4-hero"]');
+    const mediaElement = heroBlock.locator('[data-edit-media="image"]');
     await expect(mediaElement).toBeVisible();
 
     // Click the media element
@@ -134,9 +135,10 @@ test.describe('Inline editing - linkable/media fields', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Hover over the media element
+    // Hover over the media element (scope to hero block to avoid strict mode violation)
     const iframe = helper.getIframe();
-    const mediaElement = iframe.locator('[data-edit-media="image"]');
+    const heroBlock = iframe.locator('[data-block-uid="block-4-hero"]');
+    const mediaElement = heroBlock.locator('[data-edit-media="image"]');
     await mediaElement.hover();
 
     // Check that the ::after pseudo-element creates a dashed border

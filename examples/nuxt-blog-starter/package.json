@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "sync-hydra": "cp ../../packages/hydra-js/hydra.js ./packages/hydra.js",
+    "sync-hydra": "mkdir -p ./packages && cp ../../packages/hydra-js/hydra.js ./packages/hydra.js",
     "prebuild": "npm run sync-hydra",
     "build": "nuxt build",
     "predev": "npm run sync-hydra",
@@ -11,8 +11,11 @@
     "predev_edit": "npm run sync-hydra",
     "dev_edit": "nuxt dev --envName edit",
     "dev:test": "NUXT_ENV_NAME=test nuxt dev --envName test --port 3003",
+    "build:test": "NUXT_ENV_NAME=test nuxt build --envName test",
+    "preview:test": "nuxt preview --port 3003",
     "pregenerate": "npm run sync-hydra",
     "generate": "nuxt generate",
+    "preedit": "npm run sync-hydra",
     "edit": "nuxt generate --envName edit",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare"
@@ -20,6 +23,7 @@
   "dependencies": {
     "@vueuse/core": "^11.3.0",
     "flowbite": "^2.5.2",
+    "highlight.js": "^11.11.1",
     "netlify-cli": "^23.12.3",
     "nitropack": "^2.10.4",
     "nuxi": "^3.15.0",

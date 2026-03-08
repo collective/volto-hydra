@@ -469,7 +469,7 @@ test.describe('Add and Remove Combined', () => {
 test.describe('Footer Blocks Add/Remove', () => {
   // These tests are specific to the mock frontend's footer_blocks configuration
   test.beforeEach(async ({}, testInfo) => {
-    test.skip(testInfo.project.name === 'nuxt', 'Skipping on nuxt - tests mock frontend config');
+    test.skip(testInfo.project.name.includes('nuxt'), 'Skipping on nuxt - tests mock frontend config');
   });
 
   test('can add a block to footer', async ({ page }) => {
@@ -693,7 +693,7 @@ test.describe('Allowed Blocks from Frontend', () => {
   // These tests are specific to the mock frontend's allowedBlocks configuration
   // The nuxt frontend has a different allowedBlocks list (includes video, excludes hero)
   test.beforeEach(async ({}, testInfo) => {
-    test.skip(testInfo.project.name === 'nuxt', 'Skipping on nuxt - tests mock frontend config');
+    test.skip(testInfo.project.name.includes('nuxt'), 'Skipping on nuxt - tests mock frontend config');
   });
 
   test('block chooser hides blocks not in allowedBlocks list', async ({ page }) => {

@@ -9,8 +9,11 @@
 
 import React from 'react';
 import { defineMessages, useIntl } from 'react-intl';
-import { mergeTemplatesIntoPage, templateIdToPath } from '@volto-hydra/hydra-js';
+import { v4 as uuid } from 'uuid';
+import { templateIdToPath } from '@volto-hydra/hydra-js';
+import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import Api from '@plone/volto/helpers/Api/Api';
+import config from '@plone/volto/registry';
 
 const messages = defineMessages({
   selectLayout: {
@@ -123,6 +126,9 @@ const LayoutSelector = ({
       const { merged: newFormData } = await mergeTemplatesIntoPage(formData, {
         loadTemplate: async (templateId) => api.get(templateId),
         pageBlocksFields: { blocks_layout: { allowedLayouts: [layoutToApply] } },
+        uuidGenerator: uuid,
+        blocksConfig: config.blocks.blocksConfig,
+        intl,
       });
 
       // Merge with existing formData (preserve other fields)

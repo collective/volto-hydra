@@ -17,25 +17,25 @@
     },
     "accordion-1": {
       "@type": "accordion",
-      "blocks": {
-        "header-text-1": {
-          "@type": "slate",
-          "value": [{"type": "p", "children": [{"text": "Accordion Header Text"}]}],
-          "plaintext": "Accordion Header Text"
-        },
-        "content-text-1": {
-          "@type": "slate",
-          "value": [{"type": "p", "children": [{"text": "Accordion Content Text"}]}],
-          "plaintext": "Accordion Content Text"
-        },
-        "content-text-2": {
-          "@type": "slate",
-          "value": [{"type": "p", "children": [{"text": "More content"}]}],
-          "plaintext": "More content"
+      "panels": [
+        {
+          "@id": "panel-1",
+          "title": "Accordion Header Text",
+          "blocks": {
+            "content-text-1": {
+              "@type": "slate",
+              "value": [{"type": "p", "children": [{"text": "Accordion Content Text"}]}],
+              "plaintext": "Accordion Content Text"
+            },
+            "content-text-2": {
+              "@type": "slate",
+              "value": [{"type": "p", "children": [{"text": "More content"}]}],
+              "plaintext": "More content"
+            }
+          },
+          "blocks_layout": {"items": ["content-text-1", "content-text-2"]}
         }
-      },
-      "header": {"items": ["header-text-1"]},
-      "content": {"items": ["content-text-1", "content-text-2"]}
+      ]
     },
     "text-after": {
       "@type": "slate",

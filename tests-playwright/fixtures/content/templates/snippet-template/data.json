@@ -1,0 +1,41 @@
+{
+  "@id": "/templates/snippet-template",
+  "@type": "Document",
+  "UID": "snippet-template-uid",
+  "id": "snippet-template",
+  "title": "Snippet Template",
+  "description": "A small insertable template not in allowedLayouts",
+  "blocks": {
+    "snippet-header": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/snippet-template-uid",
+      "templateInstanceId": "snippet-def-instance",
+      "placeholder": "snippet-heading",
+      "value": [
+        {
+          "type": "h2",
+          "children": [{ "text": "Snippet Header - From Template" }]
+        }
+      ],
+      "plaintext": "Snippet Header - From Template"
+    },
+    "snippet-content": {
+      "@type": "slate",
+      "templateId": "resolveuid/snippet-template-uid",
+      "templateInstanceId": "snippet-def-instance",
+      "placeholder": "snippet-body",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "Default snippet content" }]
+        }
+      ],
+      "plaintext": "Default snippet content"
+    }
+  },
+  "blocks_layout": {
+    "items": ["snippet-header", "snippet-content"]
+  }
+}

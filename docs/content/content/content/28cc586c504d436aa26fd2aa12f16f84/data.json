@@ -1,5 +1,5 @@
 {
-  "@id": "/block/grid-block/image",
+  "@id": "/block/grid-block/grid-image",
   "@type": "Document",
   "UID": "28cc586c504d436aa26fd2aa12f16f84",
   "allow_discussion": false,
@@ -343,7 +343,7 @@
   "exportimport.constrains": {},
   "exportimport.conversation": [],
   "exportimport.versions": {},
-  "id": "image",
+  "id": "grid-image",
   "is_folderish": true,
   "language": "##DEFAULT##",
   "layout": "document_view",

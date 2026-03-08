@@ -601,6 +601,33 @@ test.describe('Templates', () => {
     expect(newStandalone2Index).toBe(newUserContentIndex + 1);
   });
 
+  test('inserted template fixed blocks render when not in allowedLayouts', async ({ page }) => {
+    // Bug: When allowedLayouts is set (e.g. [null, '/templates/test-layout', ...])
+    // and the page contains an inserted template whose templateId is NOT in allowedLayouts,
+    // expandTemplatesSync overrides templateId to allowedLayouts[0] (null) and nulls
+    // existingInstanceId, causing the template removal flow to strip fixed blocks.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/inserted-template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // The regular (non-template) blocks should always render
+    await expect(iframe.locator('[data-block-uid="regular-block-1"]')).toBeVisible({ timeout: 15000 });
+    await expect(iframe.locator('[data-block-uid="regular-block-2"]')).toBeVisible();
+
+    // The snippet template's fixed+readOnly header block should be visible
+    // with content from the TEMPLATE (not the stale page content).
+    // BUG: allowedLayouts causes this block to be stripped entirely.
+    const { locator: snippetHeader } = await helper.waitForBlockByContent('Snippet Header');
+    await expect(snippetHeader).toContainText('Snippet Header - From Template');
+
+    // The user content in the placeholder should also be preserved
+    const snippetContent = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'User snippet content' });
+    await expect(snippetContent).toBeVisible();
+  });
+
   test('template instance toolbar remains visible after scrolling', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 

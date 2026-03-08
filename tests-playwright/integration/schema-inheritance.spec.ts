@@ -501,6 +501,9 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const searchInputAfter = iframe.locator('[data-block-uid="search-block-1"] input[name="SearchableText"]');
     await expect(searchInputAfter).toHaveValue('accordion', { timeout: 10000 });
 
+    // Wait for block count to stabilize after reactive re-fetch
+    await helper.getStableBlockCount();
+
     // Check filtered results
     const filteredResults = iframe.locator('[data-block-uid="search-block-1"] .search-results [data-block-uid]');
 
@@ -1121,8 +1124,8 @@ test.describe('Frontend-Driven Schema Enhancers', () => {
   });
 });
 
-test.describe('Skiplogic - Conditional Field Visibility', () => {
-  test('field with skiplogic is hidden when condition not met', async ({ page }) => {
+test.describe('fieldRules - Conditional Field Visibility', () => {
+  test('field with fieldRules is hidden when condition not met', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -1147,7 +1150,7 @@ test.describe('Skiplogic - Conditional Field Visibility', () => {
     await expect(basicField).toBeVisible();
   });
 
-  test('field with skiplogic is shown when condition is met', async ({ page }) => {
+  test('field with fieldRules is shown when condition is met', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -1177,7 +1180,7 @@ test.describe('Skiplogic - Conditional Field Visibility', () => {
     await expect(advancedField).toBeVisible({ timeout: 5000 });
   });
 
-  test('skiplogic with isNot operator', async ({ page }) => {
+  test('fieldRules with isNot operator', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -1193,7 +1196,7 @@ test.describe('Skiplogic - Conditional Field Visibility', () => {
     await helper.waitForSidebarOpen();
     await helper.openSidebarTab('Block');
 
-    // 'Simple Warning' has skiplogic: { field: 'mode', isNot: 'advanced' }
+    // 'Simple Warning' has fieldRules: { when: { mode: { isNot: 'advanced' } }, else: false }
     // Initially mode is not set, so isNot: 'advanced' is true -> should be visible
     const warningField = page.locator('text=Simple Warning');
     await expect(warningField).toBeVisible({ timeout: 5000 });
@@ -1210,7 +1213,7 @@ test.describe('Skiplogic - Conditional Field Visibility', () => {
     await expect(warningField).not.toBeVisible({ timeout: 5000 });
   });
 
-  test('skiplogic with numeric comparison', async ({ page }) => {
+  test('fieldRules with numeric comparison', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -1226,7 +1229,7 @@ test.describe('Skiplogic - Conditional Field Visibility', () => {
     await helper.waitForSidebarOpen();
     await helper.openSidebarTab('Block');
 
-    // 'Column Layout' has skiplogic: { field: 'columns', gte: 2 }
+    // 'Column Layout' has fieldRules: { when: { columns: { gte: 2 } }, else: false }
     // Initially columns is not set or 1, so should be hidden
     const columnLayoutField = page.locator('text=Column Layout');
     await expect(columnLayoutField).not.toBeVisible();
@@ -1240,7 +1243,7 @@ test.describe('Skiplogic - Conditional Field Visibility', () => {
     await expect(columnLayoutField).toBeVisible({ timeout: 5000 });
   });
 
-  test('skiplogic with parent path reference', async ({ page }) => {
+  test('fieldRules with parent path reference', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -1257,7 +1260,7 @@ test.describe('Skiplogic - Conditional Field Visibility', () => {
     await helper.openSidebarTab('Block');
 
     // Page has description "A test page with blocks", so pageNotice should be visible
-    // skiplogic: { field: '../description', isSet: true }
+    // fieldRules: { when: { '../description': { isSet: true } }, else: false }
     let pageNoticeField = page.locator('text=Page Notice');
     await expect(pageNoticeField).toBeVisible({ timeout: 5000 });
 

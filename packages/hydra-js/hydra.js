@@ -1716,7 +1716,7 @@ export class Bridge {
         } else {
           const initMessage = {
             type: 'INIT',
-            currentPath: currentPath,
+            currentPath: this.pathToApiPath(currentPath),
           };
           if (options?.page) {
             initMessage.page = options.page;
@@ -1733,9 +1733,6 @@ export class Bridge {
         const receiveInitialData = (e) => {
           if (e.origin === this.adminOrigin) {
             if (e.data.type === 'INITIAL_DATA') {
-              // Store block field types metadata (blockId -> fieldName -> fieldType)
-              this.blockFieldTypes = e.data.blockFieldTypes || {};
-
               // Central method sets formData, lastReceivedFormData, and blockPathMap
               this.setFormDataFromAdmin(e.data.data, 'INITIAL_DATA', e.data.blockPathMap);
 
@@ -1860,7 +1857,7 @@ export class Bridge {
           }
         }
         window.parent.postMessage(
-          { type: 'INIT', currentPath: currentPath },
+          { type: 'INIT', currentPath: this.pathToApiPath(currentPath) },
           this.adminOrigin,
         );
       }
@@ -3947,6 +3944,13 @@ export class Bridge {
         return null;
       }
 
+      // Skip error if the field is not contenteditable — the user clicked on a
+      // display-only field (e.g. a plain text field not yet activated for editing).
+      // The data-node-id warning only matters when the field is actually being edited.
+      if (container && container.getAttribute('contenteditable') !== 'true') {
+        return null;
+      }
+
       // Check if this field is supposed to be a Slate field
       // Use getFieldType which handles page-level fields (blockUid === null) correctly
       const fieldType = this.getFieldType(blockUid, fieldName);
@@ -3989,8 +3993,12 @@ export class Bridge {
       // Get container innerHTML for debugging (truncated)
       const containerHtml = container?.innerHTML?.slice(0, 200) || 'N/A';
 
+      const fieldTypeDesc = fieldType
+        ? `"${fieldType}" (registered but no data-node-id rendered)`
+        : 'undefined — field not registered in blockSchema.properties; if this is a Slate field, add it with widget: "slate"; if plain text, add type: "string"';
+
       const errorMsg =
-        `Block: ${blockUid}, Field: ${fieldName}\n\n` +
+        `Block: ${blockUid}, Field: ${fieldName}\nField type: ${fieldTypeDesc}\n\n` +
         'DOM path (text node → container):\n' +
         domPath.map((p, i) => '  '.repeat(i) + p).join('\n') +
         '\n\nContainer HTML:\n' + containerHtml + (container?.innerHTML?.length > 200 ? '...' : '');
@@ -4068,6 +4076,44 @@ export class Bridge {
       if (this.fieldTypeIsTextEditable(fieldType)) {
         field.setAttribute('contenteditable', 'true');
         log(`  ${fieldPath}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})`);
+
+        // For <pre> elements, handle Enter (newline) and Tab (indent) properly
+        const isPreElement = field.tagName === 'PRE' || !!field.closest('pre');
+        if (isPreElement && !field._preKeyHandler) {
+          field._preKeyHandler = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              // Insert a plain \n at cursor position instead of browser's <div>
+              const sel = window.getSelection();
+              if (!sel.rangeCount) return;
+              const range = sel.getRangeAt(0);
+              range.deleteContents();
+              const textNode = document.createTextNode('\n');
+              range.insertNode(textNode);
+              // Move cursor after the newline
+              range.setStartAfter(textNode);
+              range.setEndAfter(textNode);
+              sel.removeAllRanges();
+              sel.addRange(range);
+              field.dispatchEvent(new Event('input', { bubbles: true }));
+            } else if (e.key === 'Tab') {
+              e.preventDefault();
+              // Insert 2 spaces for indentation
+              const sel = window.getSelection();
+              if (!sel.rangeCount) return;
+              const range = sel.getRangeAt(0);
+              range.deleteContents();
+              const spaces = document.createTextNode('  ');
+              range.insertNode(spaces);
+              range.setStartAfter(spaces);
+              range.setEndAfter(spaces);
+              sel.removeAllRanges();
+              sel.addRange(range);
+              field.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          };
+          field.addEventListener('keydown', field._preKeyHandler);
+        }
 
         // For plain string fields (single-line), Enter navigates to next field or adds a block
         if (this.fieldTypeIsPlainString(fieldType) && !field._enterKeyHandler) {
@@ -6798,9 +6844,9 @@ export class Bridge {
 
           // Focus the contenteditable element for blocks with editable fields
           // This includes slate, string, and textarea field types
-          const blockType = this.getBlockType(uid);
-          const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-          const hasEditableFields = Object.keys(blockTypeFields).length > 0 || blockType === 'slate';
+          const pathInfo = this.blockPathMap?.[uid];
+          const schemaProps = pathInfo?.resolvedBlockSchema?.properties;
+          const hasEditableFields = schemaProps && Object.keys(schemaProps).length > 0;
 
           if (hasEditableFields) {
             // Use double requestAnimationFrame to wait for ALL DOM updates including Quanta toolbar
@@ -7847,28 +7893,12 @@ export class Bridge {
       const block = this.getBlockData(blockId);
       if (!block) return;
 
-      // For object_list items, use itemSchema from pathMap
-      if (pathInfo.itemSchema?.properties) {
-        Object.entries(pathInfo.itemSchema.properties).forEach(([fieldName, fieldDef]) => {
-          if (fieldDef?.widget === 'slate' && block[fieldName]) {
-            block[fieldName] = this.addNodeIds(block[fieldName]);
-          }
-        });
-        return;
-      }
+      const schema = pathInfo.resolvedBlockSchema;
+      if (!schema?.properties) return;
 
-      // For regular blocks, use blockFieldTypes
-      const blockType = pathInfo.blockType;
-      const fieldTypes = this.blockFieldTypes?.[blockType] || {};
-      if (blockType === 'slate') {
-        log('addNodeIdsToAllSlateFields:', blockId, 'blockType:', blockType, 'fieldTypes:', Object.keys(fieldTypes), 'hasValue:', !!block.value);
-      }
-      Object.keys(fieldTypes).forEach((fieldName) => {
-        if (this.fieldTypeIsSlate(fieldTypes[fieldName]) && block[fieldName]) {
+      Object.entries(schema.properties).forEach(([fieldName, fieldDef]) => {
+        if (isSlateFieldType(getFieldTypeString(fieldDef)) && block[fieldName]) {
           block[fieldName] = this.addNodeIds(block[fieldName]);
-          if (blockType === 'slate') {
-            log('addNodeIdsToAllSlateFields: added nodeIds to', blockId, fieldName, 'value:', JSON.stringify(block[fieldName]));
-          }
         }
       });
     });
@@ -8568,12 +8598,11 @@ export class Bridge {
       if (!blocks || typeof blocks !== 'object') return;
       for (const blockId of Object.keys(blocks)) {
         const block = blocks[blockId];
-        const blockType = this.getBlockType(blockId);
-        if (block && blockType) {
-          // Check if this block has slate fields and strip nodeIds from them
-          const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-          for (const [fieldName, fieldType] of Object.entries(blockTypeFields)) {
-            if (this.fieldTypeIsSlate(fieldType) && block[fieldName]) {
+        const pathInfo = this.blockPathMap?.[blockId];
+        const schema = pathInfo?.resolvedBlockSchema;
+        if (block && schema?.properties) {
+          for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
+            if (isSlateFieldType(getFieldTypeString(fieldDef)) && block[fieldName]) {
               this.resetJsonNodeIds(block[fieldName]);
             }
           }
@@ -8659,16 +8688,11 @@ export class Bridge {
    */
   getFieldType(blockUid, fieldName) {
     const resolved = this.resolveFieldPath(fieldName, blockUid);
-
-    // Page-level field
-    if (resolved.blockId === PAGE_BLOCK_UID) {
-      return this.blockFieldTypes?._page?.[resolved.fieldName];
-    }
-
-    // Block field
-    const blockType = this.getBlockType(resolved.blockId);
-    const blockTypeFields = this.blockFieldTypes?.[blockType] || {};
-    return blockTypeFields[resolved.fieldName];
+    const pathInfo = this.blockPathMap?.[resolved.blockId];
+    const schema = pathInfo?.resolvedBlockSchema;
+    const fieldDef = schema?.properties?.[resolved.fieldName];
+    if (!fieldDef) return undefined;
+    return getFieldTypeString(fieldDef);
   }
 
   /**
@@ -9806,6 +9830,96 @@ export class Bridge {
 // Use window.__hydraBridge to survive module hot-reloading in frameworks like Nuxt/Vite
 let bridgeInstance = (typeof window !== 'undefined' && window.__hydraBridge) || null;
 
+////////////////////////////////////////////////////////////////////////////////
+// Bridge Connection Diagnostic
+////////////////////////////////////////////////////////////////////////////////
+
+let _diagnosticShown = false;
+
+/**
+ * Show a diagnostic popup when the bridge can't connect.
+ * Automatically called when hydra.js detects it's in an iframe with edit signals
+ * but the bridge doesn't initialize within a timeout.
+ */
+function _showBridgeDiagnostic(info) {
+  if (_diagnosticShown) return;
+  if (typeof document === 'undefined') return;
+  _diagnosticShown = true;
+
+  const el = document.createElement('div');
+  el.id = 'hydra-bridge-diagnostic';
+  el.setAttribute('style', [
+    'position:fixed', 'bottom:16px', 'right:16px', 'z-index:2147483647',
+    'max-width:440px', 'background:#fef2f2', 'border:2px solid #dc2626',
+    'border-radius:8px', 'padding:16px', 'box-shadow:0 4px 12px rgba(0,0,0,0.15)',
+    'font-family:monospace', 'font-size:13px', 'line-height:1.6', 'color:#7f1d1d',
+  ].join(';'));
+
+  const rows = [
+    `<strong>window.name:</strong> "${info.windowName || '(empty)'}"`,
+    `<strong>In iframe:</strong> ${info.inIframe}`,
+    `<strong>Admin origin:</strong> ${info.adminOrigin || '(none)'}`,
+    `<strong>initBridge called:</strong> ${info.bridgeCreated}`,
+    `<strong>INITIAL_DATA received:</strong> ${info.bridgeInitialized}`,
+  ];
+
+  let hint = '';
+  if (info.inIframe && !info.hasHydraName) {
+    hint = 'The admin should set the iframe name to "hydra-edit:&lt;origin&gt;". ' +
+      'Check that Volto sets window.name on the iframe element.';
+  } else if (info.bridgeCreated && !info.bridgeInitialized) {
+    hint = 'INIT was sent but admin did not respond with INITIAL_DATA. ' +
+      'Check that adminOrigin matches the parent window origin.';
+  } else if (!info.bridgeCreated) {
+    hint = 'hydra.js was imported but initBridge() was never called. ' +
+      'The frontend should call initBridge() in edit mode.';
+  }
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <strong style="color:#dc2626;font-size:14px">Hydra Bridge: Not Connected</strong>
+      <button id="hydra-diag-dismiss" style="background:none;border:none;cursor:pointer;font-size:18px;color:#666">&times;</button>
+    </div>
+    <div>${rows.join('<br>')}</div>
+    ${hint ? `<div style="margin-top:8px;padding:8px;background:#fee2e2;border-radius:4px;font-size:12px">${hint}</div>` : ''}
+  `;
+
+  document.body.appendChild(el);
+  document.getElementById('hydra-diag-dismiss').addEventListener('click', () => el.remove());
+}
+
+// Auto-detect bridge connection issues when hydra.js is loaded in an iframe
+// with edit signals (window.name or _edit param) but bridge doesn't connect.
+if (typeof window !== 'undefined' && window.self !== window.top) {
+  const _url = new URL(window.location.href);
+  const _editParam = _url.searchParams.get('_edit');
+  const _isEditMode = window.name.startsWith('hydra-edit:');
+  const _expectsHydra = _isEditMode || _editParam === 'true';
+
+  if (_expectsHydra) {
+    // Check after page load + 5 seconds — enough time for bridge to connect
+    const _checkConnection = () => {
+      setTimeout(() => {
+        if (!bridgeInstance || !bridgeInstance.initialized) {
+          _showBridgeDiagnostic({
+            windowName: window.name,
+            hasHydraName: _isEditMode,
+            inIframe: true,
+            adminOrigin: bridgeInstance?.adminOrigin || null,
+            bridgeCreated: !!bridgeInstance,
+            bridgeInitialized: bridgeInstance?.initialized || false,
+          });
+        }
+      }, 5000);
+    };
+    if (document.readyState === 'complete') {
+      _checkConnection();
+    } else {
+      window.addEventListener('load', _checkConnection);
+    }
+  }
+}
+
 /**
  * Initialize the bridge
  *
@@ -9904,6 +10018,27 @@ export function getAccessToken() {
   }
   // Fallback to cookie
   return getTokenFromCookie();
+}
+
+/**
+ * Convert an absolute API URL to a frontend-relative path.
+ *
+ * Content URLs from the Plone REST API (e.g. @id fields in listing items)
+ * use the API base URL. Pass your API base URL to convert them to
+ * frontend-relative paths. Note: the bridge may not be initialised in
+ * non-edit mode, so the API URL must be provided by the frontend itself.
+ *
+ * @param {string} url - URL to convert (absolute or relative)
+ * @param {string} apiUrl - API base URL (e.g. 'https://api.example.com')
+ * @returns {string} Relative path if url starts with apiUrl, otherwise url unchanged
+ */
+export function contentPath(url, apiUrl) {
+  if (!url || !apiUrl || typeof url !== 'string') return url || '';
+  if (url.startsWith(apiUrl)) {
+    const rel = url.slice(apiUrl.length);
+    return rel.startsWith('/') ? rel : '/' + rel;
+  }
+  return url;
 }
 
 /**
@@ -10598,6 +10733,21 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
 // ============================================================================
 
 /**
+ * Convert a schema field definition to a "type:widget" string.
+ * Mirrors the format used by extractBlockFieldTypes in View.jsx.
+ * @param {Object} field - Schema field definition with optional type and widget
+ * @returns {string} Field type string like "string", "array:slate", "string:textarea", ":object_browser"
+ */
+export function getFieldTypeString(field) {
+  const type = field.type;
+  const widget = field.widget;
+  if (type && widget) return `${type}:${widget}`;
+  if (widget) return `:${widget}`;
+  if (type) return type;
+  return 'string';
+}
+
+/**
  * Check if a field type indicates a Slate field.
  * Handles both old format ('slate') and new format ('array:slate', 'object:richtext').
  * @param {string} fieldType - Field type string
@@ -11191,154 +11341,6 @@ export function getUniqueTemplateIds(formData) {
 }
 
 /**
- * Merge templates into page data using expandTemplates.
- * Processes each blocks field with its allowedLayouts, then recursively handles containers.
- *
- * @param {Object} page - Page data with blocks
- * @param {Object} options - Configuration
- * @param {Function} options.loadTemplate - Async function to load template: (templateId) => Promise<templateData>
- * @param {Object} options.pageBlocksFields - Field configs { fieldName: { allowedLayouts, ... } }
- * @param {Object} options.preloadedTemplates - Already-loaded templates: { templateId: templateData }. Caller owns the cache.
- * @param {Function} options.uuidGenerator - UUID generator function (default: generateUUID)
- * @returns {Promise<{merged: Object, newTemplateIds: string[]}>}
- */
-export async function mergeTemplatesIntoPage(page, options = {}) {
-  const {
-    loadTemplate,
-    pageBlocksFields = { blocks_layout: {} },
-    uuidGenerator = generateUUID,
-    filterInstanceId,
-    preloadedTemplates = {},
-  } = options;
-
-  let result = { ...page };
-  const allNewTemplateIds = new Set();
-
-  // Helper to expand templates at one level, then recurse into nested containers.
-  // Only the top call for each blocks field does template expansion;
-  // nested containers just need their inner containers processed (templates
-  // inside containers were already merged by expandTemplatesSync).
-  async function processBlocksRecursive(blocks, layout, allowedLayouts, templateState, skipExpand = false) {
-    let items;
-    if (skipExpand) {
-      // Already expanded — just convert layout IDs to block objects
-      items = layout.map(id => blocks[id] ? { ...blocks[id], '@uid': id } : null).filter(Boolean);
-    } else {
-      items = await expandTemplates(layout, {
-        blocks,
-        templateState,
-        loadTemplate,
-        preloadedTemplates,
-        allowedLayouts,
-        uuidGenerator,
-        filterInstanceId,
-      });
-    }
-
-    // Convert items back to blocks/layout format
-    const newBlocks = {};
-    const newLayout = [];
-
-    for (const item of items) {
-      const { '@uid': blockId, ...block } = item;
-      newLayout.push(blockId);
-
-      // Check for nested container blocks and process recursively
-      // In shared blocks format: block.blocks is the shared dict, layout fields are { items: [...] }
-      const processedBlock = { ...block };
-      if (isBlocksMap(block.blocks)) {
-        let mergedBlocks = {};
-        // Process each layout field separately (columns, top_images, blocks_layout, etc.)
-        for (const [key, value] of Object.entries(block)) {
-          if (key !== 'blocks' && value?.items && Array.isArray(value.items)) {
-            // This is a layout field — extract its blocks subset and process
-            const fieldBlocks = {};
-            for (const id of value.items) {
-              if (block.blocks[id]) fieldBlocks[id] = block.blocks[id];
-            }
-            // skipExpand=true: nested containers' templates were already merged
-            const { blocks: newFieldBlocks, layout: newFieldLayout } = await processBlocksRecursive(
-              fieldBlocks,
-              value.items,
-              null, // No forced layouts for nested containers
-              templateState,
-              true, // skip template expansion — already done
-            );
-            Object.assign(mergedBlocks, newFieldBlocks);
-            processedBlock[key] = { items: newFieldLayout };
-          }
-        }
-        // Keep any blocks not referenced by layout fields (orphaned/utility blocks)
-        for (const [id, blockData] of Object.entries(block.blocks)) {
-          if (!mergedBlocks[id]) mergedBlocks[id] = blockData;
-        }
-        processedBlock.blocks = mergedBlocks;
-      }
-
-      newBlocks[blockId] = processedBlock;
-    }
-
-    // Collect new template IDs
-    for (const tid of templateState.newTemplateIds || []) {
-      allNewTemplateIds.add(tid);
-    }
-
-    return { blocks: newBlocks, layout: newLayout };
-  }
-
-  // Process each page-level blocks field
-  // All fields share result.blocks; each field has its own layout (fieldName: { items: [...] })
-  const fieldsToProcess = Object.keys(pageBlocksFields).length > 0
-    ? pageBlocksFields
-    : { blocks_layout: {} }; // Default to main blocks_layout field
-
-  for (const [fieldName, fieldDef] of Object.entries(fieldsToProcess)) {
-    const blocksData = result.blocks || {};
-    const layoutData = result[fieldName];
-    const layout = layoutData?.items || [];
-    const allowedLayouts = fieldDef?.allowedLayouts || null;
-
-    if (layout.length === 0 && !allowedLayouts) {
-      // No layout items and no forced layout - skip this field
-      continue;
-    }
-
-    // Build a blocks subset for this field (only blocks referenced by this field's layout)
-    const fieldBlocks = {};
-    for (const blockId of layout) {
-      if (blocksData[blockId]) {
-        fieldBlocks[blockId] = blocksData[blockId];
-      }
-    }
-
-    const templateState = {};
-    const { blocks: newBlocks, layout: newLayout } = await processBlocksRecursive(
-      fieldBlocks,
-      layout,
-      allowedLayouts,
-      templateState
-    );
-
-    // Remove old field blocks that were dropped during template processing,
-    // then merge in the new blocks. Other fields' blocks must remain.
-    const updatedBlocks = { ...result.blocks };
-    for (const oldId of Object.keys(fieldBlocks)) {
-      if (!newBlocks[oldId]) {
-        delete updatedBlocks[oldId];
-      }
-    }
-    result.blocks = { ...updatedBlocks, ...newBlocks };
-    result[fieldName] = { items: newLayout };
-  }
-
-  return {
-    merged: result,
-    newTemplateIds: Array.from(allNewTemplateIds),
-  };
-}
-
-
-/**
  * Check if an object looks like a blocks map (string keys -> objects with @type).
  */
 function isBlocksMap(obj) {
@@ -11369,13 +11371,21 @@ function collectContentFromTree(container, instanceId, pendingContent, standalon
     return;
   }
 
-  // Look for blocks/layout pairs (any field name)
+  // Look for blocks maps (shared blocks format: one "blocks" dict + named layout fields)
   for (const [fieldName, value] of Object.entries(container)) {
     if (!isBlocksMap(value)) continue;
 
-    // Find corresponding layout
-    const layoutField = container[`${fieldName}_layout`];
-    const blockLayout = layoutField?.items || Object.keys(value);
+    // Collect block IDs from all layout fields ({ items: [...] }) in this container.
+    // In shared blocks format, layout fields are named (columns, top_images, blocks_layout, etc.)
+    // — there is no ${fieldName}_layout convention.
+    const layoutBlockIds = new Set();
+    for (const [key, val] of Object.entries(container)) {
+      if (key !== fieldName && val?.items && Array.isArray(val.items)) {
+        for (const id of val.items) layoutBlockIds.add(id);
+      }
+    }
+    // Fall back to all keys if no layout fields found
+    const blockLayout = layoutBlockIds.size > 0 ? layoutBlockIds : Object.keys(value);
 
     // Process in order
     for (const blockId of blockLayout) {
@@ -11486,7 +11496,7 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
         blockId
       );
 
-      // Register further nested containers
+      // Register further nested containers (blocks_layout and object_list)
       if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
         const nestedLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
         templateState.nestedContainers.set(tplBlock.blocks, {
@@ -11494,6 +11504,16 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
           templateBlocks: tplBlock.blocks,
           templateLayout: nestedLayout,
         });
+      }
+      for (const val of Object.values(tplBlock)) {
+        if (Array.isArray(val) && val.length > 0 && val[0]?.templateId) {
+          const itemIdField = '@id';
+          templateState.nestedContainers.set(val, {
+            templateBlockId: tplBlockId,
+            templateBlocks: Object.fromEntries(val.map(item => [item[itemIdField], item])),
+            templateLayout: val.map(item => item[itemIdField]),
+          });
+        }
       }
     } else if (tplBlock.placeholder) {
       // Placeholder slot - emit document content that goes here
@@ -11526,9 +11546,10 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
  * @param {Object} data - Page data to scan for template references
  * @param {Function} loadTemplate - Async function: (templateId) => Promise<templateData>
  * @param {Object} preloadedTemplates - Already-loaded templates: { templateId: templateData }. Caller owns the cache.
+ * @param {Array} extraTemplateIds - Additional template IDs to fetch (e.g. forced layouts not referenced in page data)
  * @returns {Promise<Object>} Map of templateId -> template data (includes preloaded + newly fetched)
  */
-export async function loadTemplates(data, loadTemplate, preloadedTemplates = {}) {
+export async function loadTemplates(data, loadTemplate, preloadedTemplates = {}, extraTemplateIds = []) {
   // Start with caller-provided templates (caller owns the cache)
   const templates = { ...preloadedTemplates };
   const loaded = new Set(Object.keys(preloadedTemplates));
@@ -11561,8 +11582,11 @@ export async function loadTemplates(data, loadTemplate, preloadedTemplates = {})
     return ids;
   }
 
-  // Collect template IDs referenced in the page data.
+  // Collect template IDs referenced in the page data, plus any extra forced layouts.
   let pending = collectTemplateIds(data);
+  for (const id of extraTemplateIds) {
+    if (id) pending.add(id);
+  }
 
   // Keep loading until no new templates found
   while (pending.size > 0) {
@@ -11597,6 +11621,7 @@ export async function loadTemplates(data, loadTemplate, preloadedTemplates = {})
       if (template) {
         loaded.add(id);
         templates[id] = template;
+        preloadedTemplates[id] = template;  // Write back to caller's cache
 
         // Scan this template for nested template references
         const nestedIds = collectTemplateIds(template);
@@ -11641,16 +11666,15 @@ export async function expandTemplates(inputItems, options = {}) {
   // Load templates referenced in the page data, seeded with caller's cache
   const templates = await loadTemplates(data, loadTemplate, preloadedTemplates);
 
-  // Delegate to sync version with loaded templates.
-  // expandTemplatesSync will load missing templates on demand via loadTemplate
-  // (e.g. forced layouts from allowedLayouts not referenced in page data).
-  // Since loadTemplate is async, we retry when expandTemplatesSync reports
-  // a missing template so we can await the load.
+  // Delegate to sync version with pre-loaded templates.
+  // Don't pass loadTemplate — it's async and expandTemplatesSync requires
+  // sync loaders. Instead, catch "not found" errors and retry after awaiting.
+  const { loadTemplate: _drop, ...syncOptions } = options;
   const loaded = new Set(Object.keys(templates));
   while (true) {
     try {
       return expandTemplatesSync(inputItems, {
-        ...options,
+        ...syncOptions,
         templates,
       });
     } catch (e) {
@@ -11673,8 +11697,9 @@ export async function expandTemplates(inputItems, options = {}) {
 /**
  * Synchronous version of expandTemplates.
  * Requires all templates to be pre-loaded in options.templates.
- * Falls back to options.loadTemplate (sync) if a required template is not in the
- * pre-loaded map. Throws if the template still can't be found.
+ * Falls back to options.loadTemplate (must be synchronous) if a required template
+ * is not in the pre-loaded map. Throws if loadTemplate returns a Promise or if
+ * the template still can't be found.
  *
  * This function is called recursively: the top-level BlocksRenderer calls it for
  * the page layout, and the expanded result may contain container blocks (columns,
@@ -11702,6 +11727,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
     uuidGenerator,
     filterInstanceId,
     loadTemplate,
+    idField,  // For object_list arrays: field name used as item ID (e.g. '@id', 'key')
   } = options;
 
   if (!templates) {
@@ -11721,6 +11747,11 @@ export function expandTemplatesSync(inputItems, options = {}) {
         const block = blocksDict?.[item];
         return block ? { ...block, '@uid': item } : null;
       }
+      // Object_list items: map idField → @uid
+      if (idField && item && !item['@uid']) {
+        const id = item[idField];
+        if (id) return { ...item, '@uid': id };
+      }
       return item;
     }).filter(Boolean);
   }
@@ -11734,6 +11765,11 @@ export function expandTemplatesSync(inputItems, options = {}) {
         return null;
       }
       return { ...block, '@uid': item };
+    }
+    // Object_list items: map idField → @uid
+    if (idField && item && !item['@uid']) {
+      const id = item[idField];
+      if (id) return { ...item, '@uid': id };
     }
     return item;
   }).filter(Boolean);
@@ -11752,9 +11788,13 @@ export function expandTemplatesSync(inputItems, options = {}) {
     templateState.generatedInstanceIds = new WeakMap(); // blocksDict -> generated instanceId
   }
 
-  // Check if inside a registered nested container
+  // Check if inside a registered nested container (blocks_layout or object_list)
   if (blocksDict && templateState.nestedContainers.has(blocksDict)) {
     const nestedInfo = templateState.nestedContainers.get(blocksDict);
+    return processNestedTemplateLevel(blocks, layout, nestedInfo, templateState, options, addItem, items);
+  }
+  if (inputItems && templateState.nestedContainers.has(inputItems)) {
+    const nestedInfo = templateState.nestedContainers.get(inputItems);
     return processNestedTemplateLevel(blocks, layout, nestedInfo, templateState, options, addItem, items);
   }
 
@@ -11780,9 +11820,23 @@ export function expandTemplatesSync(inputItems, options = {}) {
   const previousTemplateId = templateId;
 
   if (allowedLayouts?.length > 0) {
+    // Determine if this is a layout (all blocks belong to the template) or an
+    // inserted template (template blocks mixed with standalone blocks).
+    // allowedLayouts should only enforce on layouts, not on inserted templates.
+    const isLayout = templateId && layout.every(blockId => {
+      const block = blocks[blockId];
+      return block?.templateInstanceId === existingInstanceId;
+    });
+
     // Use path-normalised comparison: block templateId may be a full URL
     // (e.g. from Plone's resolveuid) while allowedLayouts may be paths.
-    if (!templateId || !allowedLayouts.some(l => templateIdsMatch(l, templateId))) {
+    if (isLayout && !allowedLayouts.some(l => templateIdsMatch(l, templateId))) {
+      templateId = allowedLayouts[0];
+      if (!filterInstanceId) {
+        existingInstanceId = null;
+      }
+    } else if (!templateId) {
+      // No template found — apply the forced layout
       templateId = allowedLayouts[0];
       if (!filterInstanceId) {
         existingInstanceId = null;
@@ -11827,6 +11881,10 @@ export function expandTemplatesSync(inputItems, options = {}) {
       }
     }
   }
+
+  // Store for processNestedTemplateLevel (called from nested expandTemplatesSync calls)
+  templateState.templateId = templateId;
+  templateState.instanceId = instanceId;
 
   // Get or create instance context.
   // Always rebuild ctx when the instanceId is re-encountered (e.g. after save,
@@ -11920,17 +11978,14 @@ export function expandTemplatesSync(inputItems, options = {}) {
   }
 
   // Load template from pre-loaded map, falling back to sync loadTemplate callback.
-  // Async callers should use expandTemplates() which retries on missing templates.
   if (!ctx.template) {
     let template = templates[templateId];
     if (!template && loadTemplate) {
-      const result = loadTemplate(templateId);
-      // Only use sync results — async loadTemplate returns a Promise which
-      // expandTemplates() handles via its retry loop.
-      if (result && typeof result.then !== 'function') {
-        template = result;
-        templates[templateId] = template;
+      template = loadTemplate(templateId);
+      if (!template || typeof template.then === 'function') {
+        throw new Error(`loadTemplate for "${templateId}" must return data synchronously, not a Promise. Use expandTemplates() for async loading, or pre-load templates via loadTemplates().`);
       }
+      templates[templateId] = template;
     }
     if (!template) {
       throw new Error(`Template "${templateId}" not found in pre-loaded templates. Available: ${Object.keys(templates).join(', ')}`);
@@ -12045,6 +12100,17 @@ export function expandTemplatesSync(inputItems, options = {}) {
           templateBlocks: filteredBlocks,
           templateLayout: filteredLayout.items,
         });
+      }
+      // Register object_list arrays (arrays of objects with templateId)
+      for (const val of Object.values(tplBlock)) {
+        if (Array.isArray(val) && val.length > 0 && val[0]?.templateId) {
+          const itemIdField = '@id';
+          templateState.nestedContainers.set(val, {
+            templateBlockId: tplBlockId,
+            templateBlocks: Object.fromEntries(val.map(item => [item[itemIdField], item])),
+            templateLayout: val.map(item => item[itemIdField]),
+          });
+        }
       }
     } else {
       const placeholder = tplBlock.placeholder || 'default';

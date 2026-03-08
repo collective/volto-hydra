@@ -170,12 +170,12 @@
     },
     "910a3f25-0318-41b3-a1a6-6e35cdf83451": {
       "@type": "slate",
-      "plaintext": "\u00dcberschrift zweiter Ordnung (Headline H2)",
+      "plaintext": "Überschrift zweiter Ordnung (Headline H2)",
       "value": [
         {
           "children": [
             {
-              "text": "\u00dcberschrift zweiter Ordnung (Headline H2)"
+              "text": "Überschrift zweiter Ordnung (Headline H2)"
             }
           ],
           "type": "h2"
@@ -267,15 +267,265 @@
     },
     "f0a56edf-a963-4177-877c-76d9a4d6c20b": {
       "@type": "slate",
-      "plaintext": "\u00dcberschrift dritter Ordnung (Headline H3)",
+      "plaintext": "Überschrift dritter Ordnung (Headline H3)",
       "value": [
         {
           "children": [
             {
-              "text": "\u00dcberschrift dritter Ordnung (Headline H3)"
+              "text": "Überschrift dritter Ordnung (Headline H3)"
             }
           ],
           "type": "h3"
+        }
+      ]
+    },
+    "ref-text-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "sep",
+      "styles": {
+        "align": "full"
+      }
+    },
+    "ref-text-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "examples-heading",
+      "plaintext": "Developer Reference",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Developer Reference"
+            }
+          ]
+        }
+      ]
+    },
+    "ref-text-schema": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-text-schema-javascript-6ffd2e",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  \"slate\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"value\": {\n          \"title\": \"Text\",\n          \"widget\": \"slate\"\n        }\n      }\n    }\n  }\n}"
+        }
+      ]
+    },
+    "ref-text-json-data": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-text-json-data-json-f6d82b",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"slate\",\n  \"value\": [\n    {\n      \"type\": \"h2\",\n      \"children\": [\n        {\n          \"text\": \"Welcome\"\n        }\n      ]\n    },\n    {\n      \"type\": \"p\",\n      \"children\": [\n        {\n          \"text\": \"This is \"\n        },\n        {\n          \"type\": \"strong\",\n          \"children\": [\n            {\n              \"text\": \"bold\"\n            }\n          ]\n        },\n        {\n          \"text\": \" and \"\n        },\n        {\n          \"type\": \"em\",\n          \"children\": [\n            {\n              \"text\": \"italic\"\n            }\n          ]\n        },\n        {\n          \"text\": \" text.\"\n        }\n      ]\n    },\n    {\n      \"type\": \"ul\",\n      \"children\": [\n        {\n          \"type\": \"li\",\n          \"children\": [\n            {\n              \"text\": \"First item\"\n            }\n          ]\n        },\n        {\n          \"type\": \"li\",\n          \"children\": [\n            {\n              \"text\": \"Second item\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"type\": \"p\",\n      \"children\": [\n        {\n          \"text\": \"Visit \"\n        },\n        {\n          \"type\": \"link\",\n          \"data\": {\n            \"url\": \"https://example.com\"\n          },\n          \"children\": [\n            {\n              \"text\": \"our site\"\n            }\n          ]\n        },\n        {\n          \"text\": \" for more.\"\n        }\n      ]\n    }\n  ]\n}"
+        }
+      ]
+    },
+    "ref-text-rendering": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-text-rendering-jsx-076433",
+          "label": "React",
+          "language": "jsx",
+          "code": "function SlateBlock({ block }) {\n  return (\n    <div data-block-uid={block['@uid']} data-edit-text=\"value\">\n      {(block.value || []).map((node, i) => (\n        <SlateNode key={i} node={node} />\n      ))}\n    </div>\n  );\n}\n\nfunction SlateNode({ node }) {\n  if (node.text !== undefined) return <>{node.text}</>;\n  const children = (node.children || []).map((c, i) => <SlateNode key={i} node={c} />);\n  const Tag = node.type === 'link' ? 'a' : node.type;\n  const props = { 'data-node-id': node.nodeId };\n  if (node.type === 'link') props.href = node.data?.url;\n  return <Tag {...props}>{children}</Tag>;\n}"
+        },
+        {
+          "@id": "ref-text-rendering-vue-54b4b7",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<!-- SlateBlock.vue -->\n<template>\n  <div :data-block-uid=\"block['@uid']\" data-edit-text=\"value\">\n    <SlateNode v-for=\"(node, i) in block.value || []\" :key=\"i\" :node=\"node\" />\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>\n\n<!-- SlateNode.vue -->\n<template>\n  <template v-if=\"!node.type\">{{ node.text }}</template>\n  <a v-else-if=\"node.type === 'link'\" :href=\"node.data?.url\" :data-node-id=\"node.nodeId\">\n    <SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" />\n  </a>\n  <component v-else :is=\"node.type\" :data-node-id=\"node.nodeId\">\n    <SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" />\n  </component>\n</template>\n\n<script setup>\ndefineProps({ node: Object });\n</script>"
+        },
+        {
+          "@id": "ref-text-rendering-svelte-2aa474",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<!-- SlateBlock.svelte -->\n<script>\n  import SlateNode from './SlateNode.svelte';\n  export let block;\n</script>\n\n<div data-block-uid={block['@uid']} data-edit-text=\"value\">\n  {#each block.value || [] as node, i (i)}\n    <SlateNode {node} />\n  {/each}\n</div>\n\n<!-- SlateNode.svelte -->\n<script>\n  export let node;\n</script>\n\n{#if node.text !== undefined}\n  {node.text}\n{:else if node.type === 'link'}\n  <a href={node.data?.url} data-node-id={node.nodeId}>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</a>\n{:else}\n  <svelte:element this={node.type} data-node-id={node.nodeId}>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</svelte:element>\n{/if}"
+        }
+      ]
+    },
+    "ref-text-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "schema-heading"
+    },
+    "ref-text-schema-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "schema-desc"
+    },
+    "ref-text-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "json-heading"
+    },
+    "ref-text-json-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "json-desc"
+    },
+    "ref-text-rendering-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "rendering-heading"
+    },
+    "ref-text-rendering-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-text",
+      "placeholder": "rendering-desc"
+    },
+    "ref-slate-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-slate",
+      "placeholder": "sep"
+    },
+    "ref-slate-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-slate",
+      "placeholder": "heading"
+    },
+    "ref-slate-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-slate",
+      "placeholder": "schema-heading"
+    },
+    "ref-slate-schema-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-slate",
+      "placeholder": "schema-desc"
+    },
+    "ref-slate-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-slate",
+      "placeholder": "json-heading"
+    },
+    "ref-slate-json-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-slate",
+      "placeholder": "json-desc"
+    },
+    "ref-slate-rendering-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-slate",
+      "placeholder": "rendering-heading"
+    },
+    "ref-slate-rendering-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-slate",
+      "placeholder": "rendering-desc"
+    },
+    "ref-slate-schema": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-slate",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-slate-schema-javascript-36f411",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  \"slate\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"value\": {\n          \"title\": \"Text\",\n          \"widget\": \"slate\"\n        }\n      }\n    }\n  }\n}"
+        }
+      ]
+    },
+    "ref-slate-json-data": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-slate",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-slate-json-data-json-0fbdba",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"slate\",\n  \"value\": [\n    {\n      \"type\": \"h2\",\n      \"children\": [\n        {\n          \"text\": \"Welcome\"\n        }\n      ]\n    },\n    {\n      \"type\": \"p\",\n      \"children\": [\n        {\n          \"text\": \"This is \"\n        },\n        {\n          \"type\": \"strong\",\n          \"children\": [\n            {\n              \"text\": \"bold\"\n            }\n          ]\n        },\n        {\n          \"text\": \" and \"\n        },\n        {\n          \"type\": \"em\",\n          \"children\": [\n            {\n              \"text\": \"italic\"\n            }\n          ]\n        },\n        {\n          \"text\": \" text.\"\n        }\n      ]\n    },\n    {\n      \"type\": \"ul\",\n      \"children\": [\n        {\n          \"type\": \"li\",\n          \"children\": [\n            {\n              \"text\": \"First item\"\n            }\n          ]\n        },\n        {\n          \"type\": \"li\",\n          \"children\": [\n            {\n              \"text\": \"Second item\"\n            }\n          ]\n        }\n      ]\n    },\n    {\n      \"type\": \"p\",\n      \"children\": [\n        {\n          \"text\": \"Visit \"\n        },\n        {\n          \"type\": \"link\",\n          \"data\": {\n            \"url\": \"https://example.com\"\n          },\n          \"children\": [\n            {\n              \"text\": \"our site\"\n            }\n          ]\n        },\n        {\n          \"text\": \" for more.\"\n        }\n      ]\n    }\n  ]\n}"
+        }
+      ]
+    },
+    "ref-slate-rendering": {
+      "@type": "codeExample",
+      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateInstanceId": "tpl-inst-slate",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-slate-rendering-jsx-7f46e2",
+          "label": "React",
+          "language": "jsx",
+          "code": "function SlateBlock({ block }) {\n  return (\n    <div data-block-uid={block['@uid']} data-edit-text=\"value\">\n      {(block.value || []).map((node, i) => (\n        <SlateNode key={i} node={node} />\n      ))}\n    </div>\n  );\n}\n\nfunction SlateNode({ node }) {\n  if (node.text !== undefined) return <>{node.text}</>;\n  const children = (node.children || []).map((c, i) => <SlateNode key={i} node={c} />);\n  const Tag = node.type === 'link' ? 'a' : node.type;\n  const props = { 'data-node-id': node.nodeId };\n  if (node.type === 'link') props.href = node.data?.url;\n  return <Tag {...props}>{children}</Tag>;\n}"
+        },
+        {
+          "@id": "ref-slate-rendering-vue-df9cbd",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<!-- SlateBlock.vue -->\n<template>\n  <div :data-block-uid=\"block['@uid']\" data-edit-text=\"value\">\n    <SlateNode v-for=\"(node, i) in block.value || []\" :key=\"i\" :node=\"node\" />\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>\n\n<!-- SlateNode.vue -->\n<template>\n  <template v-if=\"!node.type\">{{ node.text }}</template>\n  <a v-else-if=\"node.type === 'link'\" :href=\"node.data?.url\" :data-node-id=\"node.nodeId\">\n    <SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" />\n  </a>\n  <component v-else :is=\"node.type\" :data-node-id=\"node.nodeId\">\n    <SlateNode v-for=\"(c, i) in node.children\" :key=\"i\" :node=\"c\" />\n  </component>\n</template>\n\n<script setup>\ndefineProps({ node: Object });\n</script>"
+        },
+        {
+          "@id": "ref-slate-rendering-svelte-8413b2",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<!-- SlateBlock.svelte -->\n<script>\n  import SlateNode from './SlateNode.svelte';\n  export let block;\n</script>\n\n<div data-block-uid={block['@uid']} data-edit-text=\"value\">\n  {#each block.value || [] as node, i (i)}\n    <SlateNode {node} />\n  {/each}\n</div>\n\n<!-- SlateNode.svelte -->\n<script>\n  export let node;\n</script>\n\n{#if node.text !== undefined}\n  {node.text}\n{:else if node.type === 'link'}\n  <a href={node.data?.url} data-node-id={node.nodeId}>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</a>\n{:else}\n  <svelte:element this={node.type} data-node-id={node.nodeId}>{#each node.children || [] as c, i (i)}<svelte:self node={c} />{/each}</svelte:element>\n{/if}"
         }
       ]
     }
@@ -298,7 +548,29 @@
       "910a3f25-0318-41b3-a1a6-6e35cdf83451",
       "486c4646-de10-40a9-9470-58b7b1449240",
       "f0a56edf-a963-4177-877c-76d9a4d6c20b",
-      "00146980-5c86-4ecd-a84e-d373183231ad"
+      "00146980-5c86-4ecd-a84e-d373183231ad",
+      "ref-text-sep",
+      "ref-text-heading",
+      "ref-text-schema-heading",
+      "ref-text-schema-desc",
+      "ref-text-schema",
+      "ref-text-json-heading",
+      "ref-text-json-desc",
+      "ref-text-json-data",
+      "ref-text-rendering-heading",
+      "ref-text-rendering-desc",
+      "ref-text-rendering",
+      "ref-slate-sep",
+      "ref-slate-heading",
+      "ref-slate-schema-heading",
+      "ref-slate-schema-desc",
+      "ref-slate-schema",
+      "ref-slate-json-heading",
+      "ref-slate-json-desc",
+      "ref-slate-json-data",
+      "ref-slate-rendering-heading",
+      "ref-slate-rendering-desc",
+      "ref-slate-rendering"
     ]
   },
   "contributors": [],
