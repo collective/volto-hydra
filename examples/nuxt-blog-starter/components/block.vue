@@ -1106,9 +1106,7 @@ const getListingTotalResults = (searchBlock) => {
 
 // Get current search text from URL (for preserving in input field)
 const currentSearchText = computed(() => {
-  if (typeof window === 'undefined') return '';
-  const params = new URLSearchParams(window.location.search);
-  return params.get('SearchableText') || '';
+  return useRoute().query.SearchableText || '';
 });
 
 // Extract TOC entries from page blocks (heading blocks + slate blocks with heading nodes)
@@ -1134,20 +1132,19 @@ const tocEntries = computed(() => {
 const handleSearchSubmit = (event) => {
   const formData = new FormData(event.target);
   const searchText = formData.get('SearchableText');
-  const url = new URL(window.location.href);
+  const route = useRoute();
+  const query = { ...route.query };
   if (searchText) {
-    url.searchParams.set('SearchableText', searchText);
+    query.SearchableText = searchText;
   } else {
-    url.searchParams.delete('SearchableText');
+    delete query.SearchableText;
   }
-  window.location.href = url.toString();
+  navigateTo({ path: route.path, query });
 };
 
 const handleSortChange = (event) => {
-  const sortOn = event.target.value;
-  const url = new URL(window.location.href);
-  url.searchParams.set('sort_on', sortOn);
-  window.location.href = url.toString();
+  const route = useRoute();
+  navigateTo({ path: route.path, query: { ...route.query, sort_on: event.target.value } });
 };
 
 // Facet field options - maps field name to available options
@@ -1183,11 +1180,12 @@ const getFacetOptions = (facet) => {
 
 // Check if a facet value is currently selected (from URL params)
 const isFacetChecked = (facet, value) => {
-  if (typeof window === 'undefined') return false;
   const field = getFacetField(facet);
-  const params = new URLSearchParams(window.location.search);
-  const currentValues = params.getAll(`facet.${field}`);
-  return currentValues.includes(value);
+  const route = useRoute();
+  const paramKey = `facet.${field}`;
+  const current = route.query[paramKey];
+  if (Array.isArray(current)) return current.includes(value);
+  return current === value;
 };
 
 // Handle facet checkbox change
@@ -1195,23 +1193,29 @@ const handleFacetCheckboxChange = (event) => {
   const checkbox = event.target;
   const field = checkbox.dataset.field;
   const value = checkbox.value;
-  const url = new URL(window.location.href);
+  const route = useRoute();
   const paramKey = `facet.${field}`;
+  const query = { ...route.query };
 
-  const currentValues = url.searchParams.getAll(paramKey);
+  const current = query[paramKey];
+  const currentValues = Array.isArray(current) ? [...current] : current ? [current] : [];
 
   if (checkbox.checked) {
-    if (!currentValues.includes(value)) {
-      url.searchParams.append(paramKey, value);
-    }
+    if (!currentValues.includes(value)) currentValues.push(value);
   } else {
-    url.searchParams.delete(paramKey);
-    currentValues.filter(v => v !== value).forEach(v => {
-      url.searchParams.append(paramKey, v);
-    });
+    const idx = currentValues.indexOf(value);
+    if (idx !== -1) currentValues.splice(idx, 1);
   }
 
-  window.location.href = url.toString();
+  if (currentValues.length === 0) {
+    delete query[paramKey];
+  } else if (currentValues.length === 1) {
+    query[paramKey] = currentValues[0];
+  } else {
+    query[paramKey] = currentValues;
+  }
+
+  navigateTo({ path: route.path, query });
 };
 
 // Handle facet select change
@@ -1219,16 +1223,17 @@ const handleFacetSelectChange = (event) => {
   const select = event.target;
   const field = select.dataset.field;
   const value = select.value;
-  const url = new URL(window.location.href);
+  const route = useRoute();
+  const query = { ...route.query };
   const paramKey = `facet.${field}`;
 
   if (value) {
-    url.searchParams.set(paramKey, value);
+    query[paramKey] = value;
   } else {
-    url.searchParams.delete(paramKey);
+    delete query[paramKey];
   }
 
-  window.location.href = url.toString();
+  navigateTo({ path: route.path, query });
 };
 
 // Form block: per-block state for errors, success, and user input values.

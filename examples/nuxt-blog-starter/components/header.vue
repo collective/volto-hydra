@@ -3,11 +3,25 @@
 <nav class="bg-white border-b border-gray-200 dark:bg-gray-900 relative">
     <div class="flex flex-wrap items-center justify-between max-w-screen-xl mx-auto p-4">
         <NuxtLink to="/" class="flex items-center space-x-3 rtl:space-x-reverse">
-            <span class="self-center text-2xl font-semibold whitespace-nowrap dark:text-white">Hydra Nuxt Example</span>
+            <span class="self-center text-2xl font-semibold whitespace-nowrap dark:text-white">Hydra</span>
         </NuxtLink>
         <div class="flex items-center md:order-2 space-x-1 md:space-x-2 rtl:space-x-reverse">
+            <!-- Search icon + expandable input -->
+            <div class="relative flex items-center">
+                <button v-if="!searchOpen" @click="openSearch" type="button"
+                    class="p-2 text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600"
+                    aria-label="Search">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </button>
+                <form v-else class="flex items-center" @submit.prevent="submitSearch">
+                    <input ref="searchInput" v-model="searchQuery" type="text" placeholder="Search..."
+                        class="w-48 md:w-64 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        @keydown.escape="closeSearch" @blur="onSearchBlur" />
+                </form>
+            </div>
             <NuxtLink :to="`${adminUrl}/login`" class="text-gray-800 dark:text-white hover:bg-gray-50 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-4 py-2 md:px-5 md:py-2.5 dark:hover:bg-gray-700 focus:outline-none dark:focus:ring-gray-800">Login</NuxtLink>
-            <NuxtLink :to="`${adminUrl}/register`" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 md:px-5 md:py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">Sign up</NuxtLink>
             <button @click="mobileMenuOpen = !mobileMenuOpen" type="button" class="inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-gray-500 rounded-lg md:hidden hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600">
                 <span class="sr-only">Open main menu</span>
                 <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 17 14">
@@ -78,6 +92,35 @@ const adminUrl = runtimeConfig.public.adminUrl;
 const openPanel = ref(null);
 const openPanelItem = ref(null);
 const mobileMenuOpen = ref(false);
+
+// Search state
+const searchOpen = ref(false);
+const searchQuery = ref('');
+const searchInput = ref(null);
+
+function openSearch() {
+    searchOpen.value = true;
+    nextTick(() => searchInput.value?.focus());
+}
+
+function closeSearch() {
+    searchOpen.value = false;
+    searchQuery.value = '';
+}
+
+function onSearchBlur() {
+    if (!searchQuery.value) {
+        closeSearch();
+    }
+}
+
+function submitSearch() {
+    const query = searchQuery.value.trim();
+    if (query) {
+        navigateTo(`/search?SearchableText=${encodeURIComponent(query)}`);
+        closeSearch();
+    }
+}
 
 function nav(data) {
     if (!data) return [];
