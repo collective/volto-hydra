@@ -501,6 +501,9 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const searchInputAfter = iframe.locator('[data-block-uid="search-block-1"] input[name="SearchableText"]');
     await expect(searchInputAfter).toHaveValue('accordion', { timeout: 10000 });
 
+    // Wait for block count to stabilize after reactive re-fetch
+    await helper.getStableBlockCount();
+
     // Check filtered results
     const filteredResults = iframe.locator('[data-block-uid="search-block-1"] .search-results [data-block-uid]');
 
