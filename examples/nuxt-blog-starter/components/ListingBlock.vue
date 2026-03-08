@@ -43,10 +43,12 @@ const listingPage = ownsPaging
 const paging = props.paging || { start: listingPage * listingPageSize, size: listingPageSize };
 
 async function fetchItems(extraCriteria) {
+  // Create fresh paging object each call — expandListingBlocks mutates it
+  const fetchPaging = { start: paging.start, size: paging.size };
   return await expandListingBlocks([props.id], {
     blocks: { [props.id]: props.block },
     fetchItems: { listing: ploneFetchItems({ apiUrl: props.apiUrl, contextPath: props.contextPath, extraCriteria }) },
-    paging,
+    paging: fetchPaging,
     itemTypeField: 'variation',
   });
 }
