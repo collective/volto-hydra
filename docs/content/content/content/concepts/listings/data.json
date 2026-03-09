@@ -9,7 +9,7 @@
     },
     "intro-1-t0": {
       "@type": "slate",
-      "plaintext": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. expandListingBlocks(layout, options) walks a layout, fetches results for each listing-type block, and returns an array of block objects with @uid and @type. You tell it which block types need fetching via a fetchItems map \u2014 keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:",
+      "plaintext": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. expandListingBlocks(layout, options) walks a layout, fetches results for each listing-type block, and returns { items, paging } where items is an array of block objects with @uid and @type. You tell it which block types need fetching via a fetchItems map \u2014 keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:",
       "value": [
         {
           "children": [
@@ -25,7 +25,7 @@
               "type": "strong"
             },
             {
-              "text": " walks a layout, fetches results for each listing-type block, and returns an array of block objects with @uid and @type."
+              "text": " walks a layout, fetches results for each listing-type block, and returns { items, paging } where items is an array of block objects with @uid and @type."
             }
           ],
           "type": "p"
@@ -58,7 +58,7 @@
           "@id": "intro-1-c1-javascript-cd69ac",
           "label": "JavaScript",
           "language": "javascript",
-          "code": "const items = await expandListingBlocks(layout, {\n  blocks,\n  fetchItems: {\n    listing: ploneFetchItems({ apiUrl, contextPath }),\n    rssFeed: myRSSFetcher,\n  },\n  paging,\n});"
+          "code": "const { items, paging } = await expandListingBlocks(layout, {\n  blocks,\n  paging: { start: 0, size: 6 },\n  fetchItems: {\n    listing: ploneFetchItems({ apiUrl, contextPath }),\n    rssFeed: myRSSFetcher,\n  },\n});\n// paging = { totalPages, totalItems, currentPage, prev, next, pages, seen }"
         }
       ]
     },
@@ -114,7 +114,7 @@
           "@id": "example-text-c1-jsx-dab0b1",
           "label": "JSX",
           "language": "jsx",
-          "code": "import { Suspense } from 'react';\nimport { staticBlocks, expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';\n\nfunction Grid({ blocks, blocks_layout, pageNum, apiUrl, contextPath }) {\n  const paging = { start: pageNum * 6, size: 6 };\n  const fetchItems = { listing: ploneFetchItems({ apiUrl, contextPath }) };\n\n  return (\n    <div className=\"grid\">\n      {blocks_layout.items.map(id =>\n        fetchItems[blocks[id]['@type']] ? (\n          <Suspense key={id} fallback={<div>Loading...</div>}>\n            <ListingItems id={id} blocks={blocks} paging={paging} fetchItems={fetchItems} />\n          </Suspense>\n        ) : (\n          staticBlocks([id], { blocks, paging }).map(item =>\n            <Block key={item['@uid']} block={item} />\n          )\n        )\n      )}\n      <Suspense>\n        <PagingWhenReady paging={paging} />\n      </Suspense>\n    </div>\n  );\n}\n\nasync function ListingItems({ id, blocks, paging, fetchItems }) {\n  const items = await expandListingBlocks([id], {\n    blocks, paging, fetchItems,\n  });\n  return items.map(item => <Block key={item['@uid']} block={item} />);\n}\n\nasync function PagingWhenReady({ paging }) {\n  await paging._ready;\n  if (paging.totalPages <= 1) return null;\n  return (\n    <nav>\n      {paging.prev != null && <a href={`?page=${paging.prev}`}>Prev</a>}\n      {paging.pages.map(p =>\n        <a key={p.page} href={`?page=${p.page - 1}`}\n           className={p.page === paging.currentPage + 1 ? 'active' : ''}>\n          {p.page}\n        </a>\n      )}\n      {paging.next != null && <a href={`?page=${paging.next}`}>Next</a>}\n    </nav>\n  );\n}"
+          "code": "import { Suspense, useState } from 'react';\nimport { staticBlocks, expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';\n\nfunction Grid({ blocks, blocks_layout, pageNum, apiUrl, contextPath }) {\n  const pagingInput = { start: pageNum * 6, size: 6 };\n  const fetchItems = { listing: ploneFetchItems({ apiUrl, contextPath }) };\n  const [gridPaging, setGridPaging] = useState({});\n\n  // Walk layout in order, chaining `seen` for position tracking\n  let seen = 0;\n  return (\n    <div className=\"grid\">\n      {blocks_layout.items.map(id => {\n        if (fetchItems[blocks[id]['@type']]) {\n          const mySeen = seen;\n          return (\n            <Suspense key={id} fallback={<div>Loading...</div>}>\n              <ListingItems id={id} blocks={blocks} paging={pagingInput}\n                seen={mySeen} fetchItems={fetchItems} onPaging={setGridPaging} />\n            </Suspense>\n          );\n        }\n        const result = staticBlocks([id], { blocks, paging: pagingInput, seen });\n        seen = result.paging.seen;\n        return result.items.map(item =>\n          <Block key={item['@uid']} block={item} />\n        );\n      })}\n      {gridPaging.totalPages > 1 && <Paging paging={gridPaging} />}\n    </div>\n  );\n}\n\nasync function ListingItems({ id, blocks, paging, seen, fetchItems, onPaging }) {\n  const result = await expandListingBlocks([id], {\n    blocks, paging, seen, fetchItems,\n  });\n  onPaging(result.paging);\n  return result.items.map(item => <Block key={item['@uid']} block={item} />);\n}"
         }
       ]
     },
@@ -134,7 +134,7 @@
     },
     "options-text": {
       "@type": "slate",
-      "plaintext": "Options for expandListingBlocks: blocks, fetchItems (type\u2192fetcher map), paging, itemTypeField, defaultItemType.",
+      "plaintext": "Options for expandListingBlocks: blocks, fetchItems (type\u2192fetcher map), paging, seen, itemTypeField, defaultItemType.",
       "value": [
         {
           "children": [
@@ -181,7 +181,23 @@
                   "type": "strong"
                 },
                 {
-                  "text": " \u2014 Shared paging object { start, size } (mutated in-place with computed values)"
+                  "text": " \u2014 Paging input { start, size } (not mutated). Computed values are returned in the response."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "seen"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " \u2014 Number of items already seen by prior calls (default: 0). Chain paging.seen from one call to the next for grids."
                 }
               ],
               "type": "li"
@@ -391,23 +407,34 @@
     },
     "paging-text": {
       "@type": "slate",
-      "plaintext": "You pass { start, size } and expandListingBlocks mutates it with computed paging values.",
+      "plaintext": "Both expandListingBlocks and staticBlocks return { items, paging }. You pass { start, size } as input (not mutated) and get back computed paging values:",
       "value": [
         {
           "children": [
             {
-              "text": "You pass "
+              "text": "Both "
             },
             {
               "children": [
                 {
-                  "text": "{ start, size }"
+                  "text": "expandListingBlocks"
                 }
               ],
               "type": "strong"
             },
             {
-              "text": " \u2014 expandListingBlocks mutates it with computed values:"
+              "text": " and "
+            },
+            {
+              "children": [
+                {
+                  "text": "staticBlocks"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " return { items, paging }. You pass { start, size } as input (not mutated) and get back computed paging values:"
             }
           ],
           "type": "p"
@@ -515,13 +542,13 @@
                 {
                   "children": [
                     {
-                      "text": "_ready"
+                      "text": "seen"
                     }
                   ],
                   "type": "strong"
                 },
                 {
-                  "text": " (Promise) \u2014 Resolves after all expandListingBlocks calls complete (for async paging UI)"
+                  "text": " (number) \u2014 Running item count \u2014 pass to the next call's seen option for position tracking in grids"
                 }
               ],
               "type": "li"

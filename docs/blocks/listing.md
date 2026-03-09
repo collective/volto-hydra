@@ -135,7 +135,7 @@ function ListingBlock({ block, blockId }) {
         fetchItems: { listing: fetchItems },
         itemTypeField: 'variation',
       });
-      setItems(result);
+      setItems(result.items);
     }
     load();
   }, [block.querystring]);
@@ -173,7 +173,7 @@ watch(() => props.block.querystring, async () => {
     fetchItems: { listing: fetchItems },
     itemTypeField: 'variation',
   });
-  items.value = result;
+  items.value = result.items;
 }, { immediate: true });
 </script>
 ```
@@ -199,7 +199,7 @@ watch(() => props.block.querystring, async () => {
       fetchItems: { listing: fetchItems },
       itemTypeField: 'variation',
     });
-    items = result;
+    items = result.items;
   }
 </script>
 

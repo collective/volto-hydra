@@ -1261,12 +1261,13 @@ be moved between containers and reuse normal blocks for what it repeats.
 ```js
 import { expandListingBlocks, ploneFetchItems } from '@volto-hydra/hydra-js';
 
-const paging = { start: 0, size: 6 };
-const items = await expandListingBlocks(layout, {
-  blocks, paging,
+const { items, paging } = await expandListingBlocks(layout, {
+  blocks,
+  paging: { start: 0, size: 6 },
   fetchItems: { listing: ploneFetchItems({ apiUrl, contextPath }) },
 });
 // items = [{ '@uid': 'listing-1', '@type': 'summary', title: 'My Article', href: '/my-article', ... }, ...]
+// paging = { totalPages, totalItems, currentPage, prev, next, pages, ... }
 ```
 
 See [ListingBlock.vue](./examples/nuxt-blog-starter/components/ListingBlock.vue) for a Vue equivalent.
@@ -1288,8 +1289,9 @@ Items should have the fields referenced in the listing's `fieldMapping` (typical
 Different block types can use different fetchers:
 
 ```js
-const items = await expandListingBlocks(layout, {
-  blocks, paging,
+const { items, paging } = await expandListingBlocks(layout, {
+  blocks,
+  paging: { start: 0, size: 6 },
   fetchItems: {
     listing: ploneFetchItems({ apiUrl, contextPath }),
     rssFeed: async (block, { start, size }) => {
@@ -1356,7 +1358,7 @@ This adds a type selector and `FieldMappingWidget` to the listing's sidebar. Whe
 
 ### Paging
 
-`expandListingBlocks` accepts a `paging` object `{ start, size }` that gets mutated with computed values:
+Both `expandListingBlocks` and `staticBlocks` return `{ items, paging }` where the returned `paging` object contains computed values:
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1366,62 +1368,54 @@ This adds a type selector and `FieldMappingWidget` to the listing's sidebar. Whe
 | `prev` | `number \| null` | Previous page index, or `null` on first page |
 | `next` | `number \| null` | Next page index, or `null` on last page |
 | `pages` | `array` | Window of ~5 page objects: `{ start, page }` where `page` is 1-based |
-| `_ready` | `Promise` | Resolves after all `expandListingBlocks` calls complete |
+| `seen` | `number` | Running item count — pass to the next call's `seen` option for position tracking |
+
+Neither function mutates the input `paging` object. This makes re-fetching safe — just call again with the same `{ start, size }`.
 
 When multiple listings share a pager (e.g., in a grid), `expandListingBlocks` walks them sequentially — each fetch returns `{ items, total }`, so the total is learned from the response and used to compute where the next listing starts. One request per listing. Listings outside the page window are fetched with `size: 0` (total only).
 
-When mixing listings with static blocks in a shared pager, use **`staticBlocks(ids, { blocks, paging })`** for the non-listing blocks — it tracks their position in the paging window so totals stay correct.
+When mixing listings with static blocks in a shared pager, use **`staticBlocks(ids, { blocks, paging, seen })`** for the non-listing blocks — it tracks their position in the paging window. Chain the returned `paging.seen` to the next call so each knows its offset:
 
 **Example: grid with listings, static blocks, and shared paging (React Suspense)**
 
 ```jsx
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import { staticBlocks, expandListingBlocks, ploneFetchItems } from '@volto-hydra/hydra-js';
 
 function Grid({ blocks, blocks_layout, pageNum }) {
-  const paging = { start: pageNum * 6, size: 6 };
+  const pagingInput = { start: pageNum * 6, size: 6 };
   const fetchItems = { listing: ploneFetchItems({ apiUrl, contextPath }) };
+  const [gridPaging, setGridPaging] = useState({});
 
+  // Walk layout in order, chaining `seen` for position tracking
+  let seen = 0;
   return (
     <div className="grid">
-      {blocks_layout.items.map(id =>
-        blocks[id]['@type'] === 'listing' ? (
-          <Suspense key={id} fallback={<div>Loading...</div>}>
-            <ListingItems id={id} blocks={blocks} paging={paging} fetchItems={fetchItems} />
-          </Suspense>
-        ) : (
-          staticBlocks([id], { blocks, paging }).map(item =>
-            <Block key={item['@uid']} block={item} />
-          )
-        )
-      )}
-      <Suspense>
-        <PagingWhenReady paging={paging} />
-      </Suspense>
+      {blocks_layout.items.map(id => {
+        if (blocks[id]['@type'] === 'listing') {
+          const mySeen = seen; // capture for closure
+          return (
+            <Suspense key={id} fallback={<div>Loading...</div>}>
+              <ListingItems id={id} blocks={blocks} paging={pagingInput}
+                seen={mySeen} fetchItems={fetchItems} onPaging={setGridPaging} />
+            </Suspense>
+          );
+        }
+        const result = staticBlocks([id], { blocks, paging: pagingInput, seen });
+        seen = result.paging.seen;
+        return result.items.map(item =>
+          <Block key={item['@uid']} block={item} />
+        );
+      })}
+      {gridPaging.totalPages > 1 && <Paging paging={gridPaging} />}
     </div>
   );
 }
 
-async function ListingItems({ id, blocks, paging, fetchItems }) {
-  const items = await expandListingBlocks([id], { blocks, paging, fetchItems });
-  return items.map(item => <Block key={item['@uid']} block={item} />);
-}
-
-async function PagingWhenReady({ paging }) {
-  await paging._ready;
-  if (paging.totalPages <= 1) return null;
-  return (
-    <nav>
-      {paging.prev != null && <a href={`?start=${paging.prev * paging.size}`}>Prev</a>}
-      {paging.pages.map(p =>
-        <a key={p.page} href={`?start=${p.start}`}
-           className={p.page === paging.currentPage + 1 ? 'active' : ''}>
-          {p.page}
-        </a>
-      )}
-      {paging.next != null && <a href={`?start=${paging.next * paging.size}`}>Next</a>}
-    </nav>
-  );
+async function ListingItems({ id, blocks, paging, seen, fetchItems, onPaging }) {
+  const result = await expandListingBlocks([id], { blocks, paging, seen, fetchItems });
+  onPaging(result.paging);
+  return result.items.map(item => <Block key={item['@uid']} block={item} />);
 }
 ```
 
@@ -1430,7 +1424,8 @@ async function PagingWhenReady({ paging }) {
 | Option | Default | Description |
 |--------|---------|-------------|
 | `blocks` | — | Map of blockId to block data |
-| `paging` | — | Shared paging object `{ start, size }` (mutated in-place) |
+| `paging` | — | Paging input `{ start, size }` (not mutated) |
+| `seen` | `0` | Number of items already seen by prior calls (for position tracking) |
 | `fetchItems` | — | `{ blockType: async (block, { start, size }) => { items, total } }` |
 | `itemTypeField` | `'itemType'` | Field on the listing block that holds the item type |
 | `defaultItemType` | `'summary'` | Fallback type when field is not set |
