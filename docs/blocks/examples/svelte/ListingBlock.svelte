@@ -15,7 +15,7 @@
       fetchItems: { listing: fetchItems },
       itemTypeField: 'variation',
     });
-    items = result;
+    items = result.items;
   }
 </script>
 

@@ -9,7 +9,7 @@ function ListingBlock({ block, blockId }) {
         fetchItems: { listing: fetchItems },
         itemTypeField: 'variation',
       });
-      setItems(result);
+      setItems(result.items);
     }
     load();
   }, [block.querystring]);

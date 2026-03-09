@@ -133,13 +133,10 @@
             // Set up expansion helper for container renderers
             // Use 'variation' field for item type (matches Volto listing block schema)
             // Returns { items, paging } where each item has @uid
-            // paging object: { start, size } — total and _seen are auto-initialized
             window._expandListingBlocks = async (blocks, layout, containerId) => {
                 const size = 6;
                 const pageNum = pages[containerId] || 0;
-                const paging = { start: pageNum * size, size };
-                const items = await expandListingBlocks(layout, { blocks, fetchItems: { listing: fetchItems }, paging, itemTypeField: 'variation' });
-                return { items, paging };
+                return await expandListingBlocks(layout, { blocks, fetchItems: { listing: fetchItems }, paging: { start: pageNum * size, size }, itemTypeField: 'variation' });
             };
 
             // Convert layout IDs to block objects with @uid
@@ -188,7 +185,7 @@
                 if (myGeneration !== window._renderGeneration) return; // stale render
 
                 if (expandedItems.length > 0) {
-                    const footerItems = await expandListingBlocks(
+                    const { items: footerItems } = await expandListingBlocks(
                         expandedItems,
                         { fetchItems: { listing: fetchItems }, itemTypeField: 'variation' }
                     );

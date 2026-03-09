@@ -17,6 +17,6 @@ watch(() => props.block.querystring, async () => {
     fetchItems: { listing: fetchItems },
     itemTypeField: 'variation',
   });
-  items.value = result;
+  items.value = result.items;
 }, { immediate: true });
 </script>

@@ -10256,19 +10256,23 @@ export function calculatePaging(itemsTotal, bSize, currentPage = 0) {
 
 /**
  * Synchronous helper to pass through static blocks with @uid.
- * Use for blocks without listings that render outside Suspense.
- * Shares paging object with expandBlocks for combined paging.
+ * Use for non-listing blocks in grids with combined paging.
+ *
+ * Returns { items, paging } — does NOT mutate the input paging object.
+ * Chain `paging.seen` from one call to the next for correct positioning.
  *
  * @param {Array} inputItems - Array of block IDs or objects with @uid
  * @param {Object} options - Configuration options
  * @param {Object} options.blocks - Map of blockId -> block data (for ID lookups)
- * @param {Object} options.paging - Paging object { start, size, total, _seen } - mutated
- * @returns {Array} Items on current page (paging object is mutated in-place)
+ * @param {Object} options.paging - Paging input { start, size } (not mutated)
+ * @param {number} [options.seen=0] - Number of items already seen (from prior calls)
+ * @returns {{ items: Array, paging: Object }} Items on current page + computed paging state
  */
 export function staticBlocks(inputItems, options = {}) {
-  const { blocks: blocksDict, paging } = options;
-  if (paging._seen == null) paging._seen = 0;
-  if (paging.total == null) paging.total = 0;
+  const { blocks: blocksDict, paging: pagingIn = {} } = options;
+  let seen = options.seen || 0;
+  const start = pagingIn.start || 0;
+  const size = pagingIn.size || 1000;
 
   // Normalize items: convert IDs to objects if blocksDict provided
   const normalizedItems = (inputItems || []).map(item => {
@@ -10284,23 +10288,20 @@ export function staticBlocks(inputItems, options = {}) {
   }).filter(Boolean);
 
   const items = [];
-  const startingSeen = paging._seen;
 
   for (const item of normalizedItems) {
-    paging._seen++;
+    seen++;
     // Only include items on current page
-    if (paging._seen > paging.start && (paging._seen - paging.start) <= paging.size) {
+    if (seen > start && (seen - start) <= size) {
       items.push(item);
     }
   }
 
-  // Total is always everything seen so far
-  paging.total = paging._seen;
-
-  // Compute paging UI values
+  // Build output paging with computed UI values
+  const paging = { start, size, total: seen, seen };
   computePagingUI(paging);
 
-  return items;
+  return { items, paging };
 }
 
 /**
@@ -10481,7 +10482,7 @@ export async function expandListingBlocks(inputItems, options = {}) {
   const {
     blocks: blocksDict,  // Optional: lookup dict for when items are IDs
     fetchItems,          // { blockType: async (block, { start, size }) => { items, total } }
-    paging: pagingIn,    // { start, size } - mutated to track position across calls
+    paging: pagingIn,    // { start, size } — not mutated
     itemTypeField = 'itemType',  // Field name to read item type from (e.g., 'variation')
     defaultItemType = 'summary',  // Default item type when field is not set
   } = options;
@@ -10510,15 +10511,8 @@ export async function expandListingBlocks(inputItems, options = {}) {
   const blocks = Object.fromEntries(normalizedItems.map(item => [item['@uid'], item]));
   const blocksLayout = normalizedItems.map(item => item['@uid']);
 
-  // Create default paging if not provided, and ensure defaults for tracking fields
+  // Use input paging values (not mutated) and seen count from prior calls
   const paging = pagingIn || { start: 0, size: 1000 };
-
-  // Auto-track _ready: create promise on first call, resolve when all calls complete
-  if (!paging._ready) {
-    paging._ready = new Promise(resolve => { paging._resolve = resolve; });
-    paging._pending = 0;
-  }
-  paging._pending++;
 
   // Find all listing blocks that need expansion (any block whose @type has a fetcher)
   const listingBlockIds = blocksLayout.filter(
@@ -10536,9 +10530,9 @@ export async function expandListingBlocks(inputItems, options = {}) {
     log('expandListingBlocks: no bridgeInstance, skipping readonly registration for:', listingBlockIds);
   }
 
-  // Account for items already counted by prior staticBlocks calls on the same paging object.
-  // staticBlocks increments paging._seen for each static block it processes.
-  const priorSeen = paging._seen || 0;
+  // Account for items already counted by prior staticBlocks calls.
+  // Caller passes seen count explicitly (no shared mutable state).
+  const priorSeen = options.seen || 0;
 
   // Single-pass: walk blocks in layout order, fetching each listing sequentially.
   // Each fetch returns { items, total }, so we learn the total and get the items
@@ -10658,20 +10652,12 @@ export async function expandListingBlocks(inputItems, options = {}) {
     }
   }
 
-  // Advance _seen by this batch; total is always everything seen
-  paging._seen = (paging._seen || 0) + batchTotal;
-  paging.total = paging._seen;
+  // Build output paging with computed UI values (input is not mutated)
+  const seen = priorSeen + batchTotal;
+  const outPaging = { start: paging.start, size: paging.size, total: seen, seen };
+  computePagingUI(outPaging);
 
-  // Compute paging UI values
-  computePagingUI(paging);
-
-  // Resolve _ready when all pending expandListingBlocks calls have completed
-  paging._pending--;
-  if (paging._pending <= 0 && paging._resolve) {
-    paging._resolve(paging);
-  }
-
-  return items;
+  return { items, paging: outPaging };
 }
 
 /**

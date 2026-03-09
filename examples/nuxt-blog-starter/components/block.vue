@@ -79,7 +79,7 @@
       <template v-for="entry in gridChildren" :key="entry.id">
         <!-- Listing child: async expand in Suspense, with shared paging -->
         <Suspense v-if="entry.isListing" :key="`grid-listing-${entry.id}-pg${gridPageFromUrl}-${JSON.stringify(entry.block)}`">
-          <ListingBlock :id="entry.id" :block="entry.block" :paging="gridPaging"
+          <ListingBlock :id="entry.id" :block="entry.block" :paging="gridPaging" :seen="entry.seen"
             :api-url="effectiveApiUrl" :context-path="effectiveContextPath">
             <template #default="{ items }">
               <template v-for="item in items" :key="item['@uid']">
@@ -102,10 +102,8 @@
         </template>
       </template>
     </div>
-    <!-- Combined paging: awaits _ready from all listings -->
-    <Suspense :key="`grid-paging-${gridPageFromUrl}`">
-      <AsyncPaging :paging="gridPaging" :build-url="gridBuildPagingUrl" />
-    </Suspense>
+    <!-- Combined paging: reactive via gridPaging (updated by ListingBlock via Object.assign) -->
+    <Paging v-if="gridPaging.totalPages > 1" :paging="gridPaging" :build-url="gridBuildPagingUrl" />
   </div>
 
   <!-- Columns container block -->
@@ -776,7 +774,7 @@
 
 </template>
 <script setup>
-import { ref, watch, nextTick, computed, toRefs, inject, onMounted } from 'vue';
+import { ref, reactive, watch, nextTick, computed, toRefs, inject, onMounted } from 'vue';
 import { expandTemplatesSync, staticBlocks, isEditMode } from '@hydra-js/hydra.js';
 import RichText from './richtext.vue';
 
@@ -912,38 +910,37 @@ const expand = (layout, blocks, idField) => expandTemplatesSync(layout, {
 });
 
 // Grid block: combined paging across all children (mirrors README Grid pattern)
-// Stable object so expandListingBlocks can mutate _ready/_pending/total on it
+// Reactive so ListingBlock can update totalPages etc. via Object.assign
 const GRID_PAGE_SIZE = 6;
 const gridPageFromUrl = computed(() => {
   const pages = injectedPages.value || injectedPages;
   return pages[block_uid.value] || 0;
 });
-const gridPaging = { start: 0, size: GRID_PAGE_SIZE };
+const gridPaging = reactive({ start: 0, size: GRID_PAGE_SIZE });
 const gridBuildPagingUrl = (page) => {
   if (page === 0) return effectiveContextPath.value;
   return `${effectiveContextPath.value}/@pg_${block_uid.value}_${page}`;
 };
 
 // Process grid children: listings marked for Suspense, static blocks filtered by paging window
-// This is the Vue equivalent of the README's inline JSX pattern:
-//   blocks[id]['@type'] === 'listing' ? <Suspense><ListingItems/></Suspense>
-//                                     : staticBlocks([id], { blocks, paging }).map(...)
+// staticBlocks and expandListingBlocks return { items, paging } — chain paging.seen for position tracking
 const LISTING_TYPES = ['listing'];
 const gridChildren = computed(() => {
   const layout = block.value.blocks_layout?.items || [];
   const blocks = block.value.blocks || {};
-  // Read page number (reactive dependency) and update paging start
-  gridPaging.start = gridPageFromUrl.value * GRID_PAGE_SIZE;
-  gridPaging._seen = 0;
-  gridPaging.total = 0;
+  // Read page number (reactive dependency) and compute paging start
+  const start = gridPageFromUrl.value * GRID_PAGE_SIZE;
+  gridPaging.start = start;
+  let seen = 0;
   return layout.map(id => {
     const child = blocks[id];
     if (!child) return null;
     if (LISTING_TYPES.includes(child['@type'])) {
-      return { id, block: child, isListing: true };
+      return { id, block: child, isListing: true, seen };
     }
-    const items = staticBlocks([id], { blocks, paging: gridPaging });
-    return { id, block: child, isListing: false, items };
+    const result = staticBlocks([id], { blocks, paging: { start, size: GRID_PAGE_SIZE }, seen });
+    seen = result.paging.seen;
+    return { id, block: child, isListing: false, items: result.items };
   }).filter(Boolean);
 });
 
