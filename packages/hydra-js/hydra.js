@@ -11539,7 +11539,7 @@ export async function loadTemplates(data, loadTemplate, preloadedTemplates = {},
   // Start with caller-provided templates (caller owns the cache)
   const templates = { ...preloadedTemplates };
   const loaded = new Set(Object.keys(preloadedTemplates));
-  const failed = new Set();
+  const failed = new Map();
 
   // Helper to scan an object for templateId references
   function collectTemplateIds(obj, visited = new Set()) {
@@ -11597,13 +11597,13 @@ export async function loadTemplates(data, loadTemplate, preloadedTemplates = {},
           return { id, template };
         } catch (error) {
           console.warn(`[HYDRA] Failed to load template ${id}:`, error);
-          return { id, template: null };
+          return { id, template: null, error };
         }
       })
     );
 
     // Process results and collect nested template IDs
-    for (const { id, template } of results) {
+    for (const { id, template, error } of results) {
       if (template) {
         loaded.add(id);
         templates[id] = template;
@@ -11617,12 +11617,13 @@ export async function loadTemplates(data, loadTemplate, preloadedTemplates = {},
           }
         }
       } else {
-        failed.add(id);
+        failed.set(id, error);
       }
     }
   }
 
-  return templates;
+  const errors = Array.from(failed.entries()).map(([templateId, error]) => ({ templateId, error }));
+  return { templates, errors };
 }
 
 /**
@@ -11650,7 +11651,7 @@ export async function expandTemplates(inputItems, options = {}) {
     : { items: inputItems };
 
   // Load templates referenced in the page data, seeded with caller's cache
-  const templates = await loadTemplates(data, loadTemplate, preloadedTemplates);
+  const { templates } = await loadTemplates(data, loadTemplate, preloadedTemplates);
 
   // Delegate to sync version with pre-loaded templates.
   // Don't pass loadTemplate — it's async and expandTemplatesSync requires

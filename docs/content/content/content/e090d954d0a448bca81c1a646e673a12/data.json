@@ -151,7 +151,7 @@
       "@type": "separator",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-maps",
       "placeholder": "sep"
     },
@@ -159,7 +159,7 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-maps",
       "placeholder": "heading"
     },
@@ -167,7 +167,7 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-maps",
       "placeholder": "schema-heading"
     },
@@ -175,7 +175,7 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-maps",
       "placeholder": "schema-desc"
     },
@@ -183,7 +183,7 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-maps",
       "placeholder": "json-heading"
     },
@@ -191,7 +191,7 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-maps",
       "placeholder": "json-desc"
     },
@@ -199,7 +199,7 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-maps",
       "placeholder": "rendering-heading"
     },
@@ -207,13 +207,13 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-maps",
       "placeholder": "rendering-desc"
     },
     "ref-maps-schema": {
       "@type": "codeExample",
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-maps",
       "placeholder": "schema",
       "tabs": [
@@ -227,7 +227,7 @@
     },
     "ref-maps-json-data": {
       "@type": "codeExample",
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-maps",
       "placeholder": "json-data",
       "tabs": [
@@ -241,7 +241,7 @@
     },
     "ref-maps-rendering": {
       "@type": "codeExample",
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-maps",
       "placeholder": "rendering",
       "tabs": [

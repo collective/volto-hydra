@@ -317,7 +317,7 @@
           "head_title": "Welcome to Hydra",
           "href": [
             {
-              "@id": "resolveuid/e8178744e30a418b9a5768997bb29a19",
+              "@id": "/content-types",
               "@type": "Document",
               "Description": "This section has a sample of content types available in this site.",
               "Title": "Content Types",
@@ -329,7 +329,7 @@
           ],
           "preview_image": [
             {
-              "@id": "resolveuid/9abc1a813bcf46388e565b277bd8c6bf",
+              "@id": "/images/penguin1.jpg",
               "@type": "Image",
               "CreationDate": "2024-03-07T12:29:54+01:00",
               "Creator": "admin",
@@ -391,7 +391,7 @@
           "hideButton": false,
           "href": [
             {
-              "@id": "resolveuid/425695d2b7cb47e69374d6f211f17e38",
+              "@id": "/block",
               "@type": "Document",
               "Description": "",
               "Title": "Blocks",
@@ -403,7 +403,7 @@
           ],
           "preview_image": [
             {
-              "@id": "resolveuid/05bace45294c45d5ab93de883e7ce702",
+              "@id": "/images/penguin2.jpg",
               "@type": "Image",
               "CreationDate": "2024-03-08T13:05:46+01:00",
               "Creator": "admin",
@@ -464,7 +464,7 @@
           "hideButton": true,
           "href": [
             {
-              "@id": "resolveuid/c40a2be214b645338a7ef2e711e2f5c6",
+              "@id": "/vertical-spacing",
               "@type": "Document",
               "Description": "",
               "Title": "Vertical Spacing",
@@ -476,7 +476,7 @@
           ],
           "preview_image": [
             {
-              "@id": "resolveuid/7de78fea55354a29ad78b909efb07436",
+              "@id": "/images/penguin3.jpg",
               "@type": "Image",
               "CreationDate": "2024-03-08T13:05:46+01:00",
               "Creator": "admin",

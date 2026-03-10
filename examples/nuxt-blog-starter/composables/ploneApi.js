@@ -81,12 +81,9 @@ export default async function ploneApi({
           }
           return response.json();
         };
-        let templates;
-        try {
-          templates = await loadTemplates(data, loadTemplate, templateCache, preloadTemplates);
-        } catch (e) {
-          console.error('[ploneApi] loadTemplates failed:', e.message, 'preloadTemplates:', preloadTemplates);
-          templates = {};
+        const { templates, errors } = await loadTemplates(data, loadTemplate, templateCache, preloadTemplates);
+        if (errors.length) {
+          console.warn('[ploneApi] Failed to load templates:', errors.map(e => `${e.templateId}: ${e.error?.message || e.error}`).join('; '));
         }
 
         return {

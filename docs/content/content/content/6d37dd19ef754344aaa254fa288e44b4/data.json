@@ -202,7 +202,7 @@
       "@type": "separator",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-video",
       "placeholder": "sep"
     },
@@ -210,7 +210,7 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-video",
       "placeholder": "heading"
     },

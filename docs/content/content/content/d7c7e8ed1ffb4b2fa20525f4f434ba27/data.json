@@ -13,7 +13,7 @@
           "head_title": null,
           "href": [
             {
-              "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
+              "@id": "/content-types/page",
               "@type": "Document",
               "Description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten können mit Hilfe von Text, Bildern und Blöcken strukturiert werden.",
               "Title": "Inhaltstyp: Seite (Page)",
@@ -35,7 +35,7 @@
           "head_title": null,
           "href": [
             {
-              "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
+              "@id": "/content-types/page",
               "@type": "Document",
               "Description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten können mit Hilfe von Text, Bildern und Blöcken strukturiert werden.",
               "Title": "Inhaltstyp: Seite (Page)",
@@ -145,7 +145,7 @@
           "head_title": null,
           "href": [
             {
-              "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
+              "@id": "/content-types/page",
               "@type": "Document",
               "Description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten können mit Hilfe von Text, Bildern und Blöcken strukturiert werden.",
               "Title": "Inhaltstyp: Seite (Page)",
@@ -167,7 +167,7 @@
           "head_title": null,
           "href": [
             {
-              "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
+              "@id": "/content-types/page",
               "@type": "Document",
               "Description": "Der Inhaltstyp Seite kann verwendet werden Inhalte auf einer Einzelseite der Webseite darzustellen. Seiten können mit Hilfe von Text, Bildern und Blöcken strukturiert werden.",
               "Title": "Inhaltstyp: Seite (Page)",

@@ -415,7 +415,7 @@
       "@type": "separator",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
       "placeholder": "sep"
     },
@@ -423,7 +423,7 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
       "placeholder": "heading"
     },
@@ -431,7 +431,7 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
       "placeholder": "schema-heading"
     },
@@ -439,7 +439,7 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
       "placeholder": "schema-desc"
     },
@@ -447,7 +447,7 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
       "placeholder": "json-heading"
     },
@@ -455,7 +455,7 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
       "placeholder": "json-desc"
     },
@@ -463,7 +463,7 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
       "placeholder": "rendering-heading"
     },
@@ -471,13 +471,13 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
       "placeholder": "rendering-desc"
     },
     "ref-slate-schema": {
       "@type": "codeExample",
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
       "placeholder": "schema",
       "tabs": [
@@ -491,7 +491,7 @@
     },
     "ref-slate-json-data": {
       "@type": "codeExample",
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
       "placeholder": "json-data",
       "tabs": [
@@ -505,7 +505,7 @@
     },
     "ref-slate-rendering": {
       "@type": "codeExample",
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
       "placeholder": "rendering",
       "tabs": [

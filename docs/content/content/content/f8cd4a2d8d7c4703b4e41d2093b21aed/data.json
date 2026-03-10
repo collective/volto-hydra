@@ -68,7 +68,7 @@
                 "size:noprefix": "medium"
               },
               "title": "Image - Light",
-              "url": "../../resolveuid/eec82559bf3242a6be4d43bc2096f399"
+              "url": "/content-types/image-light"
             },
             "11af3b59-7720-4875-b0b9-90be5807d476": {
               "@type": "separator",
@@ -120,7 +120,7 @@
               "image_field": "image",
               "size": "l",
               "title": "Image",
-              "url": "../../resolveuid/970ec24c76784c66a06d8c8d8b6522b2"
+              "url": "/content-types/image"
             },
             "725bfc52-49f6-4e70-8d11-48c537cfb5ff": {
               "@type": "slate",
@@ -169,7 +169,7 @@
                 "size:noprefix": "small"
               },
               "title": "Image - Light",
-              "url": "../../resolveuid/eec82559bf3242a6be4d43bc2096f399"
+              "url": "/content-types/image-light"
             },
             "8f1ad076-32b9-432b-9308-8b0972a8f57e": {
               "@type": "image",
@@ -182,7 +182,7 @@
                 "size:noprefix": "small"
               },
               "title": "Image",
-              "url": "../../resolveuid/970ec24c76784c66a06d8c8d8b6522b2"
+              "url": "/content-types/image"
             },
             "b4536f61-92a1-4b65-aa40-c142d799f0ba": {
               "@type": "slate",
@@ -210,7 +210,7 @@
                 "size:noprefix": "medium"
               },
               "title": "Image",
-              "url": "../../resolveuid/970ec24c76784c66a06d8c8d8b6522b2"
+              "url": "/content-types/image"
             },
             "c3344b1c-89b9-4119-993e-58ef6bece880": {
               "@type": "slate",
@@ -250,7 +250,7 @@
               "image_field": "image",
               "size": "l",
               "title": "Image - Light",
-              "url": "../../resolveuid/eec82559bf3242a6be4d43bc2096f399"
+              "url": "/content-types/image-light"
             },
             "d77557e0-793a-408f-9940-a0ad80d3be8f": {
               "@type": "slate",
@@ -333,7 +333,7 @@
               "head_title": null,
               "href": [
                 {
-                  "@id": "../../resolveuid/eec82559bf3242a6be4d43bc2096f399",
+                  "@id": "/content-types/image-light",
                   "@type": "Image",
                   "Description": " The Image content type can be used to upload an image in various formats (JPG, GIF, PNG, SVG). The uploaded image should always have a high resolution so that it can be used flexibly, for example as a banner image. Plone automatically delivers the images in the best scaling, so there is no need to scale images down manually.",
                   "Title": "Image - Light",
@@ -355,7 +355,7 @@
               "head_title": null,
               "href": [
                 {
-                  "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
+                  "@id": "/content-types/page",
                   "@type": "Document",
                   "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
                   "Title": "Page",
@@ -377,7 +377,7 @@
               "head_title": null,
               "href": [
                 {
-                  "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
+                  "@id": "/content-types/page",
                   "@type": "Document",
                   "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
                   "Title": "Page",
@@ -1183,7 +1183,7 @@
                 "size:noprefix": "medium"
               },
               "title": "Image - Light",
-              "url": "../../resolveuid/eec82559bf3242a6be4d43bc2096f399"
+              "url": "/content-types/image-light"
             },
             "11af3b59-7720-4875-b0b9-90be5807d476": {
               "@type": "separator",
@@ -1235,7 +1235,7 @@
               "image_field": "image",
               "size": "l",
               "title": "Image - Light",
-              "url": "../../resolveuid/eec82559bf3242a6be4d43bc2096f399"
+              "url": "/content-types/image-light"
             },
             "725bfc52-49f6-4e70-8d11-48c537cfb5ff": {
               "@type": "slate",
@@ -1284,7 +1284,7 @@
                 "size:noprefix": "small"
               },
               "title": "Image",
-              "url": "../../resolveuid/970ec24c76784c66a06d8c8d8b6522b2"
+              "url": "/content-types/image"
             },
             "8f1ad076-32b9-432b-9308-8b0972a8f57e": {
               "@type": "image",
@@ -1297,7 +1297,7 @@
                 "size:noprefix": "small"
               },
               "title": "Image",
-              "url": "../../resolveuid/970ec24c76784c66a06d8c8d8b6522b2"
+              "url": "/content-types/image"
             },
             "b4536f61-92a1-4b65-aa40-c142d799f0ba": {
               "@type": "slate",
@@ -1325,7 +1325,7 @@
                 "size:noprefix": "medium"
               },
               "title": "Image",
-              "url": "../../resolveuid/970ec24c76784c66a06d8c8d8b6522b2"
+              "url": "/content-types/image"
             },
             "c3344b1c-89b9-4119-993e-58ef6bece880": {
               "@type": "slate",
@@ -1365,7 +1365,7 @@
               "image_field": "image",
               "size": "l",
               "title": "Image",
-              "url": "../../resolveuid/970ec24c76784c66a06d8c8d8b6522b2"
+              "url": "/content-types/image"
             },
             "d77557e0-793a-408f-9940-a0ad80d3be8f": {
               "@type": "slate",
@@ -1448,7 +1448,7 @@
               "head_title": null,
               "href": [
                 {
-                  "@id": "../../resolveuid/eec82559bf3242a6be4d43bc2096f399",
+                  "@id": "/content-types/image-light",
                   "@type": "Image",
                   "Description": " The Image content type can be used to upload an image in various formats (JPG, GIF, PNG, SVG). The uploaded image should always have a high resolution so that it can be used flexibly, for example as a banner image. Plone automatically delivers the images in the best scaling, so there is no need to scale images down manually.",
                   "Title": "Image - Light",
@@ -1470,7 +1470,7 @@
               "head_title": null,
               "href": [
                 {
-                  "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
+                  "@id": "/content-types/page",
                   "@type": "Document",
                   "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
                   "Title": "Page",
@@ -1492,7 +1492,7 @@
               "head_title": null,
               "href": [
                 {
-                  "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
+                  "@id": "/content-types/page",
                   "@type": "Document",
                   "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
                   "Title": "Page",
@@ -2239,7 +2239,7 @@
       "@type": "separator",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-accordion",
       "placeholder": "sep"
     },
@@ -2247,7 +2247,7 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
+      "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-accordion",
       "placeholder": "heading"
     },
