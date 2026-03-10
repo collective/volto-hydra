@@ -1,0 +1,15 @@
+{
+  "@type": "listing",
+  "variation": "summary",
+  "querystring": {
+    "query": [
+      {
+        "i": "portal_type",
+        "o": "plone.app.querystring.operation.selection.any",
+        "v": ["Document"]
+      }
+    ],
+    "sort_on": "effective",
+    "sort_order": "descending"
+  }
+}

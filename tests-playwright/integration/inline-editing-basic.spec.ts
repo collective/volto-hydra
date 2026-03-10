@@ -55,7 +55,7 @@ test.describe('Inline Editing - Basic', () => {
 
   // This test uses #render-counter which only exists in mock test frontend
   test('cursor position remains stable while typing', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'nuxt', 'Uses #render-counter which only exists in mock frontend');
+    test.skip(testInfo.project.name.includes('nuxt'), 'Uses #render-counter which only exists in mock frontend');
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -125,7 +125,7 @@ test.describe('Inline Editing - Basic', () => {
 
   // This test verifies DOM element identity which may differ in Vue due to reactivity
   test('typing does not cause DOM element to be replaced (no re-render)', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name === 'nuxt', 'Vue reactivity may replace DOM elements differently');
+    test.skip(testInfo.project.name.includes('nuxt'), 'Vue reactivity may replace DOM elements differently');
     const helper = new AdminUIHelper(page);
 
     await helper.login();

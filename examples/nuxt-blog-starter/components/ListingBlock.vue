@@ -6,15 +6,17 @@
 </template>
 
 <script setup>
-import { inject } from 'vue';
+import { inject, ref, reactive, watch } from 'vue';
 import { expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';
 
 const props = defineProps({
   id: { type: String, required: true },
   block: { type: Object, required: true },
-  // Shared paging object (for combined paging in containers like gridBlock).
+  // Shared paging state (for combined paging in containers like gridBlock).
   // When null, the listing creates and owns its own paging.
   paging: { type: Object, default: null },
+  // Number of items already seen by prior staticBlocks calls (for grid position tracking)
+  seen: { type: Number, default: 0 },
   apiUrl: { type: String, required: true },
   contextPath: { type: String, required: true },
 });
@@ -22,13 +24,16 @@ const props = defineProps({
 const DEFAULT_PAGE_SIZE = 6;
 const injectedPages = inject('pages', {});
 
-// Read facet/search params from URL to pass as extraCriteria
 const route = useRoute();
-const extraCriteria = {};
-for (const [key, value] of Object.entries(route.query)) {
-  if (key === 'SearchableText' || key === 'sort_on' || key.startsWith('facet.')) {
-    extraCriteria[key] = value;
+
+function buildExtraCriteria(query) {
+  const criteria = {};
+  for (const [key, value] of Object.entries(query)) {
+    if (key === 'SearchableText' || key === 'sort_on' || key.startsWith('facet.')) {
+      criteria[key] = value;
+    }
   }
+  return criteria;
 }
 
 // Create own paging if none shared
@@ -37,13 +42,29 @@ const listingPageSize = props.block.b_size || DEFAULT_PAGE_SIZE;
 const listingPage = ownsPaging
   ? ((injectedPages.value || injectedPages)[props.id] || 0)
   : 0;
-const paging = props.paging || { start: listingPage * listingPageSize, size: listingPageSize };
+const paging = props.paging || reactive({ start: listingPage * listingPageSize, size: listingPageSize });
 
-const items = await expandListingBlocks([props.id], {
-  blocks: { [props.id]: props.block },
-  fetchItems: { listing: ploneFetchItems({ apiUrl: props.apiUrl, contextPath: props.contextPath, extraCriteria }) },
-  paging,
-  itemTypeField: 'variation',
+async function fetchListing(query) {
+  return await expandListingBlocks([props.id], {
+    blocks: { [props.id]: props.block },
+    fetchItems: { listing: ploneFetchItems({ apiUrl: props.apiUrl, contextPath: props.contextPath, extraCriteria: buildExtraCriteria(query) }) },
+    paging: { start: paging.start, size: paging.size },
+    seen: props.seen,
+    itemTypeField: 'variation',
+  });
+}
+
+// Initial fetch
+const result = await fetchListing(route.query);
+const items = ref(result.items);
+Object.assign(paging, result.paging);
+
+// Re-fetch when route query changes (e.g. header search on search page).
+// No mutation dance needed — expandListingBlocks returns a fresh paging object.
+watch(() => route.query, async (newQuery) => {
+  const result = await fetchListing(newQuery);
+  items.value = result.items;
+  Object.assign(paging, result.paging);
 });
 
 // Build paging URL for own paging (per-listing)

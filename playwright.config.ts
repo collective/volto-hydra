@@ -1,11 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 import * as path from 'path';
 
-// Check if we need Nuxt server (only for nuxt/nuxt-specific projects)
+// Check which extra servers we need based on --project arg
 const projectArgIndex = process.argv.indexOf('--project');
 const projectArg = process.argv.find(arg => arg.startsWith('--project='))?.split('=')[1]
   || (projectArgIndex !== -1 ? process.argv[projectArgIndex + 1] : undefined);
 const needsNuxt = !projectArg || projectArg.includes('nuxt');
+const needsReact = !projectArg || projectArg.includes('react');
+const needsSvelte = !projectArg || projectArg.includes('svelte');
+const needsVue = !projectArg || projectArg.includes('vue');
 
 // Only import coverage reporter when COVERAGE is enabled (CI)
 // This prevents V8 coverage collection overhead locally
@@ -84,11 +87,87 @@ export default defineConfig({
     video: process.env.VIDEO ? 'retain-on-failure' : 'off',
   },
 
-  /* Configure projects for different frontends */
+  /* Configure projects for different test categories and frontends.
+   *
+   * Three test directories:
+   *   unit/        — Pure unit tests, run once (no frontend needed)
+   *   bridge/      — Mock-parent tests using hydra.js bridge protocol,
+   *                  run on ALL frontends (mock, nuxt, react, svelte, vue)
+   *   integration/ — Full Volto admin UI tests, run on mock + nuxt only
+   */
   projects: [
-    // Mock frontend (default) - tests run against mock HTML frontend on port 8888
+    // --- Unit tests (run once) ---
+    {
+      name: 'unit',
+      testDir: 'tests-playwright/unit',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+      },
+    },
+
+    // --- Bridge tests — run on all frontends ---
+    // Mock frontend (default, port 8888)
     {
       name: 'mock',
+      testDir: 'tests-playwright/bridge',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+      },
+    },
+    // Nuxt frontend (port 3003)
+    {
+      name: 'nuxt',
+      testDir: 'tests-playwright/bridge',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-nuxt.json',
+      },
+    },
+    // React Vite frontend (port 3004)
+    {
+      name: 'react',
+      testDir: 'tests-playwright/bridge',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-react.json',
+      },
+    },
+    // Svelte Vite frontend (port 3005)
+    {
+      name: 'svelte',
+      testDir: 'tests-playwright/bridge',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-svelte.json',
+      },
+    },
+    // Vue Vite frontend (port 3006)
+    {
+      name: 'vue',
+      testDir: 'tests-playwright/bridge',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-vue.json',
+      },
+    },
+
+    // --- Admin integration tests — fully implemented frontends only ---
+    // Mock frontend
+    {
+      name: 'admin-mock',
+      testDir: 'tests-playwright/integration',
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
@@ -98,42 +177,32 @@ export default defineConfig({
         /nuxt-.*\.spec\.ts/, // Skip nuxt-specific tests
       ],
     },
-    // Nuxt frontend - tests run against Nuxt frontend on port 3003
+    // Nuxt frontend
     {
-      name: 'nuxt',
+      name: 'admin-nuxt',
+      testDir: 'tests-playwright/integration',
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
-        // Pre-set iframe_url cookie to use Nuxt frontend
         storageState: 'tests-playwright/fixtures/storage-nuxt.json',
       },
       testIgnore: [
         /nuxt-.*\.spec\.ts/, // Skip nuxt-specific tests (they set their own cookie)
         /multifield.*\.spec\.ts/, // Skip multifield tests (hero block not in Nuxt)
-        /unit\/.*\.spec\.ts/, // Unit tests don't need to run per-frontend
       ],
     },
     // Nuxt-specific tests (nuxt-*.spec.ts) - set their own iframe_url cookie
     {
       name: 'nuxt-specific',
+      testDir: 'tests-playwright/integration',
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
       },
-      testMatch: /nuxt-.*\.spec\.ts/, // Only run nuxt-specific tests
+      testMatch: /nuxt-.*\.spec\.ts/,
     },
-
-    // Uncomment to test on Firefox and WebKit
-    // {
-    //   name: 'firefox',
-    //   use: { ...devices['Desktop Firefox'] },
-    // },
-    // {
-    //   name: 'webkit',
-    //   use: { ...devices['Desktop Safari'] },
-    // },
   ],
 
   /* Start mock API server and Volto dev server before running tests */
@@ -173,7 +242,7 @@ export default defineConfig({
             PORT: '3001',
             RAZZLE_API_PATH: 'http://localhost:8888',
             // Both mock frontend (8888) and Nuxt frontend (3003) available for switching
-            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003',
+            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006',
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
           },
         }
@@ -197,7 +266,7 @@ export default defineConfig({
             PORT: '3001',
             RAZZLE_API_PATH: 'http://localhost:8888',
             // Both mock frontend (8888) and Nuxt frontend (3003) available for switching
-            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003',
+            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006',
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
             // Prevent parcel from trying to access TTY (fixes segfault in background process)
             CI: process.env.CI || 'true',
@@ -211,6 +280,39 @@ export default defineConfig({
       timeout: 120 * 1000, // 2 minutes for Nuxt compilation
       reuseExistingServer: true, // CI starts server in advance, local dev starts manually
       cwd: path.join(process.cwd(), 'examples/nuxt-blog-starter'),
+      stdout: 'pipe',
+      stderr: 'pipe',
+    }] : []),
+    // React Vite frontend for doc example tests
+    ...(needsReact ? [{
+      name: 'React Frontend (Test)',
+      command: 'npx vite --port 3004 --strictPort',
+      url: 'http://localhost:3004',
+      timeout: 30 * 1000,
+      reuseExistingServer: true,
+      cwd: path.join(process.cwd(), 'docs/blocks/test-react'),
+      stdout: 'pipe',
+      stderr: 'pipe',
+    }] : []),
+    // Svelte Vite frontend for doc example tests
+    ...(needsSvelte ? [{
+      name: 'Svelte Frontend (Test)',
+      command: 'npx vite --port 3005 --strictPort',
+      url: 'http://localhost:3005',
+      timeout: 30 * 1000,
+      reuseExistingServer: true,
+      cwd: path.join(process.cwd(), 'docs/blocks/test-svelte'),
+      stdout: 'pipe',
+      stderr: 'pipe',
+    }] : []),
+    // Vue Vite frontend for doc example tests
+    ...(needsVue ? [{
+      name: 'Vue Frontend (Test)',
+      command: 'npx vite --port 3006 --strictPort',
+      url: 'http://localhost:3006',
+      timeout: 30 * 1000,
+      reuseExistingServer: true,
+      cwd: path.join(process.cwd(), 'docs/blocks/test-vue'),
       stdout: 'pipe',
       stderr: 'pipe',
     }] : []),

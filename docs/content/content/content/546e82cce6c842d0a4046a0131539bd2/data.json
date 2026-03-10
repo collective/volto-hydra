@@ -221,6 +221,124 @@
       "styles": {
         "align": "left"
       }
+    },
+    "ref-separator-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-separator",
+      "placeholder": "sep"
+    },
+    "ref-separator-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-separator",
+      "placeholder": "heading"
+    },
+    "ref-separator-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-separator",
+      "placeholder": "schema-heading"
+    },
+    "ref-separator-schema-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-separator",
+      "placeholder": "schema-desc"
+    },
+    "ref-separator-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-separator",
+      "placeholder": "json-heading"
+    },
+    "ref-separator-json-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-separator",
+      "placeholder": "json-desc"
+    },
+    "ref-separator-rendering-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-separator",
+      "placeholder": "rendering-heading"
+    },
+    "ref-separator-rendering-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-separator",
+      "placeholder": "rendering-desc"
+    },
+    "ref-separator-schema": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-separator",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-separator-schema-javascript-3157d9",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  \"separator\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"styles\": {\n          \"title\": \"Styles\"\n        }\n      }\n    }\n  }\n}"
+        }
+      ]
+    },
+    "ref-separator-json-data": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-separator",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-separator-json-data-json-9d890c",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"separator\",\n  \"styles\": {\n    \"align\": \"center\"\n  }\n}"
+        }
+      ]
+    },
+    "ref-separator-rendering": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-separator",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-separator-rendering-jsx-470901",
+          "label": "React",
+          "language": "jsx",
+          "code": "function SeparatorBlock({ block }) {\n  const align = block.styles?.align || 'full';\n\n  return (\n    <div data-block-uid={block['@uid']} className={`separator-block separator-${align}`}>\n      <hr />\n    </div>\n  );\n}"
+        },
+        {
+          "@id": "ref-separator-rendering-vue-4281a1",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\" :class=\"'separator-block separator-' + (block.styles?.align || 'full')\">\n    <hr />\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"
+        },
+        {
+          "@id": "ref-separator-rendering-svelte-8c1d19",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<script>\n  export let block;\n</script>\n\n<div data-block-uid={block['@uid']} class=\"separator-block separator-{block.styles?.align || 'full'}\">\n  <hr />\n</div>"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -244,7 +362,36 @@
       "ef3f8f79-11c3-4495-b98f-15f0568645b5",
       "9c102ef1-5044-41cf-9859-025b23a90c26",
       "c209c305-cde3-497d-9a58-3dc642f3cb5d",
-      "c0f46bdd-58ae-48a1-9ee7-a9ba780d7386"
+      "c0f46bdd-58ae-48a1-9ee7-a9ba780d7386",
+      "ref-separator-schema-heading",
+      "ref-separator-schema-desc",
+      "ref-separator-schema",
+      "ref-separator-json-heading",
+      "ref-separator-json-desc",
+      "ref-separator-json-data",
+      "ref-separator-rendering-heading",
+      "ref-separator-rendering-desc",
+      "ref-separator-rendering",
+      "ref-separator-schema-heading",
+      "ref-separator-schema-desc",
+      "ref-separator-schema",
+      "ref-separator-json-heading",
+      "ref-separator-json-desc",
+      "ref-separator-json-data",
+      "ref-separator-rendering-heading",
+      "ref-separator-rendering-desc",
+      "ref-separator-rendering",
+      "ref-separator-sep",
+      "ref-separator-heading",
+      "ref-separator-schema-heading",
+      "ref-separator-schema-desc",
+      "ref-separator-schema",
+      "ref-separator-json-heading",
+      "ref-separator-json-desc",
+      "ref-separator-json-data",
+      "ref-separator-rendering-heading",
+      "ref-separator-rendering-desc",
+      "ref-separator-rendering"
     ]
   },
   "contributors": [],

@@ -98,7 +98,7 @@ test.describe('Block Selection', () => {
 
   test('switching block selection updates visual state', async ({ page }, testInfo) => {
     // Skip on Nuxt - test-page has custom blocks that affect bounding box comparison
-    test.skip(testInfo.project.name === 'nuxt', 'Nuxt test-page has custom blocks');
+    test.skip(testInfo.project.name.includes('nuxt'), 'Nuxt test-page has custom blocks');
 
     const helper = new AdminUIHelper(page);
 
@@ -445,7 +445,7 @@ test.describe('Block Selection', () => {
 
   test('scrolling selected block off screen does not scroll back', async ({ page }, testInfo) => {
     // Skip on Nuxt - uses container-test-page which has container blocks not yet supported
-    test.skip(testInfo.project.name === 'nuxt', 'Uses container-test-page');
+    test.skip(testInfo.project.name.includes('nuxt'), 'Uses container-test-page');
 
     // Bug: After selecting a block, if user scrolls the iframe so the block
     // goes off screen, the page automatically scrolls back to the block.

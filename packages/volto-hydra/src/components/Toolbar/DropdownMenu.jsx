@@ -407,7 +407,10 @@ const DropdownMenu = ({
         // Determine remove label and action based on table mode
         // Uses addDirection to determine Column vs Row (same as add button icon)
         const actionsRegistry = config.settings.hydraActions || {};
-        const isTableMode = addMode === 'table' || parentAddMode === 'table';
+        // Only use table-specific remove actions at cell level (parentAddMode === 'table')
+        // At row level (addMode === 'table'), the normal handleRemove → onDeleteBlock
+        // path correctly computes previous sibling selection via getSelectAfterDelete.
+        const isTableMode = parentAddMode === 'table';
         const isRightDirection = addDirection === 'right';
 
         let removeLabel = 'Remove';

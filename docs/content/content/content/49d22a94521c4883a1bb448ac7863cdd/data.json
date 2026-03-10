@@ -142,7 +142,7 @@
           "head_title": null,
           "href": [
             {
-              "@id": "../../resolveuid/e8178744e30a418b9a5768997bb29a19",
+              "@id": "/content-types",
               "@type": "Document",
               "Description": "This section has a sample of content types available in this site.",
               "Title": "Content Types",

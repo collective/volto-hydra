@@ -41,9 +41,9 @@
         }
       ]
     },
-    "lazy-text": {
+    "lazy-text-t0": {
       "@type": "slate",
-      "plaintext": "Detect the admin iframe via window.name and load hydra.js only when needed.",
+      "plaintext": "Detect the admin iframe and load the bridge only when needed. window.name is set by Hydra to indicate mode: hydra-edit:<origin> \u2014 edit mode (e.g., hydra-edit:http://localhost:3001)hydra-view:<origin> \u2014 view mode (e.g., hydra-view:http://localhost:3001) This persists across SPA navigation within the iframe, allowing your frontend to detect it's in the admin even after client-side route changes. In view mode, render from your API immediately but still load the bridge for navigation tracking. In edit mode, wait for onEditChange before rendering.",
       "value": [
         {
           "children": [
@@ -77,7 +77,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — edit mode (e.g., hydra-edit:http://localhost:3001)"
+                  "text": " \u2014 edit mode (e.g., hydra-edit:http://localhost:3001)"
                 }
               ],
               "type": "li"
@@ -93,7 +93,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — view mode (e.g., hydra-view:http://localhost:3001)"
+                  "text": " \u2014 view mode (e.g., hydra-view:http://localhost:3001)"
                 }
               ],
               "type": "li"
@@ -108,14 +108,17 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "lazy-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "function loadBridge(callback) {\n    const existingScript = document.getElementById(\"hydraBridge\");\n    if (!existingScript) {\n      const script = document.createElement(\"script\");\n      script.src = \"your-hydra-js-path\";\n      script.id = \"hydraBridge\";\n      document.body.appendChild(script);\n      script.onload = () => callback();\n    } else {\n      callback();\n    }\n}\n\nconst isHydraEdit = window.name.startsWith('hydra-edit:');\nconst isHydraView = window.name.startsWith('hydra-view:');\nconst inAdminIframe = isHydraEdit || isHydraView;\n\n// View mode or not in admin: render from API\nif (!isHydraEdit) {\n    renderPage(await fetchContent(path));\n}\n\n// Load bridge only in admin iframe\nif (inAdminIframe) {\n    loadBridge(() => {\n        initBridge({\n            onEditChange: (formData) => renderPage(formData),\n        });\n    });\n}"
-            }
-          ],
-          "type": "p"
+          "@id": "lazy-text-c1-javascript-548599",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "function loadBridge(callback) {\n    const existingScript = document.getElementById(\"hydraBridge\");\n    if (!existingScript) {\n      const script = document.createElement(\"script\");\n      script.src = \"your-hydra-js-path\";\n      script.id = \"hydraBridge\";\n      document.body.appendChild(script);\n      script.onload = () => callback();\n    } else {\n      callback();\n    }\n}\n\nconst isHydraEdit = window.name.startsWith('hydra-edit:');\nconst isHydraView = window.name.startsWith('hydra-view:');\nconst inAdminIframe = isHydraEdit || isHydraView;\n\n// View mode or not in admin: render from API\nif (!isHydraEdit) {\n    renderPage(await fetchContent(path));\n}\n\n// Load bridge only in admin iframe\nif (inAdminIframe) {\n    loadBridge(() => {\n        initBridge({\n            onEditChange: (formData) => renderPage(formData),\n        });\n    });\n}"
         }
       ]
     },
@@ -133,9 +136,9 @@
         }
       ]
     },
-    "auth-text": {
+    "auth-text-t0": {
       "@type": "slate",
-      "plaintext": "Use getAccessToken() to authenticate the frontend to access private content via the same auth as the editor.",
+      "plaintext": "As soon as the editor logs into the hydra editor, your frontend should use the same auth token to access the REST API with the same privileges and render private content. The access_token is passed as a URL parameter on initial load and automatically stored in sessionStorage by hydra.js. On SPA navigation, the URL param is gone but the token persists in sessionStorage. Use the getAccessToken() helper:",
       "value": [
         {
           "children": [
@@ -163,15 +166,24 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "auth-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "import { getAccessToken } from '@hydra-js/hydra.js';\n\nconst token = getAccessToken();\n// Returns token from URL param (if present)\n// or sessionStorage (for SPA navigation)"
-            }
-          ],
-          "type": "p"
-        },
+          "@id": "auth-text-c1-javascript-1935b7",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "import { getAccessToken } from '@hydra-js/hydra.js';\n\nconst token = getAccessToken();\n// Returns token from URL param (if present)\n// or sessionStorage (for SPA navigation)"
+        }
+      ]
+    },
+    "auth-text-t1": {
+      "@type": "slate",
+      "plaintext": "Example using Next.js 14 and ploneClient:",
+      "value": [
         {
           "children": [
             {
@@ -179,14 +191,17 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "auth-text-c2": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "import ploneClient from \"@plone/client\";\nimport { useQuery } from \"@tanstack/react-query\";\nimport { getAccessToken } from '@hydra-js/hydra.js';\n\nexport default function Blog({ params }) {\n  const token = getAccessToken();\n\n  const client = ploneClient.initialize({\n    apiPath: \"http://localhost:8080/Plone/\",\n    token: token,\n  });\n\n  const { getContentQuery } = client;\n  const { data, isLoading } = useQuery(\n    getContentQuery({ path: '/blogs' })\n  );\n\n  if (isLoading) return <div>Loading...</div>;\n  return <div>{data.title}</div>;\n}"
-            }
-          ],
-          "type": "p"
+          "@id": "auth-text-c2-javascript-ca5bc8",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "import ploneClient from \"@plone/client\";\nimport { useQuery } from \"@tanstack/react-query\";\nimport { getAccessToken } from '@hydra-js/hydra.js';\n\nexport default function Blog({ params }) {\n  const token = getAccessToken();\n\n  const client = ploneClient.initialize({\n    apiPath: \"http://localhost:8080/Plone/\",\n    token: token,\n  });\n\n  const { getContentQuery } = client;\n  const { data, isLoading } = useQuery(\n    getContentQuery({ path: '/blogs' })\n  );\n\n  if (isLoading) return <div>Loading...</div>;\n  return <div>{data.title}</div>;\n}"
         }
       ]
     },
@@ -225,9 +240,13 @@
       "intro-1",
       "sep-1",
       "lazy-heading",
-      "lazy-text",
+      "lazy-text-t0",
+      "lazy-text-c1",
       "auth-heading",
-      "auth-text",
+      "auth-text-t0",
+      "auth-text-c1",
+      "auth-text-t1",
+      "auth-text-c2",
       "reload-heading",
       "reload-text"
     ]

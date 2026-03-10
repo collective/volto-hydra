@@ -62,7 +62,7 @@
 
     <script src="/renderer.js"></script>
     <script type="module">
-        import { initBridge, expandListingBlocks, ploneFetchItems, expandTemplates, getAccessToken } from '/hydra.js';
+        import { initBridge, expandListingBlocks, ploneFetchItems, expandTemplates, expandTemplatesSync, getAccessToken, contentPath } from '/hydra.js';
         import { sharedBlocksConfig } from '/shared-block-schemas.js';
 
         // Parse page numbers from URL query params (format: ?pg_{blockId}={pageNumber})
@@ -106,6 +106,7 @@
 
         // Make search criteria available globally for form handlers
         window._searchCriteria = {};
+        window._contentPath = (url) => contentPath(url, window.location.origin);
 
         // Render generation counter — prevents stale async renders from
         // overwriting newer ones when rapid FORM_DATA messages arrive.
@@ -132,13 +133,10 @@
             // Set up expansion helper for container renderers
             // Use 'variation' field for item type (matches Volto listing block schema)
             // Returns { items, paging } where each item has @uid
-            // paging object: { start, size } — total and _seen are auto-initialized
             window._expandListingBlocks = async (blocks, layout, containerId) => {
                 const size = 6;
                 const pageNum = pages[containerId] || 0;
-                const paging = { start: pageNum * size, size };
-                const items = await expandListingBlocks(layout, { blocks, fetchItems: { listing: fetchItems }, paging, itemTypeField: 'variation' });
-                return { items, paging };
+                return await expandListingBlocks(layout, { blocks, fetchItems: { listing: fetchItems }, paging: { start: pageNum * size, size }, itemTypeField: 'variation' });
             };
 
             // Convert layout IDs to block objects with @uid
@@ -187,7 +185,7 @@
                 if (myGeneration !== window._renderGeneration) return; // stale render
 
                 if (expandedItems.length > 0) {
-                    const footerItems = await expandListingBlocks(
+                    const { items: footerItems } = await expandListingBlocks(
                         expandedItems,
                         { fetchItems: { listing: fetchItems }, itemTypeField: 'variation' }
                     );
@@ -287,6 +285,10 @@
                 content.blocks = { ...content.blocks, ...expandedBlocksMap };
                 content.blocks_layout = { items: expandedItems.map(item => item['@uid']) };
 
+                // Expose template expansion for renderer.js (object_list arrays)
+                window._expandTemplatesSync = expandTemplatesSync;
+                window._templateState = templateState;
+
                 // Render navigation from @components.navigation.items
                 const navItems = content['@components']?.navigation?.items || [];
                 const navElement = document.getElementById('navigation');
@@ -371,6 +373,9 @@
                             } else {
                                 previewImg.style.display = 'none';
                             }
+
+                            // Store formData globally so block renderers (e.g. TOC) can access page context
+                            window._currentFormData = formData;
 
                             // Re-render content with updated data
                             // Return promise so hydra.js can materialize comments after DOM is ready

@@ -428,29 +428,29 @@ test.describe('Bridge.updateJsonNode()', () => {
       const p = container.querySelector('p')!;
       const textNodeAfterStrong = p.childNodes[2]; // " normal"
 
-      // Set up bridge with mock block data
+      // Set up bridge with mock block data — use buildBlockPathMap via mock-parent
+      // so resolvedBlockSchema is populated (slate schema is in mockBlocksConfig)
       const bridge = (window as any).bridge;
-      bridge.blockPathMap = {
-        'test-block': { path: ['blocks', 'test-block'], blockType: 'slate' },
-      };
-      bridge.formData = {
-        blocks: {
-          'test-block': {
-            '@type': 'slate',
-            value: [
-              {
-                type: 'p',
-                nodeId: '0',
-                children: [
-                  { text: 'Hello ' },
-                  { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
-                  { text: '' }, // Empty initially, will be updated to " normal"
-                ],
-              },
+      const testBlock = {
+        '@type': 'slate',
+        value: [
+          {
+            type: 'p',
+            nodeId: '0',
+            children: [
+              { text: 'Hello ' },
+              { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
+              { text: '' }, // Empty initially, will be updated to " normal"
             ],
           },
-        },
+        ],
       };
+      const mockParent = (window as any).parent.mockParent;
+      const formData = mockParent.getFormData();
+      formData.blocks['test-block'] = testBlock;
+      formData.blocks_layout.items.push('test-block');
+      bridge.formData = formData;
+      bridge.blockPathMap = mockParent.buildBlockPathMap();
 
       // Call handleTextChange simulating a mutation on the text node after strong
       // This should detect childIndex=2 and update only that child

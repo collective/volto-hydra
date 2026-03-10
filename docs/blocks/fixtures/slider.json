@@ -1,0 +1,23 @@
+{
+  "@type": "slider",
+  "autoplayEnabled": true,
+  "autoplayDelay": 5000,
+  "slides": [
+    {
+      "@id": "slide-1",
+      "head_title": "New Release",
+      "title": "Product Launch 2025",
+      "description": "Discover our latest innovations.",
+      "preview_image": [{ "@id": "/images/slide1/@@images/image" }],
+      "buttonText": "Learn More"
+    },
+    {
+      "@id": "slide-2",
+      "head_title": "Featured",
+      "title": "Award-Winning Design",
+      "description": "Recognized for excellence in UX.",
+      "preview_image": [{ "@id": "/images/slide2/@@images/image" }],
+      "buttonText": "See Details"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "test-react",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:test": "vite --port 3004 --strictPort"
+  }
+}

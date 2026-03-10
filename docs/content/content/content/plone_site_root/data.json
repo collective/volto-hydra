@@ -18,120 +18,32 @@
         }
       ]
     },
-    "quickstart-text": {
-      "@type": "slate",
-      "plaintext": "Try the online demo at hydra.pretagov.com. Or run locally: clone the repo, start Plone, start a frontend, start Hydra.",
-      "value": [
+    "quickstart-code": {
+      "@type": "codeExample",
+      "tabs": [
         {
-          "children": [
-            {
-              "text": "Try the "
-            },
-            {
-              "children": [
-                {
-                  "text": "online demo"
-                }
-              ],
-              "data": {
-                "url": "https://hydra.pretagov.com"
-              },
-              "type": "link"
-            },
-            {
-              "text": " — log in, go to user preferences and select a preset frontend or paste in your own frontend URL."
-            }
-          ],
-          "type": "p"
+          "@id": "tab-nuxt",
+          "label": "Nuxt.js",
+          "language": "vue",
+          "code": "<!-- pages/[...slug].vue -->\n<template>\n  <!-- data-block-uid: makes block selectable, draggable, and editable -->\n  <div v-for=\"id in page?.blocks_layout?.items\" :key=\"id\"\n       :data-block-uid=\"editing ? id : undefined\">\n    <!-- data-edit-link: click to edit link URL in sidebar -->\n    <a :href=\"page.blocks[id].link\"\n       :data-edit-link=\"editing ? 'link' : undefined\">\n      <!-- data-edit-media: click to pick/upload image in sidebar -->\n      <img :src=\"page.blocks[id].image\"\n           :data-edit-media=\"editing ? 'image' : undefined\" />\n      <!-- data-edit-text: edit text directly in the preview -->\n      <h3 :data-edit-text=\"editing ? 'title' : undefined\">\n        {{ page.blocks[id].title }}\n      </h3>\n      <p :data-edit-text=\"editing ? 'description' : undefined\">\n        {{ page.blocks[id].description }}\n      </p>\n    </a>\n  </div>\n</template>\n\n<script setup>\nimport { ref, onMounted } from 'vue'\nimport { initBridge } from 'hydra-js'\n\nconst page = ref(null)\nconst editing = ref(false)\n\nonMounted(async () => {\n  // Only init bridge when loaded inside the editor\n  if (window.name.startsWith('hydra')) {\n    editing.value = true\n    initBridge({\n      // Register custom block types with their field schemas\n      blocks: {\n        card: { blockSchema: { properties: {\n          image: { widget: 'image' },\n          title: { type: 'string' },\n          description: { type: 'string' },\n          link: { widget: 'url' },\n        }}}\n      },\n      // Receive live updates as editor changes content\n      onEditChange: (data) => { page.value = data }\n    })\n  } else {\n    const res = await fetch(`/++api++${useRoute().path}`)\n    page.value = await res.json()\n  }\n})\n</script>"
         },
         {
-          "children": [
-            {
-              "text": "To make your own site editable with Hydra, add the hydra.js bridge to your frontend and annotate your HTML with block markers:"
-            }
-          ],
-          "type": "p"
+          "@id": "tab-nextjs",
+          "label": "Next.js",
+          "language": "jsx",
+          "code": "// app/[...slug]/page.jsx\n'use client'\nimport { useState, useEffect } from 'react'\nimport { initBridge } from 'hydra-js'\n\nexport default function Page({ params }) {\n  const [page, setPage] = useState(null)\n  const [editing, setEditing] = useState(false)\n\n  useEffect(() => {\n    // Only init bridge when loaded inside the editor\n    if (window.name.startsWith('hydra')) {\n      setEditing(true)\n      initBridge({\n        // Register custom block types with their field schemas\n        blocks: {\n          card: { blockSchema: { properties: {\n            image: { widget: 'image' },\n            title: { type: 'string' },\n            description: { type: 'string' },\n            link: { widget: 'url' },\n          }}}\n        },\n        // Receive live updates as editor changes content\n        onEditChange: setPage\n      })\n    } else {\n      fetch(`/++api++/${params.slug?.join('/') || ''}`)\n        .then(r => r.json()).then(setPage)\n    }\n  }, [])\n\n  if (!page) return <div>Loading...</div>\n\n  return page.blocks_layout?.items?.map(id => {\n    const block = page.blocks[id]\n    return (\n      // data-block-uid: makes block selectable, draggable, and editable\n      <div key={id} data-block-uid={editing ? id : undefined}>\n        {/* data-edit-link: click to edit link URL in sidebar */}\n        <a href={block.link}\n           data-edit-link={editing ? 'link' : undefined}>\n          {/* data-edit-media: click to pick/upload image in sidebar */}\n          <img src={block.image}\n               data-edit-media={editing ? 'image' : undefined} />\n          {/* data-edit-text: edit text directly in the preview */}\n          <h3 data-edit-text={editing ? 'title' : undefined}>\n            {block.title}\n          </h3>\n          <p data-edit-text={editing ? 'description' : undefined}>\n            {block.description}\n          </p>\n        </a>\n      </div>\n    )\n  })\n}"
         },
         {
-          "children": [
-            {
-              "children": [
-                {
-                  "text": "Load "
-                },
-                {
-                  "children": [
-                    {
-                      "text": "hydra.js"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " and call initBridge() with your block configuration"
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Add "
-                },
-                {
-                  "children": [
-                    {
-                      "text": "data-block-uid"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " attributes to enable click-to-select blocks"
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Register "
-                },
-                {
-                  "children": [
-                    {
-                      "text": "onEditChange"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " callback for realtime preview updates"
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Add "
-                },
-                {
-                  "children": [
-                    {
-                      "text": "data-edit-text"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " for inline text, media and link editing"
-                }
-              ],
-              "type": "li"
-            }
-          ],
-          "type": "ol"
+          "@id": "tab-svelte",
+          "label": "SvelteKit",
+          "language": "svelte",
+          "code": "<!-- src/routes/[...slug]/+page.svelte -->\n<script>\n  import { onMount } from 'svelte'\n  import { initBridge } from 'hydra-js'\n\n  let page = $state(null)\n  let editing = $state(false)\n\n  onMount(async () => {\n    // Only init bridge when loaded inside the editor\n    if (window.name.startsWith('hydra')) {\n      editing = true\n      initBridge({\n        // Register custom block types with their field schemas\n        blocks: {\n          card: { blockSchema: { properties: {\n            image: { widget: 'image' },\n            title: { type: 'string' },\n            description: { type: 'string' },\n            link: { widget: 'url' },\n          }}}\n        },\n        // Receive live updates as editor changes content\n        onEditChange: (data) => { page = data }\n      })\n    } else {\n      const res = await fetch(`/++api++${window.location.pathname}`)\n      page = await res.json()\n    }\n  })\n</script>\n\n{#if page}\n  {#each page.blocks_layout?.items ?? [] as id}\n    <!-- data-block-uid: makes block selectable, draggable, and editable -->\n    <div data-block-uid={editing ? id : undefined}>\n      <!-- data-edit-link: click to edit link URL in sidebar -->\n      <a href={page.blocks[id].link}\n         data-edit-link={editing ? 'link' : undefined}>\n        <!-- data-edit-media: click to pick/upload image in sidebar -->\n        <img src={page.blocks[id].image}\n             data-edit-media={editing ? 'image' : undefined} />\n        <!-- data-edit-text: edit text directly in the preview -->\n        <h3 data-edit-text={editing ? 'title' : undefined}>\n          {page.blocks[id].title}\n        </h3>\n        <p data-edit-text={editing ? 'description' : undefined}>\n          {page.blocks[id].description}\n        </p>\n      </a>\n    </div>\n  {/each}\n{/if}"
+        },
+        {
+          "@id": "tab-vanilla",
+          "label": "HTML/JS",
+          "language": "html",
+          "code": "<!-- index.html -->\n<div id=\"content\"></div>\n<script type=\"module\">\n  import { initBridge } from 'hydra-js'\n\n  let editing = false\n\n  // Only init bridge when loaded inside the editor\n  if (window.name.startsWith('hydra')) {\n    editing = true\n    initBridge({\n      // Register custom block types with their field schemas\n      blocks: {\n        card: { blockSchema: { properties: {\n          image: { widget: 'image' },\n          title: { type: 'string' },\n          description: { type: 'string' },\n          link: { widget: 'url' },\n        }}}\n      },\n      // Receive live updates as editor changes content\n      onEditChange: renderPage\n    })\n  } else {\n    const res = await fetch(`/++api++${location.pathname}`)\n    renderPage(await res.json())\n  }\n\n  function renderPage(page) {\n    const el = document.getElementById('content')\n    el.innerHTML = page.blocks_layout.items.map(id => {\n      const b = page.blocks[id]\n      return `\n        <!-- data-block-uid: makes block selectable, draggable, and editable -->\n        <div ${editing ? `data-block-uid=\"${id}\"` : ''}>\n          <!-- data-edit-link: click to edit link URL in sidebar -->\n          <a href=\"${b.link}\"\n             ${editing ? 'data-edit-link=\"link\"' : ''}>\n            <!-- data-edit-media: click to pick/upload image in sidebar -->\n            <img src=\"${b.image}\"\n                 ${editing ? 'data-edit-media=\"image\"' : ''} />\n            <!-- data-edit-text: edit text directly in the preview -->\n            <h3 ${editing ? 'data-edit-text=\"title\"' : ''}>\n              ${b.title}\n            </h3>\n            <p ${editing ? 'data-edit-text=\"description\"' : ''}>\n              ${b.description}\n            </p>\n          </a>\n        </div>`\n    }).join('')\n  }\n</script>"
         }
       ]
     },
@@ -141,73 +53,163 @@
         "align": "full"
       }
     },
-    "0c91e9dd-842e-4764-a4f1-8a62c85b731a": {
+    "why-hydra-heading": {
       "@type": "slate",
-      "plaintext": "Quick to enable Visual editing of frontend blocks regardless of framework. Switch between multiple frontends mid visual edit. Enterprise features such as versioning, i18n, workflow and automated content rules. Customisable Administration Interface. Scalable and Secure with a mature battle hardened backend. Open source means flexibility to host where and how you want.",
+      "plaintext": "Why Hydra",
       "styles": {},
       "value": [
         {
           "children": [
             {
-              "children": [
-                {
-                  "text": "Quick to enable Visual editing of frontend blocks regardless of framework by just using tags. No required React or Vue in your frontend."
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Switch between multiple frontends mid visual edit. Perfect for omni-channel."
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Enterprise features such as versioning, i18n, workflow and automated content rules."
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Easier to implement design systems that enforce governance of content and design."
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Customisable Administration Interface. Choice of Python or JavaScript for your server."
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Scalable and Secure with a mature battle hardened backend."
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Open source means flexibility to host where and how you want and optimise costs and security."
-                }
-              ],
-              "type": "li"
+              "text": "Why Hydra"
             }
           ],
-          "type": "ul"
+          "type": "h2"
         }
       ]
+    },
+    "why-hydra-tagline": {
+      "@type": "slate",
+      "plaintext": "Most CMS platforms force a trade-off: visual editing or frontend freedom. Hydra gives you both.",
+      "styles": {},
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Most CMS platforms force a trade-off: visual editing or frontend freedom. Hydra gives you both."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "why-hydra-quadrant": {
+      "@type": "image",
+      "align": "center",
+      "size": "l",
+      "url": "/images/quadrant/@@download/image/quadrant.svg"
+    },
+    "why-hydra-grid": {
+      "@type": "gridBlock",
+      "blocks": {
+        "box-visual": {
+          "@type": "slate",
+          "plaintext": "Visual Editing. True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes.",
+          "value": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Visual Editing"
+                    }
+                  ],
+                  "type": "strong"
+                }
+              ],
+              "type": "p"
+            },
+            {
+              "children": [
+                {
+                  "text": "True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes."
+                }
+              ],
+              "type": "p"
+            }
+          ]
+        },
+        "box-frontend": {
+          "@type": "slate",
+          "plaintext": "Any Frontend. Use React, Vue, Nuxt, Next.js, or any stack. Switch between frontends mid-edit for omni-channel delivery.",
+          "value": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Any Frontend"
+                    }
+                  ],
+                  "type": "strong"
+                }
+              ],
+              "type": "p"
+            },
+            {
+              "children": [
+                {
+                  "text": "Use React, Vue, Nuxt, Next.js, or any stack. Switch between frontends mid-edit for omni-channel delivery."
+                }
+              ],
+              "type": "p"
+            }
+          ]
+        },
+        "box-enterprise": {
+          "@type": "slate",
+          "plaintext": "Truly Decoupled. Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience.",
+          "value": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Truly Decoupled"
+                    }
+                  ],
+                  "type": "strong"
+                }
+              ],
+              "type": "p"
+            },
+            {
+              "children": [
+                {
+                  "text": "Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience."
+                }
+              ],
+              "type": "p"
+            }
+          ]
+        },
+        "box-opensource": {
+          "@type": "slate",
+          "plaintext": "Open Source. Secure, scalable Plone backend. Host anywhere, control your costs and security.",
+          "value": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Open Source"
+                    }
+                  ],
+                  "type": "strong"
+                }
+              ],
+              "type": "p"
+            },
+            {
+              "children": [
+                {
+                  "text": "Secure, scalable Plone backend. Host anywhere, control your costs and security."
+                }
+              ],
+              "type": "p"
+            }
+          ]
+        }
+      },
+      "blocks_layout": {
+        "items": [
+          "box-visual",
+          "box-frontend",
+          "box-enterprise",
+          "box-opensource"
+        ]
+      },
+      "styles": {}
     },
     "0d0c0506-f9bb-48d8-af0a-1352d81b45de": {
       "@type": "slate",
@@ -315,7 +317,7 @@
           "head_title": "Welcome to Hydra",
           "href": [
             {
-              "@id": "resolveuid/e8178744e30a418b9a5768997bb29a19",
+              "@id": "/content-types",
               "@type": "Document",
               "Description": "This section has a sample of content types available in this site.",
               "Title": "Content Types",
@@ -327,7 +329,7 @@
           ],
           "preview_image": [
             {
-              "@id": "resolveuid/9abc1a813bcf46388e565b277bd8c6bf",
+              "@id": "/images/penguin1.jpg",
               "@type": "Image",
               "CreationDate": "2024-03-07T12:29:54+01:00",
               "Creator": "admin",
@@ -389,7 +391,7 @@
           "hideButton": false,
           "href": [
             {
-              "@id": "resolveuid/425695d2b7cb47e69374d6f211f17e38",
+              "@id": "/block",
               "@type": "Document",
               "Description": "",
               "Title": "Blocks",
@@ -401,7 +403,7 @@
           ],
           "preview_image": [
             {
-              "@id": "resolveuid/05bace45294c45d5ab93de883e7ce702",
+              "@id": "/images/penguin2.jpg",
               "@type": "Image",
               "CreationDate": "2024-03-08T13:05:46+01:00",
               "Creator": "admin",
@@ -462,7 +464,7 @@
           "hideButton": true,
           "href": [
             {
-              "@id": "resolveuid/c40a2be214b645338a7ef2e711e2f5c6",
+              "@id": "/vertical-spacing",
               "@type": "Document",
               "Description": "",
               "Title": "Vertical Spacing",
@@ -474,7 +476,7 @@
           ],
           "preview_image": [
             {
-              "@id": "resolveuid/7de78fea55354a29ad78b909efb07436",
+              "@id": "/images/penguin3.jpg",
               "@type": "Image",
               "CreationDate": "2024-03-08T13:05:46+01:00",
               "Creator": "admin",
@@ -530,9 +532,6 @@
       ],
       "styles": {}
     },
-    "31561f88-873a-4277-8703-ba1183e58bf1": {
-      "@type": "system"
-    },
     "9567ae6d-191c-43f1-91cc-4288bbb98f88": {
       "@type": "slate",
       "plaintext": " Mobile hybrid app using f7-Vue.js ",
@@ -561,7 +560,7 @@
                 }
               ],
               "type": "li"
-            },            
+            },
             {
               "children": [
                 {
@@ -633,21 +632,6 @@
         }
       ]
     },
-    "dd34a386-6054-4a91-83e0-c7b3a6f391cf": {
-      "@type": "slate",
-      "plaintext": "Why Hydra",
-      "styles": {},
-      "value": [
-        {
-          "children": [
-            {
-              "text": "Why Hydra"
-            }
-          ],
-          "type": "h2"
-        }
-      ]
-    },
     "e972541f-b114-494b-a51e-cc8b11c8207d": {
       "@type": "slate",
       "plaintext": "Frontends for this content",
@@ -660,21 +644,6 @@
             }
           ],
           "type": "h2"
-        }
-      ]
-    },
-    "eadb0f33-16da-4974-9f87-69206f0a1db8": {
-      "@type": "slate",
-      "plaintext": "A unique CMS by being Visual, true Headless, and Open Source.",
-      "styles": {},
-      "value": [
-        {
-          "children": [
-            {
-              "text": "A unique CMS by being Visual, true Headless, and Open Source."
-            }
-          ],
-          "type": "p"
         }
       ]
     },
@@ -856,19 +825,19 @@
   },
   "blocks_layout": {
     "items": [
+      "why-hydra-heading",
+      "why-hydra-tagline",
+      "why-hydra-quadrant",
+      "why-hydra-grid",
+      "quickstart-heading",
+      "quickstart-code",
       "303984b4-693a-408f-83f7-5a88b243d7db",
       "fae599f3-e7d4-451b-a413-84355c796b7e",
-      "dd34a386-6054-4a91-83e0-c7b3a6f391cf",
-      "eadb0f33-16da-4974-9f87-69206f0a1db8",
-      "0c91e9dd-842e-4764-a4f1-8a62c85b731a",
       "0ab1a8f7-2d26-4933-800c-2f10474afe63",
-      "quickstart-heading",
-      "quickstart-text",
       "e972541f-b114-494b-a51e-cc8b11c8207d",
       "9567ae6d-191c-43f1-91cc-4288bbb98f88",
       "0d0c0506-f9bb-48d8-af0a-1352d81b45de",
-      "2fac7e5d-affb-4a8e-969f-2fac4d08e0fd",
-      "31561f88-873a-4277-8703-ba1183e58bf1"
+      "2fac7e5d-affb-4a8e-969f-2fac4d08e0fd"
     ]
   },
   "contributors": [],

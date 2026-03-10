@@ -4,8 +4,8 @@
   </div>
 
   <div v-else-if="block['@type'] == 'introduction'" :data-block-uid="block_uid"
-       data-edit-text="value" class="text-xl text-gray-600 leading-relaxed my-6 border-t border-b border-gray-200 py-4">
-    <RichText v-for="node in block['value']" :key="node" :node="node" />
+       data-edit-text="/description" class="text-xl text-gray-600 leading-relaxed my-6 border-t border-b border-gray-200 py-4">
+    {{ data.description }}
   </div>
 
   <h1 v-else-if="block['@type'] == 'title'" :data-block-uid="block_uid" data-edit-text="/title">{{ data.title }}
@@ -23,20 +23,31 @@
     <NuxtImg v-else v-for="props in [imageProps(block)]" data-edit-media="url" data-edit-link="href" :src="props.url" :width="props.width"
       :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
   </div>
-  <div v-else-if="block['@type'] == 'image' && !contained" :data-block-uid="block_uid">
+  <div v-else-if="block['@type'] == 'image' && !contained" :data-block-uid="block_uid"
+       :class="['image-size-' + (block.size || 'l'), 'image-align-' + (block.align || 'center')]">
     <figure>
       <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-edit-link="href">
         <NuxtImg v-for="props in [imageProps(block)]" data-edit-media="url" :src="props.url" _width="props.width"
-          :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
+          :alt="block.alt" />
       </a>
       <NuxtImg v-else v-for="props in [imageProps(block)]" data-edit-media="url" data-edit-link="href" :src="props.url" _width="props.width"
-        :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
+        :alt="block.alt" />
     </figure>
   </div>
 
   <div v-else-if="block['@type'] == 'leadimage'" :data-block-uid="block_uid" class="mb-6">
-    <NuxtImg v-for="props in [imageProps(data)]" :src="props.url"
-      class="w-full rounded-lg object-cover max-h-96" loading="lazy" decoding="async" />
+    <template v-for="props in [imageProps(data)]">
+      <NuxtImg v-if="props.url" :src="props.url" data-edit-media="preview_image"
+        class="w-full rounded-lg object-cover max-h-96" loading="lazy" decoding="async" />
+    </template>
+  </div>
+
+  <!-- dateField block: renders a configurable page-level date field -->
+  <div v-else-if="block['@type'] == 'dateField'" :data-block-uid="block_uid"
+       class="text-sm text-gray-500 my-2">
+    <span :data-edit-text="`/${block.dateField || 'effective'}`">
+      {{ formatDateField(data[block.dateField || 'effective'], block.showTime) }}
+    </span>
   </div>
 
   <!-- Hero block - uses comment syntax for field selectors (tests hydra comment parser) -->
@@ -68,7 +79,7 @@
       <template v-for="entry in gridChildren" :key="entry.id">
         <!-- Listing child: async expand in Suspense, with shared paging -->
         <Suspense v-if="entry.isListing" :key="`grid-listing-${entry.id}-pg${gridPageFromUrl}-${JSON.stringify(entry.block)}`">
-          <ListingBlock :id="entry.id" :block="entry.block" :paging="gridPaging"
+          <ListingBlock :id="entry.id" :block="entry.block" :paging="gridPaging" :seen="entry.seen"
             :api-url="effectiveApiUrl" :context-path="effectiveContextPath">
             <template #default="{ items }">
               <template v-for="item in items" :key="item['@uid']">
@@ -91,10 +102,8 @@
         </template>
       </template>
     </div>
-    <!-- Combined paging: awaits _ready from all listings -->
-    <Suspense :key="`grid-paging-${gridPageFromUrl}`">
-      <AsyncPaging :paging="gridPaging" :build-url="gridBuildPagingUrl" />
-    </Suspense>
+    <!-- Combined paging: reactive via gridPaging (updated by ListingBlock via Object.assign) -->
+    <Paging v-if="gridPaging.totalPages > 1" :paging="gridPaging" :build-url="gridBuildPagingUrl" />
   </div>
 
   <!-- Columns container block -->
@@ -166,7 +175,7 @@
     <div class="relative w-full">
       <!-- Carousel wrapper -->
       <div class="relative h-56 overflow-hidden rounded-lg md:h-96">
-        <div v-for="(slide, index) in block.slides" :key="slide['@id']" :data-block-uid="slide['@id']"
+        <div v-for="(slide, index) in expand(block.slides, null, '@id')" :key="slide['@uid']" :data-block-uid="slide['@uid']"
           class="slide duration-700 ease-linear bg-center items-center absolute inset-0"
           :class="[
             { 'bg-gray-700': !slide.preview_image, 'bg-blend-multiply': !slide.preview_image, 'bg-no-repeat': !slide.preview_image, 'bg-cover': slide.preview_image }
@@ -180,26 +189,26 @@
             class="max-w-sm p-6 bg-slate-200/90 border border-gray-200 m-12 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 absolute"
             :class="{ 'right-0': slide.flagAlign == 'right' }" style="z-index: 2;">
             <div data-edit-text="head_title">{{ slide.head_title }}</div>
-            <h5 :id="`heading-${slide['@id']}`"
+            <h5 :id="`heading-${slide['@uid']}`"
               class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-edit-text="title">
               {{ slide.title }}</h5>
             <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-edit-text="description">
               {{ slide.description }}</p>
             <NuxtLink v-if="slide.href" :to="getUrl(slide.href[0])" data-edit-text="buttonText" data-edit-link="href"
               class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-              :aria-describedby="`heading-${slide['@id']}`">
+              :aria-describedby="`heading-${slide['@uid']}`">
               {{ slide.buttonText || 'Read More' }}</NuxtLink>
             <a v-else href="#" data-edit-text="buttonText" data-edit-link="href"
               class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-              :aria-describedby="`heading-${slide['@id']}`">
+              :aria-describedby="`heading-${slide['@uid']}`">
               {{ slide.buttonText || 'Read More' }}</a>
           </div>
         </div>
       </div>
       <!-- Slider indicators -->
       <div class="absolute z-30 flex -translate-x-1/2 bottom-5 left-1/2 space-x-3 rtl:space-x-reverse">
-        <button v-for="(slide, index) in block.slides" :key="slide['@id']" type="button" class="w-3 h-3 rounded-full" aria-current="true"
-          :aria-label="`Slide ${index + 1}`" :data-carousel-slide-to="index" :data-block-selector="slide['@id']"></button>
+        <button v-for="(slide, index) in expand(block.slides, null, '@id')" :key="slide['@uid']" type="button" class="w-3 h-3 rounded-full" aria-current="true"
+          :aria-label="`Slide ${index + 1}`" :data-carousel-slide-to="index" :data-block-selector="slide['@uid']"></button>
       </div>
       <!-- Slider controls -->
       <button type="button"
@@ -244,30 +253,7 @@
 
 
 
-  <div v-else-if="block['@type'] == 'accordion'" data-accordion="collapse" :data-block-uid="block_uid">
-    <h2 :id="block_uid">
-      <button type="button"
-        class="flex items-center justify-between w-full p-5 font-medium rtl:text-right text-gray-500 border border-b-0 border-gray-200 rounded-t-xl focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:border-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 gap-3"
-        :data-accordion-target="`#accordion-collapse-body-${block_uid}`" aria-expanded="true"
-        :aria-controls="`accordion-collapse-body-${block_uid}`">
-        <span>
-          <Block v-for="item in expand(block.header?.items || [], block.blocks || {})"
-                 :key="item['@uid']" :block_uid="item['@uid']" :block="item" :data="data" />
-        </span>
-        <svg data-accordion-icon class="w-3 h-3 rotate-180 shrink-0" aria-hidden="true"
-          xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
-          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M9 5 5 1 1 5" />
-        </svg>
-      </button>
-    </h2>
-    <div :id="`accordion-collapse-body-${block_uid}`" class="hidden" :aria-labelledby="block_uid">
-      <div class="p-5 border border-b-0 border-gray-200 dark:border-gray-700 dark:bg-gray-900">
-        <Block v-for="item in expand(block.content?.items || [], block.blocks || {})"
-               :key="item['@uid']" :block_uid="item['@uid']" :block="item" :data="data" />
-      </div>
-    </div>
-  </div>
+  <AccordionBlock v-else-if="block['@type'] == 'accordion'" :block_uid="block_uid" :block="block" :data="data" />
 
 
 
@@ -311,16 +297,17 @@
     <!-- Facets on top (default or facetsTopSide) -->
     <template v-if="!block.variation || block.variation === 'facetsTopSide'">
       <!-- Facets horizontal -->
+      <h3 v-if="block.facetsTitle" class="font-semibold mb-3 text-gray-700">{{ block.facetsTitle }}</h3>
       <div v-if="block.facets?.length" class="search-facets mb-4 p-4 bg-gray-50 rounded-lg flex flex-wrap gap-4">
-        <template v-for="(facet, idx) in block.facets" :key="facet['@id'] || idx">
+        <template v-for="(facet, idx) in expand(block.facets, null, '@id')" :key="facet['@uid'] || idx">
           <!-- Non-facet types (slate, image) rendered as generic blocks -->
           <template v-if="facet.type === 'slate' || facet.type === 'image'">
-            <div :data-block-uid="facet['@id']" data-block-add="bottom" class="p-3 border border-gray-200 rounded min-w-48">
-              <Block :block="facet" :block_uid="facet['@id']" :data="data" :api-url="effectiveApiUrl" />
+            <div :data-block-uid="facet['@uid']" data-block-add="bottom" class="p-3 border border-gray-200 rounded min-w-48">
+              <Block :block="facet" :block_uid="facet['@uid']" :data="data" :api-url="effectiveApiUrl" />
             </div>
           </template>
           <!-- Facet types -->
-          <div v-else :data-block-uid="facet['@id']" :data-block-type="facet.type" data-block-add="bottom"
+          <div v-else :data-block-uid="facet['@uid']" :data-block-type="facet.type" data-block-add="bottom"
                class="facet-item p-3 border border-gray-200 rounded min-w-48">
             <div data-edit-text="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
             <template v-if="facet.type === 'selectFacet'">
@@ -386,16 +373,16 @@
         <aside v-if="block.facets?.length" class="search-facets w-full md:w-64 shrink-0">
           <div class="p-4 bg-gray-50 rounded-lg sticky top-4">
             <h3 v-if="block.facetsTitle" class="font-semibold mb-3 text-gray-700">{{ block.facetsTitle }}</h3>
-            <template v-for="(facet, idx) in block.facets" :key="facet['@id'] || idx">
+            <template v-for="(facet, idx) in expand(block.facets, null, '@id')" :key="facet['@uid'] || idx">
               <!-- Non-facet types (slate, image) rendered as generic blocks -->
               <template v-if="facet.type === 'slate' || facet.type === 'image'">
-                <div :data-block-uid="facet['@id']" data-block-add="bottom"
+                <div :data-block-uid="facet['@uid']" data-block-add="bottom"
                      class="mb-4 pb-4 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0">
-                  <Block :block="facet" :block_uid="facet['@id']" :data="data" :api-url="effectiveApiUrl" />
+                  <Block :block="facet" :block_uid="facet['@uid']" :data="data" :api-url="effectiveApiUrl" />
                 </div>
               </template>
               <!-- Facet types -->
-              <div v-else :data-block-uid="facet['@id']" :data-block-type="facet.type" data-block-add="bottom"
+              <div v-else :data-block-uid="facet['@uid']" :data-block-type="facet.type" data-block-add="bottom"
                    class="facet-item mb-4 pb-4 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0">
                 <div data-edit-text="title" class="facet-label font-medium text-sm mb-2">{{ facet.title }}</div>
                 <template v-if="facet.type === 'selectFacet'">
@@ -463,12 +450,12 @@
 
   <div v-else-if="block['@type'] == 'slateTable'" class="data-table" :data-block-uid="block_uid">
     <table>
-      <tr v-for="(row) in block.table?.rows" :key="row.key" :data-block-uid="row.key" data-block-add="bottom">
+      <tr v-for="(row) in expand(block.table?.rows, null, 'key')" :key="row['@uid']" :data-block-uid="row['@uid']" data-block-add="bottom">
         <component
-          v-for="(cell) in row.cells"
-          :key="cell.key"
+          v-for="(cell) in expand(row.cells, null, 'key')"
+          :key="cell['@uid']"
           :is="(cell.type == 'header') ? 'th' : 'td'"
-          :data-block-uid="cell.key"
+          :data-block-uid="cell['@uid']"
           data-block-add="right"
         >
           <RichText v-for="(node, idx) in cell.value" :key="idx" :node="node" data-edit-text="value" />
@@ -501,46 +488,60 @@
   </div>
 
   <section v-else-if="block['@type'] == 'highlight'" :data-block-uid="block_uid"
-           class="relative overflow-hidden rounded-lg my-6">
-    <div v-for="props in [imageProps(block)]" :key="props.url"
-         class="absolute inset-0 bg-cover bg-center"
-         :style="props.url ? { backgroundImage: `url(${props.url})` } : {}" />
-    <div class="absolute inset-0 bg-black/50"></div>
-    <div class="relative py-16 px-4 mx-auto max-w-screen-xl text-center lg:py-24">
-      <h2 class="mb-4 text-4xl font-extrabold text-white md:text-5xl lg:text-6xl">
+           class="relative overflow-hidden rounded-lg my-6 isolate">
+    <div v-if="imageProps(block.image).url"
+         class="absolute inset-0 bg-cover bg-center z-0"
+         :style="{ backgroundImage: `url(${imageProps(block.image).url})` }" />
+    <div v-else class="absolute inset-0 z-0"
+         :class="highlightGradient(block.styles?.descriptionColor)"></div>
+    <div class="absolute inset-0 bg-black/50 z-10"></div>
+    <div class="relative z-20 py-16 px-4 mx-auto max-w-screen-xl text-center lg:py-24">
+      <h2 data-edit-text="title" class="mb-4 text-4xl font-extrabold text-white md:text-5xl lg:text-6xl">
         {{ block.title }}</h2>
       <div class="mb-8 text-lg text-gray-200 lg:text-xl sm:px-16 lg:px-48">
-        <RichText v-for="node in block['value']" :key="node" :node="node" />
+        <RichText v-for="node in (block.description || block['value'] || [])" :key="node" :node="node" />
       </div>
-      <NuxtLink v-if="block.button" :to="getUrl(block.buttonLink)"
+      <NuxtLink v-if="block.cta_title" :to="getUrl(block.cta_link)"
+          data-edit-text="cta_title" data-edit-link="cta_link"
           class="py-3 px-5 text-sm font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800">
-        {{ block.buttonText }}
+        {{ block.cta_title }}
       </NuxtLink>
     </div>
-    <div v-if="!imageProps(block).url" class="absolute inset-0 bg-gradient-to-r from-blue-800 to-blue-600 -z-10"></div>
   </section>
+
+  <!-- Table of Contents block -->
+  <nav v-else-if="block['@type'] == 'toc'" :data-block-uid="block_uid" class="toc-block my-6 p-4 bg-gray-50 rounded-lg">
+    <h3 class="text-lg font-semibold mb-2">Table of Contents</h3>
+    <ul v-if="tocEntries.length" class="list-disc pl-5 space-y-1">
+      <li v-for="e in tocEntries" :key="e.id" :style="{ marginLeft: (e.level - 2) * 1.5 + 'em' }">
+        <a :href="`#${e.id}`" class="text-blue-600 hover:underline">{{ e.text }}</a>
+      </li>
+    </ul>
+    <p v-else class="text-gray-400 italic">No headings found</p>
+  </nav>
 
   <!-- Default listing item: title + description -->
   <div v-else-if="block['@type'] == 'default'" :data-block-uid="block_uid"
        class="default-item-block py-4 border-b border-gray-200 hover:bg-gray-50 transition-colors">
-    <NuxtLink :to="getUrl(block.href)" class="text-decoration-none">
-      <h4 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white">{{ block.title }}</h4>
+    <NuxtLink :to="getUrl(block.href)" class="text-decoration-none" data-edit-link="href">
+      <h4 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white" data-edit-text="title">{{ block.title }}</h4>
     </NuxtLink>
-    <p v-if="block.description" class="text-gray-600 dark:text-gray-400 text-sm">{{ block.description }}</p>
+    <p v-if="block.description" class="text-gray-600 dark:text-gray-400 text-sm" data-edit-text="description">{{ block.description }}</p>
   </div>
 
   <!-- Summary listing item: image thumbnail + title + description -->
   <div v-else-if="block['@type'] == 'summary'" :data-block-uid="block_uid"
        class="summary-item-block py-4 border-b border-gray-200 flex items-start gap-4 hover:bg-gray-50 transition-colors">
     <template v-if="block.image" v-for="props in [imageProps(block.image)]" :key="props.url">
-      <NuxtImg v-if="props.url" :src="props.url" alt=""
+      <NuxtImg v-if="props.url" :src="props.url" alt="" data-edit-media="image"
         class="w-32 h-24 object-cover rounded shrink-0" />
     </template>
     <div class="flex-1">
-      <NuxtLink :to="getUrl(block.href)" class="text-decoration-none">
-        <h4 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white">{{ block.title }}</h4>
+      <time v-if="block.date" class="block text-xs font-bold uppercase tracking-wide text-gray-800 mb-1">{{ new Date(block.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) }}</time>
+      <NuxtLink :to="getUrl(block.href)" class="text-decoration-none" data-edit-link="href">
+        <h4 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white" data-edit-text="title">{{ block.title }}</h4>
       </NuxtLink>
-      <p v-if="block.description" class="text-gray-600 dark:text-gray-400 text-sm">{{ block.description }}</p>
+      <p v-if="block.description" class="text-gray-600 dark:text-gray-400 text-sm" data-edit-text="description">{{ block.description }}</p>
     </div>
   </div>
 
@@ -551,12 +552,12 @@
       {{ block.send_message || 'Form submitted successfully.' }}
     </div>
     <form v-else @submit.prevent="handleFormSubmit($event, block)" novalidate class="space-y-4">
-      <template v-for="field in block.subblocks" :key="field.field_id">
-        <div :data-block-uid="field.field_id" :data-block-type="field.field_type" data-block-add="bottom"
+      <template v-for="field in expand(block.subblocks, null, 'field_id')" :key="field['@uid']">
+        <div :data-block-uid="field['@uid']" :data-block-type="field.field_type" data-block-add="bottom"
              class="form-field">
           <!-- Text -->
           <template v-if="field.field_type === 'text'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
               {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
             </label>
             <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -568,7 +569,7 @@
           </template>
           <!-- Textarea -->
           <template v-else-if="field.field_type === 'textarea'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
               {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
             </label>
             <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -580,7 +581,7 @@
           </template>
           <!-- Number -->
           <template v-else-if="field.field_type === 'number'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
               {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
             </label>
             <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -592,7 +593,7 @@
           </template>
           <!-- Select (List) -->
           <template v-else-if="field.field_type === 'select'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
               {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
             </label>
             <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -608,7 +609,7 @@
           <!-- Single Choice (Radio) -->
           <template v-else-if="field.field_type === 'single_choice'">
             <fieldset>
-              <legend class="block text-sm font-medium text-gray-700 mb-1">
+              <legend class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
                 {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
               </legend>
               <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -626,7 +627,7 @@
           <!-- Multiple Choice (Checkboxes) -->
           <template v-else-if="field.field_type === 'multiple_choice'">
             <fieldset>
-              <legend class="block text-sm font-medium text-gray-700 mb-1">
+              <legend class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
                 {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
               </legend>
               <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -649,14 +650,14 @@
                      :checked="!!getFormValue(block_uid, field.field_id)"
                      @change="setFormValue(block_uid, field.field_id, $event.target.checked)"
                      class="rounded border-gray-300" />
-              {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
+              <span data-edit-text="label">{{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span></span>
             </label>
             <p v-if="field.description" class="text-xs text-gray-500 mt-0.5">{{ field.description }}</p>
             <p v-if="formFieldError(block_uid, field.field_id)" class="form-error text-red-500 text-xs mt-1">{{ formFieldError(block_uid, field.field_id) }}</p>
           </template>
           <!-- Date -->
           <template v-else-if="field.field_type === 'date'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
               {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
             </label>
             <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -668,7 +669,7 @@
           </template>
           <!-- Email (from) -->
           <template v-else-if="field.field_type === 'from'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
               {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
             </label>
             <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -680,7 +681,7 @@
           </template>
           <!-- Attachment -->
           <template v-else-if="field.field_type === 'attachment'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1" data-edit-text="label">
               {{ field.label }}<span v-if="field.required" class="text-red-500 ml-0.5">*</span>
             </label>
             <p v-if="field.description" class="text-xs text-gray-500 mb-1">{{ field.description }}</p>
@@ -692,7 +693,7 @@
           <!-- Static text -->
           <template v-else-if="field.field_type === 'static_text'">
             <div class="text-sm text-gray-600">
-              <strong v-if="field.label">{{ field.label }}</strong>
+              <strong v-if="field.label" data-edit-text="label">{{ field.label }}</strong>
               <p v-if="field.description">{{ field.description }}</p>
             </div>
           </template>
@@ -715,8 +716,55 @@
     </form>
   </div>
 
+  <!-- Code example block: tabbed code with syntax highlighting -->
+  <CodeExample v-else-if="block['@type'] == 'codeExample'" :block_uid="block_uid" :block="block" />
+
   <!-- Empty block - placeholder for deleted blocks in containers -->
   <div v-else-if="block['@type'] == 'empty'" :data-block-uid="block_uid" class="empty-block min-h-[60px]">
+  </div>
+
+  <!-- Event Metadata block: renders page-level event fields (start, end, location, contact) -->
+  <div v-else-if="block['@type'] == 'eventMetadata'" :data-block-uid="block_uid"
+       class="event-metadata my-6 p-4 bg-gray-50 rounded-lg border border-gray-200 text-sm">
+    <dl class="grid grid-cols-1 gap-2">
+      <div v-if="data.start" class="flex gap-2">
+        <dt class="font-semibold text-gray-600 min-w-24">When</dt>
+        <dd>
+          <span data-edit-text="/start">{{ formatDate(data.start) }}</span>
+          <span v-if="data.end"> – <span data-edit-text="/end">{{ formatDate(data.end) }}</span></span>
+        </dd>
+      </div>
+      <div v-if="data.location" class="flex gap-2">
+        <dt class="font-semibold text-gray-600 min-w-24">Where</dt>
+        <dd data-edit-text="/location">{{ data.location }}</dd>
+      </div>
+      <div v-if="data.event_url" class="flex gap-2">
+        <dt class="font-semibold text-gray-600 min-w-24">Website</dt>
+        <dd><a :href="data.event_url" class="text-blue-600 underline">{{ data.event_url }}</a></dd>
+      </div>
+      <div v-if="data.contact_name || data.contact_email || data.contact_phone" class="flex gap-2">
+        <dt class="font-semibold text-gray-600 min-w-24">Contact</dt>
+        <dd>
+          <span v-if="data.contact_name" data-edit-text="/contact_name">{{ data.contact_name }}</span>
+          <span v-if="data.contact_email"> · <a :href="`mailto:${data.contact_email}`">{{ data.contact_email }}</a></span>
+          <span v-if="data.contact_phone" data-edit-text="/contact_phone"> · {{ data.contact_phone }}</span>
+        </dd>
+      </div>
+    </dl>
+  </div>
+
+  <!-- Social Links: auto-detects icons from URL domains -->
+  <div v-else-if="block['@type'] == 'socialLinks'" :data-block-uid="block_uid"
+       class="flex items-center justify-center gap-4 py-2">
+    <span class="text-sm text-gray-500 dark:text-gray-400">Follow us:</span>
+    <a v-for="link in expand(block.links || [], null, '@id')" :key="link['@uid']"
+       :data-block-uid="link['@uid']" data-block-add="right"
+       :href="link.url" target="_blank" rel="noopener"
+       data-edit-link="url"
+       :title="socialInfo(link.url).name"
+       class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+      <span v-html="socialInfo(link.url).svg" />
+    </a>
   </div>
 
   <div v-else :data-block-uid="block_uid">
@@ -726,7 +774,7 @@
 
 </template>
 <script setup>
-import { ref, watch, nextTick, computed, toRefs, inject, onMounted } from 'vue';
+import { ref, reactive, watch, nextTick, computed, toRefs, inject, onMounted } from 'vue';
 import { expandTemplatesSync, staticBlocks, isEditMode } from '@hydra-js/hydra.js';
 import RichText from './richtext.vue';
 
@@ -784,58 +832,115 @@ const effectiveContextPath = computed(() => {
 
 const route = useRoute();
 
-// Sync fallback for templates not in the pre-loaded map
-function syncLoadTemplate(templateId) {
-  const tplPath = templateId.startsWith('http')
-    ? new URL(templateId).pathname
-    : `/${templateId.replace(/^\//, '')}`;
-  const url = `${effectiveApiUrl.value}${tplPath}`;
-  const xhr = new XMLHttpRequest();
-  xhr.open('GET', url, false);
-  xhr.setRequestHeader('Accept', 'application/json');
-  xhr.send();
-  if (xhr.status === 200) return JSON.parse(xhr.responseText);
-  throw new Error(`Sync template load failed: ${templateId} (${xhr.status})`);
+// Format an ISO date string for display (date + time)
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString(undefined, {
+    year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+// Format a page-level date field, optionally including time
+function formatDateField(dateStr, showTime) {
+  if (!dateStr) return '';
+  const opts = { year: 'numeric', month: 'long', day: 'numeric' };
+  if (showTime) { opts.hour = '2-digit'; opts.minute = '2-digit'; }
+  return new Date(dateStr).toLocaleDateString(undefined, opts);
+}
+
+// Social links: map URL domains to SVG icons (24x24)
+const SOCIAL_ICONS = {
+  'github.com': {
+    name: 'GitHub',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>',
+  },
+  'discord.gg': {
+    name: 'Discord',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189z"/></svg>',
+  },
+  'discord.com': {
+    name: 'Discord',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189z"/></svg>',
+  },
+  'plone.org': {
+    name: 'Plone',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><text x="12" y="16" text-anchor="middle" font-size="12" font-weight="bold" fill="currentColor">P</text></svg>',
+  },
+  'youtube.com': {
+    name: 'YouTube',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>',
+  },
+  'mastodon.social': {
+    name: 'Mastodon',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M23.268 5.313c-.35-2.578-2.617-4.61-5.304-5.004C17.51.242 15.792 0 11.813 0h-.03c-3.98 0-4.835.242-5.288.309C3.882.692 1.496 2.518.917 5.127.64 6.412.61 7.837.661 9.143c.074 1.874.088 3.745.26 5.611.118 1.24.325 2.47.62 3.68.55 2.237 2.777 4.098 4.96 4.857 2.336.792 4.849.923 7.256.38.265-.061.527-.132.786-.213.585-.184 1.27-.39 1.774-.753a.057.057 0 0 0 .023-.043v-1.809a.052.052 0 0 0-.02-.041.053.053 0 0 0-.046-.01 20.282 20.282 0 0 1-4.709.547c-2.73 0-3.463-1.284-3.674-1.818a5.593 5.593 0 0 1-.319-1.433.053.053 0 0 1 .066-.054 19.648 19.648 0 0 0 4.636.536c.397 0 .794 0 1.192-.013 1.99-.059 4.088-.163 5.985-.67a.175.175 0 0 0 .023-.006c2.298-.665 4.48-2.688 4.623-7.828.006-.238.046-2.476.046-2.717 0-.833.31-5.907-.046-7.172zM19.903 13.24h-2.558v-5.9c0-1.243-.525-1.875-1.575-1.875-1.16 0-1.74.749-1.74 2.23v3.227h-2.544V7.695c0-1.481-.58-2.23-1.74-2.23-1.05 0-1.576.632-1.576 1.875v5.9H5.612V7.514c0-1.243.317-2.232.954-2.965.657-.733 1.517-1.108 2.584-1.108 1.234 0 2.17.474 2.795 1.423L12 4.958l.055.906c.625-.95 1.56-1.423 2.795-1.423 1.066 0 1.926.375 2.583 1.108.637.733.955 1.722.955 2.965v5.726z"/></svg>',
+  },
+  'x.com': {
+    name: 'X',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>',
+  },
+  'twitter.com': {
+    name: 'X',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>',
+  },
+  'bsky.app': {
+    name: 'Bluesky',
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.785 2.627 3.6 3.494 6.67 3.06-4.576.78-5.865 3.36-3.397 5.94 3.006 3.144 5.434-1.056 6.103-3.26.079-.26.114-.39.114-.26 0-.13.035 0 .114.26.669 2.204 3.097 6.404 6.103 3.26 2.468-2.58 1.179-5.16-3.397-5.94 3.07.434 5.885-.433 6.67-3.06.246-.828.624-5.79.624-6.479 0-.688-.139-1.86-.902-2.203-.66-.299-1.664-.621-4.3 1.24C12.046 4.747 9.087 8.686 8 10.8z"/></svg>',
+  },
+};
+const DEFAULT_LINK_ICON = {
+  name: 'Link',
+  svg: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+};
+
+function socialInfo(url) {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, '');
+    return SOCIAL_ICONS[hostname] || { ...DEFAULT_LINK_ICON, name: hostname };
+  } catch {
+    return DEFAULT_LINK_ICON;
+  }
 }
 
 // Expand child blocks: wraps expandTemplatesSync with injected context
-const expand = (layout, blocks) => expandTemplatesSync(layout, {
-  blocks, templateState, templates: injectedTemplates, loadTemplate: syncLoadTemplate,
+// For blocks dicts: expand(layout, blocks)
+// For object_list arrays: expand(items, null, '@id')
+const expand = (layout, blocks, idField) => expandTemplatesSync(layout, {
+  blocks, templateState, templates: injectedTemplates,
+  ...(idField && { idField }),
 });
 
 // Grid block: combined paging across all children (mirrors README Grid pattern)
-// Stable object so expandListingBlocks can mutate _ready/_pending/total on it
+// Reactive so ListingBlock can update totalPages etc. via Object.assign
 const GRID_PAGE_SIZE = 6;
 const gridPageFromUrl = computed(() => {
   const pages = injectedPages.value || injectedPages;
   return pages[block_uid.value] || 0;
 });
-const gridPaging = { start: 0, size: GRID_PAGE_SIZE };
+const gridPaging = reactive({ start: 0, size: GRID_PAGE_SIZE });
 const gridBuildPagingUrl = (page) => {
   if (page === 0) return effectiveContextPath.value;
   return `${effectiveContextPath.value}/@pg_${block_uid.value}_${page}`;
 };
 
 // Process grid children: listings marked for Suspense, static blocks filtered by paging window
-// This is the Vue equivalent of the README's inline JSX pattern:
-//   blocks[id]['@type'] === 'listing' ? <Suspense><ListingItems/></Suspense>
-//                                     : staticBlocks([id], { blocks, paging }).map(...)
+// staticBlocks and expandListingBlocks return { items, paging } — chain paging.seen for position tracking
 const LISTING_TYPES = ['listing'];
 const gridChildren = computed(() => {
   const layout = block.value.blocks_layout?.items || [];
   const blocks = block.value.blocks || {};
-  // Read page number (reactive dependency) and update paging start
-  gridPaging.start = gridPageFromUrl.value * GRID_PAGE_SIZE;
-  gridPaging._seen = 0;
-  gridPaging.total = 0;
+  // Read page number (reactive dependency) and compute paging start
+  const start = gridPageFromUrl.value * GRID_PAGE_SIZE;
+  gridPaging.start = start;
+  let seen = 0;
   return layout.map(id => {
     const child = blocks[id];
     if (!child) return null;
     if (LISTING_TYPES.includes(child['@type'])) {
-      return { id, block: child, isListing: true };
+      return { id, block: child, isListing: true, seen };
     }
-    const items = staticBlocks([id], { blocks, paging: gridPaging });
-    return { id, block: child, isListing: false, items };
+    const result = staticBlocks([id], { blocks, paging: { start, size: GRID_PAGE_SIZE }, seen });
+    seen = result.paging.seen;
+    return { id, block: child, isListing: false, items: result.items };
   }).filter(Boolean);
 });
 
@@ -950,6 +1055,18 @@ const getImageUrl = (value) => {
   return url;
 };
 
+// Map highlight descriptionColor styles to Tailwind gradient classes
+const highlightGradient = (colorClass) => {
+  const gradients = {
+    'highlight-custom-color-1': 'bg-gradient-to-r from-blue-800 to-blue-600',
+    'highlight-custom-color-2': 'bg-gradient-to-r from-emerald-800 to-emerald-600',
+    'highlight-custom-color-3': 'bg-gradient-to-r from-purple-800 to-purple-600',
+    'highlight-custom-color-4': 'bg-gradient-to-r from-amber-800 to-amber-600',
+    'highlight-custom-color-5': 'bg-gradient-to-r from-rose-800 to-rose-600',
+  };
+  return gradients[colorClass] || gradients['highlight-custom-color-1'];
+};
+
 // Teaser helpers: use block data if overwrite is set OR if hrefObj has no content data
 // This ensures listing-expanded teasers (which have block data but empty hrefObj) display correctly
 // When overwrite is enabled but custom value not set yet, fall back to href value for editing
@@ -986,28 +1103,45 @@ const getListingTotalResults = (searchBlock) => {
 
 // Get current search text from URL (for preserving in input field)
 const currentSearchText = computed(() => {
-  if (typeof window === 'undefined') return '';
-  const params = new URLSearchParams(window.location.search);
-  return params.get('SearchableText') || '';
+  return useRoute().query.SearchableText || '';
+});
+
+// Extract TOC entries from page blocks (heading blocks + slate blocks with heading nodes)
+const tocEntries = computed(() => {
+  const result = [];
+  const blocks = data.value?.blocks;
+  const layout = data.value?.blocks_layout?.items;
+  if (!blocks || !layout) return result;
+  for (const id of layout) {
+    const b = blocks[id];
+    if (!b) continue;
+    if (b['@type'] === 'heading' && b.heading) {
+      result.push({ id, level: parseInt((b.tag || 'h2').slice(1)), text: b.heading });
+    } else if (b['@type'] === 'slate' && b.value?.[0]?.type?.match(/^h[1-6]$/)) {
+      const level = parseInt(b.value[0].type.slice(1));
+      const text = b.plaintext || b.value[0].children?.map(c => c.text).join('') || '';
+      if (text.trim()) result.push({ id, level, text });
+    }
+  }
+  return result;
 });
 
 const handleSearchSubmit = (event) => {
   const formData = new FormData(event.target);
   const searchText = formData.get('SearchableText');
-  const url = new URL(window.location.href);
+  const route = useRoute();
+  const query = { ...route.query };
   if (searchText) {
-    url.searchParams.set('SearchableText', searchText);
+    query.SearchableText = searchText;
   } else {
-    url.searchParams.delete('SearchableText');
+    delete query.SearchableText;
   }
-  window.location.href = url.toString();
+  navigateTo({ path: route.path, query });
 };
 
 const handleSortChange = (event) => {
-  const sortOn = event.target.value;
-  const url = new URL(window.location.href);
-  url.searchParams.set('sort_on', sortOn);
-  window.location.href = url.toString();
+  const route = useRoute();
+  navigateTo({ path: route.path, query: { ...route.query, sort_on: event.target.value } });
 };
 
 // Facet field options - maps field name to available options
@@ -1043,11 +1177,12 @@ const getFacetOptions = (facet) => {
 
 // Check if a facet value is currently selected (from URL params)
 const isFacetChecked = (facet, value) => {
-  if (typeof window === 'undefined') return false;
   const field = getFacetField(facet);
-  const params = new URLSearchParams(window.location.search);
-  const currentValues = params.getAll(`facet.${field}`);
-  return currentValues.includes(value);
+  const route = useRoute();
+  const paramKey = `facet.${field}`;
+  const current = route.query[paramKey];
+  if (Array.isArray(current)) return current.includes(value);
+  return current === value;
 };
 
 // Handle facet checkbox change
@@ -1055,23 +1190,29 @@ const handleFacetCheckboxChange = (event) => {
   const checkbox = event.target;
   const field = checkbox.dataset.field;
   const value = checkbox.value;
-  const url = new URL(window.location.href);
+  const route = useRoute();
   const paramKey = `facet.${field}`;
+  const query = { ...route.query };
 
-  const currentValues = url.searchParams.getAll(paramKey);
+  const current = query[paramKey];
+  const currentValues = Array.isArray(current) ? [...current] : current ? [current] : [];
 
   if (checkbox.checked) {
-    if (!currentValues.includes(value)) {
-      url.searchParams.append(paramKey, value);
-    }
+    if (!currentValues.includes(value)) currentValues.push(value);
   } else {
-    url.searchParams.delete(paramKey);
-    currentValues.filter(v => v !== value).forEach(v => {
-      url.searchParams.append(paramKey, v);
-    });
+    const idx = currentValues.indexOf(value);
+    if (idx !== -1) currentValues.splice(idx, 1);
   }
 
-  window.location.href = url.toString();
+  if (currentValues.length === 0) {
+    delete query[paramKey];
+  } else if (currentValues.length === 1) {
+    query[paramKey] = currentValues[0];
+  } else {
+    query[paramKey] = currentValues;
+  }
+
+  navigateTo({ path: route.path, query });
 };
 
 // Handle facet select change
@@ -1079,16 +1220,17 @@ const handleFacetSelectChange = (event) => {
   const select = event.target;
   const field = select.dataset.field;
   const value = select.value;
-  const url = new URL(window.location.href);
+  const route = useRoute();
+  const query = { ...route.query };
   const paramKey = `facet.${field}`;
 
   if (value) {
-    url.searchParams.set(paramKey, value);
+    query[paramKey] = value;
   } else {
-    url.searchParams.delete(paramKey);
+    delete query[paramKey];
   }
 
-  window.location.href = url.toString();
+  navigateTo({ path: route.path, query });
 };
 
 // Form block: per-block state for errors, success, and user input values.

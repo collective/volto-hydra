@@ -66,18 +66,19 @@ import config from '@plone/volto/registry';
  * @returns {array} Routes.
  */
 export const multilingualRoutes = [
-  {
-    path: `/(${config.settings?.supportedLanguages.join('|')})/sitemap`,
-    component: Sitemap,
-  },
-  {
-    path: `/(${config.settings?.supportedLanguages.join('|')})/search`,
-    component: Search,
-  },
-  {
-    path: `/(${config.settings?.supportedLanguages.join('|')})/contact-form`,
-    component: ContactForm,
-  },
+  // HYDRA: These are content paths the frontend handles.
+  // {
+  //   path: `/(${config.settings?.supportedLanguages.join('|')})/sitemap`,
+  //   component: Sitemap,
+  // },
+  // {
+  //   path: `/(${config.settings?.supportedLanguages.join('|')})/search`,
+  //   component: Search,
+  // },
+  // {
+  //   path: `/(${config.settings?.supportedLanguages.join('|')})/contact-form`,
+  //   component: ContactForm,
+  // },
   {
     path: `/(${config.settings?.supportedLanguages.join('|')})/change-password`,
     component: ChangePassword,
@@ -145,18 +146,20 @@ export const defaultRoutes = [
     path: ['/logout', '/**/logout'],
     component: Logout,
   },
-  {
-    path: '/sitemap',
-    component: Sitemap,
-  },
-  {
-    path: '/search',
-    component: Search,
-  },
-  {
-    path: '/contact-form',
-    component: ContactForm,
-  },
+  // HYDRA: These are content paths the frontend handles.
+  // Keeping them would prevent editing content at those paths.
+  // {
+  //   path: '/sitemap',
+  //   component: Sitemap,
+  // },
+  // {
+  //   path: '/search',
+  //   component: Search,
+  // },
+  // {
+  //   path: '/contact-form',
+  //   component: ContactForm,
+  // },
   {
     path: '/controlpanel',
     exact: true,

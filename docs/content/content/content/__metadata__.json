@@ -21,7 +21,8 @@
     "05bace45294c45d5ab93de883e7ce702/image/penguin2.jpg",
     "7de78fea55354a29ad78b909efb07436/image/penguin3.jpg",
     "0c351dd841c34c6da9c313b1bc551e34/image/penguin4.jpg",
-    "a5bf990b119747c4b2855fedc1ea0185/image/image.png"
+    "a5bf990b119747c4b2855fedc1ea0185/image/image.png",
+    "quadrant-svg/image/quadrant.svg"
   ],
   "_data_files_": [
     "plone_site_root/data.json",
@@ -77,7 +78,23 @@
     "f51777793dab4a61982e35dfa71d0575/data.json",
     "e017bd4a0b3845aab26f6d855cc4ef14/data.json",
     "1efc7b73b28e4edeaf40040709299d69/data.json",
-    "7950cae06c994276930f6d13151308c5/data.json"
+    "7950cae06c994276930f6d13151308c5/data.json",
+    "concepts/data.json",
+    "concepts/architecture/data.json",
+    "concepts/integration-levels/data.json",
+    "concepts/visual-editing/data.json",
+    "concepts/custom-blocks/data.json",
+    "concepts/container-blocks/data.json",
+    "concepts/listings/data.json",
+    "concepts/templates/data.json",
+    "concepts/deployment/data.json",
+    "concepts/advanced/data.json",
+    "templates/data.json",
+    "templates/block-reference-layout/data.json",
+    "templates/event-view/data.json",
+    "templates/newsitem-view/data.json",
+    "templates/site-footer/data.json",
+    "quadrant-svg/data.json"
   ],
   "default_page": {},
   "local_roles": {
@@ -458,6 +475,118 @@
           "Owner"
         ]
       }
+    },
+    "concepts-folder-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-architecture-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-integration-levels-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-visual-editing-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-custom-blocks-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-container-blocks-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-listings-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-templates-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-deployment-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "concepts-advanced-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "tpl-block-reference-layout": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "tpl-folder-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "tpl-ct-event-view": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "tpl-ct-newsitem-view": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "site-footer-uid": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "quadrant-svg": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
     }
   },
   "ordering": {
@@ -514,7 +643,13 @@
     "f0018ecb26ac442aa1f03482a09c8b81": 0,
     "f51777793dab4a61982e35dfa71d0575": 6,
     "f8cd4a2d8d7c4703b4e41d2093b21aed": 0,
-    "fb086a3d1d3d4a9ebf9bc864d2172e79": 3
+    "fb086a3d1d3d4a9ebf9bc864d2172e79": 3,
+    "tpl-folder-001": 44,
+    "tpl-block-reference-layout": 0,
+    "tpl-ct-event-view": 1,
+    "tpl-ct-newsitem-view": 2,
+    "site-footer-uid": 3,
+    "quadrant-svg": 4
   },
   "relations": []
 }

@@ -1,5 +1,8 @@
 import { getAccessToken, loadTemplates } from '@hydra-js/hydra.js';
 
+// Shared template cache across all page renders (survives SSG prerendering)
+const templateCache = {};
+
 export default async function ploneApi({
   path,
   query = null,
@@ -19,7 +22,7 @@ export default async function ploneApi({
   if (token) {
     headers['Authorization'] = 'Bearer ' + token;
   }
-  var api = path?.join ? path.join('/') : path;
+  var api = path?.join ? path.filter(Boolean).join('/') : path;
   if (!api.startsWith('http')) {
     api = `${runtimeConfig.public.backendBaseUrl}/++api++/${api}`;
   }
@@ -78,7 +81,10 @@ export default async function ploneApi({
           }
           return response.json();
         };
-        const templates = await loadTemplates(data, loadTemplate, preloadTemplates);
+        const { templates, errors } = await loadTemplates(data, loadTemplate, templateCache, preloadTemplates);
+        if (errors.length) {
+          console.warn('[ploneApi] Failed to load templates:', errors.map(e => `${e.templateId}: ${e.error?.message || e.error}`).join('; '));
+        }
 
         return {
           page: data,

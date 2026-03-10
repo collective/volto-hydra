@@ -20,6 +20,7 @@
 // Global render counter for testing re-render behavior
 window.hydraRenderCount = window.hydraRenderCount || 0;
 
+
 // Test-frontend log with run ID prefix (matches hydra.js log pattern)
 function tfLog(...args) {
   const runId = window.__testRunId;
@@ -158,6 +159,9 @@ async function renderBlock(blockId, block) {
         case 'video':
             wrapper.innerHTML = renderVideoBlock(block);
             break;
+        case 'maps':
+            wrapper.innerHTML = renderMapsBlock(block);
+            break;
         case 'multifield':
             wrapper.innerHTML = renderMultiFieldBlock(block);
             break;
@@ -198,6 +202,7 @@ async function renderBlock(blockId, block) {
         case 'accordion':
             wrapper.innerHTML = await renderAccordionBlock(block, blockId);
             break;
+        // accordionPanel is rendered inline by renderAccordionBlock (object_list items)
         case 'slateTable':
             wrapper.innerHTML = renderSlateTableBlock(block);
             break;
@@ -223,11 +228,36 @@ async function renderBlock(blockId, block) {
             }
             wrapper.textContent = 'Listing block (no query)';
             break;
+        case 'introduction':
+            wrapper.innerHTML = renderIntroductionBlock(block);
+            break;
+        case 'heading':
+            wrapper.innerHTML = renderHeadingBlock(block);
+            break;
+        case 'separator':
+            wrapper.innerHTML = renderSeparatorBlock(block);
+            break;
+        case '__button':
+            wrapper.innerHTML = renderButtonBlock(block);
+            break;
+        case 'highlight':
+            wrapper.innerHTML = renderHighlightBlock(block);
+            break;
+        case 'toc':
+            wrapper.innerHTML = renderTocBlock(block);
+            break;
+        case 'form':
+            wrapper.innerHTML = renderFormBlock(block);
+            attachFormValidation(wrapper.querySelector('form'), block);
+            break;
         case 'skiplogicTest':
             wrapper.innerHTML = renderSkiplogicTestBlock(block);
             break;
         case 'empty':
             wrapper.innerHTML = renderEmptyBlock(block);
+            break;
+        case 'codeExample':
+            wrapper.innerHTML = renderCodeExampleBlock(block, blockId);
             break;
         case 'title':
             // Title block is just rendered by page title, empty here
@@ -248,13 +278,10 @@ async function renderBlock(blockId, block) {
 function renderSlateBlock(block) {
     const value = block.value || [];
     let html = '';
-    tfLog('renderSlateBlock:', JSON.stringify(value?.slice(0,1)));
-
     value.forEach((node) => {
         // nodeId is required for edit mode (hydra.js adds it), but optional for view mode
         // If missing in edit mode, hydra.js should add it - but we don't throw here to allow view mode
         const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
-        tfLog('renderSlateBlock node:', node.type, 'nodeId:', node.nodeId, 'attr:', nodeIdAttr);
 
         const text = renderChildren(node.children);
         // Mark as editable field - hydra.js will read this and set contenteditable="true"
@@ -623,7 +650,7 @@ function renderTeaserBlock(block, blockUid) {
  */
 function renderDefaultItemBlock(block, blockUid) {
     const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
-    const href = typeof block.href === 'string' ? block.href : (hrefObj?.['@id'] || '');
+    const href = window._contentPath(typeof block.href === 'string' ? block.href : (hrefObj?.['@id'] || ''));
     const title = block.title || hrefObj?.title || '';
     const description = block.description || hrefObj?.description || '';
     const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
@@ -646,21 +673,26 @@ function renderDefaultItemBlock(block, blockUid) {
  */
 function renderSummaryItemBlock(block, blockUid) {
     const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
-    const href = typeof block.href === 'string' ? block.href : (hrefObj?.['@id'] || '');
+    const href = window._contentPath(typeof block.href === 'string' ? block.href : (hrefObj?.['@id'] || ''));
     const title = block.title || hrefObj?.title || '';
     const description = block.description || hrefObj?.description || '';
     const blockUidAttr = blockUid ? `data-block-uid="${blockUid}"` : '';
 
-    const imageSrc = block.image ? getImageUrl(block.image) : '';
+    const imageSrc = block.image ? window._contentPath(getImageUrl(block.image)) : '';
 
     const imageHtml = imageSrc
-        ? `<img src="${imageSrc}" alt="" style="width: 80px; height: 60px; object-fit: cover; margin-right: 15px; border-radius: 4px;" />`
+        ? `<img data-edit-media="image" src="${imageSrc}" alt="" style="width: 80px; height: 60px; object-fit: cover; margin-right: 15px; border-radius: 4px;" />`
+        : '';
+
+    const dateHtml = block.date
+        ? `<time style="display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #333; margin-bottom: 4px;">${new Date(block.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</time>`
         : '';
 
     return `
         <div ${blockUidAttr} class="summary-item-block" style="padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: flex-start;">
             ${imageHtml}
             <div style="flex: 1;">
+                ${dateHtml}
                 <a href="${href || '#'}" data-edit-link="href" style="text-decoration: none; color: inherit;">
                     <h4 data-edit-text="title" style="margin: 0 0 5px 0;">${title}</h4>
                 </a>
@@ -699,11 +731,278 @@ function renderImageBlock(block) {
  * @param {Object} block - Video block data with url
  * @returns {string} HTML string
  */
+function renderMapsBlock(block) {
+    const url = block.url || '';
+    const title = block.title || 'Map';
+    if (url) {
+        return `<div class="maps-block">
+            <iframe src="${url}" title="${title}" allowfullscreen loading="lazy"
+                style="width:100%;height:450px;border:none"></iframe>
+        </div>`;
+    }
+    return `<div class="maps-block"><p>No map URL set</p></div>`;
+}
+
 function renderVideoBlock(block) {
     const url = block.url || '';
-    return `<div class="video-block">
-        <p>Video: ${url || 'No URL set'}</p>
-    </div>`;
+    const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?/]+)/);
+    if (ytMatch) {
+        return `<div class="video-block">
+            <iframe src="https://www.youtube.com/embed/${ytMatch[1]}" allowfullscreen
+                style="width:100%;aspect-ratio:16/9;border:none" title="Video"></iframe>
+        </div>`;
+    }
+    if (url) {
+        return `<div class="video-block">
+            <video src="${url}" controls style="width:100%"></video>
+        </div>`;
+    }
+    return `<div class="video-block"><p>No video URL set</p></div>`;
+}
+
+/**
+ * Render an introduction block (page title + description).
+ * The introduction block has no content of its own — it displays the page's
+ * title and description from metadata, making them inline-editable.
+ * @param {Object} block - Introduction block data (typically just @type)
+ * @returns {string} HTML string
+ */
+function renderIntroductionBlock(block) {
+    const title = document.getElementById('page-title')?.textContent || '';
+    const description = block._pageDescription || '';
+    let html = `<h1 data-edit-text="/title">${title}</h1>`;
+    if (description) {
+        html += `<p data-edit-text="/description" class="description" style="font-size:1.2em;color:#555;">${description}</p>`;
+    }
+    return html;
+}
+
+/**
+ * Render a heading block (standalone h1–h6).
+ * @param {Object} block - Heading block data
+ * @returns {string} HTML string
+ */
+function renderHeadingBlock(block) {
+    const tag = block.tag || 'h2';
+    const text = block.heading || '';
+    return `<${tag} data-edit-text="heading">${text}</${tag}>`;
+}
+
+/**
+ * Render a separator block (horizontal rule).
+ * @param {Object} block - Separator block data
+ * @returns {string} HTML string
+ */
+function renderSeparatorBlock(block) {
+    const align = block.styles?.align || 'full';
+    return `<hr class="separator-${align}" />`;
+}
+
+/**
+ * Render a button block (CTA link).
+ * @param {Object} block - Button block data
+ * @returns {string} HTML string
+ */
+function renderButtonBlock(block) {
+    const title = block.title || 'Button';
+    const href = getLinkUrl(block.href) || '#';
+    return `<a href="${href}" data-edit-text="title" data-edit-link="href" class="btn" style="display:inline-block;padding:10px 20px;background:#007eb1;color:white;text-decoration:none;border-radius:4px;">${title}</a>`;
+}
+
+/**
+ * Render a highlight block (banner with background, overlay, CTA).
+ * @param {Object} block - Highlight block data
+ * @returns {string} HTML string
+ */
+function renderHighlightBlock(block) {
+    const title = block.title || '';
+    const imageSrc = getImageUrl(block.image);
+    const ctaText = block.cta_title || '';
+    const ctaLink = getLinkUrl(block.cta_link);
+    const description = block.description || [];
+
+    let descHtml = '';
+    description.forEach((node) => {
+        const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
+        const text = renderChildren(node.children);
+        descHtml += `<p data-edit-text="description"${nodeIdAttr}>${text}</p>`;
+    });
+
+    const highlightGradients = {
+        'highlight-custom-color-1': 'linear-gradient(135deg, #1e3a5f, #2563eb)',
+        'highlight-custom-color-2': 'linear-gradient(135deg, #064e3b, #059669)',
+        'highlight-custom-color-3': 'linear-gradient(135deg, #581c87, #9333ea)',
+        'highlight-custom-color-4': 'linear-gradient(135deg, #78350f, #d97706)',
+        'highlight-custom-color-5': 'linear-gradient(135deg, #881337, #e11d48)',
+    };
+    const gradient = highlightGradients[block.styles?.descriptionColor] || 'linear-gradient(135deg, #334, #556)';
+    const bgStyle = imageSrc ? `background-image:url(${imageSrc});background-size:cover;` : `background:${gradient};`;
+    const ctaHtml = ctaText
+        ? `<a href="${ctaLink || '#'}" data-edit-text="cta_title" data-edit-link="cta_link" style="display:inline-block;padding:10px 20px;background:#007eb1;color:white;text-decoration:none;border-radius:4px;">${ctaText}</a>`
+        : '';
+
+    return `<section class="highlight-block" style="${bgStyle}padding:40px 20px;color:white;border-radius:8px;">
+        <div class="highlight-overlay" style="background:rgba(0,0,0,0.4);padding:30px;border-radius:8px;">
+            <h2 data-edit-text="title">${title}</h2>
+            <div class="highlight-body">${descHtml}</div>
+            ${ctaHtml}
+        </div>
+    </section>`;
+}
+
+/**
+ * Render a table-of-contents block.
+ * Scans page blocks for headings.
+ * @param {Object} block - TOC block data
+ * @returns {string} HTML string
+ */
+function renderTocBlock(block) {
+    const formData = window._currentFormData;
+    const entries = [];
+    if (formData?.blocks && formData?.blocks_layout?.items) {
+        for (const id of formData.blocks_layout.items) {
+            const b = formData.blocks[id];
+            if (!b) continue;
+            if (b['@type'] === 'heading' && b.heading) {
+                entries.push({ id, level: parseInt((b.tag || 'h2').slice(1)), text: b.heading });
+            } else if (b['@type'] === 'slate' && b.value?.[0]?.type?.match(/^h[1-6]$/)) {
+                const level = parseInt(b.value[0].type.slice(1));
+                const text = b.plaintext || b.value[0].children?.map(c => c.text).join('') || '';
+                if (text.trim()) entries.push({ id, level, text });
+            }
+        }
+    }
+    if (entries.length === 0) {
+        return `<nav class="toc-block"><p>Table of Contents</p></nav>`;
+    }
+    const lis = entries.map(e =>
+        `<li style="margin-left:${(e.level - 2) * 1.5}em"><a href="#${e.id}">${e.text}</a></li>`
+    ).join('');
+    return `<nav class="toc-block"><ul>${lis}</ul></nav>`;
+}
+
+/**
+ * Render a form block.
+ * @param {Object} block - Form block data
+ * @returns {string} HTML string
+ */
+function renderFormBlock(block) {
+    const title = block.title || '';
+    const description = block.description || '';
+    const subblocks = block.subblocks || [];
+    const submitLabel = block.submit_label || 'Submit';
+    const successMessage = block.send_message || 'Thank you, your form has been submitted.';
+
+    let html = '<form class="form-block" style="padding: 20px; border: 1px solid #ddd; border-radius: 8px;" novalidate>';
+    if (title) {
+        html += `<h2 data-edit-text="title">${title}</h2>`;
+    }
+    if (description) {
+        html += `<p data-edit-text="description" style="color: #666;">${description}</p>`;
+    }
+    for (const field of subblocks) {
+        const fieldId = field['field_id'] || field['@id'] || '';
+        const fieldType = field.field_type || 'text';
+        const label = field.label || '';
+        const required = field.required || false;
+        html += `<div class="form-field" data-block-uid="${fieldId}" data-block-add="bottom" style="margin-bottom: 12px;">`;
+        html += `<label data-edit-text="label" style="display: block; margin-bottom: 4px; font-weight: bold;">${label}${required ? ' *' : ''}</label>`;
+        if (fieldType === 'textarea') {
+            html += `<textarea name="${fieldId}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" rows="3"></textarea>`;
+        } else if (fieldType === 'select') {
+            const values = field.input_values || [];
+            html += `<select name="${fieldId}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">`;
+            html += '<option value="">-- Select --</option>';
+            for (const v of values) html += `<option value="${v}">${v}</option>`;
+            html += '</select>';
+        } else if (fieldType === 'checkbox') {
+            html += `<input type="checkbox" name="${fieldId}" style="margin-right: 8px;" />`;
+        } else if (fieldType === 'single_choice') {
+            const values = field.input_values || [];
+            for (const v of values) {
+                html += `<label style="display: inline-flex; align-items: center; gap: 4px; margin-right: 16px;"><input type="radio" name="${fieldId}" value="${v}" /> ${v}</label>`;
+            }
+        } else {
+            const inputType = fieldType === 'from' ? 'email' : fieldType;
+            html += `<input type="${inputType}" name="${fieldId}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" />`;
+        }
+        html += '</div>';
+    }
+    html += `<button type="button" class="form-submit" style="padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 4px;">${submitLabel}</button>`;
+    html += '</form>';
+    return html;
+}
+
+/**
+ * Attach client-side validation to a rendered form block.
+ * Called after innerHTML is set so the DOM elements exist.
+ */
+function attachFormValidation(formEl, block) {
+    if (!formEl) return;
+    const subblocks = block.subblocks || [];
+    const submitBtn = formEl.querySelector('.form-submit');
+    if (!submitBtn) return;
+
+    submitBtn.addEventListener('click', function () {
+        // Clear previous errors
+        formEl.querySelectorAll('.form-error').forEach(el => el.remove());
+
+        let valid = true;
+
+        for (const field of subblocks) {
+            const fieldId = field['field_id'] || field['@id'] || '';
+            const fieldType = field.field_type || 'text';
+            if (!field.required) continue;
+
+            const fieldDiv = formEl.querySelector(`.form-field[data-block-uid="${fieldId}"]`);
+            if (!fieldDiv) continue;
+
+            let hasError = false;
+            let errorMsg = 'This field is required.';
+
+            if (fieldType === 'checkbox') {
+                const input = formEl.querySelector(`input[name="${fieldId}"]`);
+                if (input && !input.checked) hasError = true;
+            } else if (fieldType === 'from') {
+                const input = formEl.querySelector(`input[name="${fieldId}"]`);
+                if (input) {
+                    if (!input.value) {
+                        hasError = true;
+                    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.value)) {
+                        hasError = true;
+                        errorMsg = 'Please enter a valid email address.';
+                    }
+                }
+            } else if (fieldType === 'select') {
+                const select = formEl.querySelector(`select[name="${fieldId}"]`);
+                if (select && !select.value) hasError = true;
+            } else if (fieldType === 'textarea') {
+                const textarea = formEl.querySelector(`textarea[name="${fieldId}"]`);
+                if (textarea && !textarea.value.trim()) hasError = true;
+            } else {
+                const input = formEl.querySelector(`input[name="${fieldId}"]`);
+                if (input && !input.value.trim()) hasError = true;
+            }
+
+            if (hasError) {
+                valid = false;
+                const errorEl = document.createElement('div');
+                errorEl.className = 'form-error';
+                errorEl.style.cssText = 'color: red; font-size: 13px; margin-top: 4px;';
+                errorEl.textContent = errorMsg;
+                fieldDiv.appendChild(errorEl);
+            }
+        }
+
+        if (valid) {
+            const successMessage = block.send_message || 'Thank you, your form has been submitted.';
+            const successDiv = document.createElement('div');
+            successDiv.className = 'form-success';
+            successDiv.style.cssText = 'color: green; margin-top: 16px; padding: 12px; background: #f0fff0; border-radius: 4px;';
+            successDiv.textContent = successMessage;
+            formEl.appendChild(successDiv);
+        }
+    });
 }
 
 /**
@@ -714,7 +1013,8 @@ function renderVideoBlock(block) {
  * @returns {Promise<string>} HTML string
  */
 async function renderColumnsBlock(block) {
-    const blocks = block.blocks || {};
+    // Support both flat (block.blocks) and nested (block.columns.blocks) formats
+    const blocks = block.blocks || block.columns?.blocks || {};
     const topImagesItems = block.top_images?.items || [];
     const columnsItems = block.columns?.items || [];
     const title = block.title || '';
@@ -1035,7 +1335,11 @@ function renderCarouselBlock(block) {
  * @returns {string} HTML string
  */
 function renderSliderBlock(block, blockId) {
-    const slides = block.slides || [];
+    // Expand slides through template system (handles templateInstanceId, fixed, etc.)
+    const rawSlides = block.slides || [];
+    const slides = window._expandTemplatesSync
+        ? window._expandTemplatesSync(rawSlides, { templateState: window._templateState || {}, templates: {}, idField: '@id' })
+        : rawSlides;
     const prevCount = sliderSlideCount[blockId] || 0;
     const newCount = slides.length;
 
@@ -1096,6 +1400,41 @@ function renderSliderBlock(block, blockId) {
 }
 
 /**
+ * Render a codeExample block with tabs as child blocks.
+ * Each tab has its own data-block-uid and the code is shown in a <pre> element.
+ * @param {Object} block - Code example block data
+ * @param {string} blockId - Block ID
+ * @returns {string} HTML string
+ */
+function renderCodeExampleBlock(block, blockId) {
+    const tabs = block.tabs || [];
+    let html = '<div data-block-container="{add:\'horizontal\'}" style="background: #1a1a2e; border-radius: 8px; overflow: hidden; margin: 8px 0;">';
+
+    // Tab bar (only when 2+ tabs)
+    if (tabs.length > 1) {
+        html += '<div data-tab-bar style="display: flex; background: #16213e; border-bottom: 1px solid #334;">';
+        tabs.forEach((tab) => {
+            const tabId = tab['@id'];
+            html += `<button data-block-uid="${tabId}" data-linkable-allow style="padding: 8px 16px; color: #aaa; background: transparent; border: none; cursor: pointer; font-size: 13px;"><span data-edit-text="label">${tab.label || tab.language || 'Tab'}</span></button>`;
+        });
+        html += '</div>';
+    }
+
+    // Each tab is a child block - only first is visible
+    tabs.forEach((tab, index) => {
+        const tabId = tab['@id'];
+        const display = index === 0 ? 'block' : 'none';
+        const code = (tab.code || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        html += `<div data-block-uid="${tabId}" data-block-add="right" style="display: ${display};">`;
+        html += `<pre data-edit-text="code" style="padding: 16px; margin: 0; color: #e0e0e0; white-space: pre-wrap; font-size: 13px;"><code>${code}</code></pre>`;
+        html += '</div>';
+    });
+
+    html += '</div>';
+    return html;
+}
+
+/**
  * Render a slide block (child of carousel/slider).
  * Supports both old format (title, content) and volto-slider-block format (title, description, head_title).
  * @param {Object} block - Slide block data
@@ -1127,44 +1466,53 @@ function renderSlideBlock(block) {
 }
 
 /**
- * Render an accordion block with separate header and content containers.
- * Calls window._expandListingBlocks for nested listings in content.
+ * Render an accordion block — panels stored as object_list items.
+ * Each panel has title, blocks, and blocks_layout.
  *
- * @param {Object} block - Accordion block data with shared blocks dict + header/content layout fields
+ * @param {Object} block - Accordion block data
  * @param {string} blockId - Accordion block ID
  * @returns {Promise<string>} HTML string
  */
 async function renderAccordionBlock(block, blockId) {
-    const blocks = block.blocks || {};
-    let headerItems = block.header?.items || [];
-    let contentItems = block.content?.items || [];
-
-    const { items: expandedItems } = await expandItems(blocks, contentItems, `${blockId}-content`);
+    const panels = block.panels || [];
 
     let html = '<div class="accordion-container" style="border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">';
 
-    // Header section
-    html += '<div class="accordion-header" style="background: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">';
-    html += '<div class="header-label" style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">HEADER</div>';
-
-    for (const childId of headerItems) {
-        const childBlock = blocks[childId];
-        if (childBlock) {
-            html += `<div data-block-uid="${childId}" data-block-add="bottom">`;
-            html += renderNestedSlateBlock(childBlock);
-            html += '</div>';
-        }
+    for (const panel of panels) {
+        const panelId = panel['@id'];
+        html += `<div data-block-uid="${panelId}" data-block-add="bottom">`;
+        html += await renderAccordionPanelBlock(panel, panelId);
+        html += '</div>';
     }
 
     html += '</div>';
+    return html;
+}
 
-    // Content section
+/**
+ * Render an accordion panel with title and content blocks.
+ *
+ * @param {Object} block - AccordionPanel block data
+ * @param {string} blockId - Panel block ID
+ * @returns {Promise<string>} HTML string
+ */
+async function renderAccordionPanelBlock(block, blockId) {
+    const contentBlocks = block.blocks || {};
+    const contentLayout = block.blocks_layout?.items || [];
+
+    const { items: expandedItems } = await expandItems(contentBlocks, contentLayout, `${blockId}-content`);
+
+    let html = '';
+
+    // Panel header (title)
+    html += '<div class="accordion-header" style="background: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd; cursor: pointer;">';
+    html += `<strong data-edit-text="title">${block.title || ''}</strong>`;
+    html += '</div>';
+
+    // Panel content
     html += '<div class="accordion-content" style="padding: 15px;">';
-    html += '<div class="content-label" style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">CONTENT</div>';
 
-    const itemsToRender = expandedItems;
-
-    for (const childBlock of itemsToRender) {
+    for (const childBlock of expandedItems) {
         if (!childBlock) continue;
         const uid = childBlock['@uid'];
         html += `<div data-block-uid="${uid}" data-block-add="bottom">`;
@@ -1186,8 +1534,6 @@ async function renderAccordionBlock(block, blockId) {
         }
         html += '</div>';
     }
-
-    html += '</div>';
 
     html += '</div>';
     return html;
@@ -1324,9 +1670,10 @@ async function renderSearchBlock(block, blockId) {
     }
 
     // Facets (rendered from object_list - each has data-block-uid for selection)
+    const facetsTitle = block.facetsTitle || '';
     if (facets.length > 0) {
         html += '<div class="search-facets" style="margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 4px;">';
-        html += '<div style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">FACETS</div>';
+        html += `<div data-edit-text="facetsTitle" style="font-weight: bold; margin-bottom: 8px; color: #666; font-size: 12px;">${facetsTitle || 'FACETS'}</div>`;
         for (const facet of facets) {
             const facetId = facet['@id'] || facet.id || '';
             const facetType = facet.type || '';

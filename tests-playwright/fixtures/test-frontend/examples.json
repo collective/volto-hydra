@@ -1,0 +1,532 @@
+{
+  "@id": "/_test_data/examples",
+  "@type": "Document",
+  "id": "examples",
+  "title": "Block Examples",
+  "description": "Test page with one of each block type from doc examples",
+  "blocks": {
+    "ex-hero": {
+      "@type": "hero",
+      "heading": "Welcome to Our Site",
+      "subheading": "Discover amazing content\nacross multiple lines",
+      "buttonText": "Get Started",
+      "buttonLink": [
+        {
+          "@id": "/getting-started"
+        }
+      ],
+      "image": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%234a90d9%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3EHero Image%3C/text%3E%3C/svg%3E",
+      "description": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "We build tools that make content editing delightful."
+            }
+          ]
+        }
+      ]
+    },
+    "ex-slate": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Welcome"
+            }
+          ]
+        },
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This is "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "bold"
+                }
+              ]
+            },
+            {
+              "text": " and "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "italic"
+                }
+              ]
+            },
+            {
+              "text": " text."
+            }
+          ]
+        },
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "First item"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Second item"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Visit "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "https://example.com"
+              },
+              "children": [
+                {
+                  "text": "our site"
+                }
+              ]
+            },
+            {
+              "text": " for more."
+            }
+          ]
+        }
+      ]
+    },
+    "ex-image": {
+      "@type": "image",
+      "url": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27600%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2377aadd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ETest Image%3C/text%3E%3C/svg%3E",
+      "alt": "A description of the image",
+      "href": [
+        {
+          "@id": "/target-page"
+        }
+      ]
+    },
+    "ex-teaser": {
+      "@type": "teaser",
+      "href": [
+        {
+          "@id": "/news/my-article",
+          "title": "My Article",
+          "description": "A short summary of the article",
+          "hasPreviewImage": true
+        }
+      ],
+      "title": "Custom Title",
+      "description": "Custom description overriding the target",
+      "preview_image": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%2399bbdd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2718%27%3ETeaser%3C/text%3E%3C/svg%3E",
+      "overwrite": true
+    },
+    "ex-table": {
+      "@type": "slateTable",
+      "table": {
+        "rows": [
+          {
+            "key": "row-1",
+            "cells": [
+              {
+                "key": "cell-1",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Name"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "cell-2",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Role"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "row-2",
+            "cells": [
+              {
+                "key": "cell-3",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Alice"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "cell-4",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Engineer"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "ex-columns": {
+      "@type": "columns",
+      "title": "Our Services",
+      "blocks": {
+        "col-1": {
+          "@type": "column",
+          "title": "Design",
+          "blocks": {
+            "text-1": {
+              "@type": "slate",
+              "value": [
+                {
+                  "type": "p",
+                  "children": [
+                    {
+                      "text": "We craft beautiful interfaces."
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "blocks_layout": {
+            "items": [
+              "text-1"
+            ]
+          }
+        },
+        "col-2": {
+          "@type": "column",
+          "title": "Engineering",
+          "blocks": {
+            "text-2": {
+              "@type": "slate",
+              "value": [
+                {
+                  "type": "p",
+                  "children": [
+                    {
+                      "text": "We build robust systems."
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "blocks_layout": {
+            "items": [
+              "text-2"
+            ]
+          }
+        }
+      },
+      "columns": {
+        "items": [
+          "col-1",
+          "col-2"
+        ]
+      }
+    },
+    "ex-accordion": {
+      "@type": "accordion",
+      "panels": [
+        {
+          "@id": "panel-1",
+          "title": "Frequently Asked Questions",
+          "blocks": {
+            "content-text-1": {
+              "@type": "slate",
+              "value": [
+                {
+                  "type": "p",
+                  "children": [
+                    {
+                      "text": "Here are the answers to common questions."
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "blocks_layout": {
+            "items": [
+              "content-text-1"
+            ]
+          }
+        }
+      ]
+    },
+    "ex-slider": {
+      "@type": "slider",
+      "autoplayEnabled": false,
+      "autoplayDelay": 5000,
+      "slides": [
+        {
+          "@id": "slide-1",
+          "@type": "slide",
+          "head_title": "New Release",
+          "title": "Product Launch 2025",
+          "description": "Discover our latest innovations.",
+          "preview_image": [
+            {
+              "@id": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%235577aa%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ESlide 1%3C/text%3E%3C/svg%3E"
+            }
+          ],
+          "buttonText": "Learn More"
+        },
+        {
+          "@id": "slide-2",
+          "@type": "slide",
+          "head_title": "Featured",
+          "title": "Award-Winning Design",
+          "description": "Recognized for excellence in UX.",
+          "preview_image": [
+            {
+              "@id": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%23aa5577%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ESlide 2%3C/text%3E%3C/svg%3E"
+            }
+          ],
+          "buttonText": "See Details"
+        }
+      ]
+    },
+    "ex-listing": {
+      "@type": "listing",
+      "variation": "summary",
+      "querystring": {
+        "query": [
+          {
+            "i": "portal_type",
+            "o": "plone.app.querystring.operation.selection.any",
+            "v": [
+              "Document"
+            ]
+          }
+        ],
+        "sort_on": "effective",
+        "sort_order": "descending"
+      }
+    },
+    "ex-search": {
+      "@type": "search",
+      "facetsTitle": "Filter by",
+      "facets": [
+        {
+          "@id": "facet-1",
+          "type": "checkboxFacet",
+          "title": "Content Type",
+          "field": "portal_type",
+          "multiple": true,
+          "hidden": false
+        },
+        {
+          "@id": "facet-2",
+          "type": "daterangeFacet",
+          "title": "Date Range",
+          "field": "effective",
+          "hidden": false
+        }
+      ],
+      "blocks": {
+        "listing-1": {
+          "@type": "listing",
+          "variation": "summary",
+          "querystring": {
+            "query": [
+              {
+                "i": "portal_type",
+                "o": "plone.app.querystring.operation.selection.any",
+                "v": [
+                  "Document",
+                  "News Item"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "listing": {
+        "items": [
+          "listing-1"
+        ]
+      }
+    },
+    "ex-form": {
+      "@type": "form",
+      "title": "Contact Us",
+      "description": "Fill out this form and we'll get back to you.",
+      "default_to": "admin@example.com",
+      "default_from": "noreply@example.com",
+      "default_subject": "New contact form submission",
+      "submit_label": "Send Message",
+      "subblocks": [
+        {
+          "@id": "field-1",
+          "field_id": "name",
+          "field_type": "text",
+          "label": "Your Name",
+          "required": true
+        },
+        {
+          "@id": "field-2",
+          "field_id": "email",
+          "field_type": "from",
+          "label": "Email Address",
+          "use_as_reply_to": true,
+          "required": true
+        },
+        {
+          "@id": "field-3",
+          "field_id": "department",
+          "field_type": "select",
+          "label": "Department",
+          "input_values": [
+            "Sales",
+            "Support",
+            "General"
+          ],
+          "required": false
+        },
+        {
+          "@id": "field-4",
+          "field_id": "message",
+          "field_type": "textarea",
+          "label": "Message",
+          "required": true
+        }
+      ]
+    },
+    "ex-introduction": {
+      "@type": "introduction"
+    },
+    "ex-heading": {
+      "@type": "heading",
+      "heading": "Getting Started",
+      "tag": "h2"
+    },
+    "ex-separator": {
+      "@type": "separator",
+      "styles": {
+        "align": "center"
+      }
+    },
+    "ex-button": {
+      "@type": "__button",
+      "title": "Learn More",
+      "href": [
+        {
+          "@id": "/about-us"
+        }
+      ]
+    },
+    "ex-highlight": {
+      "@type": "highlight",
+      "title": "Featured Content",
+      "description": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Discover the latest updates and features available in this release."
+            }
+          ]
+        }
+      ],
+      "image": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%23334455%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3EHighlight BG%3C/text%3E%3C/svg%3E",
+      "cta_title": "Read More",
+      "cta_link": [
+        {
+          "@id": "/news/latest"
+        }
+      ]
+    },
+    "ex-video": {
+      "@type": "video",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    },
+    "ex-maps": {
+      "@type": "maps",
+      "url": "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2468.496805908769!2d4.867355714504337!3d50.46334407876937!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x47c1996d6ee4733f%3A0x1e62003289f50ea5!2zVGjDqcOidHJlIGRlIE5hbXVy!5e1!3m2!1sde!2sde!4v1710240653269!5m2!1sde!2sde",
+      "title": "Ploneconf 2022 was in Namur, Belgium"
+    },
+    "ex-toc": {
+      "@type": "toc",
+      "title": "On this page",
+      "hide_title": false,
+      "ordered": false,
+      "levels": [
+        "h2",
+        "h3"
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "ex-hero",
+      "ex-slate",
+      "ex-image",
+      "ex-teaser",
+      "ex-table",
+      "ex-columns",
+      "ex-accordion",
+      "ex-slider",
+      "ex-listing",
+      "ex-search",
+      "ex-form",
+      "ex-introduction",
+      "ex-heading",
+      "ex-separator",
+      "ex-button",
+      "ex-highlight",
+      "ex-video",
+      "ex-maps",
+      "ex-toc"
+    ]
+  },
+  "is_folderish": false,
+  "review_state": "published",
+  "@components": {
+    "navigation": {
+      "items": []
+    }
+  }
+}

@@ -6,69 +6,11 @@
   "blocks": {
     "25a0a1b5-3ce9-468f-8968-9a7f83ca4e53": {
       "@type": "highlight",
-      "button": true,
-      "buttonLink": [
-        {
-          "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
-          "@type": "Document",
-          "CreationDate": "2023-07-06T23:35:20+02:00",
-          "Creator": "admin",
-          "Date": "2023-07-06T18:35:00+02:00",
-          "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-          "EffectiveDate": "2023-07-06T18:35:00+02:00",
-          "ExpirationDate": "None",
-          "ModificationDate": "2023-09-22T16:25:49+02:00",
-          "Subject": [],
-          "Title": "Page",
-          "Type": "Page",
-          "UID": "7ab9c48ede33415fa2a66a99549c8f70",
-          "author_name": null,
-          "cmf_uid": null,
-          "commentators": [],
-          "created": "2023-07-06T21:35:20+00:00",
-          "description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-          "effective": "2023-07-06T16:35:00+00:00",
-          "end": null,
-          "exclude_from_nav": false,
-          "expires": "2499-12-30T22:00:00+00:00",
-          "getIcon": null,
-          "getId": "page",
-          "getObjSize": "676.8 KB",
-          "getPath": "/Plone/content-types/page",
-          "getRemoteUrl": null,
-          "getURL": "http://localhost:8080/Plone/content-types/page",
-          "hasPreviewImage": true,
-          "head_title": null,
-          "id": "page",
-          "image_field": "preview_image",
-          "in_response_to": null,
-          "is_folderish": true,
-          "last_comment_date": null,
-          "listCreators": [
-            "admin"
-          ],
-          "location": null,
-          "mime_type": "text/plain",
-          "modified": "2023-09-22T14:25:49+00:00",
-          "nav_title": null,
-          "portal_type": "Document",
-          "review_state": "published",
-          "start": null,
-          "sync_uid": null,
-          "title": "Page",
-          "total_comments": 0,
-          "type_title": "Page"
-        }
-      ],
-      "buttonText": "Button ",
-      "image_field": "image",
-      "plaintext": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt.",
       "styles": {
         "descriptionColor": "highlight-custom-color-4"
       },
       "title": "Highlight-Block",
-      "url": "../../resolveuid/970ec24c76784c66a06d8c8d8b6522b2",
-      "value": [
+      "description": [
         {
           "children": [
             {
@@ -91,73 +33,22 @@
           ],
           "type": "p"
         }
-      ]
+      ],
+      "cta_title": "Button",
+      "cta_link": [
+        {
+          "@id": "/content-types/page"
+        }
+      ],
+      "image": "/content-types/image/@@images/image"
     },
     "417e7343-af04-4da4-96bf-29321a3e0fc6": {
       "@type": "highlight",
-      "button": true,
-      "buttonLink": [
-        {
-          "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
-          "@type": "Document",
-          "CreationDate": "2023-07-06T23:35:20+02:00",
-          "Creator": "admin",
-          "Date": "2023-07-06T18:35:00+02:00",
-          "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-          "EffectiveDate": "2023-07-06T18:35:00+02:00",
-          "ExpirationDate": "None",
-          "ModificationDate": "2023-09-22T16:25:49+02:00",
-          "Subject": [],
-          "Title": "Page",
-          "Type": "Page",
-          "UID": "7ab9c48ede33415fa2a66a99549c8f70",
-          "author_name": null,
-          "cmf_uid": null,
-          "commentators": [],
-          "created": "2023-07-06T21:35:20+00:00",
-          "description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-          "effective": "2023-07-06T16:35:00+00:00",
-          "end": null,
-          "exclude_from_nav": false,
-          "expires": "2499-12-30T22:00:00+00:00",
-          "getIcon": null,
-          "getId": "page",
-          "getObjSize": "676.8 KB",
-          "getPath": "/Plone/content-types/page",
-          "getRemoteUrl": null,
-          "getURL": "http://localhost:8080/Plone/content-types/page",
-          "hasPreviewImage": true,
-          "head_title": null,
-          "id": "page",
-          "image_field": "preview_image",
-          "in_response_to": null,
-          "is_folderish": true,
-          "last_comment_date": null,
-          "listCreators": [
-            "admin"
-          ],
-          "location": null,
-          "mime_type": "text/plain",
-          "modified": "2023-09-22T14:25:49+00:00",
-          "nav_title": null,
-          "portal_type": "Document",
-          "review_state": "published",
-          "start": null,
-          "sync_uid": null,
-          "title": "Page",
-          "total_comments": 0,
-          "type_title": "Page"
-        }
-      ],
-      "buttonText": "Button ",
-      "image_field": "image",
-      "plaintext": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt.",
       "styles": {
         "descriptionColor": "highlight-custom-color-2"
       },
       "title": "Highlight-Block",
-      "url": "../../resolveuid/970ec24c76784c66a06d8c8d8b6522b2",
-      "value": [
+      "description": [
         {
           "children": [
             {
@@ -180,73 +71,22 @@
           ],
           "type": "p"
         }
-      ]
+      ],
+      "cta_title": "Button",
+      "cta_link": [
+        {
+          "@id": "/content-types/page"
+        }
+      ],
+      "image": "/content-types/image/@@images/image"
     },
     "67a6a73a-5ae7-4e14-a11b-bd0139e56513": {
       "@type": "highlight",
-      "button": true,
-      "buttonLink": [
-        {
-          "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
-          "@type": "Document",
-          "CreationDate": "2023-07-06T23:35:20+02:00",
-          "Creator": "admin",
-          "Date": "2023-07-06T18:35:00+02:00",
-          "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-          "EffectiveDate": "2023-07-06T18:35:00+02:00",
-          "ExpirationDate": "None",
-          "ModificationDate": "2023-09-22T16:25:49+02:00",
-          "Subject": [],
-          "Title": "Page",
-          "Type": "Page",
-          "UID": "7ab9c48ede33415fa2a66a99549c8f70",
-          "author_name": null,
-          "cmf_uid": null,
-          "commentators": [],
-          "created": "2023-07-06T21:35:20+00:00",
-          "description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-          "effective": "2023-07-06T16:35:00+00:00",
-          "end": null,
-          "exclude_from_nav": false,
-          "expires": "2499-12-30T22:00:00+00:00",
-          "getIcon": null,
-          "getId": "page",
-          "getObjSize": "676.8 KB",
-          "getPath": "/Plone/content-types/page",
-          "getRemoteUrl": null,
-          "getURL": "http://localhost:8080/Plone/content-types/page",
-          "hasPreviewImage": true,
-          "head_title": null,
-          "id": "page",
-          "image_field": "preview_image",
-          "in_response_to": null,
-          "is_folderish": true,
-          "last_comment_date": null,
-          "listCreators": [
-            "admin"
-          ],
-          "location": null,
-          "mime_type": "text/plain",
-          "modified": "2023-09-22T14:25:49+00:00",
-          "nav_title": null,
-          "portal_type": "Document",
-          "review_state": "published",
-          "start": null,
-          "sync_uid": null,
-          "title": "Page",
-          "total_comments": 0,
-          "type_title": "Page"
-        }
-      ],
-      "buttonText": "Button ",
-      "image_field": "image",
-      "plaintext": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt.",
       "styles": {
         "descriptionColor": "highlight-custom-color-3"
       },
       "title": "Highlight-Block",
-      "url": "../../resolveuid/970ec24c76784c66a06d8c8d8b6522b2",
-      "value": [
+      "description": [
         {
           "children": [
             {
@@ -269,73 +109,22 @@
           ],
           "type": "p"
         }
-      ]
+      ],
+      "cta_title": "Button",
+      "cta_link": [
+        {
+          "@id": "/content-types/page"
+        }
+      ],
+      "image": "/content-types/image/@@images/image"
     },
     "8d932379-1247-4281-bd30-dfecd5b3c378": {
       "@type": "highlight",
-      "button": true,
-      "buttonLink": [
-        {
-          "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
-          "@type": "Document",
-          "CreationDate": "2023-07-06T23:35:20+02:00",
-          "Creator": "admin",
-          "Date": "2023-07-06T18:35:00+02:00",
-          "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-          "EffectiveDate": "2023-07-06T18:35:00+02:00",
-          "ExpirationDate": "None",
-          "ModificationDate": "2023-09-22T16:25:49+02:00",
-          "Subject": [],
-          "Title": "Page",
-          "Type": "Page",
-          "UID": "7ab9c48ede33415fa2a66a99549c8f70",
-          "author_name": null,
-          "cmf_uid": null,
-          "commentators": [],
-          "created": "2023-07-06T21:35:20+00:00",
-          "description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-          "effective": "2023-07-06T16:35:00+00:00",
-          "end": null,
-          "exclude_from_nav": false,
-          "expires": "2499-12-30T22:00:00+00:00",
-          "getIcon": null,
-          "getId": "page",
-          "getObjSize": "676.8 KB",
-          "getPath": "/Plone/content-types/page",
-          "getRemoteUrl": null,
-          "getURL": "http://localhost:8080/Plone/content-types/page",
-          "hasPreviewImage": true,
-          "head_title": null,
-          "id": "page",
-          "image_field": "preview_image",
-          "in_response_to": null,
-          "is_folderish": true,
-          "last_comment_date": null,
-          "listCreators": [
-            "admin"
-          ],
-          "location": null,
-          "mime_type": "text/plain",
-          "modified": "2023-09-22T14:25:49+00:00",
-          "nav_title": null,
-          "portal_type": "Document",
-          "review_state": "published",
-          "start": null,
-          "sync_uid": null,
-          "title": "Page",
-          "total_comments": 0,
-          "type_title": "Page"
-        }
-      ],
-      "buttonText": "Button ",
-      "image_field": "image",
-      "plaintext": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt.",
       "styles": {
         "descriptionColor": "highlight-custom-color-1"
       },
       "title": "Highlight-Block",
-      "url": "../../resolveuid/970ec24c76784c66a06d8c8d8b6522b2",
-      "value": [
+      "description": [
         {
           "children": [
             {
@@ -358,73 +147,22 @@
           ],
           "type": "p"
         }
-      ]
+      ],
+      "cta_title": "Button",
+      "cta_link": [
+        {
+          "@id": "/content-types/page"
+        }
+      ],
+      "image": "/content-types/image/@@images/image"
     },
     "94655cc3-817d-48ba-bc20-6e9f7796dc46": {
       "@type": "highlight",
-      "button": true,
-      "buttonLink": [
-        {
-          "@id": "../../resolveuid/7ab9c48ede33415fa2a66a99549c8f70",
-          "@type": "Document",
-          "CreationDate": "2023-07-06T23:35:20+02:00",
-          "Creator": "admin",
-          "Date": "2023-07-06T18:35:00+02:00",
-          "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-          "EffectiveDate": "2023-07-06T18:35:00+02:00",
-          "ExpirationDate": "None",
-          "ModificationDate": "2023-09-22T16:25:49+02:00",
-          "Subject": [],
-          "Title": "Page",
-          "Type": "Page",
-          "UID": "7ab9c48ede33415fa2a66a99549c8f70",
-          "author_name": null,
-          "cmf_uid": null,
-          "commentators": [],
-          "created": "2023-07-06T21:35:20+00:00",
-          "description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
-          "effective": "2023-07-06T16:35:00+00:00",
-          "end": null,
-          "exclude_from_nav": false,
-          "expires": "2499-12-30T22:00:00+00:00",
-          "getIcon": null,
-          "getId": "page",
-          "getObjSize": "676.8 KB",
-          "getPath": "/Plone/content-types/page",
-          "getRemoteUrl": null,
-          "getURL": "http://localhost:8080/Plone/content-types/page",
-          "hasPreviewImage": true,
-          "head_title": null,
-          "id": "page",
-          "image_field": "preview_image",
-          "in_response_to": null,
-          "is_folderish": true,
-          "last_comment_date": null,
-          "listCreators": [
-            "admin"
-          ],
-          "location": null,
-          "mime_type": "text/plain",
-          "modified": "2023-09-22T14:25:49+00:00",
-          "nav_title": null,
-          "portal_type": "Document",
-          "review_state": "published",
-          "start": null,
-          "sync_uid": null,
-          "title": "Page",
-          "total_comments": 0,
-          "type_title": "Page"
-        }
-      ],
-      "buttonText": "Button ",
-      "image_field": "image",
-      "plaintext": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt.",
       "styles": {
         "descriptionColor": "highlight-custom-color-5"
       },
       "title": "Highlight-Block",
-      "url": "../../resolveuid/970ec24c76784c66a06d8c8d8b6522b2",
-      "value": [
+      "description": [
         {
           "children": [
             {
@@ -447,10 +185,135 @@
           ],
           "type": "p"
         }
-      ]
+      ],
+      "cta_title": "Button",
+      "cta_link": [
+        {
+          "@id": "/content-types/page"
+        }
+      ],
+      "image": "/content-types/image/@@images/image"
     },
     "af3c704a-1f80-48c8-843b-dc29368d43d9": {
       "@type": "title"
+    },
+    "ref-highlight-sep": {
+      "@type": "separator",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "sep"
+    },
+    "ref-highlight-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "heading"
+    },
+    "ref-highlight-schema-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "schema-heading"
+    },
+    "ref-highlight-schema-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "schema-desc"
+    },
+    "ref-highlight-json-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "json-heading"
+    },
+    "ref-highlight-json-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "json-desc"
+    },
+    "ref-highlight-rendering-heading": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "rendering-heading"
+    },
+    "ref-highlight-rendering-desc": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "rendering-desc"
+    },
+    "ref-highlight-schema": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-highlight-schema-javascript-80590c",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  \"highlight\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"description\": {\n          \"title\": \"Description\",\n          \"widget\": \"slate\"\n        },\n        \"image\": {\n          \"title\": \"Background Image\",\n          \"widget\": \"image\"\n        },\n        \"cta_title\": {\n          \"title\": \"CTA Text\"\n        },\n        \"cta_link\": {\n          \"title\": \"CTA Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        }\n      }\n    }\n  }\n}"
+        }
+      ]
+    },
+    "ref-highlight-json-data": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-highlight-json-data-json-a2bfa3",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"highlight\",\n  \"title\": \"Featured Content\",\n  \"description\": [\n    {\n      \"type\": \"p\",\n      \"children\": [\n        {\n          \"text\": \"Discover the latest updates and features available in this release.\"\n        }\n      ]\n    }\n  ],\n  \"image\": \"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%23334455%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3EHighlight BG%3C/text%3E%3C/svg%3E\",\n  \"cta_title\": \"Read More\",\n  \"cta_link\": [\n    {\n      \"@id\": \"/news/latest\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    "ref-highlight-rendering": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-highlight",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-highlight-rendering-jsx-659b6c",
+          "label": "React",
+          "language": "jsx",
+          "code": "const highlightGradients = {\n  'highlight-custom-color-1': 'linear-gradient(135deg, #1e3a5f, #2563eb)',\n  'highlight-custom-color-2': 'linear-gradient(135deg, #064e3b, #059669)',\n  'highlight-custom-color-3': 'linear-gradient(135deg, #581c87, #9333ea)',\n  'highlight-custom-color-4': 'linear-gradient(135deg, #78350f, #d97706)',\n  'highlight-custom-color-5': 'linear-gradient(135deg, #881337, #e11d48)',\n};\n\nfunction HighlightBlock({ block }) {\n  const title = block.title || '';\n  const description = block.description || [];\n  const imageSrc = block.image || '';\n  const ctaText = block.cta_title || '';\n  const ctaLink = block.cta_link?.[0]?.['@id'] || '';\n  const gradient = highlightGradients[block.styles?.descriptionColor] || 'linear-gradient(135deg, #334, #556)';\n  const bgStyle = imageSrc\n    ? { backgroundImage: `url(${imageSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' }\n    : { background: gradient };\n\n  return (\n    <section\n      data-block-uid={block['@uid']}\n      className=\"highlight-block\"\n      style={{ ...bgStyle, padding: '40px 20px', color: 'white', borderRadius: '8px' }}\n    >\n      <div className=\"highlight-overlay\" style={{ background: 'rgba(0,0,0,0.4)', padding: '30px', borderRadius: '8px' }}>\n        <h2 data-edit-text=\"title\">{title}</h2>\n        <div className=\"highlight-body\">\n          {description.map((node, i) => (\n            <SlateNode key={i} node={node} />\n          ))}\n        </div>\n        {ctaText && (\n          <a href={ctaLink} data-edit-text=\"cta_title\" data-edit-link=\"cta_link\" className=\"highlight-cta\"\n            style={{ display: 'inline-block', padding: '10px 20px', background: '#007eb1', color: 'white', textDecoration: 'none', borderRadius: '4px', marginTop: '16px' }}>\n            {ctaText}\n          </a>\n        )}\n      </div>\n    </section>\n  );\n}"
+        },
+        {
+          "@id": "ref-highlight-rendering-vue-dd8730",
+          "label": "Vue",
+          "language": "vue",
+          "code": "<template>\n  <section\n    :data-block-uid=\"block['@uid']\"\n    class=\"highlight-block\"\n    :style=\"{ ...bgStyle, padding: '40px 20px', color: 'white', borderRadius: '8px' }\"\n  >\n    <div class=\"highlight-overlay\" style=\"background:rgba(0,0,0,0.4);padding:30px;border-radius:8px\">\n      <h2 data-edit-text=\"title\">{{ block.title }}</h2>\n      <div class=\"highlight-body\">\n        <SlateNode v-for=\"(node, i) in block.description || []\" :key=\"i\" :node=\"node\" />\n      </div>\n      <a\n        v-if=\"block.cta_title\"\n        :href=\"ctaLink\"\n        data-edit-text=\"cta_title\"\n        data-edit-link=\"cta_link\"\n        class=\"highlight-cta\"\n        style=\"display:inline-block;padding:10px 20px;background:#007eb1;color:white;text-decoration:none;border-radius:4px;margin-top:16px\"\n      >\n        {{ block.cta_title }}\n      </a>\n    </div>\n  </section>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nconst props = defineProps({ block: Object });\nconst ctaLink = computed(() => props.block.cta_link?.[0]?.['@id'] || '');\n\nconst gradients = {\n  'highlight-custom-color-1': 'linear-gradient(135deg, #1e3a5f, #2563eb)',\n  'highlight-custom-color-2': 'linear-gradient(135deg, #064e3b, #059669)',\n  'highlight-custom-color-3': 'linear-gradient(135deg, #581c87, #9333ea)',\n  'highlight-custom-color-4': 'linear-gradient(135deg, #78350f, #d97706)',\n  'highlight-custom-color-5': 'linear-gradient(135deg, #881337, #e11d48)',\n};\nconst bgStyle = computed(() => {\n  if (props.block.image) {\n    return { backgroundImage: `url(${props.block.image})`, backgroundSize: 'cover', backgroundPosition: 'center' };\n  }\n  const gradient = gradients[props.block.styles?.descriptionColor] || 'linear-gradient(135deg, #334, #556)';\n  return { background: gradient };\n});\n</script>"
+        },
+        {
+          "@id": "ref-highlight-rendering-svelte-d3a4c8",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": "<script>\n  import SlateNode from './SlateNode.svelte';\n  export let block;\n  $: ctaLink = block.cta_link?.[0]?.['@id'] || '';\n\n  const gradients = {\n    'highlight-custom-color-1': 'linear-gradient(135deg, #1e3a5f, #2563eb)',\n    'highlight-custom-color-2': 'linear-gradient(135deg, #064e3b, #059669)',\n    'highlight-custom-color-3': 'linear-gradient(135deg, #581c87, #9333ea)',\n    'highlight-custom-color-4': 'linear-gradient(135deg, #78350f, #d97706)',\n    'highlight-custom-color-5': 'linear-gradient(135deg, #881337, #e11d48)',\n  };\n  $: gradient = gradients[block.styles?.descriptionColor] || 'linear-gradient(135deg, #334, #556)';\n  $: bgStyle = block.image\n    ? `background-image:url(${block.image});background-size:cover;background-position:center`\n    : `background:${gradient}`;\n</script>\n\n<section\n  data-block-uid={block['@uid']}\n  class=\"highlight-block\"\n  style=\"{bgStyle};padding:40px 20px;color:white;border-radius:8px\"\n>\n  <div class=\"highlight-overlay\" style=\"background:rgba(0,0,0,0.4);padding:30px;border-radius:8px\">\n    <h2 data-edit-text=\"title\">{block.title}</h2>\n    <div class=\"highlight-body\">\n      {#each block.description || [] as node, i (i)}\n        <SlateNode {node} />\n      {/each}\n    </div>\n    {#if block.cta_title}\n      <a href={ctaLink} data-edit-text=\"cta_title\" data-edit-link=\"cta_link\" class=\"highlight-cta\"\n        style=\"display:inline-block;padding:10px 20px;background:#007eb1;color:white;text-decoration:none;border-radius:4px;margin-top:16px\">\n        {block.cta_title}\n      </a>\n    {/if}\n  </div>\n</section>"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -460,7 +323,36 @@
       "417e7343-af04-4da4-96bf-29321a3e0fc6",
       "67a6a73a-5ae7-4e14-a11b-bd0139e56513",
       "25a0a1b5-3ce9-468f-8968-9a7f83ca4e53",
-      "94655cc3-817d-48ba-bc20-6e9f7796dc46"
+      "94655cc3-817d-48ba-bc20-6e9f7796dc46",
+      "ref-highlight-schema-heading",
+      "ref-highlight-schema-desc",
+      "ref-highlight-schema",
+      "ref-highlight-json-heading",
+      "ref-highlight-json-desc",
+      "ref-highlight-json-data",
+      "ref-highlight-rendering-heading",
+      "ref-highlight-rendering-desc",
+      "ref-highlight-rendering",
+      "ref-highlight-schema-heading",
+      "ref-highlight-schema-desc",
+      "ref-highlight-schema",
+      "ref-highlight-json-heading",
+      "ref-highlight-json-desc",
+      "ref-highlight-json-data",
+      "ref-highlight-rendering-heading",
+      "ref-highlight-rendering-desc",
+      "ref-highlight-rendering",
+      "ref-highlight-sep",
+      "ref-highlight-heading",
+      "ref-highlight-schema-heading",
+      "ref-highlight-schema-desc",
+      "ref-highlight-schema",
+      "ref-highlight-json-heading",
+      "ref-highlight-json-desc",
+      "ref-highlight-json-data",
+      "ref-highlight-rendering-heading",
+      "ref-highlight-rendering-desc",
+      "ref-highlight-rendering"
     ]
   },
   "contributors": [],

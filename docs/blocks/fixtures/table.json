@@ -1,0 +1,33 @@
+{
+  "@type": "slateTable",
+  "table": {
+    "rows": [
+      {
+        "key": "row-1",
+        "cells": [
+          {
+            "key": "cell-1",
+            "value": [{ "type": "p", "children": [{ "text": "Name" }] }]
+          },
+          {
+            "key": "cell-2",
+            "value": [{ "type": "p", "children": [{ "text": "Role" }] }]
+          }
+        ]
+      },
+      {
+        "key": "row-2",
+        "cells": [
+          {
+            "key": "cell-3",
+            "value": [{ "type": "p", "children": [{ "text": "Alice" }] }]
+          },
+          {
+            "key": "cell-4",
+            "value": [{ "type": "p", "children": [{ "text": "Engineer" }] }]
+          }
+        ]
+      }
+    ]
+  }
+}

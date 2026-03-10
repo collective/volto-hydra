@@ -40,7 +40,7 @@
     "title": "Content Types",
     "type_title": "Page"
   },
-  "review_state": null,
+  "review_state": "published",
   "rights": "Credits: ipsum dolor sit amet.",
   "subjects": [],
   "title": "Image",

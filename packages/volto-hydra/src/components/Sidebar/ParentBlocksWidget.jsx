@@ -26,7 +26,7 @@ import { BlockDataForm } from '@plone/volto/components/manage/Form';
 import { Icon } from '@plone/volto/components';
 import { SidebarPortalTargetContext } from './SidebarPortalTargetContext';
 import DropdownMenu from '../Toolbar/DropdownMenu';
-import { getBlockById, getBlockSchema, updateBlockById } from '../../utils/blockPath';
+import { getBlockById, updateBlockById } from '../../utils/blockPath';
 import { HydraSchemaProvider } from '../../context';
 import { getConvertibleTypes, convertBlockType } from '../../utils/schemaInheritance';
 import { PAGE_BLOCK_UID, isBlockReadonly } from '@volto-hydra/hydra-js';
@@ -120,11 +120,25 @@ const filterBlocksFields = (schema) => {
 /**
  * Get the block schema for a block type, filtered for sidebar display.
  * Returns filtered schema (without blocks-type fields) or null.
- * Uses the central getBlockSchema which handles object_list items.
+ * For object_list items, uses the cached itemSchema from blockPathMap.
  */
 const getFilteredBlockSchema = (blockType, intl, blockPathMap, blockId, blockData) => {
-  const schema = getBlockSchema(blockType, intl, config.blocks?.blocksConfig, blockPathMap, blockId, blockData);
-  if (!schema) return null;
+  const pathInfo = blockPathMap?.[blockId];
+
+  // For object_list items (like table rows/cells), use itemSchema from blockPathMap
+  if (pathInfo?.isObjectListItem && pathInfo.itemSchema?.fieldsets) {
+    return filterBlocksFields({
+      ...pathInfo.itemSchema,
+      required: pathInfo.itemSchema.required || [],
+    });
+  }
+
+  // Use cached enhanced schema from pathMap (built during buildBlockPathMap)
+  const schema = pathInfo?.resolvedBlockSchema;
+  if (!schema) {
+    console.error(`[getFilteredBlockSchema] No cached resolvedBlockSchema for '${blockId}' (type: ${blockType})`);
+    return null;
+  }
 
   // Filter out blocks-type fields (container fields) for sidebar display
   return filterBlocksFields(schema);
@@ -248,15 +262,15 @@ const ParentBlockSection = ({
   const targetId = isCurrentBlock ? 'sidebar-properties' : `parent-sidebar-${blockId}`;
 
   // Get the Edit component for this block type
-  // Skip Edit component if sidebarSchemaOnly is set (e.g., slateTable's Edit expects specific data structures)
+  // Skip Edit component if disableCustomSidebarEditForm is set (e.g., slateTable's Edit expects specific data structures)
   // For readonly blocks, use the View component instead (like Volto core does)
   // Use shared isBlockReadonly to handle template edit mode correctly
   const blockConfig = config.blocks?.blocksConfig?.[blockType];
-  const useSchemaOnly = blockConfig?.sidebarSchemaOnly;
+  const useSchemaOnly = blockConfig?.disableCustomSidebarEditForm;
   const isReadonly = isBlockReadonly(blockData, templateEditMode);
   const BlockEdit = useSchemaOnly ? null : (isReadonly ? blockConfig?.view : blockConfig?.edit);
 
-  // Get schema for fallback rendering (when no Edit component or sidebarSchemaOnly)
+  // Get schema for fallback rendering (when no Edit component or disableCustomSidebarEditForm)
   const schema = !BlockEdit ? getFilteredBlockSchema(blockType, intl, blockPathMap, blockId, blockData) : null;
 
   // Compute a key suffix that changes when parent's schema inheritance state changes.
@@ -267,7 +281,7 @@ const ParentBlockSection = ({
     const parentBlock = liveBlockDataRef.current[parentId];
     if (!parentBlock) return '';
     const parentConfig = config.blocks?.blocksConfig?.[parentBlock['@type']];
-    const parentTypeField = parentConfig?.schemaEnhancer?.config?.typeField;
+    const parentTypeField = parentConfig?.itemTypeField;
     if (!parentTypeField) return '';
     return `-parent-${parentTypeField}:${parentBlock[parentTypeField] || 'none'}`;
   }, [parentId, liveBlockDataRef?.current?.[parentId]]);
@@ -432,7 +446,7 @@ const ParentBlockSection = ({
       )}
 
       {/* Fallback: If no Edit component but has schema, render BlockDataForm directly */}
-      {!BlockEdit && schema && !pathInfo?.isTemplateInstance && (() => {
+      {!BlockEdit && schema && !isReadonly && !pathInfo?.isTemplateInstance && (() => {
         const formContent = (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
             <BlockDataForm
@@ -449,7 +463,6 @@ const ParentBlockSection = ({
               formData={blockData}
               block={blockId}
               applySchemaEnhancers={true}
-              editable={!isReadonly}
             />
           </HydraSchemaProvider>
         );
@@ -493,6 +506,7 @@ const ParentBlockSection = ({
         // Check if this block is inside the template being edited
         const isBlockInEditedTemplate = templateEditMode &&
           !pathInfo?.isTemplateInstance &&
+          !pathInfo?.isObjectListItem &&
           blockData &&
           blockData.templateId &&
           blockData.templateInstanceId === templateEditMode;

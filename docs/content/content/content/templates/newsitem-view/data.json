@@ -1,0 +1,45 @@
+{
+  "@id": "/templates/newsitem-view",
+  "@type": "Document",
+  "UID": "tpl-ct-newsitem-view",
+  "id": "newsitem-view",
+  "title": "News Item View",
+  "review_state": "published",
+  "description": "Layout template for News Item content type pages",
+  "blocks": {
+    "tpl-ni-date": {
+      "@type": "dateField",
+      "dateField": "effective",
+      "showTime": false,
+      "fixed": true,
+      "templateId": "/templates/newsitem-view",
+      "templateInstanceId": "tpl-ni-def",
+      "placeholder": "date"
+    },
+    "tpl-ni-title": {
+      "@type": "title",
+      "fixed": true,
+      "templateId": "/templates/newsitem-view",
+      "templateInstanceId": "tpl-ni-def",
+      "placeholder": "title"
+    },
+    "tpl-ni-leadimage": {
+      "@type": "leadimage",
+      "fixed": true,
+      "templateId": "/templates/newsitem-view",
+      "templateInstanceId": "tpl-ni-def",
+      "placeholder": "lead-image"
+    },
+    "tpl-ni-content": {
+      "@type": "slate",
+      "templateId": "/templates/newsitem-view",
+      "templateInstanceId": "tpl-ni-def",
+      "placeholder": "content",
+      "plaintext": "",
+      "value": [{ "type": "p", "children": [{ "text": "" }] }]
+    }
+  },
+  "blocks_layout": {
+    "items": ["tpl-ni-date", "tpl-ni-title", "tpl-ni-leadimage", "tpl-ni-content"]
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "@type": "search",
+  "facetsTitle": "Filter by",
+  "facets": [
+    {
+      "@id": "facet-1",
+      "type": "checkboxFacet",
+      "title": "Content Type",
+      "field": "portal_type",
+      "multiple": true,
+      "hidden": false
+    },
+    {
+      "@id": "facet-2",
+      "type": "daterangeFacet",
+      "title": "Date Range",
+      "field": "effective",
+      "hidden": false
+    }
+  ],
+  "listing": {
+    "items": ["listing-1"],
+    "blocks": {
+      "listing-1": {
+        "@type": "listing",
+        "variation": "summary",
+        "querystring": {
+          "query": [
+            {
+              "i": "portal_type",
+              "o": "plone.app.querystring.operation.selection.any",
+              "v": ["Document", "News Item"]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -43,25 +43,11 @@
     <!-- </div> -->
     </main>
     <footer class="bg-white rounded-lg shadow m-4 dark:bg-gray-800">
-        <!-- Dynamic footer_blocks content (sync - templates pre-loaded) -->
-        <div id="footer-content" class="w-full mx-auto max-w-screen-xl p-4">
+        <div id="footer-content" class="w-full mx-auto max-w-screen-xl p-4 text-center text-sm text-gray-500 dark:text-gray-400">
             <template v-if="(data.page?.footer_blocks || footerAllowedLayouts) && shouldRenderBlocks">
                 <Block v-for="item in footerExpandedItems" :key="item['@uid']"
                        :block_uid="item['@uid']" :block="item" :data="data.page" :api-url="apiUrl" />
             </template>
-        </div>
-        <!-- Static footer content -->
-        <div class="w-full mx-auto max-w-screen-xl p-4 md:flex md:items-center md:justify-between">
-        <span class="text-sm text-gray-500 sm:text-center dark:text-gray-400">© 2023 <a href="https://flowbite.com/" class="hover:underline">Flowbite™</a>. All Rights Reserved.
-        </span>
-        <ul class="flex flex-wrap items-center mt-3 text-sm font-medium text-gray-500 dark:text-gray-400 sm:mt-0">
-            <li>
-                <a href="https://github.com/collective/volto-hydra" class="hover:underline me-4 md:me-6">About</a>
-            </li>
-            <li>
-                <a href="https://github.com/collective/volto-hydra" class="hover:underline">Contact</a>
-            </li>
-        </ul>
         </div>
     </footer>   
 </template>
@@ -136,22 +122,6 @@ function groupByStyle(items) {
 // Shared templateState for all expandTemplatesSync calls (page + nested containers)
 const templateState = {};
 
-// Template expansion for main blocks (page-level only, because of style grouping)
-function syncLoadTemplate(templateId) {
-    const tplPath = templateId.startsWith('http')
-        ? new URL(templateId).pathname
-        : `/${templateId.replace(/^\//, '')}`;
-    const url = `${apiUrl}${tplPath}`;
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', url, false);
-    xhr.setRequestHeader('Accept', 'application/json');
-    xhr.send();
-    if (xhr.status === 200) {
-        return JSON.parse(xhr.responseText);
-    }
-    throw new Error(`Sync template load failed: ${templateId} (${xhr.status})`);
-}
-
 const mainExpandedItems = computed(() => {
     const layout = data.value?.page?.blocks_layout?.items || [];
     const blocks = data.value?.page?.blocks || {};
@@ -161,7 +131,6 @@ const mainExpandedItems = computed(() => {
         templateState,
         templates: data.value?.templates || {},
         allowedLayouts: mainBlocksAllowedLayouts.value,
-        loadTemplate: syncLoadTemplate,
     });
 });
 
@@ -170,15 +139,23 @@ const mainStyleGroups = computed(() => groupByStyle(mainExpandedItems.value));
 const footerExpandedItems = computed(() => {
     const layout = data.value?.page?.footer_blocks?.items || [];
     const blocks = data.value?.page?.blocks || {};
-    if (!layout.length) return [];
+    // Don't early-return on empty layout — allowedLayouts forces a template
+    // even when the page has no footer_blocks content yet.
+    if (!layout.length && !footerAllowedLayouts.value) return [];
     return expandTemplatesSync(layout, {
         blocks,
         templateState,
         templates: data.value?.templates || {},
         allowedLayouts: footerAllowedLayouts.value,
-        loadTemplate: syncLoadTemplate,
     });
 });
+
+// Content-type-specific layout templates (enforced in edit mode via initBridge allowedLayouts).
+// Document is the default case — no entry needed.
+const CONTENT_TYPE_LAYOUTS = {
+    'Event': ['/templates/event-view'],
+    'News Item': ['/templates/newsitem-view'],
+};
 
 // Initialize Flowbite components based on data attribute selectors.
 // Safe to call initFlowbite() (which includes initCarousels) because block.vue
@@ -218,10 +195,78 @@ onMounted(() => {
                         },
                     },
                 },
+                eventMetadata: {
+                    id: 'eventMetadata',
+                    title: 'Event Metadata',
+                    group: 'common',
+                    restricted: true,  // Not in add-block picker — part of event layout template
+                    blockSchema: {
+                        fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+                        properties: {},
+                    },
+                },
+                dateField: {
+                    id: 'dateField',
+                    title: 'Date',
+                    group: 'common',
+                    restricted: true,  // Not in add-block picker — added via content-type templates
+                    blockSchema: {
+                        fieldsets: [{ id: 'default', title: 'Default', fields: ['dateField', 'showTime'] }],
+                        properties: {
+                            dateField: {
+                                title: 'Date field',
+                                type: 'string',
+                                widget: 'select',
+                                choices: [
+                                    ['effective', 'Publication date'],
+                                    ['expires', 'Expiration date'],
+                                    ['created', 'Creation date'],
+                                    ['modified', 'Last modified date'],
+                                    ['start', 'Event start'],
+                                    ['end', 'Event end'],
+                                ],
+                            },
+                            showTime: {
+                                title: 'Show time',
+                                type: 'boolean',
+                            },
+                        },
+                    },
+                },
+                socialLinks: {
+                    restricted: true,  // Only used in footer template
+                    blockSchema: {
+                        properties: {
+                            links: {
+                                title: 'Links',
+                                widget: 'object_list',
+                                schema: {
+                                    properties: {
+                                        url: {
+                                            title: 'URL',
+                                            widget: 'url',
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
                 ...sharedBlocksConfig,
             };
-            // Page-level blocks (column is only allowed inside columns, not at page level)
-            const pageLevelBlocks = Object.keys(newBlocks).filter(k => k !== 'column');
+            // Content-type-aware page-level blocks:
+            // - Always exclude 'column' (only inside columns block)
+            // - Restricted blocks are excluded unless they match the current content type
+            const pageType = data.value?.page?.['@type'];
+            const pageLevelBlocks = Object.keys(newBlocks).filter(k => {
+                if (k === 'column') return false;
+                if (newBlocks[k]?.restricted) {
+                    if (k === 'eventMetadata') return pageType === 'Event';
+                    if (k === 'dateField') return pageType === 'News Item';
+                    return false;
+                }
+                return true;
+            });
             const bridge = initBridge({
                 debug: new URLSearchParams(window.location.search).has('_hydra_debug'),
                 page: {
@@ -231,12 +276,14 @@ onMounted(() => {
                                 title: 'Blocks',
                                 allowedBlocks: [...new Set(['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', ...pageLevelBlocks])],
                                 allowedTemplates: ['/_test_data/templates/test-layout'],
-                                allowedLayouts: [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
+                                allowedLayouts: CONTENT_TYPE_LAYOUTS[pageType] || [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
                             },
                             footer_blocks: {
                                 title: 'Footer',
-                                allowedBlocks: ['slate', 'image'],
-                                allowedLayouts: route.path === '/_test_data/another-page' ? ['/_test_data/templates/footer-layout'] : null,
+                                allowedBlocks: ['slate', 'image', 'socialLinks'],
+                                allowedLayouts: route.path === '/_test_data/another-page'
+                                    ? ['/_test_data/templates/footer-layout']
+                                    : ['/templates/site-footer'],
                             },
                         },
                     },
@@ -260,19 +307,32 @@ onMounted(() => {
 
 // Determine footer allowedLayouts based on path (same as mock frontend)
 const footerAllowedLayouts = computed(() => {
-    // Use startsWith to handle trailing slashes and normalize
     const normalizedPath = route.path.replace(/\/$/, '');
-    return normalizedPath === '/_test_data/another-page' ? ['/_test_data/templates/footer-layout'] : null;
+    // Test page uses its own test footer layout
+    if (normalizedPath === '/_test_data/another-page') {
+        return ['/_test_data/templates/footer-layout'];
+    }
+    // All other pages get the site footer
+    return ['/templates/site-footer'];
 });
 
-// Main blocks allowedLayouts (same as bridge config)
+// Main blocks allowedLayouts for expandTemplatesSync (view mode / SSR)
+// Content-type pages use null — their blocks_layout already contains the right blocks.
+// The CONTENT_TYPE_LAYOUTS templates are enforced in edit mode via initBridge only.
 const mainBlocksAllowedLayouts = computed(() => {
+    const pageType = data.value?.page?.['@type'];
+    if (CONTENT_TYPE_LAYOUTS[pageType]) {
+        return null;  // Use page's own blocks_layout directly
+    }
     return [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'];
 });
 
 // Templates to eagerly pre-load (forced layouts that won't appear in page data)
 const preloadTemplates = [
+    '/templates/site-footer',
     ...(footerAllowedLayouts.value || []).filter(Boolean),
+    // Content-type forced layouts (not referenced in page data but applied by expandTemplatesSync)
+    ...Object.values(CONTENT_TYPE_LAYOUTS).flat(),
 ];
 
 var path = [];

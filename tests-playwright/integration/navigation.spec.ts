@@ -36,7 +36,7 @@ test.describe('Navigation and URL Handling', () => {
   for (const format of hashFormats) {
     test(`Hash-based frontend routing works with ${format.name} format`, async ({ page }, testInfo) => {
       // Skip on Nuxt - this test uses the mock frontend which supports hash URLs
-      test.skip(testInfo.project.name === 'nuxt', 'Mock frontend test only');
+      test.skip(testInfo.project.name.includes('nuxt'), 'Mock frontend test only');
 
       const helper = new AdminUIHelper(page);
 
@@ -340,7 +340,7 @@ test.describe('Navigation and URL Handling', () => {
 
   test('Iframe does not double-load when clicking nav link', async ({ page }, testInfo) => {
     // Skip on Nuxt - this test uses mock frontend's load counter
-    test.skip(testInfo.project.name === 'nuxt', 'Mock frontend test only');
+    test.skip(testInfo.project.name.includes('nuxt'), 'Mock frontend test only');
 
     const helper = new AdminUIHelper(page);
 
@@ -375,7 +375,7 @@ test.describe('Navigation and URL Handling', () => {
 
   test('Changing frontend URL in preferences reloads iframe', async ({ page }, testInfo) => {
     // Skip on Nuxt - this test changes frontend URL which would conflict
-    test.skip(testInfo.project.name === 'nuxt', 'Mock frontend test only');
+    test.skip(testInfo.project.name.includes('nuxt'), 'Mock frontend test only');
 
     const helper = new AdminUIHelper(page);
 
