@@ -148,14 +148,14 @@
         },
         "box-enterprise": {
           "@type": "slate",
-          "plaintext": "Enterprise Ready. Versioning, i18n, workflow, automated content rules, and design governance built in.",
+          "plaintext": "Truly Decoupled. Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience.",
           "value": [
             {
               "children": [
                 {
                   "children": [
                     {
-                      "text": "Enterprise Ready"
+                      "text": "Truly Decoupled"
                     }
                   ],
                   "type": "strong"
@@ -166,7 +166,7 @@
             {
               "children": [
                 {
-                  "text": "Versioning, i18n, workflow, automated content rules, and design governance built in."
+                  "text": "Your frontend is independent code you own. Upgrade the CMS without rewriting your site; switch frameworks and get the same editing experience."
                 }
               ],
               "type": "p"
