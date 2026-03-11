@@ -776,8 +776,8 @@ export class Bridge {
         .map(([id]) => id);
       // Sort by DOM order
       cellsInAdjRow.sort((a, b) => {
-        const elA = document.querySelector(`[data-block-uid="${a}"]`);
-        const elB = document.querySelector(`[data-block-uid="${b}"]`);
+        const elA = this.queryBlockElement(a);
+        const elB = this.queryBlockElement(b);
         if (!elA || !elB) return 0;
         return elA.compareDocumentPosition(elB) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
       });
@@ -804,8 +804,8 @@ export class Bridge {
       .filter(([, info]) => info.parentId === parentId)
       .map(([id]) => id);
     siblings.sort((a, b) => {
-      const elA = document.querySelector(`[data-block-uid="${a}"]`);
-      const elB = document.querySelector(`[data-block-uid="${b}"]`);
+      const elA = this.queryBlockElement(a);
+      const elB = this.queryBlockElement(b);
       if (!elA || !elB) return 0;
       return elA.compareDocumentPosition(elB) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
     });
@@ -901,7 +901,7 @@ export class Bridge {
     let adjacentId = this._resolveNavigationTarget(blockUid, direction, isTableVertical);
     if (!adjacentId) return;
 
-    const adjacentElement = document.querySelector(`[data-block-uid="${adjacentId}"]`);
+    const adjacentElement = this.queryBlockElement(adjacentId);
     if (!adjacentElement) return;
 
     log('handleArrowAtEdge: navigating from', blockUid, 'to', adjacentId, 'direction:', direction);
@@ -914,7 +914,7 @@ export class Bridge {
     // Focus the appropriate field and place cursor after DOM settles
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const currentElement = document.querySelector(`[data-block-uid="${adjacentId}"]`);
+        const currentElement = this.queryBlockElement(adjacentId);
         if (!currentElement) return;
         let targetField;
         if (direction === 'backward') {
@@ -986,7 +986,7 @@ export class Bridge {
       }
 
       // Verify the target has a DOM element
-      if (document.querySelector(`[data-block-uid="${adjacentId}"]`)) {
+      if (this.queryBlockElement(adjacentId)) {
         return adjacentId;
       }
       return null;
@@ -1768,7 +1768,7 @@ export class Bridge {
                 const MAX_RETRIES = 40; // ~2 seconds at 50ms interval
 
                 const waitForStable = (retries = MAX_RETRIES) => {
-                  const element = document.querySelector(`[data-block-uid="${blockUidToSelect}"]`);
+                  const element = this.queryBlockElement(blockUidToSelect);
                   if (!element) {
                     if (retries > 0) {
                       setTimeout(() => waitForStable(retries - 1), 50);
@@ -1838,7 +1838,7 @@ export class Bridge {
               // Only update toolbar if field actually changed
               if (previousFieldName !== editableField) {
                 log('Field changed from', previousFieldName, 'to', editableField, '- updating toolbar');
-                const blockEl = document.querySelector(`[data-block-uid="${blockUid}"]`);
+                const blockEl = this.queryBlockElement(blockUid);
                 if (blockEl) {
                   this.sendBlockSelected('fieldFocusListener', blockEl, { focusedFieldName: editableField });
                 }
@@ -2011,7 +2011,7 @@ export class Bridge {
           const { blockId, fieldName } = event.data;
           log('Received FOCUS_FIELD:', blockId, fieldName);
 
-          const blockElement = document.querySelector(`[data-block-uid="${blockId}"]`);
+          const blockElement = this.queryBlockElement(blockId);
           if (blockElement) {
             // Find the specific field by data-field-id attribute
             const field = blockElement.querySelector(`[data-field-id="${fieldName}"][contenteditable="true"]`);
@@ -2042,7 +2042,7 @@ export class Bridge {
 
           // Refresh contenteditable on the currently selected block
           if (this.selectedBlockUid) {
-            const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+            const blockElement = this.queryBlockElement(this.selectedBlockUid);
             if (blockElement) {
               this.restoreContentEditableOnFields(blockElement, 'TEMPLATE_EDIT_MODE');
             }
@@ -2064,7 +2064,7 @@ export class Bridge {
    * @param {string} blockUid - The UID of the block to detect field for.
    */
   detectFocusedFieldAndUpdateToolbar(blockUid) {
-    const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
+    const blockElement = this.queryBlockElement(blockUid);
     if (!blockElement) {
       log('Block element not found for field detection:', blockUid);
       return;
@@ -2102,7 +2102,7 @@ export class Bridge {
       this.focusedFieldName = fieldToFocus;
 
       // Send BLOCK_SELECTED message to update toolbar visibility
-      const blockElement = document.querySelector(`[data-block-uid="${blockUid}"]`);
+      const blockElement = this.queryBlockElement(blockUid);
       if (blockElement) {
         this.sendBlockSelected('detectFieldChange', blockElement, { focusedFieldName: fieldToFocus });
       }
@@ -2360,7 +2360,7 @@ export class Bridge {
             this.selectBlock(parentId);
           } else {
             // Select the parent block
-            const parentElement = document.querySelector(`[data-block-uid="${parentId}"]`);
+            const parentElement = this.queryBlockElement(parentId);
             if (parentElement) {
               this.selectBlock(parentElement, 'escapeKey');
             }
@@ -2514,7 +2514,7 @@ export class Bridge {
       this._ensureDocumentKeyboardBlocker();
 
       // Visual feedback on current element
-      const block = document.querySelector(`[data-block-uid="${blockId}"]`);
+      const block = this.queryBlockElement(blockId);
       const editableField = block ? this.getOwnFirstEditableField(block) : null;
       if (editableField) {
         editableField.style.cursor = 'wait';
@@ -2532,7 +2532,7 @@ export class Bridge {
       this.blockedBlockId = null;
 
       // Restore visual feedback on current element (may be new after re-render)
-      const block = document.querySelector(`[data-block-uid="${blockId}"]`);
+      const block = this.queryBlockElement(blockId);
       const editableField = block ? this.getOwnFirstEditableField(block) : null;
       if (editableField) {
         editableField.style.cursor = 'text';
@@ -2612,7 +2612,7 @@ export class Bridge {
     log('Replaying', buffer.length, 'buffered events, retry:', retryCount);
 
     // Re-query editable field in case DOM was re-rendered
-    const currentBlock = document.querySelector(`[data-block-uid="${blockId}"]`);
+    const currentBlock = this.queryBlockElement(blockId);
     const currentEditable = currentBlock ? this.getOwnFirstEditableField(currentBlock) : null;
     if (!currentEditable) {
       // Retry a few times with RAF to wait for Vue/Nuxt re-render
@@ -2898,7 +2898,7 @@ export class Bridge {
    * @param {string} blockId - Block UID that timed out
    */
   handleTransformTimeout(blockId) {
-    const block = document.querySelector(`[data-block-uid="${blockId}"]`);
+    const block = this.queryBlockElement(blockId);
     const editableField = block ? this.getOwnFirstEditableField(block) : null;
 
     if (editableField) {
@@ -4542,7 +4542,7 @@ export class Bridge {
 
         // Re-attach observers/editors for the currently selected block
         if (this.selectedBlockUid) {
-          const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+          const blockElement = this.queryBlockElement(this.selectedBlockUid);
           if (blockElement) {
             // NOTE: observeBlockTextChanges is NOT called here — it's deferred
             // to the very end of afterContentRender, after restoreSlateSelection
@@ -4631,14 +4631,14 @@ export class Bridge {
           : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
 
         if (blockUidToProcess) {
-          let blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+          let blockElement = this.queryBlockElement(blockUidToProcess);
 
           if (blockElement && this.isElementHidden(blockElement)) {
             if (this._blockSelectorNavigating || this._navigatingToBlock) {
               log('afterContentRender: block hidden, waiting for animation:', blockUidToProcess);
               for (let i = 0; i < 30; i++) {
                 await new Promise((resolve) => setTimeout(resolve, 50));
-                blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+                blockElement = this.queryBlockElement(blockUidToProcess);
                 if (blockElement && !this.isElementHidden(blockElement)) {
                   log('afterContentRender: block now visible after animation');
                   break;
@@ -4650,7 +4650,7 @@ export class Bridge {
               if (madeVisible) {
                 for (let i = 0; i < 10; i++) {
                   await new Promise((resolve) => setTimeout(resolve, 50));
-                  blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+                  blockElement = this.queryBlockElement(blockUidToProcess);
                   if (blockElement && !this.isElementHidden(blockElement)) {
                     log('afterContentRender: block now visible');
                     break;
@@ -4660,12 +4660,12 @@ export class Bridge {
             }
           }
 
-          blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+          blockElement = this.queryBlockElement(blockUidToProcess);
 
           if (!blockElement && needsBlockSwitch) {
             for (let retry = 0; retry < 10 && !blockElement; retry++) {
               await new Promise(r => setTimeout(r, 100));
-              blockElement = document.querySelector(`[data-block-uid="${blockUidToProcess}"]`);
+              blockElement = this.queryBlockElement(blockUidToProcess);
               log('afterContentRender: retry', retry + 1, 'finding block', blockUidToProcess, 'found:', !!blockElement);
             }
           }
@@ -4685,7 +4685,7 @@ export class Bridge {
         // restoreSlateSelection to anchor on nodes that get replaced, destroying
         // the selection.
         if (this.selectedBlockUid && this.formData) {
-          const contentBlock = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+          const contentBlock = this.queryBlockElement(this.selectedBlockUid);
           if (contentBlock) {
             await this.waitForContentReady(contentBlock);
           }
@@ -4783,7 +4783,7 @@ export class Bridge {
         // ZWS creation from restoreSlateSelection or late Vue render passes,
         // and handleTextChange reads mid-render DOM, corrupting this.formData.
         if (this.selectedBlockUid) {
-          const currentBlockEl = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+          const currentBlockEl = this.queryBlockElement(this.selectedBlockUid);
           if (currentBlockEl) {
             this.observeBlockTextChanges(currentBlockEl);
           }
@@ -5308,7 +5308,7 @@ export class Bridge {
     // Use double requestAnimationFrame to wait for ALL DOM updates including rendering editable fields
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const currentBlockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+        const currentBlockElement = this.queryBlockElement(this.selectedBlockUid);
         log('selectBlock focus handler:', { blockUid: this.selectedBlockUid, found: !!currentBlockElement });
 
         if (currentBlockElement) {
@@ -5427,7 +5427,7 @@ export class Bridge {
 
     // Helper to get fresh child blocks (DOM may re-render)
     const getFreshChildBlocks = () => {
-      const container = document.querySelector(`[data-block-uid="${containerUid}"]`);
+      const container = this.queryBlockElement(containerUid);
       if (!container) return [];
       const allNested = container.querySelectorAll('[data-block-uid]');
       return Array.from(allNested).filter((el) => {
@@ -5504,7 +5504,7 @@ export class Bridge {
     // Check if target block is visible (centered within container bounds)
     // Also returns position for stability tracking
     const getTargetVisibility = (container) => {
-      const targetEl = document.querySelector(`[data-block-uid="${targetUid}"]`);
+      const targetEl = this.queryBlockElement(targetUid);
       if (!targetEl || !container) return { visible: false, x: null };
 
       const containerRect = container.getBoundingClientRect();
@@ -5525,7 +5525,7 @@ export class Bridge {
     // Snapshot which blocks are currently visible before the animation starts.
     // We won't accept any target position as stable until this set changes,
     // proving the carousel animation has actually begun.
-    const containerForSnapshot = document.querySelector(`[data-block-uid="${containerUid}"]`);
+    const containerForSnapshot = this.queryBlockElement(containerUid);
     const containerRectSnapshot = containerForSnapshot?.getBoundingClientRect();
     const initialVisibleUids = new Set();
     if (containerRectSnapshot) {
@@ -5552,7 +5552,7 @@ export class Bridge {
         return;
       }
 
-      const container = document.querySelector(`[data-block-uid="${containerUid}"]`);
+      const container = this.queryBlockElement(containerUid);
       const freshChildBlocks = getFreshChildBlocks();
 
       const { visible, x } = getTargetVisibility(container);
@@ -5598,7 +5598,7 @@ export class Bridge {
           log('handleBlockSelector: target visible and position stable, selecting', targetUid);
           // Keep _blockSelectorNavigating true - selectBlock will clear it after 1500ms
           // sendBlockSelected allows initial selection sources through while suppressing position tracking
-          const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
+          const targetElement = this.queryBlockElement(targetUid);
           if (targetElement) {
             this.selectBlock(targetElement);
           }
@@ -5659,7 +5659,7 @@ export class Bridge {
     log('handleBlockSelector fallback: targetUid =', targetUid);
 
     if (targetUid) {
-      const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
+      const targetElement = this.queryBlockElement(targetUid);
       if (targetElement) {
         this.selectBlock(targetElement);
       }
@@ -5674,7 +5674,7 @@ export class Bridge {
     const STABLE_THRESHOLD = 3;
     const POSITION_TOLERANCE = 2;
 
-    const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
+    const targetElement = this.queryBlockElement(targetUid);
     if (targetElement && !this.isElementHidden(targetElement)) {
       const rect = targetElement.getBoundingClientRect();
       const x = rect.left;
@@ -6853,7 +6853,7 @@ export class Bridge {
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
                 // Re-query the block element to ensure we get the updated DOM element
-                const currentBlockElement = document.querySelector(`[data-block-uid="${uid}"]`);
+                const currentBlockElement = this.queryBlockElement(uid);
                 if (currentBlockElement) {
                   // Find the first contenteditable field that belongs to THIS block
                   // (not a nested block's field) to avoid ping-pong selection issues
@@ -7590,7 +7590,7 @@ export class Bridge {
       // If a transform or re-render is pending, wait for the actual DOM
       // mutation before proceeding with selection restore and buffer replay.
       const blockId = this.selectedBlockUid;
-      const blockEl = blockId && document.querySelector(`[data-block-uid="${blockId}"]`);
+      const blockEl = blockId && this.queryBlockElement(blockId);
       if (blockEl && !afterRenderOptions.skipRender && (this.pendingTransform || this._reRenderBlocking)) {
         this._waitForDomMutation(blockEl, afterRender);
       } else {
@@ -7657,6 +7657,25 @@ export class Bridge {
   }
 
   /**
+   * Find the visible DOM element for a block uid.
+   * When multiple elements share the same data-block-uid (e.g. listing items
+   * expanded into carousel slides), querySelector returns the first which may
+   * be hidden.  This method returns the first *visible* match, falling back
+   * to the first match if none are visible.
+   * @param {string} uid - The block uid to search for
+   * @returns {HTMLElement|null}
+   */
+  queryBlockElement(uid) {
+    const all = document.querySelectorAll(`[data-block-uid="${uid}"]`);
+    if (all.length === 0) return null;
+    if (all.length === 1) return all[0];
+    for (const el of all) {
+      if (!this.isElementHidden(el)) return el;
+    }
+    return all[0];
+  }
+
+  /**
    * Tries to make a block visible by clicking data-block-selector elements.
    * First looks for a direct selector (data-block-selector="{uid}"),
    * then tries +1/-1 navigation to reach the target block.
@@ -7681,7 +7700,7 @@ export class Bridge {
     log(`tryMakeBlockVisible: no direct selector, trying +1/-1 navigation`);
 
     // Find the target element first (may exist but be hidden)
-    const targetElement = document.querySelector(`[data-block-uid="${targetUid}"]`);
+    const targetElement = this.queryBlockElement(targetUid);
     if (!targetElement) {
       log(`tryMakeBlockVisible: target element not in DOM`);
       return false;
@@ -7783,7 +7802,7 @@ export class Bridge {
       const elapsed = performance.now() - startTime;
 
       // Re-query element each time - DOM may re-render and replace elements
-      const currentNextBlock = document.querySelector(`[data-block-uid="${nextUid}"]`);
+      const currentNextBlock = this.queryBlockElement(nextUid);
 
       // Debug: log element state every 500ms
       if (elapsed > 0 && Math.floor(elapsed / 500) !== Math.floor((elapsed - 16) / 500)) {
@@ -8000,7 +8019,7 @@ export class Bridge {
     try {
       // Scope to current block to avoid selecting wrong element when multiple blocks visible
       const blockElement = this.selectedBlockUid
-        ? document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`)
+        ? this.queryBlockElement(this.selectedBlockUid)
         : document;
       const startNode = blockElement?.querySelector(`[data-node-id="${savedCursor.startNodeId}"]`);
       const endNode = blockElement?.querySelector(`[data-node-id="${savedCursor.endNodeId}"]`);
@@ -8069,7 +8088,7 @@ export class Bridge {
       const fieldValue = fieldData?.[resolved.fieldName];
 
       // Find the block element for locating editable fields
-      const blockElement = document.querySelector(`[data-block-uid="${this.selectedBlockUid}"]`);
+      const blockElement = this.queryBlockElement(this.selectedBlockUid);
       if (!blockElement) {
         log('restoreSlateSelection failed: block element not in DOM', this.selectedBlockUid);
         return false;

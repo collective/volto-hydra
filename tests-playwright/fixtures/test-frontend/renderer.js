@@ -194,7 +194,7 @@ async function renderBlock(blockId, block) {
         case 'slider':
             // Slider uses object_list format (slides as array with @id)
             wrapper.classList.add('carousel-block');
-            wrapper.innerHTML = renderSliderBlock(block, blockId);
+            wrapper.innerHTML = await renderSliderBlock(block, blockId);
             break;
         case 'slide':
             wrapper.innerHTML = renderSlideBlock(block);
@@ -1174,7 +1174,8 @@ async function renderListingBlock(block, blockId) {
     const blocks = { [blockId]: block };
     const layout = [blockId];
 
-    const { items: expandedItems, paging } = await window._expandListingBlocks(blocks, layout, blockId);
+    const PAGE_SIZE = 6;
+    const { items: expandedItems, paging } = await window._expandListingBlocks(blocks, layout, blockId, { start: 0, size: PAGE_SIZE });
     const showPaging = paging?.totalPages > 1 ? paging : null;
 
     for (const childBlock of expandedItems) {
@@ -1334,23 +1335,37 @@ function renderCarouselBlock(block) {
  * @param {string} blockId - Block UID for state tracking
  * @returns {string} HTML string
  */
-function renderSliderBlock(block, blockId) {
+async function renderSliderBlock(block, blockId) {
     // Expand slides through template system (handles templateInstanceId, fixed, etc.)
     const rawSlides = block.slides || [];
     const slides = window._expandTemplatesSync
         ? window._expandTemplatesSync(rawSlides, { templateState: window._templateState || {}, templates: {}, idField: '@id' })
         : rawSlides;
+
+    // Convert object_list items to blocks dict + layout for expandItems
+    const blocksDict = {};
+    const layout = [];
+    for (const slide of slides) {
+        const slideId = slide['@id'];
+        if (!slideId) continue;
+        blocksDict[slideId] = slide;
+        layout.push(slideId);
+    }
+
+    // Expand listing blocks into individual items
+    const { items: expandedItems } = await expandItems(blocksDict, layout, blockId);
+
     const prevCount = sliderSlideCount[blockId] || 0;
-    const newCount = slides.length;
+    const newCount = expandedItems.length;
 
     // Detect if a new slide was added - show it instead of first slide
     let activeIndex = 0;
     if (newCount > prevCount && prevCount > 0) {
-        activeIndex = newCount - 1; // New slide is at the end
+        activeIndex = newCount - 1;
     }
     sliderSlideCount[blockId] = newCount;
 
-    const activeSlideId = slides[activeIndex]?.['@id'] || null;
+    const activeSlideId = expandedItems[activeIndex]?.['@uid'] || null;
 
     let html = '<div class="carousel-container" style="position: relative; padding: 20px; background: #f5f5f5; border-radius: 8px; min-height: 120px;">';
 
@@ -1360,17 +1375,28 @@ function renderSliderBlock(block, blockId) {
     // Slides container - only ONE slide visible at a time
     html += '<div class="slides-wrapper" style="position: relative; margin: 0 50px; min-height: 80px;">';
 
-    slides.forEach((slide, index) => {
-        const slideId = slide['@id'];
-        if (!slideId) return;
+    expandedItems.forEach((item, index) => {
+        const itemId = item['@uid'];
+        if (!itemId) return;
 
-        // Only first slide is visible, others are hidden
-        const isActive = slideId === activeSlideId;
+        const isActive = index === activeIndex;
         const displayStyle = isActive ? 'block' : 'none';
 
-        // Render slide as nested block - hidden slides still have data-block-uid
-        html += `<div data-block-uid="${slideId}" data-block-add="right" class="slide ${isActive ? 'active' : ''}" style="display: ${displayStyle}; padding: 15px; background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">`;
-        html += renderSlideBlock(slide);
+        html += `<div data-block-uid="${itemId}" data-block-add="right" class="slide ${isActive ? 'active' : ''}" style="display: ${displayStyle}; padding: 15px; background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">`;
+
+        // Render based on item type
+        switch (item['@type']) {
+            case 'image':
+                html += renderImageBlock(item);
+                break;
+            case 'teaser':
+                html += renderTeaserBlock(item, null);
+                break;
+            default:
+                html += renderSlideBlock(item);
+                break;
+        }
+
         html += '</div>';
     });
 
@@ -1381,16 +1407,16 @@ function renderSliderBlock(block, blockId) {
 
     // Direct selector buttons for each slide (like dot indicators)
     // Only show dots for first half of slides to test both direct selector and +1/-1 fallback
-    const halfLength = Math.ceil(slides.length / 2);
+    const halfLength = Math.ceil(expandedItems.length / 2);
     html += '<div class="slide-indicators" style="text-align: center; margin-top: 10px;">';
-    slides.forEach((slide, index) => {
-        const slideId = slide['@id'];
+    expandedItems.forEach((item, index) => {
+        const itemId = item['@uid'];
         if (index < halfLength) {
             // First half: show direct selector dot
-            html += `<button data-block-selector="${slideId}" class="slide-dot" style="width: 12px; height: 12px; border-radius: 50%; margin: 0 4px; cursor: pointer; border: 1px solid #999; background: ${slideId === activeSlideId ? '#333' : '#fff'};">${index + 1}</button>`;
+            html += `<button data-block-selector="${itemId}" class="slide-dot" style="width: 12px; height: 12px; border-radius: 50%; margin: 0 4px; cursor: pointer; border: 1px solid #999; background: ${index === activeIndex ? '#333' : '#fff'};">${index + 1}</button>`;
         } else {
             // Second half: no direct selector, must use +1/-1 navigation
-            html += `<span class="slide-dot no-selector" style="width: 12px; height: 12px; border-radius: 50%; margin: 0 4px; display: inline-block; border: 1px solid #ccc; background: ${slideId === activeSlideId ? '#333' : '#eee'};">${index + 1}</span>`;
+            html += `<span class="slide-dot no-selector" style="width: 12px; height: 12px; border-radius: 50%; margin: 0 4px; display: inline-block; border: 1px solid #ccc; background: ${index === activeIndex ? '#333' : '#eee'};">${index + 1}</span>`;
         }
     });
     html += '</div>';
@@ -1700,7 +1726,8 @@ async function renderSearchBlock(block, blockId) {
     // Expand listing blocks if we have the helper
     // expandListingBlocks returns { items, paging } where each item has @uid
     if (window._expandListingBlocks && listingLayout.length > 0) {
-        const result = await window._expandListingBlocks(blocks, listingLayout, `${blockId}-listing`);
+        const PAGE_SIZE = 6;
+        const result = await window._expandListingBlocks(blocks, listingLayout, `${blockId}-listing`, { start: 0, size: PAGE_SIZE });
         const expandedItems = result.items;
 
         for (const childBlock of expandedItems) {

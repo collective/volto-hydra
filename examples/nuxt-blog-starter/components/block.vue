@@ -175,40 +175,61 @@
     <div class="relative w-full">
       <!-- Carousel wrapper -->
       <div class="relative h-56 overflow-hidden rounded-lg md:h-96">
-        <div v-for="(slide, index) in expand(block.slides, null, '@id')" :key="slide['@uid']" :data-block-uid="slide['@uid']"
-          class="slide duration-700 ease-linear bg-center items-center absolute inset-0"
-          :class="[
-            { 'bg-gray-700': !slide.preview_image, 'bg-blend-multiply': !slide.preview_image, 'bg-no-repeat': !slide.preview_image, 'bg-cover': slide.preview_image }
-          ]"
-          :data-carousel-item="index === activeSlideIndex ? 'active' : ''"
-          :style="slide.preview_image ? imageProps(slide, true).class : ''"
-          data-block-add="right">
-          <!-- Clickable overlay for preview_image editing -->
-          <div data-edit-media="preview_image" class="absolute inset-0 cursor-pointer" style="z-index: 1;"></div>
-          <div
-            class="max-w-sm p-6 bg-slate-200/90 border border-gray-200 m-12 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 absolute"
-            :class="{ 'right-0': slide.flagAlign == 'right' }" style="z-index: 2;">
-            <div data-edit-text="head_title">{{ slide.head_title }}</div>
-            <h5 :id="`heading-${slide['@uid']}`"
-              class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-edit-text="title">
-              {{ slide.title }}</h5>
-            <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-edit-text="description">
-              {{ slide.description }}</p>
-            <NuxtLink v-if="slide.href" :to="getUrl(slide.href[0])" data-edit-text="buttonText" data-edit-link="href"
-              class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-              :aria-describedby="`heading-${slide['@uid']}`">
-              {{ slide.buttonText || 'Read More' }}</NuxtLink>
-            <a v-else href="#" data-edit-text="buttonText" data-edit-link="href"
-              class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-              :aria-describedby="`heading-${slide['@uid']}`">
-              {{ slide.buttonText || 'Read More' }}</a>
+        <template v-for="(entry, entryIdx) in sliderChildren" :key="entry.slide['@uid']">
+          <!-- Listing child: async expand, each result becomes a slide -->
+          <Suspense v-if="entry.isListing">
+            <ListingBlock :id="entry.slide['@uid']" :block="entry.slide"
+              :api-url="effectiveApiUrl" :context-path="effectiveContextPath">
+              <template #default="{ items }">
+                <template v-for="item in items" :key="item['@uid']">
+                  <template v-if="item.readOnly"><!-- hydra block-readonly --></template>
+                  <div class="slide duration-700 ease-linear bg-center items-center absolute inset-0"
+                    data-carousel-item data-block-add="right">
+                    <Block :block_uid="item['@uid']" :block="item" :data="data" :contained="true" />
+                  </div>
+                </template>
+              </template>
+            </ListingBlock>
+            <template #fallback>
+              <div class="slide absolute inset-0 animate-pulse bg-gray-200 dark:bg-gray-700" data-carousel-item></div>
+            </template>
+          </Suspense>
+          <!-- Static slide -->
+          <div v-else :data-block-uid="entry.slide['@uid']"
+            class="slide duration-700 ease-linear bg-center items-center absolute inset-0"
+            :class="[
+              { 'bg-gray-700': !entry.slide.preview_image, 'bg-blend-multiply': !entry.slide.preview_image, 'bg-no-repeat': !entry.slide.preview_image, 'bg-cover': entry.slide.preview_image }
+            ]"
+            :data-carousel-item="entryIdx === activeSlideIndex ? 'active' : ''"
+            :style="entry.slide.preview_image ? imageProps(entry.slide, true).class : ''"
+            data-block-add="right">
+            <!-- Clickable overlay for preview_image editing -->
+            <div data-edit-media="preview_image" class="absolute inset-0 cursor-pointer" style="z-index: 1;"></div>
+            <div
+              class="max-w-sm p-6 bg-slate-200/90 border border-gray-200 m-12 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 absolute"
+              :class="{ 'right-0': entry.slide.flagAlign == 'right' }" style="z-index: 2;">
+              <div data-edit-text="head_title">{{ entry.slide.head_title }}</div>
+              <h5 :id="`heading-${entry.slide['@uid']}`"
+                class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white" data-edit-text="title">
+                {{ entry.slide.title }}</h5>
+              <p class="mb-3 font-normal text-gray-700 dark:text-gray-400" data-edit-text="description">
+                {{ entry.slide.description }}</p>
+              <NuxtLink v-if="entry.slide.href" :to="getUrl(entry.slide.href[0])" data-edit-text="buttonText" data-edit-link="href"
+                class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+                :aria-describedby="`heading-${entry.slide['@uid']}`">
+                {{ entry.slide.buttonText || 'Read More' }}</NuxtLink>
+              <a v-else href="#" data-edit-text="buttonText" data-edit-link="href"
+                class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+                :aria-describedby="`heading-${entry.slide['@uid']}`">
+                {{ entry.slide.buttonText || 'Read More' }}</a>
+            </div>
           </div>
-        </div>
+        </template>
       </div>
       <!-- Slider indicators -->
       <div class="absolute z-30 flex -translate-x-1/2 bottom-5 left-1/2 space-x-3 rtl:space-x-reverse">
-        <button v-for="(slide, index) in expand(block.slides, null, '@id')" :key="slide['@uid']" type="button" class="w-3 h-3 rounded-full" aria-current="true"
-          :aria-label="`Slide ${index + 1}`" :data-carousel-slide-to="index" :data-block-selector="slide['@uid']"></button>
+        <button v-for="(entry, index) in sliderChildren" :key="entry.slide['@uid']" type="button" class="w-3 h-3 rounded-full" aria-current="true"
+          :aria-label="`Slide ${index + 1}`" :data-carousel-slide-to="index" :data-block-selector="entry.slide['@uid']"></button>
       </div>
       <!-- Slider controls -->
       <button type="button"
@@ -942,6 +963,17 @@ const gridChildren = computed(() => {
     seen = result.paging.seen;
     return { id, block: child, isListing: false, items: result.items };
   }).filter(Boolean);
+});
+
+// Slider: expand templates and detect listing blocks among slides
+const sliderChildren = computed(() => {
+  const slides = expand(block.value?.slides || [], null, '@id');
+  return slides.map(slide => {
+    if (LISTING_TYPES.includes(slide['@type'])) {
+      return { slide, isListing: true };
+    }
+    return { slide, isListing: false };
+  });
 });
 
 // Slider state: track active slide and detect new slides

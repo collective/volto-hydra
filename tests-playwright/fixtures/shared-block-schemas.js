@@ -399,8 +399,12 @@ export const sharedBlocksConfig = {
         },
     },
     // Image block: configure which fields are editable on child vs parent
-    // fieldMappings come from volto-hydra index.js (merged via deepMerge)
     image: {
+        id: 'image',
+        title: 'Image',
+        fieldMappings: {
+            '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },
+        },
         schemaEnhancer: {
             childBlockConfig: {
                 defaultsField: 'itemDefaults',

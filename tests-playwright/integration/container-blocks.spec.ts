@@ -3166,6 +3166,96 @@ test.describe('data-block-selector Navigation', () => {
 });
 
 // ============================================================================
+// Slider with listing - Listing block inside slider expands into individual slides
+// ============================================================================
+test.describe('Slider with listing expansion', () => {
+  test('Listing block in slider expands images as individual slides', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/gallery-test-page');
+
+    await helper.getStableBlockCount();
+
+    const iframe = helper.getIframe();
+
+    // Verify slider is loaded
+    const slider = iframe.locator('[data-block-uid="gallery-slider"]');
+    await expect(slider).toBeVisible();
+
+    // The listing should have expanded into image slides (all 11 mock images).
+    // All listing items share the listing block's @uid ("gallery-listing").
+    const gallerySlides = iframe.locator('[data-block-uid="gallery-listing"]');
+    await expect(gallerySlides).toHaveCount(11, { timeout: 10000 });
+
+    // Verify image slides are rendered as image blocks (have img or data-edit-media)
+    const firstGallerySlide = gallerySlides.first();
+    await expect(firstGallerySlide.locator('[data-edit-media="url"], img')).toBeAttached({ timeout: 5000 });
+  });
+
+  test('+1 navigates from listing slides to manual image', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/gallery-test-page');
+    await helper.getStableBlockCount();
+
+    const iframe = helper.getIframe();
+
+    // Wait for listing expansion (11 listing + 1 manual image = 12 total slides)
+    await expect(iframe.locator('[data-block-uid="gallery-listing"]')).toHaveCount(11, { timeout: 10000 });
+
+    // First visible slide is a listing slide — click it
+    await helper.clickBlockInIframe('gallery-listing');
+    await helper.waitForQuantaToolbar('gallery-listing');
+
+    // Navigate +1 through all 11 listing slides to reach manual-image-1
+    const nextButton = iframe.locator('[data-block-selector="+1"]');
+    await expect(nextButton).toBeVisible();
+
+    for (let i = 0; i < 11; i++) {
+      await nextButton.click();
+      if (i < 10) {
+        await helper.waitForQuantaToolbar('gallery-listing');
+      }
+    }
+
+    // After 11 clicks we should be on the manual image slide
+    await helper.waitForQuantaToolbar('manual-image-1');
+  });
+
+  test('-1 navigates from manual image back to listing slide', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/gallery-test-page');
+    await helper.getStableBlockCount();
+
+    const iframe = helper.getIframe();
+
+    // Wait for listing expansion
+    await expect(iframe.locator('[data-block-uid="gallery-listing"]')).toHaveCount(11, { timeout: 10000 });
+
+    // Select gallery-listing (first visible slide), navigate up to slider, then select manual-image-1
+    await helper.clickBlockInIframe('gallery-listing');
+    await helper.waitForQuantaToolbar('gallery-listing');
+    // Click ‹ Listing in sidebar to go up to the Slider level
+    await page.locator('button').filter({ hasText: /^‹.*Listing/ }).click();
+    await helper.waitForQuantaToolbar('gallery-slider');
+    // Select manual-image-1 from the slider's child blocks list
+    await page.locator('#sidebar-order .child-block-item').last().click();
+    await helper.waitForQuantaToolbar('manual-image-1');
+
+    // Click -1 to go back to the last listing slide
+    const prevButton = iframe.locator('[data-block-selector="-1"]');
+    await expect(prevButton).toBeVisible();
+    await prevButton.click();
+
+    await helper.waitForQuantaToolbar('gallery-listing');
+  });
+});
+
+// ============================================================================
 // slateTable Tests - Nested object_list (rows contain cells)
 // Tests that buildBlockPathMap traverses nested object_list structures
 // ============================================================================
