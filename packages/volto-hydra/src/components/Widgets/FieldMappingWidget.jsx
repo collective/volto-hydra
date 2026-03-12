@@ -69,8 +69,9 @@ const FieldMappingWidget = (props) => {
   // Get target schema and compute smart defaults
   const blocksConfig = config.blocks.blocksConfig;
   const targetSchema = getBlockTypeSchema(targetType, intl, blocksConfig);
+  const childFieldMappings = blocksConfig[targetType]?.fieldMappings;
   const smartDefaults = sourceFields && targetSchema
-    ? computeSmartDefaults(sourceFields, targetSchema)
+    ? computeSmartDefaults(sourceFields, targetSchema, childFieldMappings)
     : {};
 
   // Filter out any saved mappings that reference fields not in the current target type

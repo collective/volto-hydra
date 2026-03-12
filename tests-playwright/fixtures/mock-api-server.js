@@ -1198,6 +1198,8 @@ app.get('/@querystring', (req, res) => {
         'vocabulary': 'plone.app.vocabularies.Keywords',
         'operations': [
           'plone.app.querystring.operation.selection.any',
+          'plone.app.querystring.operation.selection.all',
+          'plone.app.querystring.operation.selection.none',
         ],
         'operators': {
           'plone.app.querystring.operation.selection.any': {
@@ -1205,6 +1207,19 @@ app.get('/@querystring', (req, res) => {
             'widget': 'autocomplete',
             'operation': 'plone.app.querystring.operation.selection.any',
           },
+          'plone.app.querystring.operation.selection.all': {
+            'title': 'Matches all of',
+            'widget': 'autocomplete',
+            'operation': 'plone.app.querystring.operation.selection.all',
+          },
+          'plone.app.querystring.operation.selection.none': {
+            'title': 'Matches none of',
+            'widget': 'autocomplete',
+            'operation': 'plone.app.querystring.operation.selection.none',
+          },
+        },
+        'values': {
+          'main folder': { 'title': 'main folder' },
         },
       },
       'Title': {
@@ -1528,6 +1543,25 @@ app.post('*/@querystring-search', (req, res) => {
       // Filter by review state
       const states = Array.isArray(value) ? value : [value];
       allItems = allItems.filter((item) => states.includes(item.review_state || 'published'));
+    } else if (index === 'Subject' && operation.includes('selection')) {
+      // Filter by subject/tag
+      const tags = Array.isArray(value) ? value : [value];
+      if (operation.includes('.any')) {
+        allItems = allItems.filter((item) => {
+          const subjects = item.Subject || [];
+          return tags.some((tag) => subjects.includes(tag));
+        });
+      } else if (operation.includes('.all')) {
+        allItems = allItems.filter((item) => {
+          const subjects = item.Subject || [];
+          return tags.every((tag) => subjects.includes(tag));
+        });
+      } else if (operation.includes('.none')) {
+        allItems = allItems.filter((item) => {
+          const subjects = item.Subject || [];
+          return !tags.some((tag) => subjects.includes(tag));
+        });
+      }
     }
   }
 

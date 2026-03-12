@@ -738,6 +738,7 @@ export const QUERY_RESULT_FIELDS = {
 export function getFieldType(fieldDef) {
   if (!fieldDef) return 'string';
   if (fieldDef.widget === 'object_browser' && fieldDef.mode === 'link') return 'link';
+  if (fieldDef.widget === 'url') return 'link';
   if (fieldDef.widget === 'object_browser' && fieldDef.mode === 'image') return 'image';
   if (fieldDef.widget === 'image') return 'image';
   return fieldDef.type || 'string';

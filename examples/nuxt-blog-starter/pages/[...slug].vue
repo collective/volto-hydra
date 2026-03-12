@@ -274,7 +274,7 @@ onMounted(() => {
                         properties: {
                             blocks_layout: {
                                 title: 'Blocks',
-                                allowedBlocks: [...new Set(['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', ...pageLevelBlocks])],
+                                allowedBlocks: [...new Set(['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', 'summary', 'default', ...pageLevelBlocks])],
                                 allowedTemplates: ['/_test_data/templates/test-layout'],
                                 allowedLayouts: CONTENT_TYPE_LAYOUTS[pageType] || [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
                             },

@@ -238,6 +238,44 @@ test.describe('Multi-element blocks', () => {
     await expect(listingBreadcrumb).toBeVisible({ timeout: 5000 });
   });
 
+  test('clicking listing item renders sidebar form without errors', async ({ page }) => {
+    // Regression test: clicking a listing item must not crash the QueryWidget.
+    // The listing becomes a parent block and its QuerystringWidget needs
+    // querystring indexes from Redux. Delay /@querystring to widen the race window.
+    const helper = new AdminUIHelper(page);
+
+    const pageErrors: Error[] = [];
+    page.on('pageerror', (error: Error) => pageErrors.push(error));
+
+    // Delay /@querystring to reproduce the race condition even locally
+    await page.route('**/@querystring', async (route) => {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await route.continue();
+    });
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    const listingItems = iframe.locator('[data-block-uid="listing-in-grid"]');
+    await expect(listingItems.first()).toBeVisible({ timeout: 10000 });
+
+    // Click immediately — listing's Edit + QueryWidget mount in sidebar
+    await listingItems.first().click();
+    await helper.waitForBlockSelected('listing-in-grid');
+
+    // QueryWidget's .query-widget should render once indexes arrive
+    const sidebar = page.locator('#sidebar');
+    await expect(sidebar.locator('.query-widget')).toBeVisible({ timeout: 15000 });
+
+    // No crash from accessing undefined indexes
+    const queryCrash = pageErrors.find(e =>
+      e.message.includes("Cannot read properties of undefined (reading 'title')")
+    );
+    expect(queryCrash, 'QueryWidget should not crash').toBeUndefined();
+  });
+
   test('scroll into view considers all elements bounding box', async ({ page }) => {
     // Tests that scroll-into-view uses combined bounding box, not just first element
     // Listing block is at bottom of page, not visible on initial load

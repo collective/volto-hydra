@@ -422,7 +422,9 @@ const ParentBlockSection = ({
                 properties={formData}
                 pathname={pathname}
                 intl={intl}
+                manage={true}
                 onChangeBlock={onChangeBlock}
+                onChangeField={() => {}}
                 // For parent blocks, use no-op to prevent Edit components from changing
                 // selection when they initialize/render. This was causing parent blocks
                 // to get selected when clicking on child blocks (e.g., empty blocks).

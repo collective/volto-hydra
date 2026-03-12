@@ -58,6 +58,7 @@ import {
   setUIState,
   updateContent,
 } from '@plone/volto/actions';
+import { getQuerystring } from '@plone/volto/actions/querystring/querystring';
 import { compose } from 'redux';
 import config from '@plone/volto/registry';
 import SlotRenderer from '@plone/volto/components/theme/SlotRenderer/SlotRenderer';
@@ -404,6 +405,10 @@ class Form extends Component {
    */
   componentDidMount() {
     this.setState({ isClient: true });
+
+    // Pre-fetch querystring indexes so widgets like QueryWidget don't crash
+    // when mounted before their own getQuerystring() call completes
+    this.props.getQuerystring();
 
     // Add Ctrl+S / Cmd+S save shortcut
     this.handleSaveShortcut = (event) => {
@@ -1075,6 +1080,7 @@ export default compose(
       setUIState,
       resetMetadataFocus,
       updateContent,
+      getQuerystring,
     },
     null,
     { forwardRef: true },
