@@ -125,6 +125,7 @@
             }
 
             const pages = getPagesFromUrl();
+            window._pagingPages = pages; // Store for renderers to read current page
             const extraCriteria = getSearchCriteriaFromUrl();
             tfLog('extraCriteria from URL:', JSON.stringify(extraCriteria), 'search:', window.location.search);
             window._searchCriteria = extraCriteria; // Store for form handlers

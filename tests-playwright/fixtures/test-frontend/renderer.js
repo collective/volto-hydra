@@ -36,10 +36,10 @@ function tfLog(...args) {
  * @param {string} containerId - Container ID for paging
  * @returns {Promise<{items: Object[], paging: Object|null}>}
  */
-async function expandItems(blocks, layout, containerId) {
+async function expandItems(blocks, layout, containerId, paging) {
     const hasListings = layout.some(id => blocks[id]?.['@type'] === 'listing' && blocks[id]?.querystring?.query);
     if (hasListings && window._expandListingBlocks) {
-        return await window._expandListingBlocks(blocks, layout, containerId);
+        return await window._expandListingBlocks(blocks, layout, containerId, paging);
     }
     // No listings — convert to items format directly (sync, no fetch)
     return { items: layout.map(id => ({ ...blocks[id], '@uid': id })), paging: null };
@@ -1175,7 +1175,8 @@ async function renderListingBlock(block, blockId) {
     const layout = [blockId];
 
     const PAGE_SIZE = 6;
-    const { items: expandedItems, paging } = await window._expandListingBlocks(blocks, layout, blockId, { start: 0, size: PAGE_SIZE });
+    const currentPage = (window._pagingPages || {})[blockId] || 0;
+    const { items: expandedItems, paging } = await window._expandListingBlocks(blocks, layout, blockId, { start: currentPage * PAGE_SIZE, size: PAGE_SIZE });
     const showPaging = paging?.totalPages > 1 ? paging : null;
 
     for (const childBlock of expandedItems) {
@@ -1204,11 +1205,13 @@ async function renderListingBlock(block, blockId) {
  * @returns {Promise<string>} HTML string
  */
 async function renderGridBlock(block, blockId) {
+    const PAGE_SIZE = 6;
     let blocks = block.blocks || {};
     let items = block.blocks_layout?.items || [];
     let paging = block._paging;
 
-    const result = await expandItems(blocks, items, blockId);
+    const currentPage = (window._pagingPages || {})[blockId] || 0;
+    const result = await expandItems(blocks, items, blockId, { start: currentPage * PAGE_SIZE, size: PAGE_SIZE });
     const expandedItems = result.items;
     paging = result.paging?.totalPages > 1 ? result.paging : null;
 
