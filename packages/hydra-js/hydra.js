@@ -5483,8 +5483,9 @@ export class Bridge {
     log('handleBlockSelector: currently visible =', currentVisibleUid);
 
     // Calculate the expected target block based on +1/-1
+    // Compare by element reference (not UID) since multiple elements can share the same UID
     let currentIndex = childBlocks.findIndex(
-      el => el.getAttribute('data-block-uid') === currentVisibleUid
+      el => el === currentlyVisibleElement
     );
     if (currentIndex === -1) currentIndex = 0;
 
@@ -5503,9 +5504,12 @@ export class Bridge {
 
     // Check if target block is visible (centered within container bounds)
     // Also returns position for stability tracking
+    let visibilityPollCount = 0;
     const getTargetVisibility = (container) => {
       const targetEl = this.queryBlockElement(targetUid);
-      if (!targetEl || !container) return { visible: false, x: null };
+      if (!targetEl || !container) {
+        return { visible: false, x: null };
+      }
 
       const containerRect = container.getBoundingClientRect();
       const targetRect = targetEl.getBoundingClientRect();
@@ -5513,6 +5517,13 @@ export class Bridge {
 
       // Target is visible if its center is within container bounds
       const visible = targetCenter >= containerRect.left && targetCenter <= containerRect.right;
+      visibilityPollCount++;
+      if (visibilityPollCount <= 5 || visibilityPollCount % 10 === 0) {
+        log('getTargetVisibility:', targetUid, 'class:', targetEl.className.substring(0, 120),
+          'rect:', JSON.stringify({l: Math.round(targetRect.left), w: Math.round(targetRect.width)}),
+          'container:', JSON.stringify({l: Math.round(containerRect.left), r: Math.round(containerRect.right)}),
+          'visible:', visible);
+      }
       return { visible, x: targetRect.left };
     };
 
@@ -5527,18 +5538,20 @@ export class Bridge {
     // proving the carousel animation has actually begun.
     const containerForSnapshot = this.queryBlockElement(containerUid);
     const containerRectSnapshot = containerForSnapshot?.getBoundingClientRect();
-    const initialVisibleUids = new Set();
+    // Track initially visible elements (not just UIDs) since multiple elements
+    // can share the same data-block-uid (e.g., listing items in a carousel).
+    const initialVisibleElements = new Set();
     if (containerRectSnapshot) {
       for (const child of childBlocks) {
         const rect = child.getBoundingClientRect();
         const center = rect.left + rect.width / 2;
         if (center >= containerRectSnapshot.left && center <= containerRectSnapshot.right) {
-          initialVisibleUids.add(child.getAttribute('data-block-uid'));
+          initialVisibleElements.add(child);
         }
       }
     }
     let visibilityChanged = false;
-    log('handleBlockSelector: initial visible blocks:', [...initialVisibleUids]);
+    log('handleBlockSelector: initial visible blocks:', [...initialVisibleElements].map(el => el.getAttribute('data-block-uid')));
 
     // Get the set of child block UIDs for checking if user navigated away
     const childUids = new Set(childBlocks.map(el => el.getAttribute('data-block-uid')));
@@ -5568,12 +5581,12 @@ export class Bridge {
           const rect = child.getBoundingClientRect();
           const center = rect.left + rect.width / 2;
           if (center >= containerRect.left && center <= containerRect.right) {
-            currentVisible.add(child.getAttribute('data-block-uid'));
+            currentVisible.add(child);
           }
         }
-        // Check if the visible set differs from the initial snapshot
-        if (currentVisible.size !== initialVisibleUids.size ||
-            [...currentVisible].some(uid => !initialVisibleUids.has(uid))) {
+        // Check if the visible set differs from the initial snapshot (by element reference)
+        if (currentVisible.size !== initialVisibleElements.size ||
+            [...currentVisible].some(el => !initialVisibleElements.has(el))) {
           visibilityChanged = true;
           log('handleBlockSelector: visible blocks changed, animation started');
         }
@@ -7690,128 +7703,113 @@ export class Bridge {
     const directSelector = document.querySelector(
       `[data-block-selector="${targetUid}"]`,
     );
+    // Click the appropriate selector to navigate toward the target block.
+    // For direct selectors (data-block-selector="{uid}"), one click suffices.
+    // For +1/-1 selectors, we click once and may recurse if more steps are needed.
+    let clickedSelector = null;
+    let nextUid = targetUid; // UID we expect to become visible after one click
+
     if (directSelector) {
       log(`tryMakeBlockVisible: found direct selector for ${targetUid}`);
-      directSelector.click();
-      return true;
-    }
-
-    // No direct selector - try +1/-1 navigation
-    log(`tryMakeBlockVisible: no direct selector, trying +1/-1 navigation`);
-
-    // Find the target element first (may exist but be hidden)
-    const targetElement = this.queryBlockElement(targetUid);
-    if (!targetElement) {
-      log(`tryMakeBlockVisible: target element not in DOM`);
-      return false;
-    }
-
-    // Find the container block (parent with data-block-uid)
-    const containerBlock = targetElement.parentElement?.closest('[data-block-uid]');
-    if (!containerBlock) {
-      log(`tryMakeBlockVisible: no container block found`);
-      return false;
-    }
-    const containerUid = containerBlock.getAttribute('data-block-uid');
-
-    // Find siblings by looking at the direct parent (which may be a wrapper div like .slides-wrapper)
-    const directParent = targetElement.parentElement;
-    if (!directParent) {
-      log(`tryMakeBlockVisible: no parent element`);
-      return false;
-    }
-
-    const siblings = Array.from(
-      directParent.querySelectorAll(':scope > [data-block-uid]'),
-    );
-    log(`tryMakeBlockVisible: found ${siblings.length} siblings in container ${containerUid}`);
-
-    const targetIndex = siblings.findIndex(
-      (el) => el.getAttribute('data-block-uid') === targetUid,
-    );
-    if (targetIndex === -1) {
-      log(`tryMakeBlockVisible: target not in siblings`);
-      return false;
-    }
-
-    // Find the currently visible sibling
-    const currentIndex = siblings.findIndex((el) => !this.isElementHidden(el));
-    const currentUid = currentIndex >= 0 ? siblings[currentIndex].getAttribute('data-block-uid') : null;
-    log(`tryMakeBlockVisible: currentIndex=${currentIndex} (${currentUid}), targetIndex=${targetIndex}`);
-
-    if (currentIndex === -1) {
-      log(`tryMakeBlockVisible: no visible sibling`);
-      return false;
-    }
-
-    const stepsNeeded = targetIndex - currentIndex;
-    if (stepsNeeded === 0) {
-      log(`tryMakeBlockVisible: already at target`);
-      return false;
-    }
-
-    const direction = stepsNeeded > 0 ? '+1' : '-1';
-
-    // Look for +1/-1 selectors in two formats:
-    // 1. "{blockUid}:+1" - explicit format, can be anywhere on page
-    // 2. "+1" - simple format, must be inside the container block
-    let selector = null;
-
-    // Try explicit format first: data-block-selector="{currentUid}:+1"
-    // This means "clicking this will show the block after {currentUid}"
-    // We need to click through each step, so find selector for current visible block
-    const explicitSelector = document.querySelector(
-      `[data-block-selector="${currentUid}:${direction}"]`,
-    );
-    if (explicitSelector) {
-      log(`tryMakeBlockVisible: found explicit selector ${currentUid}:${direction}`);
-      selector = explicitSelector;
+      clickedSelector = directSelector;
     } else {
-      // Try simple format: selector must be inside the container
-      const simpleSelector = containerBlock.querySelector(
-        `[data-block-selector="${direction}"]`,
-      );
-      if (simpleSelector) {
-        log(`tryMakeBlockVisible: found simple selector ${direction} inside container`);
-        selector = simpleSelector;
+      // No direct selector - try +1/-1 navigation
+      log(`tryMakeBlockVisible: no direct selector, trying +1/-1 navigation`);
+
+      const targetElement = this.queryBlockElement(targetUid);
+      if (!targetElement) {
+        log(`tryMakeBlockVisible: target element not in DOM`);
+        return false;
       }
+
+      const containerBlock = targetElement.parentElement?.closest('[data-block-uid]');
+      if (!containerBlock) {
+        log(`tryMakeBlockVisible: no container block found`);
+        return false;
+      }
+      const containerUid = containerBlock.getAttribute('data-block-uid');
+
+      const directParent = targetElement.parentElement;
+      if (!directParent) {
+        log(`tryMakeBlockVisible: no parent element`);
+        return false;
+      }
+
+      const siblings = Array.from(
+        directParent.querySelectorAll(':scope > [data-block-uid]'),
+      );
+      log(`tryMakeBlockVisible: found ${siblings.length} siblings in container ${containerUid}`);
+
+      const targetIndex = siblings.findIndex(
+        (el) => el.getAttribute('data-block-uid') === targetUid,
+      );
+      if (targetIndex === -1) {
+        log(`tryMakeBlockVisible: target not in siblings`);
+        return false;
+      }
+
+      const currentIndex = siblings.findIndex((el) => !this.isElementHidden(el));
+      const currentUid = currentIndex >= 0 ? siblings[currentIndex].getAttribute('data-block-uid') : null;
+      log(`tryMakeBlockVisible: currentIndex=${currentIndex} (${currentUid}), targetIndex=${targetIndex}`);
+
+      if (currentIndex === -1) {
+        log(`tryMakeBlockVisible: no visible sibling`);
+        return false;
+      }
+
+      const stepsNeeded = targetIndex - currentIndex;
+      if (stepsNeeded === 0) {
+        log(`tryMakeBlockVisible: already at target`);
+        return false;
+      }
+
+      const direction = stepsNeeded > 0 ? '+1' : '-1';
+
+      const explicitSelector = document.querySelector(
+        `[data-block-selector="${currentUid}:${direction}"]`,
+      );
+      if (explicitSelector) {
+        log(`tryMakeBlockVisible: found explicit selector ${currentUid}:${direction}`);
+        clickedSelector = explicitSelector;
+      } else {
+        const simpleSelector = containerBlock.querySelector(
+          `[data-block-selector="${direction}"]`,
+        );
+        if (simpleSelector) {
+          log(`tryMakeBlockVisible: found simple selector ${direction} inside container`);
+          clickedSelector = simpleSelector;
+        }
+      }
+
+      if (!clickedSelector) {
+        log(`tryMakeBlockVisible: no ${direction} selector found`);
+        return false;
+      }
+
+      // For +1/-1, the next visible block is one step from current
+      const nextIndex = currentIndex + (stepsNeeded > 0 ? 1 : -1);
+      const nextBlock = siblings[nextIndex];
+      nextUid = nextBlock?.getAttribute('data-block-uid');
+      log(`tryMakeBlockVisible: clicking ${direction}, expecting ${nextUid} to become visible`);
     }
 
-    if (!selector) {
-      log(`tryMakeBlockVisible: no ${direction} selector found`);
-      return false;
-    }
-
-    // Figure out which block should become visible after one click
-    const nextIndex = currentIndex + (stepsNeeded > 0 ? 1 : -1);
-    const nextBlock = siblings[nextIndex];
-    const nextUid = nextBlock?.getAttribute('data-block-uid');
-    log(`tryMakeBlockVisible: clicking ${direction}, expecting ${nextUid} to become visible`);
-    log(`tryMakeBlockVisible: selector element:`, selector.tagName, selector.className, `parent: ${selector.parentElement?.id || selector.parentElement?.className}`);
-
-    // Click once
-    selector.click();
+    // Click the selector and wait for nextUid to become visible
+    clickedSelector.click();
     log(`tryMakeBlockVisible: click() called`);
 
-    // Wait for the expected block to become visible using requestAnimationFrame
-    // This is more universal than setTimeout - works with CSS transitions, JS animations, and instant changes
     const startTime = performance.now();
-    const MAX_WAIT_MS = 2000; // 2 second timeout
+    const MAX_WAIT_MS = 2000;
 
     const checkVisibility = () => {
       const elapsed = performance.now() - startTime;
-
-      // Re-query element each time - DOM may re-render and replace elements
       const currentNextBlock = this.queryBlockElement(nextUid);
 
-      // Debug: log element state every 500ms
       if (elapsed > 0 && Math.floor(elapsed / 500) !== Math.floor((elapsed - 16) / 500)) {
         if (currentNextBlock) {
-          const style = window.getComputedStyle(currentNextBlock);
           const rect = currentNextBlock.getBoundingClientRect();
           const container = currentNextBlock.parentElement?.closest('[data-block-uid]');
           const containerRect = container?.getBoundingClientRect();
-          log(`tryMakeBlockVisible debug: display=${style.display} rect=${Math.round(rect.width)}x${Math.round(rect.height)} left=${Math.round(rect.left)} right=${Math.round(rect.right)} containerLeft=${containerRect ? Math.round(containerRect.left) : 'none'} containerRight=${containerRect ? Math.round(containerRect.right) : 'none'}`);
+          log(`tryMakeBlockVisible debug: rect=${Math.round(rect.width)}x${Math.round(rect.height)} left=${Math.round(rect.left)} containerLeft=${containerRect ? Math.round(containerRect.left) : 'none'} containerRight=${containerRect ? Math.round(containerRect.right) : 'none'}`);
         } else {
           log(`tryMakeBlockVisible debug: element not found in DOM`);
         }
@@ -7819,10 +7817,9 @@ export class Bridge {
 
       if (currentNextBlock && !this.isElementHidden(currentNextBlock)) {
         log(`tryMakeBlockVisible: ${nextUid} is now visible after ${Math.round(elapsed)}ms`);
-        // Check if we've reached the target
         if (nextUid === targetUid) {
           log(`tryMakeBlockVisible: reached target ${targetUid}`);
-          this._navigatingToBlock = null; // Clear flag
+          this._navigatingToBlock = null;
           return;
         }
         // Need more clicks - recurse
@@ -7832,11 +7829,10 @@ export class Bridge {
       }
 
       if (elapsed < MAX_WAIT_MS) {
-        // Not visible yet - check again next frame
         requestAnimationFrame(checkVisibility);
       } else {
-        log(`tryMakeBlockVisible: timeout waiting for ${nextUid} to become visible after ${Math.round(elapsed)}ms`);
-        this._navigatingToBlock = null; // Clear flag on timeout
+        log(`tryMakeBlockVisible: timeout waiting for ${nextUid} after ${Math.round(elapsed)}ms`);
+        this._navigatingToBlock = null;
       }
     };
 

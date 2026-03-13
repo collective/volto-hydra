@@ -13,7 +13,7 @@ const props = defineProps({
   id: { type: String, required: true },
   block: { type: Object, required: true },
   // Shared paging state (for combined paging in containers like gridBlock).
-  // When null, the listing creates and owns its own paging.
+  // When null, the listing creates and owns its own paging with default page size.
   paging: { type: Object, default: null },
   // Number of items already seen by prior staticBlocks calls (for grid position tracking)
   seen: { type: Number, default: 0 },
@@ -36,14 +36,12 @@ function buildExtraCriteria(query) {
 }
 
 // Create own paging if none shared.
-// When no shared paging and no b_size on block, omit paging entirely
-// so expandListingBlocks fetches all items (defaults to size: 1000).
 const ownsPaging = !props.paging;
-const listingPageSize = props.block.b_size;
-const listingPage = (ownsPaging && listingPageSize)
+const DEFAULT_PAGE_SIZE = 6;
+const listingPage = ownsPaging
   ? ((injectedPages.value || injectedPages)[props.id] || 0)
   : 0;
-const paging = props.paging || (listingPageSize ? reactive({ start: listingPage * listingPageSize, size: listingPageSize }) : null);
+const paging = props.paging || reactive({ start: listingPage * DEFAULT_PAGE_SIZE, size: DEFAULT_PAGE_SIZE });
 
 async function fetchListing(query) {
   const opts = {

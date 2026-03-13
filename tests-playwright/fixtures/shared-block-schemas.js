@@ -190,6 +190,7 @@ export const sharedBlocksConfig = {
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
         group: 'common',
         mostUsed: true,
+        restricted: true, // Only used inside slider's typed object_list
         fieldMappings: {
             '@default': { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'preview_image' },
             image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },

@@ -171,21 +171,24 @@
   </div>
 
   <section ref="carouselRef" v-else-if="block['@type'] == 'slider'" :data-block-uid="block_uid" data-block-container="{allowed:['Slide'],add:'horizontal'}"
-    class="max-w-4xl mx-auto" data-carousel="static" >
+    class="max-w-4xl mx-auto" >
     <div class="relative w-full">
       <!-- Carousel wrapper -->
       <div class="relative h-56 overflow-hidden rounded-lg md:h-96">
         <template v-for="(entry, entryIdx) in sliderChildren" :key="entry.slide['@uid']">
           <!-- Listing child: async expand, each result becomes a slide -->
-          <Suspense v-if="entry.isListing">
+          <Suspense v-if="entry.isListing" @resolve="onListingResolved">
             <ListingBlock :id="entry.slide['@uid']" :block="entry.slide"
+              :paging="{ start: 0, size: 1000 }"
               :api-url="effectiveApiUrl" :context-path="effectiveContextPath">
               <template #default="{ items }">
-                <template v-for="item in items" :key="item['@uid']">
+                <template v-for="(item, itemIdx) in trackItems(entry.slide['@uid'], items)" :key="item['@uid']">
                   <template v-if="item.readOnly"><!-- hydra block-readonly --></template>
-                  <div class="slide duration-700 ease-linear bg-center items-center absolute inset-0"
+                  <div class="slide bg-center items-center absolute inset-0"
+                    :class="slideClasses(slideOffset(entryIdx) + itemIdx)"
+                    :data-block-uid="item['@uid']" data-block-readonly
                     data-carousel-item data-block-add="right">
-                    <Block :block_uid="item['@uid']" :block="item" :data="data" :contained="true" />
+                    <Block :block_uid="null" :block="item" :data="data" :contained="true" />
                   </div>
                 </template>
               </template>
@@ -196,11 +199,12 @@
           </Suspense>
           <!-- Static slide -->
           <div v-else :data-block-uid="entry.slide['@uid']"
-            class="slide duration-700 ease-linear bg-center items-center absolute inset-0"
+            class="slide bg-center items-center absolute inset-0"
             :class="[
+              slideClasses(slideOffset(entryIdx)),
               { 'bg-gray-700': !entry.slide.preview_image, 'bg-blend-multiply': !entry.slide.preview_image, 'bg-no-repeat': !entry.slide.preview_image, 'bg-cover': entry.slide.preview_image }
             ]"
-            :data-carousel-item="entryIdx === activeSlideIndex ? 'active' : ''"
+            data-carousel-item
             :style="entry.slide.preview_image ? imageProps(entry.slide, true).class : ''"
             data-block-add="right">
             <!-- Clickable overlay for preview_image editing -->
@@ -976,63 +980,144 @@ const sliderChildren = computed(() => {
   });
 });
 
-// Slider state: track active slide and detect new slides
-const activeSlideIndex = ref(0);
+// Slider state: Vue-reactive carousel (no Flowbite — its imperative DOM classes
+// conflict with Vue's reactive rendering on parent re-renders).
+const carouselPosition = ref(0);
 const carouselRef = ref(null);
-const prevSlideCount = ref(block.value?.slides?.length || 0);
 
-// On mount: hide non-active slides and initialize Flowbite carousel.
-// Vue's reactive :class is NOT used for visibility to avoid fighting
-// with Flowbite's imperative DOM manipulation during transitions.
-onMounted(async () => {
+// Map from listing slide @uid to resolved item count (for flat index calculation)
+const listingItemCounts = reactive({});
+function onListingResolved() {
+  // Suspense @resolve callback — no action needed since trackItems() handles counts
+}
+
+// Total flat slide count (listing items expanded + static slides).
+// Before listings resolve, each listing counts as 1 (its fallback placeholder).
+const totalSlides = computed(() => {
+  let count = 0;
+  for (const entry of sliderChildren.value) {
+    if (entry.isListing) {
+      count += listingItemCounts[entry.slide['@uid']] || 1;
+    } else {
+      count++;
+    }
+  }
+  return count;
+});
+
+// Compute the flat slide offset for a given entry index (sum of all prior entries' slide counts).
+function slideOffset(entryIdx) {
+  let offset = 0;
+  for (let i = 0; i < entryIdx; i++) {
+    const e = sliderChildren.value[i];
+    if (e.isListing) {
+      offset += listingItemCounts[e.slide['@uid']] || 1;
+    } else {
+      offset++;
+    }
+  }
+  return offset;
+}
+
+// Track listing item counts when scoped slot renders (called from template).
+// Uses nextTick to avoid mutating reactive state during render (Vue warns about this).
+function trackItems(uid, items) {
+  if (listingItemCounts[uid] !== items.length) {
+    nextTick(() => { listingItemCounts[uid] = items.length; });
+  }
+  return items;
+}
+
+// CSS classes for a slide at the given flat index relative to carouselPosition.
+// Mirrors Flowbite's 3-slide layout: left (-translate-x-full), center (translate-x-0), right (translate-x-full).
+function slideClasses(index) {
+  const pos = carouselPosition.value;
+  const total = totalSlides.value;
+  if (total === 0) return 'hidden';
+
+  const prev = (pos - 1 + total) % total;
+  const next = (pos + 1) % total;
+  const t = useTransitions ? ' transition-transform transform duration-700 ease-linear' : '';
+
+  if (index === pos) return `translate-x-0 z-30${t}`;
+  if (index === prev) return `-translate-x-full z-10${t}`;
+  if (index === next) return `translate-x-full z-20${t}`;
+  return 'hidden';
+}
+
+// In edit mode, skip CSS transitions — admin data updates trigger Vue re-renders
+// that conflict with in-progress CSS transform transitions, causing slides to
+// animate to wrong positions. In visitor mode, transitions work fine.
+const useTransitions = !isEditMode();
+
+// Next/prev handlers — simple reactive position update, Vue handles the rest
+function carouselNext() {
+  const total = totalSlides.value;
+  if (total > 0) {
+    carouselPosition.value = (carouselPosition.value + 1) % total;
+  }
+}
+function carouselPrev() {
+  const total = totalSlides.value;
+  if (total > 0) {
+    carouselPosition.value = (carouselPosition.value - 1 + total) % total;
+  }
+}
+
+// Navigate to a specific slide by its block UID (for indicator/direct selector clicks).
+function carouselGoTo(uid) {
+  // Find the flat index for this UID by checking sliderChildren + listing items
+  let idx = 0;
+  for (const entry of sliderChildren.value) {
+    if (entry.isListing) {
+      if (entry.slide['@uid'] === uid) {
+        carouselPosition.value = idx;
+        return;
+      }
+      idx += listingItemCounts[entry.slide['@uid']] || 1;
+    } else {
+      if (entry.slide['@uid'] === uid) {
+        carouselPosition.value = idx;
+        return;
+      }
+      idx++;
+    }
+  }
+}
+
+// On mount: attach click handlers for next/prev buttons and indicators
+onMounted(() => {
   if (block.value?.['@type'] !== 'slider' || !process.client) return;
   const section = carouselRef.value;
   if (!section) return;
-  // Immediately remove data-carousel to prevent ANY other initCarousels() call
-  // from re-initializing this carousel. Each initCarousels() creates a NEW Carousel
-  // whose constructor calls slideTo(defaultPosition), resetting position and adding
-  // duplicate click handlers. Sources: page-level initFlowbite(), window load event.
-  // We restore the attribute only for our single initCarousels() call below.
-  const carouselType = section.getAttribute('data-carousel');
-  section.removeAttribute('data-carousel');
-  // Hide non-active slides before Flowbite inits (prevents flash)
-  const slides = section.querySelectorAll('[data-carousel-item]');
-  slides.forEach((slide, i) => {
-    if (i !== activeSlideIndex.value) slide.classList.add('hidden');
-    else slide.classList.add('flex');
+
+  // Use event delegation on the section — individual button elements may be replaced
+  // by Vue re-renders (from admin data updates), losing directly-attached handlers.
+  section.addEventListener('click', (event) => {
+    const target = event.target.closest('[data-carousel-next], [data-carousel-prev], [data-carousel-slide-to]');
+    if (!target) return;
+    if (target.hasAttribute('data-carousel-next')) {
+      carouselNext();
+    } else if (target.hasAttribute('data-carousel-prev')) {
+      carouselPrev();
+    } else if (target.hasAttribute('data-carousel-slide-to')) {
+      const uid = target.getAttribute('data-block-selector');
+      if (uid) carouselGoTo(uid);
+    }
   });
-  await nextTick();
-  const flowbite = await import('flowbite');
-  section.setAttribute('data-carousel', carouselType);
-  flowbite.initCarousels();
-  section.removeAttribute('data-carousel');
 });
 
-// Watch for slide count changes to detect new slides and reinitialize Flowbite
+// Watch for slide count changes — when new slide added, show it
 watch(
   () => block.value?.slides?.length,
-  async (newCount, oldCount) => {
-    // Only detect new slides after initial render (when oldCount is defined)
+  (newCount, oldCount) => {
     if (oldCount !== undefined && newCount > oldCount) {
-      // New slide added - show it (it's at the end)
-      activeSlideIndex.value = newCount - 1;
-
-      // Reinitialize Flowbite carousel to recognize new slides
-      if (process.client) {
-        await nextTick();
-        const section = carouselRef.value;
-        if (section) {
-          // Restore data-carousel so initCarousels() finds it, then remove again
-          section.setAttribute('data-carousel', 'static');
-          const flowbite = await import('flowbite');
-          flowbite.initCarousels();
-          section.removeAttribute('data-carousel');
-        }
-      }
+      // New slide added at end — navigate to it.
+      // Need to recalculate total since listing counts haven't changed.
+      const total = totalSlides.value + (newCount - oldCount);
+      carouselPosition.value = total - 1;
     }
-    prevSlideCount.value = newCount || 0;
-  },
-  { immediate: true }
+  }
 );
 
 // Grid block helpers

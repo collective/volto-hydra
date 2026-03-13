@@ -411,7 +411,11 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         containerField: fieldName,
         blockType, // Block type for uniform lookups (single source of truth)
         resolvedBlockSchema: blockSchema, // Full schema with functions — stripped only when sending to iframe
-        allowedSiblingTypes: fieldDef.allowedBlocks || defaultPageAllowedBlocks,
+        allowedSiblingTypes: fieldDef.allowedBlocks
+          ? (parentId === PAGE_BLOCK_UID
+            ? fieldDef.allowedBlocks.filter(t => defaultPageAllowedBlocks.includes(t))
+            : fieldDef.allowedBlocks)
+          : defaultPageAllowedBlocks,
         allowedTemplates: fieldDef.allowedTemplates || null,
         maxSiblings: fieldDef.maxLength || null,
         siblingCount: layout.length, // Total siblings in this container

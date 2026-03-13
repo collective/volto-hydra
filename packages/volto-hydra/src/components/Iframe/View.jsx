@@ -2951,30 +2951,20 @@ const Iframe = (props) => {
     };
 
     if (pendingAdd?.mode === 'sidebar') {
-      // Sidebar add: get allowed blocks from the container's field schema
+      // Sidebar add appends to end of container — use last sibling's allowedSiblingTypes
       const { parentBlockId, fieldName } = pendingAdd;
-      if (parentBlockId === null) {
-        // Page-level - get allowedBlocks and templates from _page schema for this field
-        const pageSchema = config.blocks.blocksConfig?.['_page']?.schema?.();
-        const pageFieldDef = pageSchema?.properties?.[fieldName];
-        allowedTemplates = pageFieldDef?.allowedTemplates;
-        allowed = pageFieldDef?.allowedBlocks;
-        // Add template type IDs to allowed blocks
-        if (allowedTemplates?.length > 0) {
-          const templateTypeIds = allowedTemplates.map(getTemplateTypeId);
-          return allowed ? [...allowed, ...templateTypeIds] : templateTypeIds;
-        }
-        return allowed;
+      if (parentBlockId !== null) {
+        parentBlockData = getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId);
+        parentType = iframeSyncState.blockPathMap?.[parentBlockId]?.blockType;
       }
-      parentBlockData = getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId);
-      parentType = iframeSyncState.blockPathMap?.[parentBlockId]?.blockType;
-      // Find any child in this container field to get allowedSiblingTypes from blockPathMap
-      const childEntry = Object.entries(iframeSyncState.blockPathMap || {}).find(
-        ([, info]) => info.parentId === parentBlockId && info.containerField === fieldName
-      );
-      if (childEntry) {
-        allowed = childEntry[1].allowedSiblingTypes || null;
-        allowedTemplates = childEntry[1].allowedTemplates || null;
+      // Get layout to find last block in this container field
+      const parentData = parentBlockId === null ? properties : parentBlockData;
+      const layout = parentData?.[fieldName]?.items;
+      const lastBlockId = layout?.[layout.length - 1];
+      const lastPathInfo = lastBlockId ? iframeSyncState.blockPathMap?.[lastBlockId] : null;
+      if (lastPathInfo) {
+        allowed = lastPathInfo.allowedSiblingTypes || null;
+        allowedTemplates = lastPathInfo.allowedTemplates || null;
       }
     } else {
       // Iframe add: get allowed blocks from blockPathMap (already resolved by buildBlockPathMap)
@@ -3029,9 +3019,6 @@ const Iframe = (props) => {
       .filter(block => {
         if (!block.id || !block.title) return false;
         if (block.id === 'slate') return false; // same as core Volto
-        if (typeof block.restricted === 'function'
-          ? block.restricted({ properties, block, navRoot, contentType })
-          : block.restricted) return false;
         if (hasAllowed && !effectiveAllowedBlocks.includes(block.id)) return false;
         if (!search) return true;
         const title = intl.formatMessage({ id: block.title, defaultMessage: block.title }).toLowerCase();
