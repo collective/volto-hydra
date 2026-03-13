@@ -88,7 +88,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems } from '../../utils/blockPath';
+import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems } from '../../utils/blockPath';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
@@ -2951,20 +2951,21 @@ const Iframe = (props) => {
     };
 
     if (pendingAdd?.mode === 'sidebar') {
-      // Sidebar add appends to end of container — use last sibling's allowedSiblingTypes
+      // Sidebar add appends to container — get allowedSiblingTypes from any existing sibling
       const { parentBlockId, fieldName } = pendingAdd;
+      const effectiveParentId = parentBlockId === null ? '_page' : parentBlockId;
       if (parentBlockId !== null) {
         parentBlockData = getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId);
         parentType = iframeSyncState.blockPathMap?.[parentBlockId]?.blockType;
       }
-      // Get layout to find last block in this container field
-      const parentData = parentBlockId === null ? properties : parentBlockData;
-      const layout = parentData?.[fieldName]?.items;
-      const lastBlockId = layout?.[layout.length - 1];
-      const lastPathInfo = lastBlockId ? iframeSyncState.blockPathMap?.[lastBlockId] : null;
-      if (lastPathInfo) {
-        allowed = lastPathInfo.allowedSiblingTypes || null;
-        allowedTemplates = lastPathInfo.allowedTemplates || null;
+      const childIds = getChildBlockIds(effectiveParentId, iframeSyncState.blockPathMap);
+      const siblingInField = childIds.find(
+        id => iframeSyncState.blockPathMap[id].containerField === fieldName
+      );
+      if (siblingInField) {
+        const siblingInfo = iframeSyncState.blockPathMap[siblingInField];
+        allowed = siblingInfo.allowedSiblingTypes || null;
+        allowedTemplates = siblingInfo.allowedTemplates || null;
       }
     } else {
       // Iframe add: get allowed blocks from blockPathMap (already resolved by buildBlockPathMap)

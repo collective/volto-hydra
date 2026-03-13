@@ -1722,16 +1722,15 @@ test.describe('Block Type Conversion via fieldMappings', () => {
       itemTexts.push((await submenuItems.nth(i).textContent() || '').trim());
     }
 
-    // At page level, only non-restricted content-item types should appear
-    // (Default and Summary are restricted: true, so they can't be created or converted to at page level)
+    // At page level, only content-item types allowed by the page should appear
     const expectedTypes = ['Image', 'Hero'];
 
     // Types that should NOT appear:
-    // - Restricted content-item types (can't be created at page level)
+    // - Restricted types not in page allowedBlocks (e.g., Slide is restricted and only valid inside slider)
     // - Different fieldMapping families (facets, form fields)
     const forbiddenTypes = [
-      // Restricted content-item types — same family but not allowed at page level
-      'Default', 'Summary',
+      // Restricted content-item type not in page allowedBlocks
+      'Slide',
       // Facet family — share { title, field, hidden } @default
       'Checkbox Facet', 'Select Facet', 'Date Range Facet', 'Toggle Facet',
       // Form field family — share { label, description, required } @default
