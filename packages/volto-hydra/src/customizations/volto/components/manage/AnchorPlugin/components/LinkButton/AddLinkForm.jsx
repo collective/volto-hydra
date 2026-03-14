@@ -233,6 +233,7 @@ class AddLinkForm extends Component {
       this.onSubmit();
     } else if (e.key === 'Escape') {
       e.preventDefault();
+      e.stopPropagation();
       this.onClose();
     }
   }
