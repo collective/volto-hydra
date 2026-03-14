@@ -703,10 +703,8 @@ test.describe('allowedLayouts', () => {
       // Footer block should be locked (outside the template)
       const footerBlock = iframe.locator('#footer-content [data-block-uid]').first();
       await expect(footerBlock).toBeVisible({ timeout: 5000 });
-      await expect(footerBlock.locator('.hydra-locked')).toBeVisible({ timeout: 5000 }).catch(() => {
-        // The locked class might be on the block itself
-        return expect(footerBlock).toHaveClass(/hydra-locked/, { timeout: 5000 });
-      });
+      const footerBlockId = await footerBlock.getAttribute('data-block-uid');
+      await helper.waitForBlockReadonly(footerBlockId!);
     });
   });
 });
