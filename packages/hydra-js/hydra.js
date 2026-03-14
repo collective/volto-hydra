@@ -4882,17 +4882,34 @@ export class Bridge {
    * - In template edit mode: blocks outside the template being edited
    */
   applyReadonlyVisuals() {
+    // Build a dynamic CSS rule targeting readonly blocks by data-block-uid.
+    // This is resilient to framework re-renders — CSS selectors keep matching
+    // even when Vue/React/Svelte replaces or patches DOM elements.
+    const readonlyUids = [];
     const allBlocks = document.querySelectorAll('[data-block-uid]');
     allBlocks.forEach((blockElement) => {
       const blockUid = blockElement.getAttribute('data-block-uid');
       const blockData = this.getBlockData(blockUid);
-
       if (isBlockReadonly(blockData, this.templateEditMode)) {
-        blockElement.classList.add('hydra-locked');
-      } else {
-        blockElement.classList.remove('hydra-locked');
+        readonlyUids.push(blockUid);
       }
     });
+
+    // Update or create the dynamic style element
+    if (!this._readonlyStyleEl) {
+      this._readonlyStyleEl = document.createElement('style');
+      this._readonlyStyleEl.type = 'text/css';
+      document.head.appendChild(this._readonlyStyleEl);
+    }
+    let newCSS = '';
+    if (readonlyUids.length > 0) {
+      const selector = readonlyUids.map(uid => `[data-block-uid="${uid}"]`).join(', ');
+      newCSS = `${selector} { filter: grayscale(0.5) opacity(0.6); }`;
+    }
+    // Only update DOM when CSS actually changes to avoid unnecessary style recalculations
+    if (this._readonlyStyleEl.textContent !== newCSS) {
+      this._readonlyStyleEl.textContent = newCSS;
+    }
   }
 
   /**
@@ -9590,19 +9607,7 @@ export class Bridge {
           border-radius: 4px;
           pointer-events: none;
         }
-        /* Readonly blocks - visually greyed out but still clickable for selection */
-        .hydra-locked {
-          opacity: 0.5;
-          position: relative;
-        }
-        .hydra-locked::after {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: rgba(128, 128, 128, 0.1);
-          pointer-events: none;
-          z-index: 1;
-        }
+        /* Readonly block styles are applied dynamically via applyReadonlyVisuals() */
         .volto-hydra--outline {
           position: relative !important;
         }

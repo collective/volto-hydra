@@ -781,11 +781,13 @@ export class AdminUIHelper {
   async waitForBlockReadonly(blockId: string, timeout: number = 5000): Promise<void> {
     const iframe = this.getIframe();
     const block = iframe.locator(`[data-block-uid="${blockId}"]`);
-    await expect(block).toHaveClass(/hydra-locked/, { timeout });
+    // Readonly visuals are applied via dynamic CSS rules (not classList),
+    // so check computed filter instead of a class name.
+    await expect(block).toHaveCSS('filter', /grayscale/, { timeout });
   }
 
   /**
-   * Wait for a block to NOT be shown as readonly (no hydra-locked class).
+   * Wait for a block to NOT be shown as readonly.
    * Used to verify template edit mode is inactive.
    * @param blockId - The block ID to check
    * @param timeout - Maximum time to wait
@@ -793,7 +795,7 @@ export class AdminUIHelper {
   async waitForBlockEditable(blockId: string, timeout: number = 5000): Promise<void> {
     const iframe = this.getIframe();
     const block = iframe.locator(`[data-block-uid="${blockId}"]`);
-    await expect(block).not.toHaveClass(/hydra-locked/, { timeout });
+    await expect(block).not.toHaveCSS('filter', /grayscale/, { timeout });
   }
 
   /**
