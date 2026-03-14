@@ -123,6 +123,11 @@
         {
           "@id": "slider-listing-1",
           "@type": "listing",
+          "fieldMapping": {
+            "@id": "href",
+            "title": "alt",
+            "image": "url"
+          },
           "querystring": {
             "query": [
               {

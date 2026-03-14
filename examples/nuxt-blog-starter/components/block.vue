@@ -188,7 +188,7 @@
                     :class="slideClasses(slideOffset(entryIdx) + itemIdx)"
                     :data-block-uid="item['@uid']" data-block-readonly
                     data-carousel-item data-block-add="right">
-                    <Block :block_uid="null" :block="item" :data="data" :contained="true" />
+                    <Block :block_uid="undefined" :block="item" :data="data" :contained="true" />
                   </div>
                 </template>
               </template>
@@ -792,6 +792,16 @@
     </a>
   </div>
 
+  <!-- Maps block: Google Maps embed -->
+  <div v-else-if="block['@type'] == 'maps'" :data-block-uid="block_uid"
+       :class="['maps-block my-4', { 'mx-auto max-w-2xl': block.align === 'center', 'float-left mr-4': block.align === 'left', 'float-right ml-4': block.align === 'right' }]">
+    <h3 v-if="block.title" data-edit-text="title" class="text-lg font-semibold mb-2">{{ block.title }}</h3>
+    <iframe v-if="block.url" :src="block.url" data-edit-link="url"
+      :class="{ 'w-full': block.align === 'full' || block.align === 'center', 'w-96': block.align === 'left' || block.align === 'right' }"
+      height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+    <p v-else class="text-gray-400 italic">No map URL configured</p>
+  </div>
+
   <div v-else :data-block-uid="block_uid">
     {{ 'Not implemented Block: @type=' + block['@type'] }}
     <pre>{{ block }}</pre>
@@ -813,7 +823,7 @@ const injectedPages = inject('pages', {});
 const props = defineProps({
   block_uid: {
     type: String,
-    required: true
+    default: undefined
   },
   block: {
     type: Object,
