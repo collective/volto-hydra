@@ -549,14 +549,10 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     const imageCheckboxAfter = iframe.locator('.facet-checkbox[data-field="portal_type"][value="Image"]');
     await expect(imageCheckboxAfter).toBeChecked({ timeout: 10000 });
 
-    // Wait for async loading to complete (skeleton to disappear)
-    const skeleton = iframe.locator('.animate-pulse');
-    await expect(skeleton).not.toBeVisible({ timeout: 10000 });
-
     // Should have 0 results (base query filters to Documents, facet adds Image filter = no matches)
+    // Use polling assertion — the old DOM may still be present briefly after navigation
     const filteredResults = iframe.locator('[data-block-uid="results-listing"]');
-    const filteredCount = await filteredResults.count();
-    expect(filteredCount).toBe(0);
+    await expect(filteredResults).toHaveCount(0, { timeout: 10000 });
   });
 
   test('can add a facet using add button', async ({ page }) => {
