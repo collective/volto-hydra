@@ -21,14 +21,14 @@
     "19a3d50a-a683-4e59-ac7c-d2ba2149cdd7": {
       "@type": "video",
       "align": "right",
-      "preview_image": "http://localhost:8080/Plone/content-types/image",
+      "preview_image": "http://localhost:8080/Plone/content-types/image-dark",
       "styles": {},
       "url": "https://www.youtube.com/watch?v=_yaYy86jdk8"
     },
     "205fa3ab-9358-46f3-81d6-4ea90dc8c290": {
       "@type": "video",
       "align": "left",
-      "preview_image": "http://localhost:8080/Plone/content-types/image",
+      "preview_image": "http://localhost:8080/Plone/content-types/image-dark",
       "styles": {},
       "url": "https://www.youtube.com/watch?v=_yaYy86jdk8"
     },

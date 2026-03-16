@@ -29,7 +29,7 @@
         "size:noprefix": "small"
       },
       "title": "Title Image",
-      "url": "/content-types/image"
+      "url": "/content-types/image-dark"
     },
     "05810541-401a-4a47-901c-ce8a8cef1c31": {
       "@type": "introduction",
@@ -55,7 +55,7 @@
         "size:noprefix": "large"
       },
       "title": "Title Image",
-      "url": "/content-types/image"
+      "url": "/content-types/image-dark"
     },
     "28a468d0-00d4-4e0b-8724-272e2e613695": {
       "@type": "slate",
@@ -241,7 +241,7 @@
         "size:noprefix": "medium"
       },
       "title": "Title Image",
-      "url": "/content-types/image"
+      "url": "/content-types/image-dark"
     },
     "5ca3eebb-e24c-4444-81f9-b5850c57e618": {
       "@type": "separator",
@@ -372,7 +372,7 @@
       "description": "Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt.",
       "size": "l",
       "title": "Title Image",
-      "url": "/content-types/image"
+      "url": "/content-types/image-dark"
     },
     "84de0f6c-9e7b-4f60-b2cd-44aa2e80cf4c": {
       "@type": "slate",
@@ -396,7 +396,7 @@
       "description": "Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt.",
       "size": "l",
       "title": "Title Image",
-      "url": "/content-types/image"
+      "url": "/content-types/image-dark"
     },
     "8ebd405e-90c4-40ff-81b7-052dd5292098": {
       "@type": "slate",
@@ -422,7 +422,7 @@
         "size:noprefix": "small"
       },
       "title": "Title Image",
-      "url": "/content-types/image"
+      "url": "/content-types/image-dark"
     },
     "9a3d1a33-d559-45af-846b-8a2a37a51e0d": {
       "@type": "slate",
@@ -449,7 +449,7 @@
         "size:noprefix": "large"
       },
       "title": "Title Image",
-      "url": "/content-types/image"
+      "url": "/content-types/image-dark"
     },
     "b1ffd738-793d-4c3f-9349-d2880c2fad80": {
       "@type": "slate",
@@ -586,7 +586,7 @@
         "size:noprefix": "medium"
       },
       "title": "Title Image",
-      "url": "/content-types/image"
+      "url": "/content-types/image-dark"
     },
     "f773ee3a-ecbe-40de-a214-16dfa19bb8d6": {
       "@type": "slate",

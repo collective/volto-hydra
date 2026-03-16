@@ -15,7 +15,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image"
+          "url": "/content-types/image-dark"
         },
         "b1015ec4-9ddf-4e59-b6bf-214fc12c3a3d": {
           "@type": "image",
@@ -25,7 +25,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image"
+          "url": "/content-types/image-dark"
         },
         "e800de8b-25f2-4a40-a3c6-189bec399a45": {
           "@type": "image",
@@ -35,7 +35,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image"
+          "url": "/content-types/image-dark"
         }
       },
       "blocks_layout": {
@@ -70,7 +70,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image"
+          "url": "/content-types/image-dark"
         }
       },
       "blocks_layout": {
@@ -104,7 +104,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image"
+          "url": "/content-types/image-dark"
         }
       },
       "blocks_layout": {
@@ -126,7 +126,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image"
+          "url": "/content-types/image-dark"
         }
       },
       "blocks_layout": {
@@ -163,7 +163,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image"
+          "url": "/content-types/image-dark"
         },
         "d8ed659a-020b-4688-9d72-42c518677d4a": {
           "@type": "image",
@@ -183,7 +183,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image"
+          "url": "/content-types/image-dark"
         }
       },
       "blocks_layout": {
@@ -209,7 +209,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image"
+          "url": "/content-types/image-dark"
         },
         "eaa34549-1998-45a4-957e-2ea5d7cf41c4": {
           "@type": "image",
@@ -229,7 +229,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image"
+          "url": "/content-types/image-dark"
         }
       },
       "blocks_layout": {
@@ -252,7 +252,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image"
+          "url": "/content-types/image-dark"
         }
       },
       "blocks_layout": {
@@ -294,7 +294,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image"
+          "url": "/content-types/image-dark"
         },
         "da85c8f3-5de2-4d66-822d-a177e42821ff": {
           "@type": "image",
@@ -304,7 +304,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image"
+          "url": "/content-types/image-dark"
         }
       },
       "blocks_layout": {

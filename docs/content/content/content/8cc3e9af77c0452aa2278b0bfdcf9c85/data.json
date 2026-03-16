@@ -767,7 +767,7 @@
       "image_field": "image",
       "size": "l",
       "title": "Inhaltstyp: Image-1",
-      "url": "/content-types/image",
+      "url": "/content-types/image-dark",
       "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "placeholder": "content"

@@ -1,5 +1,5 @@
 {
-  "@id": "/content-types/image",
+  "@id": "/content-types/image-dark",
   "@type": "Image",
   "UID": "970ec24c76784c66a06d8c8d8b6522b2",
   "allow_discussion": false,
@@ -15,7 +15,7 @@
   "exportimport.constrains": {},
   "exportimport.conversation": [],
   "exportimport.versions": {},
-  "id": "image",
+  "id": "image-dark",
   "image": {
     "blob_path": "970ec24c76784c66a06d8c8d8b6522b2/image/black-starry-night.jpg",
     "content-type": "image/jpeg",
@@ -40,7 +40,7 @@
     "title": "Content Types",
     "type_title": "Page"
   },
-  "review_state": "published",
+  "review_state": null,
   "rights": "Credits: ipsum dolor sit amet.",
   "subjects": [],
   "title": "Image",

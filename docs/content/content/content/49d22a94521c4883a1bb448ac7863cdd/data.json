@@ -519,7 +519,7 @@
       "image_field": "image",
       "size": "l",
       "title": "Caption Title (14/18px). Image",
-      "url": "http://host.docker.internal:8080/Plone/content-types/image"
+      "url": "http://host.docker.internal:8080/Plone/content-types/image-dark"
     },
     "f5858bf7-5485-479c-b0b2-10eee0dc937c": {
       "@type": "slate",
