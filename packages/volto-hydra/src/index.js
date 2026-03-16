@@ -1,5 +1,7 @@
 import filterSVG from '@plone/volto/icons/filter.svg';
-import frontendPreviewUrl from './reducers';
+import frontendPreviewUrl, { viewportPreset } from './reducers';
+import FrontendSwitcherPlug from './components/Toolbar/FrontendSwitcherPlug';
+import FrontendSwitcherPanel from './components/Toolbar/FrontendSwitcherPanel';
 import {
   getAllowedBlocksList,
   subscribeToAllowedBlocksListChanges,
@@ -51,8 +53,24 @@ const applyConfig = (config) => {
       return originalSetTimeout.call(this, callback, delay, ...args);
     };
   }
-  // Add the frontendPreviwUrl reducer
+  // Add reducers
   config.addonReducers.frontendPreviewUrl = frontendPreviewUrl;
+  config.addonReducers.viewportPreset = viewportPreset;
+
+  // Frontend Switcher toolbar menu (viewport + frontend URL switching)
+  config.settings.additionalToolbarComponents = {
+    ...config.settings.additionalToolbarComponents,
+    frontendSwitcher: {
+      component: FrontendSwitcherPanel,
+      wrapper: null,
+    },
+  };
+
+  // Register the toolbar plug as appExtras so Plug mounts in the App tree
+  config.settings.appExtras = [
+    ...(config.settings.appExtras || []),
+    { match: '/', component: FrontendSwitcherPlug },
+  ];
 
   // Hide container block fields - ChildBlocksWidget handles their UI
   config.widgets.widget.blocks_layout = HiddenBlocksWidget;

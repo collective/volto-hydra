@@ -37,6 +37,7 @@
   width: 100%;
   height: 100vh;
   border: none;
+  transition: max-width 0.3s ease;
 }
 
 /* Compact Quanta Toolbar Styles */

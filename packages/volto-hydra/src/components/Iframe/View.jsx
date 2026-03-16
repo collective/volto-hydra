@@ -436,6 +436,17 @@ const Iframe = (props) => {
 
   const dispatch = useDispatch();
 
+  // Viewport preset for responsive preview
+  const viewportPreset = useSelector(
+    (state) => state.viewportPreset?.preset || 'desktop',
+  );
+  const viewportWidths = useSelector(
+    (state) => state.viewportPreset?.widths || { mobile: 375, tablet: 768 },
+  );
+  const iframeMaxWidth = viewportPreset === 'desktop'
+    ? undefined
+    : `${viewportWidths[viewportPreset]}px`;
+
   // DEBUG: Track what causes re-renders
   const renderCountRef = useRef(0);
   const prevPropsRef = useRef({});
@@ -502,6 +513,14 @@ const Iframe = (props) => {
 
   // Track last SELECT_BLOCK sent to avoid redundant sends during pending selection
   const lastSentSelectBlockRef = useRef(null);
+
+  // When frontend URL changes (iframe remounts), reset the last-sent ref so the
+  // selectedBlock effect below re-sends SELECT_BLOCK to the new iframe.
+  // Also clear stale blockUI positioning from the old frontend.
+  useEffect(() => {
+    lastSentSelectBlockRef.current = null;
+    setBlockUI(null);
+  }, [u]);
 
   useEffect(() => {
     // Only send SELECT_BLOCK if iframe is ready (has sent INIT)
@@ -2655,6 +2674,7 @@ const Iframe = (props) => {
             type: 'INITIAL_DATA',
             data: formDataToSend,
             blockPathMap: stripBlockPathMapForPostMessage(blockPathMap),
+            selectedBlockUid: selectedBlock,
             slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
           }, origin);
           pendingInitialDataRef.current = null;
@@ -2741,6 +2761,7 @@ const Iframe = (props) => {
           type: 'INITIAL_DATA',
           data: formDataToSend,
           blockPathMap: stripBlockPathMapForPostMessage(blockPathMap),
+          selectedBlockUid: selectedBlock,
           slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
         }, origin);
         pendingInitialDataRef.current = null;
@@ -3271,11 +3292,12 @@ const Iframe = (props) => {
           document.body,
         )}
       {/* Only render when src is ready (ensures name attribute is applied on creation).
-          Key on mode ensures iframe remounts when switching edit/view,
+          Key on mode + frontend URL ensures iframe remounts when switching edit/view
+          or switching frontends (avoids beforeunload dialog from old iframe),
           but persists during SPA navigation within the same mode */}
       {iframeSrc && (
         <iframe
-          key={isEditMode ? 'edit' : 'view'}
+          key={`${isEditMode ? 'edit' : 'view'}-${u}`}
           id="previewIframe"
           name={iframeName}
           title="Preview"
@@ -3283,6 +3305,7 @@ const Iframe = (props) => {
           ref={setReferenceElement}
           allow="clipboard-read; clipboard-write"
           suppressHydrationWarning
+          style={iframeMaxWidth ? { maxWidth: iframeMaxWidth } : undefined}
         />
       )}
 

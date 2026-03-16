@@ -1,0 +1,358 @@
+/* Frontend Switcher Panel */
+.frontend-switcher-panel {
+  padding: 12px;
+  min-width: 260px;
+}
+
+.frontend-switcher-section {
+  margin-bottom: 12px;
+}
+
+.frontend-switcher-section:last-child {
+  margin-bottom: 0;
+}
+
+.frontend-switcher-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+}
+
+/* Viewport row */
+.frontend-switcher-viewport-row {
+  display: flex;
+  gap: 4px;
+}
+
+.frontend-switcher-viewport-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 36px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.frontend-switcher-viewport-btn:hover {
+  background: #f0f0f0;
+  border-color: #bbb;
+}
+
+.frontend-switcher-viewport-btn.active {
+  background: #007eb1;
+  border-color: #007eb1;
+  color: #fff;
+}
+
+.frontend-switcher-viewport-btn.active svg {
+  fill: #fff !important;
+}
+
+/* Frontend URL list */
+.frontend-switcher-url-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.frontend-switcher-url-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 0.15s ease;
+}
+
+.frontend-switcher-url-item:hover {
+  background: #f0f0f0;
+}
+
+.frontend-switcher-url-item.active {
+  background: #e8f4f8;
+}
+
+.frontend-switcher-url-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #007eb1;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+
+.frontend-switcher-url-item.active .frontend-switcher-url-icon {
+  background: #005a80;
+}
+
+.frontend-switcher-url-text {
+  font-size: 13px;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Settings */
+.frontend-switcher-settings {
+  border-top: 1px solid #eee;
+  padding-top: 8px;
+}
+
+.frontend-switcher-settings-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+  font-size: 13px;
+  color: #555;
+  transition: background 0.15s ease;
+}
+
+.frontend-switcher-settings-btn:hover {
+  background: #f0f0f0;
+}
+
+/* Toolbar button style */
+.frontend-switcher-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 8px 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.frontend-switcher-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* Settings Modal */
+.frontend-settings-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.frontend-settings-modal {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  width: 400px;
+  max-width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.frontend-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.frontend-settings-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.frontend-settings-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.frontend-settings-close:hover {
+  background: #f0f0f0;
+}
+
+.frontend-settings-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+
+.frontend-settings-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+
+.frontend-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.frontend-settings-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: #f8f8f8;
+}
+
+.frontend-settings-item-url {
+  flex: 1;
+  font-size: 13px;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.frontend-settings-remove {
+  display: flex;
+  align-items: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  color: #999;
+}
+
+.frontend-settings-remove:hover {
+  background: #fee;
+  color: #c00;
+}
+
+.frontend-settings-env-badge {
+  font-size: 10px;
+  color: #888;
+  background: #eee;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.frontend-settings-add {
+  display: flex;
+  gap: 4px;
+}
+
+.frontend-settings-input {
+  flex: 1;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  outline: none;
+}
+
+.frontend-settings-input:focus {
+  border-color: #007eb1;
+}
+
+.frontend-settings-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #007eb1;
+  border-radius: 4px;
+  background: #007eb1;
+  color: #fff;
+  cursor: pointer;
+}
+
+.frontend-settings-add-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.frontend-settings-add-btn svg {
+  fill: #fff !important;
+}
+
+.frontend-settings-error {
+  font-size: 12px;
+  color: #c00;
+  margin-top: 4px;
+}
+
+/* Viewport width settings */
+.frontend-settings-widths {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.frontend-settings-width-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.frontend-settings-width-row label {
+  width: 60px;
+  font-size: 13px;
+  color: #555;
+}
+
+.frontend-settings-width-input {
+  width: 80px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  outline: none;
+  text-align: right;
+}
+
+.frontend-settings-width-input:focus {
+  border-color: #007eb1;
+}
+
+.frontend-settings-width-unit {
+  font-size: 13px;
+  color: #888;
+}
