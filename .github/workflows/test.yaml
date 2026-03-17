@@ -62,7 +62,7 @@ jobs:
           cd examples/nuxt-blog-starter && npm install && npm run build:test
       - name: Build Next.js example
         run: |
-          cd examples/hydra-nextjs && npm run build:test
+          cd examples/hydra-nextjs && pnpm run build:test
         env:
           NEXT_PUBLIC_BACKEND_BASE_URL: http://localhost:8888
       - name: Install F7 example
@@ -86,7 +86,7 @@ jobs:
           cd docs/blocks/test-vue && npx vite --port 3006 --strictPort &
 
           # Start Next.js example (production mode — fast, no compilation)
-          cd examples/hydra-nextjs && npm run start:test &
+          cd examples/hydra-nextjs && pnpm run start:test &
 
           # Start F7 example (Vite — no mkcert for CI)
           cd examples/hydra-vue-f7 && cp ../../packages/hydra-js/hydra.js ./src/js/hydra.js && VITE_API_BASE_URL=http://localhost:8888 npx vite --port 3008 --strictPort --config vite.config.test.js &
