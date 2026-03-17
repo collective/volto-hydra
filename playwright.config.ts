@@ -166,8 +166,8 @@ export default defineConfig({
       },
     },
 
-    // Example frontends for bridge tests — opt-in only
-    {
+    // Example frontends for bridge tests — opt-in only (run with --project=nextjs or --project=f7)
+    ...(needsNextjs ? [{
       name: 'nextjs',
       testDir: 'tests-playwright/bridge',
       use: {
@@ -175,8 +175,8 @@ export default defineConfig({
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
       },
-    },
-    {
+    }] : []),
+    ...(needsF7 ? [{
       name: 'f7',
       testDir: 'tests-playwright/bridge',
       use: {
@@ -184,7 +184,7 @@ export default defineConfig({
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
       },
-    },
+    }] : []),
 
     // --- Admin integration tests — fully implemented frontends only ---
     // Mock frontend
@@ -228,8 +228,7 @@ export default defineConfig({
     },
 
     // --- Example frontends — opt-in only (run with --project=admin-nextjs or --project=admin-f7) ---
-    // Always defined so workers can find them; webServer entries below are conditional
-    {
+    ...(needsNextjs ? [{
       name: 'admin-nextjs',
       testDir: 'tests-playwright/integration',
       use: {
@@ -241,8 +240,8 @@ export default defineConfig({
       testIgnore: [
         /nuxt-.*\.spec\.ts/,
       ],
-    },
-    {
+    }] : []),
+    ...(needsF7 ? [{
       name: 'admin-f7',
       testDir: 'tests-playwright/integration',
       use: {
@@ -254,7 +253,7 @@ export default defineConfig({
       testIgnore: [
         /nuxt-.*\.spec\.ts/,
       ],
-    },
+    }] : []),
   ],
 
   /* Start mock API server and Volto dev server before running tests */
