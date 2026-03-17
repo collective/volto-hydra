@@ -131,6 +131,8 @@
         },
         onEditChange: (data) => {
           store.state.content = data;
+          // Always set apiBase — needed for listing/search API calls
+          store.state.apiBase = import.meta.env.VITE_API_BASE_URL || "https://hydra-api.pretagov.com";
         },
       });
 

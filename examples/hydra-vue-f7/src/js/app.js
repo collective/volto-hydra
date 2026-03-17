@@ -10,6 +10,10 @@ import Framework7Vue, { registerComponents } from 'framework7-vue/bundle';
 // Import Framework7 Styles
 import 'framework7/css/bundle';
 
+// Register Swiper web components (used by f7-tabs swipeable and slider block)
+import { register as registerSwiper } from 'swiper/element/bundle'
+registerSwiper();
+
 // Import Icons and App Custom Styles
 import '../css/icons.css';
 import '../css/app.css';

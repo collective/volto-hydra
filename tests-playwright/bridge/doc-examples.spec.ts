@@ -18,12 +18,24 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // Doc-example tests run on frontends that render blocks from fixture data.
-// Skip mock (test frontend only handles specific blocks) and nuxt (uses
-// server-side rendering that conflicts with mock parent protocol).
-base.beforeEach(({}, testInfo) => {
+// Skip mock/nuxt (different block handling). Skip nextjs/f7 unless their
+// servers are running (they're opt-in — only started with --project=nextjs/f7).
+base.beforeEach(async ({}, testInfo) => {
   const project = testInfo.project.name;
   if (project === 'mock' || project === 'nuxt') {
     testInfo.skip(true, `Doc-examples only run on doc-example frontends (not ${project})`);
+  }
+  // Skip opt-in frontends if their server isn't running
+  if (project === 'nextjs' || project === 'f7') {
+    const url = getFrontendUrl(project);
+    if (url) {
+      try {
+        const resp = await fetch(url, { signal: AbortSignal.timeout(2000) });
+        if (!resp.ok) testInfo.skip(true, `${project} server not running (${resp.status})`);
+      } catch {
+        testInfo.skip(true, `${project} server not reachable`);
+      }
+    }
   }
 });
 

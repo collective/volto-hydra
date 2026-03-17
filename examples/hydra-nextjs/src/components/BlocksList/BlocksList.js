@@ -1,9 +1,11 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import SlateBlock from "@/components/SlateBlock";
+import CodeExampleBlock from "@/components/CodeExampleBlock/CodeExampleBlock";
 import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, staticBlocks, contentPath } from "#utils/hydra";
+import SwiperSlider from "@/components/SwiperSlider";
 
 // Template context for nested block expansion
 const TemplateContext = createContext({ templates: {}, templateState: {} });
@@ -49,7 +51,7 @@ function getUrl(value, apiUrl) {
  * Ported from Nuxt composables/imageProps.js
  * @param {object|string|Array} block - image value in various Plone formats
  * @param {string} backendBaseUrl - backend base URL for relative paths
- * @returns {{ url: string|null, size: string, align: string }}
+ * @returns {{ url: string|null, size: string, align: string, srcset: string, sizes: string, width: number }}
  */
 function imageProps(block, backendBaseUrl) {
   if (!block) return { url: null };
@@ -108,11 +110,27 @@ function imageProps(block, backendBaseUrl) {
   // Prepend backend base URL for relative paths
   image_url = image_url.startsWith("/") ? `${backendBaseUrl}${image_url}` : image_url;
 
+  let srcset = "";
+  let sizes = "";
+  const width = block?.width;
+
   // Use image_scales download path if available
   if (block?.image_scales && block?.image_field) {
     const field = block.image_field;
+    srcset = Object.keys(block.image_scales[field][0].scales).map((name) => {
+      const scale = block.image_scales[field][0].scales[name];
+      return `${image_url}/${scale.download} ${scale.width}w`;
+    }).join(", ");
+    sizes = Object.keys(block.image_scales[field][0].scales).map((name) => {
+      const scale = block.image_scales[field][0].scales[name];
+      return `${name}:${scale.width}px`;
+    }).join(" ");
     image_url = `${image_url}/${block.image_scales[field][0].download}`;
   } else if (block?.scales) {
+    srcset = Object.keys(block.scales).map((name) => {
+      const scale = block.scales[name];
+      return `${image_url}/${scale.download} ${scale.width}w`;
+    }).join(", ");
     image_url = block.download;
   } else if (block?.url && block?.image_field) {
     image_url = `${image_url}/@@images/${block.image_field}`;
@@ -131,6 +149,9 @@ function imageProps(block, backendBaseUrl) {
     url: image_url,
     size: block.size,
     align: block.align,
+    srcset,
+    sizes,
+    width,
   };
 }
 
@@ -207,11 +228,115 @@ function getSocialInfo(url) {
   }
 }
 
-// ─── Listing Block (async fetcher) ───────────────────────────────────────────
+// ─── Facet helpers (search block) ────────────────────────────────────────────
+
+const FACET_FIELD_OPTIONS = {
+  review_state: [
+    { value: "private", title: "Private" },
+    { value: "pending", title: "Pending" },
+    { value: "published", title: "Published" },
+  ],
+  portal_type: [
+    { value: "Document", title: "Page" },
+    { value: "News Item", title: "News Item" },
+    { value: "Event", title: "Event" },
+    { value: "Image", title: "Image" },
+    { value: "File", title: "File" },
+    { value: "Link", title: "Link" },
+  ],
+};
+
+function getFacetField(facet) {
+  if (typeof facet.field === "object") {
+    return facet.field?.value || "";
+  }
+  return facet.field || "";
+}
+
+function getFacetOptions(facet) {
+  const field = getFacetField(facet);
+  return FACET_FIELD_OPTIONS[field] || [];
+}
+
+// ─── Paging Component ────────────────────────────────────────────────────────
+
+function Paging({ paging, buildUrl, onNavigate }) {
+  if (!paging || paging.totalPages <= 1) return null;
+  const handleClick = (e, page) => {
+    e.preventDefault();
+    onNavigate(page);
+  };
+  return (
+    <nav aria-label="Page Navigation" className="paging" style={{ marginTop: "1rem" }}>
+      <ul style={{ display: "inline-flex", listStyle: "none", padding: 0, gap: 0 }}>
+        {paging.prev !== null && (
+          <li>
+            <a
+              href={buildUrl(paging.prev)}
+              className="paging-prev"
+              data-linkable-allow
+              onClick={(e) => handleClick(e, paging.prev)}
+              style={{ padding: "0.25rem 0.75rem", border: "1px solid #d1d5db", borderRadius: "4px 0 0 4px", color: "#6b7280", backgroundColor: "#fff" }}
+            >
+              Previous
+            </a>
+          </li>
+        )}
+        {paging.pages && paging.pages.map((pg) => (
+          <li key={pg.page}>
+            <a
+              href={buildUrl(pg.page - 1)}
+              className={`paging-page${paging.currentPage === pg.page - 1 ? " current" : ""}`}
+              data-linkable-allow
+              onClick={(e) => handleClick(e, pg.page - 1)}
+              style={{
+                padding: "0.25rem 0.75rem",
+                border: "1px solid #d1d5db",
+                color: "#6b7280",
+                backgroundColor: paging.currentPage === pg.page - 1 ? "#dbeafe" : "#fff",
+              }}
+            >
+              {pg.page}
+            </a>
+          </li>
+        ))}
+        {paging.next !== null && (
+          <li>
+            <a
+              href={buildUrl(paging.next)}
+              className="paging-next"
+              data-linkable-allow
+              onClick={(e) => handleClick(e, paging.next)}
+              style={{ padding: "0.25rem 0.75rem", border: "1px solid #d1d5db", borderRadius: "0 4px 4px 0", color: "#6b7280", backgroundColor: "#fff" }}
+            >
+              Next
+            </a>
+          </li>
+        )}
+      </ul>
+    </nav>
+  );
+}
+
+// ─── Listing Block (async fetcher with paging) ──────────────────────────────
+
+const DEFAULT_PAGE_SIZE = 6;
 
 function ListingBlock({ id, block, data, apiUrl, contextPath }) {
   const [items, setItems] = useState([]);
   const [paging, setPaging] = useState(null);
+  const [currentPage, setCurrentPage] = useState(0);
+
+  // Read initial page from URL on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname;
+      const match = path.match(new RegExp(`@pg_${id}_(\\d+)`));
+      if (match) {
+        setCurrentPage(parseInt(match[1], 10));
+      }
+    }
+  }, [id]);
 
   useEffect(() => {
     if (!apiUrl) return;
@@ -222,19 +347,591 @@ function ListingBlock({ id, block, data, apiUrl, contextPath }) {
       blocks: { [id]: block },
       fetchItems,
       itemTypeField: "variation",
+      paging: { start: currentPage * DEFAULT_PAGE_SIZE, size: DEFAULT_PAGE_SIZE },
     }).then((result) => {
       setItems(result.items || []);
-      setPaging(result.paging);
+      setPaging(result.paging || null);
     });
-  }, [id, block, apiUrl, contextPath]);
+  }, [id, block, apiUrl, contextPath, currentPage]);
 
-  if (!items.length) return null;
+  const buildPagingUrl = useCallback((page) => {
+    const cp = contextPath || "/";
+    if (page === 0) return cp;
+    return `${cp}/@pg_${id}_${page}`;
+  }, [id, contextPath]);
+
+  const handleNavigate = useCallback((page) => {
+    setCurrentPage(page);
+    // Update URL without full page reload
+    if (typeof window !== "undefined") {
+      const url = page === 0 ? (contextPath || "/") : `${contextPath || "/"}/@pg_${id}_${page}`;
+      window.history.pushState({}, "", url);
+    }
+  }, [id, contextPath]);
+
+  if (!items.length && !paging) return null;
   return (
     <>
       {items.map((item) => (
         <Block key={item["@uid"]} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
       ))}
+      <Paging paging={paging} buildUrl={buildPagingUrl} onNavigate={handleNavigate} />
     </>
+  );
+}
+
+// ─── Accordion Block (with open/close panel tracking) ────────────────────────
+
+function AccordionBlock({ id, block, data, apiUrl, contextPath }) {
+  const expand = useExpand();
+  const panels = expand(block.panels || [], null, "@id");
+
+  // Track open panels — first panel open by default
+  const [openPanels, setOpenPanels] = useState(() => {
+    const initial = {};
+    if (panels.length > 0) {
+      initial[panels[0]["@uid"]] = true;
+    }
+    return initial;
+  });
+
+  const toggle = (panelUid) => {
+    setOpenPanels((prev) => ({ ...prev, [panelUid]: !prev[panelUid] }));
+  };
+
+  return (
+    <div data-block-uid={id} className="accordion-block">
+      {panels.map((panel, i) => {
+        const children = expand(panel.blocks_layout?.items || [], panel.blocks || {});
+        const isOpen = !!openPanels[panel["@uid"]];
+        return (
+          <div key={panel["@uid"] || i} data-block-uid={panel["@uid"]} style={{ border: "1px solid #e5e7eb" }}>
+            <h2>
+              <button
+                type="button"
+                onClick={() => toggle(panel["@uid"])}
+                aria-expanded={isOpen ? "true" : "false"}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  width: "100%", padding: "1.25rem", fontWeight: 500, cursor: "pointer",
+                  backgroundColor: isOpen ? "#f3f4f6" : "transparent", border: "none",
+                  color: isOpen ? "#111827" : "#6b7280",
+                }}
+              >
+                <span data-edit-text="title">{panel.title || `Panel ${i + 1}`}</span>
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none"
+                  style={{ transform: isOpen ? "rotate(0deg)" : "rotate(180deg)", transition: "transform 0.2s" }}>
+                  <path d="M9 5L5 1L1 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </h2>
+            {isOpen && (
+              <div style={{ padding: "1.25rem", borderTop: "1px solid #e5e7eb" }}>
+                {children.map((item) => (
+                  <Block key={item["@uid"]} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Form Block (with state tracking, validation, submit) ────────────────────
+
+function FormBlock({ id, block, data, apiUrl, contextPath }) {
+  const expand = useExpand();
+  const formFields = expand(block.subblocks || [], null, "field_id");
+
+  const [formValues, setFormValues] = useState({});
+  const [formErrors, setFormErrors] = useState({});
+  const [success, setSuccess] = useState(false);
+
+  const getFormValue = (fieldId) => formValues[fieldId] ?? "";
+
+  const setFormValue = (fieldId, value) => {
+    setFormValues((prev) => ({ ...prev, [fieldId]: value }));
+  };
+
+  const toggleMultiChoice = (fieldId, opt, checked) => {
+    const current = formValues[fieldId] || [];
+    const arr = Array.isArray(current) ? [...current] : [];
+    if (checked) {
+      if (!arr.includes(opt)) arr.push(opt);
+    } else {
+      const idx = arr.indexOf(opt);
+      if (idx >= 0) arr.splice(idx, 1);
+    }
+    setFormValue(fieldId, arr);
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    for (const field of formFields) {
+      if (!field.required) continue;
+      if (field.field_type === "static_text" || field.field_type === "hidden") continue;
+      const value = formValues[field.field_id];
+      const hasValue = Array.isArray(value) ? value.length > 0 : (value !== "" && value !== undefined && value !== false);
+      if (!hasValue) {
+        errors[field.field_id] = `${field.label} is required.`;
+      }
+    }
+    // Email format validation for 'from' fields
+    for (const field of formFields) {
+      if (field.field_type !== "from") continue;
+      const value = formValues[field.field_id];
+      if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        errors[field.field_id] = "Please enter a valid email address.";
+      }
+    }
+    return errors;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
+
+    const submitData = formFields
+      .filter((f) => f.field_type !== "static_text")
+      .map((f) => ({
+        field_id: f.field_id,
+        label: f.label,
+        value: formValues[f.field_id] ?? "",
+      }));
+
+    const cp = contextPath || "/";
+    const response = await fetch(`${apiUrl}${cp}/@submit-form`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ block_id: id, data: submitData }),
+    });
+    if (response.ok || response.status === 204) {
+      setSuccess(true);
+    }
+  };
+
+  const inputStyle = (fieldId) => ({
+    width: "100%", padding: "0.5rem",
+    border: `1px solid ${formErrors[fieldId] ? "#ef4444" : "#d1d5db"}`,
+    borderRadius: "0.5rem",
+  });
+
+  return (
+    <div data-block-uid={id} className="form-block">
+      {block.title && <h3 data-edit-text="title">{block.title}</h3>}
+      {success ? (
+        <div className="form-success" style={{ padding: "1rem", backgroundColor: "#f0fdf4", color: "#166534", borderRadius: "0.5rem", marginBottom: "1rem" }}>
+          {block.send_message || "Form submitted successfully."}
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} noValidate>
+          {formFields.map((field) => (
+            <div
+              key={field["@uid"]}
+              data-block-uid={field["@uid"]}
+              data-block-type={field.field_type}
+              data-block-add="bottom"
+              style={{ marginBottom: "1rem" }}
+            >
+              {field.field_type === "text" && (
+                <>
+                  <label data-edit-text="label">
+                    {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
+                  </label>
+                  {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
+                  <input type="text" name={field.field_id} placeholder={field.placeholder || ""}
+                    value={getFormValue(field.field_id)}
+                    onChange={(e) => setFormValue(field.field_id, e.target.value)}
+                    style={inputStyle(field.field_id)} />
+                  {formErrors[field.field_id] && <p className="form-error" style={{ color: "#ef4444", fontSize: "0.75rem", marginTop: "0.25rem" }}>{formErrors[field.field_id]}</p>}
+                </>
+              )}
+              {field.field_type === "textarea" && (
+                <>
+                  <label data-edit-text="label">
+                    {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
+                  </label>
+                  {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
+                  <textarea name={field.field_id} rows={4}
+                    value={getFormValue(field.field_id)}
+                    onChange={(e) => setFormValue(field.field_id, e.target.value)}
+                    style={inputStyle(field.field_id)} />
+                  {formErrors[field.field_id] && <p className="form-error" style={{ color: "#ef4444", fontSize: "0.75rem", marginTop: "0.25rem" }}>{formErrors[field.field_id]}</p>}
+                </>
+              )}
+              {field.field_type === "number" && (
+                <>
+                  <label data-edit-text="label">
+                    {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
+                  </label>
+                  {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
+                  <input type="number" name={field.field_id}
+                    value={getFormValue(field.field_id)}
+                    onChange={(e) => setFormValue(field.field_id, e.target.value)}
+                    style={inputStyle(field.field_id)} />
+                  {formErrors[field.field_id] && <p className="form-error" style={{ color: "#ef4444", fontSize: "0.75rem", marginTop: "0.25rem" }}>{formErrors[field.field_id]}</p>}
+                </>
+              )}
+              {field.field_type === "select" && (
+                <>
+                  <label data-edit-text="label">
+                    {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
+                  </label>
+                  {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
+                  <select name={field.field_id}
+                    value={getFormValue(field.field_id)}
+                    onChange={(e) => setFormValue(field.field_id, e.target.value)}
+                    style={inputStyle(field.field_id)}>
+                    <option value="">Select...</option>
+                    {(field.input_values || []).map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                  {formErrors[field.field_id] && <p className="form-error" style={{ color: "#ef4444", fontSize: "0.75rem", marginTop: "0.25rem" }}>{formErrors[field.field_id]}</p>}
+                </>
+              )}
+              {field.field_type === "single_choice" && (
+                <fieldset>
+                  <legend data-edit-text="label">
+                    {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
+                  </legend>
+                  {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
+                  {(field.input_values || []).map((opt) => (
+                    <label key={opt} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <input type="radio" name={field.field_id} value={opt}
+                        checked={getFormValue(field.field_id) === opt}
+                        onChange={() => setFormValue(field.field_id, opt)} /> {opt}
+                    </label>
+                  ))}
+                  {formErrors[field.field_id] && <p className="form-error" style={{ color: "#ef4444", fontSize: "0.75rem", marginTop: "0.25rem" }}>{formErrors[field.field_id]}</p>}
+                </fieldset>
+              )}
+              {field.field_type === "multiple_choice" && (
+                <fieldset>
+                  <legend data-edit-text="label">
+                    {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
+                  </legend>
+                  {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
+                  {(field.input_values || []).map((opt) => (
+                    <label key={opt} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <input type="checkbox" name={field.field_id} value={opt}
+                        checked={(getFormValue(field.field_id) || []).includes(opt)}
+                        onChange={(e) => toggleMultiChoice(field.field_id, opt, e.target.checked)} /> {opt}
+                    </label>
+                  ))}
+                  {formErrors[field.field_id] && <p className="form-error" style={{ color: "#ef4444", fontSize: "0.75rem", marginTop: "0.25rem" }}>{formErrors[field.field_id]}</p>}
+                </fieldset>
+              )}
+              {field.field_type === "checkbox" && (
+                <>
+                  <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <input type="checkbox" name={field.field_id}
+                      checked={!!getFormValue(field.field_id)}
+                      onChange={(e) => setFormValue(field.field_id, e.target.checked)} />
+                    <span data-edit-text="label">{field.label}{field.required && <span style={{ color: "red" }}> *</span>}</span>
+                  </label>
+                  {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
+                  {formErrors[field.field_id] && <p className="form-error" style={{ color: "#ef4444", fontSize: "0.75rem", marginTop: "0.25rem" }}>{formErrors[field.field_id]}</p>}
+                </>
+              )}
+              {field.field_type === "date" && (
+                <>
+                  <label data-edit-text="label">
+                    {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
+                  </label>
+                  {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
+                  <input type="date" name={field.field_id}
+                    value={getFormValue(field.field_id)}
+                    onChange={(e) => setFormValue(field.field_id, e.target.value)}
+                    style={inputStyle(field.field_id)} />
+                  {formErrors[field.field_id] && <p className="form-error" style={{ color: "#ef4444", fontSize: "0.75rem", marginTop: "0.25rem" }}>{formErrors[field.field_id]}</p>}
+                </>
+              )}
+              {field.field_type === "from" && (
+                <>
+                  <label data-edit-text="label">
+                    {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
+                  </label>
+                  {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
+                  <input type="email" name={field.field_id}
+                    value={getFormValue(field.field_id)}
+                    onChange={(e) => setFormValue(field.field_id, e.target.value)}
+                    style={inputStyle(field.field_id)} />
+                  {formErrors[field.field_id] && <p className="form-error" style={{ color: "#ef4444", fontSize: "0.75rem", marginTop: "0.25rem" }}>{formErrors[field.field_id]}</p>}
+                </>
+              )}
+              {field.field_type === "attachment" && (
+                <>
+                  <label data-edit-text="label">
+                    {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
+                  </label>
+                  {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
+                  <input type="file" name={field.field_id}
+                    onChange={(e) => setFormValue(field.field_id, e.target.files?.[0]?.name || "")} />
+                  {formErrors[field.field_id] && <p className="form-error" style={{ color: "#ef4444", fontSize: "0.75rem", marginTop: "0.25rem" }}>{formErrors[field.field_id]}</p>}
+                </>
+              )}
+              {field.field_type === "static_text" && (
+                <div>
+                  {field.label && <strong data-edit-text="label">{field.label}</strong>}
+                  {field.description && <p>{field.description}</p>}
+                </div>
+              )}
+              {field.field_type === "hidden" && (
+                <input type="hidden" name={field.field_id} value={field.value || ""} />
+              )}
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: "0.75rem", paddingTop: "0.5rem" }}>
+            <button type="submit" className="form-submit" data-edit-text="submit_label">
+              {block.submit_label || "Submit"}
+            </button>
+            {block.show_cancel && (
+              <button type="reset" data-edit-text="cancel_label"
+                onClick={() => { setFormValues({}); setFormErrors({}); }}>
+                {block.cancel_label || "Cancel"}
+              </button>
+            )}
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+// ─── Search Block (with facets, search input, sort) ──────────────────────────
+
+function SearchBlock({ id, block, data, apiUrl, contextPath }) {
+  const expand = useExpand();
+  const facets = expand(block.facets || [], null, "@id");
+  const searchResults = expand(block.listing?.items || [], block.blocks || {});
+
+  const [searchText, setSearchText] = useState("");
+  const [facetValues, setFacetValues] = useState({});
+  const [sortOn, setSortOn] = useState("");
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    setSearchText(formData.get("SearchableText") || "");
+  };
+
+  const handleSortChange = (e) => {
+    setSortOn(e.target.value);
+  };
+
+  const isFacetChecked = (facet, value) => {
+    const field = getFacetField(facet);
+    const current = facetValues[field];
+    if (Array.isArray(current)) return current.includes(value);
+    return current === value;
+  };
+
+  const handleFacetCheckboxChange = (e) => {
+    const checkbox = e.target;
+    const field = checkbox.dataset.field;
+    const value = checkbox.value;
+
+    setFacetValues((prev) => {
+      const current = prev[field];
+      const currentValues = Array.isArray(current) ? [...current] : current ? [current] : [];
+
+      if (checkbox.checked) {
+        if (!currentValues.includes(value)) currentValues.push(value);
+      } else {
+        const idx = currentValues.indexOf(value);
+        if (idx !== -1) currentValues.splice(idx, 1);
+      }
+
+      const next = { ...prev };
+      if (currentValues.length === 0) {
+        delete next[field];
+      } else if (currentValues.length === 1) {
+        next[field] = currentValues[0];
+      } else {
+        next[field] = currentValues;
+      }
+      return next;
+    });
+  };
+
+  const handleFacetSelectChange = (e) => {
+    const field = e.target.dataset.field;
+    const value = e.target.value;
+    setFacetValues((prev) => {
+      const next = { ...prev };
+      if (value) {
+        next[field] = value;
+      } else {
+        delete next[field];
+      }
+      return next;
+    });
+  };
+
+  const getListingTotalResults = () => {
+    const listingUid = block.listing?.items?.[0];
+    if (!listingUid) return null;
+    const listingBlock = block.blocks?.[listingUid];
+    return listingBlock?._paging?.totalItems || listingBlock?.items_total || null;
+  };
+
+  const renderFacet = (facet, i) => {
+    if (facet.type === "slate" || facet.type === "image") {
+      return (
+        <div key={facet["@uid"] || i} data-block-uid={facet["@uid"]} data-block-add="bottom"
+          style={{ padding: "0.75rem", border: "1px solid #e5e7eb", borderRadius: "4px", minWidth: "12rem" }}>
+          <Block block={facet} id={facet["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
+        </div>
+      );
+    }
+    return (
+      <div key={facet["@uid"] || i} data-block-uid={facet["@uid"]} data-block-type={facet.type} data-block-add="bottom"
+        style={{ padding: "0.75rem", border: "1px solid #e5e7eb", borderRadius: "4px", minWidth: "12rem" }}>
+        <div data-edit-text="title" style={{ fontWeight: 500, fontSize: "0.875rem", marginBottom: "0.5rem" }}>{facet.title}</div>
+        {facet.type === "selectFacet" && (
+          <select data-field={getFacetField(facet)} onChange={handleFacetSelectChange} style={{ width: "100%", padding: "0.5rem", border: "1px solid #d1d5db", borderRadius: "4px", fontSize: "0.875rem" }}>
+            <option value="">Select...</option>
+            {getFacetOptions(facet).map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.title}</option>
+            ))}
+          </select>
+        )}
+        {facet.type === "daterangeFacet" && (
+          <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
+            <input type="date" style={{ padding: "0.25rem 0.5rem", border: "1px solid #d1d5db", borderRadius: "4px", fontSize: "0.875rem" }} />
+            <span style={{ color: "#9ca3af" }}>&mdash;</span>
+            <input type="date" style={{ padding: "0.25rem 0.5rem", border: "1px solid #d1d5db", borderRadius: "4px", fontSize: "0.875rem" }} />
+          </div>
+        )}
+        {facet.type === "toggleFacet" && (
+          <div style={{ marginTop: "0.25rem" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem" }}>
+              <input type="checkbox" />
+              {getFacetOptions(facet)?.[0]?.title || "Toggle"}
+            </label>
+          </div>
+        )}
+        {facet.type !== "selectFacet" && facet.type !== "daterangeFacet" && facet.type !== "toggleFacet" && (
+          <div>
+            {getFacetOptions(facet).map((opt) => (
+              <label key={opt.value} style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem" }}>
+                <input type="checkbox" value={opt.value} className="facet-checkbox"
+                  data-field={getFacetField(facet)}
+                  checked={isFacetChecked(facet, opt.value)}
+                  onChange={handleFacetCheckboxChange} />
+                {opt.title}
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const totalResults = getListingTotalResults();
+
+  // Facets on left/right side variation
+  if (block.variation === "facetsLeftSide" || block.variation === "facetsRightSide") {
+    return (
+      <div data-block-uid={id} className="search-block">
+        {block.headline && <h2 data-edit-text="headline">{block.headline}</h2>}
+        {block.showSearchInput && (
+          <form onSubmit={handleSearchSubmit} style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+            <input type="text" name="SearchableText" placeholder="Search..." defaultValue={searchText}
+              style={{ flex: 1, padding: "0.5rem 1rem", border: "1px solid #d1d5db", borderRadius: "0.5rem" }} />
+            <button type="submit" style={{ padding: "0.5rem 1rem", backgroundColor: "#2563eb", color: "#fff", borderRadius: "0.5rem", border: "none" }}>
+              Search
+            </button>
+          </form>
+        )}
+        <div style={{ display: "flex", gap: "1.5rem", flexDirection: block.variation === "facetsRightSide" ? "row-reverse" : "row" }}>
+          {facets.length > 0 && (
+            <aside className="search-facets" style={{ width: "16rem", flexShrink: 0 }}>
+              <div style={{ padding: "1rem", backgroundColor: "#f9fafb", borderRadius: "0.5rem" }}>
+                {block.facetsTitle && <h3 style={{ fontWeight: 600, marginBottom: "0.75rem", color: "#374151" }}>{block.facetsTitle}</h3>}
+                {facets.map((facet, i) => (
+                  <div key={facet["@uid"] || i} style={{ marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid #e5e7eb" }}>
+                    {renderFacet(facet, i)}
+                  </div>
+                ))}
+              </div>
+            </aside>
+          )}
+          <div className="search-results" style={{ flex: 1 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem", marginBottom: "1rem" }}>
+              {block.showTotalResults && totalResults && (
+                <p style={{ color: "#4b5563" }}>{totalResults} results</p>
+              )}
+              {block.showSortOn && block.sortOnOptions?.length > 0 && (
+                <div className="search-sort">
+                  <label style={{ fontSize: "0.875rem", color: "#4b5563", marginRight: "0.5rem" }}>Sort by:</label>
+                  <select onChange={handleSortChange} style={{ padding: "0.25rem 0.75rem", border: "1px solid #d1d5db", borderRadius: "4px", fontSize: "0.875rem" }}>
+                    {block.sortOnOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            {searchResults.map((item) => (
+              <Block key={item["@uid"]} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Default: facets on top
+  return (
+    <div data-block-uid={id} className="search-block">
+      {block.headline && <h2 data-edit-text="headline">{block.headline}</h2>}
+      {block.showSearchInput && (
+        <form onSubmit={handleSearchSubmit} style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+          <input type="text" name="SearchableText" placeholder="Search..." defaultValue={searchText}
+            style={{ flex: 1, padding: "0.5rem 1rem", border: "1px solid #d1d5db", borderRadius: "0.5rem" }} />
+          <button type="submit" style={{ padding: "0.5rem 1rem", backgroundColor: "#2563eb", color: "#fff", borderRadius: "0.5rem", border: "none" }}>
+            Search
+          </button>
+        </form>
+      )}
+      {facets.length > 0 && (
+        <>
+          {block.facetsTitle && <h3 style={{ fontWeight: 600, marginBottom: "0.75rem", color: "#374151" }}>{block.facetsTitle}</h3>}
+          <div className="search-facets" style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "1rem", padding: "1rem", backgroundColor: "#f9fafb", borderRadius: "0.5rem" }}>
+            {facets.map((facet, i) => renderFacet(facet, i))}
+          </div>
+        </>
+      )}
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem", marginBottom: "1rem" }}>
+        {block.showTotalResults && totalResults && (
+          <p style={{ color: "#4b5563" }}>{totalResults} results</p>
+        )}
+        {block.showSortOn && block.sortOnOptions?.length > 0 && (
+          <div className="search-sort">
+            <label style={{ fontSize: "0.875rem", color: "#4b5563", marginRight: "0.5rem" }}>Sort by:</label>
+            <select onChange={handleSortChange} style={{ padding: "0.25rem 0.75rem", border: "1px solid #d1d5db", borderRadius: "4px", fontSize: "0.875rem" }}>
+              {block.sortOnOptions.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+      <div className="search-results">
+        {searchResults.map((item) => (
+          <Block key={item["@uid"]} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -300,10 +997,14 @@ function Block({ block, id, data, apiUrl, contextPath }) {
         >
           {href ? (
             <a href={href} className="image-link" data-edit-link="href">
-              <img data-edit-media="url" src={src} alt={block.alt || ""} />
+              <img data-edit-media="url" src={src} alt={block.alt || ""}
+                {...(imgProps.srcset ? { srcSet: imgProps.srcset, sizes: imgProps.sizes } : {})}
+                {...(imgProps.width ? { width: imgProps.width } : {})} />
             </a>
           ) : (
-            <img data-edit-media="url" data-edit-link="href" src={src} alt={block.alt || ""} />
+            <img data-edit-media="url" data-edit-link="href" src={src} alt={block.alt || ""}
+              {...(imgProps.srcset ? { srcSet: imgProps.srcset, sizes: imgProps.sizes } : {})}
+              {...(imgProps.width ? { width: imgProps.width } : {})} />
           )}
         </div>
       );
@@ -315,7 +1016,8 @@ function Block({ block, id, data, apiUrl, contextPath }) {
       if (!leadImgProps.url) return <div data-block-uid={id} />;
       return (
         <div data-block-uid={id} className="leadimage-block">
-          <img data-edit-media="preview_image" src={leadImgProps.url} alt="" loading="lazy" />
+          <img data-edit-media="preview_image" src={leadImgProps.url} alt="" loading="lazy"
+            {...(leadImgProps.srcset ? { srcSet: leadImgProps.srcset, sizes: leadImgProps.sizes } : {})} />
         </div>
       );
     }
@@ -339,11 +1041,12 @@ function Block({ block, id, data, apiUrl, contextPath }) {
           {block.image ? (
             <img
               className="hero-image"
+              data-edit-media="image"
               src={imageProps(block.image, apiUrl).url || ""}
               alt="Hero image"
             />
           ) : (
-            <div className="hero-image hero-placeholder" />
+            <div className="hero-image hero-placeholder" data-edit-media="image" />
           )}
           <h1 className="hero-heading" data-edit-text="heading">
             {block.heading}
@@ -435,6 +1138,7 @@ function Block({ block, id, data, apiUrl, contextPath }) {
             const children = expand(col.blocks_layout?.items || [], col.blocks || {});
             return (
               <div key={columnId} data-block-uid={columnId} data-block-add="right" style={{ flex: 1 }}>
+                {col.title && <h4 data-edit-text="title">{col.title}</h4>}
                 {children.map((item) => (
                   <Block key={item["@uid"]} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
                 ))}
@@ -473,56 +1177,16 @@ function Block({ block, id, data, apiUrl, contextPath }) {
     }
 
     // ── Accordion ──
-    case "accordion": {
-      const panels = expand(block.panels || [], null, "@id");
-      return (
-        <div data-block-uid={id} className="accordion-block">
-          {panels.map((panel, i) => {
-            const children = expand(panel.blocks_layout?.items || [], panel.blocks || {});
-            return (
-              <details key={panel["@uid"] || i} data-block-uid={panel["@uid"]}>
-                <summary>{panel.title || `Panel ${i + 1}`}</summary>
-                <div>
-                  {children.map((item) => (
-                    <Block key={item["@uid"]} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
-                  ))}
-                </div>
-              </details>
-            );
-          })}
-        </div>
-      );
-    }
+    case "accordion":
+      return <AccordionBlock id={id} block={block} data={data} apiUrl={apiUrl} contextPath={contextPath} />;
 
     // ── Slider ──
     case "slider": {
-      const slides = expand(block.value?.slides || block.blocks_layout?.items || [], block.blocks || {}, block.value?.slides ? "@id" : undefined);
+      const slides = expand(block.slides || [], null, "@id");
       return (
-        <div data-block-uid={id} data-block-container="{allowed:['Slide'],add:'horizontal'}" className="slider-block" style={{ overflow: "hidden" }}>
-          <div style={{ display: "flex" }}>
-            {slides.map((slide) => (
-              <div key={slide["@uid"]} data-block-uid={slide["@uid"]} data-block-add="right" style={{ minWidth: "100%", flexShrink: 0, position: "relative" }}>
-                {slide.preview_image ? (
-                  <img data-edit-media="preview_image" src={imageProps(slide, apiUrl).url || ""} alt="" style={{ width: "100%" }} />
-                ) : (
-                  <div data-edit-media="preview_image" style={{ width: "100%", height: "300px", backgroundColor: "#374151" }} />
-                )}
-                {slide.head_title && <div data-edit-text="head_title">{slide.head_title}</div>}
-                {slide.title && <h2 data-edit-text="title">{slide.title}</h2>}
-                {slide.description && <p data-edit-text="description">{slide.description}</p>}
-                {slide.href ? (
-                  <a href={getUrl(slide.href, apiUrl)} data-edit-link="href" data-edit-text="buttonText">
-                    {slide.buttonText || "Read More"}
-                  </a>
-                ) : (
-                  <a href="#" data-edit-link="href" data-edit-text="buttonText">
-                    {slide.buttonText || "Read More"}
-                  </a>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        <section data-block-uid={id} data-block-container="{allowed:['Slide'],add:'horizontal'}" className="slider-block">
+          <SwiperSlider slides={slides} apiUrl={apiUrl} imageProps={imageProps} getUrl={getUrl} />
+        </section>
       );
     }
 
@@ -535,37 +1199,8 @@ function Block({ block, id, data, apiUrl, contextPath }) {
       );
 
     // ── Search ──
-    case "search": {
-      const facets = expand(block.facets || [], null, "@id");
-      const searchResults = expand(block.listing?.items || [], block.blocks || {});
-      return (
-        <div data-block-uid={id} className="search-block">
-          {block.headline && <h2 data-edit-text="headline">{block.headline}</h2>}
-          {block.showSearchInput && (
-            <form onSubmit={(e) => e.preventDefault()} style={{ marginBottom: "1rem" }}>
-              <input type="search" placeholder="Search..." />
-              <button type="submit">Search</button>
-            </form>
-          )}
-          {facets.length > 0 && (
-            <div className="search-facets" style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "1rem" }}>
-              {facets.map((facet, i) => (
-                <div key={facet["@uid"] || i} data-block-uid={facet["@uid"]} data-block-add="bottom" style={{ padding: "0.5rem", border: "1px solid #ddd", borderRadius: "4px" }}>
-                  <div data-edit-text="title" style={{ fontWeight: "bold", marginBottom: "0.25rem" }}>{facet.title}</div>
-                  {facet.type === "selectFacet" && <select><option value="">Select...</option></select>}
-                  {facet.type === "checkboxFacet" && <label><input type="checkbox" /> {facet.title}</label>}
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="search-results">
-            {searchResults.map((item) => (
-              <Block key={item["@uid"]} block={item} id={item["@uid"]} data={data} apiUrl={apiUrl} contextPath={contextPath} />
-            ))}
-          </div>
-        </div>
-      );
-    }
+    case "search":
+      return <SearchBlock id={id} block={block} data={data} apiUrl={apiUrl} contextPath={contextPath} />;
 
     // ── Slate Table ──
     case "slateTable": {
@@ -707,168 +1342,46 @@ function Block({ block, id, data, apiUrl, contextPath }) {
       );
 
     // ── Table of Contents ──
-    case "toc":
+    case "toc": {
+      // Generate TOC entries from heading blocks in page data
+      const tocEntries = [];
+      const layout = data?.blocks_layout?.items || [];
+      for (const bid of layout) {
+        const b = data?.blocks?.[bid];
+        if (!b) continue;
+        if (b["@type"] === "heading" && b.heading) {
+          tocEntries.push({ id: bid, level: parseInt((b.tag || "h2").slice(1)), text: b.heading });
+        } else if (b["@type"] === "slate" && b.value?.[0]?.type?.match(/^h[1-6]$/)) {
+          const level = parseInt(b.value[0].type.slice(1));
+          const text = b.plaintext || b.value[0].children?.map(c => c.text).join("") || "";
+          if (text.trim()) tocEntries.push({ id: bid, level, text });
+        }
+      }
       return (
         <nav data-block-uid={id} className="toc-block">
           <h3>Table of Contents</h3>
-          <p>(Auto-generated from headings)</p>
+          {tocEntries.length > 0 ? (
+            <ul style={{ listStyle: "disc", paddingLeft: "1.25rem" }}>
+              {tocEntries.map((e) => (
+                <li key={e.id} style={{ marginLeft: `${(e.level - 2) * 1.5}em` }}>
+                  <a href={`#${e.id}`}>{e.text}</a>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ color: "#9ca3af", fontStyle: "italic" }}>No headings found</p>
+          )}
         </nav>
-      );
-
-    // ── Form ──
-    case "form": {
-      const formFields = expand(block.subblocks || [], null, "field_id");
-      return (
-        <div data-block-uid={id} className="form-block">
-          {block.title && <h3 data-edit-text="title">{block.title}</h3>}
-          <form onSubmit={(e) => e.preventDefault()}>
-            {formFields.map((field) => (
-              <div
-                key={field["@uid"]}
-                data-block-uid={field["@uid"]}
-                data-block-type={field.field_type}
-                data-block-add="bottom"
-                style={{ marginBottom: "1rem" }}
-              >
-                {field.field_type === "text" && (
-                  <>
-                    <label data-edit-text="label">
-                      {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
-                    </label>
-                    {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
-                    <input type="text" name={field.field_id} placeholder={field.placeholder || ""} style={{ width: "100%", padding: "0.5rem", border: "1px solid #d1d5db", borderRadius: "0.5rem" }} />
-                  </>
-                )}
-                {field.field_type === "textarea" && (
-                  <>
-                    <label data-edit-text="label">
-                      {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
-                    </label>
-                    {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
-                    <textarea name={field.field_id} rows={4} style={{ width: "100%", padding: "0.5rem", border: "1px solid #d1d5db", borderRadius: "0.5rem" }} />
-                  </>
-                )}
-                {field.field_type === "number" && (
-                  <>
-                    <label data-edit-text="label">
-                      {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
-                    </label>
-                    {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
-                    <input type="number" name={field.field_id} style={{ width: "100%", padding: "0.5rem", border: "1px solid #d1d5db", borderRadius: "0.5rem" }} />
-                  </>
-                )}
-                {field.field_type === "select" && (
-                  <>
-                    <label data-edit-text="label">
-                      {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
-                    </label>
-                    {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
-                    <select name={field.field_id} style={{ width: "100%", padding: "0.5rem", border: "1px solid #d1d5db", borderRadius: "0.5rem" }}>
-                      <option value="">Select...</option>
-                      {(field.input_values || []).map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </>
-                )}
-                {field.field_type === "single_choice" && (
-                  <fieldset>
-                    <legend data-edit-text="label">
-                      {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
-                    </legend>
-                    {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
-                    {(field.input_values || []).map((opt) => (
-                      <label key={opt} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <input type="radio" name={field.field_id} value={opt} /> {opt}
-                      </label>
-                    ))}
-                  </fieldset>
-                )}
-                {field.field_type === "multiple_choice" && (
-                  <fieldset>
-                    <legend data-edit-text="label">
-                      {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
-                    </legend>
-                    {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
-                    {(field.input_values || []).map((opt) => (
-                      <label key={opt} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <input type="checkbox" name={field.field_id} value={opt} /> {opt}
-                      </label>
-                    ))}
-                  </fieldset>
-                )}
-                {field.field_type === "checkbox" && (
-                  <>
-                    <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      <input type="checkbox" name={field.field_id} />
-                      <span data-edit-text="label">{field.label}{field.required && <span style={{ color: "red" }}> *</span>}</span>
-                    </label>
-                    {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
-                  </>
-                )}
-                {field.field_type === "date" && (
-                  <>
-                    <label data-edit-text="label">
-                      {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
-                    </label>
-                    {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
-                    <input type="date" name={field.field_id} style={{ width: "100%", padding: "0.5rem", border: "1px solid #d1d5db", borderRadius: "0.5rem" }} />
-                  </>
-                )}
-                {field.field_type === "from" && (
-                  <>
-                    <label data-edit-text="label">
-                      {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
-                    </label>
-                    {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
-                    <input type="email" name={field.field_id} style={{ width: "100%", padding: "0.5rem", border: "1px solid #d1d5db", borderRadius: "0.5rem" }} />
-                  </>
-                )}
-                {field.field_type === "attachment" && (
-                  <>
-                    <label data-edit-text="label">
-                      {field.label}{field.required && <span style={{ color: "red" }}> *</span>}
-                    </label>
-                    {field.description && <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>{field.description}</p>}
-                    <input type="file" name={field.field_id} />
-                  </>
-                )}
-                {field.field_type === "static_text" && (
-                  <div>
-                    {field.label && <strong data-edit-text="label">{field.label}</strong>}
-                    {field.description && <p>{field.description}</p>}
-                  </div>
-                )}
-                {field.field_type === "hidden" && (
-                  <input type="hidden" name={field.field_id} value={field.value || ""} />
-                )}
-              </div>
-            ))}
-            <div style={{ display: "flex", gap: "0.75rem", paddingTop: "0.5rem" }}>
-              <button type="submit" data-edit-text="submit_label">
-                {block.submit_label || "Submit"}
-              </button>
-              {block.show_cancel && (
-                <button type="reset" data-edit-text="cancel_label">
-                  {block.cancel_label || "Cancel"}
-                </button>
-              )}
-            </div>
-          </form>
-        </div>
       );
     }
 
+    // ── Form ──
+    case "form":
+      return <FormBlock id={id} block={block} data={data} apiUrl={apiUrl} contextPath={contextPath} />;
+
     // ── Code Example ──
     case "codeExample":
-      return (
-        <div data-block-uid={id} className="code-example">
-          {block.title && <h3 data-edit-text="title">{block.title}</h3>}
-          <pre data-edit-text="code" style={{ background: "#1e1e1e", color: "#d4d4d4", padding: "1rem", borderRadius: "8px", overflow: "auto" }}>
-            <code>{block.code || ""}</code>
-          </pre>
-        </div>
-      );
+      return <CodeExampleBlock id={id} block={block} />;
 
     // ── Empty ──
     case "empty":
@@ -971,6 +1484,7 @@ function Block({ block, id, data, apiUrl, contextPath }) {
               src={summaryImgProps.url}
               alt=""
               style={{ width: "8rem", height: "6rem", objectFit: "cover", borderRadius: "4px", flexShrink: 0 }}
+              {...(summaryImgProps.srcset ? { srcSet: summaryImgProps.srcset, sizes: summaryImgProps.sizes } : {})}
             />
           )}
           <div style={{ flex: 1 }}>

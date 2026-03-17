@@ -23,6 +23,8 @@
     "@plone/client": "^1.0.0-alpha.15",
     "@tanstack/react-query": "^5.40.1",
     "axios": "^1.7.2",
+    "highlight.js": "^11.10.0",
+    "swiper": "^11.1.7",
     "next": "^14.2.7",
     "react": "^18",
     "react-dom": "^18",

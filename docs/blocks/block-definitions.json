@@ -1706,15 +1706,24 @@
       "codeExample": {
         "blockSchema": {
           "properties": {
-            "title": {
-              "title": "Title"
-            },
-            "code": {
-              "title": "Code",
-              "widget": "textarea"
-            },
-            "language": {
-              "title": "Language"
+            "tabs": {
+              "title": "Tabs",
+              "widget": "object_list",
+              "idField": "@id",
+              "schema": {
+                "properties": {
+                  "label": {
+                    "title": "Label"
+                  },
+                  "code": {
+                    "title": "Code",
+                    "widget": "textarea"
+                  },
+                  "language": {
+                    "title": "Language"
+                  }
+                }
+              }
             }
           }
         }
@@ -1723,9 +1732,14 @@
     "examples": {
       "ex-codeExample": {
         "@type": "codeExample",
-        "title": "Hello World",
-        "code": "const greeting = 'Hello, World!';\nconsole.log(greeting);",
-        "language": "javascript"
+        "tabs": [
+          {
+            "@id": "ex-codeExample-tab-1",
+            "code": "const greeting = 'Hello, World!';\nconsole.log(greeting);",
+            "language": "javascript",
+            "label": "Hello World"
+          }
+        ]
       }
     }
   }

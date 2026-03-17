@@ -166,8 +166,10 @@ export default defineConfig({
       },
     },
 
-    // Example frontends for bridge tests — opt-in only (run with --project=nextjs or --project=f7)
-    ...(needsNextjs ? [{
+    // Example frontends for bridge tests — always defined so workers can find them.
+    // webServer entries below are conditional (only started when --project includes nextjs/f7).
+    // Tests are skipped at runtime in doc-examples.spec.ts beforeEach when not explicitly requested.
+    {
       name: 'nextjs',
       testDir: 'tests-playwright/bridge',
       use: {
@@ -175,8 +177,8 @@ export default defineConfig({
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
       },
-    }] : []),
-    ...(needsF7 ? [{
+    },
+    {
       name: 'f7',
       testDir: 'tests-playwright/bridge',
       use: {
@@ -184,7 +186,7 @@ export default defineConfig({
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
       },
-    }] : []),
+    },
 
     // --- Admin integration tests — fully implemented frontends only ---
     // Mock frontend

@@ -12,7 +12,13 @@ const BUILD_DIR = path.resolve(__dirname, './dist',);
 
 export default {
   plugins: [
-    vue(),
+    vue({
+      template: {
+        compilerOptions: {
+          isCustomElement: (tag) => tag.startsWith('swiper-'),
+        },
+      },
+    }),
     mkcert(),  
   ],
   root: SRC_DIR,

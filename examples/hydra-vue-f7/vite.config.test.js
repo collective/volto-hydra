@@ -7,7 +7,13 @@ const PUBLIC_DIR = path.resolve(__dirname, './public');
 const BUILD_DIR = path.resolve(__dirname, './dist');
 
 export default {
-  plugins: [vue()],
+  plugins: [vue({
+    template: {
+      compilerOptions: {
+        isCustomElement: (tag) => tag.startsWith('swiper-'),
+      },
+    },
+  })],
   root: SRC_DIR,
   base: '',
   publicDir: PUBLIC_DIR,

@@ -500,9 +500,14 @@
     },
     "ex-codeExample": {
       "@type": "codeExample",
-      "title": "Hello World",
-      "code": "const greeting = 'Hello, World!';\nconsole.log(greeting);",
-      "language": "javascript"
+      "tabs": [
+        {
+          "@id": "ex-codeExample-tab-1",
+          "code": "const greeting = 'Hello, World!';\nconsole.log(greeting);",
+          "language": "javascript",
+          "label": "Hello World"
+        }
+      ]
     }
   },
   "blocks_layout": {

@@ -511,6 +511,13 @@ const Iframe = (props) => {
     ],
   });
 
+  // Frontend URL: from Redux store, cookie, or env default
+  const urlFromEnv = getURlsFromEnv();
+  const u =
+    useSelector((state) => state.frontendPreviewUrl.url) ||
+    Cookies.get(getIframeUrlCookieName()) ||
+    urlFromEnv[0];
+
   // Track last SELECT_BLOCK sent to avoid redundant sends during pending selection
   const lastSentSelectBlockRef = useRef(null);
 
@@ -788,11 +795,6 @@ const Iframe = (props) => {
     return () => document.removeEventListener('keydown', handleEscape, true);
   }, [selectedBlock, iframeSyncState.blockPathMap, onSelectBlock]);
 
-  const urlFromEnv = getURlsFromEnv();
-  const u =
-    useSelector((state) => state.frontendPreviewUrl.url) ||
-    Cookies.get(getIframeUrlCookieName()) ||
-    urlFromEnv[0];
   // Initialize from persisted state so component remounts don't reset to null
   // (which would cause a duplicate iframe load for the same URL).
   // On first-ever load, persistedIframe.src is null (safe for SSR hydration).
