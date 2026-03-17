@@ -497,6 +497,12 @@
         "h2",
         "h3"
       ]
+    },
+    "ex-codeExample": {
+      "@type": "codeExample",
+      "title": "Hello World",
+      "code": "const greeting = 'Hello, World!';\nconsole.log(greeting);",
+      "language": "javascript"
     }
   },
   "blocks_layout": {
@@ -519,7 +525,8 @@
       "ex-highlight",
       "ex-video",
       "ex-maps",
-      "ex-toc"
+      "ex-toc",
+      "ex-codeExample"
     ]
   },
   "is_folderish": false,

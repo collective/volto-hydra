@@ -23,6 +23,7 @@ import HighlightBlock from './HighlightBlock.vue';
 import VideoBlock from './VideoBlock.vue';
 import MapsBlock from './MapsBlock.vue';
 import TocBlock from './TocBlock.vue';
+import CodeExampleBlock from './CodeExampleBlock.vue';
 import { h } from 'vue';
 
 defineProps({ block: Object, blockId: String, content: Object });
@@ -62,6 +63,7 @@ const typeMap = {
   video: VideoBlock,
   maps: MapsBlock,
   toc: TocBlock,
+  codeExample: CodeExampleBlock,
   summary: ListingItemBlock,
   default: ListingItemBlock,
 };

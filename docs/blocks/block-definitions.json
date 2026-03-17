@@ -425,7 +425,11 @@
                 ]
               }
             },
-            "blocks_layout": { "items": ["text-1"] }
+            "blocks_layout": {
+              "items": [
+                "text-1"
+              ]
+            }
           },
           "col-2": {
             "@type": "column",
@@ -445,10 +449,19 @@
                 ]
               }
             },
-            "blocks_layout": { "items": ["text-2"] }
+            "blocks_layout": {
+              "items": [
+                "text-2"
+              ]
+            }
           }
         },
-        "columns": { "items": ["col-1", "col-2"] }
+        "columns": {
+          "items": [
+            "col-1",
+            "col-2"
+          ]
+        }
       }
     }
   },
@@ -881,7 +894,11 @@
             }
           }
         },
-        "listing": { "items": ["listing-1"] }
+        "listing": {
+          "items": [
+            "listing-1"
+          ]
+        }
       }
     }
   },
@@ -989,7 +1006,9 @@
         "schemaEnhancer": {
           "fieldRules": {
             "cancel_label": {
-              "when": { "show_cancel": true },
+              "when": {
+                "show_cancel": true
+              },
               "else": false
             }
           }
@@ -1679,6 +1698,34 @@
           "h2",
           "h3"
         ]
+      }
+    }
+  },
+  "codeExample": {
+    "blocks": {
+      "codeExample": {
+        "blockSchema": {
+          "properties": {
+            "title": {
+              "title": "Title"
+            },
+            "code": {
+              "title": "Code",
+              "widget": "textarea"
+            },
+            "language": {
+              "title": "Language"
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-codeExample": {
+        "@type": "codeExample",
+        "title": "Hello World",
+        "code": "const greeting = 'Hello, World!';\nconsole.log(greeting);",
+        "language": "javascript"
       }
     }
   }

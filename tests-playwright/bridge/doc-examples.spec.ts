@@ -154,6 +154,11 @@ const examples = [
     blockId: 'ex-maps',
     expectedText: null,
   },
+  {
+    type: 'codeExample',
+    blockId: 'ex-codeExample',
+    expectedText: 'Hello, World!',
+  },
 ];
 
 test.describe('Doc example blocks', () => {

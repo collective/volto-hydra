@@ -19,6 +19,7 @@
   import VideoBlock from './VideoBlock.svelte';
   import MapsBlock from './MapsBlock.svelte';
   import TocBlock from './TocBlock.svelte';
+  import CodeExampleBlock from './CodeExampleBlock.svelte';
 
   export let block;
   export let content = {};
@@ -64,6 +65,8 @@
   <MapsBlock {block} />
 {:else if block['@type'] === 'toc'}
   <TocBlock {block} {content} />
+{:else if block['@type'] === 'codeExample'}
+  <CodeExampleBlock {block} />
 {:else if block['@type'] === 'summary' || block['@type'] === 'default'}
   <div data-block-uid={block['@uid']} class="listing-item">
     {#if block.image}
