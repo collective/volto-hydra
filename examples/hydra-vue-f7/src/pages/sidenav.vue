@@ -19,14 +19,14 @@
   
   <script>
     import { useStore } from 'framework7-vue';
-    const runtimeConfig = useRuntimeConfig();
+    const backendBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://hydra-api.pretagov.com';
     export default {
       props: {
         data: Object,
       },
       methods: {
         getUrl(item) {
-          return item['@id'].replace(runtimeConfig.public.backendBaseUrl+'/', '/').replace(runtimeConfig.public.backendBaseUrl, '/')
+          return item['@id'].replace(backendBaseUrl+'/', '/').replace(backendBaseUrl, '/')
         }
       },
       data() {      

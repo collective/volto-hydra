@@ -22,7 +22,7 @@ const TranstackProviders = ({ children }) => {
   return (
     <QueryClientProvider client={queryClient}> 
         {children}
-      {isClient && <ReactQueryDevtools initialIsOpen={true} />}
+      {isClient && process.env.NODE_ENV === 'development' && !window.frameElement && <ReactQueryDevtools initialIsOpen={false} />}
     </QueryClientProvider>
   )
 }

@@ -4,7 +4,10 @@ import { createStore } from 'framework7/lite';
 const store = createStore({
   state: {
     content: {},
-    navigation: []
+    navigation: [],
+    templates: {},
+    apiBase: '',
+    contextPath: '/',
   },
   getters: {
     content({ state }) {
@@ -12,7 +15,16 @@ const store = createStore({
     },
     navigation({ state }) {
       return state.navigation;
-    }
+    },
+    templates({ state }) {
+      return state.templates;
+    },
+    apiBase({ state }) {
+      return state.apiBase;
+    },
+    contextPath({ state }) {
+      return state.contextPath;
+    },
   },
   actions: {
     setContent({ state }, content) {

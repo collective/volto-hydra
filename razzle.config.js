@@ -17,6 +17,11 @@ module.exports = {
       config.devtool = 'eval-source-map';
     }
 
+    // Enable source maps for production server to debug SSR errors
+    if (!opts.env.dev && opts.env.target === 'node') {
+      config.devtool = 'source-map';
+    }
+
     return config;
   },
 };

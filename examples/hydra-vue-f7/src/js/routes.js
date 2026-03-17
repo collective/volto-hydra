@@ -2,23 +2,26 @@
 import Page from '../pages/page.vue';
 import NotFoundPage from '../pages/404.vue';
 import axios from 'axios';
+import { loadTemplates, isEditMode } from '../js/hydra.js';
 
+// Shared template cache across route navigations
+const templateCache = {};
 
 var routes = [
   {
     path: '{/:path}*',
     browserHistory: true,
     async: function ({ router, to, resolve }) {
-
-      //const token = url.searchParams.get("access_token", null);  
-  
-      // App instance
       var app = router.app;
-
-      // Show Preloader
-      app.preloader.show();
-      // User ID from request
       var path = to.path;
+
+      // In edit mode, hydra.js sends content via onEditChange — skip API fetch
+      if (isEditMode()) {
+        resolve({ component: Page });
+        return;
+      }
+
+      app.preloader.show();
 
       const url = new URL(window.location.href);
       const token = url.searchParams.get("access_token");
@@ -26,25 +29,33 @@ var routes = [
       if (token) {
         headers = {'Authorization': 'Bearer '+token};
       };
-      const api = "https://hydra-api.pretagov.com/++api++"+path+"?expand=breadcrumbs,navroot,navigation&expand.navigation.depth=2"
-      axios.get(api, {headers}).then((response) => {
-        app.store.state.content = response.data;
-        app.store.state.navigation = response.data["@components"].navigation.items;
-        // Hide Preloader
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "https://hydra-api.pretagov.com";
+      const api = `${apiBase}/++api++${path}?expand=breadcrumbs,navroot,navigation&expand.navigation.depth=2`;
+      axios.get(api, {headers}).then(async (response) => {
+        const data = response.data;
+
+        // Pre-load templates referenced by page content
+        const loadTemplate = async (templateId) => {
+          const tplPath = templateId.startsWith('http')
+            ? new URL(templateId).pathname
+            : `/${templateId.replace(/^\//, '')}`;
+          const tplUrl = `${apiBase}/++api++${tplPath}`;
+          const tplResponse = await axios.get(tplUrl, { headers });
+          return tplResponse.data;
+        };
+        const { templates, errors } = await loadTemplates(data, loadTemplate, templateCache);
+        if (errors.length) {
+          console.warn('[routes] Failed to load templates:', errors.map(e => `${e.templateId}: ${e.error?.message || e.error}`).join('; '));
+        }
+
+        app.store.state.content = data;
+        app.store.state.templates = templates;
+        app.store.state.apiBase = apiBase;
+        app.store.state.contextPath = path;
+        app.store.state.navigation = data["@components"].navigation.items;
         app.preloader.hide();
 
-        //this.$root.panelProps.data = data;
-
-        // Resolve route to load page
-        resolve(
-          {
-            component: Page,
-          },
-          {
-            props: {
-            }
-          }
-        );
+        resolve({ component: Page });
       });
     }
   },

@@ -2,6 +2,9 @@
 .settings/
 .vscode
 .claude/settings.local.json
+.claude/plans/
+.claude/plan.md
+.claude/projects/
 *~
 acceptance/cypress/videos/
 acceptance/node_modules
@@ -16,6 +19,10 @@ examples/nuxt-blog-starter/certs/mkcert
 examples/nuxt-blog-starter/packages/hydra.js
 
 examples/hydra-vue-f7/src/.vite-ssg-temp/
+examples/nuxt-blog-starter/.nuxt-edit/
+# Lock files in example dirs (managed separately)
+examples/hydra-nextjs/package-lock.json
+examples/hydra-vue-f7/pnpm-lock.yaml
 # Local Netlify folder
 .netlify
 /core

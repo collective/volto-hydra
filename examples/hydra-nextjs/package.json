@@ -7,6 +7,7 @@
     "copy:hydra": "cp ../../packages/hydra-js/hydra.js ./src/utils/hydra.js",
     "predev": "npm run copy:hydra",
     "dev": "next dev -p 3002",
+    "dev:test": "npm run copy:hydra && next dev -p 3007",
     "dev:https": "next dev --experimental-https -p 3002",
     "prebuild": "npm run copy:hydra",
     "build": "next build",

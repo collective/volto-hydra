@@ -102,11 +102,7 @@
             browserHistoryOnLoad: true,
             browserHistoryStoreHistory: false,
             browserHistoryInitialMatch: false,
-            preloadPreviousPage: false
-            //browserHistorySeperator: "#!",
-            //cache: false,
-            //reloadPages: true,
-            //reloadDetail: true
+            preloadPreviousPage: false,
         },
 
         // App store
@@ -129,7 +125,7 @@
         page: {
           schema: {
             properties: {
-              blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'gridBlock', 'teaser'] },
+              blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'video', 'teaser', 'title', 'description', 'introduction', 'leadimage', 'dateField', 'hero', 'columns', 'gridBlock', 'accordion', 'slider', 'listing', 'search', 'slateTable', 'heading', 'separator', '__button', 'highlight', 'maps', 'toc', 'form', 'codeExample', 'eventMetadata', 'socialLinks'] },
             },
           },
         },
@@ -140,13 +136,17 @@
 
       onMounted(() => {
         f7ready((f7) => {
-          window.addEventListener("hashchange", () => {
-              const url = new URL(window.location);
-              const path = url.href.split("#!")[1];
-              f7.views.main.router.navigate(path);
-            });
+          const navigateFromHash = () => {
+            const hash = window.location.href.split("#!")[1];
+            if (hash) {
+              f7.views.main.router.navigate(hash);
+            }
+          };
 
-          // Call F7 APIs here
+          window.addEventListener("hashchange", navigateFromHash);
+
+          // Navigate to initial hash path on first load
+          navigateFromHash();
         });
       });
       const panelComponent = null;

@@ -3,6 +3,7 @@ packages:
   - 'packages/*'
   - 'examples/*'
   - '!examples/hydra-vue-f7'
+  - '!examples/hydra-nextjs'
   - '!examples/nuxt-blog-starter'
   - 'docs/blocks/test-react'
   - 'docs/blocks/test-svelte'

@@ -28,8 +28,16 @@ const COMPONENT_IMPORTS = {
   ButtonBlock:       './ButtonBlock.jsx',
   HighlightBlock:    './HighlightBlock.jsx',
   VideoBlock:        './VideoBlock.jsx',
-  MapsBlock:         './MapsBlock.jsx',
-  TocBlock:          './TocBlock.jsx',
+  MapsBlock:           './MapsBlock.jsx',
+  TocBlock:            './TocBlock.jsx',
+  TitleBlock:          './TitleBlock.jsx',
+  DescriptionBlock:    './DescriptionBlock.jsx',
+  LeadImageBlock:      './LeadImageBlock.jsx',
+  DateFieldBlock:      './DateFieldBlock.jsx',
+  EmptyBlock:          './EmptyBlock.jsx',
+  EventMetadataBlock:  './EventMetadataBlock.jsx',
+  SocialLinksBlock:    './SocialLinksBlock.jsx',
+  CodeExampleBlock:    './CodeExampleBlock.jsx',
 };
 
 /**
@@ -80,6 +88,9 @@ function reactExamplesPlugin() {
       }
       if (code.includes('contentPath')) {
         imports += `const contentPath = (...a) => window._contentPath(...a);\n`;
+      }
+      if (code.includes('expandTemplatesSync')) {
+        imports += `const expandTemplatesSync = (...a) => window._expandTemplatesSync(...a);\n`;
       }
 
       // Find all top-level function declarations and export the first as default

@@ -2,8 +2,12 @@ function BlockRenderer({ block, content }) {
   const type = block['@type'];
   switch (type) {
     case 'slate':         return <SlateBlock block={block} />;
+    case 'title':         return <TitleBlock block={block} content={content} />;
+    case 'description':   return <DescriptionBlock block={block} content={content} />;
     case 'introduction':  return <IntroductionBlock block={block} content={content} />;
     case 'image':         return <ImageBlock block={block} />;
+    case 'leadimage':     return <LeadImageBlock block={block} content={content} />;
+    case 'dateField':     return <DateFieldBlock block={block} content={content} />;
     case 'hero':          return <HeroBlock block={block} />;
     case 'teaser':        return <TeaserBlock block={block} />;
     case 'slateTable':    return <TableBlock block={block} />;
@@ -21,6 +25,10 @@ function BlockRenderer({ block, content }) {
     case 'video':         return <VideoBlock block={block} />;
     case 'maps':          return <MapsBlock block={block} />;
     case 'toc':           return <TocBlock block={block} content={content} />;
+    case 'codeExample':   return <CodeExampleBlock block={block} />;
+    case 'empty':         return <EmptyBlock block={block} />;
+    case 'eventMetadata': return <EventMetadataBlock block={block} content={content} />;
+    case 'socialLinks':   return <SocialLinksBlock block={block} />;
     case 'summary':
     case 'default':
       return (

@@ -19,7 +19,7 @@
     "start:nuxt:test": "cd examples/nuxt-blog-starter && pnpm run dev:test",
     "start:react:test": "cd docs/blocks/test-react && pnpm run dev:test",
     "start:svelte:test": "cd docs/blocks/test-svelte && pnpm run dev:test",
-    "start:prod": "NODE_ENV=production node build/server.js",
+    "start:prod": "NODE_ENV=production node --enable-source-maps build/server.js",
     "build": "VOLTOCONFIG=$(pwd)/volto.config.js razzle build --noninteractive",
     "i18n": "pnpm --filter volto-hydra i18n",
     "test": "RAZZLE_JEST_CONFIG=$(pwd)/jest-addon.config.js razzle test --maxWorkers=50%",

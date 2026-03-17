@@ -21,6 +21,8 @@ const FRONTEND_URLS: Record<string, string> = {
   react: 'http://localhost:3004',
   svelte: 'http://localhost:3005',
   vue: 'http://localhost:3006',
+  nextjs: 'http://localhost:3007',
+  f7: 'http://localhost:3008',
 };
 
 export function getFrontendUrl(projectName: string): string | undefined {

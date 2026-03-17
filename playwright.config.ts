@@ -9,6 +9,9 @@ const needsNuxt = !projectArg || projectArg.includes('nuxt');
 const needsReact = !projectArg || projectArg.includes('react');
 const needsSvelte = !projectArg || projectArg.includes('svelte');
 const needsVue = !projectArg || projectArg.includes('vue');
+// Example frontends — opt-in only (not started unless explicitly requested)
+const needsNextjs = projectArg?.includes('nextjs');
+const needsF7 = projectArg?.includes('f7');
 
 // Only import coverage reporter when COVERAGE is enabled (CI)
 // This prevents V8 coverage collection overhead locally
@@ -163,6 +166,26 @@ export default defineConfig({
       },
     },
 
+    // Example frontends for bridge tests — opt-in only
+    {
+      name: 'nextjs',
+      testDir: 'tests-playwright/bridge',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+      },
+    },
+    {
+      name: 'f7',
+      testDir: 'tests-playwright/bridge',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+      },
+    },
+
     // --- Admin integration tests — fully implemented frontends only ---
     // Mock frontend
     {
@@ -203,6 +226,35 @@ export default defineConfig({
       },
       testMatch: /nuxt-.*\.spec\.ts/,
     },
+
+    // --- Example frontends — opt-in only (run with --project=admin-nextjs or --project=admin-f7) ---
+    // Always defined so workers can find them; webServer entries below are conditional
+    {
+      name: 'admin-nextjs',
+      testDir: 'tests-playwright/integration',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-nextjs.json',
+      },
+      testIgnore: [
+        /nuxt-.*\.spec\.ts/,
+      ],
+    },
+    {
+      name: 'admin-f7',
+      testDir: 'tests-playwright/integration',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-f7.json',
+      },
+      testIgnore: [
+        /nuxt-.*\.spec\.ts/,
+      ],
+    },
   ],
 
   /* Start mock API server and Volto dev server before running tests */
@@ -217,8 +269,8 @@ export default defineConfig({
       timeout: 50 * 1000,
       reuseExistingServer: true, // Always reuse if running - CI starts in advance, local dev starts manually
       cwd: process.cwd(),
-      stdout: 'pipe',
-      stderr: 'pipe',
+      stdout: 'pipe' as const,
+      stderr: 'pipe' as const,
       env: {
         PORT: '8888',
         CONTENT_MOUNTS: '/:docs/content/content/content,/_test_data:tests-playwright/fixtures/content',
@@ -235,14 +287,14 @@ export default defineConfig({
           timeout: 30 * 1000, // 30 seconds should be plenty for starting prebuilt server
           reuseExistingServer: true, // CI starts server in advance
           cwd: process.cwd(),
-          stdout: 'pipe',
-          stderr: 'pipe',
+          stdout: 'pipe' as const,
+          stderr: 'pipe' as const,
           env: {
             NODE_ENV: 'production',
             PORT: '3001',
             RAZZLE_API_PATH: 'http://localhost:8888',
             // Both mock frontend (8888) and Nuxt frontend (3003) available for switching
-            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006',
+            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008',
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
           },
         }
@@ -260,13 +312,13 @@ export default defineConfig({
           timeout: 300 * 1000, // 5 minutes for initial webpack compilation
           reuseExistingServer: true, // Always reuse - local dev starts manually
           cwd: process.cwd(),
-          stdout: 'pipe',
-          stderr: 'pipe',
+          stdout: 'pipe' as const,
+          stderr: 'pipe' as const,
           env: {
             PORT: '3001',
             RAZZLE_API_PATH: 'http://localhost:8888',
             // Both mock frontend (8888) and Nuxt frontend (3003) available for switching
-            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006',
+            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008',
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
             // Prevent parcel from trying to access TTY (fixes segfault in background process)
             CI: process.env.CI || 'true',
@@ -280,8 +332,8 @@ export default defineConfig({
       timeout: 120 * 1000, // 2 minutes for Nuxt compilation
       reuseExistingServer: true, // CI starts server in advance, local dev starts manually
       cwd: path.join(process.cwd(), 'examples/nuxt-blog-starter'),
-      stdout: 'pipe',
-      stderr: 'pipe',
+      stdout: 'pipe' as const,
+      stderr: 'pipe' as const,
     }] : []),
     // React Vite frontend for doc example tests
     ...(needsReact ? [{
@@ -291,8 +343,8 @@ export default defineConfig({
       timeout: 30 * 1000,
       reuseExistingServer: true,
       cwd: path.join(process.cwd(), 'docs/blocks/test-react'),
-      stdout: 'pipe',
-      stderr: 'pipe',
+      stdout: 'pipe' as const,
+      stderr: 'pipe' as const,
     }] : []),
     // Svelte Vite frontend for doc example tests
     ...(needsSvelte ? [{
@@ -302,8 +354,8 @@ export default defineConfig({
       timeout: 30 * 1000,
       reuseExistingServer: true,
       cwd: path.join(process.cwd(), 'docs/blocks/test-svelte'),
-      stdout: 'pipe',
-      stderr: 'pipe',
+      stdout: 'pipe' as const,
+      stderr: 'pipe' as const,
     }] : []),
     // Vue Vite frontend for doc example tests
     ...(needsVue ? [{
@@ -313,8 +365,36 @@ export default defineConfig({
       timeout: 30 * 1000,
       reuseExistingServer: true,
       cwd: path.join(process.cwd(), 'docs/blocks/test-vue'),
-      stdout: 'pipe',
-      stderr: 'pipe',
+      stdout: 'pipe' as const,
+      stderr: 'pipe' as const,
+    }] : []),
+    // Example frontends — opt-in only
+    ...(needsNextjs ? [{
+      name: 'Next.js Frontend (Test)',
+      command: 'npm run dev:test',
+      url: 'http://localhost:3007',
+      timeout: 120 * 1000,
+      reuseExistingServer: true,
+      cwd: path.join(process.cwd(), 'examples/hydra-nextjs'),
+      stdout: 'pipe' as const,
+      stderr: 'pipe' as const,
+      env: {
+        NEXT_PUBLIC_BACKEND_BASE_URL: 'http://localhost:8888',
+      },
+    }] : []),
+    ...(needsF7 ? [{
+      name: 'Framework7 Frontend (Test)',
+      command: 'cp ../../packages/hydra-js/hydra.js ./src/js/hydra.js && npx vite --port 3008 --strictPort --config vite.config.test.js',
+      url: 'http://localhost:3008',
+      timeout: 120 * 1000,
+      reuseExistingServer: true,
+      cwd: path.join(process.cwd(), 'examples/hydra-vue-f7'),
+      stdout: 'pipe' as const,
+      stderr: 'pipe' as const,
+      env: {
+        ...process.env,
+        VITE_API_BASE_URL: 'http://localhost:8888',
+      },
     }] : []),
   ],
 });

@@ -17,9 +17,9 @@ import { getFrontendUrl } from './fixtures';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Doc-example tests only run on doc-example frontends (react, svelte, vue)
-// which load schemas from block-definitions.json. Mock and nuxt use
-// sharedBlocksConfig which is for other tests.
+// Doc-example tests run on frontends that render blocks from fixture data.
+// Skip mock (test frontend only handles specific blocks) and nuxt (uses
+// server-side rendering that conflicts with mock parent protocol).
 base.beforeEach(({}, testInfo) => {
   const project = testInfo.project.name;
   if (project === 'mock' || project === 'nuxt') {
