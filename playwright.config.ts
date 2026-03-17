@@ -327,7 +327,7 @@ export default defineConfig({
     // Nuxt frontend for testing Nuxt-specific scenarios (only started when running nuxt tests)
     ...(needsNuxt ? [{
       name: 'Nuxt Frontend (Test)',
-      command: 'npm run dev:test',
+      command: 'pnpm run dev:test',
       url: 'http://localhost:3003',
       timeout: 120 * 1000, // 2 minutes for Nuxt compilation
       reuseExistingServer: true, // CI starts server in advance, local dev starts manually
@@ -371,7 +371,7 @@ export default defineConfig({
     // Example frontends — opt-in only
     ...(needsNextjs ? [{
       name: 'Next.js Frontend (Test)',
-      command: 'npm run dev:test',
+      command: 'pnpm run dev:test',
       url: 'http://localhost:3007',
       timeout: 120 * 1000,
       reuseExistingServer: true,

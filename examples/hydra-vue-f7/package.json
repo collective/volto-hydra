@@ -7,11 +7,11 @@
   "license": "UNLICENSED",
   "scripts": {
     "copy:hydra": "cp ../../packages/hydra-js/hydra.js ./src/js/hydra.js",
-    "start": "npm run dev",
-    "predev": "npm run copy:hydra",
+    "start": "pnpm run dev",
+    "predev": "pnpm run copy:hydra",
     "dev": "cross-env NODE_ENV=development vite",
-    "dev:test": "npm run copy:hydra && cross-env VITE_API_BASE_URL=http://localhost:8888 vite --port 3008 --strictPort",
-    "prebuild": "npm run copy:hydra",
+    "dev:test": "pnpm run copy:hydra && cross-env VITE_API_BASE_URL=http://localhost:8888 vite --port 3008 --strictPort",
+    "prebuild": "pnpm run copy:hydra",
     "build": "cross-env NODE_ENV=production vite build",
     "postinstall": "cpy --flat ./node_modules/framework7-icons/fonts/*.* ./src/fonts/ && cpy --flat ./node_modules/material-icons/iconfont/*.* ./src/fonts/"
   },
