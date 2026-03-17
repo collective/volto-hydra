@@ -2570,10 +2570,15 @@ const Iframe = (props) => {
         _editSequence: editSequenceRef.current,
       };
       const skipRender = iframeSyncState.skipRenderOnSend;
+      // Always build blockPathMap from the form data being sent — never rely on
+      // potentially stale/undefined cached state
+      const toolbarBlockPathMap = iframeSyncState.blockPathMap && Object.keys(iframeSyncState.blockPathMap).length > 0
+        ? iframeSyncState.blockPathMap
+        : buildBlockPathMap(iframeSyncState.formData || formToUse, config.blocks.blocksConfig, intl);
       const message = {
         type: 'FORM_DATA',
         data: formWithSequence,
-        blockPathMap: stripBlockPathMapForPostMessage(iframeSyncState.blockPathMap),
+        blockPathMap: stripBlockPathMapForPostMessage(toolbarBlockPathMap),
         formatRequestId: iframeSyncState.toolbarRequestDone,
       };
       if (iframeSyncState.selection) {
