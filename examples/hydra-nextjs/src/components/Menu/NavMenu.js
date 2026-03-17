@@ -1,16 +1,26 @@
 "use client";
 import React from "react";
-import { Menu as SemanticMenu } from "semantic-ui-react";
+import { Dropdown, Menu as SemanticMenu } from "semantic-ui-react";
 import Link from "next/link";
 
+function getPath(item) {
+  return '/' + (item['@id'] || '').replace(/^https?:\/\/[^/]+\//, '');
+}
+
 function NavItem({ item }) {
-  const path = '/' + (item['@id'] || '').replace(/^https?:\/\/[^/]+\//, '');
+  const path = getPath(item);
 
   if (item.items && item.items.length > 0) {
     return (
-      <SemanticMenu.Item>
-        <Link href={path}>{item.title}</Link>
-      </SemanticMenu.Item>
+      <Dropdown item text={item.title}>
+        <Dropdown.Menu>
+          {item.items.map((child, i) => (
+            <Dropdown.Item key={i} as={Link} href={getPath(child)}>
+              {child.title}
+            </Dropdown.Item>
+          ))}
+        </Dropdown.Menu>
+      </Dropdown>
     );
   }
 

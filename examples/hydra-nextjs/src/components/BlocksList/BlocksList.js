@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import SlateBlock from "@/components/SlateBlock";
-import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, staticBlocks } from "#utils/hydra";
+import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, staticBlocks, contentPath } from "#utils/hydra";
 
 // Template context for nested block expansion
 const TemplateContext = createContext({ templates: {}, templateState: {} });
@@ -33,13 +33,15 @@ function SlateNodes({ value }) {
 }
 
 /**
- * Get a display URL from a link value (handles Plone's array/object format)
+ * Get a display URL from a link value (handles Plone's array/object format).
+ * Strips the backend base URL to return relative paths for internal links.
  */
-function getUrl(value) {
+function getUrl(value, apiUrl) {
   if (!value) return "";
-  if (Array.isArray(value) && value.length) return value[0]["@id"] || value[0];
-  if (typeof value === "object" && value["@id"]) return value["@id"];
-  return String(value);
+  if (Array.isArray(value) && value.length) value = value[0];
+  if (typeof value === "object" && value["@id"]) return contentPath(value["@id"], apiUrl);
+  if (typeof value === "object" && value.url) return value.url;
+  return contentPath(String(value), apiUrl);
 }
 
 /**
@@ -290,7 +292,7 @@ function Block({ block, id, data, apiUrl, contextPath }) {
     case "image": {
       const imgProps = imageProps(block, apiUrl);
       const src = imgProps.url || "";
-      const href = getUrl(block.href);
+      const href = getUrl(block.href, apiUrl);
       return (
         <div
           data-block-uid={id}
@@ -355,7 +357,7 @@ function Block({ block, id, data, apiUrl, contextPath }) {
           {block.buttonText && (
             <a
               className="hero-button"
-              href={getUrl(block.buttonLink)}
+              href={getUrl(block.buttonLink, apiUrl)}
               data-edit-link="buttonLink"
             >
               {block.buttonText}
@@ -366,7 +368,7 @@ function Block({ block, id, data, apiUrl, contextPath }) {
 
     // ── Teaser ──
     case "teaser": {
-      const teaserHref = getUrl(block.href);
+      const teaserHref = getUrl(block.href, apiUrl);
       const teaserTitle = getTeaserTitle(block);
       const teaserDesc = getTeaserDescription(block);
       const teaserImgProps = block.preview_image
@@ -509,7 +511,7 @@ function Block({ block, id, data, apiUrl, contextPath }) {
                 {slide.title && <h2 data-edit-text="title">{slide.title}</h2>}
                 {slide.description && <p data-edit-text="description">{slide.description}</p>}
                 {slide.href ? (
-                  <a href={getUrl(slide.href)} data-edit-link="href" data-edit-text="buttonText">
+                  <a href={getUrl(slide.href, apiUrl)} data-edit-link="href" data-edit-text="buttonText">
                     {slide.buttonText || "Read More"}
                   </a>
                 ) : (
@@ -612,7 +614,7 @@ function Block({ block, id, data, apiUrl, contextPath }) {
       return (
         <div data-block-uid={id} className="button-block">
           <a
-            href={getUrl(block.href)}
+            href={getUrl(block.href, apiUrl)}
             data-edit-link="href"
             className="button"
           >
@@ -649,7 +651,7 @@ function Block({ block, id, data, apiUrl, contextPath }) {
             </div>
             {block.cta_title && (
               <a
-                href={getUrl(block.cta_link)}
+                href={getUrl(block.cta_link, apiUrl)}
                 data-edit-text="cta_title"
                 data-edit-link="cta_link"
                 className="highlight-cta"
@@ -948,7 +950,7 @@ function Block({ block, id, data, apiUrl, contextPath }) {
       return (
         <div data-block-uid={id} className="listing-item default-item">
           <h4>
-            <a href={getUrl(block.href)} data-edit-link="href" data-edit-text="title">
+            <a href={getUrl(block.href, apiUrl)} data-edit-link="href" data-edit-text="title">
               {block.title}
             </a>
           </h4>
@@ -976,7 +978,7 @@ function Block({ block, id, data, apiUrl, contextPath }) {
               <time>{formatDate(block.date)}</time>
             )}
             <h4>
-              <a href={getUrl(block.href)} data-edit-link="href" data-edit-text="title">
+              <a href={getUrl(block.href, apiUrl)} data-edit-link="href" data-edit-text="title">
                 {block.title}
               </a>
             </h4>

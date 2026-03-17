@@ -451,9 +451,12 @@ const ListingBlock = {
     const items = ref([]);
 
     async function fetchListing() {
-      if (!apiBase) return;
+      // Unwrap Vue refs — inject returns refs from useStore which are reactive objects
+      const apiUrl = typeof apiBase === 'object' && apiBase?.value !== undefined ? apiBase.value : apiBase;
+      const ctxPath = typeof contextPath === 'object' && contextPath?.value !== undefined ? contextPath.value : contextPath;
+      if (!apiUrl) return;
       const fetchItems = {
-        listing: ploneFetchItems({ apiUrl: apiBase, contextPath }),
+        listing: ploneFetchItems({ apiUrl, contextPath: ctxPath }),
       };
       const result = await expandListingBlocks([props.id], {
         blocks: { [props.id]: props.block },
