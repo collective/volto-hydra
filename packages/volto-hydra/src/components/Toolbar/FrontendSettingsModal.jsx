@@ -10,7 +10,7 @@ import { getURlsFromEnv } from '../../utils/getSavedURLs';
 import getSavedURLs from '../../utils/getSavedURLs';
 import isValidUrl from '../../utils/isValidUrl';
 import { getSavedUrlsCookieName } from '../../utils/cookieNames';
-import { getDomainInitials } from './FrontendSwitcherPanel';
+import getDomainInitials from '../../utils/getDomainInitials';
 import { setViewportWidths } from '../../actions';
 
 /**

@@ -29,10 +29,13 @@ const FrontendSwitcherButton = ({ onClickHandler }) => {
   );
 };
 
-const FrontendSwitcherPlug = () => (
-  <Plug pluggable="main.toolbar.bottom" id="frontend-switcher">
-    {(params) => <FrontendSwitcherButton {...params} />}
-  </Plug>
-);
+const FrontendSwitcherPlug = () => {
+  if (typeof window === 'undefined') return null;
+  return (
+    <Plug pluggable="main.toolbar.bottom" id="frontend-switcher">
+      {(params) => <FrontendSwitcherButton {...params} />}
+    </Plug>
+  );
+};
 
 export default FrontendSwitcherPlug;
