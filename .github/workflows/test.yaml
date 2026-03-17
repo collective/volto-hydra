@@ -55,18 +55,26 @@ jobs:
           pnpm build
         env:
           RAZZLE_API_PATH: http://localhost:8888
-          RAZZLE_DEFAULT_IFRAME_URL: http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006
+          RAZZLE_DEFAULT_IFRAME_URL: http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008
           VOLTOCONFIG: ${{ github.workspace }}/volto.config.js
       - name: Install and build Nuxt
         run: |
           cd examples/nuxt-blog-starter && npm install && npm run build:test
+      - name: Build Next.js example
+        run: |
+          cd examples/hydra-nextjs && npm run build:test
+        env:
+          NEXT_PUBLIC_BACKEND_BASE_URL: http://localhost:8888
+      - name: Install F7 example
+        run: |
+          cd examples/hydra-vue-f7 && pnpm install --ignore-workspace
       - name: Start servers in background
         run: |
           # Start mock API server
           node tests-playwright/fixtures/mock-api-server.js &
 
           # Start Volto production server
-          PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006 \
+          PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008 \
             pnpm start:prod &
 
           # Start Nuxt test server (preview mode — stable, no Vite dev quirks)
@@ -76,6 +84,12 @@ jobs:
           cd docs/blocks/test-react && npx vite --port 3004 --strictPort &
           cd docs/blocks/test-svelte && npx vite --port 3005 --strictPort &
           cd docs/blocks/test-vue && npx vite --port 3006 --strictPort &
+
+          # Start Next.js example (production mode — fast, no compilation)
+          cd examples/hydra-nextjs && npm run start:test &
+
+          # Start F7 example (Vite — no mkcert for CI)
+          cd examples/hydra-vue-f7 && cp ../../packages/hydra-js/hydra.js ./src/js/hydra.js && VITE_API_BASE_URL=http://localhost:8888 npx vite --port 3008 --strictPort --config vite.config.test.js &
 
           # Give servers a moment to start their processes
           sleep 5
@@ -135,6 +149,24 @@ jobs:
           for i in {1..30}; do
             if curl -s http://localhost:3006 > /dev/null; then
               echo "Vue frontend ready"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "Waiting for Next.js (3007)..."
+          for i in {1..30}; do
+            if curl -s http://localhost:3007 > /dev/null; then
+              echo "Next.js ready"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "Waiting for F7 Vite frontend (3008)..."
+          for i in {1..30}; do
+            if curl -s http://localhost:3008 > /dev/null; then
+              echo "F7 frontend ready"
               break
             fi
             sleep 2
