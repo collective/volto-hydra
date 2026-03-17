@@ -1959,6 +1959,13 @@ export class Bridge {
             }
 
             // Central method for setting form data with logging (also sets blockPathMap)
+            if (event.data.blockPathMap === undefined) {
+              log('WARNING: FORM_DATA received without blockPathMap!',
+                'message keys:', Object.keys(event.data),
+                'hasData:', !!event.data.data,
+                'formatRequestId:', event.data.formatRequestId,
+                'selectedBlockUid:', event.data.selectedBlockUid);
+            }
             this.setFormDataFromAdmin(event.data.data, 'FORM_DATA', event.data.blockPathMap);
 
             // === Non-stale FORM_DATA - apply it fully ===

@@ -2589,8 +2589,10 @@ const Iframe = (props) => {
       if (skipRender) {
         message.skipRender = true;
       }
-      log('Sending FORM_DATA with formatRequestId:', message.formatRequestId,
-        '_editSequence:', editSequenceRef.current, 'skipRender:', !!skipRender);
+      log('Sending FORM_DATA (Case 1: toolbar) formatRequestId:', message.formatRequestId,
+        '_editSequence:', editSequenceRef.current, 'skipRender:', !!skipRender,
+        'blockPathMap keys:', Object.keys(message.blockPathMap || {}),
+        'cachedBPM keys:', Object.keys(iframeSyncState.blockPathMap || {}));
       const iframeEl = document.getElementById('previewIframe');
       iframeEl?.contentWindow?.postMessage(
         message,
