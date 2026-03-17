@@ -5,13 +5,13 @@
   "type": "module",
   "scripts": {
     "copy:hydra": "cp ../../packages/hydra-js/hydra.js ./src/utils/hydra.js",
-    "predev": "npm run copy:hydra",
+    "predev": "pnpm run copy:hydra",
     "dev": "next dev -p 3002",
-    "dev:test": "npm run copy:hydra && next dev -p 3007",
-    "build:test": "NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:8888 npm run build",
+    "dev:test": "pnpm run copy:hydra && next dev -p 3007",
+    "build:test": "pnpm run copy:hydra && next build",
     "start:test": "next start -p 3007",
     "dev:https": "next dev --experimental-https -p 3002",
-    "prebuild": "npm run copy:hydra",
+    "prebuild": "pnpm run copy:hydra",
     "build": "next build",
     "start": "next start -p 3002",
     "lint": "next lint"
