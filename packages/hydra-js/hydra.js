@@ -1771,8 +1771,9 @@ export class Bridge {
                   const element = this.queryBlockElement(blockUidToSelect);
                   if (!element) {
                     if (retries > 0) {
-                      setTimeout(() => waitForStable(retries - 1), 50);
+                      bridge._pendingInitialSelectTimer = setTimeout(() => waitForStable(retries - 1), 50);
                     } else {
+                      bridge._pendingInitialSelectTimer = null;
                       log('Could not find element for selectedBlockUid:', blockUidToSelect);
                     }
                     return;
@@ -1791,11 +1792,13 @@ export class Bridge {
                   lastRect = rect;
 
                   if (stableCount >= STABLE_THRESHOLD) {
+                    bridge._pendingInitialSelectTimer = null;
                     bridge.selectBlock(blockUidToSelect);
                   } else if (retries > 0) {
-                    setTimeout(() => waitForStable(retries - 1), 50);
+                    bridge._pendingInitialSelectTimer = setTimeout(() => waitForStable(retries - 1), 50);
                   } else {
                     // Timed out waiting for stable - select anyway
+                    bridge._pendingInitialSelectTimer = null;
                     bridge.selectBlock(blockUidToSelect);
                   }
                 };
@@ -1810,6 +1813,14 @@ export class Bridge {
         // This avoids adding duplicate listeners and works for all blocks
         if (!this.fieldFocusListenerAdded) {
           this.fieldFocusListenerAdded = true;
+          // Track mouse button state so fieldFocusListener can distinguish
+          // keyboard navigation (Tab) from mouse click side-effects.
+          // During mouse clicks, the click handler handles block selection —
+          // the focus event between mousedown and click must not call selectBlock
+          // because restoreContentEditableOnFields would change the DOM and
+          // shift event.target before the click event fires.
+          document.addEventListener('mousedown', () => { this._mouseButtonDown = true; }, true);
+          document.addEventListener('mouseup', () => { this._mouseButtonDown = false; }, true);
           document.addEventListener('focus', (e) => {
             const target = e.target;
             const blockElement = target.closest('[data-block-uid]');
@@ -1822,8 +1833,20 @@ export class Bridge {
               if (this._blockSelectorNavigating || this._navigatingToBlock) {
                 return;
               }
+              // During mouse clicks, defer to the click handler for block selection.
+              // The focus event fires between mousedown and click — calling selectBlock
+              // here would run restoreContentEditableOnFields before click, which can
+              // change event.target and break linkable/media field detection.
+              if (this._mouseButtonDown) {
+                return;
+              }
               // Focus moved to a different block (e.g., via Tab) — select it
               log('Focus moved to different block:', blockUid, 'from:', this.selectedBlockUid);
+              // Cancel any pending initial-selection — user navigated away
+              if (this._pendingInitialSelectTimer) {
+                clearTimeout(this._pendingInitialSelectTimer);
+                this._pendingInitialSelectTimer = null;
+              }
               this.selectBlock(blockElement);
               return;
             }
@@ -2236,6 +2259,12 @@ export class Bridge {
             linkableField: clickedLinkableField?.getAttribute('data-edit-link') || null,
             mediaField: clickedMediaField?.getAttribute('data-edit-media') || null,
           };
+        }
+        // Cancel any pending initial-selection from waitForStable —
+        // user click takes priority over automatic block restoration
+        if (this._pendingInitialSelectTimer) {
+          clearTimeout(this._pendingInitialSelectTimer);
+          this._pendingInitialSelectTimer = null;
         }
         this.selectBlock(blockElement);
       } else {

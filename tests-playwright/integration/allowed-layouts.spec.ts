@@ -81,6 +81,9 @@ test.describe('allowedLayouts', () => {
       await helper.navigateToEdit('/another-page');
       await helper.waitForIframeReady();
 
+      // Wait for initial block selection to settle (first block auto-selected on page load)
+      await helper.waitForQuantaToolbar('block-1-uuid');
+
       // Remember initial block order
       const initialBlocks = await iframe.locator('[data-block-uid]').allTextContents();
       expect(initialBlocks.length).toBeGreaterThan(0);
@@ -282,6 +285,9 @@ test.describe('allowedLayouts', () => {
       await helper.navigateToEdit('/another-page');
       await helper.waitForIframeReady();
 
+      // Wait for initial block selection to settle (first block auto-selected on page load)
+      await helper.waitForQuantaToolbar('block-1-uuid');
+
       // Apply layout
       await page.keyboard.press('Escape');
       const layoutSelector = page.locator('.layout-selector select');
@@ -351,6 +357,9 @@ test.describe('allowedLayouts', () => {
       await helper.navigateToEdit('/test-page');
       await helper.waitForIframeReady();
 
+      // Wait for initial block selection to settle (first block auto-selected on page load)
+      await helper.waitForQuantaToolbar('block-1-uuid');
+
       // Verify multiple user blocks exist before layout
       const { locator: block1 } = await helper.waitForBlockByContent('test paragraph');
       const { locator: block2 } = await helper.waitForBlockByContent('Another paragraph');
@@ -396,6 +405,9 @@ test.describe('allowedLayouts', () => {
       await helper.login();
       await helper.navigateToEdit('/another-page');
       await helper.waitForIframeReady();
+
+      // Wait for initial block selection to settle (first block auto-selected on page load)
+      await helper.waitForQuantaToolbar('block-1-uuid');
 
       const originalContent = 'another test page';
 

@@ -21,6 +21,9 @@ test.describe('Inline editing - linkable/media fields', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
+    // Wait for initial block selection to settle (first block auto-selected on page load)
+    await helper.waitForQuantaToolbar('block-1-uuid');
+
     // The hero block has a button with data-edit-link="buttonLink"
     const iframe = helper.getIframe();
     const linkableElement = iframe.locator('[data-edit-link="buttonLink"]');
@@ -68,6 +71,9 @@ test.describe('Inline editing - linkable/media fields', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
+    // Wait for initial block selection to settle
+    await helper.waitForQuantaToolbar('block-1-uuid');
+
     // Click the linkable element (hero button)
     const iframe = helper.getIframe();
     const linkableElement = iframe.locator('[data-edit-link="buttonLink"]');
@@ -92,6 +98,9 @@ test.describe('Inline editing - linkable/media fields', () => {
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
+
+    // Wait for initial block selection to settle
+    await helper.waitForQuantaToolbar('block-1-uuid');
 
     // The hero button has both data-edit-text="buttonText" and data-edit-link="buttonLink"
     const iframe = helper.getIframe();
