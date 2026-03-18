@@ -130,6 +130,9 @@
           },
         },
         onEditChange: (data) => {
+          const firstBlock = data?.blocks_layout?.items?.[0];
+          const firstText = firstBlock && data?.blocks?.[firstBlock]?.value?.[0]?.children?.[0]?.text;
+          console.log('[F7-EDIT] onEditChange, firstBlock:', firstBlock, 'text:', firstText?.substring(0, 30));
           store.state.content = data;
           // Always set apiBase — needed for listing/search API calls
           store.state.apiBase = import.meta.env.VITE_API_BASE_URL || "https://hydra-api.pretagov.com";

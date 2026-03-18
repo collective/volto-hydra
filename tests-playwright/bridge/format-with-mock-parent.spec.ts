@@ -185,7 +185,7 @@ test.describe('Inline Editing with Mock Parent', () => {
       iframe.contentWindow.postMessage({
         type: 'FORM_DATA',
         data: echoData,
-        blockPathMap: {},
+        blockPathMap: window.mockParent.buildBlockPathMap(),
       }, '*');
       console.log('[TEST] Sent text echo FORM_DATA during blocking');
     });
@@ -193,6 +193,8 @@ test.describe('Inline Editing with Mock Parent', () => {
     // Wait for format response (500ms transform) + replay
     await expect(async () => {
       const text = await helper.getCleanTextContent(editable);
+      const innerHTML = await editable.innerHTML();
+      console.log('[TEST-DEBUG] polling text:', JSON.stringify(text), 'innerHTML:', innerHTML.substring(0, 100));
       expect(text).toBe('Hello world');
     }).toPass({ timeout: 10000 });
 
@@ -535,6 +537,46 @@ test.describe('Inline Editing with Mock Parent', () => {
         delete (window as any).__echoInterval;
       }
     });
+  });
+
+  test('typing after framework re-render is captured (observer survives DOM replacement)', async ({ helper, page }) => {
+    // When onEditChange triggers a framework re-render (Vue, React), the
+    // framework may replace the DOM element the MutationObserver was watching.
+    // After re-render, typing must still be captured by hydra.js.
+    // This catches bugs where the observer is attached to a now-detached element.
+
+    const iframe = helper.getIframe();
+    const editable = await helper.getEditorLocator('mock-block-1', 'value');
+
+    // Type initial text
+    await editable.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('Before');
+    await page.waitForTimeout(500); // Let debounce send INLINE_EDIT_DATA
+
+    // Send FORM_DATA to trigger onEditChange → framework re-render.
+    // The re-render replaces DOM nodes. Observer must survive.
+    await page.evaluate(() => {
+      const iframeEl = document.getElementById('previewIframe') as HTMLIFrameElement;
+      const formData = JSON.parse(JSON.stringify(window.mockParent.getFormData()));
+      const blockPathMap = window.mockParent.buildBlockPathMap();
+      iframeEl.contentWindow!.postMessage({
+        type: 'FORM_DATA',
+        data: formData,
+        blockPathMap,
+      }, '*');
+    });
+    await page.waitForTimeout(500); // Let re-render complete
+
+    // Type more text AFTER the re-render
+    await page.keyboard.type(' After');
+    await page.waitForTimeout(500);
+
+    // Verify both parts are captured
+    await expect(async () => {
+      const text = await helper.getCleanTextContent(editable);
+      expect(text).toBe('Before After');
+    }).toPass({ timeout: 5000 });
   });
 
   test('rapid FORM_DATA from sidebar typing shows final text, not stale render', async ({ helper, page }) => {

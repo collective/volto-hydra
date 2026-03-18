@@ -7529,9 +7529,28 @@ export class Bridge {
             console.warn('[HYDRA] No targetElement found, parent chain:', parentEl?.outerHTML?.substring(0, 100));
           }
         }
-        // childList mutations are NOT processed here. Structural DOM changes
-        // (adding/removing element nodes like STRONG, EM) come from FORM_DATA
-        // re-renders and are already handled by the admin via transforms.
+        // childList mutations: when text is inside wrapper elements without
+        // data-node-id (e.g., Vue/F7 <span>), the browser may REPLACE the
+        // text node (childList) rather than modify it in place (characterData).
+        // This happens on select-all + type, backspace across node boundaries,
+        // or browser DOM normalization.
+        // NOTE: the observer is disconnected during framework re-renders
+        // (_executeRender disconnects, afterContentRender reconnects) so
+        // structural changes from FORM_DATA don't trigger this.
+        if (mutation.type === 'childList' && this.isInlineEditing && !this._renderInProgress) {
+          const parent = mutation.target;
+          if (parent?.nodeType === Node.ELEMENT_NODE) {
+            const targetElement = parent.closest?.('[data-edit-text]');
+            if (targetElement) {
+              const addedTextNode = Array.from(mutation.addedNodes).find(
+                n => n.nodeType === Node.TEXT_NODE
+              );
+              if (addedTextNode) {
+                this.handleTextChange(targetElement, parent, addedTextNode);
+              }
+            }
+          }
+        }
       });
     });
 
@@ -7543,6 +7562,7 @@ export class Bridge {
         this.blockTextMutationObserver.observe(element, {
           subtree: true,
           characterData: true,
+          childList: true,
         });
       }
     } else {
@@ -7550,6 +7570,7 @@ export class Bridge {
       this.blockTextMutationObserver.observe(blockElement, {
         subtree: true,
         characterData: true,
+        childList: true,
       });
     }
   }
@@ -8890,11 +8911,12 @@ export class Bridge {
 
     if (this.fieldTypeIsSlate(fieldType)) {
       // Slate field - update JSON structure using nodeId
-      // Use the actual mutated node's parent if provided (e.g., SPAN for inline formatting)
-      // This ensures we update the correct node, not the whole editable field
+      // Find the nearest element with data-node-id by walking UP from the mutation site.
+      // mutatedNodeParent may be a wrapper (e.g., <span>) without data-node-id —
+      // walk up from there to find the Slate element node (e.g., <p data-node-id="0">).
       const closestNode = (mutatedNodeParent && mutatedNodeParent.hasAttribute('data-node-id'))
         ? mutatedNodeParent
-        : target.closest('[data-node-id]');
+        : (mutatedNodeParent || target).closest('[data-node-id]');
       if (!closestNode) {
         log('Slate field but no data-node-id found!');
         return;

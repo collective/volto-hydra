@@ -389,7 +389,18 @@ function renderChildren(children) {
             return `<a href="${url}"${nodeId}>${renderChildren(child.children)}</a>`;
         }
 
-        // Handle text nodes (leaf nodes)
+        // Handle text nodes (leaf nodes).
+        // Wrapped in <span> to match how Vue/F7 frontends render text — they
+        // use template interpolation ({{ node.text }}) inside <span> elements.
+        // This is the hardest case for hydra.js because:
+        // 1. The <span> has no data-node-id (only Slate element nodes get IDs,
+        //    not leaf text nodes), so hydra.js must walk UP to find the parent
+        //    element's data-node-id.
+        // 2. When the user types, the browser may REPLACE the text node inside
+        //    <span> (a childList mutation) rather than modify it in-place
+        //    (characterData mutation). The MutationObserver must handle both.
+        // 3. Select-all + type replaces the entire <span> content, which is a
+        //    childList change that characterData-only observers miss entirely.
         if (child.text !== undefined) {
             let content = child.text || '';
 
@@ -399,7 +410,8 @@ function renderChildren(children) {
             if (child.code) content = `<code>${content}</code>`;
             if (child.del) content = `<span style="text-decoration: line-through">${content}</span>`;
 
-            return content;
+            const nodeIdAttr = child.nodeId !== undefined ? ` data-node-id="${child.nodeId}"` : '';
+            return `<span${nodeIdAttr}>${content}</span>`;
         }
 
         // Unknown node type - render children if present, otherwise return empty

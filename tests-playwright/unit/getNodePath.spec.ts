@@ -44,6 +44,65 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     expect(path).toEqual([0, 0]);
   });
 
+  test('closest data-node-id from span without data-node-id (F7/Vue pattern)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // handleTextChange uses closest('[data-node-id]') to find the Slate node.
+    // When mutatedNodeParent is <span> (no data-node-id), it must walk up from
+    // the span, not from the data-edit-text target.
+    const result = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-edit-text="value">' +
+        '<p data-node-id="0"><span>Hello world</span></p>' +
+        '</div>';
+      document.body.appendChild(container);
+
+      const span = container.querySelector('span')!;
+      const editTarget = container.querySelector('[data-edit-text]')!;
+
+      // BUG: handleTextChange falls back to editTarget.closest('[data-node-id]')
+      const fromEditTarget = editTarget.closest('[data-node-id]');
+      // FIX: should use span.closest('[data-node-id]')
+      const fromSpan = span.closest('[data-node-id]');
+
+      container.remove();
+      return {
+        fromEditTarget: fromEditTarget?.getAttribute('data-node-id') ?? null,
+        fromSpan: fromSpan?.getAttribute('data-node-id') ?? null,
+      };
+    });
+
+    // editTarget.closest walks UP and finds nothing (data-node-id is a descendant)
+    expect(result.fromEditTarget).toBeNull();
+    // span.closest walks UP and finds <p data-node-id="0">
+    expect(result.fromSpan).toBe('0');
+  });
+
+  test('text wrapped in span without data-node-id (F7/Vue pattern)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // F7 renders: <p data-node-id="0"><span>Hello world</span></p>
+    // The <span> has no data-node-id — it's a decorative wrapper.
+    // getNodePath should still find [0, 0] by walking through the span.
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<p data-edit-text="value" data-node-id="0"><span>Hello world</span></p>';
+      document.body.appendChild(container);
+
+      const textNode = container.querySelector('span')!.firstChild;
+      const result = (window as any).bridge.getNodePath(textNode);
+
+      container.remove();
+      return result;
+    });
+
+    expect(path).toEqual([0, 0]);
+  });
+
   test('text inside bold span', async () => {
     const iframe = helper.getIframe();
     const body = iframe.locator('body');

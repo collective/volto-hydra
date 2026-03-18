@@ -1,15 +1,11 @@
-
 import path from 'path';
 import vue from '@vitejs/plugin-vue';
-import { defineConfig } from 'vite'
-import mkcert from 'vite-plugin-mkcert'
-
-
 
 const SRC_DIR = path.resolve(__dirname, './src');
 const PUBLIC_DIR = path.resolve(__dirname, './public');
-const BUILD_DIR = path.resolve(__dirname, './dist',);
+const BUILD_DIR = path.resolve(__dirname, './dist');
 
+// For local HTTPS dev, use: pnpm exec vite --config vite.config.https.js
 export default {
   plugins: [
     vue({
@@ -19,7 +15,6 @@ export default {
         },
       },
     }),
-    mkcert(),  
   ],
   root: SRC_DIR,
   base: '',
@@ -39,11 +34,8 @@ export default {
   },
   server: {
     host: true,
-    https: true,
     cors: {
       origin: "https://hydra.pretagov.com"
     }
   },
-
 };
-

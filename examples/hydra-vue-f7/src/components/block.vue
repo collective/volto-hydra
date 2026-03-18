@@ -1,8 +1,6 @@
 <template>
   <!-- Slate (rich text) -->
-  <div v-if="block['@type'] == 'slate'" :data-block-uid="block_uid" data-edit-text="value">
-    <RichText v-for="node in block['value']" :key="node" :node="node" />
-  </div>
+  <div v-if="block['@type'] == 'slate'" :data-block-uid="block_uid" data-edit-text="value"><RichText v-for="(node, idx) in block['value']" :key="node.nodeId || idx" :node="node" /></div>
 
   <!-- Title -->
   <h1 v-else-if="block['@type'] == 'title'" :data-block-uid="block_uid" data-edit-text="/title">
