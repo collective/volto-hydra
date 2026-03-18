@@ -3321,11 +3321,10 @@ export class Bridge {
       anchorParent: range.startContainer.parentElement?.tagName,
     });
 
-    // Disconnect observer before modifying DOM — getValidatedPosition may create
+    // Disconnect observer during DOM modification — getValidatedPosition may create
     // ZWS text nodes, and we must not let the observer treat those as user edits.
-    if (this.blockTextMutationObserver) {
-      this.blockTextMutationObserver.disconnect();
-    }
+    // Must disconnect (not just set a flag) because MutationObserver fires async.
+    this._suppressObserver();
 
     // Get corrected positions using shared helper
     const anchorPos = this.getValidatedPosition(range.startContainer, range.startOffset);
@@ -3334,10 +3333,7 @@ export class Bridge {
     log('correctInvalidWhitespaceSelection: anchorPos:', anchorPos, 'focusPos:', focusPos);
 
     if (!anchorPos.node || !focusPos.node) {
-      // Reconnect observer before returning
-      if (this.selectedBlockUid) {
-        this._reattachBlockTextObserver(this.selectedBlockUid);
-      }
+      this._resumeObserver();
       return false;
     }
 
@@ -3346,10 +3342,7 @@ export class Bridge {
     const focusSame = focusPos.node === range.endContainer && focusPos.offset === range.endOffset;
     if (anchorSame && focusSame) {
       log('correctInvalidWhitespaceSelection: corrected position same as current, skipping to avoid loop');
-      // Reconnect observer before returning
-      if (this.selectedBlockUid) {
-        this._reattachBlockTextObserver(this.selectedBlockUid);
-      }
+      this._resumeObserver();
       return false;
     }
 
@@ -3360,11 +3353,7 @@ export class Bridge {
     selection.removeAllRanges();
     selection.addRange(newRange);
 
-    // Reconnect observer now that DOM modification is done
-    if (this.selectedBlockUid) {
-      this.observeBlockTextChanges(this.selectedBlockUid);
-    }
-
+    this._resumeObserver();
     log('correctInvalidWhitespaceSelection: Corrected selection');
     return true;
   }
@@ -3431,18 +3420,14 @@ export class Bridge {
     // All ancestors are empty — whitespace is a rendering artifact with no
     // CSS layout box. Replace with BOM so the browser has a valid target.
     // Disconnect observer to prevent this DOM change from being treated as user typing.
-    if (this.blockTextMutationObserver) {
-      this.blockTextMutationObserver.disconnect();
-    }
+    this._suppressObserver();
     node.textContent = '\uFEFF';
     const range = selection.getRangeAt(0);
     range.setStart(node, 1);
     range.setEnd(node, 1);
     selection.removeAllRanges();
     selection.addRange(range);
-    if (this.selectedBlockUid) {
-      this.observeBlockTextChanges(this.selectedBlockUid);
-    }
+    this._resumeObserver();
     log('ensureValidInsertionTarget: replaced artifact whitespace with FEFF');
 
     return false;
@@ -7551,6 +7536,34 @@ export class Bridge {
    *
    * @param {HTMLElement} blockElement - The block element to observe.
    */
+  /**
+   * Temporarily disconnect the text MutationObserver. Call _resumeObserver() to reconnect.
+   * Used during internal DOM modifications (whitespace correction, ZWS insertion)
+   * that should not be treated as user edits.
+   */
+  _suppressObserver() {
+    if (this.blockTextMutationObserver) {
+      // takeRecords() flushes pending mutations so they don't fire after reconnect
+      this.blockTextMutationObserver.takeRecords();
+      this.blockTextMutationObserver.disconnect();
+    }
+  }
+
+  /**
+   * Reconnect the text MutationObserver to the currently selected block.
+   */
+  _resumeObserver() {
+    if (!this.blockTextMutationObserver || !this.selectedBlockUid) return;
+    const allElements = this.getAllBlockElements(this.selectedBlockUid);
+    for (const element of allElements) {
+      this.blockTextMutationObserver.observe(element, {
+        subtree: true,
+        characterData: true,
+        childList: true,
+      });
+    }
+  }
+
   observeBlockTextChanges(blockElement) {
     const blockUid = blockElement.getAttribute('data-block-uid');
     log('observeBlockTextChanges called for block:', blockUid);
@@ -7602,16 +7615,6 @@ export class Bridge {
       });
     });
 
-    this._reattachBlockTextObserver(blockUid, blockElement);
-  }
-
-  /**
-   * Re-attach the existing MutationObserver to block elements.
-   * Used after internal DOM modifications (whitespace correction, ZWS insertion)
-   * to resume observation without recreating the observer.
-   */
-  _reattachBlockTextObserver(blockUid, fallbackElement) {
-    if (!this.blockTextMutationObserver) return;
     // For multi-element blocks, observe ALL elements with the same block UID
     // For page-level fields (no blockUid), observe the element directly
     if (blockUid) {
