@@ -8903,7 +8903,6 @@ export class Bridge {
     // Determine field type (supports page-level fields via getFieldType)
     const fieldType = this.getFieldType(blockUid, editableField);
 
-
     // Note: We intentionally do NOT strip ZWS from DOM during typing.
     // Like slate-react, we let the frontend re-render (triggered by FORM_DATA)
     // naturally remove ZWS. Stripping during typing corrupts cursor position.

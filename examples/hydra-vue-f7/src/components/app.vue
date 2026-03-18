@@ -75,7 +75,7 @@
   import routes from '../js/routes.js';
   import store from '../js/store';
   import SideMenu from '../pages/sidenav.vue'
-  import { initBridge } from '../js/hydra.js';
+  import { initBridge } from '@hydra-js/hydra.js';
 
 
   export default {

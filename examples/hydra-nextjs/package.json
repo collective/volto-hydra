@@ -17,6 +17,7 @@
     "lint": "next lint"
   },
   "imports": {
+    "#utils/hydra": "../../packages/hydra-js/hydra.js",
     "#utils/*": "./src/utils/*.js"
   },
   "dependencies": {

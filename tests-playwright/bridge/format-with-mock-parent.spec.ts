@@ -193,8 +193,6 @@ test.describe('Inline Editing with Mock Parent', () => {
     // Wait for format response (500ms transform) + replay
     await expect(async () => {
       const text = await helper.getCleanTextContent(editable);
-      const innerHTML = await editable.innerHTML();
-      console.log('[TEST-DEBUG] polling text:', JSON.stringify(text), 'innerHTML:', innerHTML.substring(0, 100));
       expect(text).toBe('Hello world');
     }).toPass({ timeout: 10000 });
 

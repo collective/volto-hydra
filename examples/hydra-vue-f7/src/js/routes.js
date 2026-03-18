@@ -2,7 +2,7 @@
 import Page from '../pages/page.vue';
 import NotFoundPage from '../pages/404.vue';
 import axios from 'axios';
-import { loadTemplates, isEditMode } from '../js/hydra.js';
+import { loadTemplates, isEditMode } from '@hydra-js/hydra.js';
 
 // Shared template cache across route navigations
 const templateCache = {};
