@@ -1608,7 +1608,7 @@ export class Bridge {
         } else if (window.location.hash !== currentUrlObj.hash) {
           const hash = window.location.hash;
           const i = hash.indexOf('/');
-          const rawPath = i !== -1 ? hash.slice(i) || '/' : '/';
+          const rawPath = (i !== -1 ? hash.slice(i) || '/' : '/').replace(/\/+/g, '/');
           const apiPath = this.pathToApiPath(rawPath);
           log('Sending PATH_CHANGE (hash):', rawPath, '-> apiPath:', apiPath, 'to', this.adminOrigin);
           window.parent.postMessage(

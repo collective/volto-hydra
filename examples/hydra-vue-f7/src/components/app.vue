@@ -75,7 +75,7 @@
   import routes from '../js/routes.js';
   import store from '../js/store';
   import SideMenu from '../pages/sidenav.vue'
-  import { initBridge } from '@hydra-js/hydra.js';
+  import { initBridge, isEditMode } from '@hydra-js/hydra.js';
 
 
   export default {
@@ -99,6 +99,7 @@
         theme: 'auto', // Automatic theme detection
         view: {
             browserHistory: true,
+            browserHistorySeparator: '#!',
             browserHistoryOnLoad: true,
             browserHistoryStoreHistory: false,
             browserHistoryInitialMatch: false,
@@ -120,8 +121,9 @@
         });
       }
 
-      // In Layout.js or App.js
-      const bridge = initBridge({
+      // Only initialize the hydra bridge in edit mode
+      if (isEditMode()) {
+      initBridge({
         page: {
           schema: {
             properties: {
@@ -138,6 +140,7 @@
           store.state.apiBase = import.meta.env.VITE_API_BASE_URL || "https://hydra-api.pretagov.com";
         },
       });
+      }
 
       onMounted(() => {
         f7ready((f7) => {

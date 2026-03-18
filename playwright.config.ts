@@ -230,7 +230,7 @@ export default defineConfig({
     },
 
     // --- Example frontends — opt-in only (run with --project=admin-nextjs or --project=admin-f7) ---
-    ...(needsNextjs ? [{
+    {
       name: 'admin-nextjs',
       testDir: 'tests-playwright/integration',
       use: {
@@ -242,8 +242,8 @@ export default defineConfig({
       testIgnore: [
         /nuxt-.*\.spec\.ts/,
       ],
-    }] : []),
-    ...(needsF7 ? [{
+    },
+    {
       name: 'admin-f7',
       testDir: 'tests-playwright/integration',
       use: {
@@ -255,7 +255,7 @@ export default defineConfig({
       testIgnore: [
         /nuxt-.*\.spec\.ts/,
       ],
-    }] : []),
+    },
   ],
 
   /* Start mock API server and Volto dev server before running tests */

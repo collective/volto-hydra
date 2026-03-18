@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import Cookies from 'js-cookie';
@@ -16,9 +16,13 @@ import { setViewportWidths } from '../../actions';
 /**
  * Modal for managing frontend URLs (add/remove) and viewport widths.
  * Environment URLs (from RAZZLE_DEFAULT_IFRAME_URL) cannot be removed.
+ *
+ * Uses a native mousedown capture listener to prevent Volto's toolbar
+ * click-outside handler from closing the panel while the modal is open.
  */
 const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
   const dispatch = useDispatch();
+  const overlayRef = useRef(null);
   const [urls, setUrls] = useState(() => getSavedURLs());
   const [newUrl, setNewUrl] = useState('');
   const [error, setError] = useState('');
@@ -29,11 +33,18 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
   const [mobileWidth, setMobileWidth] = useState(currentWidths.mobile);
   const [tabletWidth, setTabletWidth] = useState(currentWidths.tablet);
 
+  // Prevent toolbar's document-level mousedown handler from closing the panel.
+  // Must use native capture listener since the toolbar uses addEventListener directly.
+  useEffect(() => {
+    const stop = (e) => e.stopPropagation();
+    document.addEventListener('mousedown', stop, true);
+    return () => document.removeEventListener('mousedown', stop, true);
+  }, []);
+
   // Environment URLs can't be removed
   const envUrls = new Set(getURlsFromEnv());
 
   const saveUrls = (updatedUrls) => {
-    // Only save non-env URLs to cookie (env URLs are always merged by getSavedURLs)
     const customUrls = updatedUrls.filter((u) => !envUrls.has(u));
     const allEnvUrls = getURlsFromEnv();
     const cookieUrls = [...new Set([...customUrls, ...allEnvUrls])];
@@ -53,7 +64,6 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
       return;
     }
 
-    // Normalize: strip trailing slash from pathname (but not hash URLs)
     let normalized = trimmed;
     try {
       const urlObj = new URL(trimmed);
@@ -105,6 +115,7 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
 
   return createPortal(
     <div
+      ref={overlayRef}
       className="frontend-settings-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();

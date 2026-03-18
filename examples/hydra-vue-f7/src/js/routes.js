@@ -10,7 +10,6 @@ const templateCache = {};
 var routes = [
   {
     path: '{/:path}*',
-    browserHistory: true,
     async: function ({ router, to, resolve }) {
       var app = router.app;
       var path = to.path;

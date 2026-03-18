@@ -177,6 +177,55 @@ test.describe('Frontend & Viewport Switcher', () => {
     await helper.waitForQuantaToolbar(blockId);
   });
 
+  test('switching to hash-based frontend stays in edit mode', async ({ page }) => {
+    // Reproduces production bug: F7 uses hash-bang routing (#!/path).
+    // When switching to F7, the iframe should stay in edit mode and render content.
+    // Bug: F7's router strips _edit param, hydra.js sends PATH_CHANGE with
+    // double-slash path, Volto exits edit mode.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.waitForIframeReady();
+
+    // Open frontend switcher settings and add hash-based URL
+    const switcherBtn = page.locator('#toolbar-frontend-switcher');
+    await switcherBtn.click();
+    const panel = page.locator('.frontend-switcher-panel');
+    await expect(panel).toBeVisible();
+
+    const settingsBtn = panel.locator('.frontend-switcher-settings-btn');
+    await settingsBtn.click();
+
+    const modal = page.locator('.frontend-settings-modal');
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    // Add F7 hash-based URL
+    const input = modal.locator('.frontend-settings-input');
+    await input.fill('http://localhost:3008/#!');
+    await modal.locator('.frontend-settings-add-btn').click();
+
+    // Close modal
+    await modal.locator('.frontend-settings-close').click();
+    await expect(modal).not.toBeVisible({ timeout: 5000 });
+
+    // Select the F7 URL in the switcher panel
+    const f7Item = panel.locator('.frontend-switcher-url-item', { hasText: 'localhost:3008' });
+    await expect(f7Item).toBeVisible();
+    await f7Item.click();
+
+    // Wait for iframe to load F7 and render content
+    const iframe = helper.getIframe();
+    await expect(iframe.locator('[data-block-uid]').first()).toBeVisible({ timeout: 15000 });
+
+    // Verify we're still in edit mode (URL ends with /edit)
+    expect(page.url()).toContain('/edit');
+
+    // Verify the iframe has F7 content (not a blank page or redirect)
+    const blockCount = await iframe.locator('[data-block-uid]').count();
+    expect(blockCount).toBeGreaterThan(0);
+  });
+
   test('toolbar button visible in view mode', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
