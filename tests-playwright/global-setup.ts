@@ -2,8 +2,23 @@
  * Global setup for Playwright tests
  * Verifies servers are healthy before running tests
  */
+import * as fs from 'fs';
+import * as path from 'path';
+import { discoverBlocks } from './helpers/discover-blocks';
 
 async function globalSetup() {
+  // Run block discovery if configured (before health checks — SKIP_VOLTO_CHECK
+  // causes early return but discovery still needs to run for bridge tests)
+  const discoverApi = process.env.DISCOVER_BLOCKS_API;
+  if (discoverApi) {
+    const maxPages = parseInt(process.env.DISCOVER_MAX_PAGES || '50', 10);
+    console.log(`[SETUP] Discovering blocks from ${discoverApi} (max ${maxPages} pages)...`);
+    const blocks = await discoverBlocks(discoverApi, maxPages);
+    const outPath = path.resolve(__dirname, '../.discovered-blocks.json');
+    fs.writeFileSync(outPath, JSON.stringify(blocks, null, 2));
+    console.log(`[SETUP] Wrote ${blocks.length} discovered blocks to ${outPath}`);
+  }
+
   // Bridge-only CI jobs don't run Volto — skip the health check
   if (process.env.SKIP_VOLTO_CHECK === 'true') {
     console.log('[SETUP] Skipping Volto health check (SKIP_VOLTO_CHECK=true)');

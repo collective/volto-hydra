@@ -33,3 +33,4 @@ playwright-report/
 coverage/
 *.txt
 cache/
+.discovered-blocks.json

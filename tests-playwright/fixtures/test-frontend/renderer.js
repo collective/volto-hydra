@@ -49,6 +49,21 @@ async function expandItems(blocks, layout, containerId, paging) {
 const sliderSlideCount = {};
 
 /**
+ * Strip the API origin from an absolute URL, returning a relative path.
+ * e.g. "http://localhost:8888/images/foo.jpg" → "/images/foo.jpg"
+ * Leaves relative paths unchanged.
+ */
+function stripApiOrigin(url) {
+    if (!url || !url.startsWith('http')) return url;
+    const apiOrigin = window._apiOrigin;
+    if (apiOrigin && url.startsWith(apiOrigin)) {
+        return url.slice(apiOrigin.length) || '/';
+    }
+    // Unknown origin — extract pathname
+    try { return new URL(url).pathname; } catch { return url; }
+}
+
+/**
  * Extract URL from various formats and construct image URL.
  * Handles:
  * - Catalog brain: { '@id': '/path', image_field: 'image', image_scales: { image: [{ download: '@@images/...' }] } }
@@ -94,7 +109,7 @@ function getLinkUrl(value) {
     if (!value) return '';
     // Extract @id from array or object format
     const url = Array.isArray(value) ? value[0]?.['@id'] : value?.['@id'] || value;
-    return typeof url === 'string' ? url : '';
+    return typeof url === 'string' ? stripApiOrigin(url) : '';
 }
 
 /**
