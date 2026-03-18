@@ -4,6 +4,12 @@
  */
 
 async function globalSetup() {
+  // Bridge-only CI jobs don't run Volto — skip the health check
+  if (process.env.SKIP_VOLTO_CHECK === 'true') {
+    console.log('[SETUP] Skipping Volto health check (SKIP_VOLTO_CHECK=true)');
+    return;
+  }
+
   const maxRetries = 60; // 60 retries * 5 seconds = 5 minutes max wait
   const retryDelay = 5000; // 5 seconds between retries
 

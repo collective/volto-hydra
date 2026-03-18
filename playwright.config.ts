@@ -260,7 +260,8 @@ export default defineConfig({
 
   /* Start mock API server and Volto dev server before running tests */
   /* In CI, servers are started in advance by the workflow - Playwright just reuses them */
-  webServer: [
+  /* Set NO_WEBSERVER=true in CI to disable all auto-start (each CI job manages its own servers) */
+  webServer: process.env.NO_WEBSERVER ? [] : [
     {
       // Mock Plone API server - must start BEFORE Volto
       // Uses --watch for auto-reload on code changes during development
