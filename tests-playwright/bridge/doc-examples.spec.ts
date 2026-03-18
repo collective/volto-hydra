@@ -59,7 +59,7 @@ const test = base.extend<{ helper: AdminUIHelper }>({
     const frontendUrl = getFrontendUrl(testInfo.project.name);
     const frontend = frontendUrl ? `&frontend=${encodeURIComponent(frontendUrl)}` : '';
     await page.goto(
-      `http://localhost:8888/mock-parent.html?content=examples${frontend}`,
+      `http://localhost:8889/mock-parent.html?content=examples${frontend}`,
     );
     await helper.waitForIframeReady();
     await use(helper);
@@ -300,7 +300,7 @@ docBlockTest.describe('Doc page blocks render', () => {
       });
 
       await page.goto(
-        `http://localhost:8888/mock-parent.html?content=docblock${frontend}`,
+        `http://localhost:8889/mock-parent.html?content=docblock${frontend}`,
       );
       await helper.waitForIframeReady();
 

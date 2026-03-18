@@ -40,7 +40,7 @@ jobs:
         run: pnpm build
         env:
           RAZZLE_API_PATH: http://localhost:8888
-          RAZZLE_DEFAULT_IFRAME_URL: http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008
+          RAZZLE_DEFAULT_IFRAME_URL: http://localhost:8889,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008
           VOLTOCONFIG: ${{ github.workspace }}/volto.config.js
       - name: Upload Volto build
         uses: actions/upload-artifact@v4
@@ -100,7 +100,7 @@ jobs:
           sleep 3
       - name: Wait for servers
         run: |
-          for port in 8888 3004 3005 3006; do
+          for port in 8888 8889 3004 3005 3006; do
             echo "Waiting for port $port..."
             for i in {1..30}; do
               curl -s http://localhost:$port > /dev/null && break
@@ -185,16 +185,16 @@ jobs:
         run: |
           node tests-playwright/fixtures/mock-api-server.js &
           PORT=3001 RAZZLE_API_PATH=http://localhost:8888 \
-            RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888,http://localhost:3003 \
+            RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8889,http://localhost:3003 \
             VOLTOCONFIG=${{ github.workspace }}/volto.config.js \
             pnpm start:prod &
           sleep 3
       - name: Wait for servers
         run: |
-          echo "Waiting for mock API (8888)..."
-          for i in {1..60}; do curl -s http://localhost:8888/health > /dev/null && break; sleep 2; done
-          echo "Waiting for Volto (3001)..."
-          for i in {1..60}; do curl -s http://localhost:3001 > /dev/null && break; sleep 2; done
+          for port in 8888 8889 3001; do
+            echo "Waiting for port $port..."
+            for i in {1..30}; do curl -s http://localhost:$port > /dev/null && break; sleep 2; done
+          done
           echo "All servers ready"
       - name: Run tests
         run: pnpm exec playwright test --project=admin-mock --reporter=github,list,html
@@ -272,7 +272,7 @@ jobs:
           sleep 3
       - name: Wait for servers
         run: |
-          for port in 8888 3003; do
+          for port in 8888 8889 3003; do
             echo "Waiting for port $port..."
             for i in {1..30}; do curl -s http://localhost:$port > /dev/null && break; sleep 2; done
           done
@@ -347,14 +347,14 @@ jobs:
         run: |
           node tests-playwright/fixtures/mock-api-server.js &
           PORT=3001 RAZZLE_API_PATH=http://localhost:8888 \
-            RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888,http://localhost:3003 \
+            RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8889,http://localhost:3003 \
             VOLTOCONFIG=${{ github.workspace }}/volto.config.js \
             pnpm start:prod &
           cd examples/nuxt-blog-starter && pnpm run preview:test &
           sleep 3
       - name: Wait for servers
         run: |
-          for port in 8888 3001 3003; do
+          for port in 8888 8889 3001 3003; do
             echo "Waiting for port $port..."
             for i in {1..30}; do curl -s http://localhost:$port > /dev/null && break; sleep 2; done
           done
@@ -432,7 +432,7 @@ jobs:
           sleep 3
       - name: Wait for servers
         run: |
-          for port in 8888 3007 3008; do
+          for port in 8888 8889 3007 3008; do
             echo "Waiting for port $port..."
             for i in {1..30}; do
               curl -s http://localhost:$port > /dev/null && break

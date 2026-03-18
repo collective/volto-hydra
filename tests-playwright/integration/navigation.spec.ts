@@ -29,8 +29,8 @@ test.describe('Navigation and URL Handling', () => {
 
   // Test hash-based routing with different URL formats
   const hashFormats = [
-    { name: '#/', url: 'http://localhost:8888/#/', expectedHash: `#${TEST_DATA_PREFIX}/test-page` },
-    { name: '#!/', url: 'http://localhost:8888/#!/', expectedHash: `#!${TEST_DATA_PREFIX}/test-page` },
+    { name: '#/', url: 'http://localhost:8889/#/', expectedHash: `#${TEST_DATA_PREFIX}/test-page` },
+    { name: '#!/', url: 'http://localhost:8889/#!/', expectedHash: `#!${TEST_DATA_PREFIX}/test-page` },
   ];
 
   for (const format of hashFormats) {
@@ -390,7 +390,7 @@ test.describe('Navigation and URL Handling', () => {
     // Get the current iframe src (should be path-based: localhost:8888/test-page)
     const iframeElement = page.locator('#previewIframe');
     const srcBefore = await iframeElement.getAttribute('src');
-    expect(srcBefore).toContain(`localhost:8888${TEST_DATA_PREFIX}/test-page`);
+    expect(srcBefore).toContain(`localhost:8889${TEST_DATA_PREFIX}/test-page`);
     expect(srcBefore).not.toContain('#');
 
     // Open Personal Preferences
@@ -401,7 +401,7 @@ test.describe('Navigation and URL Handling', () => {
     // Enable custom URL and change to hash-based URL format
     await page.locator('label:has-text("Custom URL")').click();
     const urlInput = page.locator('input[name="url"]');
-    await urlInput.fill('http://localhost:8888/#/');
+    await urlInput.fill('http://localhost:8889/#/');
 
     // Submit the form
     await page.locator('form button[type="submit"], form .ui.button.primary').click();

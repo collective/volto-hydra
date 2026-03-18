@@ -91,7 +91,7 @@
 
     // Configure iframe frontend from ?frontend= URL param (default: mock frontend on 8888)
     const params = new URLSearchParams(window.location.search);
-    const frontendOrigin = params.get('frontend') || 'http://localhost:8888';
+    const frontendOrigin = params.get('frontend') || 'http://localhost:8889';
     const contentName = params.get('content'); // e.g., 'examples' loads /examples.json
     const apiPath = params.get('api_path'); // e.g., '/block/toc-block' loads from API
     const adminOrigin = window.location.origin;
@@ -102,7 +102,7 @@
       const previewIframe = document.createElement('iframe');
       previewIframe.id = 'previewIframe';
       previewIframe.name = `hydra-edit:${adminOrigin}`;
-      previewIframe.src = `${frontendOrigin}/_test_data/test-page?_edit=true&_admin_origin=${adminOrigin}&_hydra_debug=1`;
+      previewIframe.src = `${frontendOrigin}/_test_data/test-page?_edit=true&_admin_origin=${adminOrigin}&_api_origin=http://localhost:8888&_hydra_debug=1`;
       document.getElementById('iframe-container').appendChild(previewIframe);
     }
 

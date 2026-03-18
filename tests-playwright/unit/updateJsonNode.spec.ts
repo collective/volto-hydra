@@ -11,7 +11,7 @@ test.describe('Bridge.updateJsonNode()', () => {
 
   test.beforeEach(async ({ page }) => {
     helper = new AdminUIHelper(page);
-    await page.goto('http://localhost:8888/mock-parent.html');
+    await page.goto('http://localhost:8889/mock-parent.html');
     await helper.waitForIframeReady();
     await helper.waitForBlockSelected('mock-block-1');
     await helper.injectPreserveWhitespaceHelper();

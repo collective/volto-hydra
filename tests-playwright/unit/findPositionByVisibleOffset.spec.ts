@@ -11,7 +11,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
 
   test.beforeEach(async ({ page }) => {
     helper = new AdminUIHelper(page);
-    await page.goto('http://localhost:8888/mock-parent.html');
+    await page.goto('http://localhost:8889/mock-parent.html');
     await helper.waitForIframeReady();
     await helper.waitForBlockSelected('mock-block-1');
     // Inject helper for creating DOM with preserved whitespace (Vue/Nuxt template artifacts)

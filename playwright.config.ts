@@ -263,18 +263,20 @@ export default defineConfig({
   /* Set NO_WEBSERVER=true in CI to disable all auto-start (each CI job manages its own servers) */
   webServer: process.env.NO_WEBSERVER ? [] : [
     {
-      // Mock Plone API server - must start BEFORE Volto
+      // Mock Plone API + test frontend — starts both servers
+      // API on port 8888, test frontend on port 8889
       // Uses --watch for auto-reload on code changes during development
       name: 'Mock API + Frontend',
       command: `node --watch --watch-path=tests-playwright/fixtures --watch-path=packages/hydra-js ${path.join(__dirname, 'tests-playwright/fixtures/mock-api-server.js')}`,
-      url: 'http://localhost:8888/health',
+      url: 'http://localhost:8889/mock-parent.html',
       timeout: 50 * 1000,
-      reuseExistingServer: true, // Always reuse if running - CI starts in advance, local dev starts manually
+      reuseExistingServer: true,
       cwd: process.cwd(),
       stdout: 'pipe' as const,
       stderr: 'pipe' as const,
       env: {
         PORT: '8888',
+        FRONTEND_PORT: '8889',
         CONTENT_MOUNTS: '/:docs/content/content/content,/_test_data:tests-playwright/fixtures/content',
       },
     },
@@ -284,7 +286,7 @@ export default defineConfig({
           // Production server (prebuilt in CI) - starts immediately, no webpack compilation
           name: 'Volto Admin UI (Production)',
           command:
-            'PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888 pnpm start:prod',
+            'PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8889 pnpm start:prod',
           url: 'http://localhost:3001', // Health check on SSR server directly
           timeout: 30 * 1000, // 30 seconds should be plenty for starting prebuilt server
           reuseExistingServer: true, // CI starts server in advance
@@ -296,7 +298,7 @@ export default defineConfig({
             PORT: '3001',
             RAZZLE_API_PATH: 'http://localhost:8888',
             // Both mock frontend (8888) and Nuxt frontend (3003) available for switching
-            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008',
+            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8889,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008',
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
           },
         }
@@ -309,7 +311,7 @@ export default defineConfig({
           // Health check on port 3002 (webpack-dev-server) waits for compilation to complete
           name: 'Volto Admin UI (Dev)',
           command:
-            'PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8888 VOLTOCONFIG=$(pwd)/volto.config.js razzle start',
+            'PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8889 VOLTOCONFIG=$(pwd)/volto.config.js razzle start',
           url: 'http://localhost:3002/health', // Health check on webpack-dev-server (returns 200 when ready)
           timeout: 300 * 1000, // 5 minutes for initial webpack compilation
           reuseExistingServer: true, // Always reuse - local dev starts manually
@@ -320,7 +322,7 @@ export default defineConfig({
             PORT: '3001',
             RAZZLE_API_PATH: 'http://localhost:8888',
             // Both mock frontend (8888) and Nuxt frontend (3003) available for switching
-            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8888,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008',
+            RAZZLE_DEFAULT_IFRAME_URL: 'http://localhost:8889,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008',
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
             // Prevent parcel from trying to access TTY (fixes segfault in background process)
             CI: process.env.CI || 'true',
