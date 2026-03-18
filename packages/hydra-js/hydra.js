@@ -7533,7 +7533,15 @@ export class Bridge {
       log('MutationObserver fired, mutations:', mutations.length, 'isInlineEditing:', this.isInlineEditing);
       mutations.forEach((mutation) => {
         log('Mutation:', mutation.type, 'target:', mutation.target?.nodeName, 'text:', mutation.target?.textContent?.substring(0, 50));
-        if (mutation.type === 'characterData' && this.isInlineEditing) {
+        if (mutation.type === 'characterData' && this.isInlineEditing && !this._renderInProgress) {
+          // Skip mutations that only contain ZWS/BOM characters — these are internal
+          // DOM modifications from correctInvalidWhitespaceSelection or
+          // ensureValidInsertionTarget, not user typing. Users can't type ZWS.
+          const mutationText = mutation.target?.textContent;
+          if (mutationText && mutationText.replace(/[\uFEFF\u200B]/g, '') === '') {
+            log('Skipping ZWS-only characterData mutation');
+            return;
+          }
           // Find the editable field element (works for both Slate and non-Slate fields)
           const mutatedTextNode = mutation.target; // The actual text node that changed
           const parentEl = mutation.target?.parentElement;
