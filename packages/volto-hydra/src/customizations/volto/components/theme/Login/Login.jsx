@@ -22,6 +22,8 @@ import { toast } from 'react-toastify';
 import { Toast } from '@plone/volto/components';
 import aheadSVG from '@plone/volto/icons/ahead.svg';
 import clearSVG from '@plone/volto/icons/clear.svg';
+import { getURlsFromEnv } from '../../../../../utils/getSavedURLs';
+import getDomainInitials from '../../../../../utils/getDomainInitials';
 
 const messages = defineMessages({
   login: {
@@ -141,49 +143,54 @@ const Login = (props) => {
         <Grid centered style={{ marginTop: '10px' }}>
           <Grid.Column>
             <Segment raised>
-              <Header as="h1" textAlign="center">
-                Hydra: Plone Visual Headless PoC
+              <Header as="h2">
+                <a href="https://github.com/collective/volto-hydra" style={{ color: 'inherit' }}>
+                  Hydra
+                </a>
+                <Header.Subheader>Headless Visual Editor</Header.Subheader>
               </Header>
-              <List bulleted>
-                <List.Item>
-                  <a
-                    href="https://hydra-nuxt-flowbrite.netlify.app/"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Nuxt.js/Vue Example
-                  </a>
-                </List.Item>
-                <List.Item>
-                  <a
-                    href="https://hydra-blogsite-nextjs.vercel.app/"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Next.js/React Example
-                  </a>
-                </List.Item>
-                <List.Item>
-                  <a
-                    href="https://hydra-vue-f7.netlify.app/"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    framework7/Vue Example (mobile app)
-                  </a>
-                </List.Item>
-              </List>
-              <p>
-                <a href="https://github.com/collective/volto-hydra">
-                  Hydra README
-                </a>{' '}
-                - currently implemented features and tutorial.
-              </p>
-              <ul>
-                <li>Use "admin" and password "admin" to edit sites above</li> 
-                <li>User preferences: to Switch headless frontend</li> 
-              </ul>
-
+              <p style={{ margin: '1em 0 0.5em' }}>Editor for</p>
+              <div style={{ display: 'flex', gap: '0.75em', flexWrap: 'wrap' }}>
+                {getURlsFromEnv().map((url) => {
+                  const displayUrl = url.replace(/#.*$/, '');
+                  return (
+                    <a
+                      key={url}
+                      href={displayUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={displayUrl}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4em',
+                        padding: '0.3em 0.7em',
+                        borderRadius: '4px',
+                        background: '#f0f0f0',
+                        color: '#333',
+                        textDecoration: 'none',
+                        fontSize: '0.9em',
+                      }}
+                    >
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '1.8em',
+                        height: '1.8em',
+                        borderRadius: '3px',
+                        background: '#007bb5',
+                        color: '#fff',
+                        fontWeight: 'bold',
+                        fontSize: '0.75em',
+                      }}>
+                        {getDomainInitials(url)}
+                      </span>
+                      {new URL(displayUrl).hostname}
+                    </a>
+                  );
+                })}
+              </div>
             </Segment>
           </Grid.Column>
         </Grid>
