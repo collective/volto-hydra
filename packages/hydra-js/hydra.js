@@ -4762,11 +4762,14 @@ export class Bridge {
           this._reRenderBlocking = false;
 
           // Restore pre-render cursor position when no transformedSelection was
-          // provided (sidebar-originated FORM_DATA). The DOM re-render may reset
+          // provided (echo or sidebar FORM_DATA). The DOM re-render may reset
           // cursor to position 0; we need to put it back before replaying events.
-          // Skip when focus is in the sidebar (skipFocus=true) — restoring selection
-          // calls .focus() inside the iframe which steals focus from the sidebar field.
-          if (!transformedSelection && this._preRenderSelection && !skipFocus) {
+          // Only restore when iframe has focus — restoring selection calls .focus()
+          // which would steal focus from sidebar fields. Note: skipFocus (based on
+          // focusLost) can't be used here because frameworks like Vue may patch the
+          // DOM without destroying the focused element, so focus isn't "lost" even
+          // though the cursor position was reset to 0.
+          if (!transformedSelection && this._preRenderSelection && this._iframeFocused) {
             log('Restoring pre-render selection for buffer replay:', JSON.stringify(this._preRenderSelection));
             try {
               await this.restoreSlateSelection(this._preRenderSelection, this.formData);
