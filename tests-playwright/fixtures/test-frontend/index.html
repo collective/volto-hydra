@@ -104,9 +104,8 @@
             return criteria;
         }
 
-        // API origin — defaults to same origin, override with ?_api_origin= for split servers
-        const urlParams = new URLSearchParams(window.location.search);
-        window._apiOrigin = urlParams.get('_api_origin') || window.location.origin;
+        // API origin — the mock Plone API always runs on port 8888
+        window._apiOrigin = 'http://localhost:8888';
 
         // Make search criteria available globally for form handlers
         window._searchCriteria = {};

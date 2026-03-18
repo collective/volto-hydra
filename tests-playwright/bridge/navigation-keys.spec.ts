@@ -280,22 +280,23 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // Wait for the clear to complete
     await expect.poll(() => editable.textContent()).toMatch(/^[\s\uFEFF\u200B]*$/);
 
-    // Simulate Nuxt's rendering: replace content of <p> with whitespace-only text node.
-    // This is what Nuxt does after a re-render — Vue templates produce " " in empty elements.
-    // On mock frontend, data-node-id is on the same element as data-edit-text;
-    // on Nuxt, data-node-id is on a child <p>. Handle both cases.
-    await editable.evaluate((el) => {
-      const nodeEl = el.querySelector('[data-node-id="0"]')
-        || (el.hasAttribute('data-node-id') ? el : null);
-      if (!nodeEl) throw new Error('No data-node-id="0" element found');
-      nodeEl.textContent = ' ';
-      const sel = window.getSelection();
-      const range = document.createRange();
-      range.setStart(nodeEl.firstChild, 0);
-      range.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(range);
+    // Simulate Nuxt's rendering: send FORM_DATA with empty slate value through
+    // mock parent. This triggers a proper render cycle (observer disconnected,
+    // framework re-renders, observer reconnected). Vue templates produce " " in
+    // empty elements — ensureValidInsertionTarget fixes that on next keypress.
+    await page.evaluate(() => {
+      const iframeEl = document.getElementById('previewIframe') as HTMLIFrameElement;
+      const formData = JSON.parse(JSON.stringify(window.mockParent.getFormData()));
+      formData.blocks['mock-block-1'].value = [
+        { type: 'p', children: [{ text: '' }] },
+      ];
+      iframeEl.contentWindow!.postMessage({
+        type: 'FORM_DATA',
+        data: formData,
+        blockPathMap: window.mockParent.buildBlockPathMap(),
+      }, '*');
     });
+    await page.waitForTimeout(500); // Let re-render complete
 
     // Type — without the fix, "r" would land outside <p> as a sibling text node
     await page.keyboard.type('replacement text', { delay: 10 });
