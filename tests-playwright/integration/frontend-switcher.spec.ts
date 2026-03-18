@@ -210,7 +210,7 @@ test.describe('Frontend & Viewport Switcher', () => {
     await expect(modal).not.toBeVisible({ timeout: 5000 });
 
     // Select the F7 URL in the switcher panel
-    const f7Item = panel.locator('.frontend-switcher-url-item', { hasText: 'localhost:3008' });
+    const f7Item = panel.locator('.frontend-switcher-url-item', { hasText: 'localhost:3008/#!' });
     await expect(f7Item).toBeVisible();
     await f7Item.click();
 
