@@ -71,6 +71,14 @@ export default defineNuxtConfig({
     test: {
       // Test environment: HTTP mode, points to mock API on localhost:8888
       ssr: false,
+      vue: {
+        compilerOptions: {
+          comments: true,  // Preserve HTML comments for hydra comment syntax
+        },
+      },
+      nitro: {
+        preset: 'static'  // SPA with proper fallback routing (same as edit profile)
+      },
       devtools: { enabled: false },
       devServer: {
         https: false  // Disable HTTPS for test mode
