@@ -1062,6 +1062,7 @@ function Block({ block, id, data, apiUrl, contextPath }) {
               className="hero-button"
               href={getUrl(block.buttonLink, apiUrl)}
               data-edit-link="buttonLink"
+              data-edit-text="buttonText"
             >
               {block.buttonText}
             </a>

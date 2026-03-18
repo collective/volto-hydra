@@ -54,7 +54,7 @@
     <div class="hero-description" data-edit-text="description">
       <RichText v-for="node in (block.description || [])" :key="node" :node="node" />
     </div>
-    <f7-button v-if="block.buttonText" fill :href="getUrl(block.buttonLink)" data-edit-link="buttonLink">
+    <f7-button v-if="block.buttonText" fill :href="getUrl(block.buttonLink)" data-edit-link="buttonLink" data-edit-text="buttonText">
       {{ block.buttonText }}
     </f7-button>
   </div>
