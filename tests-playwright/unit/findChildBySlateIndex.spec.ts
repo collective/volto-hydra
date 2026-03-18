@@ -25,7 +25,7 @@ test.describe('findChildBySlateIndex() - Vue empty text node handling', () => {
       container.innerHTML =
         '<div data-edit-text="value">' +
         '<p data-node-id="0">' +
-        '<strong data-node-id="0-1"></strong>' +
+        '<strong data-node-id="0.1"></strong>' +
         '</p>' +
         '</div>';
       document.body.appendChild(container);
@@ -57,7 +57,7 @@ test.describe('findChildBySlateIndex() - Vue empty text node handling', () => {
       const container = document.createElement('div');
       container.innerHTML =
         '<div data-edit-text="value">' +
-        '<strong data-node-id="0-1"></strong>' +
+        '<strong data-node-id="0.1"></strong>' +
         '</div>';
       document.body.appendChild(container);
 
@@ -118,7 +118,7 @@ test.describe('findChildBySlateIndex() - Vue empty text node handling', () => {
       const container = document.createElement('div');
       container.innerHTML =
         '<div data-edit-text="value">' +
-        '<strong data-node-id="0-1"></strong>' +
+        '<strong data-node-id="0.1"></strong>' +
         '</div>';
       document.body.appendChild(container);
 
@@ -153,7 +153,7 @@ test.describe('findChildBySlateIndex() - Vue empty text node handling', () => {
       p.appendChild(document.createTextNode('before')); // Slate index 0
 
       const strong = document.createElement('strong');
-      strong.setAttribute('data-node-id', '0-1');
+      strong.setAttribute('data-node-id', '0.1');
       strong.appendChild(document.createTextNode('')); // Vue artifact
       strong.appendChild(document.createTextNode('bold'));
       p.appendChild(strong); // Slate index 1
@@ -187,8 +187,8 @@ test.describe('findChildBySlateIndex() - Vue empty text node handling', () => {
       container.innerHTML =
         '<div data-edit-text="value">' +
         '<p data-node-id="0">' +
-        '<strong data-node-id="0-0">bold</strong>' +
-        '<em data-node-id="0-1">italic</em>' +
+        '<strong data-node-id="0.0">bold</strong>' +
+        '<em data-node-id="0.1">italic</em>' +
         '</p>' +
         '</div>';
       document.body.appendChild(container);
@@ -405,5 +405,74 @@ test.describe('findChildBySlateIndex() - Vue empty text node handling', () => {
     });
 
     expect(result.isNull).toBe(true);
+  });
+
+  test('invalid data-node-id span does not steal Slate index from valid sibling (Next.js pattern)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // Next.js renders: <p data-node-id="0">
+    //   <span data-node-id="undefined">Hello </span>
+    //   <strong data-node-id="0.1">world</strong>
+    // </p>
+    // Without fix: span steals index 0 (nodeId "undefined" is truthy), strong is at index 1
+    // With fix: span is skipped (invalid nodeId), strong is at index 0
+    const result = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<p data-node-id="0">' +
+        '<span data-node-id="undefined">Hello </span>' +
+        '<strong data-node-id="0.1">world</strong>' +
+        '</p>';
+      document.body.appendChild(container);
+
+      const p = container.querySelector('p')!;
+      const child0 = (window as any).bridge.findChildBySlateIndex(p, 0);
+
+      container.remove();
+      return {
+        child0Tag: child0?.tagName || null,
+      };
+    });
+
+    // Strong should be at index 0 (invalid span doesn't count)
+    expect(result.child0Tag).toBe('STRONG');
+  });
+
+  test('invalid data-node-id span not counted when followed by text node (Next.js pattern)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // Inside a <strong>, Next.js renders:
+    //   <strong data-node-id="0.1"><span data-node-id="undefined">bold text</span></strong>
+    // findChildBySlateIndex(strong, 0) should find the text, not the span as a Slate child.
+    // The span with invalid nodeId should be treated as a wrapper.
+    const result = await body.evaluate(() => {
+      const container = document.createElement('div');
+      // Put a real text node and an invalid-nodeId span as siblings inside strong
+      container.innerHTML =
+        '<strong data-node-id="0.1">' +
+        '<span data-node-id="undefined">bold</span>' +
+        '</strong>';
+      document.body.appendChild(container);
+
+      const strong = container.querySelector('strong')!;
+      const child0 = (window as any).bridge.findChildBySlateIndex(strong, 0);
+      // With the bug: span is counted as Slate child (nodeId is truthy)
+      // With the fix: span has invalid nodeId, is skipped as wrapper, no children found
+      // Actually the span's text content IS the child, but the span element shouldn't
+      // steal an index. Since there's no real text node sibling, index 0 should be null
+      // because the only content is wrapped inside the invalid span.
+
+      container.remove();
+      return {
+        // The span with invalid nodeId should NOT be returned as a Slate child
+        isSpan: child0?.tagName === 'SPAN',
+        isNull: child0 === null,
+      };
+    });
+
+    // Invalid nodeId span should not be counted as a Slate element child
+    expect(result.isSpan).toBe(false);
   });
 });

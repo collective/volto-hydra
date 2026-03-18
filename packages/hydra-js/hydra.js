@@ -103,6 +103,13 @@ const log = (...args) => {
 };
 
 /**
+ * Validates a data-node-id value is a real Slate path (dot-separated integers like "0", "0.1").
+ * Frontends may render invalid values (e.g. Next.js renders data-node-id="undefined" on text
+ * leaves where nodeId is JS undefined). All code that reads data-node-id should use this.
+ */
+const isValidNodeId = (id) => id && /^\d+(\.\d+)*$/.test(id);
+
+/**
  * Virtual block UID for page-level fields (title, description, preview_image, etc.)
  * Used to distinguish "page field selected" from "nothing selected" (null)
  */
@@ -3089,8 +3096,8 @@ export class Bridge {
 
     // Handle ELEMENT nodes - cursor can land on wrapper DIV when clicking at edge of block
     if (node.nodeType === Node.ELEMENT_NODE) {
-      // If this element has data-node-id, cursor position is valid
-      if (node.hasAttribute?.('data-node-id')) {
+      // If this element has a valid data-node-id, cursor position is valid
+      if (node.hasAttribute?.('data-node-id') && isValidNodeId(node.getAttribute('data-node-id'))) {
         return false;
       }
 
@@ -3153,8 +3160,9 @@ export class Bridge {
     // Walk up from node to find if there's a data-node-id ancestor (including editableField itself)
     current = node.parentNode;
     while (current) {
-      // If we hit an element with data-node-id, cursor is valid
-      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-node-id')) {
+      // If we hit an element with a valid data-node-id, cursor is valid
+      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-node-id')
+          && isValidNodeId(current.getAttribute('data-node-id'))) {
         return false;
       }
       // Stop at editable field boundary
@@ -3206,14 +3214,16 @@ export class Bridge {
       return null;
     }
 
-    // Get first and last elements with data-node-id
+    // Get first and last elements with valid data-node-id
     // Check if container itself has data-node-id first, then look for descendants
-    const firstNodeIdEl = container.hasAttribute?.('data-node-id')
+    const containerHasValidId = container.hasAttribute?.('data-node-id') && isValidNodeId(container.getAttribute('data-node-id'));
+    const allDescendants = [...container.querySelectorAll('[data-node-id]')].filter(el => isValidNodeId(el.getAttribute('data-node-id')));
+    const firstNodeIdEl = containerHasValidId
       ? container
-      : container.querySelector('[data-node-id]');
-    const allNodeIdEls = container.hasAttribute?.('data-node-id')
-      ? [container, ...container.querySelectorAll('[data-node-id]')]
-      : container.querySelectorAll('[data-node-id]');
+      : allDescendants[0] || null;
+    const allNodeIdEls = containerHasValidId
+      ? [container, ...allDescendants]
+      : allDescendants;
     const lastNodeIdEl = allNodeIdEls[allNodeIdEls.length - 1];
 
     if (!firstNodeIdEl) {
@@ -3382,7 +3392,7 @@ export class Bridge {
         // Check data-node-id BEFORE data-edit-text because elements
         // can have both attrs (e.g. <p data-edit-text="value" data-node-id="0">).
         // We must check the element's content before potentially breaking out.
-        if (current.hasAttribute?.('data-node-id')) {
+        if (current.hasAttribute?.('data-node-id') && isValidNodeId(current.getAttribute('data-node-id'))) {
           foundDataNodeId = true;
           const elementText = this.stripZeroWidthSpaces(current.textContent);
           if (elementText.trim() !== '') {
@@ -3676,16 +3686,16 @@ export class Bridge {
 
     for (let i = nodeIndex - 1; i >= 0; i--) {
       const sib = siblings[i];
-      if (sib.nodeType === Node.ELEMENT_NODE && sib.hasAttribute('data-node-id')) {
+      if (sib.nodeType === Node.ELEMENT_NODE && sib.hasAttribute('data-node-id') && isValidNodeId(sib.getAttribute('data-node-id'))) {
         startNode = sib;
         startAtEnd = true; // Measure from end of preceding element
         break;
       }
     }
 
-    // If no preceding sibling with data-node-id, check if parent has data-node-id
+    // If no preceding sibling with data-node-id, check if parent has valid data-node-id
     // (text is inside formatted element like <strong>)
-    if (!startNode && parent.hasAttribute?.('data-node-id')) {
+    if (!startNode && parent.hasAttribute?.('data-node-id') && isValidNodeId(parent.getAttribute('data-node-id'))) {
       startNode = parent;
       startAtEnd = false; // Measure from start of parent
     }
@@ -3747,14 +3757,16 @@ export class Bridge {
    * Empty/whitespace text nodes (Vue artifacts) map to the previous real content.
    */
   getSlateIndexAmongSiblings(node, parent) {
-    // For elements with data-node-id, use the index from the ID
+    // For elements with a valid data-node-id, use the index from the ID
     if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('data-node-id')) {
       const nodeId = node.getAttribute('data-node-id');
-      const parts = nodeId.split(/[.-]/);
-      return parseInt(parts[parts.length - 1], 10);
+      if (isValidNodeId(nodeId)) {
+        const parts = nodeId.split('.');
+        return parseInt(parts[parts.length - 1], 10);
+      }
     }
 
-    // For text nodes (including whitespace), find the preceding element with data-node-id
+    // For text nodes (including whitespace), find the preceding element with valid data-node-id
     // The text node's index = (preceding element's last id part) + 1
     // This works regardless of whitespace because all text after an element
     // belongs to the next Slate text leaf
@@ -3765,7 +3777,8 @@ export class Bridge {
       const sib = siblings[i];
       if (sib.nodeType === Node.ELEMENT_NODE && sib.hasAttribute('data-node-id')) {
         const nodeId = sib.getAttribute('data-node-id');
-        const parts = nodeId.split(/[.-]/);
+        if (!isValidNodeId(nodeId)) continue;
+        const parts = nodeId.split('.');
         return parseInt(parts[parts.length - 1], 10) + 1;
       }
     }
@@ -3785,9 +3798,9 @@ export class Bridge {
     // Walk up to find the element with data-node-id
     let current = element;
     while (current && current.nodeType === Node.ELEMENT_NODE) {
-      if (current.hasAttribute('data-node-id')) {
+      if (current.hasAttribute('data-node-id') && isValidNodeId(current.getAttribute('data-node-id'))) {
         const nodeId = current.getAttribute('data-node-id');
-        const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
+        const parts = nodeId.split('.').map((p) => parseInt(p, 10));
         log('getElementPath: Found node-id', nodeId, '-> path:', parts);
         return parts;
       }
@@ -3846,7 +3859,7 @@ export class Bridge {
         ? parent.getAttribute('data-node-id')
         : null;
       const hasValidNodeId =
-        parentNodeId && parentNodeId !== '' && parentNodeId !== 'undefined';
+        isValidNodeId(parentNodeId);
       if (
         hasValidNodeId &&
         parent.nodeName !== 'P' &&
@@ -3854,7 +3867,7 @@ export class Bridge {
         !parent.hasAttribute?.('data-edit-text')
       ) {
         // Parse the parent's path from its node ID
-        const parts = parentNodeId.split(/[.-]/).map((p) => parseInt(p, 10));
+        const parts = parentNodeId.split('.').map((p) => parseInt(p, 10));
 
         // Text node index within the parent element (filtered for Vue artifacts)
         const textIndex = this.getSlateIndexAmongSiblings(node, parent);
@@ -3902,14 +3915,14 @@ export class Bridge {
         ? current.getAttribute('data-node-id')
         : null;
       const hasValidNodeId =
-        nodeId && nodeId !== '' && nodeId !== 'undefined';
+        isValidNodeId(nodeId);
 
       // Process current node if it has a valid nodeId
       // Must process BEFORE checking edit-text since element can have both
       if (hasValidNodeId) {
         foundNodeIdInWalk = true;
         // Parse node ID to get path components (e.g., "0.1" -> [0, 1] or "0-1" -> [0, 1])
-        const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
+        const parts = nodeId.split('.').map((p) => parseInt(p, 10));
 
         // Prepend these path components
         for (let i = parts.length - 1; i >= 0; i--) {
@@ -4851,12 +4864,16 @@ export class Bridge {
       ? [fieldEl, ...nodeEls] : [...nodeEls];
 
     for (const nodeEl of nodes) {
-      // Skip parent nodes that contain child data-node-id elements —
+      const nodeId = nodeEl.getAttribute('data-node-id');
+      // Skip elements with invalid nodeId (e.g. "undefined" from Next.js text leaf spans)
+      if (!isValidNodeId(nodeId)) continue;
+
+      // Skip parent nodes that contain child data-node-id elements with VALID nodeIds —
       // their innerText includes children's text, which would cause
       // updateJsonNode to collapse the inline element structure.
-      if (nodeEl.querySelector('[data-node-id]')) continue;
-
-      const nodeId = nodeEl.getAttribute('data-node-id');
+      const validChildNodeId = Array.from(nodeEl.querySelectorAll('[data-node-id]'))
+        .some(child => isValidNodeId(child.getAttribute('data-node-id')));
+      if (validChildNodeId) continue;
       const text = this.readNodeText(nodeEl);
       this.updateJsonNode(clone, nodeId, text);
     }
@@ -8060,8 +8077,15 @@ export class Bridge {
         ? endContainer.parentElement
         : endContainer;
 
-      const startNode = startElement?.closest('[data-node-id]');
-      const endNode = endElement?.closest('[data-node-id]');
+      // Walk up to find elements with VALID data-node-id (skip "undefined" etc.)
+      let startNode = startElement;
+      while (startNode && !(startNode.hasAttribute?.('data-node-id') && isValidNodeId(startNode.getAttribute('data-node-id')))) {
+        startNode = startNode.parentElement;
+      }
+      let endNode = endElement;
+      while (endNode && !(endNode.hasAttribute?.('data-node-id') && isValidNodeId(endNode.getAttribute('data-node-id')))) {
+        endNode = endNode.parentElement;
+      }
 
       if (!startNode || !endNode) {
         return null;
@@ -8500,8 +8524,8 @@ export class Bridge {
         lastNodeId = null;
       } else if (child.nodeType === Node.ELEMENT_NODE) {
         const nodeId = child.getAttribute('data-node-id');
-        if (nodeId && nodeId !== lastNodeId) {
-          // New node-id element = new Slate child
+        if (isValidNodeId(nodeId) && nodeId !== lastNodeId) {
+          // New valid node-id element = new Slate child
           if (slateIndex === slateChildIndex) {
             return child;
           }
@@ -8913,12 +8937,24 @@ export class Bridge {
 
     if (this.fieldTypeIsSlate(fieldType)) {
       // Slate field - update JSON structure using nodeId
-      // Find the nearest element with data-node-id by walking UP from the mutation site.
-      // mutatedNodeParent may be a wrapper (e.g., <span>) without data-node-id —
-      // walk up from there to find the Slate element node (e.g., <p data-node-id="0">).
-      const closestNode = (mutatedNodeParent && mutatedNodeParent.hasAttribute('data-node-id'))
-        ? mutatedNodeParent
-        : (mutatedNodeParent || target).closest('[data-node-id]');
+      // Find the nearest element with a VALID data-node-id by walking UP from the mutation site.
+      // NodeIds are dot-separated integer paths like "0", "0.1", "0.1.2" set by addNodeIds().
+      // Frontends may render invalid values (e.g. Next.js renders data-node-id={node.nodeId}
+      // on text leaves where nodeId is undefined, producing data-node-id="undefined").
+      // Walk up past invalid values to find the real Slate element node.
+      let closestNode = null;
+      if (mutatedNodeParent && isValidNodeId(mutatedNodeParent.getAttribute('data-node-id'))) {
+        closestNode = mutatedNodeParent;
+      } else {
+        let el = mutatedNodeParent || target;
+        while (el && el !== document.body) {
+          if (el.nodeType === Node.ELEMENT_NODE && isValidNodeId(el.getAttribute('data-node-id'))) {
+            closestNode = el;
+            break;
+          }
+          el = el.parentElement;
+        }
+      }
       if (!closestNode) {
         log('Slate field but no data-node-id found!');
         return;

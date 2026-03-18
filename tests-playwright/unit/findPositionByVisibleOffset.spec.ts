@@ -80,7 +80,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
       const container = document.createElement('div');
       container.innerHTML =
         '<div data-edit-text="value">' +
-        '<strong data-node-id="0-1"></strong>' +
+        '<strong data-node-id="0.1"></strong>' +
         '</div>';
       document.body.appendChild(container);
 
@@ -169,7 +169,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
       const container = document.createElement('div');
       container.innerHTML =
         '<div data-edit-text="value">' +
-        '<p data-node-id="0">before <strong data-node-id="0-1">bold</strong> after</p>' +
+        '<p data-node-id="0">before <strong data-node-id="0.1">bold</strong> after</p>' +
         '</div>';
       document.body.appendChild(container);
 
@@ -198,7 +198,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
       const container = document.createElement('div');
       container.innerHTML =
         '<div data-edit-text="value">' +
-        '<p data-node-id="0">before <strong data-node-id="0-1">bold</strong> after</p>' +
+        '<p data-node-id="0">before <strong data-node-id="0.1">bold</strong> after</p>' +
         '</div>';
       document.body.appendChild(container);
 
@@ -235,7 +235,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
       p.appendChild(document.createTextNode('before '));
 
       const strong = document.createElement('strong');
-      strong.setAttribute('data-node-id', '0-1');
+      strong.setAttribute('data-node-id', '0.1');
       strong.appendChild(document.createTextNode('')); // Vue artifact
       strong.appendChild(document.createTextNode('bold'));
       p.appendChild(strong);
@@ -265,7 +265,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
       const container = document.createElement('div');
       container.innerHTML =
         '<div data-edit-text="value">' +
-        '<p data-node-id="0"><strong data-node-id="0-0">This</strong> bold text</p>' +
+        '<p data-node-id="0"><strong data-node-id="0.0">This</strong> bold text</p>' +
         '</div>';
       document.body.appendChild(container);
 
@@ -299,7 +299,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
       const container = document.createElement('div');
       container.innerHTML =
         '<div data-edit-text="value">' +
-        '<p data-node-id="0">Hello <span data-node-id="0-1"></span></p>' +
+        '<p data-node-id="0">Hello <span data-node-id="0.1"></span></p>' +
         '</div>';
       document.body.appendChild(container);
 
@@ -338,7 +338,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
 
       p.appendChild(document.createTextNode('Hello '));
       const span = document.createElement('span');
-      span.setAttribute('data-node-id', '0-1');
+      span.setAttribute('data-node-id', '0.1');
       span.textContent = 'world';
       p.appendChild(span);
       // No text node after span
@@ -375,7 +375,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
 
       p.appendChild(document.createTextNode('Hello '));
       const span = document.createElement('span');
-      span.setAttribute('data-node-id', '0-1');
+      span.setAttribute('data-node-id', '0.1');
       span.textContent = 'world';
       p.appendChild(span);
       p.appendChild(document.createTextNode(' after'));
@@ -413,7 +413,7 @@ test.describe('findPositionByVisibleOffset() - Range-based position finding', ()
 
       p.appendChild(document.createTextNode('Hello '));
       const span = document.createElement('span');
-      span.setAttribute('data-node-id', '0-1');
+      span.setAttribute('data-node-id', '0.1');
       // ZWS from prospective formatting + typed text
       span.appendChild(document.createTextNode('\uFEFF' + 'world'));
       p.appendChild(span);
