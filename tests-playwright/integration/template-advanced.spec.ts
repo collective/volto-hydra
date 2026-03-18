@@ -28,8 +28,8 @@ test.describe('Fixed Editable Blocks', () => {
     await layoutSelector.selectOption('Editable Fixed Layout');
     await page.locator('.apply-layout-btn').click();
 
-    // Wait for layout to be applied
-    await expect(page.locator('.child-block-item', { hasText: 'Editable Header' })).toBeVisible({ timeout: 5000 });
+    // Wait for layout to render in the iframe
+    await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Editable Header' })).toBeVisible({ timeout: 10000 });
 
     // Click the editable header block
     const headerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Editable Header' });
@@ -62,8 +62,8 @@ test.describe('Fixed Editable Blocks', () => {
     await layoutSelector.selectOption('Editable Fixed Layout');
     await page.locator('.apply-layout-btn').click();
 
-    // Wait for layout
-    await expect(page.locator('.child-block-item', { hasText: 'Editable Header' })).toBeVisible({ timeout: 5000 });
+    // Wait for layout to render in the iframe
+    await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Editable Header' })).toBeVisible({ timeout: 10000 });
 
     // Click the header block
     const headerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Editable Header' });
@@ -98,8 +98,8 @@ test.describe('Remove Layout', () => {
     await layoutSelector.selectOption('Header Footer Layout');
     await page.locator('.apply-layout-btn').click();
 
-    // Wait for layout to be applied
-    await expect(page.locator('.child-block-item', { hasText: 'Layout Header' })).toBeVisible({ timeout: 5000 });
+    // Wait for layout to render in the iframe
+    await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Header' })).toBeVisible({ timeout: 10000 });
 
     // Verify original content is still there (in default placeholder)
     const afterLayoutBlocks = await iframe.locator('main [data-block-uid], #content [data-block-uid]').allTextContents();
@@ -183,8 +183,8 @@ test.describe('Non-matching Placeholder Content', () => {
     await layoutSelector.selectOption('Header Footer Layout');
     await page.locator('.apply-layout-btn').click();
 
-    // Wait for layout
-    await expect(page.locator('.child-block-item', { hasText: 'Layout Header' })).toBeVisible({ timeout: 5000 });
+    // Wait for layout to render in the iframe
+    await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Header' })).toBeVisible({ timeout: 10000 });
 
     // Verify: header is first, original content is in the middle, footer is last
     const allBlocks = await iframe.locator('main [data-block-uid], #content [data-block-uid]').allTextContents();

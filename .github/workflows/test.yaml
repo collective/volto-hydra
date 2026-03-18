@@ -221,8 +221,80 @@ jobs:
           flags: admin-mock
           fail_ci_if_error: false
 
-  # ── Nuxt tests (bridge + integration) ───────────────────────────────────
-  test-nuxt:
+  # ── Nuxt bridge tests (no Volto needed) ─────────────────────────────────
+  test-nuxt-bridge:
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup pnpm
+        run: |
+          npm install -g corepack
+          corepack cache clean
+          corepack enable
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Get pnpm store directory
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+      - name: Install dependencies
+        run: |
+          pnpm dlx mrs-developer missdev --no-config --fetch-https
+          pnpm install --frozen-lockfile
+      - name: Install and build Nuxt
+        run: cd examples/nuxt-blog-starter && pnpm install --ignore-workspace && pnpm run build:test
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Install Playwright deps only
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+      - name: Start servers
+        run: |
+          node tests-playwright/fixtures/mock-api-server.js &
+          cd examples/nuxt-blog-starter && pnpm run preview:test &
+          sleep 3
+      - name: Wait for servers
+        run: |
+          for port in 8888 3003; do
+            echo "Waiting for port $port..."
+            for i in {1..30}; do curl -s http://localhost:$port > /dev/null && break; sleep 2; done
+          done
+          echo "All servers ready"
+      - name: Run tests
+        run: pnpm exec playwright test --project=nuxt --reporter=github,list,html
+        env:
+          CI: true
+          NO_WEBSERVER: true
+          SKIP_VOLTO_CHECK: true
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-nuxt-bridge
+          path: |
+            playwright-report/
+            test-results/**/*.png
+          retention-days: 7
+
+  # ── Nuxt integration tests (needs Volto) ────────────────────────────────
+  test-nuxt-admin:
     needs: build
     runs-on: 'ubuntu-latest'
     steps:
@@ -282,37 +354,26 @@ jobs:
           sleep 3
       - name: Wait for servers
         run: |
-          echo "Waiting for mock API (8888)..."
-          for i in {1..60}; do curl -s http://localhost:8888/health > /dev/null && break; sleep 2; done
-          echo "Waiting for Volto (3001)..."
-          for i in {1..60}; do curl -s http://localhost:3001 > /dev/null && break; sleep 2; done
-          echo "Waiting for Nuxt (3003)..."
-          for i in {1..90}; do curl -s http://localhost:3003 > /dev/null && break; sleep 2; done
+          for port in 8888 3001 3003; do
+            echo "Waiting for port $port..."
+            for i in {1..30}; do curl -s http://localhost:$port > /dev/null && break; sleep 2; done
+          done
           echo "All servers ready"
       - name: Run tests
-        run: pnpm exec playwright test --project=nuxt --project=admin-nuxt --project=nuxt-specific --reporter=github,list,html
+        run: pnpm exec playwright test --project=admin-nuxt --project=nuxt-specific --reporter=github,list,html
         env:
           CI: true
           NO_WEBSERVER: true
           USE_PREBUILT: true
-          COVERAGE: true
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-nuxt
+          name: playwright-report-nuxt-admin
           path: |
             playwright-report/
             test-results/**/*.png
           retention-days: 7
-      - name: Upload coverage
-        if: always()
-        continue-on-error: true
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage/lcov.info
-          flags: nuxt
-          fail_ci_if_error: false
 
   # ── Next.js + F7 bridge tests (no Volto needed) ─────────────────────────
   test-nextjs-f7:
