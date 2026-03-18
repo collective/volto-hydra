@@ -9262,14 +9262,30 @@ export class Bridge {
       if (json.nodeId === nodeId || json.nodeId === String(nodeId)) {
         if (json.hasOwnProperty('text')) {
           json.text = newText;
-        } else if (childIndex !== null && json.children && json.children[childIndex]) {
+        } else if (childIndex !== null && json.children) {
           // Update specific child by index (for typing in paragraphs with inline elements)
           const child = json.children[childIndex];
-          if (child.hasOwnProperty('text')) {
-            child.text = newText;
-          } else if (child.children && child.children[0]) {
+          if (child && child.hasOwnProperty('text')) {
+            // Detect NEW text insertion: after toggling a format off, the browser
+            // creates a new text node at the cursor position. The DOM has more
+            // children than the JSON. If the existing child's text doesn't match
+            // what we're typing (neither is a prefix of the other) and the old
+            // text is non-empty, we need to INSERT rather than REPLACE.
+            const oldText = child.text;
+            const isNewInsertion = oldText !== '' &&
+              !oldText.startsWith(newText) &&
+              !newText.startsWith(oldText);
+            if (isNewInsertion) {
+              json.children.splice(childIndex, 0, { text: newText });
+            } else {
+              child.text = newText;
+            }
+          } else if (child && child.children && child.children[0]) {
             // Child is an inline element, update its first text child
             child.children[0].text = newText;
+          } else if (!child) {
+            // Child doesn't exist yet — append new text node
+            json.children.push({ text: newText });
           }
         } else if (json.children) {
           // Fallback: childIndex is null, updating whole node content

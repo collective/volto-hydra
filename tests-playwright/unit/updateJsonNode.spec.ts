@@ -521,4 +521,93 @@ test.describe('Bridge.updateJsonNode()', () => {
     expect(result.value[0].children[0]).not.toHaveProperty('type');
     expect(() => validateSlateStructure(result.value)).not.toThrow();
   });
+
+  test('updating text at childIndex preserves siblings after it', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // Reproduces the prospective formatting bug:
+    // After typing "BOLD" then toggling bold off, the Slate value should be:
+    // ["one two ", {strong: "BOLD"}, "", "three four five"]
+    // Typing " normal " at childIndex 2 should update that child,
+    // NOT remove child 3 ("three four five").
+    const result = await body.evaluate(() => {
+      const bridge = (window as any).bridge;
+      const value = [{
+        type: 'p',
+        children: [
+          { text: 'one two ' },
+          { type: 'strong', children: [{ text: 'BOLD' }], nodeId: '0.1' },
+          { text: '' },
+          { text: 'three four five' },
+        ],
+        nodeId: '0',
+      }];
+
+      const updated = bridge.updateJsonNode(
+        JSON.parse(JSON.stringify(value)),
+        '0',          // nodeId of the paragraph
+        ' normal ',   // new text for child at index 2
+        2             // childIndex
+      );
+
+      return {
+        childCount: updated[0].children.length,
+        child2Text: updated[0].children[2]?.text,
+        child3Text: updated[0].children[3]?.text,
+      };
+    });
+
+    // Child 2 should be updated, child 3 should be preserved
+    expect(result.childCount).toBe(4);
+    expect(result.child2Text).toBe(' normal ');
+    expect(result.child3Text).toBe('three four five');
+  });
+
+  test('typing after toggling format off inserts new child, does not replace following text', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // Reproduces: user types "one two", bolds, types "BOLD", unbolds, types " ".
+    // After first Ctrl+B FORM_DATA, Slate value is:
+    //   ["one two ", {strong: "BOLD"}, "three four five"]
+    // User toggles bold OFF → cursor is between strong and "three four five".
+    // Browser creates a NEW text node at that position.
+    // handleTextChange sees childIndex=2 (from getNodePath), but JSON child[2]
+    // is "three four five". The new text " " should INSERT at index 2,
+    // not REPLACE "three four five".
+    const result = await body.evaluate(() => {
+      const bridge = (window as any).bridge;
+      const value = [{
+        type: 'p',
+        children: [
+          { text: 'one two ' },
+          { type: 'strong', children: [{ text: 'BOLD' }], nodeId: '0.1' },
+          { text: 'three four five' },
+        ],
+        nodeId: '0',
+      }];
+
+      // This is what handleTextChange calls when user types " " at childIndex 2
+      // The DOM has a new text node " " between strong and "three four five",
+      // so getNodePath returns childIndex=2. But JSON child[2] is "three four five".
+      const updated = bridge.updateJsonNode(
+        JSON.parse(JSON.stringify(value)),
+        '0',     // nodeId of the paragraph
+        ' ',     // new text (user typed a space)
+        2        // childIndex from getNodePath
+      );
+
+      return {
+        childCount: updated[0].children.length,
+        child2Text: updated[0].children[2]?.text,
+        child3Text: updated[0].children[3]?.text,
+      };
+    });
+
+    // Should INSERT " " at index 2 and push "three four five" to index 3
+    expect(result.childCount).toBe(4);
+    expect(result.child2Text).toBe(' ');
+    expect(result.child3Text).toBe('three four five');
+  });
 });
