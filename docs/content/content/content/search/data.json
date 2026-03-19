@@ -1,10 +1,43 @@
 {
   "@id": "/search",
   "@type": "Document",
+  "UID": "120c479717b248a8b28c3556ee63e054",
   "id": "search",
   "title": "Search",
   "description": "Search the site",
+  "allow_discussion": false,
+  "contributors": [],
+  "creators": ["admin"],
+  "effective": null,
   "exclude_from_nav": true,
+  "expires": null,
+  "is_folderish": false,
+  "language": "",
+  "lock": {},
+  "parent": {
+    "@id": "/",
+    "@type": "Plone Site",
+    "UID": "plone_site_root",
+    "description": "",
+    "title": "Volto Hydra"
+  },
+  "review_state": "published",
+  "rights": null,
+  "subjects": [],
+  "table_of_contents": false,
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2026-03-10T00:00:00+00:00"
+      }
+    ]
+  },
   "blocks": {
     "search-block": {
       "@type": "search",

@@ -238,10 +238,10 @@ async function renderBlock(blockId, block) {
             summaryEl.innerHTML = renderSummaryItemBlock(block, blockId);
             return summaryEl.firstElementChild;
         case 'listing':
-            if (block.querystring?.query && window._expandListingBlocks) {
+            if (window._expandListingBlocks) {
                 return await renderListingBlock(block, blockId);
             }
-            wrapper.textContent = 'Listing block (no query)';
+            wrapper.textContent = 'Listing block (no fetch handler)';
             break;
         case 'introduction':
             wrapper.innerHTML = renderIntroductionBlock(block);

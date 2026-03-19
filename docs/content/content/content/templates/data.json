@@ -5,6 +5,13 @@
   "title": "Templates",
   "description": "Layout and block templates",
   "@id": "/templates",
+  "parent": {
+    "@id": "/",
+    "@type": "Plone Site",
+    "UID": "plone_site_root",
+    "description": "",
+    "title": "Volto Hydra"
+  },
   "review_state": "published",
   "is_folderish": true,
   "exclude_from_nav": true
