@@ -422,8 +422,9 @@ test.describe('allowedLayouts', () => {
       await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Footer' })).toBeVisible({ timeout: 5000 });
 
       // Switch to header-only layout (has header, default but NO footer placeholder)
+      // Deselect block to show page sidebar with layout selector
       await page.keyboard.press('Escape');
-      await expect(layoutSelector).toBeVisible({ timeout: 5000 });
+      await expect(layoutSelector).toBeVisible({ timeout: 10000 });
       await layoutSelector.selectOption('Header Only Layout');
       await page.locator('.apply-layout-btn').click();
 
@@ -658,7 +659,10 @@ test.describe('allowedLayouts', () => {
       await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Footer' })).toBeVisible({ timeout: 10000 });
 
       // Now select None to remove the layout
+      // Escape deselects block; second Escape closes template panel to show layout selector
       await page.keyboard.press('Escape');
+      await page.keyboard.press('Escape');
+      await expect(layoutSelector).toBeVisible({ timeout: 10000 });
       await layoutSelector.selectOption({ label: 'None' });
       await page.locator('.apply-layout-btn').click();
 

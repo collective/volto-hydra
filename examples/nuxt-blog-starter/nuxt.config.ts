@@ -49,8 +49,8 @@ export default defineNuxtConfig({
           security: {
             headers: { // Edit site can be put in an iframe
               contentSecurityPolicy: {
-                'img-src': ["'self'", "data:", 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
-                'connect-src': ["'self'", "data:", 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
+                'img-src': ["'self'", "data:", 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com', 'http://localhost:3001', 'http://localhost:8888'],
+                'connect-src': ["'self'", "data:", 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com', 'http://localhost:3001', 'http://localhost:8888'],
                 'frame-ancestors': ['*']
               },
               crossOriginResourcePolicy: "cross-origin",
@@ -61,7 +61,10 @@ export default defineNuxtConfig({
       },
       runtimeConfig: {
         public: {
-          image_alias: ''
+          image_alias: '',
+          // Override API URL for test builds (NUXT_TEST_BACKEND env var)
+          backendBaseUrl: process.env.NUXT_TEST_BACKEND || 'https://hydra-api.pretagov.com',
+          adminUrl: process.env.NUXT_TEST_BACKEND ? 'http://localhost:3001' : 'https://hydra.pretagov.com',
         }
       },
       image: {
