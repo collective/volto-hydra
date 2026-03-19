@@ -396,7 +396,7 @@ test.describe('Adding Blocks to Containers', () => {
     const currentHeader = page.locator(
       '.sidebar-section-header[data-is-current="true"] .parent-nav',
     );
-    await currentHeader.click();
+    await currentHeader.locator('.nav-back').click();
     await page.waitForTimeout(300);
 
     // Now the sidebar should show page-level "Blocks" section
@@ -741,8 +741,8 @@ test.describe('Hierarchical Sidebar', () => {
     let currentHeader = page.locator(
       '.sidebar-section-header[data-is-current="true"] .parent-nav',
     );
-    await expect(currentHeader).toContainText(/text/i);
-    await currentHeader.click();
+    await expect(currentHeader.locator('.nav-title')).toContainText(/text/i);
+    await currentHeader.locator('.nav-back').click();
     await page.waitForTimeout(300);
 
     // Column is now current, Text header is gone
@@ -810,7 +810,7 @@ test.describe('Hierarchical Sidebar', () => {
     const currentHeader = page.locator(
       '.sidebar-section-header[data-is-current="true"] .parent-nav',
     );
-    await currentHeader.click();
+    await currentHeader.locator('.nav-back').click();
     await page.waitForTimeout(300);
 
     // Verify all selection UI is hidden
@@ -3377,9 +3377,9 @@ test.describe('slateTable Container', () => {
     await helper.clickBlockInIframe('cell-1-1');
     await helper.waitForSidebarOpen();
 
-    // Navigate up to the row by clicking "‹ Cell" in the sidebar
-    const cellNavButton = page.locator('.parent-nav:has-text("Cell")');
-    await cellNavButton.click();
+    // Navigate up to the row by clicking the back arrow on "Cell" in the sidebar
+    const cellSection = page.locator('.parent-nav:has-text("Cell")');
+    await cellSection.locator('.nav-back').click();
 
     // Verify sidebar shows cells as children of the row
     const childBlocksList = page.locator('.child-blocks-list');
@@ -4392,7 +4392,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     await expect(sidebar.locator('label').filter({ hasText: 'Facet widget' })).not.toBeVisible();
 
     // Navigate back to search block by clicking current block's parent-nav (goes to parent)
-    await sidebar.locator('[data-is-current="true"] .parent-nav').click();
+    await sidebar.locator('[data-is-current="true"] .nav-back').click();
     await helper.waitForSidebarCurrentBlock('Search');
 
     await expect(facetItems).toHaveCount(4, { timeout: 5000 });
@@ -4453,7 +4453,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     await expect(sidebar.locator('label').filter({ hasText: 'Facet widget' })).not.toBeVisible();
 
     // Navigate back to search block by clicking current block's parent-nav (goes to parent)
-    await sidebar.locator('[data-is-current="true"] .parent-nav').click();
+    await sidebar.locator('[data-is-current="true"] .nav-back').click();
     await helper.waitForSidebarCurrentBlock('Search');
 
     // Re-scope facets section after navigating back
@@ -4490,7 +4490,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     await helper.waitForQuantaToolbar('facet-type');
 
     // Navigate back to search by clicking current block's parent-nav
-    await sidebar.locator('[data-is-current="true"] .parent-nav').click();
+    await sidebar.locator('[data-is-current="true"] .nav-back').click();
     await helper.waitForSidebarCurrentBlock('Search');
 
     const updatedFacetsSection = sidebar.locator('.container-field-section').filter({ hasText: 'Facets' }).first();

@@ -529,6 +529,13 @@ const Iframe = (props) => {
     setBlockUI(null);
   }, [u]);
 
+  // Listen for sidebar "Page" click to deselect current block
+  useEffect(() => {
+    const handler = () => onSelectBlock(null);
+    document.addEventListener('hydra-select-page', handler);
+    return () => document.removeEventListener('hydra-select-page', handler);
+  }, [onSelectBlock]);
+
   useEffect(() => {
     // Only send SELECT_BLOCK if iframe is ready (has sent INIT)
     // Skip if there's a pending selection - it will be sent via FORM_DATA instead

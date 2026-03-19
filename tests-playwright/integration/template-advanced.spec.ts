@@ -22,7 +22,7 @@ test.describe('Fixed Editable Blocks', () => {
     await helper.waitForIframeReady();
 
     // Apply the editable-fixed layout
-    await page.keyboard.press('Escape');
+    await page.locator('.sidebar-section-header .section-title').click();
     const layoutSelector = page.locator('.layout-selector select');
     await expect(layoutSelector).toBeVisible({ timeout: 5000 });
     await layoutSelector.selectOption('Editable Fixed Layout');
@@ -56,7 +56,7 @@ test.describe('Fixed Editable Blocks', () => {
     await helper.waitForIframeReady();
 
     // Apply the editable-fixed layout
-    await page.keyboard.press('Escape');
+    await page.locator('.sidebar-section-header .section-title').click();
     const layoutSelector = page.locator('.layout-selector select');
     await expect(layoutSelector).toBeVisible({ timeout: 5000 });
     await layoutSelector.selectOption('Editable Fixed Layout');
@@ -92,7 +92,7 @@ test.describe('Remove Layout', () => {
     expect(hasOriginalContent).toBe(true);
 
     // Apply header-footer layout
-    await page.keyboard.press('Escape');
+    await page.locator('.sidebar-section-header .section-title').click();
     const layoutSelector = page.locator('.layout-selector select');
     await expect(layoutSelector).toBeVisible({ timeout: 5000 });
     await layoutSelector.selectOption('Header Footer Layout');
@@ -107,7 +107,7 @@ test.describe('Remove Layout', () => {
     expect(contentPreserved).toBe(true);
 
     // Now select "Layout" (no layout) to remove the layout
-    await page.keyboard.press('Escape');
+    await page.locator('.sidebar-section-header .section-title').click();
     await expect(layoutSelector).toBeVisible({ timeout: 5000 });
     await layoutSelector.selectOption('Layout');
 
@@ -177,7 +177,7 @@ test.describe('Non-matching Placeholder Content', () => {
     expect(initialBlocks.length).toBeGreaterThan(0);
 
     // Apply header-footer layout (which has a "default" placeholder)
-    await page.keyboard.press('Escape');
+    await page.locator('.sidebar-section-header .section-title').click();
     const layoutSelector = page.locator('.layout-selector select');
     await expect(layoutSelector).toBeVisible({ timeout: 5000 });
     await layoutSelector.selectOption('Header Footer Layout');
@@ -293,7 +293,7 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
     await headerBlock.click();
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await page.locator('.sidebar-section-header .section-title').click();
     await page.waitForTimeout(200);
 
     // Should be at template instance level
@@ -338,7 +338,7 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
     await headerBlock.click();
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await page.locator('.sidebar-section-header .section-title').click();
     await page.waitForTimeout(200);
 
     // Find the Primary placeholder section
@@ -389,7 +389,7 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
     await headerBlock.click();
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await page.locator('.sidebar-section-header .section-title').click();
     await page.waitForTimeout(200);
 
     // Find the Primary placeholder section

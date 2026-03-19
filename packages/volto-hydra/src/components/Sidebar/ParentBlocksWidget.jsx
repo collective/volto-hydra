@@ -24,6 +24,7 @@ import { set, cloneDeep, isEqual } from 'lodash';
 import config from '@plone/volto/registry';
 import { BlockDataForm } from '@plone/volto/components/manage/Form';
 import { Icon } from '@plone/volto/components';
+import leftArrowSVG from '@plone/volto/icons/left-key.svg';
 import { SidebarPortalTargetContext } from './SidebarPortalTargetContext';
 import DropdownMenu from '../Toolbar/DropdownMenu';
 import { getBlockById, updateBlockById } from '../../utils/blockPath';
@@ -300,16 +301,24 @@ const ParentBlockSection = ({
         className="sidebar-section-header sticky-header"
         data-is-current={isCurrentBlock}
       >
-        <button
-          className="parent-nav"
-          onClick={() => {
-            onSelectBlock(parentId);
-          }}
-          title={parentId ? `Go to parent` : 'Deselect block'}
-        >
-          <span className="nav-prefix">‹</span>
-          <span>{title}</span>
-        </button>
+        <div className="parent-nav">
+          {blockId !== PAGE_BLOCK_UID && (
+            <button
+              className="nav-back"
+              onClick={() => onSelectBlock(parentId || null)}
+              title={parentId ? 'Go to parent' : 'Deselect block'}
+            >
+              <Icon name={leftArrowSVG} size="24px" />
+            </button>
+          )}
+          <button
+            className="nav-title"
+            onClick={() => onSelectBlock(blockId)}
+            title={`Select ${title}`}
+          >
+            {title}
+          </button>
+        </div>
         <div className="block-actions-menu" style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
           {/* Toolbar action buttons (e.g., add row/column for tables) */}
           {(() => {

@@ -16,6 +16,8 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
 import { defineMessages, useIntl } from 'react-intl';
+import { Icon } from '@plone/volto/components';
+import rightArrowSVG from '@plone/volto/icons/right-key.svg';
 import config from '@plone/volto/registry';
 import { DragDropList } from '@plone/volto/components';
 import { getAllContainerFields, getBlockById } from '../../utils/blockPath';
@@ -270,7 +272,7 @@ const ContainerFieldSection = ({
                   ⋮⋮
                 </span>
                 <span className="block-type">{child.title}</span>
-                <span className="nav-arrow">›</span>
+                <Icon className="nav-arrow" name={rightArrowSVG} size="24px" />
               </div>
             )}
           </DragDropList>
@@ -425,7 +427,7 @@ const ChildBlocksWidget = ({
                   }}
                 >
                   <span className="block-type">{section.block.title}</span>
-                  <span className="nav-arrow">›</span>
+                  <Icon className="nav-arrow" name={rightArrowSVG} size="24px" />
                 </div>
               );
             }

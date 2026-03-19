@@ -44,32 +44,54 @@
   font-weight: 600;
   font-size: 14px;
   color: #333;
-}
-
-.hydra-sidebar .sidebar-section-header .parent-nav {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 600;
-  font-size: 14px;
-  color: #333;
   cursor: pointer;
   background: none;
   border: none;
   padding: 0;
 }
 
-.hydra-sidebar .sidebar-section-header .parent-nav:hover {
+.hydra-sidebar .sidebar-section-header .section-title:hover {
   color: #007bff;
 }
 
-.hydra-sidebar .sidebar-section-header .parent-nav:disabled {
-  cursor: default;
+.hydra-sidebar .sidebar-section-header .parent-nav {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.hydra-sidebar .sidebar-section-header .nav-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  color: #999;
+  font-size: 16px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.hydra-sidebar .sidebar-section-header .nav-back:hover {
   color: #333;
 }
 
-.hydra-sidebar .sidebar-section-header .parent-nav:disabled:hover {
+.hydra-sidebar .sidebar-section-header .nav-title {
+  font-weight: 600;
+  font-size: 14px;
   color: #333;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.hydra-sidebar .sidebar-section-header .nav-title:hover {
+  color: #007bff;
+  background: #f0f0f0;
 }
 
 .hydra-sidebar .sidebar-section-header .nav-suffix {
