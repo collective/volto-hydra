@@ -44,7 +44,7 @@ const FrontendSwitcherPanel = ({
   const refreshUrls = () => setUrls(getSavedURLs());
 
   return (
-    <div className="pastanaga-menu">
+    <div className="pastanaga-menu frontend-switcher-panel">
       {/* Viewport section */}
       <header>
         <h2>Viewport</h2>
@@ -54,7 +54,7 @@ const FrontendSwitcherPanel = ({
           {VIEWPORT_PRESETS.map((preset) => (
             <li key={preset.id}>
               <button
-                className={activePreset === preset.id ? 'active' : ''}
+                className={`frontend-switcher-viewport-btn${activePreset === preset.id ? ' active' : ''}`}
                 aria-label={preset.label}
                 onClick={() => dispatch(setViewportPreset(preset.id))}
               >
@@ -101,7 +101,7 @@ const FrontendSwitcherPanel = ({
       <div className="pastanaga-menu-list">
         <ul>
           <li>
-            <button onClick={() => setShowSettings(true)}>
+            <button className="frontend-switcher-settings-btn" onClick={() => setShowSettings(true)}>
               <Icon name={settingsSVG} size="24px" />
               <span className="pastanaga-menu-label">Settings</span>
             </button>

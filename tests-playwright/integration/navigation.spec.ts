@@ -41,36 +41,46 @@ test.describe('Navigation and URL Handling', () => {
       const helper = new AdminUIHelper(page);
 
       await helper.login();
-      await helper.navigateToView('/test-page');
-
-      // Open Personal Preferences to set hash-based frontend URL
-      await page.locator('#toolbar-personal').click();
-      await page.locator('#toolbar-preferences').or(page.locator('text=Preferences')).first().click();
-
-      // Wait for preferences form to load
-      await expect(page.locator('text=Frontend URL')).toBeVisible({ timeout: 5000 });
-
-      // Check "Custom URL" checkbox to enable custom URL input
-      await page.locator('label:has-text("Custom URL")').click();
-
-      // Enter hash-based frontend URL
-      const urlInput = page.locator('input[name="url"]');
-      await urlInput.fill(format.url);
-
-      // Submit the form
-      await page.locator('form button[type="submit"], form .ui.button.primary').click();
-
-      // Navigate to test-page in edit mode
       await helper.navigateToEdit('/test-page');
 
-      // Wait for iframe to load
+      // Open frontend switcher panel
+      await page.locator('#toolbar-frontend-switcher').click();
+      const panel = page.locator('.frontend-switcher-panel');
+      await expect(panel).toBeVisible({ timeout: 5000 });
+
+      // Open settings modal to add the hash-based URL
+      await panel.locator('.frontend-switcher-settings-btn').click();
+      const modal = page.locator('.frontend-settings-modal');
+      await expect(modal).toBeVisible({ timeout: 5000 });
+
+      // Add the hash-based frontend URL
+      const urlInput = modal.locator('.frontend-settings-input');
+      await urlInput.fill(format.url);
+      await modal.locator('.frontend-settings-add-btn').click();
+
+      // Close the settings modal
+      await modal.locator('.frontend-settings-close').click();
+      await expect(modal).not.toBeVisible({ timeout: 5000 });
+
+      // Ensure the panel is open and select the newly added URL
+      if (!await panel.isVisible()) {
+        await page.locator('#toolbar-frontend-switcher').click();
+        await expect(panel).toBeVisible({ timeout: 5000 });
+      }
+      const hashUrlItem = panel.locator('.frontend-switcher-url-item', { hasText: format.url.replace(/^https?:\/\//, '') });
+      await expect(hashUrlItem).toBeVisible({ timeout: 5000 });
+      await hashUrlItem.click();
+
+      // Wait for iframe to load with the hash-based URL
       const iframeElement = page.locator('#previewIframe');
       await iframeElement.waitFor({ state: 'visible', timeout: 10000 });
 
       // Verify iframe src uses hash-based URL format (hash comes after query params)
       // Note: _edit param is no longer used - edit mode is communicated via window.name
-      const iframeSrc = await iframeElement.getAttribute('src');
-      expect(iframeSrc, `Iframe src should contain ${format.expectedHash}`).toContain(format.expectedHash);
+      await expect(async () => {
+        const iframeSrc = await iframeElement.getAttribute('src');
+        expect(iframeSrc, `Iframe src should contain ${format.expectedHash}`).toContain(format.expectedHash);
+      }).toPass({ timeout: 10000 });
 
       // Verify iframe content shows the correct page
       const iframe = helper.getIframe();
@@ -424,7 +434,7 @@ test.describe('Navigation and URL Handling', () => {
     expect(loadCount, `Iframe loaded ${loadCount} times, should be 2 (not 3+ from admin reload)`).toBeLessThan(3);
   });
 
-  test('Changing frontend URL in preferences reloads iframe', async ({ page }, testInfo) => {
+  test('Changing frontend URL via switcher reloads iframe', async ({ page }, testInfo) => {
     // Skip on Nuxt - this test changes frontend URL which would conflict
     test.skip(testInfo.project.name.includes('nuxt'), 'Mock frontend test only');
 
@@ -444,18 +454,33 @@ test.describe('Navigation and URL Handling', () => {
     expect(srcBefore).toContain(`localhost:8889${TEST_DATA_PREFIX}/test-page`);
     expect(srcBefore).not.toContain('#');
 
-    // Open Personal Preferences
-    await page.locator('#toolbar-personal').click();
-    await page.locator('#toolbar-preferences').or(page.locator('text=Preferences')).first().click();
-    await expect(page.locator('text=Frontend URL')).toBeVisible({ timeout: 5000 });
+    // Open frontend switcher panel
+    await page.locator('#toolbar-frontend-switcher').click();
+    const panel = page.locator('.frontend-switcher-panel');
+    await expect(panel).toBeVisible({ timeout: 5000 });
 
-    // Enable custom URL and change to hash-based URL format
-    await page.locator('label:has-text("Custom URL")').click();
-    const urlInput = page.locator('input[name="url"]');
+    // Open settings modal to add a hash-based URL
+    await panel.locator('.frontend-switcher-settings-btn').click();
+    const modal = page.locator('.frontend-settings-modal');
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    // Add hash-based frontend URL
+    const urlInput = modal.locator('.frontend-settings-input');
     await urlInput.fill('http://localhost:8889/#/');
+    await modal.locator('.frontend-settings-add-btn').click();
 
-    // Submit the form
-    await page.locator('form button[type="submit"], form .ui.button.primary').click();
+    // Close the settings modal
+    await modal.locator('.frontend-settings-close').click();
+    await expect(modal).not.toBeVisible({ timeout: 5000 });
+
+    // Ensure the panel is open and select the hash-based URL
+    if (!await panel.isVisible()) {
+      await page.locator('#toolbar-frontend-switcher').click();
+      await expect(panel).toBeVisible({ timeout: 5000 });
+    }
+    const hashUrlItem = panel.locator('.frontend-switcher-url-item', { hasText: 'localhost:8889/#/' });
+    await expect(hashUrlItem).toBeVisible({ timeout: 5000 });
+    await hashUrlItem.click();
 
     // Wait for iframe src to change to hash-based format
     await expect(async () => {

@@ -702,11 +702,11 @@ test.describe('Hierarchical Sidebar', () => {
     await helper.clickBlockInIframe('text-1a', { waitForToolbar: false });
     await helper.waitForSidebarCurrentBlock('Text');
 
-    // Navigate up to the parent container (col-1) by clicking the parent nav
+    // Navigate up to the parent container (col-1) by clicking the back arrow
     const parentNav = page.locator(
       '.sidebar-section-header[data-is-current="true"] .parent-nav',
     );
-    await parentNav.click();
+    await parentNav.locator('.nav-back').click();
     await helper.waitForSidebarCurrentBlock('Column');
 
     // The child blocks widget should be visible for container blocks
@@ -759,7 +759,7 @@ test.describe('Hierarchical Sidebar', () => {
     const columnHeader = page.locator(
       '.sidebar-section-header[data-is-current="true"] .parent-nav',
     );
-    await columnHeader.click();
+    await columnHeader.locator('.nav-back').click();
     await page.waitForTimeout(300);
 
     // Columns is now current, Column header is gone
@@ -776,7 +776,7 @@ test.describe('Hierarchical Sidebar', () => {
     const columnsHeader = page.locator(
       '.sidebar-section-header[data-is-current="true"] .parent-nav',
     );
-    await columnsHeader.click();
+    await columnsHeader.locator('.nav-back').click();
     await page.waitForTimeout(300);
 
     // No block selected, only Page header shown

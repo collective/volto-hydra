@@ -139,8 +139,8 @@ test.describe('Delete Template Instance', () => {
     await expect(templateBreadcrumb).toBeVisible({ timeout: 5000 });
 
     // Click the "•••" dropdown button next to the template breadcrumb to access Remove option
-    // The dropdown is a sibling of the template breadcrumb in the same container
-    const templateSection = templateBreadcrumb.locator('xpath=..');
+    // The dropdown is in .block-actions-menu, sibling of .parent-nav in .sidebar-section-header
+    const templateSection = templateBreadcrumb.locator('xpath=ancestor::div[contains(@class,"sidebar-section-header")]');
     const dropdownTrigger = templateSection.locator('button', { hasText: '•••' });
     await expect(dropdownTrigger).toBeVisible();
     await dropdownTrigger.click();
@@ -289,11 +289,12 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     await helper.navigateToEdit('/template-test-page');
     await helper.waitForIframeReady();
 
-    // Click a template block then Escape up to the template virtual block
+    // Click a template block then navigate up to the template virtual block
     const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
     await headerBlock.click();
     await helper.waitForSidebarOpen();
-    await page.locator('.sidebar-section-header .section-title').click();
+    // Click back arrow to go from child block up to template instance
+    await page.locator('.sidebar-section-header[data-is-current="true"] .nav-back').click();
     await page.waitForTimeout(200);
 
     // Should be at template instance level
@@ -338,7 +339,8 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
     await headerBlock.click();
     await helper.waitForSidebarOpen();
-    await page.locator('.sidebar-section-header .section-title').click();
+    // Click back arrow to go from child block up to template instance
+    await page.locator('.sidebar-section-header[data-is-current="true"] .nav-back').click();
     await page.waitForTimeout(200);
 
     // Find the Primary placeholder section
@@ -389,7 +391,8 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
     await headerBlock.click();
     await helper.waitForSidebarOpen();
-    await page.locator('.sidebar-section-header .section-title').click();
+    // Click back arrow to go from child block up to template instance
+    await page.locator('.sidebar-section-header[data-is-current="true"] .nav-back').click();
     await page.waitForTimeout(200);
 
     // Find the Primary placeholder section
