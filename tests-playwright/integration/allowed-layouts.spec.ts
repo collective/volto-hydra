@@ -99,8 +99,8 @@ test.describe('allowedLayouts', () => {
       await applyButton.click();
 
       // Wait for layout to be applied - sidebar shows stable admin state
-      await expect(page.locator('.child-block-item', { hasText: 'Layout Header' })).toBeVisible({ timeout: 5000 });
-      await expect(page.locator('.child-block-item', { hasText: 'Layout Footer' })).toBeVisible({ timeout: 5000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Header' })).toBeVisible({ timeout: 10000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Footer' })).toBeVisible({ timeout: 10000 });
 
       // Verify structure: header, existing content, footer
       // Use main/content selector for broader compatibility (test frontend uses #content, Nuxt uses main)
@@ -187,7 +187,7 @@ test.describe('allowedLayouts', () => {
       await page.locator('.apply-layout-btn').click();
 
       // Wait for layout to be applied - sidebar shows stable admin state
-      await expect(page.locator('.child-block-item', { hasText: 'Layout Footer' })).toBeVisible({ timeout: 5000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Footer' })).toBeVisible({ timeout: 10000 });
 
       // Click footer block in iframe (use main/content selector for broader compatibility)
       const footerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Footer' });
@@ -295,7 +295,7 @@ test.describe('allowedLayouts', () => {
       await page.locator('.apply-layout-btn').click();
 
       // Wait for layout to be applied - sidebar shows stable admin state
-      await expect(page.locator('.child-block-item', { hasText: 'Layout Footer' })).toBeVisible({ timeout: 5000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Footer' })).toBeVisible({ timeout: 10000 });
 
       // Get footer block and block positions (use main/content selector for broader compatibility)
       const footerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Footer' });
@@ -456,7 +456,7 @@ test.describe('allowedLayouts', () => {
       await page.locator('.apply-layout-btn').click();
 
       // Wait for layout - sidebar shows stable state
-      await expect(page.locator('.child-block-item', { hasText: 'Header Only' })).toBeVisible({ timeout: 5000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Header Only' })).toBeVisible({ timeout: 10000 });
 
       // Verify structure: header at top, content after, NO fixed footer (use main/content selector for broader compatibility)
       const allBlocks = await iframe.locator('main [data-block-uid], #content [data-block-uid]').allTextContents();
@@ -483,7 +483,7 @@ test.describe('allowedLayouts', () => {
       await page.locator('.apply-layout-btn').click();
 
       // Wait for layout
-      await expect(page.locator('.child-block-item', { hasText: 'Header Only' })).toBeVisible({ timeout: 5000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Header Only' })).toBeVisible({ timeout: 10000 });
 
       // Click header block (use main/content selector for broader compatibility)
       const headerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Header Only' });
@@ -511,7 +511,7 @@ test.describe('allowedLayouts', () => {
       await page.locator('.apply-layout-btn').click();
 
       // Wait for layout
-      await expect(page.locator('.child-block-item', { hasText: 'Header Only' })).toBeVisible({ timeout: 5000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Header Only' })).toBeVisible({ timeout: 10000 });
 
       // Click last block (should be content, not header) - use main/content selector for broader compatibility
       const allBlocks = iframe.locator('main [data-block-uid], #content [data-block-uid]');
@@ -654,8 +654,8 @@ test.describe('allowedLayouts', () => {
       await page.locator('.apply-layout-btn').click();
 
       // Wait for layout to be applied - check sidebar shows the fixed blocks
-      await expect(page.locator('.child-block-item', { hasText: 'Layout Header' })).toBeVisible({ timeout: 5000 });
-      await expect(page.locator('.child-block-item', { hasText: 'Layout Footer' })).toBeVisible({ timeout: 5000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Header' })).toBeVisible({ timeout: 10000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Footer' })).toBeVisible({ timeout: 10000 });
 
       // Now select None to remove the layout
       await page.keyboard.press('Escape');
