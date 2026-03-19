@@ -192,9 +192,9 @@ export default defineNuxtConfig({
     ],
     resolve: {
       alias: {
-        // In test mode, use source hydra.js for live reload
-        // In production, use synced local copy (prebuild script syncs from source)
-        '@hydra-js': process.env.NUXT_ENV_NAME === 'test' ? hydraJsPath : './packages',
+        // In dev mode, use workspace source for live reload
+        // In production builds, prebuild script syncs a local copy to ./packages
+        '@hydra-js': process.env.NODE_ENV === 'development' ? hydraJsPath : './packages',
         '@test-fixtures': fixturesPath
       }
     },
@@ -202,7 +202,11 @@ export default defineNuxtConfig({
     // ssr: true // enable unstable server-side rendering for development (false by default)
     // experimentWarning: false // hide experimental warning message (disabled by default for tests)
     vue: {
-      /* options for vite-plugin-vue2 */
+      template: {
+        compilerOptions: {
+          comments: true, // Preserve HTML comments for hydra comment syntax
+        },
+      },
     },
   },
   devServer: {
