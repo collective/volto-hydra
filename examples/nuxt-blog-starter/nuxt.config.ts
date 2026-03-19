@@ -37,6 +37,11 @@ export default defineNuxtConfig({
   $env: {
     edit: {
       ssr: false, // "npm run generate -- --envName edit" == SPA
+      vue: {
+        compilerOptions: {
+          comments: true,  // Preserve HTML comments for hydra comment syntax
+        },
+      },
       app: {
         baseURL: process.env.NUXT_EDIT_BASE_URL || '/',
       },
