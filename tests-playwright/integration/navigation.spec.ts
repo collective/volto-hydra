@@ -84,6 +84,57 @@ test.describe('Navigation and URL Handling', () => {
     });
   }
 
+  test('Switching to hash-based frontend stays in edit mode', async ({ page }) => {
+    // Requires F7 running on port 3008
+    const response = await page.request.get('http://localhost:3008').catch(() => null);
+    test.skip(!response?.ok(), 'F7 not running on port 3008');
+
+    // Reproduces production bug: F7 uses hash-bang routing (#!/path).
+    // When switching to F7, the iframe should stay in edit mode and render content.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.waitForIframeReady();
+
+    // Open frontend switcher settings and add hash-based URL
+    const switcherBtn = page.locator('#toolbar-frontend-switcher');
+    await switcherBtn.click();
+    const panel = page.locator('.frontend-switcher-panel');
+    await expect(panel).toBeVisible();
+
+    const settingsBtn = panel.locator('.frontend-switcher-settings-btn');
+    await settingsBtn.click();
+
+    const modal = page.locator('.frontend-settings-modal');
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    // Add F7 hash-based URL
+    const input = modal.locator('.frontend-settings-input');
+    await input.fill('http://localhost:3008/#!');
+    await modal.locator('.frontend-settings-add-btn').click();
+
+    // Close modal
+    await modal.locator('.frontend-settings-close').click();
+    await expect(modal).not.toBeVisible({ timeout: 5000 });
+
+    // Select the F7 URL in the switcher panel
+    const f7Item = panel.locator('.frontend-switcher-url-item', { hasText: 'localhost:3008/#!' });
+    await expect(f7Item).toBeVisible();
+    await f7Item.click();
+
+    // Wait for iframe to load F7 and render content
+    const iframe = helper.getIframe();
+    await expect(iframe.locator('[data-block-uid]').first()).toBeVisible({ timeout: 15000 });
+
+    // Verify we're still in edit mode (URL ends with /edit)
+    expect(page.url()).toContain('/edit');
+
+    // Verify the iframe has F7 content (not a blank page or redirect)
+    const blockCount = await iframe.locator('[data-block-uid]').count();
+    expect(blockCount).toBeGreaterThan(0);
+  });
+
   test('Navigation links work in iframe when clicking header nav', async ({ page }, testInfo) => {
 
     const helper = new AdminUIHelper(page);
@@ -434,5 +485,135 @@ test.describe('Navigation and URL Handling', () => {
     // This should be visible because test-page is folderish (is_folderish: true in fixture)
     const contentsButton = page.locator('#toolbar a[href*="contents"], #toolbar [aria-label*="Contents" i]');
     await expect(contentsButton.first()).toBeVisible({ timeout: 5000 });
+  });
+
+  test('Frontend switcher button is visible and opens panel', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const switcherBtn = page.locator('#toolbar-frontend-switcher');
+    await expect(switcherBtn).toBeVisible({ timeout: 10000 });
+    await switcherBtn.click();
+
+    const panel = page.locator('.frontend-switcher-panel');
+    await expect(panel).toBeVisible({ timeout: 5000 });
+
+    // Should have viewport buttons
+    await expect(panel.locator('.frontend-switcher-viewport-btn')).toHaveCount(3);
+    // Should have at least one frontend URL
+    expect(await panel.locator('.frontend-switcher-url-item').count()).toBeGreaterThan(0);
+    // Should have settings button
+    await expect(panel.locator('.frontend-switcher-settings-btn')).toBeVisible();
+  });
+
+  test('Viewport switching constrains iframe width', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = page.locator('#previewIframe');
+    const switcherBtn = page.locator('#toolbar-frontend-switcher');
+    const panel = page.locator('.frontend-switcher-panel');
+
+    const openPanel = async () => {
+      if (await panel.isVisible()) return;
+      await switcherBtn.click();
+      await expect(panel).toBeVisible({ timeout: 5000 });
+    };
+
+    await expect(iframe).toBeVisible({ timeout: 10000 });
+    const initialStyle = await iframe.getAttribute('style');
+    expect(initialStyle || '').not.toContain('max-width');
+
+    await openPanel();
+    await panel.locator('.frontend-switcher-viewport-btn').first().click();
+    await expect(iframe).toHaveAttribute('style', /max-width:\s*375px/, { timeout: 5000 });
+
+    await panel.locator('.frontend-switcher-viewport-btn').nth(1).click();
+    await expect(iframe).toHaveAttribute('style', /max-width:\s*768px/, { timeout: 5000 });
+
+    await panel.locator('.frontend-switcher-viewport-btn').nth(2).click();
+    await expect(async () => {
+      const style = await iframe.getAttribute('style');
+      expect(style || '').not.toContain('max-width');
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('Switching frontend mid-edit preserves form data without leave warning', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    const editor = await helper.enterEditMode(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await editor.pressSequentially('Unsaved changes test', { delay: 20 });
+    await page.waitForTimeout(500);
+
+    const iframe = helper.getIframe();
+    await expect(iframe.locator(`[data-block-uid="${blockId}"]`)).toContainText('Unsaved changes test');
+
+    let dialogAppeared = false;
+    page.on('dialog', async (dialog: any) => {
+      dialogAppeared = true;
+      await dialog.accept();
+    });
+
+    const switcherBtn = page.locator('#toolbar-frontend-switcher');
+    await switcherBtn.click();
+    const panel = page.locator('.frontend-switcher-panel');
+    await expect(panel).toBeVisible();
+
+    const iframeEl = page.locator('#previewIframe');
+    const srcBefore = await iframeEl.getAttribute('src');
+    const currentOrigin = new URL(srcBefore!).origin;
+
+    const urlItems = panel.locator('.frontend-switcher-url-item');
+    const urlCount = await urlItems.count();
+    let targetUrl: string | null = null;
+    for (let i = 0; i < urlCount; i++) {
+      const item = urlItems.nth(i);
+      const urlText = await item.getAttribute('title');
+      if (urlText && new URL(urlText).origin !== currentOrigin) {
+        try {
+          const resp = await page.request.get(urlText, { timeout: 3000 });
+          if (resp.ok()) {
+            targetUrl = urlText;
+            await item.click();
+            break;
+          }
+        } catch { /* Not reachable, try next */ }
+      }
+    }
+
+    if (!targetUrl) {
+      test.skip(true, 'No reachable frontend with different origin available');
+      return;
+    }
+
+    expect(dialogAppeared).toBe(false);
+
+    await expect(async () => {
+      const srcAfter = await iframeEl.getAttribute('src');
+      expect(srcAfter).not.toBeNull();
+      expect(new URL(srcAfter!).origin).not.toBe(currentOrigin);
+    }).toPass({ timeout: 10000 });
+
+    await helper.waitForIframeReady();
+
+    const newIframe = helper.getIframe();
+    await expect(newIframe.locator(`[data-block-uid="${blockId}"]`)).toContainText('Unsaved changes test', { timeout: 10000 });
+    await helper.waitForQuantaToolbar(blockId);
+  });
+
+  test('Frontend switcher button visible in view mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await page.goto('http://localhost:3001/test-page');
+    await page.waitForLoadState('networkidle');
+
+    const switcherBtn = page.locator('#toolbar-frontend-switcher');
+    await expect(switcherBtn).toBeVisible({ timeout: 10000 });
   });
 });
