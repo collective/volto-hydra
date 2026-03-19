@@ -52,7 +52,7 @@ const test = base.extend<{ helper: AdminUIHelper }>({
 test.describe('Block sanity (auto-discovered)', () => {
   for (const block of discoveredBlocks) {
     test(`${block.blockType} block renders and has edit annotations`, async ({ page, helper }, testInfo) => {
-      const frontendUrl = getFrontendUrl(testInfo.project.name);
+      const frontendUrl = process.env.FRONTEND_URL || getFrontendUrl(testInfo.project.name);
       const frontend = frontendUrl ? `&frontend=${encodeURIComponent(frontendUrl)}` : '';
 
       // Use api_path to load the full page content from the API
