@@ -147,70 +147,6 @@
     "f9dec030-b72d-4940-af4c-6dc123cea7a6": {
       "@type": "slate"
     },
-    "ref-maps-sep": {
-      "@type": "separator",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-maps",
-      "placeholder": "sep"
-    },
-    "ref-maps-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-maps",
-      "placeholder": "heading"
-    },
-    "ref-maps-schema-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-maps",
-      "placeholder": "schema-heading"
-    },
-    "ref-maps-schema-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-maps",
-      "placeholder": "schema-desc"
-    },
-    "ref-maps-json-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-maps",
-      "placeholder": "json-heading"
-    },
-    "ref-maps-json-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-maps",
-      "placeholder": "json-desc"
-    },
-    "ref-maps-rendering-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-maps",
-      "placeholder": "rendering-heading"
-    },
-    "ref-maps-rendering-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-maps",
-      "placeholder": "rendering-desc"
-    },
     "ref-maps-schema": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
@@ -283,16 +219,8 @@
       "43a4b392-f0c3-4b8d-a17d-9b4ddea3f0f0",
       "ceee1cfa-80ff-44f1-b3af-3cfd4be3f4ba",
       "f9dec030-b72d-4940-af4c-6dc123cea7a6",
-      "ref-maps-sep",
-      "ref-maps-heading",
-      "ref-maps-schema-heading",
-      "ref-maps-schema-desc",
       "ref-maps-schema",
-      "ref-maps-json-heading",
-      "ref-maps-json-desc",
       "ref-maps-json-data",
-      "ref-maps-rendering-heading",
-      "ref-maps-rendering-desc",
       "ref-maps-rendering"
     ]
   },

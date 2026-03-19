@@ -59,8 +59,8 @@ function stripApiOrigin(url) {
     if (apiOrigin && url.startsWith(apiOrigin)) {
         return url.slice(apiOrigin.length) || '/';
     }
-    // Unknown origin — extract pathname
-    try { return new URL(url).pathname; } catch { return url; }
+    // External URL — preserve as-is
+    return url;
 }
 
 /**

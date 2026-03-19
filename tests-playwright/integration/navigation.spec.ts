@@ -602,13 +602,15 @@ test.describe('Navigation and URL Handling', () => {
       const urlText = await item.getAttribute('title');
       if (urlText && new URL(urlText).origin !== currentOrigin) {
         try {
-          const resp = await page.request.get(urlText, { timeout: 3000 });
-          if (resp.ok()) {
+          // Check the frontend can actually serve edit content (not just respond)
+          const testUrl = `${urlText.replace(/\/$/, '')}${TEST_DATA_PREFIX}/test-page?_edit=true`;
+          const resp = await page.request.get(testUrl, { timeout: 5000 });
+          if (resp.ok() && (await resp.text()).includes('data-block-uid')) {
             targetUrl = urlText;
             await item.click();
             break;
           }
-        } catch { /* Not reachable, try next */ }
+        } catch { /* Not reachable or can't render, try next */ }
       }
     }
 

@@ -395,70 +395,6 @@
       },
       "title": "Button"
     },
-    "ref-button-sep": {
-      "@type": "separator",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-button",
-      "placeholder": "sep"
-    },
-    "ref-button-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-button",
-      "placeholder": "heading"
-    },
-    "ref-button-schema-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-button",
-      "placeholder": "schema-heading"
-    },
-    "ref-button-schema-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-button",
-      "placeholder": "schema-desc"
-    },
-    "ref-button-json-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-button",
-      "placeholder": "json-heading"
-    },
-    "ref-button-json-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-button",
-      "placeholder": "json-desc"
-    },
-    "ref-button-rendering-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-button",
-      "placeholder": "rendering-heading"
-    },
-    "ref-button-rendering-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-button",
-      "placeholder": "rendering-desc"
-    },
     "ref-button-schema": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
@@ -548,34 +484,8 @@
       "7760c976-1716-45d0-a22b-527bed9e8de9",
       "2fa5b869-89cd-4d15-aee9-80b4e1bf11a2",
       "fc0ddcf5-4acc-4f9b-8c5c-992db47399ce",
-      "ref-button-schema-heading",
-      "ref-button-schema-desc",
       "ref-button-schema",
-      "ref-button-json-heading",
-      "ref-button-json-desc",
       "ref-button-json-data",
-      "ref-button-rendering-heading",
-      "ref-button-rendering-desc",
-      "ref-button-rendering",
-      "ref-button-schema-heading",
-      "ref-button-schema-desc",
-      "ref-button-schema",
-      "ref-button-json-heading",
-      "ref-button-json-desc",
-      "ref-button-json-data",
-      "ref-button-rendering-heading",
-      "ref-button-rendering-desc",
-      "ref-button-rendering",
-      "ref-button-sep",
-      "ref-button-heading",
-      "ref-button-schema-heading",
-      "ref-button-schema-desc",
-      "ref-button-schema",
-      "ref-button-json-heading",
-      "ref-button-json-desc",
-      "ref-button-json-data",
-      "ref-button-rendering-heading",
-      "ref-button-rendering-desc",
       "ref-button-rendering"
     ]
   },

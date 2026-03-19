@@ -134,7 +134,14 @@ const MD_TO_CONTENT_UID = {
 };
 
 const CONTENT_DIR = join(__dirname, '..', 'content', 'content', 'content');
-const TEMPLATE_ID = 'resolveuid/tpl-block-reference-layout';
+const TEMPLATE_ID = '/templates/block-reference-layout';
+
+/** Check if a block's templateId matches our template (handles resolveuid format too) */
+function isOurTemplate(block) {
+  const tid = block?.templateId;
+  if (!tid) return false;
+  return tid === TEMPLATE_ID || tid.endsWith('/block-reference-layout');
+}
 
 // Old placeholders to remove during migration
 const OLD_PLACEHOLDERS = new Set([
@@ -301,7 +308,7 @@ for (const mdFile of mdFiles) {
   let instanceId = null;
   let prefix = null; // e.g., "ref-image"
   for (const [blockId, block] of Object.entries(data.blocks)) {
-    if (block.templateId !== TEMPLATE_ID) continue;
+    if (!isOurTemplate(block)) continue;
     tplBlocks[block.placeholder] = { blockId, block };
     if (!instanceId) instanceId = block.templateInstanceId;
     if (!prefix) {
@@ -318,107 +325,56 @@ for (const mdFile of mdFiles) {
     }
   }
 
-  // Bootstrap: if no template blocks found, create the initial sep + heading anchor
+  // Bootstrap: derive prefix and instanceId if no template blocks found yet
   if (!instanceId || !prefix) {
-    // Derive prefix from md filename: "introduction.md" → "ref-introduction"
-    // Special case: "button.md" → "ref-button" (not "ref-__button")
     const name = mdFile.replace('.md', '');
     prefix = `ref-${name}`;
     instanceId = `tpl-inst-${name}`;
-
-    // Create the separator and heading anchor blocks
-    const sepId = `${prefix}-sep`;
-    data.blocks[sepId] = {
-      '@type': 'separator',
-      fixed: true,
-      readOnly: true,
-      templateId: TEMPLATE_ID,
-      templateInstanceId: instanceId,
-      placeholder: 'sep',
-    };
-
-    const headingId = `${prefix}-heading`;
-    data.blocks[headingId] = {
-      '@type': 'slate',
-      fixed: true,
-      readOnly: true,
-      templateId: TEMPLATE_ID,
-      templateInstanceId: instanceId,
-      placeholder: 'heading',
-    };
-
-    contentChanged = true;
   }
 
-  // --- Migration: remove old-format blocks, ensure new-format blocks exist ---
-
-  // Remove old placeholder blocks (headings for schema/json/react/vue + react-code/vue-code)
-  for (const oldPh of OLD_PLACEHOLDERS) {
-    const entry = tplBlocks[oldPh];
-    if (entry) {
-      delete data.blocks[entry.blockId];
-      const idx = data.blocks_layout.items.indexOf(entry.blockId);
-      if (idx !== -1) data.blocks_layout.items.splice(idx, 1);
-      delete tplBlocks[oldPh];
-      contentChanged = true;
-    }
-  }
-
-  // Ensure fixed heading/description blocks exist for each section
-  const fixedBlocks = {
-    'schema-heading': 'schema-heading',
-    'schema-desc': 'schema-desc',
-    'json-heading': 'json-heading',
-    'json-desc': 'json-desc',
-    'rendering-heading': 'rendering-heading',
-    'rendering-desc': 'rendering-desc',
-  };
-  for (const [suffix, placeholder] of Object.entries(fixedBlocks)) {
+  // --- Migration: remove fixed/boilerplate blocks that the template now provides ---
+  // Only the 3 codeExample content blocks should be in the stored content.
+  // The template expansion (expandTemplates) provides all boilerplate (sep, heading, descriptions).
+  const boilerplateSuffixes = [
+    'sep', 'heading', 'schema-heading', 'schema-desc', 'json-heading', 'json-desc',
+    'rendering-heading', 'rendering-desc',
+    // Old placeholder names
+    ...OLD_PLACEHOLDERS,
+  ];
+  for (const suffix of boilerplateSuffixes) {
     const blockId = `${prefix}-${suffix}`;
-    if (!data.blocks[blockId]) {
-      // These are fixed+readOnly template blocks — content comes from the template
-      data.blocks[blockId] = {
-        '@type': 'slate',
-        fixed: true,
-        readOnly: true,
-        templateId: TEMPLATE_ID,
-        templateInstanceId: instanceId,
-        placeholder,
-      };
+    if (data.blocks[blockId]) {
+      delete data.blocks[blockId];
+      contentChanged = true;
+    }
+  }
+  // Also remove any other blocks with our templateId that aren't codeExample
+  for (const [blockId, block] of Object.entries(data.blocks)) {
+    if (isOurTemplate(block) && block['@type'] !== 'codeExample') {
+      delete data.blocks[blockId];
       contentChanged = true;
     }
   }
 
-  // Ensure schema codeExample block exists
+  // Ensure the 3 codeExample blocks exist
   const schemaId = `${prefix}-schema`;
   if (!data.blocks[schemaId] || data.blocks[schemaId]['@type'] !== 'codeExample') {
-    // Remove old slate version if present
-    if (data.blocks[schemaId]) {
-      const idx = data.blocks_layout.items.indexOf(schemaId);
-      if (idx !== -1) data.blocks_layout.items.splice(idx, 1);
-    }
     data.blocks[schemaId] = makeCodeExampleBlock(schemaId, instanceId, 'schema', [
       { label: 'Schema', language: 'javascript', code: sections.schema || '' },
     ]);
     contentChanged = true;
   }
 
-  // Ensure json-data codeExample block exists
   const jsonId = `${prefix}-json-data`;
   if (!data.blocks[jsonId] || data.blocks[jsonId]['@type'] !== 'codeExample') {
-    if (data.blocks[jsonId]) {
-      const idx = data.blocks_layout.items.indexOf(jsonId);
-      if (idx !== -1) data.blocks_layout.items.splice(idx, 1);
-    }
     data.blocks[jsonId] = makeCodeExampleBlock(jsonId, instanceId, 'json-data', [
       { label: 'JSON Block Data', language: 'json', code: sections.json || '' },
     ]);
     contentChanged = true;
   }
 
-  // Ensure rendering codeExample block exists
   const renderingId = `${prefix}-rendering`;
-  if (!data.blocks[renderingId]) {
+  if (!data.blocks[renderingId] || data.blocks[renderingId]['@type'] !== 'codeExample') {
     data.blocks[renderingId] = makeCodeExampleBlock(renderingId, instanceId, 'rendering', [
       { label: 'React', language: 'jsx', code: sections.react || '' },
       { label: 'Vue', language: 'vue', code: sections.vue || '' },
@@ -427,23 +383,11 @@ for (const mdFile of mdFiles) {
     contentChanged = true;
   }
 
-  // Rebuild layout: keep non-template blocks, then append template blocks in correct order
-  const templateOrder = [
-    `${prefix}-sep`,
-    `${prefix}-heading`,
-    `${prefix}-schema-heading`,
-    `${prefix}-schema-desc`,
-    schemaId,
-    `${prefix}-json-heading`,
-    `${prefix}-json-desc`,
-    jsonId,
-    `${prefix}-rendering-heading`,
-    `${prefix}-rendering-desc`,
-    renderingId,
-  ];
+  // Rebuild layout: non-template blocks + the 3 codeExample blocks
+  const templateOrder = [schemaId, jsonId, renderingId];
   const nonTplItems = data.blocks_layout.items.filter(id => {
     const block = data.blocks[id];
-    return !block || block.templateId !== TEMPLATE_ID;
+    return block && !isOurTemplate(block);
   });
   const tplItems = templateOrder.filter(id => data.blocks[id]);
   const newItems = [...nonTplItems, ...tplItems];

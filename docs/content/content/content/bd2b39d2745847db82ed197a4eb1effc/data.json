@@ -139,22 +139,6 @@
     "b986b92c-e180-42d3-b755-4728854e5a50": {
       "@type": "title"
     },
-    "ref-teaser-sep": {
-      "@type": "separator",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-teaser",
-      "placeholder": "sep"
-    },
-    "ref-teaser-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-teaser",
-      "placeholder": "heading"
-    },
     "ref-teaser-schema": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
@@ -208,54 +192,6 @@
           "code": "<script>\n  export let block;\n\n  $: hrefObj = block.href?.[0] || null;\n  $: useBlockData = block.overwrite || !hrefObj?.title;\n  $: title = useBlockData ? block.title : hrefObj?.title || '';\n  $: description = useBlockData ? block.description : hrefObj?.description || '';\n  $: href = hrefObj?.['@id'] || '';\n  $: imageSrc = block.preview_image\n    ? (typeof block.preview_image === 'string' ? block.preview_image : block.preview_image['@id'])\n    : (hrefObj?.hasPreviewImage ? `${href}/@@images/preview_image` : '');\n</script>\n\n{#if !href}\n  <div data-block-uid={block['@uid']} class=\"teaser-placeholder\">\n    <p>Select a target page for this teaser</p>\n  </div>\n{:else}\n  <div data-block-uid={block['@uid']} class=\"teaser-block\">\n    {#if imageSrc}\n      <img data-edit-media=\"preview_image\" src={imageSrc} alt=\"\" />\n    {/if}\n    <h3 data-edit-text=\"title\">{title}</h3>\n    <p data-edit-text=\"description\">{description}</p>\n    <a {href} data-edit-link=\"href\">Read more</a>\n  </div>\n{/if}"
         }
       ]
-    },
-    "ref-teaser-schema-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-teaser",
-      "placeholder": "schema-heading"
-    },
-    "ref-teaser-schema-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-teaser",
-      "placeholder": "schema-desc"
-    },
-    "ref-teaser-json-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-teaser",
-      "placeholder": "json-heading"
-    },
-    "ref-teaser-json-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-teaser",
-      "placeholder": "json-desc"
-    },
-    "ref-teaser-rendering-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-teaser",
-      "placeholder": "rendering-heading"
-    },
-    "ref-teaser-rendering-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-teaser",
-      "placeholder": "rendering-desc"
     }
   },
   "blocks_layout": {
@@ -267,34 +203,8 @@
       "95648579-7116-401f-a448-e48938c88246",
       "b798dde4-6a5d-4cef-9e25-fd532e1ea9a7",
       "620f0540-8c3d-422d-a1c6-47037b5dbfbc",
-      "ref-teaser-schema-heading",
-      "ref-teaser-schema-desc",
       "ref-teaser-schema",
-      "ref-teaser-json-heading",
-      "ref-teaser-json-desc",
       "ref-teaser-json-data",
-      "ref-teaser-rendering-heading",
-      "ref-teaser-rendering-desc",
-      "ref-teaser-rendering",
-      "ref-teaser-schema-heading",
-      "ref-teaser-schema-desc",
-      "ref-teaser-schema",
-      "ref-teaser-json-heading",
-      "ref-teaser-json-desc",
-      "ref-teaser-json-data",
-      "ref-teaser-rendering-heading",
-      "ref-teaser-rendering-desc",
-      "ref-teaser-rendering",
-      "ref-teaser-sep",
-      "ref-teaser-heading",
-      "ref-teaser-schema-heading",
-      "ref-teaser-schema-desc",
-      "ref-teaser-schema",
-      "ref-teaser-json-heading",
-      "ref-teaser-json-desc",
-      "ref-teaser-json-data",
-      "ref-teaser-rendering-heading",
-      "ref-teaser-rendering-desc",
       "ref-teaser-rendering"
     ]
   },

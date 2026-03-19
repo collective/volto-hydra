@@ -5163,22 +5163,6 @@
       "styles": {},
       "tag": "h2"
     },
-    "ref-table-sep": {
-      "@type": "separator",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-table",
-      "placeholder": "sep"
-    },
-    "ref-table-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-table",
-      "placeholder": "heading"
-    },
     "ref-table-schema": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
@@ -5232,54 +5216,6 @@
           "code": "<script>\n  import SlateNode from './SlateNode.svelte';\n  export let block;\n</script>\n\n<div data-block-uid={block['@uid']}>\n  <table>\n    <tbody>\n      {#each block.table?.rows || [] as row (row.key)}\n        <tr data-block-uid={row.key}>\n          {#each row.cells as cell (cell.key)}\n            <td data-block-uid={cell.key} data-edit-text=\"value\">\n              {#each cell.value || [] as node, i (i)}\n                <SlateNode {node} />\n              {/each}\n            </td>\n          {/each}\n        </tr>\n      {/each}\n    </tbody>\n  </table>\n</div>"
         }
       ]
-    },
-    "ref-table-schema-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-table",
-      "placeholder": "schema-heading"
-    },
-    "ref-table-schema-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-table",
-      "placeholder": "schema-desc"
-    },
-    "ref-table-json-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-table",
-      "placeholder": "json-heading"
-    },
-    "ref-table-json-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-table",
-      "placeholder": "json-desc"
-    },
-    "ref-table-rendering-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-table",
-      "placeholder": "rendering-heading"
-    },
-    "ref-table-rendering-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-table",
-      "placeholder": "rendering-desc"
     }
   },
   "blocks_layout": {
@@ -5293,34 +5229,8 @@
       "0b0891c8-812e-41ca-b572-b7851361025f",
       "aa800193-7bf4-4f54-9bb6-a6c5b4e02b81",
       "4266731a-e721-4f2f-95de-c7c3e885677b",
-      "ref-table-schema-heading",
-      "ref-table-schema-desc",
       "ref-table-schema",
-      "ref-table-json-heading",
-      "ref-table-json-desc",
       "ref-table-json-data",
-      "ref-table-rendering-heading",
-      "ref-table-rendering-desc",
-      "ref-table-rendering",
-      "ref-table-schema-heading",
-      "ref-table-schema-desc",
-      "ref-table-schema",
-      "ref-table-json-heading",
-      "ref-table-json-desc",
-      "ref-table-json-data",
-      "ref-table-rendering-heading",
-      "ref-table-rendering-desc",
-      "ref-table-rendering",
-      "ref-table-sep",
-      "ref-table-heading",
-      "ref-table-schema-heading",
-      "ref-table-schema-desc",
-      "ref-table-schema",
-      "ref-table-json-heading",
-      "ref-table-json-desc",
-      "ref-table-json-data",
-      "ref-table-rendering-heading",
-      "ref-table-rendering-desc",
       "ref-table-rendering"
     ]
   },
