@@ -96,13 +96,16 @@
     const apiPath = params.get('api_path'); // e.g., '/block/toc-block' loads from API
     const adminOrigin = window.location.origin;
 
+    // Derive API origin from api_path param if present, otherwise default
+    const apiOrigin = apiPath ? new URL(apiPath).origin : 'http://localhost:8888';
+
     // Create iframe dynamically so name is set BEFORE the browsing context is created.
     // Setting iframe.name after the element is in the DOM doesn't propagate to contentWindow.name.
     function createIframe() {
       const previewIframe = document.createElement('iframe');
       previewIframe.id = 'previewIframe';
       previewIframe.name = `hydra-edit:${adminOrigin}`;
-      previewIframe.src = `${frontendOrigin}/_test_data/test-page?_edit=true&_admin_origin=${adminOrigin}&_hydra_debug=1`;
+      previewIframe.src = `${frontendOrigin}/_test_data/test-page?_edit=true&_admin_origin=${adminOrigin}&_api_origin=${apiOrigin}&_hydra_debug=1`;
       document.getElementById('iframe-container').appendChild(previewIframe);
     }
 

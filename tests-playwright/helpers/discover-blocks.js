@@ -5,50 +5,37 @@
  * block-sanity spec reads at module load time to parametrize tests.
  *
  * Works against any Plone API (mock or real) — no filesystem access needed.
+ *
+ * @typedef {{ blockType: string, blockId: string, pagePath: string, blockData: Object, isListing: boolean }} DiscoveredBlock
  */
-
-export interface DiscoveredBlock {
-  /** The block's @type (e.g. "hero_block", "features", "slate") */
-  blockType: string;
-  /** The block's ID (key in the blocks dict) */
-  blockId: string;
-  /** The API path of the page containing this block */
-  pagePath: string;
-  /** The full block data object */
-  blockData: Record<string, unknown>;
-  /** Whether this is a listing block (multiple elements share same data-block-uid) */
-  isListing: boolean;
-}
 
 /**
  * Recursively extract all blocks from a content object.
  * Handles nested containers: section, gridBlock, columns, accordion, etc.
- * Returns flat array of { blockId, blockType, blockData }.
+ * @param {Object} blocks - Block dict keyed by ID
+ * @param {string[]} [layout] - Ordered block IDs (from blocks_layout.items)
+ * @returns {{ blockId: string, blockType: string, blockData: Object }[]}
  */
-function extractBlocks(
-  blocks: Record<string, any>,
-  layout?: string[],
-): { blockId: string; blockType: string; blockData: Record<string, unknown> }[] {
-  const result: { blockId: string; blockType: string; blockData: Record<string, unknown> }[] = [];
+function extractBlocks(blocks, layout) {
+  const result = [];
   const blockIds = layout || Object.keys(blocks);
 
   for (const blockId of blockIds) {
     const block = blocks[blockId];
     if (!block || typeof block !== 'object') continue;
 
-    const blockType = block['@type'] as string;
+    const blockType = block['@type'];
     if (!blockType) continue;
 
     result.push({ blockId, blockType, blockData: block });
 
     // Recurse into nested blocks (containers)
     if (block.blocks && typeof block.blocks === 'object') {
-      const nestedLayout = block.blocks_layout?.items;
-      result.push(...extractBlocks(block.blocks, nestedLayout));
+      result.push(...extractBlocks(block.blocks, block.blocks_layout?.items));
     }
 
     // Handle object_list style arrays (accordion panels, slider slides, etc.)
-    for (const [key, value] of Object.entries(block)) {
+    for (const [, value] of Object.entries(block)) {
       if (Array.isArray(value)) {
         for (const item of value) {
           if (item && typeof item === 'object' && item.blocks) {
@@ -65,15 +52,12 @@ function extractBlocks(
 /**
  * Discover one example of each block type from a Plone API.
  *
- * @param apiUrl - Base URL of the Plone API (e.g. "http://localhost:8888")
- * @param maxPages - Maximum number of pages to fetch (default 50)
- * @returns Array of DiscoveredBlock, one per unique @type
+ * @param {string} apiUrl - Base URL of the Plone API (e.g. "http://localhost:8888")
+ * @param {number} [maxPages=50] - Maximum number of pages to fetch
+ * @returns {Promise<DiscoveredBlock[]>} One entry per unique block @type
  */
-export async function discoverBlocks(
-  apiUrl: string,
-  maxPages: number = 50,
-): Promise<DiscoveredBlock[]> {
-  const seen = new Map<string, DiscoveredBlock>();
+async function discoverBlocks(apiUrl, maxPages = 50) {
+  const seen = new Map();
 
   // Step 1: Get all content paths via @search (b_size=9999 to avoid pagination)
   const searchUrl = `${apiUrl}/@search?b_size=9999`;
@@ -85,7 +69,7 @@ export async function discoverBlocks(
     throw new Error(`Failed to fetch @search: ${searchResp.status} ${searchResp.statusText}`);
   }
   const searchData = await searchResp.json();
-  const items: { '@id': string; '@type': string }[] = searchData.items || [];
+  const items = searchData.items || [];
   console.log(`[DISCOVER] Found ${items.length} content items`);
 
   // Filter to page-like types that have blocks
@@ -98,13 +82,10 @@ export async function discoverBlocks(
   for (const item of pages) {
     if (fetched >= maxPages) break;
 
-    // Extract path from @id (strip the API base URL)
-    const itemUrl = item['@id'];
-    const pagePath = new URL(itemUrl).pathname;
+    const pagePath = new URL(item['@id']).pathname;
 
     try {
-      const contentUrl = `${apiUrl}${pagePath}`;
-      const resp = await fetch(contentUrl, {
+      const resp = await fetch(`${apiUrl}${pagePath}`, {
         headers: { Accept: 'application/json' },
       });
       if (!resp.ok) continue;
@@ -120,8 +101,7 @@ export async function discoverBlocks(
         if (seen.has(blockType)) continue;
 
         // Skip metadata block types that don't render visually
-        const skipTypes = new Set(['title', 'description']);
-        if (skipTypes.has(blockType)) continue;
+        if (blockType === 'title' || blockType === 'description') continue;
 
         seen.set(blockType, {
           blockType,
@@ -133,7 +113,7 @@ export async function discoverBlocks(
 
         console.log(`[DISCOVER] Found ${blockType} block "${blockId}" on ${pagePath}`);
       }
-    } catch (err: unknown) {
+    } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`[DISCOVER] Skipping ${pagePath}: ${msg}`);
     }
@@ -143,3 +123,5 @@ export async function discoverBlocks(
   console.log(`[DISCOVER] Discovered ${result.length} unique block types from ${fetched} pages`);
   return result;
 }
+
+module.exports = { discoverBlocks, extractBlocks };

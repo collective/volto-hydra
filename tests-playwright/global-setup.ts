@@ -4,7 +4,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { discoverBlocks } from './helpers/discover-blocks';
+const { discoverBlocks } = require('./helpers/discover-blocks');
 
 async function globalSetup() {
   // Run block discovery if configured (before health checks — SKIP_VOLTO_CHECK
