@@ -115,6 +115,7 @@ jobs:
           NO_WEBSERVER: true
           SKIP_VOLTO_CHECK: true
           COVERAGE: true
+          DISCOVER_BLOCKS_API: http://localhost:8888
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4
@@ -283,6 +284,8 @@ jobs:
           CI: true
           NO_WEBSERVER: true
           SKIP_VOLTO_CHECK: true
+          DISCOVER_BLOCKS_API: http://localhost:8888
+          FRONTEND_URL: http://localhost:3003
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4

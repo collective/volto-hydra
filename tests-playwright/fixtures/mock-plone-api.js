@@ -1916,30 +1916,10 @@ app.get('*/@@images/*', (req, res) => {
     }
   }
 
-  // Fall back to placeholder SVG
-  const scaleDimensions = {
-    icon: { width: 32, height: 32 },
-    tile: { width: 64, height: 64 },
-    thumb: { width: 128, height: 128 },
-    mini: { width: 200, height: 200 },
-    preview: { width: 400, height: 400 },
-    teaser: { width: 600, height: 600 },
-    large: { width: 800, height: 800 },
-    great: { width: 1200, height: 1200 },
-    huge: { width: 1600, height: 1600 },
-  };
-
-  const { width, height } = scaleDimensions[scale] || scaleDimensions.preview;
-
-  // Generate a simple SVG placeholder image
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-    <rect width="100%" height="100%" fill="#e0e0e0"/>
-    <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="14" fill="#666"
-          text-anchor="middle" dominant-baseline="middle">${width}×${height}</text>
-  </svg>`;
-
-  res.set('Content-Type', 'image/svg+xml');
-  res.send(svg);
+  // No image file found — return 404 (don't hide missing images with placeholders)
+  res.status(404).json({
+    error: { type: 'NotFound', message: `Image not found: ${req.path}` }
+  });
 });
 
 /**
