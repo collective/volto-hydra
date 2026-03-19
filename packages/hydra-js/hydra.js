@@ -5818,7 +5818,6 @@ export class Bridge {
 
     if (
       prevBlockUid !== null &&
-      currBlockUid &&
       prevBlockUid !== currBlockUid &&
       prevBlockElement
     ) {
@@ -6860,6 +6859,18 @@ export class Bridge {
       // Handle SELECT_BLOCK - select a new block from Admin UI
       if (event.data.type === 'SELECT_BLOCK') {
         const { uid } = event.data;
+
+        // Handle deselection: Admin sends uid=null when user clicks "Page"
+        if (!uid) {
+          const prevUid = this.selectedBlockUid;
+          this.selectedBlockUid = null;
+          if (prevUid) {
+            this.deselectBlock(prevUid, null);
+          }
+          // Send BLOCK_SELECTED(null) so Admin knows iframe acknowledged deselection
+          this.sendBlockSelected('adminDeselect', null);
+          return;
+        }
 
         // Check if already selected BEFORE updating selectedBlockUid
         // This prevents ping-pong when Admin echoes back the selection from iframe click
