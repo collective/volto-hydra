@@ -36,8 +36,8 @@
   </div>
 
   <div v-else-if="block['@type'] == 'leadimage'" :data-block-uid="block_uid" class="mb-6">
-    <template v-for="props in [imageProps(data)]">
-      <NuxtImg v-if="props.url" :src="props.url" data-edit-media="preview_image"
+    <template v-for="props in [imageProps({ url: data.image })]">
+      <NuxtImg v-if="props.url" :src="props.url" data-edit-media="/image"
         class="w-full rounded-lg object-cover max-h-96" loading="lazy" decoding="async" />
     </template>
   </div>
@@ -765,13 +765,13 @@
       </div>
       <div v-if="data.event_url" class="flex gap-2">
         <dt class="font-semibold text-gray-600 min-w-24">Website</dt>
-        <dd><a :href="data.event_url" class="text-blue-600 underline">{{ data.event_url }}</a></dd>
+        <dd><a data-edit-link="/event_url" :href="data.event_url" class="text-blue-600 underline">{{ data.event_url }}</a></dd>
       </div>
       <div v-if="data.contact_name || data.contact_email || data.contact_phone" class="flex gap-2">
         <dt class="font-semibold text-gray-600 min-w-24">Contact</dt>
         <dd>
           <span v-if="data.contact_name" data-edit-text="/contact_name">{{ data.contact_name }}</span>
-          <span v-if="data.contact_email"> · <a :href="`mailto:${data.contact_email}`">{{ data.contact_email }}</a></span>
+          <span v-if="data.contact_email"> · <a data-edit-link="/contact_email" :href="`mailto:${data.contact_email}`">{{ data.contact_email }}</a></span>
           <span v-if="data.contact_phone" data-edit-text="/contact_phone"> · {{ data.contact_phone }}</span>
         </dd>
       </div>
