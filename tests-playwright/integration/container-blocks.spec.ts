@@ -3240,7 +3240,7 @@ test.describe('Slider with listing expansion', () => {
     await helper.clickBlockInIframe('gallery-listing');
     await helper.waitForQuantaToolbar('gallery-listing');
     // Click ‹ Listing in sidebar to go up to the Slider level
-    await page.locator('button').filter({ hasText: /^‹.*Listing/ }).click();
+    await page.locator('.parent-nav:has-text("Listing") .nav-back').click();
     await helper.waitForQuantaToolbar('gallery-slider');
     // Select manual-image-1 from the slider's child blocks list
     await page.locator('#sidebar-order .child-block-item').last().click();

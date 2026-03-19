@@ -254,8 +254,8 @@ test.describe('Inline Editing - Clipboard', () => {
     // Verify new blocks are still inside the same column container:
     // Click on the "World" block and check sidebar shows ‹ Column breadcrumb
     await helper.clickBlockByContent('World');
-    const parentButton = page.locator('button').filter({ hasText: /^‹.*Column/ });
-    await expect(parentButton.first()).toBeVisible({ timeout: 5000 });
+    const columnNav = page.locator('.parent-nav:has-text("Column")');
+    await expect(columnNav.first()).toBeVisible({ timeout: 5000 });
   });
 
   test('pasting HTML with table creates table block', async ({ page }) => {

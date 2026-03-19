@@ -732,7 +732,7 @@ test.describe('Frontend-Driven Schema Enhancers', () => {
     await sidebarWrapper.evaluate((el) => el.scrollTo(0, 0));
 
     // Find the Grid section in sidebar (parent block settings)
-    // Look for section with "‹ Grid" nav button
+    // Look for section with "Grid" nav title
     const gridSection = page.locator('.parent-block-section').filter({
       has: page.locator('.parent-nav', { hasText: /Grid/ }),
     }).first();

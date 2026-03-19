@@ -558,7 +558,7 @@ export class AdminUIHelper {
 
     // Wait for parent navigation buttons to appear in sidebar
     // The sidebar needs time to render the block's parent hierarchy
-    const parentButtonLocator = this.page.locator('button').filter({ hasText: /^‹/ });
+    const parentButtonLocator = this.page.locator('.nav-back');
     try {
       await parentButtonLocator.first().waitFor({ state: 'visible', timeout: 5000 });
     } catch {
