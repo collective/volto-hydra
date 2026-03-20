@@ -329,17 +329,18 @@ function formatSearchItem(content, baseUrl) {
     'hasPreviewImage': hasPreviewImage,
     'effective': content.effective || content.created || null,
     'created': content.created || null,
-    // Match real Plone API: image_field and image_scales for all items
-    'image_field': 'image',
-    'image_scales': getPlaceholderImageScales(content.title),
   };
 
-  // For Image content types, use actual image data if available
+  // Only include image_field and image_scales for content that actually has images
   if (content['@type'] === 'Image') {
     const scales = getImageScales(content, baseUrl);
     if (scales) {
+      item.image_field = 'image';
       item.image_scales = scales;
     }
+  } else if (hasPreviewImage) {
+    item.image_field = 'preview_image';
+    item.image_scales = getPlaceholderImageScales(content.title);
   }
 
   return item;
@@ -1888,10 +1889,12 @@ app.get('*/resolveuid/:uid', (req, res) => {
  * otherwise falls back to placeholder SVGs.
  */
 app.get('*/@@images/*', (req, res) => {
-  // Extract content path, field name, and scale from URL
-  // e.g., /images/test-image-1/@@images/image/preview -> contentPath=/images/test-image-1, fieldName=image, scale=preview
-  // e.g., /block/grid-block/@@images/preview_image/large -> fieldName=preview_image, scale=large
-  const pathMatch = req.path.match(/^(.+?)\/@@images\/(\w+)(?:\/(\w+))?$/);
+  // Extract content path and field name from URL. Serves the same image
+  // file regardless of scale — the mock doesn't generate actual scales.
+  // e.g., /images/test-image-1/@@images/image/preview
+  // e.g., /block/grid-block/@@images/preview_image/large
+  // e.g., /concepts/custom-blocks/@@images/image-800-1c983515.svg (listing expansion scale URL)
+  const pathMatch = req.path.match(/^(.+?)\/@@images\/([a-z_]+)/i);
   const contentPath = pathMatch ? pathMatch[1] : '';
   const fieldName = pathMatch ? pathMatch[2] : 'image';
   const scale = pathMatch && pathMatch[3] ? pathMatch[3] : 'preview';
