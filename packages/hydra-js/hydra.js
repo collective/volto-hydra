@@ -4871,7 +4871,7 @@ export class Bridge {
    * using the same readNodeText logic as handleTextChange.
    */
   readFieldValueFromDOM(fieldEl, slateValue) {
-    const clone = JSON.parse(JSON.stringify(slateValue));
+    let result = JSON.parse(JSON.stringify(slateValue));
     const nodeEls = fieldEl.querySelectorAll('[data-node-id]');
     const nodes = fieldEl.hasAttribute('data-node-id')
       ? [fieldEl, ...nodeEls] : [...nodeEls];
@@ -4888,9 +4888,9 @@ export class Bridge {
         .some(child => isValidNodeId(child.getAttribute('data-node-id')));
       if (validChildNodeId) continue;
       const text = this.readNodeText(nodeEl);
-      this.updateJsonNode(clone, nodeId, text);
+      result = this.updateJsonNode(result, nodeId, text);
     }
-    return clone;
+    return result;
   }
 
   /**
@@ -9074,32 +9074,31 @@ export class Bridge {
         log('handleTextChange: nodeId=', nodeId, 'textContent=', textContent, 'closestNode.tagName=', closestNode.tagName);
       }
 
-      // Get block data to support nested blocks
-      const blockData = this.getBlockData(blockUid);
-      if (!blockData) {
+      // Get block data to support nested blocks (returns a reference into formData)
+      const block = this.getBlockData(blockUid);
+      if (!block) {
         log('handleTextChange: blockData not found for', blockUid);
         return;
       }
 
-      const updatedJson = this.updateJsonNode(
-        blockData,
-        nodeId,
-        textContent,
-        childIndex,
-      );
-
-      const currBlock = document.querySelector(
-        `[data-block-uid="${blockUid}"]`,
-      );
-      // Use getBlockData to handle nested blocks - it returns a reference to the actual block
-      const block = this.getBlockData(blockUid);
-      if (block) {
-        // Update the block in place (getBlockData returns a reference)
-        Object.assign(block, updatedJson);
-        // TODO: Re-enable plaintext sync once echo detection is fixed
-        // block.plaintext = this.stripZeroWidthSpaces(currBlock.innerText);
-        log('handleTextChange: updated formData value:', JSON.stringify(block.value));
+      // updateJsonNode returns the same reference if nothing changed (exact match).
+      // Also compare the full field value to catch framework re-render echoes where
+      // childIndex differs from the JSON structure (Vue/React may reorder DOM nodes)
+      // but the text content is actually the same.
+      const valueBefore = JSON.stringify(block[editableField]);
+      const updatedBlock = this.updateJsonNode(block, nodeId, textContent, childIndex);
+      if (updatedBlock === block) {
+        log('handleTextChange: text unchanged (ref), skipping. nodeId=', nodeId);
+        return;
       }
+      if (JSON.stringify(updatedBlock[editableField]) === valueBefore) {
+        log('handleTextChange: text unchanged (deep), skipping. nodeId=', nodeId);
+        return;
+      }
+
+      // Write the new block data into formData
+      Object.assign(block, updatedBlock);
+      log('handleTextChange: updated formData value:', JSON.stringify(block.value));
     } else {
       // Non-Slate field - update field directly with text content
       // Resolve field path to handle /fieldName (page) and ../fieldName (parent) syntax
@@ -9298,18 +9297,26 @@ export class Bridge {
    * @param {Number} childIndex Optional index of child to update (for paragraphs with inline elements)
    * @returns {JSON} Updated JSON object
    */
+  /**
+   * Update a Slate JSON node's text content. Returns a NEW object — never
+   * mutates the input. The caller can compare old vs new to detect no-ops
+   * (e.g. framework re-render echoes) before writing to formData.
+   */
   updateJsonNode(json, nodeId, newText, childIndex = null) {
     if (Array.isArray(json)) {
-      return json.map((item) => this.updateJsonNode(item, nodeId, newText, childIndex));
+      const mapped = json.map((item) => this.updateJsonNode(item, nodeId, newText, childIndex));
+      // Return original array if nothing changed (referential equality check)
+      return mapped.every((item, i) => item === json[i]) ? json : mapped;
     } else if (typeof json === 'object' && json !== null) {
       // Compare nodeIds as strings (path-based IDs like "0", "0.0", etc.)
       if (json.nodeId === nodeId || json.nodeId === String(nodeId)) {
         if (json.hasOwnProperty('text')) {
-          json.text = newText;
+          if (json.text === newText) return json; // No change
+          return { ...json, text: newText };
         } else if (childIndex !== null && json.children) {
-          // Update specific child by index (for typing in paragraphs with inline elements)
           const child = json.children[childIndex];
           if (child && child.hasOwnProperty('text')) {
+            if (child.text === newText) return json; // No change
             // Detect NEW text insertion: after toggling a format off, the browser
             // creates a new text node at the cursor position. The DOM has more
             // children than the JSON. If the existing child's text doesn't match
@@ -9320,36 +9327,51 @@ export class Bridge {
               !oldText.startsWith(newText) &&
               !newText.startsWith(oldText);
             if (isNewInsertion) {
-              json.children.splice(childIndex, 0, { text: newText });
+              const newChildren = [...json.children];
+              newChildren.splice(childIndex, 0, { text: newText });
+              return { ...json, children: newChildren };
             } else {
-              child.text = newText;
+              const newChildren = json.children.map((c, i) =>
+                i === childIndex ? { ...c, text: newText } : c);
+              return { ...json, children: newChildren };
             }
           } else if (child && child.children && child.children[0]) {
             // Child is an inline element, update its first text child
-            child.children[0].text = newText;
+            if (child.children[0].text === newText) return json; // No change
+            const newChild = { ...child, children: [{ ...child.children[0], text: newText }, ...child.children.slice(1)] };
+            const newChildren = json.children.map((c, i) => i === childIndex ? newChild : c);
+            return { ...json, children: newChildren };
           } else if (!child) {
             // Child doesn't exist yet — append new text node
-            json.children.push({ text: newText });
+            return { ...json, children: [...json.children, { text: newText }] };
           }
         } else if (json.children) {
           // Fallback: childIndex is null, updating whole node content
-          // Check if any child has 'type' (inline element like strong, em, link)
           const hasInlineElements = json.children.some(child => child.type);
           if (hasInlineElements) {
             // DOM simplified (inline elements deleted) - collapse to single text node
-            json.children = [{ text: newText }];
+            return { ...json, children: [{ text: newText }] };
           } else {
-            // Simple paragraph - just update first child
-            json.children[0].text = newText;
+            if (json.children[0]?.text === newText) return json; // No change
+            const newChildren = [{ ...json.children[0], text: newText }, ...json.children.slice(1)];
+            return { ...json, children: newChildren };
           }
         }
         return json;
       }
+      // Recurse into child properties
+      let changed = false;
+      const result = {};
       for (const key in json) {
         if (json.hasOwnProperty(key) && key !== 'nodeId' && key !== 'data') {
-          json[key] = this.updateJsonNode(json[key], nodeId, newText, childIndex);
+          const updated = this.updateJsonNode(json[key], nodeId, newText, childIndex);
+          result[key] = updated;
+          if (updated !== json[key]) changed = true;
+        } else {
+          result[key] = json[key];
         }
       }
+      return changed ? result : json;
     }
     return json;
   }

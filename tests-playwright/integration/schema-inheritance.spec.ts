@@ -565,9 +565,7 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
 
     // Count initial facets (wait for async expandListingBlocks to complete)
     const initialFacets = iframe.locator('.facet-item[data-block-uid]');
-    await expect(initialFacets.first()).toBeVisible({ timeout: 10000 });
-    const initialCount = await initialFacets.count();
-    expect(initialCount).toBe(3); // facet-type, facet-state, facet-subject
+    await expect(initialFacets).toHaveCount(3, { timeout: 10000 }); // facet-type, facet-state, facet-subject
 
     // Wait for iframe to finish re-rendering after initial load —
     // expanding facets triggers multiple FORM_DATA updates to iframe.
@@ -693,8 +691,7 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
 
     // Verify the dropdown has the correct options for review_state
     const options = facetDropdown.locator('option');
-    const optionCount = await options.count();
-    expect(optionCount).toBe(4); // Select..., Private, Pending, Published
+    await expect(options).toHaveCount(4, { timeout: 5000 }); // Select..., Private, Pending, Published
 
     // Check specific option values
     await expect(options.nth(0)).toHaveText('Select...');

@@ -564,6 +564,71 @@ test.describe('Bridge.updateJsonNode()', () => {
     expect(result.child3Text).toBe('three four five');
   });
 
+  test('same text returns same reference (no-op detection)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      const input = {
+        '@type': 'slate',
+        value: [{ type: 'p', nodeId: '0', children: [{ text: 'Hello' }] }],
+      };
+      const updated = (window as any).bridge.updateJsonNode(input, '0', 'Hello');
+      return { same: updated === input };
+    });
+
+    // Same text should return the same object reference
+    expect(result.same).toBe(true);
+  });
+
+  test('same text with childIndex returns same reference', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      const input = {
+        '@type': 'slate',
+        value: [{
+          type: 'p', nodeId: '0',
+          children: [
+            { text: 'Hello ' },
+            { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
+            { text: ' world' },
+          ],
+        }],
+      };
+      const updated = (window as any).bridge.updateJsonNode(input, '0', ' world', 2);
+      return { same: updated === input };
+    });
+
+    // Same text at same childIndex should be a no-op
+    expect(result.same).toBe(true);
+  });
+
+  test('different text returns new reference', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      const input = {
+        '@type': 'slate',
+        value: [{ type: 'p', nodeId: '0', children: [{ text: 'Hello' }] }],
+      };
+      const updated = (window as any).bridge.updateJsonNode(input, '0', 'Changed');
+      return {
+        same: updated === input,
+        text: updated.value[0].children[0].text,
+        originalText: input.value[0].children[0].text,
+      };
+    });
+
+    // Different text should return a new object
+    expect(result.same).toBe(false);
+    expect(result.text).toBe('Changed');
+    // Original should be unchanged (immutable)
+    expect(result.originalText).toBe('Hello');
+  });
+
   test('typing after toggling format off inserts new child, does not replace following text', async () => {
     const iframe = helper.getIframe();
     const body = iframe.locator('body');

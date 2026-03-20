@@ -36,8 +36,8 @@
   </div>
 
   <div v-else-if="block['@type'] == 'leadimage'" :data-block-uid="block_uid" class="mb-6">
-    <template v-for="props in [imageProps(data.image)]">
-      <NuxtImg v-if="props.url" :src="props.url" data-edit-media="/image"
+    <template v-for="props in [imageProps(data.image || data.preview_image)]">
+      <NuxtImg v-if="props.url" :src="props.url" :data-edit-media="data.image ? '/image' : '/preview_image'"
         class="w-full rounded-lg object-cover max-h-96" loading="lazy" decoding="async" />
     </template>
   </div>
