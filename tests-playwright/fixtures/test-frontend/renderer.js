@@ -75,6 +75,7 @@ function stripApiOrigin(url) {
  */
 function getImageUrl(value) {
     if (!value) return '';
+    const apiOrigin = window._apiOrigin || '';
 
     // Handle catalog brain format from expandListingBlocks
     // { '@id': '/content-path', image_field: 'image', image_scales: { image: [{ download: '@@images/...' }] } }
@@ -82,19 +83,21 @@ function getImageUrl(value) {
         const field = value.image_field;
         const scales = value.image_scales[field];
         if (scales?.[0]?.download) {
-            // download is relative like "@@images/image-800-hash.svg"
-            // Prepend the content @id to make it absolute
             const baseUrl = value['@id'] || '';
-            return `${baseUrl}/${scales[0].download}`;
+            return `${apiOrigin}${baseUrl}/${scales[0].download}`;
         }
     }
 
     // Extract @id from array or object format
     let url = Array.isArray(value) ? value[0]?.['@id'] : value?.['@id'] || value;
     if (typeof url !== 'string') return '';
-    // Add @@images/image suffix for Plone paths
-    if (url.startsWith('/') && !url.includes('@@images')) {
+    // Add @@images/image suffix for Plone paths that don't already have a scale/download URL
+    if (url.startsWith('/') && !url.includes('@@images') && !url.includes('@@download')) {
         url = `${url}/@@images/image`;
+    }
+    // Prepend API origin so images load from the API server, not the frontend
+    if (url.startsWith('/')) {
+        url = `${apiOrigin}${url}`;
     }
     return url;
 }
@@ -631,7 +634,7 @@ function renderTeaserBlock(block, blockUid) {
         // and conversion cases where block has image data but link target doesn't)
         imageSrc = getImageUrl(block.preview_image);
     } else if (!useBlockData && hrefObj?.hasPreviewImage && hrefObj?.['@id']) {
-        imageSrc = hrefObj['@id'] + '/@@images/preview_image';
+        imageSrc = getImageUrl({ '@id': hrefObj['@id'] + '/@@images/preview_image' });
     }
 
     // Only add data-block-uid if blockUid is provided (not when inside a container that already has it)

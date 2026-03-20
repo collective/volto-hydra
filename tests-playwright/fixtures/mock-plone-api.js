@@ -1927,6 +1927,36 @@ app.get('*/@@images/*', (req, res) => {
   });
 });
 
+// @@download — same as @@images, serves image files from content directories
+app.get('*/@@download/*', (req, res) => {
+  // e.g., /images/quadrant/@@download/image/quadrant.svg -> contentPath=/images/quadrant, fieldName=image
+  const pathMatch = req.path.match(/^(.+?)\/@@download\/(\w+)(?:\/.*)?$/);
+  const contentPath = pathMatch ? pathMatch[1] : '';
+  const fieldName = pathMatch ? pathMatch[2] : 'image';
+
+  const dirInfo = contentDirMap[contentPath];
+  const imageDir = dirInfo ? path.join(dirInfo.dirPath, fieldName) : null;
+
+  if (imageDir && fs.existsSync(imageDir)) {
+    const files = fs.readdirSync(imageDir);
+    if (files.length > 0) {
+      const imageFile = path.join(imageDir, files[0]);
+      const ext = path.extname(files[0]).toLowerCase();
+      const mimeTypes = {
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+        '.gif': 'image/gif', '.svg': 'image/svg+xml', '.webp': 'image/webp',
+      };
+      res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+      res.sendFile(imageFile);
+      return;
+    }
+  }
+
+  res.status(404).json({
+    error: { type: 'NotFound', message: `Download not found: ${req.path}` }
+  });
+});
+
 /**
  * GET /:path
  * Get content by path (API requests only)
