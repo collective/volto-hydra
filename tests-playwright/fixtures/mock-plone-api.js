@@ -731,8 +731,10 @@ function scanContentDir(contentDirPath, mountPath) {
           contentPath = '/';
         }
 
-        // Apply mount prefix
-        const urlPath = mountPath === '/' ? contentPath : mountPath + contentPath;
+        // Apply mount prefix (skip if @id already starts with mountPath)
+        const urlPath = mountPath === '/' || contentPath.startsWith(mountPath)
+          ? contentPath
+          : mountPath + contentPath;
 
         // Only store the directory mapping, content loaded on-demand
         contentDirMap[urlPath] = { dirPath: fullDirPath, dirName: dir.name };

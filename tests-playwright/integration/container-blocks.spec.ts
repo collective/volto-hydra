@@ -3941,10 +3941,15 @@ test.describe('Multi-Container Field Operations', () => {
     await expect(clearButton).toBeVisible({ timeout: 5000 });
     await clearButton.click();
 
-    // Verify the image was cleared - src should change or element should become placeholder
-    await expect(imageElement).not.toHaveAttribute('src', initialSrc!, {
-      timeout: 5000,
-    });
+    // Verify the image was cleared - src should change and empty-image-overlay should appear
+    await expect(async () => {
+      const imgCount = await imageBlock.locator('img').count();
+      if (imgCount === 0) return; // img removed entirely — cleared
+      const src = await imageBlock.locator('img').getAttribute('src');
+      expect(src).not.toBe(initialSrc);
+    }).toPass({ timeout: 5000 });
+    const emptyOverlay = page.locator('.empty-image-overlay');
+    await expect(emptyOverlay).toBeVisible({ timeout: 5000 });
   });
 
   test('creating a new gridBlock shows toolbar and has visible size', async ({
