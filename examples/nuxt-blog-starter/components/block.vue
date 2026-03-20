@@ -1,4 +1,4 @@
-<template>
+<template comments>
   <div v-if="block['@type'] == 'slate'" class="slate-block" :data-block-uid="block_uid" data-edit-text="value">
     <RichText v-for="node in block['value']" :key="node" :node="node" />
   </div>
@@ -50,9 +50,9 @@
     </span>
   </div>
 
-  <!-- Hero block - uses comment syntax for field selectors (tests hydra comment parser) -->
+  <template v-else-if="block['@type'] == 'hero'" comments>
   <!-- hydra edit-text=heading(.hero-heading) edit-text=subheading(.hero-subheading) edit-media=image(.hero-image) edit-text=buttonText(.hero-button) edit-link=buttonLink(.hero-button) -->
-  <div v-else-if="block['@type'] == 'hero'" :data-block-uid="block_uid"
+  <div :data-block-uid="block_uid"
        class="hero-block p-5 bg-gray-100 rounded-lg">
     <!-- Image - uses class for selector, no data-edit-media -->
     <img v-if="block.image" class="hero-image w-full h-auto max-h-64 object-cover mb-4 rounded"
@@ -71,7 +71,7 @@
       {{ block.buttonText }}
     </a>
   </div>
-  <!-- /hydra -->
+  </template>
 
   <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid"
        class="mt-6 mb-6 rounded-lg" :style="gridBgStyle(block)">
