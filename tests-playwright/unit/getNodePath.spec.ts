@@ -225,14 +225,12 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     expect(result.updatedText).toBe('Hello world TYPED');
   });
 
-  test('readFieldValueFromDOM reads correct text through invalid data-node-id spans (Next.js pattern)', async () => {
+  test('readSlateValueFromDOM reads correct text through invalid data-node-id spans (Next.js pattern)', async () => {
     const iframe = helper.getIframe();
     const body = iframe.locator('body');
 
-    // readFieldValueFromDOM uses querySelectorAll('[data-node-id]') to find all nodes.
-    // With invalid spans, it picks them up and tries to use nodeId "undefined".
-    // Worse: the <p> with valid nodeId gets SKIPPED (line 4867) because it contains
-    // a child [data-node-id] (the invalid span). So the paragraph's text is never read.
+    // readSlateValueFromDOM walks the DOM tree. Elements with invalid nodeId
+    // (e.g. "undefined" from Next.js) are treated as text content.
     const result = await body.evaluate(() => {
       const bridge = (window as any).bridge;
 
@@ -248,7 +246,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
         '<p data-node-id="0"><span data-node-id="undefined">Modified text</span></p>';
       document.body.appendChild(container);
 
-      const domValue = bridge.readFieldValueFromDOM(container, slateValue);
+      const domValue = bridge.readSlateValueFromDOM(container, slateValue);
 
       container.remove();
       return {

@@ -4918,7 +4918,8 @@ export class Bridge {
 
     for (const child of el.childNodes) {
       if (child.nodeType === Node.TEXT_NODE) {
-        const text = this.stripZeroWidthSpaces(child.textContent || '');
+        const raw = child.textContent || '';
+        const text = this.stripZeroWidthSpaces(raw);
         children.push({ text });
       } else if (child.nodeType === Node.ELEMENT_NODE) {
         const childNodeId = child.getAttribute('data-node-id');
@@ -4945,15 +4946,28 @@ export class Bridge {
       }
     }
 
+    // Remove whitespace-only text nodes between non-inline elements.
+    // These come from HTML indentation (e.g. newlines between <li> tags)
+    // and are not Slate content. We detect this by checking: if none of
+    // the element children are inline (per the metadata), then any
+    // whitespace-only text is just HTML formatting.
+    const inlineNodeIds = metadataMap._inlineNodeIds || new Set();
+    const hasInlineChild = merged.some(c => c.nodeId && inlineNodeIds.has(c.nodeId));
+    if (!hasInlineChild) {
+      for (let i = merged.length - 1; i >= 0; i--) {
+        if (merged[i].hasOwnProperty('text') && merged[i].text.trim() === '') {
+          merged.splice(i, 1);
+        }
+      }
+    }
+
     // Ensure at least one child (Slate requires non-empty children)
     if (merged.length === 0) {
       merged.push({ text: '' });
     }
 
-    // Slate normalization: inline nodes (identified by _inline in metadata,
-    // meaning they appeared alongside text in the existing Slate value)
-    // must have text nodes before, after, and between them.
-    const inlineNodeIds = metadataMap._inlineNodeIds || new Set();
+    // Slate normalization: inline nodes must have text nodes
+    // before, after, and between them.
     const isInline = (child) => child.nodeId && inlineNodeIds.has(child.nodeId);
     const hasInline = merged.some(isInline);
     if (hasInline) {

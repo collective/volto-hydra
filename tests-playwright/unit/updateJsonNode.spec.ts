@@ -311,6 +311,33 @@ test.describe('Bridge.readSlateValueFromDOM()', () => {
 
   // ── Lists ─────────────────────────────────────────────────────────
 
+  test('whitespace between list items is ignored (HTML indentation)', async () => {
+    const body = helper.getIframe().locator('body');
+    // Nuxt/Vue renders whitespace text nodes between <li> elements
+    // These should not become Slate text children
+    await testDomToSlate(body, {
+      id: 'lw1',
+
+      existing: [{ type: 'ul', children: [
+        { type: 'li', children: [{ text: 'Item 1' }], nodeId: '0.0' },
+        { type: 'li', children: [{ text: 'Item 2' }], nodeId: '0.1' },
+      ], nodeId: '0' }],
+
+      dom:
+        '<div data-edit-text="value">' +
+          '<ul data-node-id="0">\n' +
+          '  <li data-node-id="0.0">Item 1</li>\n' +
+          '  <li data-node-id="0.1">Item 2</li>\n' +
+          '</ul>' +
+        '</div>',
+
+      expected: [{ type: 'ul', children: [
+        { type: 'li', children: [{ text: 'Item 1' }], nodeId: '0.0' },
+        { type: 'li', children: [{ text: 'Item 2' }], nodeId: '0.1' },
+      ], nodeId: '0' }],
+    });
+  });
+
   test('list structure (no normalization needed — children are blocks)', async () => {
     const body = helper.getIframe().locator('body');
     await testDomToSlate(body, {
