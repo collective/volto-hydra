@@ -331,16 +331,18 @@ function formatSearchItem(content, baseUrl) {
     'created': content.created || null,
   };
 
-  // Only include image_field and image_scales for content that actually has images
+  // Match real Plone: always include image_field and image_scales.
+  // With image: image_field='image', image_scales={...}
+  // Without image: image_field='', image_scales=null
   if (content['@type'] === 'Image') {
-    const scales = getImageScales(content, baseUrl);
-    if (scales) {
-      item.image_field = 'image';
-      item.image_scales = scales;
-    }
+    item.image_field = 'image';
+    item.image_scales = getImageScales(content, baseUrl) || getPlaceholderImageScales(content.title);
   } else if (hasPreviewImage) {
     item.image_field = 'preview_image';
     item.image_scales = getPlaceholderImageScales(content.title);
+  } else {
+    item.image_field = '';
+    item.image_scales = null;
   }
 
   return item;
