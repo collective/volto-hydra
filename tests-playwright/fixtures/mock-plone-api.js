@@ -1903,7 +1903,12 @@ app.get('*/@@images/*', (req, res) => {
 
   // Try to serve actual image file from content directory
   // Use contentDirMap to find actual directory for nested paths
-  const dirInfo = contentDirMap[contentPath];
+  // If not found, rescan in case content was added after startup
+  let dirInfo = contentDirMap[contentPath];
+  if (!dirInfo) {
+    initContentDirMap();
+    dirInfo = contentDirMap[contentPath];
+  }
   const imageDir = dirInfo ? path.join(dirInfo.dirPath, fieldName) : null;
 
   if (imageDir && fs.existsSync(imageDir)) {
