@@ -1,12 +1,16 @@
 /**
- * Unit tests for Bridge.updateJsonNode()
- * Tests that updating text in Slate structures doesn't corrupt the structure
+ * Unit tests for Bridge.readSlateValueFromDOM()
+ *
+ * Each test provides three values:
+ *   existing  — the Slate JSON before the DOM change (determines inline metadata)
+ *   dom       — the HTML the frontend rendered
+ *   expected  — the Slate JSON we expect readSlateValueFromDOM to produce
  */
 
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
-test.describe('Bridge.updateJsonNode()', () => {
+test.describe('Bridge.readSlateValueFromDOM()', () => {
   let helper: AdminUIHelper;
 
   test.beforeEach(async ({ page }) => {
@@ -17,24 +21,16 @@ test.describe('Bridge.updateJsonNode()', () => {
     await helper.injectPreserveWhitespaceHelper();
   });
 
-  /**
-   * Helper to validate Slate structure - element nodes should NOT have 'text' property
-   */
+  /** Validate Slate structure — element nodes must not have 'text' property */
   function validateSlateStructure(node: any, path = ''): void {
     if (Array.isArray(node)) {
       node.forEach((child, i) => validateSlateStructure(child, `${path}[${i}]`));
       return;
     }
     if (typeof node !== 'object' || node === null) return;
-
-    // If node has 'type' (element node), it should NOT have 'text'
     if (node.type && Object.prototype.hasOwnProperty.call(node, 'text')) {
-      throw new Error(
-        `Invalid Slate: element node at ${path} has both 'type' and 'text'. Node: ${JSON.stringify(node)}`
-      );
+      throw new Error(`Invalid Slate at ${path}: element has both 'type' and 'text'. ${JSON.stringify(node)}`);
     }
-
-    // Recurse into children
     if (node.children) {
       node.children.forEach((child: any, i: number) =>
         validateSlateStructure(child, `${path}.children[${i}]`)
@@ -42,637 +38,554 @@ test.describe('Bridge.updateJsonNode()', () => {
     }
   }
 
-  test('updates text in simple paragraph', async () => {
-    const iframe = helper.getIframe();
-    const body = iframe.locator('body');
-
-    const result = await body.evaluate(() => {
-      const input = {
-        '@type': 'slate',
-        value: [{ type: 'p', nodeId: '0', children: [{ text: 'Hello' }] }],
-      };
-      return (window as any).bridge.updateJsonNode(input, '0', 'Updated');
-    });
-
-    // Text should be updated on first child
-    expect(result.value[0].children[0].text).toBe('Updated');
-    // Structure should still be valid
-    expect(() => validateSlateStructure(result.value)).not.toThrow();
-  });
-
-  test('updates text in list item - structure remains valid', async () => {
-    const iframe = helper.getIframe();
-    const body = iframe.locator('body');
-
-    const result = await body.evaluate(() => {
-      const input = {
-        '@type': 'slate',
-        value: [
-          {
-            type: 'ul',
-            nodeId: '0',
-            children: [
-              {
-                type: 'li',
-                nodeId: '0.0',
-                children: [
-                  { text: '' },
-                  {
-                    type: 'link',
-                    nodeId: '0.0.1',
-                    data: { url: 'https://example.com' },
-                    children: [{ text: 'NUXT.js Example' }],
-                  },
-                  { text: '' },
-                ],
-              },
-              {
-                type: 'li',
-                nodeId: '0.1',
-                children: [
-                  { text: '' },
-                  {
-                    type: 'link',
-                    nodeId: '0.1.1',
-                    data: { url: 'https://example2.com' },
-                    children: [{ text: 'Framework7 Example' }],
-                  },
-                  { text: '' },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-      return (window as any).bridge.updateJsonNode(
-        JSON.parse(JSON.stringify(input)),
-        '0.0',
-        'New text'
-      );
-    });
-
-    // First li's first child should have updated text
-    expect(result.value[0].children[0].children[0].text).toBe('New text');
-
-    // CRITICAL: li elements should NOT have 'text' property
-    expect(result.value[0].children[0]).not.toHaveProperty('text');
-    expect(result.value[0].children[1]).not.toHaveProperty('text');
-
-    // Full structure validation
-    expect(() => validateSlateStructure(result.value)).not.toThrow();
-  });
-
-  test('updates text in link inside list - structure remains valid', async () => {
-    const iframe = helper.getIframe();
-    const body = iframe.locator('body');
-
-    const result = await body.evaluate(() => {
-      const input = {
-        '@type': 'slate',
-        value: [
-          {
-            type: 'ul',
-            nodeId: '0',
-            children: [
-              {
-                type: 'li',
-                nodeId: '0.0',
-                children: [
-                  { text: '' },
-                  {
-                    type: 'link',
-                    nodeId: '0.0.1',
-                    data: { url: 'https://example.com' },
-                    children: [{ text: 'Original link text' }],
-                  },
-                  { text: '' },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-      return (window as any).bridge.updateJsonNode(
-        JSON.parse(JSON.stringify(input)),
-        '0.0.1',
-        'Updated link text'
-      );
-    });
-
-    // Link's first child should have updated text
-    expect(result.value[0].children[0].children[1].children[0].text).toBe(
-      'Updated link text'
+  /**
+   * Test helper: given existing Slate, a DOM string, and expected output,
+   * verify readSlateValueFromDOM produces the expected result.
+   */
+  async function testDomToSlate(
+    body: any,
+    { id, existing, dom, expected }: {
+      id: string;
+      existing: any[];
+      dom: string;
+      expected: any[];
+    },
+  ) {
+    const htmlWithId = dom.replace('data-edit-text=', `id="${id}" data-edit-text=`);
+    const result = await body.evaluate(
+      (_el: any, json: string) => {
+        const { html, id: elId, existing: existingValue } = JSON.parse(json);
+        const bridge = (window as any).bridge;
+        const fragment = (window as any).preserveWhitespaceDOM(html);
+        document.body.appendChild(fragment);
+        const el = document.getElementById(elId)!;
+        const result = bridge.readSlateValueFromDOM(el, existingValue);
+        el.remove();
+        return result;
+      },
+      JSON.stringify({ html: htmlWithId, id, existing }),
     );
 
-    // CRITICAL: No element should have 'text' property
-    expect(() => validateSlateStructure(result.value)).not.toThrow();
+    expect(result, `readSlateValueFromDOM result`).toEqual(expected);
+    expect(() => validateSlateStructure(result)).not.toThrow();
+  }
+
+  // ── Two valid DOM patterns ────────────────────────────────────────
+
+  test('pattern 1: field and node on same element', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'p1',
+
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: 'Hello ' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
+        { text: ' world' },
+      ]}],
+
+      dom:
+        '<div data-edit-text="value" data-node-id="0">' +
+          'Hello <strong data-node-id="0.1">bold</strong> world' +
+        '</div>',
+
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: 'Hello ' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
+        { text: ' world' },
+      ]}],
+    });
   });
 
-  test('multiple updates preserve structure', async () => {
-    const iframe = helper.getIframe();
-    const body = iframe.locator('body');
+  test('pattern 2: node nested inside field', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'p2',
 
-    const result = await body.evaluate(() => {
-      const input = {
-        '@type': 'slate',
-        value: [
-          {
-            type: 'ul',
-            nodeId: '0',
-            children: [
-              {
-                type: 'li',
-                nodeId: '0.0',
-                children: [{ text: 'Item 1' }],
-              },
-              {
-                type: 'li',
-                nodeId: '0.1',
-                children: [{ text: 'Item 2' }],
-              },
-            ],
-          },
-        ],
-      };
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: 'Hello ' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
+        { text: ' world' },
+      ]}],
 
-      // Update first item
-      let result = (window as any).bridge.updateJsonNode(
-        JSON.parse(JSON.stringify(input)),
-        '0.0',
-        'Updated Item 1'
+      dom:
+        '<div data-edit-text="value">' +
+          '<p data-node-id="0">Hello <strong data-node-id="0.1">bold</strong> world</p>' +
+        '</div>',
+
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: 'Hello ' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
+        { text: ' world' },
+      ]}],
+    });
+  });
+
+  test('both patterns produce identical result', async () => {
+    const body = helper.getIframe().locator('body');
+    const existing = [{ type: 'p', nodeId: '0', children: [
+      { text: 'Hello ' },
+      { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
+      { text: ' world' },
+    ]}];
+
+    const r1 = await body.evaluate((args: any) => {
+      const bridge = (window as any).bridge;
+      const f = (window as any).preserveWhitespaceDOM(
+        '<div id="bp1" data-edit-text="value" data-node-id="0">Hello <strong data-node-id="0.1">bold</strong> world</div>'
       );
+      document.body.appendChild(f);
+      const r = bridge.readSlateValueFromDOM(document.getElementById('bp1')!, args.existing);
+      document.getElementById('bp1')!.remove();
+      return JSON.stringify(r);
+    }, { existing });
 
-      // Update second item
-      result = (window as any).bridge.updateJsonNode(result, '0.1', 'Updated Item 2');
+    const r2 = await body.evaluate((args: any) => {
+      const bridge = (window as any).bridge;
+      const f = (window as any).preserveWhitespaceDOM(
+        '<div id="bp2" data-edit-text="value"><p data-node-id="0">Hello <strong data-node-id="0.1">bold</strong> world</p></div>'
+      );
+      document.body.appendChild(f);
+      const r = bridge.readSlateValueFromDOM(document.getElementById('bp2')!, args.existing);
+      document.getElementById('bp2')!.remove();
+      return JSON.stringify(r);
+    }, { existing });
 
+    expect(r1).toBe(r2);
+  });
+
+  // ── Slate normalization (empty text around inline) ────────────────
+
+  test('DOM without empty text around inline — normalization adds them', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'n1',
+
+      // Existing has empty text around strong (valid Slate)
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
+        { text: '' },
+      ]}],
+
+      // DOM doesn't have empty spans — just the strong
+      dom:
+        '<div data-edit-text="value" data-node-id="0">' +
+          '<strong data-node-id="0.1">bold</strong>' +
+        '</div>',
+
+      // Should still produce empty text nodes around the inline
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
+        { text: '' },
+      ]}],
+    });
+  });
+
+  test('empty text between adjacent inline elements', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'n2',
+
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
+        { text: '' },
+        { type: 'em', nodeId: '0.2', children: [{ text: 'italic' }] },
+        { text: '' },
+      ]}],
+
+      dom:
+        '<div data-edit-text="value" data-node-id="0">' +
+          '<strong data-node-id="0.1">bold</strong>' +
+          '<em data-node-id="0.2">italic</em>' +
+        '</div>',
+
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
+        { text: '' },
+        { type: 'em', nodeId: '0.2', children: [{ text: 'italic' }] },
+        { text: '' },
+      ]}],
+    });
+  });
+
+  test('text before inline — no extra empty text needed', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'n3',
+
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: 'Hello ' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
+        { text: '' },
+      ]}],
+
+      dom:
+        '<div data-edit-text="value" data-node-id="0">' +
+          'Hello <strong data-node-id="0.1">bold</strong>' +
+        '</div>',
+
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: 'Hello ' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
+        { text: '' },
+      ]}],
+    });
+  });
+
+  // ── Basic reading ─────────────────────────────────────────────────
+
+  test('simple paragraph', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'b1',
+
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: 'Hello world' },
+      ]}],
+
+      dom: '<div data-edit-text="value"><p data-node-id="0">Hello world</p></div>',
+
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: 'Hello world' },
+      ]}],
+    });
+  });
+
+  test('updated text', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'b2',
+
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: 'Original' },
+      ]}],
+
+      dom: '<div data-edit-text="value"><p data-node-id="0">Updated text</p></div>',
+
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: 'Updated text' },
+      ]}],
+    });
+  });
+
+  test('unchanged DOM produces identical JSON', async () => {
+    const body = helper.getIframe().locator('body');
+    const existing = [{ type: 'p', nodeId: '0', children: [{ text: 'Same text' }] }];
+
+    await testDomToSlate(body, {
+      id: 'b3',
+      existing,
+      dom: '<div data-edit-text="value"><p data-node-id="0">Same text</p></div>',
+      expected: existing,
+    });
+  });
+
+  // ── Metadata preservation ─────────────────────────────────────────
+
+  test('link data preserved from existing JSON', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'm1',
+
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: 'Text with ' },
+        { type: 'link', nodeId: '0.1', data: { url: 'https://example.com' }, children: [{ text: 'a link' }] },
+        { text: '' },
+      ]}],
+
+      dom:
+        '<div data-edit-text="value">' +
+          '<p data-node-id="0">Text with <a data-node-id="0.1">a link</a></p>' +
+        '</div>',
+
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: 'Text with ' },
+        { type: 'link', nodeId: '0.1', data: { url: 'https://example.com' }, children: [{ text: 'a link' }] },
+        { text: '' },
+      ]}],
+    });
+  });
+
+  // ── Lists ─────────────────────────────────────────────────────────
+
+  test('list structure (no normalization needed — children are blocks)', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'l1',
+
+      existing: [{ type: 'ul', nodeId: '0', children: [
+        { type: 'li', nodeId: '0.0', children: [{ text: 'Item 1' }] },
+        { type: 'li', nodeId: '0.1', children: [{ text: 'Item 2' }] },
+      ]}],
+
+      dom:
+        '<div data-edit-text="value">' +
+          '<ul data-node-id="0">' +
+            '<li data-node-id="0.0">Item 1</li>' +
+            '<li data-node-id="0.1">Item 2</li>' +
+          '</ul>' +
+        '</div>',
+
+      expected: [{ type: 'ul', nodeId: '0', children: [
+        { type: 'li', nodeId: '0.0', children: [{ text: 'Item 1' }] },
+        { type: 'li', nodeId: '0.1', children: [{ text: 'Item 2' }] },
+      ]}],
+    });
+  });
+
+  test('deeply nested list with link — metadata preserved', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'l2',
+
+      existing: [{ type: 'ul', nodeId: '0', children: [
+        { type: 'li', nodeId: '0.0', children: [
+          { text: '' },
+          { type: 'link', nodeId: '0.0.1', data: { url: 'https://example.com' }, children: [{ text: 'Link text' }] },
+          { text: '' },
+        ]},
+      ]}],
+
+      dom:
+        '<div data-edit-text="value">' +
+          '<ul data-node-id="0">' +
+            '<li data-node-id="0.0"><a data-node-id="0.0.1">Link text</a></li>' +
+          '</ul>' +
+        '</div>',
+
+      expected: [{ type: 'ul', nodeId: '0', children: [
+        { type: 'li', nodeId: '0.0', children: [
+          { text: '' },
+          { type: 'link', nodeId: '0.0.1', data: { url: 'https://example.com' }, children: [{ text: 'Link text' }] },
+          { text: '' },
+        ]},
+      ]}],
+    });
+  });
+
+  // ── Format toggle (new text node) ─────────────────────────────────
+
+  test('all text inside single inline element (bold all)', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'f0',
+
+      // User typed "Bold text", selected all, made bold, then typed " more"
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'Bold text' }] },
+        { text: '' },
+      ]}],
+
+      // DOM: everything inside the strong, cursor at end
+      dom:
+        '<div data-edit-text="value" data-node-id="0">' +
+          '<span></span>' +
+          '<span data-node-id="0.1"><span>Bold text more</span></span>' +
+          '<span></span>' +
+        '</div>',
+
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'Bold text more' }] },
+        { text: '' },
+      ]}],
+    });
+  });
+
+  test('new text after toggling format off is captured', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'f1',
+
+      // Before: user had typed "one two [BOLD] three four five"
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: 'one two ' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'BOLD' }] },
+        { text: 'three four five' },
+      ]}],
+
+      // After toggling bold off, user typed " new " — browser merged text nodes
+      dom:
+        '<div data-edit-text="value">' +
+          '<p data-node-id="0">' +
+            'one two <strong data-node-id="0.1">BOLD</strong> new three four five' +
+          '</p>' +
+        '</div>',
+
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: 'one two ' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'BOLD' }] },
+        { text: ' new three four five' },
+      ]}],
+    });
+  });
+
+  // ── Framework re-render echo ──────────────────────────────────────
+
+  test('framework re-render with same content produces identical value', async () => {
+    const body = helper.getIframe().locator('body');
+    const value = [{ type: 'p', nodeId: '0', children: [
+      { text: 'Hello ' },
+      { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
+      { text: ' world' },
+    ]}];
+
+    await testDomToSlate(body, {
+      id: 'e1',
+      existing: value,
+      dom:
+        '<div data-edit-text="value">' +
+          '<p data-node-id="0">Hello <strong data-node-id="0.1">bold</strong> world</p>' +
+        '</div>',
+      expected: value,
+    });
+  });
+
+  // ── Text node merging ─────────────────────────────────────────────
+
+  test('adjacent text nodes from framework splitting are merged', async () => {
+    const body = helper.getIframe().locator('body');
+    // Can't test split text nodes via HTML — use manual DOM creation
+    const result = await body.evaluate(() => {
+      const bridge = (window as any).bridge;
+      const container = document.createElement('div');
+      container.id = 'tm1';
+      container.setAttribute('data-edit-text', 'value');
+      const p = document.createElement('p');
+      p.setAttribute('data-node-id', '0');
+      p.appendChild(document.createTextNode('Hello'));
+      p.appendChild(document.createTextNode(' '));
+      p.appendChild(document.createTextNode('world'));
+      container.appendChild(p);
+      document.body.appendChild(container);
+      const result = bridge.readSlateValueFromDOM(container,
+        [{ type: 'p', nodeId: '0', children: [{ text: 'Hello world' }] }]
+      );
+      container.remove();
       return result;
     });
 
-    // Both items updated
-    expect(result.value[0].children[0].children[0].text).toBe('Updated Item 1');
-    expect(result.value[0].children[1].children[0].text).toBe('Updated Item 2');
-
-    // Structure still valid
-    expect(() => validateSlateStructure(result.value)).not.toThrow();
+    expect(result[0].children).toHaveLength(1);
+    expect(result[0].children[0].text).toBe('Hello world');
   });
 
-  test('non-existent nodeId returns unchanged structure', async () => {
-    const iframe = helper.getIframe();
-    const body = iframe.locator('body');
-
+  test('empty text nodes from Vue are merged with adjacent text', async () => {
+    const body = helper.getIframe().locator('body');
     const result = await body.evaluate(() => {
-      const input = {
-        '@type': 'slate',
-        value: [{ type: 'p', nodeId: '0', children: [{ text: 'Hello' }] }],
-      };
-      return (window as any).bridge.updateJsonNode(
-        JSON.parse(JSON.stringify(input)),
-        'nonexistent',
-        'New text'
+      const bridge = (window as any).bridge;
+      const container = document.createElement('div');
+      container.id = 'tm2';
+      container.setAttribute('data-edit-text', 'value');
+      const p = document.createElement('p');
+      p.setAttribute('data-node-id', '0');
+      p.appendChild(document.createTextNode(''));
+      p.appendChild(document.createTextNode('Real text'));
+      container.appendChild(p);
+      document.body.appendChild(container);
+      const result = bridge.readSlateValueFromDOM(container,
+        [{ type: 'p', nodeId: '0', children: [{ text: 'Real text' }] }]
       );
+      container.remove();
+      return result;
     });
 
-    // Text should be unchanged
-    expect(result.value[0].children[0].text).toBe('Hello');
-    // Structure still valid
-    expect(() => validateSlateStructure(result.value)).not.toThrow();
+    expect(result[0].children).toHaveLength(1);
+    expect(result[0].children[0].text).toBe('Real text');
   });
 
-  test('deeply nested update preserves full structure', async () => {
-    const iframe = helper.getIframe();
-    const body = iframe.locator('body');
+  // ── Invalid nodeId handling ───────────────────────────────────────
 
-    const result = await body.evaluate(() => {
-      const input = {
-        '@type': 'slate',
-        value: [
-          {
-            type: 'ul',
-            nodeId: '0',
-            children: [
-              {
-                type: 'li',
-                nodeId: '0.0',
-                children: [
-                  {
-                    type: 'ul',
-                    nodeId: '0.0.0',
-                    children: [
-                      {
-                        type: 'li',
-                        nodeId: '0.0.0.0',
-                        children: [{ text: 'Nested item' }],
-                      },
-                    ],
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-      return (window as any).bridge.updateJsonNode(
-        JSON.parse(JSON.stringify(input)),
-        '0.0.0.0',
-        'Updated nested'
-      );
+  test('invalid data-node-id elements treated as text (Next.js pattern)', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'i1',
+
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: 'Hello world' },
+      ]}],
+
+      dom:
+        '<div data-edit-text="value">' +
+          '<p data-node-id="0"><span data-node-id="undefined">Hello world</span></p>' +
+        '</div>',
+
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: 'Hello world' },
+      ]}],
     });
-
-    // Deeply nested text updated
-    expect(
-      result.value[0].children[0].children[0].children[0].children[0].text
-    ).toBe('Updated nested');
-
-    // Full structure preserved
-    expect(result.value[0].type).toBe('ul');
-    expect(result.value[0].children[0].type).toBe('li');
-    expect(result.value[0].children[0].children[0].type).toBe('ul');
-
-    // No element has 'text' property
-    expect(() => validateSlateStructure(result.value)).not.toThrow();
   });
 
-  test('updates specific child by index in paragraph with inline elements', async () => {
-    const iframe = helper.getIframe();
-    const body = iframe.locator('body');
+  // ── Mock frontend pattern (span wrappers) ─────────────────────────
 
-    // Simulate typing " normal" after a strong element
-    // DOM: [TEXT "Hello "][STRONG [TEXT "bold"]][TEXT " normal"]
-    // Slate: [{text: "Hello "}, {type: strong, children: [{text: "bold"}]}, {text: ""}]
-    const result = await body.evaluate(() => {
-      const input = {
-        '@type': 'slate',
-        value: [
-          {
-            type: 'p',
-            nodeId: '0',
-            children: [
-              { text: 'Hello ' },
-              {
-                type: 'strong',
-                nodeId: '0.1',
-                children: [{ text: 'bold' }],
-              },
-              { text: '' },
-            ],
-          },
-        ],
-      };
-      // Update child at index 2 (the text node after the strong)
-      return (window as any).bridge.updateJsonNode(
-        JSON.parse(JSON.stringify(input)),
-        '0',
-        ' normal',
-        2 // childIndex
-      );
+  test('span wrappers without nodeId around inline — text preserved', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 's1',
+
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'Bold text' }] },
+        { text: ' more' },
+      ]}],
+
+      // Mock frontend renders empty spans for empty text leaves
+      dom:
+        '<div data-edit-text="value" data-node-id="0">' +
+          '<span></span>' +
+          '<span data-node-id="0.1"><span>Bold text</span></span>' +
+          '<span> more</span>' +
+        '</div>',
+
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'Bold text' }] },
+        { text: ' more' },
+      ]}],
     });
-
-    // First text node should be UNCHANGED
-    expect(result.value[0].children[0].text).toBe('Hello ');
-    // Strong element should be preserved with its text
-    expect(result.value[0].children[1].type).toBe('strong');
-    expect(result.value[0].children[1].children[0].text).toBe('bold');
-    // Third text node (index 2) should have the new text
-    expect(result.value[0].children[2].text).toBe(' normal');
-    // Structure should still be valid
-    expect(() => validateSlateStructure(result.value)).not.toThrow();
   });
 
-  test('updates specific child by index when inline element is at index 0', async () => {
-    const iframe = helper.getIframe();
-    const body = iframe.locator('body');
+  // ── handleTextChange integration ──────────────────────────────────
 
-    // Paragraph starting with bold: [STRONG "Bold"][TEXT " after"]
+  test('handleTextChange skips when DOM matches formData', async () => {
+    const body = helper.getIframe().locator('body');
     const result = await body.evaluate(() => {
-      const input = {
-        '@type': 'slate',
-        value: [
-          {
-            type: 'p',
-            nodeId: '0',
-            children: [
-              {
-                type: 'strong',
-                nodeId: '0.0',
-                children: [{ text: 'Bold' }],
-              },
-              { text: ' after' },
-            ],
-          },
-        ],
-      };
-      // Update child at index 1 (text after strong)
-      return (window as any).bridge.updateJsonNode(
-        JSON.parse(JSON.stringify(input)),
-        '0',
-        ' after typing',
-        1 // childIndex
-      );
-    });
-
-    // Strong element should be unchanged
-    expect(result.value[0].children[0].type).toBe('strong');
-    expect(result.value[0].children[0].children[0].text).toBe('Bold');
-    // Second child should have updated text
-    expect(result.value[0].children[1].text).toBe(' after typing');
-    // Structure should still be valid
-    expect(() => validateSlateStructure(result.value)).not.toThrow();
-  });
-
-  test('childIndex null falls back to updating first child', async () => {
-    const iframe = helper.getIframe();
-    const body = iframe.locator('body');
-
-    // Without childIndex, should use original behavior (update children[0])
-    const result = await body.evaluate(() => {
-      const input = {
-        '@type': 'slate',
-        value: [
-          {
-            type: 'p',
-            nodeId: '0',
-            children: [{ text: 'Hello' }],
-          },
-        ],
-      };
-      // No childIndex - fallback behavior
-      return (window as any).bridge.updateJsonNode(
-        JSON.parse(JSON.stringify(input)),
-        '0',
-        'Updated',
-        null
-      );
-    });
-
-    // First child should be updated (fallback behavior)
-    expect(result.value[0].children[0].text).toBe('Updated');
-    expect(() => validateSlateStructure(result.value)).not.toThrow();
-  });
-
-  test('handleTextChange detects childIndex in Nuxt-style DOM (P without data-edit-text)', async () => {
-    const iframe = helper.getIframe();
-    const body = iframe.locator('body');
-
-    // Simulate Nuxt structure: DIV[data-edit-text] > P[data-node-id] > [text, STRONG, text]
-    // When typing " normal" in the third text node, handleTextChange should detect childIndex=2
-    const result = await body.evaluate(() => {
-      // Create Nuxt-style DOM structure
+      const bridge = (window as any).bridge;
       const fragment = (window as any).preserveWhitespaceDOM(
-        '<div id="test-nuxt-handletext" data-block-uid="test-block" data-edit-text="value">' +
-        '<p data-node-id="0">Hello <strong data-node-id="0.1">bold</strong> normal</p>' +
+        '<div id="ht1" data-block-uid="test-block" data-edit-text="value">' +
+          '<p data-node-id="0">Hello <strong data-node-id="0.1">bold</strong> world</p>' +
         '</div>'
       );
       document.body.appendChild(fragment);
-
-      const container = document.getElementById('test-nuxt-handletext')!;
+      const container = document.getElementById('ht1')!;
       const p = container.querySelector('p')!;
-      const textNodeAfterStrong = p.childNodes[2]; // " normal"
 
-      // Set up bridge with mock block data — use buildBlockPathMap via mock-parent
-      // so resolvedBlockSchema is populated (slate schema is in mockBlocksConfig)
-      const bridge = (window as any).bridge;
-      const testBlock = {
-        '@type': 'slate',
-        value: [
-          {
-            type: 'p',
-            nodeId: '0',
-            children: [
-              { text: 'Hello ' },
-              { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
-              { text: '' }, // Empty initially, will be updated to " normal"
-            ],
-          },
-        ],
-      };
       const mockParent = (window as any).parent.mockParent;
       const formData = mockParent.getFormData();
-      formData.blocks['test-block'] = testBlock;
+      formData.blocks['test-block'] = {
+        '@type': 'slate',
+        // nodeId at end — matches addNodeIds output order
+        value: [{ type: 'p', children: [
+          { text: 'Hello ' },
+          { type: 'strong', children: [{ text: 'bold' }], nodeId: '0.1' },
+          { text: ' world' },
+        ], nodeId: '0' }],
+      };
       formData.blocks_layout.items.push('test-block');
       bridge.formData = formData;
       bridge.blockPathMap = mockParent.buildBlockPathMap();
 
-      // Call handleTextChange simulating a mutation on the text node after strong
-      // This should detect childIndex=2 and update only that child
-      bridge.handleTextChange(container, p, textNodeAfterStrong);
-
-      // Get the updated block data
-      const updatedBlock = bridge.formData.blocks['test-block'];
+      const valueBefore = JSON.stringify(formData.blocks['test-block'].value);
+      bridge.handleTextChange(container, p, p.childNodes[0]);
+      const valueAfter = JSON.stringify(formData.blocks['test-block'].value);
       container.remove();
 
-      return {
-        child0: updatedBlock.value[0].children[0],
-        child1: updatedBlock.value[0].children[1],
-        child2: updatedBlock.value[0].children[2],
-      };
+      return { unchanged: valueBefore === valueAfter };
     });
 
-    // CRITICAL: First text node should be UNCHANGED (not "Hello bold normal")
-    expect(result.child0.text).toBe('Hello ');
-
-    // Strong element should be preserved
-    expect(result.child1.type).toBe('strong');
-    expect(result.child1.children[0].text).toBe('bold');
-
-    // Third text node should have the new text
-    expect(result.child2.text).toBe(' normal');
-  });
-
-  test('collapses children when inline element is deleted from DOM', async () => {
-    const iframe = helper.getIframe();
-    const body = iframe.locator('body');
-
-    // Bug scenario: User deletes "bold text" entirely
-    // Before: "Click on [bold text] to test" -> 3 Slate children
-    // After DOM: "Click on  to test" (single text node, no <strong>)
-    // Slate should collapse to 1 child, not leave stale inline element
-    const result = await body.evaluate(() => {
-      // Slate structure BEFORE deletion
-      const input = {
-        '@type': 'slate',
-        value: [
-          {
-            type: 'p',
-            nodeId: '0',
-            children: [
-              { text: 'Click on ' },
-              { type: 'strong', nodeId: '0.1', children: [{ text: 'bold text' }] },
-              { text: ' to test' },
-            ],
-          },
-        ],
-      };
-
-      // After deletion, DOM has merged text: "Click on  to test"
-      // childIndex=null because DOM no longer has element children
-      // The function should collapse all children to single text node
-      return (window as any).bridge.updateJsonNode(
-        JSON.parse(JSON.stringify(input)),
-        '0',
-        'Click on  to test',
-        null // childIndex is null - DOM simplified
-      );
-    });
-
-    // CRITICAL: Should collapse to single text child, not leave stale inline element
-    expect(result.value[0].children.length).toBe(1);
-    expect(result.value[0].children[0].text).toBe('Click on  to test');
-    // No type property on the text node
-    expect(result.value[0].children[0]).not.toHaveProperty('type');
-    expect(() => validateSlateStructure(result.value)).not.toThrow();
-  });
-
-  test('updating text at childIndex preserves siblings after it', async () => {
-    const iframe = helper.getIframe();
-    const body = iframe.locator('body');
-
-    // Reproduces the prospective formatting bug:
-    // After typing "BOLD" then toggling bold off, the Slate value should be:
-    // ["one two ", {strong: "BOLD"}, "", "three four five"]
-    // Typing " normal " at childIndex 2 should update that child,
-    // NOT remove child 3 ("three four five").
-    const result = await body.evaluate(() => {
-      const bridge = (window as any).bridge;
-      const value = [{
-        type: 'p',
-        children: [
-          { text: 'one two ' },
-          { type: 'strong', children: [{ text: 'BOLD' }], nodeId: '0.1' },
-          { text: '' },
-          { text: 'three four five' },
-        ],
-        nodeId: '0',
-      }];
-
-      const updated = bridge.updateJsonNode(
-        JSON.parse(JSON.stringify(value)),
-        '0',          // nodeId of the paragraph
-        ' normal ',   // new text for child at index 2
-        2             // childIndex
-      );
-
-      return {
-        childCount: updated[0].children.length,
-        child2Text: updated[0].children[2]?.text,
-        child3Text: updated[0].children[3]?.text,
-      };
-    });
-
-    // Child 2 should be updated, child 3 should be preserved
-    expect(result.childCount).toBe(4);
-    expect(result.child2Text).toBe(' normal ');
-    expect(result.child3Text).toBe('three four five');
-  });
-
-  test('same text returns same reference (no-op detection)', async () => {
-    const iframe = helper.getIframe();
-    const body = iframe.locator('body');
-
-    const result = await body.evaluate(() => {
-      const input = {
-        '@type': 'slate',
-        value: [{ type: 'p', nodeId: '0', children: [{ text: 'Hello' }] }],
-      };
-      const updated = (window as any).bridge.updateJsonNode(input, '0', 'Hello');
-      return { same: updated === input };
-    });
-
-    // Same text should return the same object reference
-    expect(result.same).toBe(true);
-  });
-
-  test('same text with childIndex returns same reference', async () => {
-    const iframe = helper.getIframe();
-    const body = iframe.locator('body');
-
-    const result = await body.evaluate(() => {
-      const input = {
-        '@type': 'slate',
-        value: [{
-          type: 'p', nodeId: '0',
-          children: [
-            { text: 'Hello ' },
-            { type: 'strong', nodeId: '0.1', children: [{ text: 'bold' }] },
-            { text: ' world' },
-          ],
-        }],
-      };
-      const updated = (window as any).bridge.updateJsonNode(input, '0', ' world', 2);
-      return { same: updated === input };
-    });
-
-    // Same text at same childIndex should be a no-op
-    expect(result.same).toBe(true);
-  });
-
-  test('different text returns new reference', async () => {
-    const iframe = helper.getIframe();
-    const body = iframe.locator('body');
-
-    const result = await body.evaluate(() => {
-      const input = {
-        '@type': 'slate',
-        value: [{ type: 'p', nodeId: '0', children: [{ text: 'Hello' }] }],
-      };
-      const updated = (window as any).bridge.updateJsonNode(input, '0', 'Changed');
-      return {
-        same: updated === input,
-        text: updated.value[0].children[0].text,
-        originalText: input.value[0].children[0].text,
-      };
-    });
-
-    // Different text should return a new object
-    expect(result.same).toBe(false);
-    expect(result.text).toBe('Changed');
-    // Original should be unchanged (immutable)
-    expect(result.originalText).toBe('Hello');
-  });
-
-  test('typing after toggling format off inserts new child, does not replace following text', async () => {
-    const iframe = helper.getIframe();
-    const body = iframe.locator('body');
-
-    // Reproduces: user types "one two", bolds, types "BOLD", unbolds, types " ".
-    // After first Ctrl+B FORM_DATA, Slate value is:
-    //   ["one two ", {strong: "BOLD"}, "three four five"]
-    // User toggles bold OFF → cursor is between strong and "three four five".
-    // Browser creates a NEW text node at that position.
-    // handleTextChange sees childIndex=2 (from getNodePath), but JSON child[2]
-    // is "three four five". The new text " " should INSERT at index 2,
-    // not REPLACE "three four five".
-    const result = await body.evaluate(() => {
-      const bridge = (window as any).bridge;
-      const value = [{
-        type: 'p',
-        children: [
-          { text: 'one two ' },
-          { type: 'strong', children: [{ text: 'BOLD' }], nodeId: '0.1' },
-          { text: 'three four five' },
-        ],
-        nodeId: '0',
-      }];
-
-      // This is what handleTextChange calls when user types " " at childIndex 2
-      // The DOM has a new text node " " between strong and "three four five",
-      // so getNodePath returns childIndex=2. But JSON child[2] is "three four five".
-      const updated = bridge.updateJsonNode(
-        JSON.parse(JSON.stringify(value)),
-        '0',     // nodeId of the paragraph
-        ' ',     // new text (user typed a space)
-        2        // childIndex from getNodePath
-      );
-
-      return {
-        childCount: updated[0].children.length,
-        child2Text: updated[0].children[2]?.text,
-        child3Text: updated[0].children[3]?.text,
-      };
-    });
-
-    // Should INSERT " " at index 2 and push "three four five" to index 3
-    expect(result.childCount).toBe(4);
-    expect(result.child2Text).toBe(' ');
-    expect(result.child3Text).toBe('three four five');
+    expect(result.unchanged).toBe(true);
   });
 });

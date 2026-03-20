@@ -48,8 +48,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 // handleTextChange
-// handleTextChangeOnSlate
-// updateJsonNode
+// readSlateValueFromDOM
 // findParentWithAttribute
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4859,43 +4858,165 @@ export class Bridge {
 
   /**
    * Read the text content of a data-node-id element from the DOM.
-   * Shared by handleTextChange (single node) and readFieldValueFromDOM (full field).
+   * Shared by handleTextChange (single node) and readSlateValueFromDOM (full field).
    */
   readNodeText(nodeEl) {
     return this.stripZeroWidthSpaces(nodeEl.innerText)?.replace(/\n$/, '');
   }
 
   /**
-   * Read an editable field's current DOM content back as a slate value.
-   * Clones the formData value then updates each node's text from the DOM,
-   * using the same readNodeText logic as handleTextChange.
+   * Build a map of nodeId → metadata from a Slate JSON value.
+   * Metadata is everything except text, children, and nodeId — e.g.
+   * type, data, bold, italic, href, etc. Used by readSlateValueFromDOM
+   * to preserve formatting when reconstructing the value from the DOM.
+   *
+   * Also tracks which nodeIds are inline (appeared alongside text children
+   * in the existing value) in map._inlineNodeIds. This drives Slate
+   * normalization — inline nodes need empty text nodes around them.
    */
-  readFieldValueFromDOM(fieldEl, slateValue) {
-    let result = JSON.parse(JSON.stringify(slateValue));
-    const nodeEls = fieldEl.querySelectorAll('[data-node-id]');
-    const nodes = fieldEl.hasAttribute('data-node-id')
-      ? [fieldEl, ...nodeEls] : [...nodeEls];
-
-    for (const nodeEl of nodes) {
-      const nodeId = nodeEl.getAttribute('data-node-id');
-      // Skip elements with invalid nodeId (e.g. "undefined" from Next.js text leaf spans)
-      if (!isValidNodeId(nodeId)) continue;
-
-      // Skip parent nodes that contain child data-node-id elements with VALID nodeIds —
-      // their innerText includes children's text, which would cause
-      // updateJsonNode to collapse the inline element structure.
-      const validChildNodeId = Array.from(nodeEl.querySelectorAll('[data-node-id]'))
-        .some(child => isValidNodeId(child.getAttribute('data-node-id')));
-      if (validChildNodeId) continue;
-      const text = this.readNodeText(nodeEl);
-      result = this.updateJsonNode(result, nodeId, text);
+  buildNodeMetadataMap(slateValue, map = {}) {
+    if (!map._inlineNodeIds) map._inlineNodeIds = new Set();
+    if (Array.isArray(slateValue)) {
+      for (const item of slateValue) this.buildNodeMetadataMap(item, map);
+    } else if (slateValue && typeof slateValue === 'object') {
+      if (slateValue.nodeId) {
+        const meta = {};
+        for (const key of Object.keys(slateValue)) {
+          if (key !== 'text' && key !== 'children' && key !== 'nodeId') {
+            meta[key] = slateValue[key];
+          }
+        }
+        map[slateValue.nodeId] = meta;
+      }
+      if (slateValue.children) {
+        // Recurse first so child entries exist in the map
+        this.buildNodeMetadataMap(slateValue.children, map);
+        // Detect inline nodeIds: if children mix text and typed nodes,
+        // the typed ones are inline elements in Slate
+        const hasText = slateValue.children.some(c => c.hasOwnProperty('text'));
+        if (hasText) {
+          for (const child of slateValue.children) {
+            if (child.nodeId) {
+              map._inlineNodeIds.add(child.nodeId);
+            }
+          }
+        }
+      }
     }
-    return result;
+    return map;
   }
 
   /**
+   * Convert a DOM element with data-node-id into a Slate JSON node.
+   * Text nodes become {text: "..."}, elements with data-node-id recurse.
+   * Metadata (type, data, marks) comes from the metadataMap, not the DOM.
+   */
+  domNodeToSlate(el, metadataMap) {
+    const nodeId = el.getAttribute('data-node-id');
+    const metadata = (nodeId && metadataMap[nodeId]) || {};
+    const children = [];
+
+    for (const child of el.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const text = this.stripZeroWidthSpaces(child.textContent || '');
+        children.push({ text });
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const childNodeId = child.getAttribute('data-node-id');
+        if (childNodeId && isValidNodeId(childNodeId)) {
+          children.push(this.domNodeToSlate(child, metadataMap));
+        } else {
+          // Element without valid nodeId (e.g. Vue wrapper span, Next.js leaf span)
+          // — treat its text content as a text node, including empty text which
+          // Slate requires around inline elements like strong/link
+          const text = this.stripZeroWidthSpaces(child.textContent || '');
+          children.push({ text });
+        }
+      }
+    }
+
+    // Merge adjacent text nodes (browser/framework may split them)
+    const merged = [];
+    for (const child of children) {
+      const prev = merged[merged.length - 1];
+      if (prev && prev.hasOwnProperty('text') && child.hasOwnProperty('text') && !child.type) {
+        prev.text += child.text;
+      } else {
+        merged.push(child);
+      }
+    }
+
+    // Ensure at least one child (Slate requires non-empty children)
+    if (merged.length === 0) {
+      merged.push({ text: '' });
+    }
+
+    // Slate normalization: inline nodes (identified by _inline in metadata,
+    // meaning they appeared alongside text in the existing Slate value)
+    // must have text nodes before, after, and between them.
+    const inlineNodeIds = metadataMap._inlineNodeIds || new Set();
+    const isInline = (child) => child.nodeId && inlineNodeIds.has(child.nodeId);
+    const hasInline = merged.some(isInline);
+    if (hasInline) {
+      const normalized = [];
+      for (let i = 0; i < merged.length; i++) {
+        const child = merged[i];
+        if (isInline(child)) {
+          const prev = normalized[normalized.length - 1];
+          if (!prev || !prev.hasOwnProperty('text')) {
+            normalized.push({ text: '' });
+          }
+        }
+        normalized.push(child);
+        if (isInline(child)) {
+          const next = merged[i + 1];
+          if (!next || !next.hasOwnProperty('text')) {
+            normalized.push({ text: '' });
+          }
+        }
+      }
+      return { ...metadata, children: normalized, nodeId };
+    }
+
+    return { ...metadata, children: merged, nodeId };
+  }
+
+  /**
+   * Read an editable field's current DOM content as a fresh Slate value.
+   * Walks the DOM tree and builds the value from scratch using nodeIds
+   * for structure and a metadata map for formatting/type info.
+   *
+   * This is the single source of truth for DOM → Slate conversion.
+   * Used by both handleTextChange and waitForContentReady.
+   */
+  readSlateValueFromDOM(fieldEl, existingValue) {
+    const metadataMap = this.buildNodeMetadataMap(existingValue);
+
+    // Two valid DOM patterns:
+    // 1. Field element IS the first node: <div data-edit-text="value" data-node-id="0">...</div>
+    // 2. Nodes nested inside field: <div data-edit-text="value"><p data-node-id="0">...</p></div>
+    // Both produce the same Slate value.
+    const fieldNodeId = fieldEl.getAttribute('data-node-id');
+    if (fieldNodeId && isValidNodeId(fieldNodeId)) {
+      return [this.domNodeToSlate(fieldEl, metadataMap)];
+    }
+
+    const topNodes = [];
+    for (const child of fieldEl.childNodes) {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const nodeId = child.getAttribute('data-node-id');
+        if (nodeId && isValidNodeId(nodeId)) {
+          topNodes.push(this.domNodeToSlate(child, metadataMap));
+        }
+      }
+    }
+
+    return topNodes;
+  }
+
+
+  /**
    * Wait for the rendered DOM to match this.formData for a block's editable fields.
-   * Reads the full contenteditable back via readFieldValueFromDOM and compares
+   * Reads the full contenteditable back via readSlateValueFromDOM and compares
    * against the formData value. Returns immediately when content matches (zero
    * cost on mock); on Nuxt/Vue waits for secondary renders to complete.
    */
@@ -4916,7 +5037,7 @@ export class Bridge {
 
       const expected = JSON.stringify(slateValue);
       for (let retry = 0; retry < maxRetries; retry++) {
-        const domValue = this.readFieldValueFromDOM(fieldEl, slateValue);
+        const domValue = this.readSlateValueFromDOM(fieldEl, slateValue);
         if (JSON.stringify(domValue) === expected) break;
         if (retry === 0) {
           log('waitForContentReady: content mismatch, waiting for render to complete');
@@ -8988,117 +9109,32 @@ export class Bridge {
     // See "Whitespace & ZWS Strategy" for the full ZWS lifecycle.
 
     if (this.fieldTypeIsSlate(fieldType)) {
-      // Slate field - update JSON structure using nodeId
-      // Find the nearest element with a VALID data-node-id by walking UP from the mutation site.
-      // NodeIds are dot-separated integer paths like "0", "0.1", "0.1.2" set by addNodeIds().
-      // Frontends may render invalid values (e.g. Next.js renders data-node-id={node.nodeId}
-      // on text leaves where nodeId is undefined, producing data-node-id="undefined").
-      // Walk up past invalid values to find the real Slate element node.
-      let closestNode = null;
-      if (mutatedNodeParent && isValidNodeId(mutatedNodeParent.getAttribute('data-node-id'))) {
-        closestNode = mutatedNodeParent;
-      } else {
-        let el = mutatedNodeParent || target;
-        while (el && el !== document.body) {
-          if (el.nodeType === Node.ELEMENT_NODE && isValidNodeId(el.getAttribute('data-node-id'))) {
-            closestNode = el;
-            break;
-          }
-          el = el.parentElement;
-        }
-      }
-      if (!closestNode) {
-        log('Slate field but no data-node-id found!');
-        return;
-      }
-
-      const nodeId = closestNode.getAttribute('data-node-id');
-
-      // Check if we're typing in a paragraph that has inline elements
-      // In this case, we need to update the specific text node, not the whole paragraph
-      let textContent;
-      let childIndex = null;
-
-      // Check if closestNode has mixed content (text nodes + element children like STRONG/EM)
-      // If so, we need to track which specific text node was modified, not use full innerText
-      const hasElementChildren = Array.from(closestNode.childNodes).some(n => n.nodeType === Node.ELEMENT_NODE);
-
-      if (mutatedTextNode && closestNode === mutatedNodeParent && hasElementChildren) {
-        // Text node is direct child of element with mixed content
-        // Use getNodePath to get the correct Slate path (handles Vue whitespace nodes)
-        const slatePath = this.getNodePath(mutatedTextNode);
-        if (slatePath && slatePath.length > 1) {
-          // Last element of path is the child index within the parent
-          childIndex = slatePath[slatePath.length - 1];
-
-          // Merge all adjacent text nodes at this position using Range.toString()
-          // This normalizes whitespace correctly and handles Vue/React text node splitting
-          let startNode = mutatedTextNode;
-          let endNode = mutatedTextNode;
-
-          // Walk backwards to find start of this text run (stop at element nodes)
-          while (startNode.previousSibling) {
-            const prev = startNode.previousSibling;
-            if (prev.nodeType === Node.ELEMENT_NODE) break;
-            if (prev.nodeType === Node.TEXT_NODE) {
-              startNode = prev;
-            } else {
-              break;
-            }
-          }
-
-          // Walk forward to find end of this text run (stop at element nodes)
-          while (endNode.nextSibling) {
-            const next = endNode.nextSibling;
-            if (next.nodeType === Node.ELEMENT_NODE) break;
-            if (next.nodeType === Node.TEXT_NODE) {
-              endNode = next;
-            } else {
-              break;
-            }
-          }
-
-          // Use Range to get normalized text content
-          const range = document.createRange();
-          range.setStart(startNode, 0);
-          range.setEnd(endNode, endNode.textContent.length);
-          textContent = this.stripZeroWidthSpaces(range.toString());
-          log('handleTextChange: nodeId=', nodeId, 'childIndex=', childIndex, 'textContent=', textContent, 'closestNode.tagName=', closestNode.tagName);
-        }
-      }
-
-      if (childIndex === null) {
-        // Fallback: update using innerText of the whole node (original behavior)
-        // This handles inline elements (STRONG, EM, etc.) which have their own nodeId
-        textContent = this.readNodeText(closestNode);
-        log('handleTextChange: nodeId=', nodeId, 'textContent=', textContent, 'closestNode.tagName=', closestNode.tagName);
-      }
-
-      // Get block data to support nested blocks (returns a reference into formData)
+      // Read the full Slate value from the DOM and compare to formData.
+      // The DOM is the source of truth for structure (which children exist,
+      // their order, their text). Metadata (type, data, marks) comes from
+      // the existing JSON via a nodeId → metadata map.
       const block = this.getBlockData(blockUid);
-      if (!block) {
-        log('handleTextChange: blockData not found for', blockUid);
+      if (!block || !block[editableField]) {
+        log('handleTextChange: block or field not found for', blockUid, editableField);
         return;
       }
 
-      // updateJsonNode returns the same reference if nothing changed (exact match).
-      // Also compare the full field value to catch framework re-render echoes where
-      // childIndex differs from the JSON structure (Vue/React may reorder DOM nodes)
-      // but the text content is actually the same.
-      const valueBefore = JSON.stringify(block[editableField]);
-      const updatedBlock = this.updateJsonNode(block, nodeId, textContent, childIndex);
-      if (updatedBlock === block) {
-        log('handleTextChange: text unchanged (ref), skipping. nodeId=', nodeId);
-        return;
-      }
-      if (JSON.stringify(updatedBlock[editableField]) === valueBefore) {
-        log('handleTextChange: text unchanged (deep), skipping. nodeId=', nodeId);
+      const freshValue = this.readSlateValueFromDOM(target, block[editableField]);
+
+      const freshStr = JSON.stringify(freshValue);
+      const currentStr = JSON.stringify(block[editableField]);
+
+      if (freshStr === currentStr) {
+        log('handleTextChange: DOM matches formData, skipping');
         return;
       }
 
-      // Write the new block data into formData
-      Object.assign(block, updatedBlock);
-      log('handleTextChange: updated formData value:', JSON.stringify(block.value));
+      // Debug: show full values when they differ
+      log('handleTextChange: DIFF fresh=', freshStr);
+      log('handleTextChange: DIFF current=', currentStr);
+
+      block[editableField] = freshValue;
+      log('handleTextChange: updated', editableField);
     } else {
       // Non-Slate field - update field directly with text content
       // Resolve field path to handle /fieldName (page) and ../fieldName (parent) syntax
@@ -9297,84 +9333,7 @@ export class Bridge {
    * @param {Number} childIndex Optional index of child to update (for paragraphs with inline elements)
    * @returns {JSON} Updated JSON object
    */
-  /**
-   * Update a Slate JSON node's text content. Returns a NEW object — never
-   * mutates the input. The caller can compare old vs new to detect no-ops
-   * (e.g. framework re-render echoes) before writing to formData.
-   */
-  updateJsonNode(json, nodeId, newText, childIndex = null) {
-    if (Array.isArray(json)) {
-      const mapped = json.map((item) => this.updateJsonNode(item, nodeId, newText, childIndex));
-      // Return original array if nothing changed (referential equality check)
-      return mapped.every((item, i) => item === json[i]) ? json : mapped;
-    } else if (typeof json === 'object' && json !== null) {
-      // Compare nodeIds as strings (path-based IDs like "0", "0.0", etc.)
-      if (json.nodeId === nodeId || json.nodeId === String(nodeId)) {
-        if (json.hasOwnProperty('text')) {
-          if (json.text === newText) return json; // No change
-          return { ...json, text: newText };
-        } else if (childIndex !== null && json.children) {
-          const child = json.children[childIndex];
-          if (child && child.hasOwnProperty('text')) {
-            if (child.text === newText) return json; // No change
-            // Detect NEW text insertion: after toggling a format off, the browser
-            // creates a new text node at the cursor position. The DOM has more
-            // children than the JSON. If the existing child's text doesn't match
-            // what we're typing (neither is a prefix of the other) and the old
-            // text is non-empty, we need to INSERT rather than REPLACE.
-            const oldText = child.text;
-            const isNewInsertion = oldText !== '' &&
-              !oldText.startsWith(newText) &&
-              !newText.startsWith(oldText);
-            if (isNewInsertion) {
-              const newChildren = [...json.children];
-              newChildren.splice(childIndex, 0, { text: newText });
-              return { ...json, children: newChildren };
-            } else {
-              const newChildren = json.children.map((c, i) =>
-                i === childIndex ? { ...c, text: newText } : c);
-              return { ...json, children: newChildren };
-            }
-          } else if (child && child.children && child.children[0]) {
-            // Child is an inline element, update its first text child
-            if (child.children[0].text === newText) return json; // No change
-            const newChild = { ...child, children: [{ ...child.children[0], text: newText }, ...child.children.slice(1)] };
-            const newChildren = json.children.map((c, i) => i === childIndex ? newChild : c);
-            return { ...json, children: newChildren };
-          } else if (!child) {
-            // Child doesn't exist yet — append new text node
-            return { ...json, children: [...json.children, { text: newText }] };
-          }
-        } else if (json.children) {
-          // Fallback: childIndex is null, updating whole node content
-          const hasInlineElements = json.children.some(child => child.type);
-          if (hasInlineElements) {
-            // DOM simplified (inline elements deleted) - collapse to single text node
-            return { ...json, children: [{ text: newText }] };
-          } else {
-            if (json.children[0]?.text === newText) return json; // No change
-            const newChildren = [{ ...json.children[0], text: newText }, ...json.children.slice(1)];
-            return { ...json, children: newChildren };
-          }
-        }
-        return json;
-      }
-      // Recurse into child properties
-      let changed = false;
-      const result = {};
-      for (const key in json) {
-        if (json.hasOwnProperty(key) && key !== 'nodeId' && key !== 'data') {
-          const updated = this.updateJsonNode(json[key], nodeId, newText, childIndex);
-          result[key] = updated;
-          if (updated !== json[key]) changed = true;
-        } else {
-          result[key] = json[key];
-        }
-      }
-      return changed ? result : json;
-    }
-    return json;
-  }
+
 
   findParentWithAttribute(node, attribute) {
     while (node && node.nodeType === Node.ELEMENT_NODE) {
