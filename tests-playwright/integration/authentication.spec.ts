@@ -84,10 +84,12 @@ test.describe('Authentication and Access Control', () => {
     await block.waitFor();
     await expect(block).toBeVisible();
 
-    // Verify no auth errors
+    // Verify no auth errors (check visible text, not full body which may
+    // contain UUIDs with "403" substrings in framework metadata)
     const pageContent = await iframe.locator('body').textContent();
     expect(pageContent).not.toContain('Unauthorized');
-    expect(pageContent).not.toContain('403');
+    expect(pageContent).not.toContain('403 Forbidden');
+    expect(pageContent).not.toContain('Access Denied');
   });
 
   test('Authentication token is passed to frontend iframe', async ({ page }) => {
