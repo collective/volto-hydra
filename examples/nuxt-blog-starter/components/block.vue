@@ -26,6 +26,8 @@
       </template>
       <img v-else-if="isInListing" data-edit-media="url" src="/placeholder.svg"
         :alt="block.alt" class="w-full h-48 object-cover rounded bg-gray-200" />
+      <div v-else data-edit-media="url" class="w-full h-48 bg-gray-100 rounded flex items-center justify-center text-gray-400">
+      </div>
     </template>
   </div>
 
