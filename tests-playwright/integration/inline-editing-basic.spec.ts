@@ -75,9 +75,7 @@ test.describe('Inline Editing - Basic', () => {
 
     // Type text at the end
     await editor.pressSequentially('Hello World', { delay: 20 });
-
-    // Wait for debounce (300ms) + buffer
-    await page.waitForTimeout(500);
+    await helper.waitForEditorText(editor, /Hello World/);
 
     // Simple text edits should NOT trigger re-render
     const afterTypingCount = await iframe.locator('#render-counter').textContent();
@@ -110,9 +108,7 @@ test.describe('Inline Editing - Basic', () => {
 
     // Assert cursor is now at position 16 (6 + 10 chars of "Beautiful ")
     await helper.assertCursorAtPosition(editor, 16, blockId);
-
-    // Wait for debounce again
-    await page.waitForTimeout(500);
+    await helper.waitForEditorText(editor, /Hello Beautiful World/);
 
     // Still no re-render
     const finalRenderCount = await iframe.locator('#render-counter').textContent();
@@ -150,9 +146,7 @@ test.describe('Inline Editing - Basic', () => {
 
     // Type some text
     await page.keyboard.type('Hello world');
-
-    // Wait for any potential async re-renders
-    await page.waitForTimeout(300);
+    await helper.waitForEditorText(editor, /Hello world/);
 
     // Check if the element is still the same instance
     const editorAfterType = await helper.getEditorLocator(blockId);
@@ -164,9 +158,7 @@ test.describe('Inline Editing - Basic', () => {
 
     // Type more text
     await page.keyboard.type(' more text');
-
-    // Wait again
-    await page.waitForTimeout(300);
+    await helper.waitForEditorText(editor, /Hello world more text/);
 
     // Verify element is STILL the same instance
     const editorAfterMore = await helper.getEditorLocator(blockId);
@@ -229,26 +221,20 @@ test.describe('Inline Editing - Basic', () => {
 
     const sidebarEditor = helper.getSidebarSlateEditor('value');
 
-    // Type first character - this syncs correctly
+    // Type first character - wait for sidebar sync
     await page.keyboard.type('1');
-    await page.waitForTimeout(500);
-    let iframeText = await helper.getCleanTextContent(editor);
-    expect(iframeText).toBe('This text 1appears after the slider. Click on bold text to test getNodePath.');
-    await expect(sidebarEditor).toHaveText(iframeText, { timeout: 5000 });
+    await helper.waitForEditorText(editor, /This text 1appears/);
+    await expect(sidebarEditor).toContainText('This text 1appears', { timeout: 5000 });
 
-    // Type second character after waiting - THIS FAILS TO SYNC
+    // Type second character
     await page.keyboard.type('2');
-    await page.waitForTimeout(500);
-    iframeText = await helper.getCleanTextContent(editor);
-    expect(iframeText).toBe('This text 12appears after the slider. Click on bold text to test getNodePath.');
-    await expect(sidebarEditor).toHaveText(iframeText, { timeout: 5000 });
+    await helper.waitForEditorText(editor, /This text 12appears/);
+    await expect(sidebarEditor).toContainText('This text 12appears', { timeout: 5000 });
 
     // Type third character
     await page.keyboard.type('3');
-    await page.waitForTimeout(500);
-    iframeText = await helper.getCleanTextContent(editor);
-    expect(iframeText).toBe('This text 123appears after the slider. Click on bold text to test getNodePath.');
-    await expect(sidebarEditor).toHaveText(iframeText, { timeout: 5000 });
+    await helper.waitForEditorText(editor, /This text 123appears/);
+    await expect(sidebarEditor).toContainText('This text 123appears', { timeout: 5000 });
   });
 
   // Typing AFTER an inline format element (bold) works correctly
@@ -273,27 +259,20 @@ test.describe('Inline Editing - Basic', () => {
 
     const sidebarEditor = helper.getSidebarSlateEditor('value');
 
-    // Type first character
+    // Type first character — wait for iframe and sidebar sync
     await page.keyboard.type('1');
-    await page.waitForTimeout(500);
-    let iframeText = await helper.getCleanTextContent(editor);
-    // Use regex to be flexible with whitespace around the inserted "1"
-    expect(iframeText).toMatch(/bold text\s*1\s*to test/);
-    await expect(sidebarEditor).toHaveText(iframeText, { timeout: 5000 });
+    await helper.waitForEditorText(editor, /bold text\s*1\s*to test/);
+    await expect(sidebarEditor).toContainText('1', { timeout: 5000 });
 
-    // Type second character after waiting - this works!
+    // Type second character
     await page.keyboard.type('2');
-    await page.waitForTimeout(500);
-    iframeText = await helper.getCleanTextContent(editor);
-    expect(iframeText).toMatch(/bold text\s*12\s*to test/);
-    await expect(sidebarEditor).toHaveText(iframeText, { timeout: 5000 });
+    await helper.waitForEditorText(editor, /bold text\s*12\s*to test/);
+    await expect(sidebarEditor).toContainText('12', { timeout: 5000 });
 
     // Type third character
     await page.keyboard.type('3');
-    await page.waitForTimeout(500);
-    iframeText = await helper.getCleanTextContent(editor);
-    expect(iframeText).toMatch(/bold text\s*123\s*to test/);
-    await expect(sidebarEditor).toHaveText(iframeText, { timeout: 5000 });
+    await helper.waitForEditorText(editor, /bold text\s*123\s*to test/);
+    await expect(sidebarEditor).toContainText('123', { timeout: 5000 });
   });
 
   test('deleting formatted text syncs to sidebar', async ({ page }) => {
@@ -323,13 +302,14 @@ test.describe('Inline Editing - Basic', () => {
     const selectionInfo = await helper.assertTextSelection(editor, 'bold text');
     expect(selectionInfo.selectedText).toBe('bold text');
 
-    // Delete
+    // Delete and wait for sync
     await page.keyboard.press('Backspace');
-    await page.waitForTimeout(500);
 
     // Verify iframe no longer has bold text
-    const iframeText = await helper.getCleanTextContent(editor);
-    expect(iframeText).not.toContain('bold text');
+    await expect(async () => {
+      const text = await helper.getCleanTextContent(editor);
+      expect(text).not.toContain('bold text');
+    }).toPass({ timeout: 5000 });
 
     // Verify sidebar synced
     await expect(sidebarEditor).not.toContainText('bold text', { timeout: 5000 });
@@ -437,7 +417,7 @@ test.describe('Inline Editing - Basic', () => {
     // Type in the new block - need to use newEditor.pressSequentially for iframe content
     await newEditor.click();
     await newEditor.pressSequentially('Second line', { delay: 10 });
-    await page.waitForTimeout(200);
+    await helper.waitForEditorText(newEditor, /Second line/);
 
     // Verify the new block contains 'Second line'
     const newBlockText = await newBlock.textContent();
@@ -535,13 +515,8 @@ test.describe('Inline Editing - Basic', () => {
     await valueField.click();
     await valueField.fill('Edited from sidebar');
 
-    // Wait for changes to sync to iframe
-    await page.waitForTimeout(500);
-
     // Verify the text updated in the iframe
-    const updatedText = await iframeBlock.textContent();
-    expect(updatedText).toContain('Edited from sidebar');
-    expect(updatedText).not.toBe(originalText);
+    await expect(iframeBlock).toContainText('Edited from sidebar', { timeout: 5000 });
   });
 
   // BUG: Selecting in iframe, then applying format from sidebar causes path error
@@ -662,11 +637,11 @@ test.describe('Inline Editing - Basic', () => {
     await page.mouse.up();
 
     // Wait for selection to stabilize
-    await page.waitForTimeout(100);
-
     // Verify some text is selected (exact text depends on font metrics)
-    const selectionInfo = await helper.getSelectionInfo(editor);
-    expect(selectionInfo.isCollapsed).toBe(false);
+    await expect(async () => {
+      const selectionInfo = await helper.getSelectionInfo(editor);
+      expect(selectionInfo.isCollapsed).toBe(false);
+    }).toPass({ timeout: 2000 });
 
     // The selected text should start with "Hello" or be a subset
     const selectedText = await editor.evaluate(() => {
@@ -701,18 +676,13 @@ test.describe('Inline Editing - Basic', () => {
 
     await page.mouse.dblclick(clickX, clickY);
 
-    // Wait for selection to stabilize
-    await page.waitForTimeout(100);
-
     // Verify "beautiful" is selected
-    const selectionInfo = await helper.getSelectionInfo(editor);
-    expect(selectionInfo.isCollapsed).toBe(false);
-
-    // Get the selected text
-    const selectedText = await editor.evaluate(() => {
-      return window.getSelection()?.toString() || '';
-    });
-    expect(selectedText).toBe('beautiful');
+    await expect(async () => {
+      const selectedText = await editor.evaluate(() => {
+        return window.getSelection()?.toString() || '';
+      });
+      expect(selectedText).toBe('beautiful');
+    }).toPass({ timeout: 2000 });
   });
 
   test('triple click selects entire paragraph', async ({ page }) => {
@@ -732,18 +702,13 @@ test.describe('Inline Editing - Basic', () => {
     // Triple click to select entire paragraph
     await editor.click({ clickCount: 3 });
 
-    // Wait for selection to stabilize
-    await page.waitForTimeout(100);
-
     // Verify entire text is selected
-    const selectionInfo = await helper.getSelectionInfo(editor);
-    expect(selectionInfo.isCollapsed).toBe(false);
-
-    // Get the selected text
-    const selectedText = await editor.evaluate(() => {
-      return window.getSelection()?.toString() || '';
-    });
-    expect(selectedText).toBe('Hello beautiful world');
+    await expect(async () => {
+      const selectedText = await editor.evaluate(() => {
+        return window.getSelection()?.toString() || '';
+      });
+      expect(selectedText).toBe('Hello beautiful world');
+    }).toPass({ timeout: 2000 });
   });
 
   // Home key is handled via selection.modify('move','backward','lineboundary')
@@ -810,9 +775,6 @@ test.describe('Inline Editing - Basic', () => {
       await page.keyboard.press('Shift+ArrowLeft');
     }
 
-    // Wait for selection to stabilize
-    await page.waitForTimeout(200);
-
     // Verify "test" is selected before formatting
     await helper.verifySelectionMatches(editor, 'test');
     console.log('[TEST] Selection verified before bold: "test"');
@@ -862,9 +824,7 @@ test.describe('Inline Editing - Basic', () => {
     const editor = await helper.enterEditMode(blockId);
     await helper.selectAllTextInEditor(editor);
     await editor.press('Backspace');
-
-    // Wait for the content to be cleared
-    await page.waitForTimeout(200);
+    await helper.waitForEditorText(editor, /^$/);
 
     // Click on a different block to deselect the empty block
     await helper.clickBlockInIframe('block-2-uuid');
@@ -1040,7 +1000,6 @@ test.describe('Inline Editing - Basic', () => {
     await newEditor.pressSequentially('Hello World', { delay: 10 });
 
     // Wait for text to appear in iframe
-    await page.waitForTimeout(200);
     const newBlock = iframe.locator(`[data-block-uid="${newBlockUid}"]`);
     await expect(newBlock).toContainText('Hello World', { timeout: 5000 });
 
