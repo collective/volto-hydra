@@ -451,21 +451,21 @@ test.describe('Image upload and drag-drop', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Click the hero block to select it
+    // Click the hero block's image to select it and trigger the media overlay
     const iframe = helper.getIframe();
     const heroBlock = iframe.locator('[data-block-uid="block-4-hero"]');
-    await expect(heroBlock).toBeVisible();
-    await heroBlock.click();
+    const heroImage = heroBlock.locator('[data-edit-media="image"]');
+    await expect(heroImage).toBeVisible();
+    await heroImage.click();
 
-    // Wait for clear button to appear (in sidebar)
+    // Wait for clear button to appear and be stable before clicking
     const clearButton = page.locator('button[aria-label="Clear image"]');
     await expect(clearButton).toBeVisible({ timeout: 5000 });
+    await expect(clearButton).toBeEnabled();
 
     // Track image src to detect when it's cleared
-    const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     const initialSrc = await heroImage.getAttribute('src');
-    // Force click in case the button position is awkward
-    await clearButton.click({ force: true });
+    await clearButton.click();
 
     // Wait for image to be cleared
     if (initialSrc) {

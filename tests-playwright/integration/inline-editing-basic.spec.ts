@@ -348,16 +348,15 @@ test.describe('Inline Editing - Basic', () => {
     await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('First', { delay: 10 });
 
-    // Wait for text batch to be sent (300ms debounce + buffer)
-    await page.waitForTimeout(400);
+    // Wait for "First" to sync to sidebar — this ensures the undo snapshot
+    // is committed before we type more text
+    await helper.openSidebarTab('Block');
+    await helper.waitForFieldValueToBe('value', 'First');
 
     // Type more text - this will be a separate undo snapshot
     await editor.pressSequentially(' Second', { delay: 10 });
-    let text = await helper.getCleanTextContent(editor);
-    expect(text).toBe('First Second');
 
-    // Wait for text to sync to sidebar (300ms debounce + render)
-    await helper.openSidebarTab('Block');
+    // Wait for "First Second" to sync to sidebar before undoing
     await helper.waitForFieldValueToBe('value', 'First Second');
 
     // Undo - should remove " Second"
