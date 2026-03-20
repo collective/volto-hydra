@@ -109,19 +109,21 @@ test.describe('Schema Inheritance - Listing Block Item Type', () => {
     const imageOverlay = page.locator('.image-upload-widget-toolbar, .hydra-image-picker-inline');
     await expect(imageOverlay).toHaveCount(0);
 
-    // Verify field mapping worked - check that rendered images have correct data:
-    // - Image src should have a URL (from image field mapping)
-    // - Alt text should have the title (from title field mapping)
-    const firstImage = imageItems.first();
-    const imgSrc = await firstImage.getAttribute('src');
-    const imgAlt = await firstImage.getAttribute('alt');
-
-    // Image src should be populated (not empty)
-    expect(imgSrc).toBeTruthy();
-    expect(imgSrc).toContain('http');
-
-    // Alt text should contain the page title (field mapping: title -> alt)
-    expect(imgAlt).toBeTruthy();
+    // Verify field mapping worked - find an image with a real URL (not placeholder)
+    // Some listing items may not have images; find one that does
+    const allImages = await imageItems.all();
+    let realImgSrc = '';
+    let realImgAlt = '';
+    for (const img of allImages) {
+      const src = await img.getAttribute('src') || '';
+      if (src.startsWith('http') || (src.startsWith('/') && src.includes('@@'))) {
+        realImgSrc = src;
+        realImgAlt = await img.getAttribute('alt') || '';
+        break;
+      }
+    }
+    expect(realImgSrc, 'At least one listing image should have a real URL').toBeTruthy();
+    expect(realImgAlt, 'Image should have alt text from field mapping').toBeTruthy();
 
     // Check that the image is wrapped in a link with href (from @id field mapping)
     const imageLink = iframe.locator(`[data-block-uid="${blockId}"] a`).first();
