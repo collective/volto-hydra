@@ -529,7 +529,12 @@ function generateComponents(urlPath, baseUrl) {
 function resolveUidUrls(obj) {
   if (typeof obj === 'string') {
     return obj.replace(/(?:\.\.\/)*resolveuid\/([a-z0-9][-a-z0-9]*)/g, (match, uid) => {
-      const resolvedPath = uidToPathMap[uid];
+      let resolvedPath = uidToPathMap[uid];
+      if (!resolvedPath) {
+        // UID not found — rescan content dirs in case new files were added
+        initContentDirMap();
+        resolvedPath = uidToPathMap[uid];
+      }
       if (!resolvedPath) return match;
       return `http://localhost:${PORT}${resolvedPath}`;
     });

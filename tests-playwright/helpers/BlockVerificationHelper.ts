@@ -182,6 +182,19 @@ export async function checkEditAnnotations(
   );
   expect(imagesWithout, 'All images should have data-edit-media').toEqual([]);
 
+  // All images must have a non-empty src and not be broken (naturalWidth > 0)
+  const brokenImages = await block.locator('img').evaluateAll(
+    (els: Element[]) => (els as HTMLImageElement[])
+      .filter(el => {
+        const src = el.getAttribute('src') || '';
+        if (!src) return true;  // empty src
+        if (el.complete && el.naturalWidth === 0) return true;  // loaded but broken
+        return false;
+      })
+      .map(el => el.getAttribute('src') || '(empty)'),
+  );
+  expect(brokenImages, 'All images should have valid src and load successfully').toEqual([]);
+
   // Simple string fields in block data must appear with data-edit-text
   if (blockData) {
     const TEXT_FIELDS = ['title', 'heading', 'description', 'head_title', 'label'];

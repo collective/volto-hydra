@@ -775,6 +775,7 @@
     // Make mock parent available to tests
     window.mockParent = {
       getFormData: () => mockFormData,
+      getBlocksConfig: () => mockBlocksConfig,
       getBlock: (blockId) => mockFormData.blocks[blockId],
       buildBlockPathMap: () => buildBlockPathMap(mockFormData, mockBlocksConfig),
       setTransformDelay: (delay) => { window.mockTransformDelay = delay; },
