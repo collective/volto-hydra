@@ -282,23 +282,23 @@ function getPlaceholderImageScales(title, fieldName = 'image') {
   return {
     [fieldName]: [{
       'content-type': 'image/svg+xml',
-      'download': `@@images/image-800-${hash}.svg`,
+      'download': `@@images/${fieldName}-800-${hash}.svg`,
       'filename': 'placeholder.svg',
       'height': 600,
       'width': 800,
       'scales': {
         'preview': {
-          'download': `@@images/image/preview`,
+          'download': `@@images/${fieldName}/preview`,
           'height': 300,
           'width': 400,
         },
         'mini': {
-          'download': `@@images/image/mini`,
+          'download': `@@images/${fieldName}/mini`,
           'height': 150,
           'width': 200,
         },
         'thumb': {
-          'download': `@@images/image/thumb`,
+          'download': `@@images/${fieldName}/thumb`,
           'height': 96,
           'width': 128,
         },
@@ -339,7 +339,7 @@ function formatSearchItem(content, baseUrl) {
     item.image_scales = getImageScales(content, baseUrl) || getPlaceholderImageScales(content.title);
   } else if (hasPreviewImage) {
     item.image_field = 'preview_image';
-    item.image_scales = getPlaceholderImageScales(content.title);
+    item.image_scales = getPlaceholderImageScales(content.title, 'preview_image');
   } else {
     item.image_field = '';
     item.image_scales = null;
@@ -1896,9 +1896,12 @@ app.get('*/@@images/*', (req, res) => {
   // e.g., /images/test-image-1/@@images/image/preview
   // e.g., /block/grid-block/@@images/preview_image/large
   // e.g., /concepts/custom-blocks/@@images/image-800-1c983515.svg (listing expansion scale URL)
-  const pathMatch = req.path.match(/^(.+?)\/@@images\/([a-z_]+)/i);
+  // Match field name which may include hash suffix: image-800-1c983515.svg
+  const pathMatch = req.path.match(/^(.+?)\/@@images\/([a-z_]+(?:-[\w.-]+)?)/i);
   const contentPath = pathMatch ? pathMatch[1] : '';
-  const fieldName = pathMatch ? pathMatch[2] : 'image';
+  // Strip hash suffix from field name (e.g., 'image-800-1c983515.svg' → 'image')
+  const rawField = pathMatch ? pathMatch[2] : 'image';
+  const fieldName = rawField.replace(/-\d+.*$/, '');
   const scale = pathMatch && pathMatch[3] ? pathMatch[3] : 'preview';
 
   // Try to serve actual image file from content directory

@@ -71,7 +71,7 @@
 {:else if block['@type'] === 'summary' || block['@type'] === 'default'}
   <div data-block-uid={block['@uid']} class="listing-item">
     {#if block.image}
-      <img data-edit-media="image" src={getImageUrl(block.image)} alt="" />
+      {#if getImageUrl(block.image)}<img data-edit-media="image" src={getImageUrl(block.image)} alt="" />{/if}
     {/if}
     {#if block.date}<time style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">{new Date(block.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</time>{/if}
     <h4><a href={contentPath(block.href)} data-edit-link="href">{block.title}</a></h4>

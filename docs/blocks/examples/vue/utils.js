@@ -1,5 +1,5 @@
 /**
- * Shared utilities for Vue doc example components.
+ * Shared utilities for React doc example components.
  */
 
 /**
@@ -17,9 +17,13 @@ export function getImageUrl(value) {
     const scales = value.image_scales[field];
     if (scales?.[0]?.download) {
       const baseUrl = value['@id'] || '';
-      return `${apiUrl}${baseUrl}/${scales[0].download}`;
+      const prefix = baseUrl.startsWith('http') ? '' : apiUrl;
+      return `${prefix}${baseUrl}/${scales[0].download}`;
     }
   }
+
+  // No image data (catalog brain without image_scales) — return empty
+  if (value.image_scales === null || value.image_field === '') return '';
 
   // Extract URL from various formats
   let url = Array.isArray(value) ? value[0]?.['@id'] : value?.['@id'] || value;
