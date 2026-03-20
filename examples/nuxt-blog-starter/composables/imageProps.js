@@ -60,6 +60,9 @@ export default function imageProps(block, bgStyles=false, imageField='image') {
             if (scales?.[0]?.download) {
                 image_url = `${urlValue['@id'] || ''}/${scales[0].download}`;
             }
+        } else if (!urlValue?.image_scales || !urlValue?.image_field) {
+            // No image data — return null (listing placeholder handled by isInListing in template)
+            return { url: null, class: bg_class };
         } else if (urlValue?.['@id']) {
             // Simple object with @id
             image_url = urlValue['@id'];
@@ -87,7 +90,7 @@ export default function imageProps(block, bgStyles=false, imageField='image') {
     var width = block?.width;
     const field = block?.image_field ? block.image_field : null;
 
-    if (block?.image_scales && block?.image_field) {
+    if (block?.image_scales && block?.image_field && block.image_scales[block.image_field]?.[0]) {
         const field = block.image_field;
         srcset = Object.keys(block.image_scales[field][0].scales).map((name) => {
             const scale = block.image_scales[field][0].scales[name];

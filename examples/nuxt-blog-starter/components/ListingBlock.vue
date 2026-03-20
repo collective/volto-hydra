@@ -61,13 +61,12 @@ const result = await fetchListing(route.query);
 const items = ref(result.items);
 if (paging) Object.assign(paging, result.paging);
 
-// Re-fetch when route query changes (e.g. header search on search page).
-// No mutation dance needed — expandListingBlocks returns a fresh paging object.
-watch(() => route.query, async (newQuery) => {
+// Re-fetch when route query or block data changes (e.g. variation change from sidebar).
+watch([() => route.query, () => props.block], async ([newQuery]) => {
   const result = await fetchListing(newQuery);
   items.value = result.items;
   if (paging) Object.assign(paging, result.paging);
-});
+}, { deep: false });
 
 // Build paging URL for own paging (per-listing)
 let contextPath = props.contextPath;

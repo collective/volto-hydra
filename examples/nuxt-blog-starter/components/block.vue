@@ -15,24 +15,18 @@
      data-edit-text="/description"
      class="text-lg text-gray-500 mb-6">{{ data.description }}</p>
 
-  <div v-else-if="block['@type'] == 'image' && contained" :data-block-uid="block_uid">
-    <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-edit-link="href">
-      <NuxtImg v-for="props in [imageProps(block)]" data-edit-media="url" :src="props.url" :width="props.width"
-        :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
-    </a>
-    <NuxtImg v-else v-for="props in [imageProps(block)]" data-edit-media="url" data-edit-link="href" :src="props.url" :width="props.width"
-      :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
-  </div>
-  <div v-else-if="block['@type'] == 'image' && !contained" :data-block-uid="block_uid"
-       :class="['image-size-' + (block.size || 'l'), 'image-align-' + (block.align || 'center')]">
-    <figure>
-      <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-edit-link="href">
-        <NuxtImg v-for="props in [imageProps(block)]" data-edit-media="url" :src="props.url" _width="props.width"
-          :alt="block.alt" />
-      </a>
-      <NuxtImg v-else v-for="props in [imageProps(block)]" data-edit-media="url" data-edit-link="href" :src="props.url" _width="props.width"
-        :alt="block.alt" />
-    </figure>
+  <div v-else-if="block['@type'] == 'image'" :data-block-uid="block_uid"
+       :class="!contained && ['image-size-' + (block.size || 'l'), 'image-align-' + (block.align || 'center')]">
+    <template v-for="props in [imageProps(block)]">
+      <template v-if="props.url">
+        <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-edit-link="href">
+          <NuxtImg data-edit-media="url" :src="props.url" :width="props.width" :alt="block.alt" />
+        </a>
+        <NuxtImg v-else data-edit-media="url" data-edit-link="href" :src="props.url" :width="props.width" :alt="block.alt" />
+      </template>
+      <img v-else-if="isInListing" data-edit-media="url" src="/placeholder.svg"
+        :alt="block.alt" class="w-full h-48 object-cover rounded bg-gray-200" />
+    </template>
   </div>
 
   <div v-else-if="block['@type'] == 'leadimage'" :data-block-uid="block_uid" class="mb-6">
@@ -84,7 +78,7 @@
             <template #default="{ items }">
               <template v-for="item in items" :key="item['@uid']">
                 <template v-if="item.readOnly"><!-- hydra block-readonly --></template>
-                <Block :block_uid="item['@uid']" :block="item" :data="data" :contained="true"
+                <Block :block_uid="item['@uid']" :block="item" :data="data" :contained="true" :is-in-listing="true"
                        class="grid-cell p-4"
                        :style="!block.styles?.backgroundColor ? { backgroundColor: '#f1f5f9' } : {}" />
               </template>
@@ -188,7 +182,7 @@
                     :class="slideClasses(slideOffset(entryIdx) + itemIdx)"
                     :data-block-uid="item['@uid']" data-block-readonly
                     data-carousel-item data-block-add="right">
-                    <Block :block_uid="undefined" :block="item" :data="data" :contained="true" />
+                    <Block :block_uid="undefined" :block="item" :data="data" :contained="true" :is-in-listing="true" />
                   </div>
                 </template>
               </template>
@@ -289,7 +283,7 @@
       <template #default="{ items }">
         <template v-for="item in items" :key="item['@uid']">
           <template v-if="item.readOnly"><!-- hydra block-readonly --></template>
-          <Block :block_uid="item['@uid']" :block="item" :data="data" :contained="contained" />
+          <Block :block_uid="item['@uid']" :block="item" :data="data" :contained="contained" :is-in-listing="true" />
         </template>
       </template>
     </ListingBlock>
@@ -847,11 +841,17 @@ const props = defineProps({
   paging: {
     type: Object,
     default: null,
+  },
+  isInListing: {
+    type: Boolean,
+    default: false,
   }
 });
 
 // Use toRefs to maintain reactivity (destructuring props directly can lose reactivity in Vue 3)
-const { block_uid, block, data, contained, apiUrl } = toRefs(props);
+const { block_uid, block, data, contained, apiUrl, isInListing } = toRefs(props);
+
+const placeholderImage = '/placeholder.svg';
 
 
 // Use prop apiUrl if provided, otherwise injected value
