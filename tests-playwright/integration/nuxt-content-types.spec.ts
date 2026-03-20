@@ -137,8 +137,8 @@ test.describe('News Item content type', () => {
     const leadimage = iframe.locator('[data-block-uid="ni-leadimage-1"]');
     await expect(leadimage).toBeVisible({ timeout: 10000 });
 
-    // Image should have data-edit-media="preview_image"
-    const img = leadimage.locator('[data-edit-media="preview_image"]');
+    // Image should have data-edit-media="/preview_image" (content-type level field)
+    const img = leadimage.locator('[data-edit-media="/preview_image"]');
     await expect(img).toBeVisible();
 
     // Click the image — should show toolbar with image button
