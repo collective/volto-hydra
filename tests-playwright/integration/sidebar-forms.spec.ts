@@ -311,18 +311,17 @@ test.describe('Sidebar Forms - Image Block Fields', () => {
     // Type one character - this triggers form data update which syncs to iframe
     await page.keyboard.type('x');
 
-    // Wait for the async round-trip that causes the bug
-    await page.waitForTimeout(2000);
-
-    // Check if focus moved to iframe (the bug) or stayed in sidebar (correct)
-    const focusLocation = await page.evaluate(() => {
-      const active = document.activeElement;
-      if (active?.tagName === 'IFRAME') return 'iframe';
-      if (active?.closest('#sidebar-properties')) return 'sidebar';
-      return active?.tagName || 'unknown';
-    });
-
-    expect(focusLocation).toBe('sidebar');
+    // Verify focus stays in sidebar (doesn't jump to iframe).
+    // Poll for 2s to catch the async round-trip that used to steal focus.
+    await expect.poll(
+      async () => page.evaluate(() => {
+        const active = document.activeElement;
+        if (active?.tagName === 'IFRAME') return 'iframe';
+        if (active?.closest('#sidebar-properties')) return 'sidebar';
+        return active?.tagName || 'unknown';
+      }),
+      { timeout: 2000, intervals: [200] },
+    ).toBe('sidebar');
   });
 
   test('toolbar style unchanged during sidebar typing', async ({ page }, testInfo) => {

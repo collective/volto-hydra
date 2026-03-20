@@ -808,9 +808,16 @@ test.describe('Quanta Toolbar - Auto-fade', () => {
     await page.keyboard.press('ControlOrMeta+a');
     await expect(toolbar).toHaveCSS('opacity', '1');
 
-    // Toolbar stays visible — non-collapsed selection prevents fade
-    await page.waitForTimeout(6000);
-    await expect(toolbar).toHaveCSS('opacity', '1');
+    // Toolbar stays visible — non-collapsed selection prevents fade.
+    // Poll opacity for 4s (past the ~3s fade timeout), asserting it stays 1.
+    await expect.poll(
+      async () => toolbar.evaluate(el => getComputedStyle(el).opacity),
+      { timeout: 4000, intervals: [500] },
+    ).toBe('1');
+
+    // Collapse selection — toolbar should now fade within ~3s
+    await page.keyboard.press('ArrowRight');
+    await expect(toolbar).toHaveCSS('opacity', '0', { timeout: 5000 });
   });
 
   test('arrow keys navigate past fixed blocks without editable fields', async ({ page }, testInfo) => {

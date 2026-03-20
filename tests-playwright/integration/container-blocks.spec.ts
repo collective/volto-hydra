@@ -1494,14 +1494,9 @@ test.describe('Single Allowed Block Auto-Insert', () => {
     const blockChooser = page.locator('.blocks-chooser');
     await expect(blockChooser).not.toBeVisible({ timeout: 1000 });
 
-    // Wait for the block to be inserted
-    await page.waitForTimeout(1000);
-
     // A new column should have been auto-inserted
-    const newColumnCount = await iframe
-      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
-      .count();
-    expect(newColumnCount).toBe(3);
+    const columns = iframe.locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]');
+    await expect(columns).toHaveCount(3, { timeout: 5000 });
 
   });
 
@@ -1717,11 +1712,10 @@ test.describe('Sidebar Editing for Nested Blocks', () => {
     await slateBlock.click();
     await page.keyboard.type('Test edit');
 
-    // Wait a moment for any errors to surface
-    await page.waitForTimeout(1000);
+    // Verify typed text appears in iframe (confirms no crash)
+    await expect(slateBlock).toContainText('Test edit', { timeout: 5000 });
 
-    // Check for console errors - the page should not have crashed
-    // The sidebar should still be visible
+    // The sidebar should still be visible (no crash)
     await expect(sidebarHeader).toBeVisible();
   });
 });
