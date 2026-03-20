@@ -1,14 +1,16 @@
 <script>
   import SlateNode from './SlateNode.svelte';
+  import { getImageUrl } from './utils.js';
   export let block;
 
   $: subheadingHtml = (block.subheading || '').replace(/\n/g, '<br>');
   $: buttonLink = block.buttonLink?.[0]?.['@id'] || '';
+  $: heroImageSrc = getImageUrl(block.image);
 </script>
 
 <div data-block-uid={block['@uid']} class="hero-block">
   {#if block.image}
-    <img data-edit-media="image" src={block.image} alt="Hero image" />
+    <img data-edit-media="image" src={heroImageSrc} alt="Hero image" />
   {/if}
   <h1 data-edit-text="heading">{block.heading}</h1>
   <p data-edit-text="subheading">{@html subheadingHtml}</p>

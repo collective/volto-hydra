@@ -1,9 +1,11 @@
+import { getImageUrl } from './utils.js';
+
 function HeroBlock({ block }) {
   const heading = block.heading || '';
   const subheading = (block.subheading || '').replace(/\n/g, '<br>');
   const buttonText = block.buttonText || '';
   const buttonLink = block.buttonLink?.[0]?.['@id'] || '';
-  const imageSrc = block.image || '';
+  const imageSrc = getImageUrl(block.image);
 
   return (
     <div data-block-uid={block['@uid']} className="hero-block">
