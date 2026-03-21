@@ -147,7 +147,7 @@ const getFilteredBlockSchema = (blockType, intl, blockPathMap, blockId, blockDat
 
 /**
  * Schema for block settings in template edit mode
- * Adds placeholder, fixed, and readOnly fields to control template behavior
+ * Adds slotId, fixed, and readOnly fields to control template behavior
  */
 const getTemplateBlockSettingsSchema = () => ({
   title: 'Template Block Settings',
@@ -160,13 +160,13 @@ const getTemplateBlockSettingsSchema = () => ({
     {
       id: 'template',
       title: 'Template Settings',
-      fields: ['placeholder', 'fixed', 'readOnly'],
+      fields: ['slotId', 'fixed', 'readOnly'],
     },
   ],
   properties: {
-    placeholder: {
-      title: 'Placeholder Name',
-      description: 'Identifier for this slot in the template (e.g., "header", "main-content")',
+    slotId: {
+      title: 'Slot ID',
+      description: 'Identifies where user content goes in the template (e.g., "header", "primary")',
       type: 'string',
     },
     fixed: {
@@ -180,7 +180,7 @@ const getTemplateBlockSettingsSchema = () => ({
       type: 'boolean',
     },
   },
-  required: ['placeholder'],
+  required: ['slotId'],
 });
 
 /**
@@ -526,7 +526,7 @@ const ParentBlockSection = ({
 
         // Build form data with current template block settings
         const templateBlockFormData = {
-          placeholder: blockData.placeholder || '',
+          slotId: blockData.slotId || '',
           fixed: blockData.fixed || false,
           readOnly: blockData.readOnly || false,
         };

@@ -4,7 +4,7 @@
  * Tests that:
  * 1. Templates appear in BlockChooser when allowedTemplates is configured
  * 2. Selecting a template inserts blocks with proper template fields
- * 3. Existing content is preserved in the placeholder region
+ * 3. Existing content is preserved in the slot region
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';

@@ -14,27 +14,27 @@
       "fixed": true,
       "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
-      "placeholder": "date"
+      "slotId": "date"
     },
     "tpl-ni-title": {
       "@type": "title",
       "fixed": true,
       "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
-      "placeholder": "title"
+      "slotId": "title"
     },
     "tpl-ni-leadimage": {
       "@type": "leadimage",
       "fixed": true,
       "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
-      "placeholder": "lead-image"
+      "slotId": "lead-image"
     },
     "tpl-ni-content": {
       "@type": "slate",
       "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
-      "placeholder": "content",
+      "slotId": "content",
       "plaintext": "",
       "value": [{ "type": "p", "children": [{ "text": "" }] }]
     }

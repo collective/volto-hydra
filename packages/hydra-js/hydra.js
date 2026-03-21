@@ -73,7 +73,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 // isLayoutTemplate
-// findPlaceholderRegions
+// findSlotRegions
 // isTemplateAllowedIn
 // getLayoutTemplates
 // getSnippetTemplates
@@ -11069,7 +11069,7 @@ export function calculateDragHandlePosition(blockRect, viewportOffset = { top: 0
 ////////////////////////////////////////////////////////////////////////////////
 // Template Utilities
 // For discovering, filtering, and merging templates.
-// Templates are Documents with blocks that have template fields (templateId, templateInstanceId, placeholder).
+// Templates are Documents with blocks that have template fields (templateId, templateInstanceId, slotId).
 // Uses Volto's standard fixed/readOnly properties for block behavior.
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -11079,7 +11079,7 @@ export const TEMPLATE_MARKER = '_template';
 // Template blocks use flat fields directly on the block:
 // - templateId: string - the template document path (e.g., '/templates/test-layout')
 // - templateInstanceId: string - unique ID for this template application instance
-// - placeholder: string - placeholder region name (e.g., 'primary', 'header')
+// - slotId: string - slot region name (e.g., 'primary', 'header')
 
 /**
  * Simple UUID generator for block IDs.
@@ -11116,31 +11116,31 @@ export function isLayoutTemplate(templateData) {
 }
 
 /**
- * Find placeholder regions in a template.
- * Placeholder blocks (fixed: false) with same placeholder form a region.
+ * Find slot regions in a template.
+ * Slot blocks (fixed: false) with same slotId form a region.
  *
  * @param {Object} templateData - Template document
- * @returns {Object} { placeholder: { blockIds: [], allowedBlocks: [] } }
+ * @returns {Object} { slotId: { blockIds: [], allowedBlocks: [] } }
  */
-export function findPlaceholderRegions(templateData) {
+export function findSlotRegions(templateData) {
   const { blocks, blocks_layout } = templateData;
   const layout = blocks_layout?.items || [];
   const regions = {};
 
   for (const blockId of layout) {
     const block = blocks?.[blockId];
-    // Placeholder blocks have fixed: false (or undefined) and a placeholder
+    // Slot blocks have fixed: false (or undefined) and a slotId
     if (block?.fixed) continue; // Skip fixed blocks
 
-    const placeholder = block?.placeholder;
-    if (placeholder) {
-      if (!regions[placeholder]) {
-        regions[placeholder] = {
+    const slotId = block?.slotId;
+    if (slotId) {
+      if (!regions[slotId]) {
+        regions[slotId] = {
           blockIds: [],
           allowedBlocks: null,
         };
       }
-      regions[placeholder].blockIds.push(blockId);
+      regions[slotId].blockIds.push(blockId);
     }
   }
   return regions;
@@ -11235,7 +11235,7 @@ export function cloneBlocksWithNewIds(blocks, layout, uuidGenerator = generateUU
 
 /**
  * Clone a block, recursively filtering nested blocks without template markers.
- * Only nested blocks with `placeholder` or `templateId` are included.
+ * Only nested blocks with `slotId` or `templateId` are included.
  *
  * @param {Object} block - Block to clone
  * @param {Function} uuidGenerator - Function to generate UUIDs
@@ -11255,7 +11255,7 @@ function cloneBlockFilteringNested(block, uuidGenerator) {
       if (!nestedBlock) continue;
 
       // Only include nested blocks that have template markers
-      if (nestedBlock.placeholder || nestedBlock.templateId) {
+      if (nestedBlock.slotId || nestedBlock.templateId) {
         const newNestedId = uuidGenerator();
         // Recursively filter this nested block's children too
         nestedBlocks[newNestedId] = cloneBlockFilteringNested(nestedBlock, uuidGenerator);
@@ -11274,7 +11274,7 @@ function cloneBlockFilteringNested(block, uuidGenerator) {
 /**
  * Insert snippet blocks at a specific position.
  * - Clones snippet blocks with new IDs
- * - Adds template fields (templateId, templateInstanceId, placeholder)
+ * - Adds template fields (templateId, templateInstanceId, slotId)
  * - Preserves Volto's fixed/readOnly properties
  * - Inserts at the specified position
  *
@@ -11312,7 +11312,7 @@ export function insertSnippetBlocks(pageFormData, templateData, position, uuidGe
     // Set flat template fields
     block.templateId = templateId;
     block.templateInstanceId = instanceId;
-    block.placeholder = originalBlock?.placeholder || originalId;
+    block.slotId = originalBlock?.slotId || originalId;
 
     // Preserve Volto's fixed/readOnly from template
     if (originalBlock?.fixed !== undefined) block.fixed = originalBlock.fixed;
@@ -11358,8 +11358,8 @@ export function isFixedTemplateBlock(block) {
 }
 
 /**
- * Check if a block is placeholder content (can be moved freely).
- * Placeholder blocks have templateId but fixed: false (or undefined).
+ * Check if a block is slot content (can be moved freely).
+ * Slot blocks have templateId but fixed: false (or undefined).
  *
  * @param {Object} block - Block data
  * @returns {boolean}
@@ -11506,7 +11506,7 @@ export function getBlockAddability(blockId, blockPathMap, blockData, templateEdi
 
   // Apply static restrictions
   // In template edit mode, ignore restrictions for blocks in the template being edited
-  // (the restrictions are for normal mode to prevent adding outside placeholders)
+  // (the restrictions are for normal mode to prevent adding outside slots)
   if (templateEditMode && targetInTemplate) {
     result.canInsertBefore = true;
     result.canInsertAfter = true;
@@ -11598,8 +11598,8 @@ function isBlocksMap(obj) {
  *
  * @param {Object} container - Container object to scan
  * @param {string} instanceId - Template instance ID to match
- * @param {Map} pendingContent - Map of placeholder -> [{blockId, block}]
- * @param {Array} standaloneBlocks - Blocks without placeholder
+ * @param {Map} pendingContent - Map of slotId -> [{blockId, block}]
+ * @param {Array} standaloneBlocks - Blocks without slotId
  * @param {Set} visited - Already visited objects (prevent cycles)
  */
 function collectContentFromTree(container, instanceId, pendingContent, standaloneBlocks, existingFixedBlockIds, visited = new Set()) {
@@ -11637,20 +11637,20 @@ function collectContentFromTree(container, instanceId, pendingContent, standalon
 
       // Only collect blocks matching our instance
       if (block.templateInstanceId === instanceId) {
-        const placeholder = block.placeholder;
-        if (placeholder) {
+        const slotId = block.slotId;
+        if (slotId) {
           if (block.fixed) {
             // Track existing fixed block ID and content for reuse
-            existingFixedBlockIds.set(placeholder, { blockId, block });
+            existingFixedBlockIds.set(slotId, { blockId, block });
           } else {
             // User content block
-            if (!pendingContent.has(placeholder)) {
-              pendingContent.set(placeholder, []);
+            if (!pendingContent.has(slotId)) {
+              pendingContent.set(slotId, []);
             }
-            pendingContent.get(placeholder).push({ blockId, block });
+            pendingContent.get(slotId).push({ blockId, block });
           }
         }
-      } else if (!block.templateId && !block.placeholder) {
+      } else if (!block.templateId && !block.slotId) {
         // Standalone block (no template markers) - track position
         standaloneBlocks.push({ blockId, block });
       }
@@ -11679,20 +11679,20 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
   const { templateId, instanceId } = templateState;
   const { uuidGenerator } = options;
 
-  // Build a map of document blocks by placeholder for user content lookup
-  const docBlocksByPlaceholder = new Map();
+  // Build a map of document blocks by slotId for user content lookup
+  const docBlocksBySlotId = new Map();
   for (const blockId of docLayout) {
     const block = docBlocks[blockId];
-    if (block?.placeholder) {
-      if (!docBlocksByPlaceholder.has(block.placeholder)) {
-        docBlocksByPlaceholder.set(block.placeholder, []);
+    if (block?.slotId) {
+      if (!docBlocksBySlotId.has(block.slotId)) {
+        docBlocksBySlotId.set(block.slotId, []);
       }
-      docBlocksByPlaceholder.get(block.placeholder).push({ blockId, block });
+      docBlocksBySlotId.get(block.slotId).push({ blockId, block });
     }
   }
 
   // Process the template layout at this nested level
-  // Only emit blocks that have template markers (fixed or placeholder)
+  // Only emit blocks that have template markers (fixed or slotId)
   // Blocks without markers are just defaults and should NOT be synced
   for (const tplBlockId of templateLayout) {
     const tplBlock = templateBlocks[tplBlockId];
@@ -11702,27 +11702,27 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
       // Fixed block - emit template version
       const blockId = uuidGenerator ? uuidGenerator() : `${instanceId}::${tplBlockId}`;
 
-      // Look ahead for next non-fixed placeholder at this nested level
+      // Look ahead for next non-fixed slot at this nested level
       const tplIdx = templateLayout.indexOf(tplBlockId);
-      let nextPlaceholder = undefined;
+      let nextSlotId = undefined;
       for (let i = tplIdx + 1; i < templateLayout.length; i++) {
         const nextTplBlock = templateBlocks[templateLayout[i]];
-        if (nextTplBlock && !nextTplBlock.fixed && nextTplBlock.placeholder) {
-          nextPlaceholder = nextTplBlock.placeholder;
+        if (nextTplBlock && !nextTplBlock.fixed && nextTplBlock.slotId) {
+          nextSlotId = nextTplBlock.slotId;
           break;
         }
         if (nextTplBlock?.fixed) break;
       }
 
-      // childPlaceholders for nested containers
-      let childPlaceholders = undefined;
+      // childSlotIds for nested containers
+      let childSlotIds = undefined;
       if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
         const innerLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
         for (const nestedId of innerLayout) {
           const nested = tplBlock.blocks[nestedId];
-          if (nested && !nested.fixed && nested.placeholder) {
-            if (!childPlaceholders) childPlaceholders = {};
-            childPlaceholders['blocks'] = nested.placeholder;
+          if (nested && !nested.fixed && nested.slotId) {
+            if (!childSlotIds) childSlotIds = {};
+            childSlotIds['blocks'] = nested.slotId;
             break;
           }
         }
@@ -11733,8 +11733,8 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
           ...tplBlock,
           templateId: templateId,
           templateInstanceId: instanceId,
-          ...(nextPlaceholder && { nextPlaceholder }),
-          ...(childPlaceholders && { childPlaceholders }),
+          ...(nextSlotId && { nextSlotId }),
+          ...(childSlotIds && { childSlotIds }),
         },
         blockId
       );
@@ -11758,23 +11758,23 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
           });
         }
       }
-    } else if (tplBlock.placeholder) {
+    } else if (tplBlock.slotId) {
       // Placeholder slot - emit document content that goes here
-      const placeholder = tplBlock.placeholder;
-      const userContent = docBlocksByPlaceholder.get(placeholder) || [];
+      const slotId = tplBlock.slotId;
+      const userContent = docBlocksBySlotId.get(slotId) || [];
       for (const { blockId, block } of userContent) {
         addItem(
           {
             ...block,
             templateId: templateId,
             templateInstanceId: instanceId,
-            placeholder: placeholder,
+            slotId: slotId,
           },
           blockId
         );
       }
     }
-    // Skip blocks without fixed or placeholder - they're just template defaults
+    // Skip blocks without fixed or slotId - they're just template defaults
     // and should NOT be synced to the document
   }
 
@@ -12096,7 +12096,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
     removingTemplate = true;
     templateId = '__none__';
     templates['__none__'] = {
-      blocks: { '__default__': { '@type': 'slate', placeholder: 'default' } },
+      blocks: { '__default__': { '@type': 'slate', slotId: 'default' } },
       blocks_layout: { items: ['__default__'] },
     };
   }
@@ -12133,7 +12133,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
   // Get or create instance context.
   // Always rebuild ctx when the instanceId is re-encountered (e.g. after save,
   // the API returns blocks with the same templateInstanceId but different content).
-  // The ctx is mutated during processing (pendingContent consumed, emittedPlaceholders
+  // The ctx is mutated during processing (pendingContent consumed, emittedSlotIds
   // populated) so it cannot be reused.
   let ctx = templateState.instances[instanceId];
   if (ctx) {
@@ -12146,7 +12146,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
       templateId,
       template: null,
       instanceId,
-      emittedPlaceholders: new Set(),
+      emittedSlotIds: new Set(),
       pendingContent: new Map(),
       existingFixedBlockIds: new Map(),
       leadingStandaloneBlocks: [],
@@ -12180,7 +12180,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
         const blockId = layout[i];
         const block = blocks[blockId];
         if (!block) continue;
-        if (!block.templateId && !block.templateInstanceId && !block.placeholder) {
+        if (!block.templateId && !block.templateInstanceId && !block.slotId) {
           if (!foundFirstTemplateBlock || i < layout.indexOf(layout.find((id, idx) => {
             const b = blocks[id];
             return b?.templateInstanceId === existingInstanceId && idx <= lastTemplateBlockIndex;
@@ -12200,17 +12200,17 @@ export function expandTemplatesSync(inputItems, options = {}) {
         }
         if (block.fixed && block.templateId && block.templateId !== templateId) {
           if (block.readOnly) continue;
-          if (block.placeholder) {
-            ctx.existingFixedBlockIds.set(block.placeholder, { blockId, block });
+          if (block.slotId) {
+            ctx.existingFixedBlockIds.set(block.slotId, { blockId, block });
           }
           continue;
         }
-        if (block.placeholder) {
-          const placeholder = block.placeholder;
-          if (!ctx.pendingContent.has(placeholder)) {
-            ctx.pendingContent.set(placeholder, []);
+        if (block.slotId) {
+          const slotId = block.slotId;
+          if (!ctx.pendingContent.has(slotId)) {
+            ctx.pendingContent.set(slotId, []);
           }
-          ctx.pendingContent.get(placeholder).push({ blockId, block });
+          ctx.pendingContent.get(slotId).push({ blockId, block });
         } else {
           if (!ctx.pendingContent.has('default')) {
             ctx.pendingContent.set('default', []);
@@ -12237,7 +12237,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
     ctx.template = template;
   }
 
-  const { template, emittedPlaceholders, pendingContent, leadingStandaloneBlocks, trailingStandaloneBlocks, existingFixedBlockIds } = ctx;
+  const { template, emittedSlotIds, pendingContent, leadingStandaloneBlocks, trailingStandaloneBlocks, existingFixedBlockIds } = ctx;
 
   // Process template (same as async version from here)
   const templateLayout = template.blocks_layout?.items || [];
@@ -12247,17 +12247,17 @@ export function expandTemplatesSync(inputItems, options = {}) {
 
   for (let i = 0; i < templateLayout.length; i++) {
     const tplBlock = template.blocks?.[templateLayout[i]];
-    if (!tplBlock?.placeholder) continue;
+    if (!tplBlock?.slotId) continue;
     if (tplBlock.fixed) {
       if (firstFixedIndex === -1) firstFixedIndex = i;
       lastFixedIndex = i;
     } else {
       if (firstFixedIndex === -1) {
-        slotPositions[tplBlock.placeholder] = 'top';
+        slotPositions[tplBlock.slotId] = 'top';
       } else if (i > lastFixedIndex) {
-        slotPositions[tplBlock.placeholder] = 'bottom';
+        slotPositions[tplBlock.slotId] = 'bottom';
       } else {
-        slotPositions[tplBlock.placeholder] = 'middle';
+        slotPositions[tplBlock.slotId] = 'middle';
       }
     }
   }
@@ -12275,8 +12275,8 @@ export function expandTemplatesSync(inputItems, options = {}) {
     if (!tplBlock) continue;
 
     if (tplBlock.fixed) {
-      const placeholder = tplBlock.placeholder;
-      const existing = placeholder && existingFixedBlockIds?.get(placeholder);
+      const slotId = tplBlock.slotId;
+      const existing = slotId && existingFixedBlockIds?.get(slotId);
       const blockId = existing?.blockId
         ? existing.blockId
         : (uuidGenerator ? uuidGenerator() : `${instanceId}::${tplBlockId}`);
@@ -12286,23 +12286,23 @@ export function expandTemplatesSync(inputItems, options = {}) {
         blockContent = { ...tplBlock, value: existing.block.value };
       }
 
-      // Look ahead in template layout for the next non-fixed placeholder at this level.
-      // This preserves placeholder info even when all placeholder blocks are deleted.
+      // Look ahead in template layout for the next non-fixed slot at this level.
+      // This preserves slot info even when all slot blocks are deleted.
       const tplIdx = templateLayout.indexOf(tplBlockId);
-      let nextPlaceholder = undefined;
+      let nextSlotId = undefined;
       for (let i = tplIdx + 1; i < templateLayout.length; i++) {
         const nextTplBlock = template.blocks?.[templateLayout[i]];
-        if (nextTplBlock && !nextTplBlock.fixed && nextTplBlock.placeholder) {
-          nextPlaceholder = nextTplBlock.placeholder;
+        if (nextTplBlock && !nextTplBlock.fixed && nextTplBlock.slotId) {
+          nextSlotId = nextTplBlock.slotId;
           break;
         }
         if (nextTplBlock?.fixed) break; // Stop at next fixed block
       }
 
       // For container blocks, filter nested blocks to only those with template markers
-      // (placeholder or templateId). Blocks without these are template-internal details
-      // that should not be synced to pages. Also compute childPlaceholders.
-      let childPlaceholders = undefined;
+      // (slotId or templateId). Blocks without these are template-internal details
+      // that should not be synced to pages. Also compute childSlotIds.
+      let childSlotIds = undefined;
       let filteredBlocks = blockContent.blocks;
       let filteredLayout = blockContent.blocks_layout;
       if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
@@ -12312,12 +12312,12 @@ export function expandTemplatesSync(inputItems, options = {}) {
         for (const nestedId of nestedLayout) {
           const nested = tplBlock.blocks[nestedId];
           if (!nested) continue;
-          if (nested.placeholder || nested.templateId) {
+          if (nested.slotId || nested.templateId) {
             newNestedBlocks[nestedId] = nested;
             newNestedLayout.push(nestedId);
-            if (!nested.fixed && nested.placeholder) {
-              if (!childPlaceholders) childPlaceholders = {};
-              if (!childPlaceholders['blocks']) childPlaceholders['blocks'] = nested.placeholder;
+            if (!nested.fixed && nested.slotId) {
+              if (!childSlotIds) childSlotIds = {};
+              if (!childSlotIds['blocks']) childSlotIds['blocks'] = nested.slotId;
             }
           }
         }
@@ -12332,8 +12332,8 @@ export function expandTemplatesSync(inputItems, options = {}) {
           blocks_layout: filteredLayout,
           templateId: templateId,
           templateInstanceId: instanceId,
-          ...(nextPlaceholder && { nextPlaceholder }),
-          ...(childPlaceholders && { childPlaceholders }),
+          ...(nextSlotId && { nextSlotId }),
+          ...(childSlotIds && { childSlotIds }),
         },
         blockId
       );
@@ -12357,48 +12357,48 @@ export function expandTemplatesSync(inputItems, options = {}) {
         }
       }
     } else {
-      const placeholder = tplBlock.placeholder || 'default';
+      const slotId = tplBlock.slotId || 'default';
       const insertIndex = items.length;
 
-      if (placeholder === 'default') {
+      if (slotId === 'default') {
         defaultInsertIndex = insertIndex;
       }
-      const position = slotPositions[placeholder];
+      const position = slotPositions[slotId];
       if (position === 'bottom' && bottomSlotInsertIndex === -1) {
         bottomSlotInsertIndex = insertIndex;
       } else if (position === 'top' && topSlotInsertIndex === -1) {
         topSlotInsertIndex = insertIndex;
       }
 
-      if (!emittedPlaceholders.has(placeholder)) {
-        emittedPlaceholders.add(placeholder);
-        const content = pendingContent.get(placeholder) || [];
+      if (!emittedSlotIds.has(slotId)) {
+        emittedSlotIds.add(slotId);
+        const content = pendingContent.get(slotId) || [];
         for (const { blockId, block } of content) {
           addItem(
             {
               ...block,
               templateId: templateId,
               templateInstanceId: instanceId,
-              placeholder: placeholder,
+              slotId: slotId,
             },
             blockId
           );
         }
-        pendingContent.delete(placeholder);
+        pendingContent.delete(slotId);
       }
     }
   }
 
   const remainingContent = [];
-  for (const [placeholder, content] of pendingContent) {
-    if (!emittedPlaceholders.has(placeholder)) {
-      emittedPlaceholders.add(placeholder);
+  for (const [slotId, content] of pendingContent) {
+    if (!emittedSlotIds.has(slotId)) {
+      emittedSlotIds.add(slotId);
       for (const { blockId, block } of content) {
         remainingContent.push({
           ...block,
           templateId: templateId,
           templateInstanceId: instanceId,
-          placeholder: 'default',
+          slotId: 'default',
           _orphaned: true,
           '@uid': blockId,
         });
@@ -12430,11 +12430,11 @@ export function expandTemplatesSync(inputItems, options = {}) {
     for (const item of items) {
       delete item.templateId;
       delete item.templateInstanceId;
-      delete item.placeholder;
+      delete item.slotId;
       delete item.fixed;
       delete item.readOnly;
-      delete item.nextPlaceholder;
-      delete item.childPlaceholders;
+      delete item.nextSlotId;
+      delete item.childSlotIds;
       delete item._orphaned;
     }
   }

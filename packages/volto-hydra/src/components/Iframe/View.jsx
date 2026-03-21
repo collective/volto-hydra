@@ -1983,7 +1983,7 @@ const Iframe = (props) => {
 
           if (newFormData) {
             // Apply defaults to moved blocks based on their new position
-            // This updates template fields (templateId, templateInstanceId, placeholder)
+            // This updates template fields (templateId, templateInstanceId, slotId)
             // based on neighboring blocks at the new location
             let updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
             for (const moveBlockId of blocksToMove) {
@@ -2018,7 +2018,7 @@ const Iframe = (props) => {
               if (updatedBlockData !== blockData) {
                 newFormData = updateBlockById(newFormData, updatedPathMap, moveBlockId, updatedBlockData);
                 updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
-                log('MOVE_BLOCK: Applied defaults to moved block:', moveBlockId, 'templateId:', updatedBlockData.templateId, 'placeholder:', updatedBlockData.placeholder);
+                log('MOVE_BLOCK: Applied defaults to moved block:', moveBlockId, 'templateId:', updatedBlockData.templateId, 'slotId:', updatedBlockData.slotId);
               }
             }
 
@@ -3658,7 +3658,7 @@ const Iframe = (props) => {
                 ...blockData,
                 templateId: newTemplateId,
                 templateInstanceId: newInstanceId,
-                placeholder: 'primary', // Default placeholder name
+                slotId: 'primary', // Default slot name
               };
 
               // Update the block in formData
@@ -3991,7 +3991,7 @@ const Iframe = (props) => {
           if (prevInstanceId && !instanceId) {
             const formData = iframeSyncState.formData;
 
-            // Validate template placeholder structure before allowing exit
+            // Validate template slot structure before allowing exit
             const validation = validateTemplatePlaceholders(formData);
             if (!validation.valid) {
               // Show validation error - user must fix structure before exiting
@@ -4041,7 +4041,7 @@ const Iframe = (props) => {
         onSelectBlock={onSelectBlock}
         onAddBlock={(parentBlockId, fieldName, options) => {
           if (options?.afterBlockId) {
-            // Template placeholder section: add after specific block
+            // Template slot section: add after specific block
             const afterId = options.afterBlockId;
             const afterPathInfo = iframeSyncState.blockPathMap?.[afterId];
             const allowed = afterPathInfo?.allowedSiblingTypes || null;

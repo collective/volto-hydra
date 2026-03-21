@@ -234,7 +234,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
     const isFixed = item.fixed === true;
     const atStart = index === 0;
     const atEnd = index === count - 1;
-    const hasNextPlaceholder = item.nextPlaceholder != null;
+    const hasNextPlaceholder = item.nextSlotId != null;
     return {
       canInsertBefore: !(isFixed && (atStart || prevIsFixed)),
       canInsertAfter: !(isFixed && (atEnd || nextIsFixed)) || hasNextPlaceholder,

@@ -649,7 +649,7 @@ export function deleteBlockFromContainer(formData, blockPathMap, blockId, contai
 }
 
 /**
- * Strip all @type:'empty' placeholder blocks from formData before saving.
+ * Strip all @type:'empty' slot blocks from formData before saving.
  * Uses blockPathMap to locate empty blocks at any nesting level.
  *
  * @param {Object} formData - The form data
@@ -683,7 +683,7 @@ export function stripEmptyBlocks(formData, blocksConfig, intl) {
 
 /**
  * Ensure every container block has at least one child.
- * Inverse of stripEmptyBlocks — restores placeholder blocks on page load
+ * Inverse of stripEmptyBlocks — restores slot blocks on page load
  * for containers that were saved empty (after stripping).
  *
  * @param {Object} formData - The form data
@@ -719,7 +719,7 @@ export function ensureAllContainersHaveBlocks(formData, blocksConfig, intl, uuid
 /**
  * Remove a template instance from the page.
  * - Fixed blocks are deleted entirely
- * - Non-fixed (placeholder) blocks have template fields stripped and become regular blocks
+ * - Non-fixed (slot) blocks have template fields stripped and become regular blocks
  *
  * @param {Object} formData - The form data
  * @param {Object} blockPathMap - Map of blockId -> { path, parentId, isTemplateInstance, ... }
@@ -752,7 +752,7 @@ export function removeTemplateInstance(formData, blockPathMap, templateInstanceI
   const layout = get(parentBlock, layoutPath, []);
   const blocks = get(parentBlock, blocksPath, {});
 
-  // Separate blocks into: fixed (to delete), placeholder (to keep but strip), and unrelated
+  // Separate blocks into: fixed (to delete), slot (to keep but strip), and unrelated
   const newLayout = [];
   const newBlocks = { ...blocks };
 
@@ -770,7 +770,7 @@ export function removeTemplateInstance(formData, blockPathMap, templateInstanceI
         delete newBlocks[blockId];
       } else {
         // Non-fixed blocks: strip template fields and keep them
-        const { templateId, templateInstanceId: _, placeholder, fixed, readOnly, ...cleanBlock } = block;
+        const { templateId, templateInstanceId: _, slotId, fixed, readOnly, ...cleanBlock } = block;
         newBlocks[blockId] = cleanBlock;
         newLayout.push(blockId);
       }
@@ -1016,7 +1016,7 @@ export function mutateBlockInContainer(formData, blockPathMap, blockId, newBlock
  *   1. containerConfig.defaultBlockType (explicit default for this container)
  *   2. Single allowedBlocks entry (only one choice)
  *   3. config.settings.defaultBlockType if allowed (global default, e.g. 'slate')
- *   4. 'empty' (placeholder that opens BlockChooser on click)
+ *   4. 'empty' (slot block that opens BlockChooser on click)
  *
  * @param {Object|null} containerConfig - Container config with allowedBlocks/defaultBlockType
  * @returns {string} Block type to create

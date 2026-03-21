@@ -143,7 +143,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-teaser",
-      "placeholder": "schema",
+      "slotId": "schema",
       "tabs": [
         {
           "@id": "ref-teaser-schema-javascript-bfff08",
@@ -157,7 +157,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-teaser",
-      "placeholder": "json-data",
+      "slotId": "json-data",
       "tabs": [
         {
           "@id": "ref-teaser-json-data-json-7f117c",
@@ -171,7 +171,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-teaser",
-      "placeholder": "rendering",
+      "slotId": "rendering",
       "tabs": [
         {
           "@id": "ref-teaser-rendering-jsx-d1dd76",

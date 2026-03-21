@@ -13,7 +13,7 @@
       "readOnly": true,
       "templateId": "/templates/site-footer",
       "templateInstanceId": "site-footer-def-instance",
-      "placeholder": "social",
+      "slotId": "social",
       "links": [
         { "@id": "link-1", "url": "https://github.com/collective/volto-hydra", "fixed": true, "readOnly": true, "templateId": "/templates/site-footer", "templateInstanceId": "site-footer-def-instance" },
         { "@id": "link-2", "url": "https://discord.gg/plone", "fixed": true, "readOnly": true, "templateId": "/templates/site-footer", "templateInstanceId": "site-footer-def-instance" },
@@ -27,7 +27,7 @@
       "readOnly": true,
       "templateId": "/templates/site-footer",
       "templateInstanceId": "site-footer-def-instance",
-      "placeholder": "copyright",
+      "slotId": "copyright",
       "value": [
         {
           "type": "p",
@@ -42,7 +42,7 @@
       "@type": "slate",
       "templateId": "/templates/site-footer",
       "templateInstanceId": "site-footer-def-instance",
-      "placeholder": "default",
+      "slotId": "default",
       "value": [
         {
           "type": "p",

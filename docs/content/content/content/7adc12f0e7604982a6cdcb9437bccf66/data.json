@@ -21,14 +21,14 @@
       ],
       "templateId": "/templates/event-view",
       "templateInstanceId": "tpl-ev-def",
-      "placeholder": "content"
+      "slotId": "content"
     },
     "b539ed36-442b-4c7d-8b9b-8af01963c206": {
       "@type": "eventMetadata",
       "templateId": "/templates/event-view",
       "templateInstanceId": "tpl-ev-def",
       "fixed": true,
-      "placeholder": "event-metadata"
+      "slotId": "event-metadata"
     },
     "d3f1c443-583f-4e8e-a682-3bf25752a300": {
       "@type": "title",
@@ -36,7 +36,7 @@
       "templateInstanceId": "tpl-ev-def",
       "fixed": true,
       "readOnly": true,
-      "placeholder": "title"
+      "slotId": "title"
     }
   },
   "blocks_layout": {

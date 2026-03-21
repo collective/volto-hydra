@@ -573,7 +573,7 @@ class Form extends Component {
         })
       : {};
 
-    // Validate template placeholder contiguity
+    // Validate template slot contiguity
     const templateValidation = validateTemplatePlaceholders(formData);
     const blocksErrors = templateValidation.blocksErrors;
 
@@ -662,7 +662,7 @@ class Form extends Component {
    * @returns {undefined}
    */
   getOnlyFormModifiedValues = () => {
-    // Strip empty placeholder blocks before diffing — they exist only for UX
+    // Strip empty slot blocks before diffing — they exist only for UX
     // in edit mode and must never be persisted. Needs the full page formData
     // so buildBlockPathMap can traverse all page-level blocks fields.
     const formData = stripEmptyBlocks(

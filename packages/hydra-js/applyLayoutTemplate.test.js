@@ -62,11 +62,11 @@ describe('applyLayoutTemplate', () => {
       expect(result.blocks['user-block-2']).toBeDefined();
 
       // Should have header placeholder block
-      const headerBlocks = Object.entries(result.blocks).filter(([_, b]) => b.placeholder === 'header');
+      const headerBlocks = Object.entries(result.blocks).filter(([_, b]) => b.slotId === 'header');
       expect(headerBlocks.length).toBeGreaterThanOrEqual(1);
 
       // Should have footer placeholder block
-      const footerBlocks = Object.entries(result.blocks).filter(([_, b]) => b.placeholder === 'footer');
+      const footerBlocks = Object.entries(result.blocks).filter(([_, b]) => b.slotId === 'footer');
       expect(footerBlocks.length).toBeGreaterThanOrEqual(1);
 
       // Should have: header (fixed) + footer (fixed) + 2 user blocks = 4
@@ -99,7 +99,7 @@ describe('applyLayoutTemplate', () => {
       const result = await applyLayoutTemplate(pageData, templateData, uuidGenerator);
 
       // User block should have placeholder: 'default'
-      expect(result.blocks['user-block'].placeholder).toBe('default');
+      expect(result.blocks['user-block'].slotId).toBe('default');
     });
 
     test('blocks are ordered: header, user content, footer', async () => {
@@ -125,8 +125,8 @@ describe('applyLayoutTemplate', () => {
       const layout = result.blocks_layout.items;
 
       // Find positions
-      const headerIndex = layout.findIndex(id => result.blocks[id]?.placeholder === 'header');
-      const footerIndex = layout.findIndex(id => result.blocks[id]?.placeholder === 'footer');
+      const headerIndex = layout.findIndex(id => result.blocks[id]?.slotId === 'header');
+      const footerIndex = layout.findIndex(id => result.blocks[id]?.slotId === 'footer');
       const user1Index = layout.indexOf('user-block-1');
       const user2Index = layout.indexOf('user-block-2');
 
@@ -211,7 +211,7 @@ describe('applyLayoutTemplate', () => {
 
       // Should have exactly one header block
       const headerBlocks = Object.entries(result.blocks).filter(
-        ([_, b]) => b.placeholder === 'header' && b.fixed
+        ([_, b]) => b.slotId === 'header' && b.fixed
       );
       expect(headerBlocks.length).toBe(1);
     });
@@ -246,7 +246,7 @@ describe('applyLayoutTemplate', () => {
 
       // No footer placeholder in result
       const footerBlocks = Object.entries(result.blocks).filter(
-        ([_, b]) => b.placeholder === 'footer'
+        ([_, b]) => b.slotId === 'footer'
       );
       expect(footerBlocks.length).toBe(0);
     });
@@ -275,7 +275,7 @@ describe('mergeTemplateContent', () => {
 
     // User content block should be preserved in the result
     expect(merged.blocks['target-default']).toBeDefined();
-    expect(merged.blocks['target-default'].placeholder).toBe('default');
+    expect(merged.blocks['target-default'].slotId).toBe('default');
   });
 });
 
@@ -313,10 +313,10 @@ describe('fallback placement when no default placeholder', () => {
     expect(result.blocks['user-block']).toBeDefined();
 
     // User content should have placeholder 'default' assigned
-    expect(result.blocks['user-block'].placeholder).toBe('default');
+    expect(result.blocks['user-block'].slotId).toBe('default');
 
     // Find positions
-    const footerIndex = layout.findIndex(id => result.blocks[id]?.placeholder === 'footer');
+    const footerIndex = layout.findIndex(id => result.blocks[id]?.slotId === 'footer');
     const userIndex = layout.indexOf('user-block');
 
     // User content should be after footer (in post_footer position since no default)
@@ -349,7 +349,7 @@ describe('fallback placement when no default placeholder', () => {
     expect(result.blocks['user-block']).toBeDefined();
 
     // Find positions
-    const headerIndex = layout.findIndex(id => result.blocks[id]?.placeholder === 'header');
+    const headerIndex = layout.findIndex(id => result.blocks[id]?.slotId === 'header');
     const userIndex = layout.indexOf('user-block');
 
     // User content should be before header (in pre_header position)
@@ -408,8 +408,8 @@ describe('fallback placement when no default placeholder', () => {
     const layout = result.blocks_layout.items;
 
     // Find positions
-    const headerIndex = layout.findIndex(id => result.blocks[id]?.placeholder === 'header');
-    const footerIndex = layout.findIndex(id => result.blocks[id]?.placeholder === 'footer');
+    const headerIndex = layout.findIndex(id => result.blocks[id]?.slotId === 'header');
+    const footerIndex = layout.findIndex(id => result.blocks[id]?.slotId === 'footer');
     const userIndex = layout.indexOf('user-block');
 
     // User content should be between header and footer (in default position, not post_footer)
@@ -505,8 +505,8 @@ describe('page reload merge - standalone blocks preserved', () => {
     const standaloneAfter = layout.indexOf('standalone-after');
 
     // Find template block positions
-    const headerIndex = layout.findIndex(id => merged.blocks[id]?.placeholder === 'header');
-    const footerIndex = layout.findIndex(id => merged.blocks[id]?.placeholder === 'footer');
+    const headerIndex = layout.findIndex(id => merged.blocks[id]?.slotId === 'header');
+    const footerIndex = layout.findIndex(id => merged.blocks[id]?.slotId === 'footer');
 
     expect(standaloneBefore).toBeLessThan(headerIndex);
     expect(standaloneAfter).toBeGreaterThan(footerIndex);
@@ -584,11 +584,11 @@ describe('reverse merge - page to template (for saving)', () => {
     });
 
     // Template should now have user's edits in the fixed blocks
-    const headerBlock = Object.values(merged.blocks).find(b => b.placeholder === 'header' && b.fixed);
+    const headerBlock = Object.values(merged.blocks).find(b => b.slotId === 'header' && b.fixed);
     expect(headerBlock).toBeDefined();
     expect(headerBlock.value[0].text).toBe('User Edited Header');
 
-    const footerBlock = Object.values(merged.blocks).find(b => b.placeholder === 'footer' && b.fixed);
+    const footerBlock = Object.values(merged.blocks).find(b => b.slotId === 'footer' && b.fixed);
     expect(footerBlock).toBeDefined();
     expect(footerBlock.value[0].text).toBe('User Edited Footer');
   });
@@ -646,12 +646,12 @@ describe('reverse merge - page to template (for saving)', () => {
     });
 
     // Fixed+readOnly header should have the edited content (transfers to template)
-    const headerBlock = Object.values(merged.blocks).find(b => b.placeholder === 'header' && b.fixed && b.readOnly);
+    const headerBlock = Object.values(merged.blocks).find(b => b.slotId === 'header' && b.fixed && b.readOnly);
     expect(headerBlock).toBeDefined();
     expect(headerBlock.value[0].text).toBe('Edited ReadOnly Header');
 
     // Fixed+editable banner should keep ORIGINAL template content (page edits don't transfer)
-    const bannerBlock = Object.values(merged.blocks).find(b => b.placeholder === 'banner' && b.fixed && !b.readOnly);
+    const bannerBlock = Object.values(merged.blocks).find(b => b.slotId === 'banner' && b.fixed && !b.readOnly);
     expect(bannerBlock).toBeDefined();
     expect(bannerBlock.value[0].text).toBe('Original Editable Banner');
   });
@@ -745,7 +745,7 @@ describe('sequential layout switching', () => {
     const result = await applyLayoutTemplate(pageData, newTemplateData, uuidGenerator);
 
     // Header should have NEW template's content (readOnly = don't preserve)
-    const headerBlocks = Object.entries(result.blocks).filter(([_, b]) => b.placeholder === 'header' && b.fixed);
+    const headerBlocks = Object.entries(result.blocks).filter(([_, b]) => b.slotId === 'header' && b.fixed);
     expect(headerBlocks.length).toBe(1);
     expect(headerBlocks[0][1].value[0].text).toBe('New ReadOnly Header');
   });
@@ -774,7 +774,7 @@ describe('sequential layout switching', () => {
 
     // Verify first layout applied
     expect(afterFirst.blocks['user-block']).toBeDefined();
-    const headerBlocksAfterFirst = Object.entries(afterFirst.blocks).filter(([_, b]) => b.placeholder === 'header' && b.fixed);
+    const headerBlocksAfterFirst = Object.entries(afterFirst.blocks).filter(([_, b]) => b.slotId === 'header' && b.fixed);
     expect(headerBlocksAfterFirst.length).toBe(1);
     expect(headerBlocksAfterFirst[0][1].value[0].text).toBe('Layout Header');
 
@@ -794,12 +794,12 @@ describe('sequential layout switching', () => {
     expect(afterSecond.blocks['user-block']).toBeDefined();
 
     // Header should preserve content from source (fixed + editable = preserve user's potential edits)
-    const headerBlocksAfterSecond = Object.entries(afterSecond.blocks).filter(([_, b]) => b.placeholder === 'header' && b.fixed);
+    const headerBlocksAfterSecond = Object.entries(afterSecond.blocks).filter(([_, b]) => b.slotId === 'header' && b.fixed);
     expect(headerBlocksAfterSecond.length).toBe(1);
     expect(headerBlocksAfterSecond[0][1].value[0].text).toBe('Layout Header');
 
     // Old footer should be gone (no footer in new layout)
-    const footerBlocks = Object.entries(afterSecond.blocks).filter(([_, b]) => b.placeholder === 'footer');
+    const footerBlocks = Object.entries(afterSecond.blocks).filter(([_, b]) => b.slotId === 'footer');
     expect(footerBlocks.length).toBe(0);
 
     // All blocks should have new templateId
@@ -1002,7 +1002,7 @@ describe('multiple template instances with shared templateState', () => {
   });
 });
 
-describe('nextPlaceholder and childPlaceholders on fixed blocks', () => {
+describe('nextSlotId and childSlotIds on fixed blocks', () => {
   let counter = 0;
   const uuidGenerator = () => `uuid-${++counter}`;
 
@@ -1010,7 +1010,7 @@ describe('nextPlaceholder and childPlaceholders on fixed blocks', () => {
     counter = 0;
   });
 
-  test('nextPlaceholder is set on fixed block preceding a placeholder', async () => {
+  test('nextSlotId is set on fixed block preceding a slot', async () => {
     const pageData = {
       blocks: {
         'user-1': { '@type': 'slate', value: [{ text: 'User content' }], templateId: '/templates/t1', templateInstanceId: 'inst-1', placeholder: 'default' },
@@ -1032,20 +1032,20 @@ describe('nextPlaceholder and childPlaceholders on fixed blocks', () => {
     const blocks = result.blocks;
     const layout = result.blocks_layout.items;
 
-    // Header should have nextPlaceholder: 'default' (the placeholder after it)
+    // Header should have nextSlotId: 'default' (the placeholder after it)
     const headerBlock = blocks[layout[0]];
     expect(headerBlock.fixed).toBe(true);
-    expect(headerBlock.placeholder).toBe('header');
-    expect(headerBlock.nextPlaceholder).toBe('default');
+    expect(headerBlock.slotId).toBe('header');
+    expect(headerBlock.nextSlotId).toBe('default');
 
-    // Footer should NOT have nextPlaceholder (nothing follows it)
+    // Footer should NOT have nextSlotId (nothing follows it)
     const footerBlock = blocks[layout[layout.length - 1]];
     expect(footerBlock.fixed).toBe(true);
-    expect(footerBlock.placeholder).toBe('footer');
-    expect(footerBlock.nextPlaceholder).toBeUndefined();
+    expect(footerBlock.slotId).toBe('footer');
+    expect(footerBlock.nextSlotId).toBeUndefined();
   });
 
-  test('nextPlaceholder not set when next block is another fixed block', async () => {
+  test('nextSlotId not set when next block is another fixed block', async () => {
     const pageData = {
       blocks: {
         'user-1': { '@type': 'slate', value: [{ text: 'User' }], templateId: '/templates/t1', templateInstanceId: 'inst-1', placeholder: 'default' },
@@ -1054,8 +1054,8 @@ describe('nextPlaceholder and childPlaceholders on fixed blocks', () => {
     };
 
     // Template: header → grid (fixed) → slot → footer
-    // header's next is grid (fixed), so header should NOT get nextPlaceholder
-    // grid's next is slot (placeholder), so grid SHOULD get nextPlaceholder
+    // header's next is grid (fixed), so header should NOT get nextSlotId
+    // grid's next is slot (placeholder), so grid SHOULD get nextSlotId
     const templateData = {
       '@id': '/templates/t1',
       blocks: {
@@ -1071,16 +1071,16 @@ describe('nextPlaceholder and childPlaceholders on fixed blocks', () => {
     const blocks = result.blocks;
     const layout = result.blocks_layout.items;
 
-    // header → next is grid (fixed) → stop, no nextPlaceholder
+    // header → next is grid (fixed) → stop, no nextSlotId
     const headerBlock = blocks[layout[0]];
-    expect(headerBlock.nextPlaceholder).toBeUndefined();
+    expect(headerBlock.nextSlotId).toBeUndefined();
 
-    // grid → next is slot (placeholder: 'default') → nextPlaceholder: 'default'
+    // grid → next is slot (placeholder: 'default') → nextSlotId: 'default'
     const gridBlock = blocks[layout[1]];
-    expect(gridBlock.nextPlaceholder).toBe('default');
+    expect(gridBlock.nextSlotId).toBe('default');
   });
 
-  test('childPlaceholders set on container fixed block with nested placeholder', async () => {
+  test('childSlotIds set on container fixed block with nested placeholder', async () => {
     const pageData = {
       blocks: {},
       blocks_layout: { items: [] },
@@ -1108,11 +1108,11 @@ describe('nextPlaceholder and childPlaceholders on fixed blocks', () => {
     const blocks = result.blocks;
     const layout = result.blocks_layout.items;
 
-    // Container block should have childPlaceholders with the first non-fixed placeholder
+    // Container block should have childSlotIds with the first non-fixed placeholder
     const containerBlock = blocks[layout[0]];
     expect(containerBlock.fixed).toBe(true);
-    expect(containerBlock.childPlaceholders).toEqual({ blocks: 'sidebar' });
-    // Container should also have nextPlaceholder for the top-level slot
-    expect(containerBlock.nextPlaceholder).toBe('default');
+    expect(containerBlock.childSlotIds).toEqual({ blocks: 'sidebar' });
+    // Container should also have nextSlotId for the top-level slot
+    expect(containerBlock.nextSlotId).toBe('default');
   });
 });

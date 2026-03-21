@@ -12,7 +12,7 @@
       "readOnly": true,
       "templateId": "resolveuid/footer-layout-uid",
       "templateInstanceId": "footer-layout-def-instance",
-      "placeholder": "branding",
+      "slotId": "branding",
       "value": [
         {
           "type": "p",
@@ -25,7 +25,7 @@
       "@type": "slate",
       "templateId": "resolveuid/footer-layout-uid",
       "templateInstanceId": "footer-layout-def-instance",
-      "placeholder": "default",
+      "slotId": "default",
       "value": [
         {
           "type": "p",

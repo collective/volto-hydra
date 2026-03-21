@@ -283,7 +283,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-text",
-      "placeholder": "schema",
+      "slotId": "schema",
       "tabs": [
         {
           "@id": "ref-text-schema-javascript-6ffd2e",
@@ -297,7 +297,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-text",
-      "placeholder": "json-data",
+      "slotId": "json-data",
       "tabs": [
         {
           "@id": "ref-text-json-data-json-f6d82b",
@@ -311,7 +311,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-text",
-      "placeholder": "rendering",
+      "slotId": "rendering",
       "tabs": [
         {
           "@id": "ref-text-rendering-jsx-076433",
@@ -339,7 +339,7 @@
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
-      "placeholder": "sep"
+      "slotId": "sep"
     },
     "ref-slate-heading": {
       "@type": "slate",
@@ -347,13 +347,13 @@
       "readOnly": true,
       "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
-      "placeholder": "heading"
+      "slotId": "heading"
     },
     "ref-slate-schema": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
-      "placeholder": "schema",
+      "slotId": "schema",
       "tabs": [
         {
           "@id": "ref-slate-schema-javascript-36f411",
@@ -367,7 +367,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
-      "placeholder": "json-data",
+      "slotId": "json-data",
       "tabs": [
         {
           "@id": "ref-slate-json-data-json-0fbdba",
@@ -381,7 +381,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
-      "placeholder": "rendering",
+      "slotId": "rendering",
       "tabs": [
         {
           "@id": "ref-slate-rendering-jsx-7f46e2",

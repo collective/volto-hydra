@@ -13,7 +13,7 @@
       "readOnly": true,
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "sep",
+      "slotId": "sep",
       "styles": {
         "align": "full"
       }
@@ -24,7 +24,7 @@
       "readOnly": true,
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "examples-heading",
+      "slotId": "examples-heading",
       "plaintext": "Developer Reference",
       "value": [
         {
@@ -43,7 +43,7 @@
       "readOnly": true,
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "schema-heading",
+      "slotId": "schema-heading",
       "plaintext": "Schema",
       "value": [
         {
@@ -62,7 +62,7 @@
       "readOnly": true,
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "schema-desc",
+      "slotId": "schema-desc",
       "plaintext": "Pass this object inside the blocks option when calling initBridge() to register this block type with the admin UI. See Custom Blocks for the full setup guide.",
       "value": [
         {
@@ -115,7 +115,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "schema",
+      "slotId": "schema",
       "tabs": [
         {
           "@id": "tpl-schema-javascript-000000",
@@ -131,7 +131,7 @@
       "readOnly": true,
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "json-heading",
+      "slotId": "json-heading",
       "plaintext": "JSON Block Data",
       "value": [
         {
@@ -150,7 +150,7 @@
       "readOnly": true,
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "json-desc",
+      "slotId": "json-desc",
       "plaintext": "Example JSON as stored in the Plone content API. This is the data structure your component will receive in the block prop.",
       "value": [
         {
@@ -178,7 +178,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "json-data",
+      "slotId": "json-data",
       "tabs": [
         {
           "@id": "tpl-json-json-000000",
@@ -194,7 +194,7 @@
       "readOnly": true,
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "rendering-heading",
+      "slotId": "rendering-heading",
       "plaintext": "Component",
       "value": [
         {
@@ -213,7 +213,7 @@
       "readOnly": true,
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "rendering-desc",
+      "slotId": "rendering-desc",
       "plaintext": "Render component for your frontend framework. Add this to your block renderer's switch/map so it handles this block type.",
       "value": [
         {
@@ -241,7 +241,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
-      "placeholder": "rendering",
+      "slotId": "rendering",
       "tabs": [
         {
           "@id": "tpl-rendering-jsx-000000",

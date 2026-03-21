@@ -12,7 +12,7 @@
       "readOnly": true,
       "templateId": "resolveuid/snippet-template-uid",
       "templateInstanceId": "snippet-def-instance",
-      "placeholder": "snippet-heading",
+      "slotId": "snippet-heading",
       "value": [
         {
           "type": "h2",
@@ -25,7 +25,7 @@
       "@type": "slate",
       "templateId": "resolveuid/snippet-template-uid",
       "templateInstanceId": "snippet-def-instance",
-      "placeholder": "snippet-body",
+      "slotId": "snippet-body",
       "value": [
         {
           "type": "p",

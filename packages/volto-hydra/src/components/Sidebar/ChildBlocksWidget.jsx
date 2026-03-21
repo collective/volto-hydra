@@ -119,46 +119,46 @@ const getBlockTitle = (blockData) => {
 };
 
 /**
- * Group template instance children into sections by placeholder.
+ * Group template instance children into sections by slotId.
  * Produces a sequence of:
  * - { type: 'fixed', block } — standalone fixed block (no drag)
- * - { type: 'placeholder', name, blocks: [...], precedingFixedId } — placeholder region
+ * - { type: 'slot', name, blocks: [...], precedingFixedId } — slot region
  *
- * Also inserts empty placeholder sections for nextPlaceholder on fixed blocks
+ * Also inserts empty slot sections for nextSlotId on fixed blocks
  * when all blocks in that region were deleted.
  */
 const groupByPlaceholder = (childBlocks, templateEditMode) => {
   const sections = [];
-  let currentPlaceholder = null;
+  let currentSlot = null;
 
   for (const child of childBlocks) {
     const isLocked = isBlockPositionLocked(child.data, templateEditMode);
 
     if (isLocked) {
-      currentPlaceholder = null;
+      currentSlot = null;
       sections.push({ type: 'fixed', block: child });
     } else {
-      const placeholderName = child.data?.placeholder || 'content';
-      if (!currentPlaceholder || currentPlaceholder.name !== placeholderName) {
-        currentPlaceholder = { type: 'placeholder', name: placeholderName, blocks: [] };
-        sections.push(currentPlaceholder);
+      const slotName = child.data?.slotId || 'content';
+      if (!currentSlot || currentSlot.name !== slotName) {
+        currentSlot = { type: 'slot', name: slotName, blocks: [] };
+        sections.push(currentSlot);
       }
-      currentPlaceholder.blocks.push(child);
+      currentSlot.blocks.push(child);
     }
   }
 
-  // Insert empty placeholder sections for fixed blocks with nextPlaceholder
+  // Insert empty slot sections for fixed blocks with nextSlotId
   // when all blocks in the region were deleted
   const result = [];
   for (let i = 0; i < sections.length; i++) {
     result.push(sections[i]);
     if (sections[i].type === 'fixed') {
-      const nextPh = sections[i].block.data?.nextPlaceholder;
+      const nextPh = sections[i].block.data?.nextSlotId;
       if (nextPh) {
         const next = sections[i + 1];
-        if (!next || next.type !== 'placeholder' || next.name !== nextPh) {
+        if (!next || next.type !== 'slot' || next.name !== nextPh) {
           result.push({
-            type: 'placeholder',
+            type: 'slot',
             name: nextPh,
             blocks: [],
             precedingFixedId: sections[i].block.id,
@@ -168,9 +168,9 @@ const groupByPlaceholder = (childBlocks, templateEditMode) => {
     }
   }
 
-  // Set precedingFixedId on all placeholder sections (for add-after when section has blocks too)
+  // Set precedingFixedId on all slot sections (for add-after when section has blocks too)
   for (let i = 0; i < result.length; i++) {
-    if (result[i].type === 'placeholder' && !result[i].precedingFixedId) {
+    if (result[i].type === 'slot' && !result[i].precedingFixedId) {
       // Look back for the nearest fixed block
       for (let j = i - 1; j >= 0; j--) {
         if (result[j].type === 'fixed') {
@@ -391,7 +391,7 @@ const ChildBlocksWidget = ({
   return createPortal(
     <div className="child-blocks-widget">
       {containerFields.map((field) => {
-        // For template instances, group children by placeholder
+        // For template instances, group children by slotId
         if (field.isTemplateInstance) {
           const childIds = Object.entries(blockPathMap)
             .filter(([, info]) => info.parentId === selectedBlock)
@@ -458,12 +458,12 @@ const ChildBlocksWidget = ({
               }
             };
 
-            const placeholderTitle = section.name.charAt(0).toUpperCase() + section.name.slice(1);
+            const slotTitle = section.name.charAt(0).toUpperCase() + section.name.slice(1);
             return (
               <ContainerFieldSection
-                key={`placeholder-${section.name}-${sectionIdx}`}
+                key={`slot-${section.name}-${sectionIdx}`}
                 fieldName={realFieldName}
-                fieldTitle={placeholderTitle}
+                fieldTitle={slotTitle}
                 childBlocks={section.blocks}
                 canAdd={true}
                 onSelectBlock={onSelectBlock}
