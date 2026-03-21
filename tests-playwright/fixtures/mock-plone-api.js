@@ -282,23 +282,23 @@ function getPlaceholderImageScales(title, fieldName = 'image') {
   return {
     [fieldName]: [{
       'content-type': 'image/svg+xml',
-      'download': `@@images/${fieldName}-800-${hash}.svg`,
+      'download': `@@images/image-800-${hash}.svg`,
       'filename': 'placeholder.svg',
       'height': 600,
       'width': 800,
       'scales': {
         'preview': {
-          'download': `@@images/${fieldName}/preview`,
+          'download': `@@images/image/preview`,
           'height': 300,
           'width': 400,
         },
         'mini': {
-          'download': `@@images/${fieldName}/mini`,
+          'download': `@@images/image/mini`,
           'height': 150,
           'width': 200,
         },
         'thumb': {
-          'download': `@@images/${fieldName}/thumb`,
+          'download': `@@images/image/thumb`,
           'height': 96,
           'width': 128,
         },
@@ -339,7 +339,7 @@ function formatSearchItem(content, baseUrl) {
     item.image_scales = getImageScales(content, baseUrl) || getPlaceholderImageScales(content.title);
   } else if (hasPreviewImage) {
     item.image_field = 'preview_image';
-    item.image_scales = getPlaceholderImageScales(content.title, 'preview_image');
+    item.image_scales = getPlaceholderImageScales(content.title);
   } else {
     item.image_field = '';
     item.image_scales = null;
@@ -731,10 +731,8 @@ function scanContentDir(contentDirPath, mountPath) {
           contentPath = '/';
         }
 
-        // Apply mount prefix (skip if @id already starts with mountPath)
-        const urlPath = mountPath === '/' || contentPath.startsWith(mountPath)
-          ? contentPath
-          : mountPath + contentPath;
+        // Apply mount prefix
+        const urlPath = mountPath === '/' ? contentPath : mountPath + contentPath;
 
         // Only store the directory mapping, content loaded on-demand
         contentDirMap[urlPath] = { dirPath: fullDirPath, dirName: dir.name };
@@ -1898,12 +1896,9 @@ app.get('*/@@images/*', (req, res) => {
   // e.g., /images/test-image-1/@@images/image/preview
   // e.g., /block/grid-block/@@images/preview_image/large
   // e.g., /concepts/custom-blocks/@@images/image-800-1c983515.svg (listing expansion scale URL)
-  // Match field name which may include hash suffix: image-800-1c983515.svg
-  const pathMatch = req.path.match(/^(.+?)\/@@images\/([a-z_]+(?:-[\w.-]+)?)/i);
+  const pathMatch = req.path.match(/^(.+?)\/@@images\/([a-z_]+)/i);
   const contentPath = pathMatch ? pathMatch[1] : '';
-  // Strip hash suffix from field name (e.g., 'image-800-1c983515.svg' → 'image')
-  const rawField = pathMatch ? pathMatch[2] : 'image';
-  const fieldName = rawField.replace(/-\d+.*$/, '');
+  const fieldName = pathMatch ? pathMatch[2] : 'image';
   const scale = pathMatch && pathMatch[3] ? pathMatch[3] : 'preview';
 
   // Try to serve actual image file from content directory
