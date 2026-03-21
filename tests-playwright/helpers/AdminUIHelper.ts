@@ -805,7 +805,7 @@ export class AdminUIHelper {
    */
   async expectTemplateSettingsCount(expected: number, timeout: number = 5000): Promise<void> {
     const container = this.page.locator('#sidebar-template-settings');
-    const sections = container.locator('.field-wrapper-placeholder');
+    const sections = container.locator('.field-wrapper-slotId');
     await expect(sections).toHaveCount(expected, { timeout });
   }
 
