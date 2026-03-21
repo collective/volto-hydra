@@ -279,36 +279,6 @@
         }
       ]
     },
-    "ref-text-sep": {
-      "@type": "separator",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-text",
-      "placeholder": "sep",
-      "styles": {
-        "align": "full"
-      }
-    },
-    "ref-text-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-text",
-      "placeholder": "examples-heading",
-      "plaintext": "Developer Reference",
-      "value": [
-        {
-          "type": "h2",
-          "children": [
-            {
-              "text": "Developer Reference"
-            }
-          ]
-        }
-      ]
-    },
     "ref-text-schema": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
@@ -363,59 +333,11 @@
         }
       ]
     },
-    "ref-text-schema-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-text",
-      "placeholder": "schema-heading"
-    },
-    "ref-text-schema-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-text",
-      "placeholder": "schema-desc"
-    },
-    "ref-text-json-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-text",
-      "placeholder": "json-heading"
-    },
-    "ref-text-json-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-text",
-      "placeholder": "json-desc"
-    },
-    "ref-text-rendering-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-text",
-      "placeholder": "rendering-heading"
-    },
-    "ref-text-rendering-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-text",
-      "placeholder": "rendering-desc"
-    },
     "ref-slate-sep": {
       "@type": "separator",
       "fixed": true,
       "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
+      "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
       "placeholder": "sep"
     },
@@ -423,57 +345,9 @@
       "@type": "slate",
       "fixed": true,
       "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
+      "templateId": "resolveuid/tpl-block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
       "placeholder": "heading"
-    },
-    "ref-slate-schema-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-slate",
-      "placeholder": "schema-heading"
-    },
-    "ref-slate-schema-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-slate",
-      "placeholder": "schema-desc"
-    },
-    "ref-slate-json-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-slate",
-      "placeholder": "json-heading"
-    },
-    "ref-slate-json-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-slate",
-      "placeholder": "json-desc"
-    },
-    "ref-slate-rendering-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-slate",
-      "placeholder": "rendering-heading"
-    },
-    "ref-slate-rendering-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-slate",
-      "placeholder": "rendering-desc"
     },
     "ref-slate-schema": {
       "@type": "codeExample",
@@ -549,28 +423,11 @@
       "486c4646-de10-40a9-9470-58b7b1449240",
       "f0a56edf-a963-4177-877c-76d9a4d6c20b",
       "00146980-5c86-4ecd-a84e-d373183231ad",
-      "ref-text-sep",
-      "ref-text-heading",
-      "ref-text-schema-heading",
-      "ref-text-schema-desc",
-      "ref-text-schema",
-      "ref-text-json-heading",
-      "ref-text-json-desc",
-      "ref-text-json-data",
-      "ref-text-rendering-heading",
-      "ref-text-rendering-desc",
-      "ref-text-rendering",
       "ref-slate-sep",
       "ref-slate-heading",
-      "ref-slate-schema-heading",
-      "ref-slate-schema-desc",
-      "ref-slate-schema",
-      "ref-slate-json-heading",
-      "ref-slate-json-desc",
-      "ref-slate-json-data",
-      "ref-slate-rendering-heading",
-      "ref-slate-rendering-desc",
-      "ref-slate-rendering"
+      "ref-text-schema",
+      "ref-text-json-data",
+      "ref-text-rendering"
     ]
   },
   "contributors": [],

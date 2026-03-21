@@ -11,7 +11,7 @@ test.describe('calculateNormalizedOffset() - Vue whitespace handling', () => {
 
   test.beforeEach(async ({ page }) => {
     helper = new AdminUIHelper(page);
-    await page.goto('http://localhost:8888/mock-parent.html');
+    await page.goto('http://localhost:8889/mock-parent.html');
     await helper.waitForIframeReady();
     await helper.waitForBlockSelected('mock-block-1');
   });
@@ -57,7 +57,7 @@ test.describe('calculateNormalizedOffset() - Vue whitespace handling', () => {
       const container = document.createElement('div');
       container.innerHTML =
         '<div data-edit-text="value">' +
-        '<p data-node-id="0">Hello <strong data-node-id="0-1">bold</strong> world</p>' +
+        '<p data-node-id="0">Hello <strong data-node-id="0.1">bold</strong> world</p>' +
         '</div>';
       document.body.appendChild(container);
 
@@ -90,7 +90,7 @@ test.describe('calculateNormalizedOffset() - Vue whitespace handling', () => {
       const container = document.createElement('div');
       container.innerHTML =
         '<div data-edit-text="value">' +
-        '<p data-node-id="0">Hello <strong data-node-id="0-1">bold</strong> world</p>' +
+        '<p data-node-id="0">Hello <strong data-node-id="0.1">bold</strong> world</p>' +
         '</div>';
       document.body.appendChild(container);
 
@@ -123,7 +123,7 @@ test.describe('calculateNormalizedOffset() - Vue whitespace handling', () => {
       const container = document.createElement('div');
       container.innerHTML =
         '<div data-edit-text="value">' +
-        '<p data-node-id="0">Hello <strong data-node-id="0-1">bold</strong> world</p>' +
+        '<p data-node-id="0">Hello <strong data-node-id="0.1">bold</strong> world</p>' +
         '</div>';
       document.body.appendChild(container);
 
@@ -157,9 +157,9 @@ test.describe('calculateNormalizedOffset() - Vue whitespace handling', () => {
       container.innerHTML =
         '<div data-edit-text="value">' +
         '<p data-node-id="0">' +
-        '<strong data-node-id="0-0">first</strong>' +
+        '<strong data-node-id="0.0">first</strong>' +
         ' middle ' +
-        '<em data-node-id="0-2">last</em>' +
+        '<em data-node-id="0.2">last</em>' +
         '</p>' +
         '</div>';
       document.body.appendChild(container);

@@ -48,8 +48,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 // handleTextChange
-// handleTextChangeOnSlate
-// updateJsonNode
+// readSlateValueFromDOM
 // findParentWithAttribute
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -101,6 +100,13 @@ const log = (...args) => {
   const prefix = runId != null ? `[HYDRA][RUN-${runId}]` : '[HYDRA]';
   console.log(prefix, ...args);
 };
+
+/**
+ * Validates a data-node-id value is a real Slate path (dot-separated integers like "0", "0.1").
+ * Frontends may render invalid values (e.g. Next.js renders data-node-id="undefined" on text
+ * leaves where nodeId is JS undefined). All code that reads data-node-id should use this.
+ */
+const isValidNodeId = (id) => id && /^\d+(\.\d+)*$/.test(id);
 
 /**
  * Virtual block UID for page-level fields (title, description, preview_image, etc.)
@@ -1601,7 +1607,7 @@ export class Bridge {
         } else if (window.location.hash !== currentUrlObj.hash) {
           const hash = window.location.hash;
           const i = hash.indexOf('/');
-          const rawPath = i !== -1 ? hash.slice(i) || '/' : '/';
+          const rawPath = (i !== -1 ? hash.slice(i) || '/' : '/').replace(/\/+/g, '/');
           const apiPath = this.pathToApiPath(rawPath);
           log('Sending PATH_CHANGE (hash):', rawPath, '-> apiPath:', apiPath, 'to', this.adminOrigin);
           window.parent.postMessage(
@@ -3089,8 +3095,8 @@ export class Bridge {
 
     // Handle ELEMENT nodes - cursor can land on wrapper DIV when clicking at edge of block
     if (node.nodeType === Node.ELEMENT_NODE) {
-      // If this element has data-node-id, cursor position is valid
-      if (node.hasAttribute?.('data-node-id')) {
+      // If this element has a valid data-node-id, cursor position is valid
+      if (node.hasAttribute?.('data-node-id') && isValidNodeId(node.getAttribute('data-node-id'))) {
         return false;
       }
 
@@ -3153,8 +3159,9 @@ export class Bridge {
     // Walk up from node to find if there's a data-node-id ancestor (including editableField itself)
     current = node.parentNode;
     while (current) {
-      // If we hit an element with data-node-id, cursor is valid
-      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-node-id')) {
+      // If we hit an element with a valid data-node-id, cursor is valid
+      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-node-id')
+          && isValidNodeId(current.getAttribute('data-node-id'))) {
         return false;
       }
       // Stop at editable field boundary
@@ -3206,14 +3213,16 @@ export class Bridge {
       return null;
     }
 
-    // Get first and last elements with data-node-id
+    // Get first and last elements with valid data-node-id
     // Check if container itself has data-node-id first, then look for descendants
-    const firstNodeIdEl = container.hasAttribute?.('data-node-id')
+    const containerHasValidId = container.hasAttribute?.('data-node-id') && isValidNodeId(container.getAttribute('data-node-id'));
+    const allDescendants = [...container.querySelectorAll('[data-node-id]')].filter(el => isValidNodeId(el.getAttribute('data-node-id')));
+    const firstNodeIdEl = containerHasValidId
       ? container
-      : container.querySelector('[data-node-id]');
-    const allNodeIdEls = container.hasAttribute?.('data-node-id')
-      ? [container, ...container.querySelectorAll('[data-node-id]')]
-      : container.querySelectorAll('[data-node-id]');
+      : allDescendants[0] || null;
+    const allNodeIdEls = containerHasValidId
+      ? [container, ...allDescendants]
+      : allDescendants;
     const lastNodeIdEl = allNodeIdEls[allNodeIdEls.length - 1];
 
     if (!firstNodeIdEl) {
@@ -3311,19 +3320,28 @@ export class Bridge {
       anchorParent: range.startContainer.parentElement?.tagName,
     });
 
+    // Disconnect observer during DOM modification — getValidatedPosition may create
+    // ZWS text nodes, and we must not let the observer treat those as user edits.
+    // Must disconnect (not just set a flag) because MutationObserver fires async.
+    this._suppressObserver();
+
     // Get corrected positions using shared helper
     const anchorPos = this.getValidatedPosition(range.startContainer, range.startOffset);
     const focusPos = this.getValidatedPosition(range.endContainer, range.endOffset);
 
     log('correctInvalidWhitespaceSelection: anchorPos:', anchorPos, 'focusPos:', focusPos);
 
-    if (!anchorPos.node || !focusPos.node) return false;
+    if (!anchorPos.node || !focusPos.node) {
+      this._resumeObserver();
+      return false;
+    }
 
     // Check if corrected position is same as current - if so, don't update (avoids infinite loop)
     const anchorSame = anchorPos.node === range.startContainer && anchorPos.offset === range.startOffset;
     const focusSame = focusPos.node === range.endContainer && focusPos.offset === range.endOffset;
     if (anchorSame && focusSame) {
       log('correctInvalidWhitespaceSelection: corrected position same as current, skipping to avoid loop');
+      this._resumeObserver();
       return false;
     }
 
@@ -3334,6 +3352,7 @@ export class Bridge {
     selection.removeAllRanges();
     selection.addRange(newRange);
 
+    this._resumeObserver();
     log('correctInvalidWhitespaceSelection: Corrected selection');
     return true;
   }
@@ -3382,7 +3401,7 @@ export class Bridge {
         // Check data-node-id BEFORE data-edit-text because elements
         // can have both attrs (e.g. <p data-edit-text="value" data-node-id="0">).
         // We must check the element's content before potentially breaking out.
-        if (current.hasAttribute?.('data-node-id')) {
+        if (current.hasAttribute?.('data-node-id') && isValidNodeId(current.getAttribute('data-node-id'))) {
           foundDataNodeId = true;
           const elementText = this.stripZeroWidthSpaces(current.textContent);
           if (elementText.trim() !== '') {
@@ -3399,12 +3418,15 @@ export class Bridge {
 
     // All ancestors are empty — whitespace is a rendering artifact with no
     // CSS layout box. Replace with BOM so the browser has a valid target.
+    // Disconnect observer to prevent this DOM change from being treated as user typing.
+    this._suppressObserver();
     node.textContent = '\uFEFF';
     const range = selection.getRangeAt(0);
     range.setStart(node, 1);
     range.setEnd(node, 1);
     selection.removeAllRanges();
     selection.addRange(range);
+    this._resumeObserver();
     log('ensureValidInsertionTarget: replaced artifact whitespace with FEFF');
 
     return false;
@@ -3676,16 +3698,16 @@ export class Bridge {
 
     for (let i = nodeIndex - 1; i >= 0; i--) {
       const sib = siblings[i];
-      if (sib.nodeType === Node.ELEMENT_NODE && sib.hasAttribute('data-node-id')) {
+      if (sib.nodeType === Node.ELEMENT_NODE && sib.hasAttribute('data-node-id') && isValidNodeId(sib.getAttribute('data-node-id'))) {
         startNode = sib;
         startAtEnd = true; // Measure from end of preceding element
         break;
       }
     }
 
-    // If no preceding sibling with data-node-id, check if parent has data-node-id
+    // If no preceding sibling with data-node-id, check if parent has valid data-node-id
     // (text is inside formatted element like <strong>)
-    if (!startNode && parent.hasAttribute?.('data-node-id')) {
+    if (!startNode && parent.hasAttribute?.('data-node-id') && isValidNodeId(parent.getAttribute('data-node-id'))) {
       startNode = parent;
       startAtEnd = false; // Measure from start of parent
     }
@@ -3747,14 +3769,16 @@ export class Bridge {
    * Empty/whitespace text nodes (Vue artifacts) map to the previous real content.
    */
   getSlateIndexAmongSiblings(node, parent) {
-    // For elements with data-node-id, use the index from the ID
+    // For elements with a valid data-node-id, use the index from the ID
     if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('data-node-id')) {
       const nodeId = node.getAttribute('data-node-id');
-      const parts = nodeId.split(/[.-]/);
-      return parseInt(parts[parts.length - 1], 10);
+      if (isValidNodeId(nodeId)) {
+        const parts = nodeId.split('.');
+        return parseInt(parts[parts.length - 1], 10);
+      }
     }
 
-    // For text nodes (including whitespace), find the preceding element with data-node-id
+    // For text nodes (including whitespace), find the preceding element with valid data-node-id
     // The text node's index = (preceding element's last id part) + 1
     // This works regardless of whitespace because all text after an element
     // belongs to the next Slate text leaf
@@ -3765,7 +3789,8 @@ export class Bridge {
       const sib = siblings[i];
       if (sib.nodeType === Node.ELEMENT_NODE && sib.hasAttribute('data-node-id')) {
         const nodeId = sib.getAttribute('data-node-id');
-        const parts = nodeId.split(/[.-]/);
+        if (!isValidNodeId(nodeId)) continue;
+        const parts = nodeId.split('.');
         return parseInt(parts[parts.length - 1], 10) + 1;
       }
     }
@@ -3785,9 +3810,9 @@ export class Bridge {
     // Walk up to find the element with data-node-id
     let current = element;
     while (current && current.nodeType === Node.ELEMENT_NODE) {
-      if (current.hasAttribute('data-node-id')) {
+      if (current.hasAttribute('data-node-id') && isValidNodeId(current.getAttribute('data-node-id'))) {
         const nodeId = current.getAttribute('data-node-id');
-        const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
+        const parts = nodeId.split('.').map((p) => parseInt(p, 10));
         log('getElementPath: Found node-id', nodeId, '-> path:', parts);
         return parts;
       }
@@ -3846,7 +3871,7 @@ export class Bridge {
         ? parent.getAttribute('data-node-id')
         : null;
       const hasValidNodeId =
-        parentNodeId && parentNodeId !== '' && parentNodeId !== 'undefined';
+        isValidNodeId(parentNodeId);
       if (
         hasValidNodeId &&
         parent.nodeName !== 'P' &&
@@ -3854,7 +3879,7 @@ export class Bridge {
         !parent.hasAttribute?.('data-edit-text')
       ) {
         // Parse the parent's path from its node ID
-        const parts = parentNodeId.split(/[.-]/).map((p) => parseInt(p, 10));
+        const parts = parentNodeId.split('.').map((p) => parseInt(p, 10));
 
         // Text node index within the parent element (filtered for Vue artifacts)
         const textIndex = this.getSlateIndexAmongSiblings(node, parent);
@@ -3902,14 +3927,14 @@ export class Bridge {
         ? current.getAttribute('data-node-id')
         : null;
       const hasValidNodeId =
-        nodeId && nodeId !== '' && nodeId !== 'undefined';
+        isValidNodeId(nodeId);
 
       // Process current node if it has a valid nodeId
       // Must process BEFORE checking edit-text since element can have both
       if (hasValidNodeId) {
         foundNodeIdInWalk = true;
         // Parse node ID to get path components (e.g., "0.1" -> [0, 1] or "0-1" -> [0, 1])
-        const parts = nodeId.split(/[.-]/).map((p) => parseInt(p, 10));
+        const parts = nodeId.split('.').map((p) => parseInt(p, 10));
 
         // Prepend these path components
         for (let i = parts.length - 1; i >= 0; i--) {
@@ -4762,11 +4787,14 @@ export class Bridge {
           this._reRenderBlocking = false;
 
           // Restore pre-render cursor position when no transformedSelection was
-          // provided (sidebar-originated FORM_DATA). The DOM re-render may reset
+          // provided (echo or sidebar FORM_DATA). The DOM re-render may reset
           // cursor to position 0; we need to put it back before replaying events.
-          // Skip when focus is in the sidebar (skipFocus=true) — restoring selection
-          // calls .focus() inside the iframe which steals focus from the sidebar field.
-          if (!transformedSelection && this._preRenderSelection && !skipFocus) {
+          // Only restore when iframe has focus — restoring selection calls .focus()
+          // which would steal focus from sidebar fields. Note: skipFocus (based on
+          // focusLost) can't be used here because frameworks like Vue may patch the
+          // DOM without destroying the focused element, so focus isn't "lost" even
+          // though the cursor position was reset to 0.
+          if (!transformedSelection && this._preRenderSelection && this._iframeFocused) {
             log('Restoring pre-render selection for buffer replay:', JSON.stringify(this._preRenderSelection));
             try {
               await this.restoreSlateSelection(this._preRenderSelection, this.formData);
@@ -4830,39 +4858,179 @@ export class Bridge {
 
   /**
    * Read the text content of a data-node-id element from the DOM.
-   * Shared by handleTextChange (single node) and readFieldValueFromDOM (full field).
+   * Shared by handleTextChange (single node) and readSlateValueFromDOM (full field).
    */
   readNodeText(nodeEl) {
     return this.stripZeroWidthSpaces(nodeEl.innerText)?.replace(/\n$/, '');
   }
 
   /**
-   * Read an editable field's current DOM content back as a slate value.
-   * Clones the formData value then updates each node's text from the DOM,
-   * using the same readNodeText logic as handleTextChange.
+   * Build a map of nodeId → metadata from a Slate JSON value.
+   * Metadata is everything except text, children, and nodeId — e.g.
+   * type, data, bold, italic, href, etc. Used by readSlateValueFromDOM
+   * to preserve formatting when reconstructing the value from the DOM.
+   *
+   * Also tracks which nodeIds are inline (appeared alongside text children
+   * in the existing value) in map._inlineNodeIds. This drives Slate
+   * normalization — inline nodes need empty text nodes around them.
    */
-  readFieldValueFromDOM(fieldEl, slateValue) {
-    const clone = JSON.parse(JSON.stringify(slateValue));
-    const nodeEls = fieldEl.querySelectorAll('[data-node-id]');
-    const nodes = fieldEl.hasAttribute('data-node-id')
-      ? [fieldEl, ...nodeEls] : [...nodeEls];
-
-    for (const nodeEl of nodes) {
-      // Skip parent nodes that contain child data-node-id elements —
-      // their innerText includes children's text, which would cause
-      // updateJsonNode to collapse the inline element structure.
-      if (nodeEl.querySelector('[data-node-id]')) continue;
-
-      const nodeId = nodeEl.getAttribute('data-node-id');
-      const text = this.readNodeText(nodeEl);
-      this.updateJsonNode(clone, nodeId, text);
+  buildNodeMetadataMap(slateValue, map = {}) {
+    if (!map._inlineNodeIds) map._inlineNodeIds = new Set();
+    if (Array.isArray(slateValue)) {
+      for (const item of slateValue) this.buildNodeMetadataMap(item, map);
+    } else if (slateValue && typeof slateValue === 'object') {
+      if (slateValue.nodeId) {
+        const meta = {};
+        for (const key of Object.keys(slateValue)) {
+          if (key !== 'text' && key !== 'children' && key !== 'nodeId') {
+            meta[key] = slateValue[key];
+          }
+        }
+        map[slateValue.nodeId] = meta;
+      }
+      if (slateValue.children) {
+        // Recurse first so child entries exist in the map
+        this.buildNodeMetadataMap(slateValue.children, map);
+        // Detect inline nodeIds: if children mix text and typed nodes,
+        // the typed ones are inline elements in Slate
+        const hasText = slateValue.children.some(c => c.hasOwnProperty('text'));
+        if (hasText) {
+          for (const child of slateValue.children) {
+            if (child.nodeId) {
+              map._inlineNodeIds.add(child.nodeId);
+            }
+          }
+        }
+      }
     }
-    return clone;
+    return map;
   }
 
   /**
+   * Convert a DOM element with data-node-id into a Slate JSON node.
+   * Text nodes become {text: "..."}, elements with data-node-id recurse.
+   * Metadata (type, data, marks) comes from the metadataMap, not the DOM.
+   */
+  domNodeToSlate(el, metadataMap) {
+    const nodeId = el.getAttribute('data-node-id');
+    const metadata = (nodeId && metadataMap[nodeId]) || {};
+    const children = [];
+
+    for (const child of el.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const raw = child.textContent || '';
+        const text = this.stripZeroWidthSpaces(raw);
+        children.push({ text });
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const childNodeId = child.getAttribute('data-node-id');
+        if (childNodeId && isValidNodeId(childNodeId)) {
+          children.push(this.domNodeToSlate(child, metadataMap));
+        } else {
+          // Element without valid nodeId (e.g. Vue wrapper span, Next.js leaf span)
+          // — treat its text content as a text node, including empty text which
+          // Slate requires around inline elements like strong/link
+          const text = this.stripZeroWidthSpaces(child.textContent || '');
+          children.push({ text });
+        }
+      }
+    }
+
+    // Merge adjacent text nodes (browser/framework may split them)
+    const merged = [];
+    for (const child of children) {
+      const prev = merged[merged.length - 1];
+      if (prev && prev.hasOwnProperty('text') && child.hasOwnProperty('text') && !child.type) {
+        prev.text += child.text;
+      } else {
+        merged.push(child);
+      }
+    }
+
+    // Remove whitespace-only text nodes between non-inline elements.
+    // These come from HTML indentation (e.g. newlines between <li> tags)
+    // and are not Slate content. We detect this by checking: if none of
+    // the element children are inline (per the metadata), then any
+    // whitespace-only text is just HTML formatting.
+    const inlineNodeIds = metadataMap._inlineNodeIds || new Set();
+    const hasInlineChild = merged.some(c => c.nodeId && inlineNodeIds.has(c.nodeId));
+    if (!hasInlineChild) {
+      for (let i = merged.length - 1; i >= 0; i--) {
+        if (merged[i].hasOwnProperty('text') && merged[i].text.trim() === '') {
+          merged.splice(i, 1);
+        }
+      }
+    }
+
+    // Ensure at least one child (Slate requires non-empty children)
+    if (merged.length === 0) {
+      merged.push({ text: '' });
+    }
+
+    // Slate normalization: inline nodes must have text nodes
+    // before, after, and between them.
+    const isInline = (child) => child.nodeId && inlineNodeIds.has(child.nodeId);
+    const hasInline = merged.some(isInline);
+    if (hasInline) {
+      const normalized = [];
+      for (let i = 0; i < merged.length; i++) {
+        const child = merged[i];
+        if (isInline(child)) {
+          const prev = normalized[normalized.length - 1];
+          if (!prev || !prev.hasOwnProperty('text')) {
+            normalized.push({ text: '' });
+          }
+        }
+        normalized.push(child);
+        if (isInline(child)) {
+          const next = merged[i + 1];
+          if (!next || !next.hasOwnProperty('text')) {
+            normalized.push({ text: '' });
+          }
+        }
+      }
+      return { ...metadata, children: normalized, nodeId };
+    }
+
+    return { ...metadata, children: merged, nodeId };
+  }
+
+  /**
+   * Read an editable field's current DOM content as a fresh Slate value.
+   * Walks the DOM tree and builds the value from scratch using nodeIds
+   * for structure and a metadata map for formatting/type info.
+   *
+   * This is the single source of truth for DOM → Slate conversion.
+   * Used by both handleTextChange and waitForContentReady.
+   */
+  readSlateValueFromDOM(fieldEl, existingValue) {
+    const metadataMap = this.buildNodeMetadataMap(existingValue);
+
+    // Two valid DOM patterns:
+    // 1. Field element IS the first node: <div data-edit-text="value" data-node-id="0">...</div>
+    // 2. Nodes nested inside field: <div data-edit-text="value"><p data-node-id="0">...</p></div>
+    // Both produce the same Slate value.
+    const fieldNodeId = fieldEl.getAttribute('data-node-id');
+    if (fieldNodeId && isValidNodeId(fieldNodeId)) {
+      return [this.domNodeToSlate(fieldEl, metadataMap)];
+    }
+
+    const topNodes = [];
+    for (const child of fieldEl.childNodes) {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const nodeId = child.getAttribute('data-node-id');
+        if (nodeId && isValidNodeId(nodeId)) {
+          topNodes.push(this.domNodeToSlate(child, metadataMap));
+        }
+      }
+    }
+
+    return topNodes;
+  }
+
+
+  /**
    * Wait for the rendered DOM to match this.formData for a block's editable fields.
-   * Reads the full contenteditable back via readFieldValueFromDOM and compares
+   * Reads the full contenteditable back via readSlateValueFromDOM and compares
    * against the formData value. Returns immediately when content matches (zero
    * cost on mock); on Nuxt/Vue waits for secondary renders to complete.
    */
@@ -4883,7 +5051,7 @@ export class Bridge {
 
       const expected = JSON.stringify(slateValue);
       for (let retry = 0; retry < maxRetries; retry++) {
-        const domValue = this.readFieldValueFromDOM(fieldEl, slateValue);
+        const domValue = this.readSlateValueFromDOM(fieldEl, slateValue);
         if (JSON.stringify(domValue) === expected) break;
         if (retry === 0) {
           log('waitForContentReady: content mismatch, waiting for render to complete');
@@ -5785,7 +5953,6 @@ export class Bridge {
 
     if (
       prevBlockUid !== null &&
-      currBlockUid &&
       prevBlockUid !== currBlockUid &&
       prevBlockElement
     ) {
@@ -6828,6 +6995,18 @@ export class Bridge {
       if (event.data.type === 'SELECT_BLOCK') {
         const { uid } = event.data;
 
+        // Handle deselection: Admin sends uid=null when user clicks "Page"
+        if (!uid) {
+          const prevUid = this.selectedBlockUid;
+          this.selectedBlockUid = null;
+          if (prevUid) {
+            this.deselectBlock(prevUid, null);
+          }
+          // Send BLOCK_SELECTED(null) so Admin knows iframe acknowledged deselection
+          this.sendBlockSelected('adminDeselect', null);
+          return;
+        }
+
         // Check if already selected BEFORE updating selectedBlockUid
         // This prevents ping-pong when Admin echoes back the selection from iframe click
         const alreadySelected = this.selectedBlockUid === uid;
@@ -7503,6 +7682,34 @@ export class Bridge {
    *
    * @param {HTMLElement} blockElement - The block element to observe.
    */
+  /**
+   * Temporarily disconnect the text MutationObserver. Call _resumeObserver() to reconnect.
+   * Used during internal DOM modifications (whitespace correction, ZWS insertion)
+   * that should not be treated as user edits.
+   */
+  _suppressObserver() {
+    if (this.blockTextMutationObserver) {
+      // takeRecords() flushes pending mutations so they don't fire after reconnect
+      this.blockTextMutationObserver.takeRecords();
+      this.blockTextMutationObserver.disconnect();
+    }
+  }
+
+  /**
+   * Reconnect the text MutationObserver to the currently selected block.
+   */
+  _resumeObserver() {
+    if (!this.blockTextMutationObserver || !this.selectedBlockUid) return;
+    const allElements = this.getAllBlockElements(this.selectedBlockUid);
+    for (const element of allElements) {
+      this.blockTextMutationObserver.observe(element, {
+        subtree: true,
+        characterData: true,
+        childList: true,
+      });
+    }
+  }
+
   observeBlockTextChanges(blockElement) {
     const blockUid = blockElement.getAttribute('data-block-uid');
     log('observeBlockTextChanges called for block:', blockUid);
@@ -7513,7 +7720,7 @@ export class Bridge {
       log('MutationObserver fired, mutations:', mutations.length, 'isInlineEditing:', this.isInlineEditing);
       mutations.forEach((mutation) => {
         log('Mutation:', mutation.type, 'target:', mutation.target?.nodeName, 'text:', mutation.target?.textContent?.substring(0, 50));
-        if (mutation.type === 'characterData' && this.isInlineEditing) {
+        if (mutation.type === 'characterData' && this.isInlineEditing && !this._renderInProgress) {
           // Find the editable field element (works for both Slate and non-Slate fields)
           const mutatedTextNode = mutation.target; // The actual text node that changed
           const parentEl = mutation.target?.parentElement;
@@ -7529,9 +7736,28 @@ export class Bridge {
             console.warn('[HYDRA] No targetElement found, parent chain:', parentEl?.outerHTML?.substring(0, 100));
           }
         }
-        // childList mutations are NOT processed here. Structural DOM changes
-        // (adding/removing element nodes like STRONG, EM) come from FORM_DATA
-        // re-renders and are already handled by the admin via transforms.
+        // childList mutations: when text is inside wrapper elements without
+        // data-node-id (e.g., Vue/F7 <span>), the browser may REPLACE the
+        // text node (childList) rather than modify it in place (characterData).
+        // This happens on select-all + type, backspace across node boundaries,
+        // or browser DOM normalization.
+        // NOTE: the observer is disconnected during framework re-renders
+        // (_executeRender disconnects, afterContentRender reconnects) so
+        // structural changes from FORM_DATA don't trigger this.
+        if (mutation.type === 'childList' && this.isInlineEditing && !this._renderInProgress) {
+          const parent = mutation.target;
+          if (parent?.nodeType === Node.ELEMENT_NODE) {
+            const targetElement = parent.closest?.('[data-edit-text]');
+            if (targetElement) {
+              const addedTextNode = Array.from(mutation.addedNodes).find(
+                n => n.nodeType === Node.TEXT_NODE
+              );
+              if (addedTextNode) {
+                this.handleTextChange(targetElement, parent, addedTextNode);
+              }
+            }
+          }
+        }
       });
     });
 
@@ -7543,6 +7769,7 @@ export class Bridge {
         this.blockTextMutationObserver.observe(element, {
           subtree: true,
           characterData: true,
+          childList: true,
         });
       }
     } else {
@@ -7550,6 +7777,7 @@ export class Bridge {
       this.blockTextMutationObserver.observe(blockElement, {
         subtree: true,
         characterData: true,
+        childList: true,
       });
     }
   }
@@ -8036,8 +8264,15 @@ export class Bridge {
         ? endContainer.parentElement
         : endContainer;
 
-      const startNode = startElement?.closest('[data-node-id]');
-      const endNode = endElement?.closest('[data-node-id]');
+      // Walk up to find elements with VALID data-node-id (skip "undefined" etc.)
+      let startNode = startElement;
+      while (startNode && !(startNode.hasAttribute?.('data-node-id') && isValidNodeId(startNode.getAttribute('data-node-id')))) {
+        startNode = startNode.parentElement;
+      }
+      let endNode = endElement;
+      while (endNode && !(endNode.hasAttribute?.('data-node-id') && isValidNodeId(endNode.getAttribute('data-node-id')))) {
+        endNode = endNode.parentElement;
+      }
 
       if (!startNode || !endNode) {
         return null;
@@ -8476,8 +8711,8 @@ export class Bridge {
         lastNodeId = null;
       } else if (child.nodeType === Node.ELEMENT_NODE) {
         const nodeId = child.getAttribute('data-node-id');
-        if (nodeId && nodeId !== lastNodeId) {
-          // New node-id element = new Slate child
+        if (isValidNodeId(nodeId) && nodeId !== lastNodeId) {
+          // New valid node-id element = new Slate child
           if (slateIndex === slateChildIndex) {
             return child;
           }
@@ -8882,112 +9117,38 @@ export class Bridge {
     // Determine field type (supports page-level fields via getFieldType)
     const fieldType = this.getFieldType(blockUid, editableField);
 
-
     // Note: We intentionally do NOT strip ZWS from DOM during typing.
     // Like slate-react, we let the frontend re-render (triggered by FORM_DATA)
     // naturally remove ZWS. Stripping during typing corrupts cursor position.
     // See "Whitespace & ZWS Strategy" for the full ZWS lifecycle.
 
     if (this.fieldTypeIsSlate(fieldType)) {
-      // Slate field - update JSON structure using nodeId
-      // Use the actual mutated node's parent if provided (e.g., SPAN for inline formatting)
-      // This ensures we update the correct node, not the whole editable field
-      const closestNode = (mutatedNodeParent && mutatedNodeParent.hasAttribute('data-node-id'))
-        ? mutatedNodeParent
-        : target.closest('[data-node-id]');
-      if (!closestNode) {
-        log('Slate field but no data-node-id found!');
-        return;
-      }
-
-      const nodeId = closestNode.getAttribute('data-node-id');
-
-      // Check if we're typing in a paragraph that has inline elements
-      // In this case, we need to update the specific text node, not the whole paragraph
-      let textContent;
-      let childIndex = null;
-
-      // Check if closestNode has mixed content (text nodes + element children like STRONG/EM)
-      // If so, we need to track which specific text node was modified, not use full innerText
-      const hasElementChildren = Array.from(closestNode.childNodes).some(n => n.nodeType === Node.ELEMENT_NODE);
-
-      if (mutatedTextNode && closestNode === mutatedNodeParent && hasElementChildren) {
-        // Text node is direct child of element with mixed content
-        // Use getNodePath to get the correct Slate path (handles Vue whitespace nodes)
-        const slatePath = this.getNodePath(mutatedTextNode);
-        if (slatePath && slatePath.length > 1) {
-          // Last element of path is the child index within the parent
-          childIndex = slatePath[slatePath.length - 1];
-
-          // Merge all adjacent text nodes at this position using Range.toString()
-          // This normalizes whitespace correctly and handles Vue/React text node splitting
-          let startNode = mutatedTextNode;
-          let endNode = mutatedTextNode;
-
-          // Walk backwards to find start of this text run (stop at element nodes)
-          while (startNode.previousSibling) {
-            const prev = startNode.previousSibling;
-            if (prev.nodeType === Node.ELEMENT_NODE) break;
-            if (prev.nodeType === Node.TEXT_NODE) {
-              startNode = prev;
-            } else {
-              break;
-            }
-          }
-
-          // Walk forward to find end of this text run (stop at element nodes)
-          while (endNode.nextSibling) {
-            const next = endNode.nextSibling;
-            if (next.nodeType === Node.ELEMENT_NODE) break;
-            if (next.nodeType === Node.TEXT_NODE) {
-              endNode = next;
-            } else {
-              break;
-            }
-          }
-
-          // Use Range to get normalized text content
-          const range = document.createRange();
-          range.setStart(startNode, 0);
-          range.setEnd(endNode, endNode.textContent.length);
-          textContent = this.stripZeroWidthSpaces(range.toString());
-          log('handleTextChange: nodeId=', nodeId, 'childIndex=', childIndex, 'textContent=', textContent, 'closestNode.tagName=', closestNode.tagName);
-        }
-      }
-
-      if (childIndex === null) {
-        // Fallback: update using innerText of the whole node (original behavior)
-        // This handles inline elements (STRONG, EM, etc.) which have their own nodeId
-        textContent = this.readNodeText(closestNode);
-        log('handleTextChange: nodeId=', nodeId, 'textContent=', textContent, 'closestNode.tagName=', closestNode.tagName);
-      }
-
-      // Get block data to support nested blocks
-      const blockData = this.getBlockData(blockUid);
-      if (!blockData) {
-        log('handleTextChange: blockData not found for', blockUid);
-        return;
-      }
-
-      const updatedJson = this.updateJsonNode(
-        blockData,
-        nodeId,
-        textContent,
-        childIndex,
-      );
-
-      const currBlock = document.querySelector(
-        `[data-block-uid="${blockUid}"]`,
-      );
-      // Use getBlockData to handle nested blocks - it returns a reference to the actual block
+      // Read the full Slate value from the DOM and compare to formData.
+      // The DOM is the source of truth for structure (which children exist,
+      // their order, their text). Metadata (type, data, marks) comes from
+      // the existing JSON via a nodeId → metadata map.
       const block = this.getBlockData(blockUid);
-      if (block) {
-        // Update the block in place (getBlockData returns a reference)
-        Object.assign(block, updatedJson);
-        // TODO: Re-enable plaintext sync once echo detection is fixed
-        // block.plaintext = this.stripZeroWidthSpaces(currBlock.innerText);
-        log('handleTextChange: updated formData value:', JSON.stringify(block.value));
+      if (!block || !block[editableField]) {
+        log('handleTextChange: block or field not found for', blockUid, editableField);
+        return;
       }
+
+      const freshValue = this.readSlateValueFromDOM(target, block[editableField]);
+
+      const freshStr = JSON.stringify(freshValue);
+      const currentStr = JSON.stringify(block[editableField]);
+
+      if (freshStr === currentStr) {
+        log('handleTextChange: DOM matches formData, skipping');
+        return;
+      }
+
+      // Debug: show full values when they differ
+      log('handleTextChange: DIFF fresh=', freshStr);
+      log('handleTextChange: DIFF current=', currentStr);
+
+      block[editableField] = freshValue;
+      log('handleTextChange: updated', editableField);
     } else {
       // Non-Slate field - update field directly with text content
       // Resolve field path to handle /fieldName (page) and ../fieldName (parent) syntax
@@ -9186,45 +9347,7 @@ export class Bridge {
    * @param {Number} childIndex Optional index of child to update (for paragraphs with inline elements)
    * @returns {JSON} Updated JSON object
    */
-  updateJsonNode(json, nodeId, newText, childIndex = null) {
-    if (Array.isArray(json)) {
-      return json.map((item) => this.updateJsonNode(item, nodeId, newText, childIndex));
-    } else if (typeof json === 'object' && json !== null) {
-      // Compare nodeIds as strings (path-based IDs like "0", "0.0", etc.)
-      if (json.nodeId === nodeId || json.nodeId === String(nodeId)) {
-        if (json.hasOwnProperty('text')) {
-          json.text = newText;
-        } else if (childIndex !== null && json.children && json.children[childIndex]) {
-          // Update specific child by index (for typing in paragraphs with inline elements)
-          const child = json.children[childIndex];
-          if (child.hasOwnProperty('text')) {
-            child.text = newText;
-          } else if (child.children && child.children[0]) {
-            // Child is an inline element, update its first text child
-            child.children[0].text = newText;
-          }
-        } else if (json.children) {
-          // Fallback: childIndex is null, updating whole node content
-          // Check if any child has 'type' (inline element like strong, em, link)
-          const hasInlineElements = json.children.some(child => child.type);
-          if (hasInlineElements) {
-            // DOM simplified (inline elements deleted) - collapse to single text node
-            json.children = [{ text: newText }];
-          } else {
-            // Simple paragraph - just update first child
-            json.children[0].text = newText;
-          }
-        }
-        return json;
-      }
-      for (const key in json) {
-        if (json.hasOwnProperty(key) && key !== 'nodeId' && key !== 'data') {
-          json[key] = this.updateJsonNode(json[key], nodeId, newText, childIndex);
-        }
-      }
-    }
-    return json;
-  }
+
 
   findParentWithAttribute(node, attribute) {
     while (node && node.nodeType === Node.ELEMENT_NODE) {

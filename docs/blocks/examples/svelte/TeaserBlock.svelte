@@ -1,4 +1,5 @@
 <script>
+  import { getImageUrl } from './utils.js';
   export let block;
 
   $: hrefObj = block.href?.[0] || null;
@@ -7,8 +8,8 @@
   $: description = useBlockData ? block.description : hrefObj?.description || '';
   $: href = hrefObj?.['@id'] || '';
   $: imageSrc = block.preview_image
-    ? (typeof block.preview_image === 'string' ? block.preview_image : block.preview_image['@id'])
-    : (hrefObj?.hasPreviewImage ? `${href}/@@images/preview_image` : '');
+    ? getImageUrl(block.preview_image)
+    : (hrefObj?.hasPreviewImage ? getImageUrl(`${href}/@@images/preview_image`) : '');
 </script>
 
 {#if !href}

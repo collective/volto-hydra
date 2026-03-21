@@ -2,7 +2,7 @@
 import Page from '../pages/page.vue';
 import NotFoundPage from '../pages/404.vue';
 import axios from 'axios';
-import { loadTemplates, isEditMode } from '../js/hydra.js';
+import { loadTemplates, isEditMode } from '@hydra-js/hydra.js';
 
 // Shared template cache across route navigations
 const templateCache = {};
@@ -10,7 +10,6 @@ const templateCache = {};
 var routes = [
   {
     path: '{/:path}*',
-    browserHistory: true,
     async: function ({ router, to, resolve }) {
       var app = router.app;
       var path = to.path;

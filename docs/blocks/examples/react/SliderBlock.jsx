@@ -1,3 +1,5 @@
+import { getImageUrl } from './utils.js';
+
 function SliderBlock({ block }) {
   const [current, setCurrent] = useState(0);
   const slides = block.slides || [];
@@ -14,7 +16,7 @@ function SliderBlock({ block }) {
           {slide.preview_image && (
             <img
               data-edit-media="preview_image"
-              src={slide.preview_image[0]?.['@id'] || slide.preview_image}
+              src={getImageUrl(slide.preview_image)}
               alt=""
             />
           )}

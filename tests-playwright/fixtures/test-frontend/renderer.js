@@ -49,6 +49,21 @@ async function expandItems(blocks, layout, containerId, paging) {
 const sliderSlideCount = {};
 
 /**
+ * Strip the API origin from an absolute URL, returning a relative path.
+ * e.g. "http://localhost:8888/images/foo.jpg" → "/images/foo.jpg"
+ * Leaves relative paths unchanged.
+ */
+function stripApiOrigin(url) {
+    if (!url || !url.startsWith('http')) return url;
+    const apiOrigin = window._apiOrigin;
+    if (apiOrigin && url.startsWith(apiOrigin)) {
+        return url.slice(apiOrigin.length) || '/';
+    }
+    // External URL — preserve as-is
+    return url;
+}
+
+/**
  * Extract URL from various formats and construct image URL.
  * Handles:
  * - Catalog brain: { '@id': '/path', image_field: 'image', image_scales: { image: [{ download: '@@images/...' }] } }
@@ -60,6 +75,7 @@ const sliderSlideCount = {};
  */
 function getImageUrl(value) {
     if (!value) return '';
+    const apiOrigin = window._apiOrigin || '';
 
     // Handle catalog brain format from expandListingBlocks
     // { '@id': '/content-path', image_field: 'image', image_scales: { image: [{ download: '@@images/...' }] } }
@@ -67,19 +83,21 @@ function getImageUrl(value) {
         const field = value.image_field;
         const scales = value.image_scales[field];
         if (scales?.[0]?.download) {
-            // download is relative like "@@images/image-800-hash.svg"
-            // Prepend the content @id to make it absolute
             const baseUrl = value['@id'] || '';
-            return `${baseUrl}/${scales[0].download}`;
+            return `${apiOrigin}${baseUrl}/${scales[0].download}`;
         }
     }
 
     // Extract @id from array or object format
     let url = Array.isArray(value) ? value[0]?.['@id'] : value?.['@id'] || value;
     if (typeof url !== 'string') return '';
-    // Add @@images/image suffix for Plone paths
-    if (url.startsWith('/') && !url.includes('@@images')) {
+    // Add @@images/image suffix for Plone paths that don't already have a scale/download URL
+    if (url.startsWith('/') && !url.includes('@@images') && !url.includes('@@download')) {
         url = `${url}/@@images/image`;
+    }
+    // Prepend API origin so images load from the API server, not the frontend
+    if (url.startsWith('/')) {
+        url = `${apiOrigin}${url}`;
     }
     return url;
 }
@@ -94,7 +112,7 @@ function getLinkUrl(value) {
     if (!value) return '';
     // Extract @id from array or object format
     const url = Array.isArray(value) ? value[0]?.['@id'] : value?.['@id'] || value;
-    return typeof url === 'string' ? url : '';
+    return typeof url === 'string' ? stripApiOrigin(url) : '';
 }
 
 /**
@@ -223,10 +241,10 @@ async function renderBlock(blockId, block) {
             summaryEl.innerHTML = renderSummaryItemBlock(block, blockId);
             return summaryEl.firstElementChild;
         case 'listing':
-            if (block.querystring?.query && window._expandListingBlocks) {
+            if (window._expandListingBlocks) {
                 return await renderListingBlock(block, blockId);
             }
-            wrapper.textContent = 'Listing block (no query)';
+            wrapper.textContent = 'Listing block (no fetch handler)';
             break;
         case 'introduction':
             wrapper.innerHTML = renderIntroductionBlock(block);
@@ -389,7 +407,18 @@ function renderChildren(children) {
             return `<a href="${url}"${nodeId}>${renderChildren(child.children)}</a>`;
         }
 
-        // Handle text nodes (leaf nodes)
+        // Handle text nodes (leaf nodes).
+        // Wrapped in <span> to match how Vue/F7 frontends render text — they
+        // use template interpolation ({{ node.text }}) inside <span> elements.
+        // This is the hardest case for hydra.js because:
+        // 1. The <span> has no data-node-id (only Slate element nodes get IDs,
+        //    not leaf text nodes), so hydra.js must walk UP to find the parent
+        //    element's data-node-id.
+        // 2. When the user types, the browser may REPLACE the text node inside
+        //    <span> (a childList mutation) rather than modify it in-place
+        //    (characterData mutation). The MutationObserver must handle both.
+        // 3. Select-all + type replaces the entire <span> content, which is a
+        //    childList change that characterData-only observers miss entirely.
         if (child.text !== undefined) {
             let content = child.text || '';
 
@@ -399,7 +428,8 @@ function renderChildren(children) {
             if (child.code) content = `<code>${content}</code>`;
             if (child.del) content = `<span style="text-decoration: line-through">${content}</span>`;
 
-            return content;
+            const nodeIdAttr = child.nodeId !== undefined ? ` data-node-id="${child.nodeId}"` : '';
+            return `<span${nodeIdAttr}>${content}</span>`;
         }
 
         // Unknown node type - render children if present, otherwise return empty
@@ -604,7 +634,7 @@ function renderTeaserBlock(block, blockUid) {
         // and conversion cases where block has image data but link target doesn't)
         imageSrc = getImageUrl(block.preview_image);
     } else if (!useBlockData && hrefObj?.hasPreviewImage && hrefObj?.['@id']) {
-        imageSrc = hrefObj['@id'] + '/@@images/preview_image';
+        imageSrc = getImageUrl({ '@id': hrefObj['@id'] + '/@@images/preview_image' });
     }
 
     // Only add data-block-uid if blockUid is provided (not when inside a container that already has it)
@@ -709,7 +739,7 @@ function renderSummaryItemBlock(block, blockUid) {
  */
 function renderImageBlock(block) {
     tfLog('renderImageBlock:', { url: block.url, type: typeof block.url, hasImageScales: !!block.url?.image_scales });
-    const imageSrc = getImageUrl(block.url);
+    const imageSrc = getImageUrl(block.url) || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22300%22%3E%3Crect width=%22400%22 height=%22300%22 fill=%22%23e5e7eb%22/%3E%3C/svg%3E';
     // Volto's image block uses 'placeholder' for alt text, not 'alt'
     const alt = block.placeholder || block.alt || '';
     const href = getLinkUrl(block.href);

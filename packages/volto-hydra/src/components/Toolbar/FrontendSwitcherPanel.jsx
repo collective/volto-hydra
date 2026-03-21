@@ -44,63 +44,69 @@ const FrontendSwitcherPanel = ({
   const refreshUrls = () => setUrls(getSavedURLs());
 
   return (
-    <div className="frontend-switcher-panel">
+    <div className="pastanaga-menu frontend-switcher-panel">
       {/* Viewport section */}
-      <div className="frontend-switcher-section">
-        <div className="frontend-switcher-section-label">Viewport</div>
-        <div className="frontend-switcher-viewport-row">
+      <header>
+        <h2>Viewport</h2>
+      </header>
+      <div className="pastanaga-menu-list">
+        <ul>
           {VIEWPORT_PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              className={`frontend-switcher-viewport-btn${activePreset === preset.id ? ' active' : ''}`}
-              aria-label={preset.label}
-              title={preset.label}
-              onClick={() => dispatch(setViewportPreset(preset.id))}
-            >
-              <Icon name={preset.icon} size="24px" />
-            </button>
+            <li key={preset.id}>
+              <button
+                className={`frontend-switcher-viewport-btn${activePreset === preset.id ? ' active' : ''}`}
+                aria-label={preset.label}
+                onClick={() => dispatch(setViewportPreset(preset.id))}
+              >
+                <Icon name={preset.icon} size="24px" />
+                <span className="pastanaga-menu-label">{preset.label}</span>
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
 
       {/* Frontend URLs section */}
-      <div className="frontend-switcher-section">
-        <div className="frontend-switcher-section-label">Frontend</div>
-        <div className="frontend-switcher-url-list">
+      <header>
+        <h2>Frontend</h2>
+      </header>
+      <div className="pastanaga-menu-list">
+        <ul>
           {urls.map((url) => {
             const isActive = activeUrl === url;
             return (
-              <button
-                key={url}
-                className={`frontend-switcher-url-item${isActive ? ' active' : ''}`}
-                onClick={() => {
-                  dispatch(setFrontendPreviewUrl(url));
-                  closeMenu();
-                }}
-                title={url}
-              >
-                <span className="frontend-switcher-url-icon">
-                  {getDomainInitials(url)}
-                </span>
-                <span className="frontend-switcher-url-text">
-                  {url.replace(/^https?:\/\//, '')}
-                </span>
-              </button>
+              <li key={url}>
+                <button
+                  className={`frontend-switcher-url-item${isActive ? ' active' : ''}`}
+                  onClick={() => {
+                    dispatch(setFrontendPreviewUrl(url));
+                    closeMenu();
+                  }}
+                  title={url}
+                >
+                  <span className="frontend-switcher-url-icon">
+                    {getDomainInitials(url)}
+                  </span>
+                  <span className="pastanaga-menu-label">
+                    {url.replace(/^https?:\/\//, '')}
+                  </span>
+                </button>
+              </li>
             );
           })}
-        </div>
+        </ul>
       </div>
 
-      {/* Settings gear — opens modal */}
-      <div className="frontend-switcher-section frontend-switcher-settings">
-        <button
-          className="frontend-switcher-settings-btn"
-          onClick={() => setShowSettings(true)}
-          title="Manage frontends"
-        >
-          <Icon name={settingsSVG} size="20px" />
-          <span>Settings</span>
-        </button>
+      {/* Settings */}
+      <div className="pastanaga-menu-list">
+        <ul>
+          <li>
+            <button className="frontend-switcher-settings-btn" onClick={() => setShowSettings(true)}>
+              <Icon name={settingsSVG} size="24px" />
+              <span className="pastanaga-menu-label">Settings</span>
+            </button>
+          </li>
+        </ul>
       </div>
 
       {showSettings && (

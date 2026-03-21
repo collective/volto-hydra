@@ -36,8 +36,8 @@ test.describe('Complex Slate Structures', () => {
     // Click on the list block to select it
     await listBlock.click();
 
-    // Wait a moment for any async errors
-    await page.waitForTimeout(1000);
+    // Wait for sidebar to open (confirms block selected without crash)
+    await helper.waitForSidebarOpen();
 
     // Check for the specific Slate error
     const slateError = errors.find(e => e.includes('Cannot find a descendant at path'));
@@ -54,9 +54,7 @@ test.describe('Complex Slate Structures', () => {
 
     // Click to select the block
     await listBlock.click();
-
-    // Wait for selection to complete
-    await page.waitForTimeout(500);
+    await helper.waitForSidebarOpen();
 
     // Verify the list structure is intact in the iframe
     const listItems = iframe.locator('[data-block-uid="block-list-links"] li');
@@ -87,9 +85,7 @@ test.describe('Complex Slate Structures', () => {
     // Click directly on the first link text to start inline editing
     const firstLink = iframe.locator('[data-block-uid="block-list-links"] a').first();
     await firstLink.click();
-
-    // Wait for potential error
-    await page.waitForTimeout(500);
+    await helper.waitForSidebarOpen();
 
     // No Slate path errors should occur
     const slateError = errors.find(e => e.includes('Cannot find a descendant at path'));

@@ -306,7 +306,7 @@ test.describe('Multi-element blocks', () => {
     await helper.waitForSidebarOpen();
 
     // Click the parent arrow to go to page level
-    const parentArrow = page.locator('.sidebar-section-header .parent-nav');
+    const parentArrow = page.locator('.sidebar-section-header .parent-nav .nav-back');
     await expect(parentArrow).toBeVisible({ timeout: 5000 });
     await parentArrow.click();
 

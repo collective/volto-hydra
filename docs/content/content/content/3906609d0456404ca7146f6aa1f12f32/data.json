@@ -329,70 +329,6 @@
         }
       ]
     },
-    "ref-toc-sep": {
-      "@type": "separator",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-toc",
-      "placeholder": "sep"
-    },
-    "ref-toc-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-toc",
-      "placeholder": "heading"
-    },
-    "ref-toc-schema-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-toc",
-      "placeholder": "schema-heading"
-    },
-    "ref-toc-schema-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-toc",
-      "placeholder": "schema-desc"
-    },
-    "ref-toc-json-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-toc",
-      "placeholder": "json-heading"
-    },
-    "ref-toc-json-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-toc",
-      "placeholder": "json-desc"
-    },
-    "ref-toc-rendering-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-toc",
-      "placeholder": "rendering-heading"
-    },
-    "ref-toc-rendering-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-toc",
-      "placeholder": "rendering-desc"
-    },
     "ref-toc-schema": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
@@ -468,34 +404,8 @@
       "2b54caa5-1c1a-40f2-aacd-84abce141e79",
       "09460f92-723d-402d-a0a5-76a15f2678ad",
       "3e036171-0a20-47d0-a06a-a7f493b65186",
-      "ref-toc-schema-heading",
-      "ref-toc-schema-desc",
       "ref-toc-schema",
-      "ref-toc-json-heading",
-      "ref-toc-json-desc",
       "ref-toc-json-data",
-      "ref-toc-rendering-heading",
-      "ref-toc-rendering-desc",
-      "ref-toc-rendering",
-      "ref-toc-schema-heading",
-      "ref-toc-schema-desc",
-      "ref-toc-schema",
-      "ref-toc-json-heading",
-      "ref-toc-json-desc",
-      "ref-toc-json-data",
-      "ref-toc-rendering-heading",
-      "ref-toc-rendering-desc",
-      "ref-toc-rendering",
-      "ref-toc-sep",
-      "ref-toc-heading",
-      "ref-toc-schema-heading",
-      "ref-toc-schema-desc",
-      "ref-toc-schema",
-      "ref-toc-json-heading",
-      "ref-toc-json-desc",
-      "ref-toc-json-data",
-      "ref-toc-rendering-heading",
-      "ref-toc-rendering-desc",
       "ref-toc-rendering"
     ]
   },

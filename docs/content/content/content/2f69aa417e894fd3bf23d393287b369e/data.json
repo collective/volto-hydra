@@ -159,70 +159,6 @@
         "align": "full"
       }
     },
-    "ref-heading-sep": {
-      "@type": "separator",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-heading",
-      "placeholder": "sep"
-    },
-    "ref-heading-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-heading",
-      "placeholder": "heading"
-    },
-    "ref-heading-schema-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-heading",
-      "placeholder": "schema-heading"
-    },
-    "ref-heading-schema-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-heading",
-      "placeholder": "schema-desc"
-    },
-    "ref-heading-json-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-heading",
-      "placeholder": "json-heading"
-    },
-    "ref-heading-json-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-heading",
-      "placeholder": "json-desc"
-    },
-    "ref-heading-rendering-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-heading",
-      "placeholder": "rendering-heading"
-    },
-    "ref-heading-rendering-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-heading",
-      "placeholder": "rendering-desc"
-    },
     "ref-heading-schema": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
@@ -292,34 +228,8 @@
       "7ebc67e3-e666-43f4-9fce-5dc14f98834f",
       "0126e819-d955-41c5-a736-2f0b5ffda8a1",
       "1bedcc9d-1c02-44e8-bb8e-5c46d6c67d3d",
-      "ref-heading-schema-heading",
-      "ref-heading-schema-desc",
       "ref-heading-schema",
-      "ref-heading-json-heading",
-      "ref-heading-json-desc",
       "ref-heading-json-data",
-      "ref-heading-rendering-heading",
-      "ref-heading-rendering-desc",
-      "ref-heading-rendering",
-      "ref-heading-schema-heading",
-      "ref-heading-schema-desc",
-      "ref-heading-schema",
-      "ref-heading-json-heading",
-      "ref-heading-json-desc",
-      "ref-heading-json-data",
-      "ref-heading-rendering-heading",
-      "ref-heading-rendering-desc",
-      "ref-heading-rendering",
-      "ref-heading-sep",
-      "ref-heading-heading",
-      "ref-heading-schema-heading",
-      "ref-heading-schema-desc",
-      "ref-heading-schema",
-      "ref-heading-json-heading",
-      "ref-heading-json-desc",
-      "ref-heading-json-data",
-      "ref-heading-rendering-heading",
-      "ref-heading-rendering-desc",
       "ref-heading-rendering"
     ]
   },

@@ -11,7 +11,7 @@ test.describe('findTextNodeInChild() - Vue empty text node handling', () => {
 
   test.beforeEach(async ({ page }) => {
     helper = new AdminUIHelper(page);
-    await page.goto('http://localhost:8888/mock-parent.html');
+    await page.goto('http://localhost:8889/mock-parent.html');
     await helper.waitForIframeReady();
     await helper.waitForBlockSelected('mock-block-1');
   });
@@ -25,7 +25,7 @@ test.describe('findTextNodeInChild() - Vue empty text node handling', () => {
       container.innerHTML =
         '<div data-edit-text="value">' +
         '<p data-node-id="0">' +
-        '<strong data-node-id="0-1"></strong>' +
+        '<strong data-node-id="0.1"></strong>' +
         '</p>' +
         '</div>';
       document.body.appendChild(container);
@@ -58,7 +58,7 @@ test.describe('findTextNodeInChild() - Vue empty text node handling', () => {
       const container = document.createElement('div');
       container.innerHTML =
         '<div data-edit-text="value">' +
-        '<strong data-node-id="0-1"></strong>' +
+        '<strong data-node-id="0.1"></strong>' +
         '</div>';
       document.body.appendChild(container);
 
@@ -87,7 +87,7 @@ test.describe('findTextNodeInChild() - Vue empty text node handling', () => {
       const container = document.createElement('div');
       container.innerHTML =
         '<div data-edit-text="value">' +
-        '<strong data-node-id="0-1">bold text</strong>' +
+        '<strong data-node-id="0.1">bold text</strong>' +
         '</div>';
       document.body.appendChild(container);
 
@@ -114,7 +114,7 @@ test.describe('findTextNodeInChild() - Vue empty text node handling', () => {
       const container = document.createElement('div');
       container.innerHTML =
         '<div data-edit-text="value">' +
-        '<strong data-node-id="0-1"></strong>' +
+        '<strong data-node-id="0.1"></strong>' +
         '</div>';
       document.body.appendChild(container);
 
@@ -145,7 +145,7 @@ test.describe('findTextNodeInChild() - Vue empty text node handling', () => {
       const container = document.createElement('div');
       container.innerHTML =
         '<div data-edit-text="value">' +
-        '<strong data-node-id="0-1"></strong>' +
+        '<strong data-node-id="0.1"></strong>' +
         '</div>';
       document.body.appendChild(container);
 
@@ -172,7 +172,7 @@ test.describe('findTextNodeInChild() - Vue empty text node handling', () => {
       container.innerHTML =
         '<div data-edit-text="value">' +
         '<p data-node-id="0">' +
-        '<strong data-node-id="0-1"><span>nested text</span></strong>' +
+        '<strong data-node-id="0.1"><span>nested text</span></strong>' +
         '</p>' +
         '</div>';
       document.body.appendChild(container);
@@ -200,7 +200,7 @@ test.describe('findTextNodeInChild() - Vue empty text node handling', () => {
       const container = document.createElement('div');
       container.innerHTML =
         '<div data-edit-text="value">' +
-        '<strong data-node-id="0-1">test</strong>' +
+        '<strong data-node-id="0.1">test</strong>' +
         '</div>';
       document.body.appendChild(container);
 

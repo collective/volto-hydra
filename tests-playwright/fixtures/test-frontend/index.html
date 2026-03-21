@@ -104,9 +104,12 @@
             return criteria;
         }
 
+        // API origin — the mock Plone API always runs on port 8888
+        window._apiOrigin = 'http://localhost:8888';
+
         // Make search criteria available globally for form handlers
         window._searchCriteria = {};
-        window._contentPath = (url) => contentPath(url, window.location.origin);
+        window._contentPath = (url) => contentPath(url, window._apiOrigin);
 
         // Render generation counter — prevents stale async renders from
         // overwriting newer ones when rapid FORM_DATA messages arrive.
@@ -129,7 +132,7 @@
             const extraCriteria = getSearchCriteriaFromUrl();
             tfLog('extraCriteria from URL:', JSON.stringify(extraCriteria), 'search:', window.location.search);
             window._searchCriteria = extraCriteria; // Store for form handlers
-            const fetchItems = ploneFetchItems({ apiUrl: window.location.origin, contextPath, extraCriteria });
+            const fetchItems = ploneFetchItems({ apiUrl: window._apiOrigin, contextPath, extraCriteria });
 
             // Set up expansion helper for container renderers
             // Use 'variation' field for item type (matches Volto listing block schema)
@@ -167,11 +170,11 @@
                     if (token) {
                         headers['Authorization'] = `Bearer ${token}`;
                     }
-                    // templateId may be a resolveuid path or a full URL — normalise to absolute path
+                    // templateId may be a resolveuid path or a full URL — normalise to absolute URL on API
                     const url = templateId.startsWith('http')
                         ? new URL(templateId).pathname
                         : `/${templateId.replace(/^\//, '')}`;
-                    const res = await fetch(url, { headers });
+                    const res = await fetch(`${window._apiOrigin}${url}`, { headers });
                     return res.json();
                 };
                 const expandedItems = await expandTemplates(footerLayout, {
@@ -256,7 +259,7 @@
                 if (token) {
                     fetchHeaders['Authorization'] = `Bearer ${token}`;
                 }
-                const response = await fetch(`/++api++${contentPath}`, { headers: fetchHeaders });
+                const response = await fetch(`${window._apiOrigin}/++api++${contentPath}`, { headers: fetchHeaders });
                 let content = await response.json();
 
                 // Helper to load templates
@@ -269,7 +272,7 @@
                     const tplPath = templateId.startsWith('http')
                         ? new URL(templateId).pathname
                         : `/${templateId.replace(/^\//, '')}`;
-                    const res = await fetch(`/++api++${tplPath}`, { headers });
+                    const res = await fetch(`${window._apiOrigin}/++api++${tplPath}`, { headers });
                     return res.json();
                 };
 

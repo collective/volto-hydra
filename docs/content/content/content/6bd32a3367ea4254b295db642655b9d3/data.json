@@ -145,22 +145,6 @@
       ],
       "styles": {}
     },
-    "ref-listing-sep": {
-      "@type": "separator",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "sep"
-    },
-    "ref-listing-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "heading"
-    },
     "ref-listing-schema": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
@@ -214,54 +198,6 @@
           "code": "<script>\n  import BlockRenderer from './BlockRenderer.svelte';\n\n  export let block;\n  export let blockId;\n\n  let items = [];\n\n  $: block.querystring, loadItems();\n\n  async function loadItems() {\n    const fetchItems = ploneFetchItems({ apiUrl: API_URL });\n    const result = await expandListingBlocks([blockId], {\n      blocks: { [blockId]: block },\n      fetchItems: { listing: fetchItems },\n      itemTypeField: 'variation',\n    });\n    items = result.items;\n  }\n</script>\n\n<div data-block-uid={blockId} class=\"listing-block\">\n  {#each items as item, i (i)}\n    <BlockRenderer block={item} />\n  {/each}\n</div>"
         }
       ]
-    },
-    "ref-listing-schema-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "schema-heading"
-    },
-    "ref-listing-schema-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "schema-desc"
-    },
-    "ref-listing-json-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "json-heading"
-    },
-    "ref-listing-json-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "json-desc"
-    },
-    "ref-listing-rendering-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "rendering-heading"
-    },
-    "ref-listing-rendering-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-listing",
-      "placeholder": "rendering-desc"
     }
   },
   "blocks_layout": {
@@ -271,34 +207,8 @@
       "53ececaa-4219-42a9-861d-862be364fd60",
       "2a597dde-dd2b-4c66-816c-09e243a188f5",
       "c2eaacd0-4e96-4344-a0ac-26ed644fc503",
-      "ref-listing-schema-heading",
-      "ref-listing-schema-desc",
       "ref-listing-schema",
-      "ref-listing-json-heading",
-      "ref-listing-json-desc",
       "ref-listing-json-data",
-      "ref-listing-rendering-heading",
-      "ref-listing-rendering-desc",
-      "ref-listing-rendering",
-      "ref-listing-schema-heading",
-      "ref-listing-schema-desc",
-      "ref-listing-schema",
-      "ref-listing-json-heading",
-      "ref-listing-json-desc",
-      "ref-listing-json-data",
-      "ref-listing-rendering-heading",
-      "ref-listing-rendering-desc",
-      "ref-listing-rendering",
-      "ref-listing-sep",
-      "ref-listing-heading",
-      "ref-listing-schema-heading",
-      "ref-listing-schema-desc",
-      "ref-listing-schema",
-      "ref-listing-json-heading",
-      "ref-listing-json-desc",
-      "ref-listing-json-data",
-      "ref-listing-rendering-heading",
-      "ref-listing-rendering-desc",
       "ref-listing-rendering"
     ]
   },

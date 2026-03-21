@@ -2235,22 +2235,6 @@
     "fec13476-1231-42fc-84d5-b110e8e3c6e7": {
       "@type": "title"
     },
-    "ref-accordion-sep": {
-      "@type": "separator",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-accordion",
-      "placeholder": "sep"
-    },
-    "ref-accordion-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-accordion",
-      "placeholder": "heading"
-    },
     "ref-accordion-schema": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
@@ -2304,54 +2288,6 @@
           "code": "<script>\n  import BlockRenderer from './BlockRenderer.svelte';\n  export let block;\n\n  let openPanels = Object.fromEntries((block.panels || []).filter(p => !p.collapsed).map(p => [p['@id'], true]));\n  function toggle(id) { openPanels[id] = !openPanels[id]; openPanels = openPanels; }\n</script>\n\n<div data-block-uid={block['@uid']} class=\"accordion-block\">\n  {#each block.panels || [] as panel (panel['@id'])}\n    <div data-block-uid={panel['@id']} class=\"accordion-panel\">\n      <button on:click={() => toggle(panel['@id'])} class=\"accordion-header\">\n        <span data-edit-text=\"title\">{panel.title}</span>\n        <span>{openPanels[panel['@id']] ? '▲' : '▼'}</span>\n      </button>\n      {#if openPanels[panel['@id']]}\n        <div class=\"accordion-content\">\n          {#each panel.blocks_layout?.items || [] as id (id)}\n            <BlockRenderer block={{ ...panel.blocks[id], '@uid': id }} />\n          {/each}\n        </div>\n      {/if}\n    </div>\n  {/each}\n</div>"
         }
       ]
-    },
-    "ref-accordion-schema-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-accordion",
-      "placeholder": "schema-heading"
-    },
-    "ref-accordion-schema-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-accordion",
-      "placeholder": "schema-desc"
-    },
-    "ref-accordion-json-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-accordion",
-      "placeholder": "json-heading"
-    },
-    "ref-accordion-json-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-accordion",
-      "placeholder": "json-desc"
-    },
-    "ref-accordion-rendering-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-accordion",
-      "placeholder": "rendering-heading"
-    },
-    "ref-accordion-rendering-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-accordion",
-      "placeholder": "rendering-desc"
     }
   },
   "blocks_layout": {
@@ -2359,34 +2295,8 @@
       "fec13476-1231-42fc-84d5-b110e8e3c6e7",
       "41a82a93-c00c-4a40-bac8-53a3e3420c8e",
       "8f68209e-220e-4230-9d42-8b0602573bd9",
-      "ref-accordion-schema-heading",
-      "ref-accordion-schema-desc",
       "ref-accordion-schema",
-      "ref-accordion-json-heading",
-      "ref-accordion-json-desc",
       "ref-accordion-json-data",
-      "ref-accordion-rendering-heading",
-      "ref-accordion-rendering-desc",
-      "ref-accordion-rendering",
-      "ref-accordion-schema-heading",
-      "ref-accordion-schema-desc",
-      "ref-accordion-schema",
-      "ref-accordion-json-heading",
-      "ref-accordion-json-desc",
-      "ref-accordion-json-data",
-      "ref-accordion-rendering-heading",
-      "ref-accordion-rendering-desc",
-      "ref-accordion-rendering",
-      "ref-accordion-sep",
-      "ref-accordion-heading",
-      "ref-accordion-schema-heading",
-      "ref-accordion-schema-desc",
-      "ref-accordion-schema",
-      "ref-accordion-json-heading",
-      "ref-accordion-json-desc",
-      "ref-accordion-json-data",
-      "ref-accordion-rendering-heading",
-      "ref-accordion-rendering-desc",
       "ref-accordion-rendering"
     ]
   },

@@ -198,70 +198,6 @@
         }
       ]
     },
-    "ref-video-sep": {
-      "@type": "separator",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-video",
-      "placeholder": "sep"
-    },
-    "ref-video-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-video",
-      "placeholder": "heading"
-    },
-    "ref-video-schema-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-video",
-      "placeholder": "schema-heading"
-    },
-    "ref-video-schema-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-video",
-      "placeholder": "schema-desc"
-    },
-    "ref-video-json-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-video",
-      "placeholder": "json-heading"
-    },
-    "ref-video-json-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-video",
-      "placeholder": "json-desc"
-    },
-    "ref-video-rendering-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-video",
-      "placeholder": "rendering-heading"
-    },
-    "ref-video-rendering-desc": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "/templates/block-reference-layout",
-      "templateInstanceId": "tpl-inst-video",
-      "placeholder": "rendering-desc"
-    },
     "ref-video-schema": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
@@ -337,34 +273,8 @@
       "b75aeb62-6aca-440b-ab6d-66b063dbdab9",
       "19a3d50a-a683-4e59-ac7c-d2ba2149cdd7",
       "49a61581-70ce-4810-84c2-1d91ac421197",
-      "ref-video-schema-heading",
-      "ref-video-schema-desc",
       "ref-video-schema",
-      "ref-video-json-heading",
-      "ref-video-json-desc",
       "ref-video-json-data",
-      "ref-video-rendering-heading",
-      "ref-video-rendering-desc",
-      "ref-video-rendering",
-      "ref-video-schema-heading",
-      "ref-video-schema-desc",
-      "ref-video-schema",
-      "ref-video-json-heading",
-      "ref-video-json-desc",
-      "ref-video-json-data",
-      "ref-video-rendering-heading",
-      "ref-video-rendering-desc",
-      "ref-video-rendering",
-      "ref-video-sep",
-      "ref-video-heading",
-      "ref-video-schema-heading",
-      "ref-video-schema-desc",
-      "ref-video-schema",
-      "ref-video-json-heading",
-      "ref-video-json-desc",
-      "ref-video-json-data",
-      "ref-video-rendering-heading",
-      "ref-video-rendering-desc",
       "ref-video-rendering"
     ]
   },

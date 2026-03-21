@@ -6,10 +6,12 @@ const highlightGradients = {
   'highlight-custom-color-5': 'linear-gradient(135deg, #881337, #e11d48)',
 };
 
+import { getImageUrl } from './utils.js';
+
 function HighlightBlock({ block }) {
   const title = block.title || '';
   const description = block.description || [];
-  const imageSrc = block.image || '';
+  const imageSrc = getImageUrl(block.image);
   const ctaText = block.cta_title || '';
   const ctaLink = block.cta_link?.[0]?.['@id'] || '';
   const gradient = highlightGradients[block.styles?.descriptionColor] || 'linear-gradient(135deg, #334, #556)';

@@ -1,8 +1,6 @@
 <template>
   <!-- Slate (rich text) -->
-  <div v-if="block['@type'] == 'slate'" :data-block-uid="block_uid" data-edit-text="value">
-    <RichText v-for="node in block['value']" :key="node" :node="node" />
-  </div>
+  <div v-if="block['@type'] == 'slate'" :data-block-uid="block_uid" data-edit-text="value"><RichText v-for="(node, idx) in block['value']" :key="node.nodeId || idx" :node="node" /></div>
 
   <!-- Title -->
   <h1 v-else-if="block['@type'] == 'title'" :data-block-uid="block_uid" data-edit-text="/title">
@@ -56,7 +54,7 @@
     <div class="hero-description" data-edit-text="description">
       <RichText v-for="node in (block.description || [])" :key="node" :node="node" />
     </div>
-    <f7-button v-if="block.buttonText" fill :href="getUrl(block.buttonLink)" data-edit-link="buttonLink">
+    <f7-button v-if="block.buttonText" fill :href="getUrl(block.buttonLink)" data-edit-link="buttonLink" data-edit-text="buttonText">
       {{ block.buttonText }}
     </f7-button>
   </div>
@@ -656,7 +654,7 @@
 import { inject, ref, reactive, computed, watch } from 'vue';
 import RichText from './richtext.vue';
 import ListingBlock from './ListingBlock.vue';
-import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, contentPath } from '../js/hydra.js';
+import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, contentPath } from '@hydra-js/hydra.js';
 
 // Social icons SVG map (with name + svg for socialInfo())
 const SOCIAL_ICONS = {

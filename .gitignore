@@ -22,6 +22,7 @@ examples/hydra-vue-f7/src/.vite-ssg-temp/
 examples/nuxt-blog-starter/.nuxt-edit/
 # Lock files in example dirs (managed separately)
 examples/hydra-nextjs/package-lock.json
+examples/hydra-nextjs/pnpm-lock.yaml
 examples/hydra-vue-f7/pnpm-lock.yaml
 # Local Netlify folder
 .netlify
@@ -32,3 +33,4 @@ playwright-report/
 coverage/
 *.txt
 cache/
+.discovered-blocks.json

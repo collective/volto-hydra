@@ -24,7 +24,7 @@ function EventMetadataBlock({ block, content }) {
         {content.event_url && (
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <dt style={{ fontWeight: 600, color: '#4b5563', minWidth: '6rem' }}>Website</dt>
-            <dd><a href={content.event_url} style={{ color: '#2563eb', textDecoration: 'underline' }}>{content.event_url}</a></dd>
+            <dd><a data-edit-link="/event_url" href={content.event_url} style={{ color: '#2563eb', textDecoration: 'underline' }}>{content.event_url}</a></dd>
           </div>
         )}
         {(content.contact_name || content.contact_email || content.contact_phone) && (
@@ -32,7 +32,7 @@ function EventMetadataBlock({ block, content }) {
             <dt style={{ fontWeight: 600, color: '#4b5563', minWidth: '6rem' }}>Contact</dt>
             <dd>
               {content.contact_name && <span data-edit-text="/contact_name">{content.contact_name}</span>}
-              {content.contact_email && <span> · <a href={`mailto:${content.contact_email}`}>{content.contact_email}</a></span>}
+              {content.contact_email && <span> · <a data-edit-link="/contact_email" href={`mailto:${content.contact_email}`}>{content.contact_email}</a></span>}
               {content.contact_phone && <span data-edit-text="/contact_phone"> · {content.contact_phone}</span>}
             </dd>
           </div>

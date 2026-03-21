@@ -37,6 +37,11 @@ export default defineNuxtConfig({
   $env: {
     edit: {
       ssr: false, // "npm run generate -- --envName edit" == SPA
+      vue: {
+        compilerOptions: {
+          comments: true,  // Preserve HTML comments for hydra comment syntax
+        },
+      },
       app: {
         baseURL: process.env.NUXT_EDIT_BASE_URL || '/',
       },
@@ -49,8 +54,8 @@ export default defineNuxtConfig({
           security: {
             headers: { // Edit site can be put in an iframe
               contentSecurityPolicy: {
-                'img-src': ["'self'", "data:", 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
-                'connect-src': ["'self'", "data:", 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com'],
+                'img-src': ["'self'", "data:", 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com', 'http://localhost:3001', 'http://localhost:8888'],
+                'connect-src': ["'self'", "data:", 'https://hydra.pretagov.com', 'https://hydra-api.pretagov.com', 'http://localhost:3001', 'http://localhost:8888'],
                 'frame-ancestors': ['*']
               },
               crossOriginResourcePolicy: "cross-origin",
@@ -61,7 +66,10 @@ export default defineNuxtConfig({
       },
       runtimeConfig: {
         public: {
-          image_alias: ''
+          image_alias: '',
+          // Override API URL for test builds (NUXT_TEST_BACKEND env var)
+          backendBaseUrl: process.env.NUXT_TEST_BACKEND || 'https://hydra-api.pretagov.com',
+          adminUrl: process.env.NUXT_TEST_BACKEND ? 'http://localhost:3001' : 'https://hydra.pretagov.com',
         }
       },
       image: {
@@ -71,6 +79,14 @@ export default defineNuxtConfig({
     test: {
       // Test environment: HTTP mode, points to mock API on localhost:8888
       ssr: false,
+      vue: {
+        compilerOptions: {
+          comments: true,  // Preserve HTML comments for hydra comment syntax
+        },
+      },
+      nitro: {
+        preset: 'static'  // SPA with proper fallback routing (same as edit profile)
+      },
       devtools: { enabled: false },
       devServer: {
         https: false  // Disable HTTPS for test mode
@@ -132,7 +148,7 @@ export default defineNuxtConfig({
     }
   },
   experimental: {
-      payloadExtraction: true
+      payloadExtraction: false
   },
 
   // How to prerender dynamic routes?
@@ -176,9 +192,9 @@ export default defineNuxtConfig({
     ],
     resolve: {
       alias: {
-        // In test mode, use source hydra.js for live reload
-        // In production, use synced local copy (prebuild script syncs from source)
-        '@hydra-js': process.env.NUXT_ENV_NAME === 'test' ? hydraJsPath : './packages',
+        // In dev mode, use workspace source for live reload
+        // In production builds, prebuild script syncs a local copy to ./packages
+        '@hydra-js': process.env.NODE_ENV === 'development' ? hydraJsPath : './packages',
         '@test-fixtures': fixturesPath
       }
     },
@@ -186,7 +202,11 @@ export default defineNuxtConfig({
     // ssr: true // enable unstable server-side rendering for development (false by default)
     // experimentWarning: false // hide experimental warning message (disabled by default for tests)
     vue: {
-      /* options for vite-plugin-vue2 */
+      template: {
+        compilerOptions: {
+          comments: true, // Preserve HTML comments for hydra comment syntax
+        },
+      },
     },
   },
   devServer: {

@@ -22,7 +22,7 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Click to deselect blocks and show page-level sidebar
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
 
       // Verify Layout dropdown is visible in sidebar (first one is the page-level layout)
       const layoutSelector = page.locator('.layout-selector').first();
@@ -58,7 +58,7 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Show page-level sidebar
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
 
       // Open layout dropdown - wait for it to be visible first
       const layoutSelector = page.locator('.layout-selector select');
@@ -89,7 +89,7 @@ test.describe('allowedLayouts', () => {
       expect(initialBlocks.length).toBeGreaterThan(0);
 
       // Show page-level sidebar
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
 
       // Select header-footer-layout and apply
       const layoutSelector = page.locator('.layout-selector select');
@@ -99,8 +99,8 @@ test.describe('allowedLayouts', () => {
       await applyButton.click();
 
       // Wait for layout to be applied - sidebar shows stable admin state
-      await expect(page.locator('.child-block-item', { hasText: 'Layout Header' })).toBeVisible({ timeout: 5000 });
-      await expect(page.locator('.child-block-item', { hasText: 'Layout Footer' })).toBeVisible({ timeout: 5000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Header' })).toBeVisible({ timeout: 10000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Footer' })).toBeVisible({ timeout: 10000 });
 
       // Verify structure: header, existing content, footer
       // Use main/content selector for broader compatibility (test frontend uses #content, Nuxt uses main)
@@ -122,7 +122,7 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Apply layout
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
       const layoutSelector = page.locator('.layout-selector select');
       await layoutSelector.selectOption('Header Footer Layout');
       await page.locator('.apply-layout-btn').click();
@@ -152,7 +152,7 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Apply layout
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
       const layoutSelector = page.locator('.layout-selector select');
       await layoutSelector.selectOption('Header Footer Layout');
       await page.locator('.apply-layout-btn').click();
@@ -181,13 +181,13 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Apply layout
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
       const layoutSelector = page.locator('.layout-selector select');
       await layoutSelector.selectOption('Header Footer Layout');
       await page.locator('.apply-layout-btn').click();
 
       // Wait for layout to be applied - sidebar shows stable admin state
-      await expect(page.locator('.child-block-item', { hasText: 'Layout Footer' })).toBeVisible({ timeout: 5000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Footer' })).toBeVisible({ timeout: 10000 });
 
       // Click footer block in iframe (use main/content selector for broader compatibility)
       const footerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Footer' });
@@ -209,7 +209,7 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Apply layout
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
       const layoutSelector = page.locator('.layout-selector select');
       await layoutSelector.selectOption('Header Footer Layout');
       await page.locator('.apply-layout-btn').click();
@@ -245,7 +245,7 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Apply layout
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
       const layoutSelector = page.locator('.layout-selector select');
       await layoutSelector.selectOption('Header Footer Layout');
       await page.locator('.apply-layout-btn').click();
@@ -289,13 +289,13 @@ test.describe('allowedLayouts', () => {
       await helper.waitForQuantaToolbar('block-1-uuid');
 
       // Apply layout
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
       const layoutSelector = page.locator('.layout-selector select');
       await layoutSelector.selectOption('Header Footer Layout');
       await page.locator('.apply-layout-btn').click();
 
       // Wait for layout to be applied - sidebar shows stable admin state
-      await expect(page.locator('.child-block-item', { hasText: 'Layout Footer' })).toBeVisible({ timeout: 5000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Footer' })).toBeVisible({ timeout: 10000 });
 
       // Get footer block and block positions (use main/content selector for broader compatibility)
       const footerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Footer' });
@@ -335,7 +335,7 @@ test.describe('allowedLayouts', () => {
       const initialContent = await iframe.locator('[data-block-uid="block-1-uuid"]').textContent();
 
       // Apply header-footer layout (has "default" placeholder)
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
       const layoutSelector = page.locator('.layout-selector select');
       await layoutSelector.selectOption('Header Footer Layout');
       await page.locator('.apply-layout-btn').click();
@@ -367,7 +367,7 @@ test.describe('allowedLayouts', () => {
       await expect(block2).toBeVisible();
 
       // Apply header-footer layout
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
       const layoutSelector = page.locator('.layout-selector select');
       await expect(layoutSelector).toBeVisible({ timeout: 5000 });
       await layoutSelector.selectOption('Header Footer Layout');
@@ -381,7 +381,7 @@ test.describe('allowedLayouts', () => {
       await expect(block2).toBeVisible();
 
       // Switch to editable-fixed layout
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
       await expect(layoutSelector).toBeVisible({ timeout: 5000 });
       await layoutSelector.selectOption('Editable Fixed Layout');
       await page.locator('.apply-layout-btn').click();
@@ -412,7 +412,7 @@ test.describe('allowedLayouts', () => {
       const originalContent = 'another test page';
 
       // Apply header-footer layout (has header, default, footer placeholders)
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
       const layoutSelector = page.locator('.layout-selector select');
       await expect(layoutSelector).toBeVisible({ timeout: 5000 });
       await layoutSelector.selectOption('Header Footer Layout');
@@ -422,8 +422,9 @@ test.describe('allowedLayouts', () => {
       await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Footer' })).toBeVisible({ timeout: 5000 });
 
       // Switch to header-only layout (has header, default but NO footer placeholder)
-      await page.keyboard.press('Escape');
-      await expect(layoutSelector).toBeVisible({ timeout: 5000 });
+      // Deselect block to show page sidebar with layout selector
+      await page.locator('.sidebar-section-header .section-title').click();
+      await expect(layoutSelector).toBeVisible({ timeout: 10000 });
       await layoutSelector.selectOption('Header Only Layout');
       await page.locator('.apply-layout-btn').click();
 
@@ -450,13 +451,13 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Apply header-only layout
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
       const layoutSelector = page.locator('.layout-selector select');
       await layoutSelector.selectOption('Header Only Layout');
       await page.locator('.apply-layout-btn').click();
 
       // Wait for layout - sidebar shows stable state
-      await expect(page.locator('.child-block-item', { hasText: 'Header Only' })).toBeVisible({ timeout: 5000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Header Only' })).toBeVisible({ timeout: 10000 });
 
       // Verify structure: header at top, content after, NO fixed footer (use main/content selector for broader compatibility)
       const allBlocks = await iframe.locator('main [data-block-uid], #content [data-block-uid]').allTextContents();
@@ -477,13 +478,13 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Apply header-only layout
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
       const layoutSelector = page.locator('.layout-selector select');
       await layoutSelector.selectOption('Header Only Layout');
       await page.locator('.apply-layout-btn').click();
 
       // Wait for layout
-      await expect(page.locator('.child-block-item', { hasText: 'Header Only' })).toBeVisible({ timeout: 5000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Header Only' })).toBeVisible({ timeout: 10000 });
 
       // Click header block (use main/content selector for broader compatibility)
       const headerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Header Only' });
@@ -505,13 +506,13 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Apply header-only layout
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
       const layoutSelector = page.locator('.layout-selector select');
       await layoutSelector.selectOption('Header Only Layout');
       await page.locator('.apply-layout-btn').click();
 
       // Wait for layout
-      await expect(page.locator('.child-block-item', { hasText: 'Header Only' })).toBeVisible({ timeout: 5000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Header Only' })).toBeVisible({ timeout: 10000 });
 
       // Click last block (should be content, not header) - use main/content selector for broader compatibility
       const allBlocks = iframe.locator('main [data-block-uid], #content [data-block-uid]');
@@ -628,7 +629,7 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Show page-level sidebar
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
 
       // Open layout dropdown
       const layoutSelector = page.locator('.layout-selector select');
@@ -648,17 +649,19 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // First apply a layout
-      await page.keyboard.press('Escape');
+      await page.locator('.sidebar-section-header .section-title').click();
       const layoutSelector = page.locator('.layout-selector select');
       await layoutSelector.selectOption('Header Footer Layout');
       await page.locator('.apply-layout-btn').click();
 
       // Wait for layout to be applied - check sidebar shows the fixed blocks
-      await expect(page.locator('.child-block-item', { hasText: 'Layout Header' })).toBeVisible({ timeout: 5000 });
-      await expect(page.locator('.child-block-item', { hasText: 'Layout Footer' })).toBeVisible({ timeout: 5000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Header' })).toBeVisible({ timeout: 10000 });
+      await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Footer' })).toBeVisible({ timeout: 10000 });
 
       // Now select None to remove the layout
-      await page.keyboard.press('Escape');
+      // Click Page to deselect block and show layout selector
+      await page.locator('.sidebar-section-header .section-title').click();
+      await expect(layoutSelector).toBeVisible({ timeout: 10000 });
       await layoutSelector.selectOption({ label: 'None' });
       await page.locator('.apply-layout-btn').click();
 

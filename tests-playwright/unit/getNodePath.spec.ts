@@ -13,7 +13,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     helper = new AdminUIHelper(page);
 
     // Load the mock parent page which initializes the real hydra.js bridge
-    await page.goto('http://localhost:8888/mock-parent.html');
+    await page.goto('http://localhost:8889/mock-parent.html');
     await helper.waitForIframeReady();
     await helper.waitForBlockSelected('mock-block-1');
 
@@ -44,6 +44,308 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     expect(path).toEqual([0, 0]);
   });
 
+  test('closest data-node-id from span without data-node-id (F7/Vue pattern)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // handleTextChange uses closest('[data-node-id]') to find the Slate node.
+    // When mutatedNodeParent is <span> (no data-node-id), it must walk up from
+    // the span, not from the data-edit-text target.
+    const result = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<div data-edit-text="value">' +
+        '<p data-node-id="0"><span>Hello world</span></p>' +
+        '</div>';
+      document.body.appendChild(container);
+
+      const span = container.querySelector('span')!;
+      const editTarget = container.querySelector('[data-edit-text]')!;
+
+      // BUG: handleTextChange falls back to editTarget.closest('[data-node-id]')
+      const fromEditTarget = editTarget.closest('[data-node-id]');
+      // FIX: should use span.closest('[data-node-id]')
+      const fromSpan = span.closest('[data-node-id]');
+
+      container.remove();
+      return {
+        fromEditTarget: fromEditTarget?.getAttribute('data-node-id') ?? null,
+        fromSpan: fromSpan?.getAttribute('data-node-id') ?? null,
+      };
+    });
+
+    // editTarget.closest walks UP and finds nothing (data-node-id is a descendant)
+    expect(result.fromEditTarget).toBeNull();
+    // span.closest walks UP and finds <p data-node-id="0">
+    expect(result.fromSpan).toBe('0');
+  });
+
+  test('text wrapped in span without data-node-id (F7/Vue pattern)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // F7 renders: <p data-node-id="0"><span>Hello world</span></p>
+    // The <span> has no data-node-id — it's a decorative wrapper.
+    // getNodePath should still find [0, 0] by walking through the span.
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<p data-edit-text="value" data-node-id="0"><span>Hello world</span></p>';
+      document.body.appendChild(container);
+
+      const textNode = container.querySelector('span')!.firstChild;
+      const result = (window as any).bridge.getNodePath(textNode);
+
+      container.remove();
+      return result;
+    });
+
+    expect(path).toEqual([0, 0]);
+  });
+
+  test('getNodePath with span data-node-id="undefined" wrapping text (Next.js pattern)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // Next.js renders: <p data-node-id="0"><span data-node-id="undefined">Hello</span></p>
+    // getNodePath must ignore the invalid "undefined" nodeId on the span
+    // and return the correct path [0, 0] (paragraph 0, text child 0).
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<p data-edit-text="value" data-node-id="0"><span data-node-id="undefined">Hello world</span></p>';
+      document.body.appendChild(container);
+
+      const textNode = container.querySelector('span')!.firstChild;
+      const result = (window as any).bridge.getNodePath(textNode);
+
+      container.remove();
+      return result;
+    });
+
+    expect(path).toEqual([0, 0]);
+  });
+
+  test('getNodePath with mixed valid and invalid data-node-id siblings (Next.js bold)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // Next.js renders bold as: <p data-node-id="0">
+    //   <span data-node-id="undefined">Hello </span>
+    //   <strong data-node-id="0.1"><span data-node-id="undefined">world</span></strong>
+    // </p>
+    // getNodePath for "world" text should be [0, 1, 0] — paragraph 0, child 1 (strong), text 0.
+    const path = await body.evaluate(() => {
+      const container = document.createElement('div');
+      container.innerHTML =
+        '<p data-edit-text="value" data-node-id="0">' +
+        '<span data-node-id="undefined">Hello </span>' +
+        '<strong data-node-id="0.1"><span data-node-id="undefined">world</span></strong>' +
+        '</p>';
+      document.body.appendChild(container);
+
+      const strong = container.querySelector('strong')!;
+      const textNode = strong.querySelector('span')!.firstChild;
+      const result = (window as any).bridge.getNodePath(textNode);
+
+      container.remove();
+      return result;
+    });
+
+    expect(path).toEqual([0, 1, 0]);
+  });
+
+  test('handleTextChange updates formData when span has data-node-id="undefined" (Next.js pattern)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // Next.js renders text leaves as <span data-node-id="undefined">text</span>
+    // because it templates `data-node-id={node.nodeId}` and text leaves have
+    // nodeId=undefined. handleTextChange must skip this invalid attribute and
+    // walk up to the <p data-node-id="0"> to find the correct Slate node.
+    //
+    // We call the real handleTextChange with a DOM mutation target inside the
+    // invalid span, then check whether formData was updated.
+    const result = await body.evaluate(() => {
+      const bridge = (window as any).bridge;
+
+      // Set up formData and blockPathMap with a known block and slate value
+      const blockId = 'test-nextjs-block';
+      bridge.formData = {
+        ...bridge.formData,
+        blocks: {
+          ...bridge.formData.blocks,
+          [blockId]: {
+            '@type': 'slate',
+            value: [{ type: 'p', children: [{ text: 'Hello world' }], nodeId: '0' }],
+          },
+        },
+      };
+      bridge.blockPathMap = {
+        ...bridge.blockPathMap,
+        [blockId]: {
+          path: ['blocks', blockId],
+          resolvedBlockSchema: {
+            properties: {
+              value: { widget: 'slate' },
+            },
+          },
+        },
+      };
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'value';
+      bridge.isInlineEditing = true;
+
+      // Create DOM matching Next.js pattern: span wraps text with invalid nodeId
+      const blockEl = document.createElement('div');
+      blockEl.setAttribute('data-block-uid', blockId);
+      blockEl.innerHTML =
+        '<div data-edit-text="value">' +
+        '<p data-node-id="0"><span data-node-id="undefined">Hello world</span></p>' +
+        '</div>';
+      document.body.appendChild(blockEl);
+
+      // Simulate typing: modify text node inside the span
+      const span = blockEl.querySelector('span')!;
+      const textNode = span.firstChild!;
+      textNode.textContent = 'Hello world TYPED';
+
+      // Call handleTextChange as the MutationObserver would
+      const editTarget = blockEl.querySelector('[data-edit-text="value"]')!;
+      bridge.handleTextChange(editTarget, span, textNode);
+
+      // Check if formData was updated
+      const updatedText = bridge.formData.blocks[blockId].value[0].children[0].text;
+
+      blockEl.remove();
+      return { updatedText };
+    });
+
+    // formData should reflect the typed text
+    expect(result.updatedText).toBe('Hello world TYPED');
+  });
+
+  test('readSlateValueFromDOM reads correct text through invalid data-node-id spans (Next.js pattern)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // readSlateValueFromDOM walks the DOM tree. Elements with invalid nodeId
+    // (e.g. "undefined" from Next.js) are treated as text content.
+    const result = await body.evaluate(() => {
+      const bridge = (window as any).bridge;
+
+      // Slate value representing the field
+      const slateValue = [
+        { type: 'p', children: [{ text: 'Original' }], nodeId: '0' },
+      ];
+
+      // DOM as Next.js renders it — text wrapped in span with invalid nodeId
+      const container = document.createElement('div');
+      container.setAttribute('data-edit-text', 'value');
+      container.innerHTML =
+        '<p data-node-id="0"><span data-node-id="undefined">Modified text</span></p>';
+      document.body.appendChild(container);
+
+      const domValue = bridge.readSlateValueFromDOM(container, slateValue);
+
+      container.remove();
+      return {
+        text: domValue[0].children[0].text,
+      };
+    });
+
+    // Should read "Modified text" from the DOM, not keep "Original"
+    expect(result.text).toBe('Modified text');
+  });
+
+  test('isOnInvalidWhitespace: whitespace outside invalid span but inside edit field is invalid', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // Next.js renders: <div data-edit-text="value">
+    //   \n  <p data-node-id="0"><span data-node-id="undefined">Hello</span></p>\n
+    // </div>
+    // The whitespace text nodes between <div> and <p> are outside any data-node-id.
+    // With the bug: querySelector('[data-node-id]') finds the invalid span, thinks
+    // the field has Slate rendering, but the walk-up from whitespace also finds the
+    // invalid span → returns false (valid). With the fix: invalid span is skipped,
+    // walk-up reaches editableField without finding valid data-node-id → returns true.
+    //
+    // BUT: the <p> has valid data-node-id="0", so querySelector('[data-node-id]')
+    // finds that too. The walk-up from whitespace (sibling of <p>, not inside it)
+    // hits the edit-text container → returns true regardless of the invalid span.
+    // So this case works correctly even without the fix.
+    //
+    // The tricky case: text INSIDE the invalid span but OUTSIDE any valid node-id.
+    // e.g. <div data-edit-text="value"><span data-node-id="undefined">Hello</span></div>
+    // (no <p> wrapping — field itself is the container, span is direct child)
+    const result = await body.evaluate(() => {
+      const bridge = (window as any).bridge;
+
+      // No <p> wrapper — invalid span is direct child of edit-text container
+      const container = document.createElement('div');
+      container.setAttribute('data-edit-text', 'value');
+      container.innerHTML = '<span data-node-id="undefined">Hello</span>';
+      document.body.appendChild(container);
+
+      const textNode = container.querySelector('span')!.firstChild!;
+      const textResult = bridge.isOnInvalidWhitespace(textNode);
+
+      container.remove();
+      return { textResult };
+    });
+
+    // Text is inside an invalid span — walk-up finds span with data-node-id,
+    // incorrectly returns false. With fix (validating nodeId), it would skip
+    // the span, hit the edit-text container, and return true.
+    // Actually this is edge-case: without a valid <p>, the field has no real
+    // Slate structure. In practice Next.js always has <p data-node-id="0">.
+    // The real protection is in the other functions we already fixed.
+    // Still, the walk-up SHOULD skip invalid nodeIds for correctness.
+    expect(result.textResult).toBe(true);
+  });
+
+  test('saveCursorPosition skips invalid data-node-id="undefined" span (Next.js pattern)', async () => {
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    // saveCursorPosition uses .closest('[data-node-id]') to save the nodeId.
+    // With invalid span, it saves "undefined" as the nodeId.
+    // restoreCursorPosition then queries querySelector('[data-node-id="undefined"]')
+    // which finds the wrong element.
+    const result = await body.evaluate(() => {
+      const bridge = (window as any).bridge;
+
+      const container = document.createElement('div');
+      container.setAttribute('data-edit-text', 'value');
+      container.setAttribute('contenteditable', 'true');
+      container.innerHTML =
+        '<p data-node-id="0"><span data-node-id="undefined">Hello world</span></p>';
+      document.body.appendChild(container);
+
+      // Place cursor inside the text
+      const textNode = container.querySelector('span')!.firstChild!;
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(textNode, 3);
+      range.setEnd(textNode, 3);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      const saved = bridge.saveCursorPosition();
+
+      container.remove();
+      return {
+        startNodeId: saved?.startNodeId || null,
+        endNodeId: saved?.endNodeId || null,
+      };
+    });
+
+    // Should save the valid <p>'s nodeId "0", not the invalid span's "undefined"
+    expect(result.startNodeId).toBe('0');
+    expect(result.endNodeId).toBe('0');
+  });
+
   test('text inside bold span', async () => {
     const iframe = helper.getIframe();
     const body = iframe.locator('body');
@@ -51,7 +353,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const paths = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<p data-edit-text="value" data-node-id="0">Hello <span style="font-weight: bold" data-node-id="0-1">world</span></p>';
+        '<p data-edit-text="value" data-node-id="0">Hello <span style="font-weight: bold" data-node-id="0.1">world</span></p>';
       document.body.appendChild(container);
 
       const p = container.querySelector('p')!;
@@ -79,7 +381,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     const paths = await body.evaluate(() => {
       const container = document.createElement('div');
       container.innerHTML =
-        '<p data-edit-text="value" data-node-id="0">This is <span data-node-id="0-1">bold</span> text</p>';
+        '<p data-edit-text="value" data-node-id="0">This is <span data-node-id="0.1">bold</span> text</p>';
       document.body.appendChild(container);
 
       const p = container.querySelector('p')!;
@@ -112,9 +414,9 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       const container = document.createElement('div');
       container.innerHTML =
         '<p data-edit-text="value" data-node-id="0">' +
-        '<span data-node-id="0-0">bold</span>' +
-        '<span data-node-id="0-1">italic</span>' +
-        '<span data-node-id="0-2">underline</span>' +
+        '<span data-node-id="0.0">bold</span>' +
+        '<span data-node-id="0.1">italic</span>' +
+        '<span data-node-id="0.2">underline</span>' +
         '</p>';
       document.body.appendChild(container);
 
@@ -142,8 +444,8 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       const container = document.createElement('div');
       container.innerHTML =
         '<p data-edit-text="value" data-node-id="0">' +
-        '<span data-node-id="0-0">' +
-        '<span data-node-id="0-0-0">nested</span>' +
+        '<span data-node-id="0.0">' +
+        '<span data-node-id="0.0.0">nested</span>' +
         '</span>' +
         '</p>';
       document.body.appendChild(container);
@@ -232,7 +534,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
 
       const text1 = document.createTextNode('text1');
       const span = document.createElement('span');
-      span.setAttribute('data-node-id', '0-1');
+      span.setAttribute('data-node-id', '0.1');
       span.textContent = 'span';
       const text2 = document.createTextNode('text2');
 
@@ -270,7 +572,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       p.setAttribute('data-node-id', '0');
 
       const span = document.createElement('span');
-      span.setAttribute('data-node-id', '0-0');
+      span.setAttribute('data-node-id', '0.0');
       span.textContent = 'This';
 
       const text = document.createTextNode(' is a test paragraph');
@@ -307,7 +609,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
 
       const text1 = document.createTextNode('This is a ');
       const span = document.createElement('span');
-      span.setAttribute('data-node-id', '0-1');
+      span.setAttribute('data-node-id', '0.1');
       span.textContent = 'test';
       const text2 = document.createTextNode(' paragraph');
 
@@ -345,13 +647,13 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       p.setAttribute('data-node-id', '0');
 
       const span1 = document.createElement('span');
-      span1.setAttribute('data-node-id', '0-0');
+      span1.setAttribute('data-node-id', '0.0');
       span1.textContent = 'This';
 
       const text1 = document.createTextNode(' is a ');
 
       const span2 = document.createElement('span');
-      span2.setAttribute('data-node-id', '0-2');
+      span2.setAttribute('data-node-id', '0.2');
       span2.textContent = 'test';
 
       const text2 = document.createTextNode(' paragraph');
@@ -434,7 +736,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     expect(paths.textAfter).toEqual([0, 4]);
   });
 
-  test('parses dash notation data-node-id - "0-1" format', async () => {
+  test('parses dash notation data-node-id - "0.1" format', async () => {
     const iframe = helper.getIframe();
     const body = iframe.locator('body');
 
@@ -445,13 +747,13 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       p.setAttribute('data-node-id', '0');
 
       const span1 = document.createElement('span');
-      span1.setAttribute('data-node-id', '0-1');
+      span1.setAttribute('data-node-id', '0.1');
       span1.textContent = 'bold';
 
       const text1 = document.createTextNode(' plain ');
 
       const span2 = document.createElement('span');
-      span2.setAttribute('data-node-id', '0-3');
+      span2.setAttribute('data-node-id', '0.3');
       span2.textContent = 'italic';
 
       p.appendChild(span1);
@@ -544,13 +846,13 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       p.setAttribute('data-node-id', '0');
 
       const span1 = document.createElement('span');
-      span1.setAttribute('data-node-id', '0-0');
+      span1.setAttribute('data-node-id', '0.0');
       span1.textContent = 'a';
 
       const whitespace = document.createTextNode('\n  ');
 
       const span2 = document.createElement('span');
-      span2.setAttribute('data-node-id', '0-1');
+      span2.setAttribute('data-node-id', '0.1');
       span2.textContent = 'b';
 
       p.appendChild(span1);
@@ -573,14 +875,14 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       return result;
     });
 
-    // span1's text is at [0, 0, 0] - from data-node-id="0-0"
-    // whitespace is at [0, 1] - Slate index based on sibling with data-node-id="0-0"
-    // span2's text is at [0, 1, 0] - from data-node-id="0-1" (NOT DOM position!)
+    // span1's text is at [0, 0, 0] - from data-node-id="0.0"
+    // whitespace is at [0, 1] - Slate index based on sibling with data-node-id="0.0"
+    // span2's text is at [0, 1, 0] - from data-node-id="0.1" (NOT DOM position!)
     // Note: getNodePath uses data-node-id to derive path, not DOM position
     expect(paths.childNodesCount).toBe(3);
     expect(paths.span1Text).toEqual([0, 0, 0]);
     expect(paths.whitespace).toEqual([0, 1]); // Slate index from previous sibling's data-node-id
-    expect(paths.span2Text).toEqual([0, 1, 0]); // Path from data-node-id="0-1"
+    expect(paths.span2Text).toEqual([0, 1, 0]); // Path from data-node-id="0.1"
   });
 
   test('empty paragraph with placeholder BR', async () => {
@@ -634,7 +936,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       container.innerHTML =
         '<div data-edit-text="value">' +
         '<p data-node-id="1">' +
-        '<strong data-node-id="1-1"><span>Disclaimer</span></strong>' +
+        '<strong data-node-id="1.1"><span>Disclaimer</span></strong>' +
         '</p>' +
         '</div>';
       document.body.appendChild(container);
@@ -659,7 +961,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       container.innerHTML =
         '<div data-edit-text="value">' +
         '<p data-node-id="1">' +
-        '<strong data-node-id="1-1">Disclaimer</strong>' +
+        '<strong data-node-id="1.1">Disclaimer</strong>' +
         '</p>' +
         '</div>';
       document.body.appendChild(container);
@@ -682,7 +984,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       const container = document.createElement('div');
       container.innerHTML =
         '<p data-edit-text="value" data-node-id="0">' +
-        '<strong data-node-id="0-0"><em data-node-id="0-0">styled text</em></strong>' +
+        '<strong data-node-id="0.0"><em data-node-id="0.0">styled text</em></strong>' +
         '</p>';
       document.body.appendChild(container);
 
@@ -693,7 +995,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       return result;
     });
 
-    // Both wrappers have same node-id "0-0", path should be [0, 0, 0]
+    // Both wrappers have same node-id "0.0", path should be [0, 0, 0]
     expect(path).toEqual([0, 0, 0]);
   });
 
@@ -705,7 +1007,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       const container = document.createElement('div');
       container.innerHTML =
         '<p data-edit-text="value" data-node-id="0">' +
-        'before <strong data-node-id="0-1"><em data-node-id="0-1">bold</em></strong> after' +
+        'before <strong data-node-id="0.1"><em data-node-id="0.1">bold</em></strong> after' +
         '</p>';
       document.body.appendChild(container);
 
@@ -738,7 +1040,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       container.innerHTML =
         '<div data-edit-text="value">' +
         '<p data-node-id="0">First paragraph</p>' +
-        '<p data-node-id="1"><strong data-node-id="1-1">Disclaimer</strong>: This instance is reset every night</p>' +
+        '<p data-node-id="1"><strong data-node-id="1.1">Disclaimer</strong>: This instance is reset every night</p>' +
         '</div>';
       document.body.appendChild(container);
 
@@ -750,7 +1052,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       return result;
     });
 
-    // Text after strong (node-id 1-1) should be at Slate index 2 (1+1)
+    // Text after strong (node-id 1.1) should be at Slate index 2 (1+1)
     expect(path).toEqual([1, 2]);
   });
 
@@ -765,7 +1067,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
         '<p data-node-id="0">First paragraph</p>' +
         '<p data-node-id="1">' +
         '<span></span>' +
-        '<strong data-node-id="1-1">Disclaimer</strong>' +
+        '<strong data-node-id="1.1">Disclaimer</strong>' +
         '<span>: This instance is reset every night</span>' +
         '</p>' +
         '</div>';
@@ -820,7 +1122,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
         '<div data-edit-text="value">' +
         '<p data-node-id="0">' +
         'This text appears after the slider. Click on ' +
-        '<strong data-node-id="0-1">bold text</strong>' +
+        '<strong data-node-id="0.1">bold text</strong>' +
         ' to test getNodePath.' +
         '</p>' +
         '</div>';
@@ -1201,7 +1503,7 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
     helper = new AdminUIHelper(page);
 
     // Load the mock parent page which initializes the real hydra.js bridge
-    await page.goto('http://localhost:8888/mock-parent.html');
+    await page.goto('http://localhost:8889/mock-parent.html');
     await helper.waitForIframeReady();
     await helper.waitForBlockSelected('mock-block-1');
 
@@ -1446,7 +1748,7 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
     const paths = await body.evaluate(() => {
       const fragment = (window as any).preserveWhitespaceDOM(
         '<div id="test-zws-after" data-edit-text="value">' +
-        '<p data-node-id="0">Hello <span data-node-id="0-1">world</span>\uFEFF</p>' +
+        '<p data-node-id="0">Hello <span data-node-id="0.1">world</span>\uFEFF</p>' +
         '</div>'
       );
       document.body.appendChild(fragment);
@@ -1480,7 +1782,7 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
     const paths = await body.evaluate(() => {
       const fragment = (window as any).preserveWhitespaceDOM(
         '<div id="test-zws-inside" data-edit-text="value">' +
-        '<p data-node-id="0">Hello <span data-node-id="0-1">\uFEFF</span></p>' +
+        '<p data-node-id="0">Hello <span data-node-id="0.1">\uFEFF</span></p>' +
         '</div>'
       );
       document.body.appendChild(fragment);
@@ -1512,7 +1814,7 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
     const paths = await body.evaluate(() => {
       const fragment = (window as any).preserveWhitespaceDOM(
         '<div id="test-zws-both" data-edit-text="value">' +
-        '<p data-node-id="0">Hello <span data-node-id="0-1">\uFEFFworld</span>\uFEFF</p>' +
+        '<p data-node-id="0">Hello <span data-node-id="0.1">\uFEFFworld</span>\uFEFF</p>' +
         '</div>'
       );
       document.body.appendChild(fragment);

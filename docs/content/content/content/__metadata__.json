@@ -89,6 +89,7 @@
     "concepts/templates/data.json",
     "concepts/deployment/data.json",
     "concepts/advanced/data.json",
+    "search/data.json",
     "templates/data.json",
     "templates/block-reference-layout/data.json",
     "templates/event-view/data.json",

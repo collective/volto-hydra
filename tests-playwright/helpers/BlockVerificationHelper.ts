@@ -156,13 +156,23 @@ export async function checkEditAnnotations(
   );
   expect(linksWithout, 'All content links should have data-edit-link or data-linkable-allow').toEqual([]);
 
-  // No link href should point to the API URL — links must use frontend-relative paths
-  const apiLinks = await block.locator('a[href]').evaluateAll(
-    (els: Element[]) => (els as HTMLAnchorElement[])
-      .map(el => el.getAttribute('href'))
-      .filter(h => h?.includes('localhost:8888')),
+  // Links must point to the same origin as the page, or be relative.
+  // Catches links that accidentally point to the API instead of the frontend.
+  const offSiteLinks = await block.locator('a[href]').evaluateAll(
+    (els: Element[]) => {
+      const pageOrigin = window.location.origin;
+      return (els as HTMLAnchorElement[])
+        .map(el => el.getAttribute('href'))
+        .filter(h => {
+          if (!h || h.startsWith('#') || h.startsWith('/')) return false;
+          try {
+            const linkOrigin = new URL(h, pageOrigin).origin;
+            return linkOrigin !== pageOrigin && linkOrigin.includes('localhost');
+          } catch { return false; }
+        });
+    },
   );
-  expect(apiLinks, 'No links should point to the API URL').toEqual([]);
+  expect(offSiteLinks, 'Links should not point to a different localhost service (e.g. the API)').toEqual([]);
 
   // All images must have data-edit-media
   const imagesWithout = await block.locator('img').evaluateAll(
@@ -171,6 +181,19 @@ export async function checkEditAnnotations(
       .map(el => el.getAttribute('src')),
   );
   expect(imagesWithout, 'All images should have data-edit-media').toEqual([]);
+
+  // All images must have a non-empty src and not be broken (naturalWidth > 0)
+  const brokenImages = await block.locator('img').evaluateAll(
+    (els: Element[]) => (els as HTMLImageElement[])
+      .filter(el => {
+        const src = el.getAttribute('src') || '';
+        if (!src) return true;  // empty src
+        if (el.complete && el.naturalWidth === 0) return true;  // loaded but broken
+        return false;
+      })
+      .map(el => el.getAttribute('src') || '(empty)'),
+  );
+  expect(brokenImages, 'All images should have valid src and load successfully').toEqual([]);
 
   // Simple string fields in block data must appear with data-edit-text
   if (blockData) {

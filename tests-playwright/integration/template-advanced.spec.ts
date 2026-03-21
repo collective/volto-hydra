@@ -22,14 +22,14 @@ test.describe('Fixed Editable Blocks', () => {
     await helper.waitForIframeReady();
 
     // Apply the editable-fixed layout
-    await page.keyboard.press('Escape');
+    await page.locator('.sidebar-section-header .section-title').click();
     const layoutSelector = page.locator('.layout-selector select');
     await expect(layoutSelector).toBeVisible({ timeout: 5000 });
     await layoutSelector.selectOption('Editable Fixed Layout');
     await page.locator('.apply-layout-btn').click();
 
-    // Wait for layout to be applied
-    await expect(page.locator('.child-block-item', { hasText: 'Editable Header' })).toBeVisible({ timeout: 5000 });
+    // Wait for layout to render in the iframe
+    await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Editable Header' })).toBeVisible({ timeout: 10000 });
 
     // Click the editable header block
     const headerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Editable Header' });
@@ -56,14 +56,14 @@ test.describe('Fixed Editable Blocks', () => {
     await helper.waitForIframeReady();
 
     // Apply the editable-fixed layout
-    await page.keyboard.press('Escape');
+    await page.locator('.sidebar-section-header .section-title').click();
     const layoutSelector = page.locator('.layout-selector select');
     await expect(layoutSelector).toBeVisible({ timeout: 5000 });
     await layoutSelector.selectOption('Editable Fixed Layout');
     await page.locator('.apply-layout-btn').click();
 
-    // Wait for layout
-    await expect(page.locator('.child-block-item', { hasText: 'Editable Header' })).toBeVisible({ timeout: 5000 });
+    // Wait for layout to render in the iframe
+    await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Editable Header' })).toBeVisible({ timeout: 10000 });
 
     // Click the header block
     const headerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Editable Header' });
@@ -92,14 +92,14 @@ test.describe('Remove Layout', () => {
     expect(hasOriginalContent).toBe(true);
 
     // Apply header-footer layout
-    await page.keyboard.press('Escape');
+    await page.locator('.sidebar-section-header .section-title').click();
     const layoutSelector = page.locator('.layout-selector select');
     await expect(layoutSelector).toBeVisible({ timeout: 5000 });
     await layoutSelector.selectOption('Header Footer Layout');
     await page.locator('.apply-layout-btn').click();
 
-    // Wait for layout to be applied
-    await expect(page.locator('.child-block-item', { hasText: 'Layout Header' })).toBeVisible({ timeout: 5000 });
+    // Wait for layout to render in the iframe
+    await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Header' })).toBeVisible({ timeout: 10000 });
 
     // Verify original content is still there (in default placeholder)
     const afterLayoutBlocks = await iframe.locator('main [data-block-uid], #content [data-block-uid]').allTextContents();
@@ -107,7 +107,7 @@ test.describe('Remove Layout', () => {
     expect(contentPreserved).toBe(true);
 
     // Now select "Layout" (no layout) to remove the layout
-    await page.keyboard.press('Escape');
+    await page.locator('.sidebar-section-header .section-title').click();
     await expect(layoutSelector).toBeVisible({ timeout: 5000 });
     await layoutSelector.selectOption('Layout');
 
@@ -139,8 +139,8 @@ test.describe('Delete Template Instance', () => {
     await expect(templateBreadcrumb).toBeVisible({ timeout: 5000 });
 
     // Click the "•••" dropdown button next to the template breadcrumb to access Remove option
-    // The dropdown is a sibling of the template breadcrumb in the same container
-    const templateSection = templateBreadcrumb.locator('xpath=..');
+    // The dropdown is in .block-actions-menu, sibling of .parent-nav in .sidebar-section-header
+    const templateSection = templateBreadcrumb.locator('xpath=ancestor::div[contains(@class,"sidebar-section-header")]');
     const dropdownTrigger = templateSection.locator('button', { hasText: '•••' });
     await expect(dropdownTrigger).toBeVisible();
     await dropdownTrigger.click();
@@ -177,14 +177,14 @@ test.describe('Non-matching Placeholder Content', () => {
     expect(initialBlocks.length).toBeGreaterThan(0);
 
     // Apply header-footer layout (which has a "default" placeholder)
-    await page.keyboard.press('Escape');
+    await page.locator('.sidebar-section-header .section-title').click();
     const layoutSelector = page.locator('.layout-selector select');
     await expect(layoutSelector).toBeVisible({ timeout: 5000 });
     await layoutSelector.selectOption('Header Footer Layout');
     await page.locator('.apply-layout-btn').click();
 
-    // Wait for layout
-    await expect(page.locator('.child-block-item', { hasText: 'Layout Header' })).toBeVisible({ timeout: 5000 });
+    // Wait for layout to render in the iframe
+    await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Header' })).toBeVisible({ timeout: 10000 });
 
     // Verify: header is first, original content is in the middle, footer is last
     const allBlocks = await iframe.locator('main [data-block-uid], #content [data-block-uid]').allTextContents();
@@ -289,11 +289,12 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     await helper.navigateToEdit('/template-test-page');
     await helper.waitForIframeReady();
 
-    // Click a template block then Escape up to the template virtual block
+    // Click a template block then navigate up to the template virtual block
     const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
     await headerBlock.click();
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    // Click back arrow to go from child block up to template instance
+    await page.locator('.sidebar-section-header[data-is-current="true"] .nav-back').click();
     await page.waitForTimeout(200);
 
     // Should be at template instance level
@@ -338,7 +339,8 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
     await headerBlock.click();
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    // Click back arrow to go from child block up to template instance
+    await page.locator('.sidebar-section-header[data-is-current="true"] .nav-back').click();
     await page.waitForTimeout(200);
 
     // Find the Primary placeholder section
@@ -389,7 +391,8 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
     await headerBlock.click();
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    // Click back arrow to go from child block up to template instance
+    await page.locator('.sidebar-section-header[data-is-current="true"] .nav-back').click();
     await page.waitForTimeout(200);
 
     // Find the Primary placeholder section

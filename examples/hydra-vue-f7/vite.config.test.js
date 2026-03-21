@@ -5,6 +5,7 @@ import vue from '@vitejs/plugin-vue';
 const SRC_DIR = path.resolve(__dirname, './src');
 const PUBLIC_DIR = path.resolve(__dirname, './public');
 const BUILD_DIR = path.resolve(__dirname, './dist');
+const HYDRA_JS_DIR = path.resolve(__dirname, '../../packages/hydra-js');
 
 export default {
   plugins: [vue({
@@ -28,6 +29,7 @@ export default {
   resolve: {
     alias: {
       '@': SRC_DIR,
+      '@hydra-js': HYDRA_JS_DIR,
     },
   },
   server: {

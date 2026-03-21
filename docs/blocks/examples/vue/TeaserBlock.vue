@@ -14,6 +14,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { getImageUrl } from './utils.js';
 const props = defineProps({ block: Object });
 
 const hrefObj = computed(() => props.block.href?.[0] || null);
@@ -23,10 +24,8 @@ const description = computed(() => useBlockData.value ? props.block.description 
 const href = computed(() => hrefObj.value?.['@id'] || '');
 const imageSrc = computed(() => {
   if (props.block.preview_image) {
-    return typeof props.block.preview_image === 'string'
-      ? props.block.preview_image
-      : props.block.preview_image['@id'];
+    return getImageUrl(props.block.preview_image);
   }
-  return hrefObj.value?.hasPreviewImage ? `${href.value}/@@images/preview_image` : '';
+  return hrefObj.value?.hasPreviewImage ? getImageUrl(`${href.value}/@@images/preview_image`) : '';
 });
 </script>

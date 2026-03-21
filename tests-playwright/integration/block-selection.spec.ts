@@ -151,10 +151,10 @@ test.describe('Block Selection', () => {
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.waitForSidebarOpen();
 
-    // Click the parent arrow "‹ Text" to deselect - this navigates up to page level
-    const parentArrow = page.locator('.sidebar-section-header .parent-nav');
-    await expect(parentArrow).toBeVisible({ timeout: 5000 });
-    await parentArrow.click();
+    // Click the back arrow to deselect - this navigates up to page level
+    const backArrow = page.locator('.sidebar-section-header .nav-back');
+    await expect(backArrow).toBeVisible({ timeout: 5000 });
+    await backArrow.click();
 
     // Wait for ChildBlocksWidget to show page-level blocks with the Image item
     const childBlocksWidget = page.locator('#sidebar-order .child-blocks-widget');

@@ -91,10 +91,17 @@
 
     // Configure iframe frontend from ?frontend= URL param (default: mock frontend on 8888)
     const params = new URLSearchParams(window.location.search);
-    const frontendOrigin = params.get('frontend') || 'http://localhost:8888';
+    const frontendOrigin = params.get('frontend') || 'http://localhost:8889';
     const contentName = params.get('content'); // e.g., 'examples' loads /examples.json
     const apiPath = params.get('api_path'); // e.g., '/block/toc-block' loads from API
     const adminOrigin = window.location.origin;
+
+    // Derive API origin from api_path param if present, otherwise default
+    const apiOrigin = apiPath ? new URL(apiPath).origin : 'http://localhost:8888';
+
+    // Derive content path from api_path (e.g. "http://localhost:8891/blog" → "/blog")
+    // Falls back to /_test_data/test-page for hydra's own test content
+    const contentPath = apiPath ? new URL(apiPath).pathname : '/_test_data/test-page';
 
     // Create iframe dynamically so name is set BEFORE the browsing context is created.
     // Setting iframe.name after the element is in the DOM doesn't propagate to contentWindow.name.
@@ -102,7 +109,7 @@
       const previewIframe = document.createElement('iframe');
       previewIframe.id = 'previewIframe';
       previewIframe.name = `hydra-edit:${adminOrigin}`;
-      previewIframe.src = `${frontendOrigin}/_test_data/test-page?_edit=true&_admin_origin=${adminOrigin}&_hydra_debug=1`;
+      previewIframe.src = `${frontendOrigin}${contentPath}?_edit=true&_admin_origin=${adminOrigin}&_api_origin=${apiOrigin}&_hydra_debug=1`;
       document.getElementById('iframe-container').appendChild(previewIframe);
     }
 
@@ -768,6 +775,7 @@
     // Make mock parent available to tests
     window.mockParent = {
       getFormData: () => mockFormData,
+      getBlocksConfig: () => mockBlocksConfig,
       getBlock: (blockId) => mockFormData.blocks[blockId],
       buildBlockPathMap: () => buildBlockPathMap(mockFormData, mockBlocksConfig),
       setTransformDelay: (delay) => { window.mockTransformDelay = delay; },

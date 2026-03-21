@@ -172,9 +172,12 @@ const Sidebar = (props) => {
             className="sidebar-section-header sticky-header page-header"
             data-page-type={type || intl.formatMessage(messages.page)}
           >
-            <span className="section-title">
+            <button
+              className="section-title"
+              onClick={() => document.dispatchEvent(new CustomEvent('hydra-select-page'))}
+            >
               {type || intl.formatMessage(messages.page)}
-            </span>
+            </button>
             <button
               className="sidebar-close-button"
               onClick={onToggleExpanded}

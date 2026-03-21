@@ -3,6 +3,7 @@
 </template>
 
 <script setup>
+import { getImageUrl } from './utils.js';
 import SlateBlock from './SlateBlock.vue';
 import IntroductionBlock from './IntroductionBlock.vue';
 import ImageBlock from './ImageBlock.vue';
@@ -32,7 +33,7 @@ const ListingItemBlock = {
   props: ['block'],
   render() {
     const b = this.block;
-    const imgSrc = b.image ? (typeof b.image === 'string' ? b.image : b.image['@id']) : null;
+    const imgSrc = getImageUrl(b.image);
     return h('div', { 'data-block-uid': b['@uid'], class: 'listing-item' }, [
       imgSrc ? h('img', { src: imgSrc, alt: '', 'data-edit-media': 'image' }) : null,
       b.date ? h('time', { style: 'font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em' }, new Date(b.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })) : null,

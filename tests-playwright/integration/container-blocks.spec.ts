@@ -396,7 +396,7 @@ test.describe('Adding Blocks to Containers', () => {
     const currentHeader = page.locator(
       '.sidebar-section-header[data-is-current="true"] .parent-nav',
     );
-    await currentHeader.click();
+    await currentHeader.locator('.nav-back').click();
     await page.waitForTimeout(300);
 
     // Now the sidebar should show page-level "Blocks" section
@@ -702,11 +702,11 @@ test.describe('Hierarchical Sidebar', () => {
     await helper.clickBlockInIframe('text-1a', { waitForToolbar: false });
     await helper.waitForSidebarCurrentBlock('Text');
 
-    // Navigate up to the parent container (col-1) by clicking the parent nav
+    // Navigate up to the parent container (col-1) by clicking the back arrow
     const parentNav = page.locator(
       '.sidebar-section-header[data-is-current="true"] .parent-nav',
     );
-    await parentNav.click();
+    await parentNav.locator('.nav-back').click();
     await helper.waitForSidebarCurrentBlock('Column');
 
     // The child blocks widget should be visible for container blocks
@@ -741,8 +741,8 @@ test.describe('Hierarchical Sidebar', () => {
     let currentHeader = page.locator(
       '.sidebar-section-header[data-is-current="true"] .parent-nav',
     );
-    await expect(currentHeader).toContainText(/text/i);
-    await currentHeader.click();
+    await expect(currentHeader.locator('.nav-title')).toContainText(/text/i);
+    await currentHeader.locator('.nav-back').click();
     await page.waitForTimeout(300);
 
     // Column is now current, Text header is gone
@@ -759,7 +759,7 @@ test.describe('Hierarchical Sidebar', () => {
     const columnHeader = page.locator(
       '.sidebar-section-header[data-is-current="true"] .parent-nav',
     );
-    await columnHeader.click();
+    await columnHeader.locator('.nav-back').click();
     await page.waitForTimeout(300);
 
     // Columns is now current, Column header is gone
@@ -776,7 +776,7 @@ test.describe('Hierarchical Sidebar', () => {
     const columnsHeader = page.locator(
       '.sidebar-section-header[data-is-current="true"] .parent-nav',
     );
-    await columnsHeader.click();
+    await columnsHeader.locator('.nav-back').click();
     await page.waitForTimeout(300);
 
     // No block selected, only Page header shown
@@ -810,7 +810,7 @@ test.describe('Hierarchical Sidebar', () => {
     const currentHeader = page.locator(
       '.sidebar-section-header[data-is-current="true"] .parent-nav',
     );
-    await currentHeader.click();
+    await currentHeader.locator('.nav-back').click();
     await page.waitForTimeout(300);
 
     // Verify all selection UI is hidden
@@ -1494,14 +1494,9 @@ test.describe('Single Allowed Block Auto-Insert', () => {
     const blockChooser = page.locator('.blocks-chooser');
     await expect(blockChooser).not.toBeVisible({ timeout: 1000 });
 
-    // Wait for the block to be inserted
-    await page.waitForTimeout(1000);
-
     // A new column should have been auto-inserted
-    const newColumnCount = await iframe
-      .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
-      .count();
-    expect(newColumnCount).toBe(3);
+    const columns = iframe.locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]');
+    await expect(columns).toHaveCount(3, { timeout: 5000 });
 
   });
 
@@ -1717,11 +1712,10 @@ test.describe('Sidebar Editing for Nested Blocks', () => {
     await slateBlock.click();
     await page.keyboard.type('Test edit');
 
-    // Wait a moment for any errors to surface
-    await page.waitForTimeout(1000);
+    // Verify typed text appears in iframe (confirms no crash)
+    await expect(slateBlock).toContainText('Test edit', { timeout: 5000 });
 
-    // Check for console errors - the page should not have crashed
-    // The sidebar should still be visible
+    // The sidebar should still be visible (no crash)
     await expect(sidebarHeader).toBeVisible();
   });
 });
@@ -3240,7 +3234,7 @@ test.describe('Slider with listing expansion', () => {
     await helper.clickBlockInIframe('gallery-listing');
     await helper.waitForQuantaToolbar('gallery-listing');
     // Click ‹ Listing in sidebar to go up to the Slider level
-    await page.locator('button').filter({ hasText: /^‹.*Listing/ }).click();
+    await page.locator('.parent-nav:has-text("Listing") .nav-back').click();
     await helper.waitForQuantaToolbar('gallery-slider');
     // Select manual-image-1 from the slider's child blocks list
     await page.locator('#sidebar-order .child-block-item').last().click();
@@ -3377,9 +3371,9 @@ test.describe('slateTable Container', () => {
     await helper.clickBlockInIframe('cell-1-1');
     await helper.waitForSidebarOpen();
 
-    // Navigate up to the row by clicking "‹ Cell" in the sidebar
-    const cellNavButton = page.locator('.parent-nav:has-text("Cell")');
-    await cellNavButton.click();
+    // Navigate up to the row by clicking the back arrow on "Cell" in the sidebar
+    const cellSection = page.locator('.parent-nav:has-text("Cell")');
+    await cellSection.locator('.nav-back').click();
 
     // Verify sidebar shows cells as children of the row
     const childBlocksList = page.locator('.child-blocks-list');
@@ -3947,10 +3941,15 @@ test.describe('Multi-Container Field Operations', () => {
     await expect(clearButton).toBeVisible({ timeout: 5000 });
     await clearButton.click();
 
-    // Verify the image was cleared - src should change or element should become placeholder
-    await expect(imageElement).not.toHaveAttribute('src', initialSrc!, {
-      timeout: 5000,
-    });
+    // Verify the image was cleared - src should change and empty-image-overlay should appear
+    await expect(async () => {
+      const imgCount = await imageBlock.locator('img').count();
+      if (imgCount === 0) return; // img removed entirely — cleared
+      const src = await imageBlock.locator('img').getAttribute('src');
+      expect(src).not.toBe(initialSrc);
+    }).toPass({ timeout: 5000 });
+    const emptyOverlay = page.locator('.empty-image-overlay');
+    await expect(emptyOverlay).toBeVisible({ timeout: 5000 });
   });
 
   test('creating a new gridBlock shows toolbar and has visible size', async ({
@@ -4392,7 +4391,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     await expect(sidebar.locator('label').filter({ hasText: 'Facet widget' })).not.toBeVisible();
 
     // Navigate back to search block by clicking current block's parent-nav (goes to parent)
-    await sidebar.locator('[data-is-current="true"] .parent-nav').click();
+    await sidebar.locator('[data-is-current="true"] .nav-back').click();
     await helper.waitForSidebarCurrentBlock('Search');
 
     await expect(facetItems).toHaveCount(4, { timeout: 5000 });
@@ -4453,7 +4452,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     await expect(sidebar.locator('label').filter({ hasText: 'Facet widget' })).not.toBeVisible();
 
     // Navigate back to search block by clicking current block's parent-nav (goes to parent)
-    await sidebar.locator('[data-is-current="true"] .parent-nav').click();
+    await sidebar.locator('[data-is-current="true"] .nav-back').click();
     await helper.waitForSidebarCurrentBlock('Search');
 
     // Re-scope facets section after navigating back
@@ -4490,7 +4489,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     await helper.waitForQuantaToolbar('facet-type');
 
     // Navigate back to search by clicking current block's parent-nav
-    await sidebar.locator('[data-is-current="true"] .parent-nav').click();
+    await sidebar.locator('[data-is-current="true"] .nav-back').click();
     await helper.waitForSidebarCurrentBlock('Search');
 
     const updatedFacetsSection = sidebar.locator('.container-field-section').filter({ hasText: 'Facets' }).first();

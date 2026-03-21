@@ -1,3 +1,5 @@
+import { getImageUrl } from './utils.js';
+
 function TeaserBlock({ block }) {
   const hrefObj = block.href?.[0] || null;
   const useBlockData = block.overwrite || !hrefObj?.title;
@@ -6,8 +8,8 @@ function TeaserBlock({ block }) {
   const description = useBlockData ? block.description : hrefObj?.description || '';
   const href = hrefObj?.['@id'] || '';
   const imageSrc = block.preview_image
-    ? (typeof block.preview_image === 'string' ? block.preview_image : block.preview_image['@id'])
-    : (hrefObj?.hasPreviewImage ? `${href}/@@images/preview_image` : '');
+    ? getImageUrl(block.preview_image)
+    : (hrefObj?.hasPreviewImage ? getImageUrl({ '@id': `${href}/@@images/preview_image` }) : '');
 
   if (!href) {
     return (

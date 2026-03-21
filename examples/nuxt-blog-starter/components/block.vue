@@ -1,4 +1,4 @@
-<template>
+<template comments>
   <div v-if="block['@type'] == 'slate'" class="slate-block" :data-block-uid="block_uid" data-edit-text="value">
     <RichText v-for="node in block['value']" :key="node" :node="node" />
   </div>
@@ -15,29 +15,25 @@
      data-edit-text="/description"
      class="text-lg text-gray-500 mb-6">{{ data.description }}</p>
 
-  <div v-else-if="block['@type'] == 'image' && contained" :data-block-uid="block_uid">
-    <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-edit-link="href">
-      <NuxtImg v-for="props in [imageProps(block)]" data-edit-media="url" :src="props.url" :width="props.width"
-        :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
-    </a>
-    <NuxtImg v-else v-for="props in [imageProps(block)]" data-edit-media="url" data-edit-link="href" :src="props.url" :width="props.width"
-      :alt="block.alt" :class="['image-size-' + props.size, 'image-align-' + props.align]" />
-  </div>
-  <div v-else-if="block['@type'] == 'image' && !contained" :data-block-uid="block_uid"
-       :class="['image-size-' + (block.size || 'l'), 'image-align-' + (block.align || 'center')]">
-    <figure>
-      <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-edit-link="href">
-        <NuxtImg v-for="props in [imageProps(block)]" data-edit-media="url" :src="props.url" _width="props.width"
-          :alt="block.alt" />
-      </a>
-      <NuxtImg v-else v-for="props in [imageProps(block)]" data-edit-media="url" data-edit-link="href" :src="props.url" _width="props.width"
-        :alt="block.alt" />
-    </figure>
+  <div v-else-if="block['@type'] == 'image'" :data-block-uid="block_uid"
+       :class="!contained && ['image-size-' + (block.size || 'l'), 'image-align-' + (block.align || 'center')]">
+    <template v-for="props in [imageProps(block)]">
+      <template v-if="props.url">
+        <a v-if="block.href" :href="getUrl(block.href)" class="image-link" data-edit-link="href">
+          <NuxtImg data-edit-media="url" :src="props.url" :width="props.width" :alt="block.alt" />
+        </a>
+        <NuxtImg v-else data-edit-media="url" data-edit-link="href" :src="props.url" :width="props.width" :alt="block.alt" />
+      </template>
+      <img v-else-if="isInListing" data-edit-media="url" src="/placeholder.svg"
+        :alt="block.alt" class="w-full h-48 object-cover rounded bg-gray-200" />
+      <div v-else data-edit-media="url" class="w-full h-48 bg-gray-100 rounded flex items-center justify-center text-gray-400">
+      </div>
+    </template>
   </div>
 
   <div v-else-if="block['@type'] == 'leadimage'" :data-block-uid="block_uid" class="mb-6">
-    <template v-for="props in [imageProps(data)]">
-      <NuxtImg v-if="props.url" :src="props.url" data-edit-media="preview_image"
+    <template v-for="props in [imageProps(data.image || data.preview_image)]">
+      <NuxtImg v-if="props.url" :src="props.url" :data-edit-media="data.image ? '/image' : '/preview_image'"
         class="w-full rounded-lg object-cover max-h-96" loading="lazy" decoding="async" />
     </template>
   </div>
@@ -50,9 +46,9 @@
     </span>
   </div>
 
-  <!-- Hero block - uses comment syntax for field selectors (tests hydra comment parser) -->
+  <template v-else-if="block['@type'] == 'hero'" comments>
   <!-- hydra edit-text=heading(.hero-heading) edit-text=subheading(.hero-subheading) edit-media=image(.hero-image) edit-text=buttonText(.hero-button) edit-link=buttonLink(.hero-button) -->
-  <div v-else-if="block['@type'] == 'hero'" :data-block-uid="block_uid"
+  <div :data-block-uid="block_uid"
        class="hero-block p-5 bg-gray-100 rounded-lg">
     <!-- Image - uses class for selector, no data-edit-media -->
     <img v-if="block.image" class="hero-image w-full h-auto max-h-64 object-cover mb-4 rounded"
@@ -71,7 +67,7 @@
       {{ block.buttonText }}
     </a>
   </div>
-  <!-- /hydra -->
+  </template>
 
   <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid"
        class="mt-6 mb-6 rounded-lg" :style="gridBgStyle(block)">
@@ -84,7 +80,7 @@
             <template #default="{ items }">
               <template v-for="item in items" :key="item['@uid']">
                 <template v-if="item.readOnly"><!-- hydra block-readonly --></template>
-                <Block :block_uid="item['@uid']" :block="item" :data="data" :contained="true"
+                <Block :block_uid="item['@uid']" :block="item" :data="data" :contained="true" :is-in-listing="true"
                        class="grid-cell p-4"
                        :style="!block.styles?.backgroundColor ? { backgroundColor: '#f1f5f9' } : {}" />
               </template>
@@ -188,7 +184,7 @@
                     :class="slideClasses(slideOffset(entryIdx) + itemIdx)"
                     :data-block-uid="item['@uid']" data-block-readonly
                     data-carousel-item data-block-add="right">
-                    <Block :block_uid="undefined" :block="item" :data="data" :contained="true" />
+                    <Block :block_uid="undefined" :block="item" :data="data" :contained="true" :is-in-listing="true" />
                   </div>
                 </template>
               </template>
@@ -289,7 +285,7 @@
       <template #default="{ items }">
         <template v-for="item in items" :key="item['@uid']">
           <template v-if="item.readOnly"><!-- hydra block-readonly --></template>
-          <Block :block_uid="item['@uid']" :block="item" :data="data" :contained="contained" />
+          <Block :block_uid="item['@uid']" :block="item" :data="data" :contained="contained" :is-in-listing="true" />
         </template>
       </template>
     </ListingBlock>
@@ -765,13 +761,13 @@
       </div>
       <div v-if="data.event_url" class="flex gap-2">
         <dt class="font-semibold text-gray-600 min-w-24">Website</dt>
-        <dd><a :href="data.event_url" class="text-blue-600 underline">{{ data.event_url }}</a></dd>
+        <dd><a data-edit-link="/event_url" :href="data.event_url" class="text-blue-600 underline">{{ data.event_url }}</a></dd>
       </div>
       <div v-if="data.contact_name || data.contact_email || data.contact_phone" class="flex gap-2">
         <dt class="font-semibold text-gray-600 min-w-24">Contact</dt>
         <dd>
           <span v-if="data.contact_name" data-edit-text="/contact_name">{{ data.contact_name }}</span>
-          <span v-if="data.contact_email"> · <a :href="`mailto:${data.contact_email}`">{{ data.contact_email }}</a></span>
+          <span v-if="data.contact_email"> · <a data-edit-link="/contact_email" :href="`mailto:${data.contact_email}`">{{ data.contact_email }}</a></span>
           <span v-if="data.contact_phone" data-edit-text="/contact_phone"> · {{ data.contact_phone }}</span>
         </dd>
       </div>
@@ -847,11 +843,17 @@ const props = defineProps({
   paging: {
     type: Object,
     default: null,
+  },
+  isInListing: {
+    type: Boolean,
+    default: false,
   }
 });
 
 // Use toRefs to maintain reactivity (destructuring props directly can lose reactivity in Vue 3)
-const { block_uid, block, data, contained, apiUrl } = toRefs(props);
+const { block_uid, block, data, contained, apiUrl, isInListing } = toRefs(props);
+
+const placeholderImage = '/placeholder.svg';
 
 
 // Use prop apiUrl if provided, otherwise injected value

@@ -796,8 +796,8 @@ test.describe('Inline Editing - Formatting', () => {
     // Now type " more" — this is where the space gets lost on Nuxt
     await editor.pressSequentially(' more', { delay: 50 });
 
-    // Wait a bit for any late renders to complete
-    await page.waitForTimeout(2000);
+    // Wait for text to sync before collecting mutation log
+    await helper.waitForEditorText(editor, /more/);
 
     // Collect the mutation log from the iframe
     const mutationLog = await frame!.evaluate(() => (window as any).__domMutationLog || []);

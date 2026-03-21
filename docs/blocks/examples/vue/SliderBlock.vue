@@ -10,7 +10,7 @@
       <img
         v-if="slide.preview_image"
         data-edit-media="preview_image"
-        :src="slide.preview_image[0]?.['@id'] || slide.preview_image"
+        :src="getImageUrl(slide.preview_image)"
         alt=""
       />
       <span data-edit-text="head_title">{{ slide.head_title }}</span>
@@ -31,6 +31,7 @@
 
 <script setup>
 import { ref } from 'vue';
+import { getImageUrl } from './utils.js';
 defineProps({ block: Object });
 const current = ref(0);
 </script>

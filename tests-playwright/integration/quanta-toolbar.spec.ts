@@ -808,8 +808,10 @@ test.describe('Quanta Toolbar - Auto-fade', () => {
     await page.keyboard.press('ControlOrMeta+a');
     await expect(toolbar).toHaveCSS('opacity', '1');
 
-    // Toolbar stays visible — non-collapsed selection prevents fade
-    await page.waitForTimeout(6000);
+    // Toolbar stays visible — non-collapsed selection prevents fade.
+    // Testing a negative (toolbar does NOT fade) requires waiting past
+    // the fade timeout (~3s). No way to avoid waitForTimeout here.
+    await page.waitForTimeout(4000);
     await expect(toolbar).toHaveCSS('opacity', '1');
   });
 

@@ -25,12 +25,15 @@ function serializeNode(node) {
   }
   const uid = Date.now().toString(36) + Math.random().toString(36).slice(2, 11);
   if (node.text !== undefined) {
+    // Only render data-node-id when nodeId is a valid path (text leaves don't
+    // get nodeIds from addNodeIds). Rendering "undefined" breaks hydra.js lookups.
+    const nodeIdProps = node.nodeId != null ? { "data-node-id": `${node.nodeId}` } : {};
     return node.text !== "" ? (
-      <span key={uid} data-node-id={`${node?.nodeId}`}>
+      <span key={uid} {...nodeIdProps}>
         {node.text}
       </span>
     ) : (
-      <span key={uid} data-node-id={`${node?.nodeId}`}>
+      <span key={uid} {...nodeIdProps}>
         &#xFEFF;
       </span>
     );
