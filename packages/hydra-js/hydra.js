@@ -4136,7 +4136,13 @@ export class Bridge {
       // Only set contenteditable for text-editable fields (string, textarea, slate)
       if (this.fieldTypeIsTextEditable(fieldType)) {
         field.setAttribute('contenteditable', 'true');
-        log(`  ${fieldPath}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})`);
+        // Set placeholder from schema or block data
+        const placeholder = this.getFieldPlaceholder(blockUid, fieldPath);
+        if (placeholder) {
+          field.setAttribute('data-placeholder', placeholder);
+        }
+        this.updateEmptyState(field);
+        log(`  ${fieldPath}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})${placeholder ? ` placeholder: "${placeholder}"` : ''}`);
 
         // For <pre> elements, handle Enter (newline) and Tab (indent) properly
         const isPreElement = field.tagName === 'PRE' || !!field.closest('pre');
@@ -4282,6 +4288,14 @@ export class Bridge {
     if (!isAlreadyFocused) {
       fieldElement.focus({ preventScroll: options.preventScroll });
       log(`activateEditableField: focused field`);
+    }
+
+    // Hide placeholder on focus — remove data-empty so CSS ::before hides
+    fieldElement.removeAttribute('data-empty');
+    // Re-add on blur if still empty
+    if (!fieldElement._placeholderBlurHandler) {
+      fieldElement._placeholderBlurHandler = () => this.updateEmptyState(fieldElement);
+      fieldElement.addEventListener('blur', fieldElement._placeholderBlurHandler);
     }
 
     // If field was already editable AND already focused, browser already handled
@@ -4600,6 +4614,7 @@ export class Bridge {
         this.materializeHydraComments();
         this.markEmptyBlocks();
         this.applyReadonlyVisuals();
+        this.applyPlaceholders();
 
         // Re-attach observers/editors for the currently selected block
         if (this.selectedBlockUid) {
@@ -5114,6 +5129,29 @@ export class Bridge {
     if (this._readonlyStyleEl.textContent !== newCSS) {
       this._readonlyStyleEl.textContent = newCSS;
     }
+  }
+
+  /**
+   * Apply placeholder attributes to all editable text fields in the document.
+   * Sets data-placeholder (from schema) and data-empty (based on content) on
+   * every [data-edit-text] element whose block has a resolvedBlockSchema.
+   * Called from afterContentRender so placeholders survive framework re-renders.
+   */
+  applyPlaceholders() {
+    const editableFields = document.querySelectorAll('[data-edit-text]');
+    editableFields.forEach((field) => {
+      const blockEl = field.closest('[data-block-uid]');
+      if (!blockEl) return;
+      const blockUid = blockEl.getAttribute('data-block-uid');
+      const fieldPath = field.getAttribute('data-edit-text');
+      const placeholder = this.getFieldPlaceholder(blockUid, fieldPath);
+      if (placeholder) {
+        field.setAttribute('data-placeholder', placeholder);
+      } else {
+        field.removeAttribute('data-placeholder');
+      }
+      this.updateEmptyState(field);
+    });
   }
 
   /**
@@ -8999,6 +9037,31 @@ export class Bridge {
   }
 
   /**
+   * Get the placeholder text for a given block field from its schema definition.
+   * Note: block.placeholder (data.placeholder) is NOT used here — in hydra it's
+   * used for template slot names, not hint text.
+   * @param {string} blockUid - The block UID
+   * @param {string} fieldName - The field name
+   * @returns {string|undefined} Placeholder text or undefined
+   */
+  getFieldPlaceholder(blockUid, fieldName) {
+    const resolved = this.resolveFieldPath(fieldName, blockUid);
+    const pathInfo = this.blockPathMap?.[resolved.blockId];
+    const fieldDef = pathInfo?.resolvedBlockSchema?.properties?.[resolved.fieldName];
+    return fieldDef?.placeholder || undefined;
+  }
+
+  /**
+   * Update the data-empty attribute on an editable field based on its text content.
+   * Treats ZWS-only content as empty.
+   * @param {HTMLElement} field - The editable field element
+   */
+  updateEmptyState(field) {
+    const text = field.textContent?.replace(/\u200B/g, '').trim();
+    field.toggleAttribute('data-empty', !text);
+  }
+
+  /**
    * Check if a field type string indicates a slate field
    * Formats: "array:slate", ":slate", "array:richtext", ":richtext"
    * @param {string} fieldType - The field type string
@@ -9159,6 +9222,9 @@ export class Bridge {
         log('handleTextChange: updated field:', resolved.fieldName);
       }
     }
+
+    // Update empty state for placeholder visibility
+    this.updateEmptyState(target);
 
     // Buffer the update - text and selection are captured together
     this.bufferUpdate(this.fieldTypeIsSlate(fieldType) ? 'textChangeSlate' : 'textChange');
@@ -9733,10 +9799,22 @@ export class Bridge {
         [contenteditable] {
           outline: 0px solid transparent;
         }
+        /* Placeholder for empty editable fields — shows schema placeholder text */
+        [data-edit-text][data-placeholder][data-empty]::before {
+          content: attr(data-placeholder);
+          color: #aaa;
+          font-style: italic;
+          pointer-events: none;
+          position: absolute;
+        }
+        /* Hide placeholder when field is focused (user is editing) */
+        [data-edit-text][data-placeholder][data-empty]:focus::before {
+          display: none;
+        }
         /* Ensure empty editable fields are visible/clickable */
-        [data-edit-text]:empty {
+        [data-edit-text][data-empty] {
           min-height: 1.5em;
-          display: block;
+          position: relative;
         }
         /* Linkable field hover styles - indicate clickable link areas */
         /* Exclude fields inside readonly blocks (listing items, non-overwrite teasers) */
