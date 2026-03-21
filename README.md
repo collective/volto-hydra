@@ -1476,9 +1476,9 @@ with special properties:
 ```json
 {
   "blocks": {
-    "header": { "@type": "slate", "fixed": true, "readOnly": true, "placeholder": "header" },
-    "content": { "@type": "slate", "placeholder": "default" },
-    "footer": { "@type": "slate", "fixed": true, "readOnly": true, "placeholder": "footer" }
+    "header": { "@type": "slate", "fixed": true, "readOnly": true, "slotId": "header" },
+    "content": { "@type": "slate", "slotId": "default" },
+    "footer": { "@type": "slate", "fixed": true, "readOnly": true, "slotId": "footer" }
   }
 }
 ```
@@ -1554,26 +1554,26 @@ for (const item of items) {
 The merge algorithm follows these rules
 
 1. Remove the blocks with the templateid to replace, storing any that aren't fixed and
-   readonly by placeholder name.
+   readonly by slotId.
 2. insert in their place the template content
    - if fixed and readonly just insert it
-   - if fixed, copy the block content not including block fields from a page block with 
-    the same placeholder name
-   - if a placeholder then don't insert it, but insert the previous blocks with the same
-    placeholder name
+   - if fixed, copy the block content not including block fields from a page block with
+    the same slotId
+   - if a slot block then don't insert it, but insert the previous blocks with the same
+    slotId
 3. Recursively replace any block fields using the same rules.
-4. Any placeholder blocks left over are inserted at the end of a special placeholder called
+4. Any slot blocks left over are inserted at the end of a special slot called
   ```default``` if it exits, otherwise are dropped.
 
-When are layout is applied the rules are the same but applied across a whole blocks field.
-So any content in the blocks field is removed first and if it doesn't already have a 
-placeholder name (due to a different template previously applied), then it will end up
-- in the default placeholder if it exists, else
-- in the bottom placeholder outside the last fixed template block if it exists, else
-- in the the top placeholder outside the first fixed template block if it exists, else
+When a layout is applied the rules are the same but applied across a whole blocks field.
+So any content in the blocks field is removed first and if it doesn't already have a
+slotId (due to a different template previously applied), then it will end up
+- in the default slot if it exists, else
+- in the bottom slot outside the last fixed template block if it exists, else
+- in the top slot outside the first fixed template block if it exists, else
 - it is dropped
 
-This allows for templates with shared placeholder names to rearrange user content.
+This allows for templates with shared slotIds to rearrange user content.
 
 ```
 Before:  [User Block A] [User Block B]

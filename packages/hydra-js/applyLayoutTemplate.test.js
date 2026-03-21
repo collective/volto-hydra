@@ -44,9 +44,9 @@ describe('applyLayoutTemplate', () => {
       const templateData = {
         '@id': '/templates/header-footer',
         blocks: {
-          'header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'Header' }] },
-          'default-slot': { '@type': 'slate', placeholder: 'default', value: [] },
-          'footer': { '@type': 'slate', fixed: true, placeholder: 'footer', value: [{ text: 'Footer' }] },
+          'header': { '@type': 'slate', fixed: true, slotId: 'header', value: [{ text: 'Header' }] },
+          'default-slot': { '@type': 'slate', slotId: 'default', value: [] },
+          'footer': { '@type': 'slate', fixed: true, slotId: 'footer', value: [{ text: 'Footer' }] },
         },
         blocks_layout: { items: ['header', 'default-slot', 'footer'] },
       };
@@ -61,11 +61,11 @@ describe('applyLayoutTemplate', () => {
       expect(result.blocks['user-block-1']).toBeDefined();
       expect(result.blocks['user-block-2']).toBeDefined();
 
-      // Should have header placeholder block
+      // Should have header slot block
       const headerBlocks = Object.entries(result.blocks).filter(([_, b]) => b.slotId === 'header');
       expect(headerBlocks.length).toBeGreaterThanOrEqual(1);
 
-      // Should have footer placeholder block
+      // Should have footer slot block
       const footerBlocks = Object.entries(result.blocks).filter(([_, b]) => b.slotId === 'footer');
       expect(footerBlocks.length).toBeGreaterThanOrEqual(1);
 
@@ -79,7 +79,7 @@ describe('applyLayoutTemplate', () => {
       }
     });
 
-    test('user content goes into default placeholder', async () => {
+    test('user content goes into default slot', async () => {
       const pageData = {
         blocks: {
           'user-block': { '@type': 'slate', value: [{ text: 'User content' }] },
@@ -90,15 +90,15 @@ describe('applyLayoutTemplate', () => {
       const templateData = {
         '@id': '/templates/test',
         blocks: {
-          'header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'Header' }] },
-          'default-slot': { '@type': 'slate', placeholder: 'default', value: [] },
+          'header': { '@type': 'slate', fixed: true, slotId: 'header', value: [{ text: 'Header' }] },
+          'default-slot': { '@type': 'slate', slotId: 'default', value: [] },
         },
         blocks_layout: { items: ['header', 'default-slot'] },
       };
 
       const result = await applyLayoutTemplate(pageData, templateData, uuidGenerator);
 
-      // User block should have placeholder: 'default'
+      // User block should have slotId: 'default'
       expect(result.blocks['user-block'].slotId).toBe('default');
     });
 
@@ -114,9 +114,9 @@ describe('applyLayoutTemplate', () => {
       const templateData = {
         '@id': '/templates/header-footer',
         blocks: {
-          'header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'Header' }] },
-          'default-slot': { '@type': 'slate', placeholder: 'default', value: [] },
-          'footer': { '@type': 'slate', fixed: true, placeholder: 'footer', value: [{ text: 'Footer' }] },
+          'header': { '@type': 'slate', fixed: true, slotId: 'header', value: [{ text: 'Header' }] },
+          'default-slot': { '@type': 'slate', slotId: 'default', value: [] },
+          'footer': { '@type': 'slate', fixed: true, slotId: 'footer', value: [{ text: 'Footer' }] },
         },
         blocks_layout: { items: ['header', 'default-slot', 'footer'] },
       };
@@ -143,14 +143,14 @@ describe('applyLayoutTemplate', () => {
   });
 
   describe('layout switching', () => {
-    test('multiple user blocks in default placeholder preserved when switching layouts', async () => {
+    test('multiple user blocks in default slot preserved when switching layouts', async () => {
       // Page with existing layout applied (blocks have templateId)
       const pageData = {
         blocks: {
-          'old-header': { '@type': 'slate', fixed: true, templateId: '/templates/old', placeholder: 'header', value: [{ text: 'Old Header' }] },
-          'user-block-1': { '@type': 'slate', templateId: '/templates/old', placeholder: 'default', value: [{ text: 'User 1' }] },
-          'user-block-2': { '@type': 'slate', templateId: '/templates/old', placeholder: 'default', value: [{ text: 'User 2' }] },
-          'old-footer': { '@type': 'slate', fixed: true, templateId: '/templates/old', placeholder: 'footer', value: [{ text: 'Old Footer' }] },
+          'old-header': { '@type': 'slate', fixed: true, templateId: '/templates/old', slotId: 'header', value: [{ text: 'Old Header' }] },
+          'user-block-1': { '@type': 'slate', templateId: '/templates/old', slotId: 'default', value: [{ text: 'User 1' }] },
+          'user-block-2': { '@type': 'slate', templateId: '/templates/old', slotId: 'default', value: [{ text: 'User 2' }] },
+          'old-footer': { '@type': 'slate', fixed: true, templateId: '/templates/old', slotId: 'footer', value: [{ text: 'Old Footer' }] },
         },
         blocks_layout: { items: ['old-header', 'user-block-1', 'user-block-2', 'old-footer'] },
       };
@@ -158,9 +158,9 @@ describe('applyLayoutTemplate', () => {
       const newTemplateData = {
         '@id': '/templates/new',
         blocks: {
-          'new-header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'New Header' }] },
-          'new-default': { '@type': 'slate', placeholder: 'default', value: [] },
-          'new-footer': { '@type': 'slate', fixed: true, placeholder: 'footer', value: [{ text: 'New Footer' }] },
+          'new-header': { '@type': 'slate', fixed: true, slotId: 'header', value: [{ text: 'New Header' }] },
+          'new-default': { '@type': 'slate', slotId: 'default', value: [] },
+          'new-footer': { '@type': 'slate', fixed: true, slotId: 'footer', value: [{ text: 'New Footer' }] },
         },
         blocks_layout: { items: ['new-header', 'new-default', 'new-footer'] },
       };
@@ -187,8 +187,8 @@ describe('applyLayoutTemplate', () => {
     test('old fixed blocks replaced by new template fixed blocks', async () => {
       const pageData = {
         blocks: {
-          'old-header': { '@type': 'slate', fixed: true, templateId: '/templates/old', placeholder: 'header', value: [{ text: 'Old Header' }] },
-          'user-block': { '@type': 'slate', templateId: '/templates/old', placeholder: 'default', value: [{ text: 'User' }] },
+          'old-header': { '@type': 'slate', fixed: true, templateId: '/templates/old', slotId: 'header', value: [{ text: 'Old Header' }] },
+          'user-block': { '@type': 'slate', templateId: '/templates/old', slotId: 'default', value: [{ text: 'User' }] },
         },
         blocks_layout: { items: ['old-header', 'user-block'] },
       };
@@ -196,8 +196,8 @@ describe('applyLayoutTemplate', () => {
       const newTemplateData = {
         '@id': '/templates/new',
         blocks: {
-          'new-header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'New Header' }] },
-          'new-default': { '@type': 'slate', placeholder: 'default', value: [] },
+          'new-header': { '@type': 'slate', fixed: true, slotId: 'header', value: [{ text: 'New Header' }] },
+          'new-default': { '@type': 'slate', slotId: 'default', value: [] },
         },
         blocks_layout: { items: ['new-header', 'new-default'] },
       };
@@ -216,12 +216,12 @@ describe('applyLayoutTemplate', () => {
       expect(headerBlocks.length).toBe(1);
     });
 
-    test('non-matching placeholder (footer removed) - user content preserved', async () => {
+    test('non-matching slot (footer removed) - user content preserved', async () => {
       const pageData = {
         blocks: {
-          'old-header': { '@type': 'slate', fixed: true, templateId: '/templates/old', placeholder: 'header', value: [{ text: 'Old Header' }] },
-          'user-block': { '@type': 'slate', templateId: '/templates/old', placeholder: 'default', value: [{ text: 'User' }] },
-          'old-footer': { '@type': 'slate', fixed: true, templateId: '/templates/old', placeholder: 'footer', value: [{ text: 'Old Footer' }] },
+          'old-header': { '@type': 'slate', fixed: true, templateId: '/templates/old', slotId: 'header', value: [{ text: 'Old Header' }] },
+          'user-block': { '@type': 'slate', templateId: '/templates/old', slotId: 'default', value: [{ text: 'User' }] },
+          'old-footer': { '@type': 'slate', fixed: true, templateId: '/templates/old', slotId: 'footer', value: [{ text: 'Old Footer' }] },
         },
         blocks_layout: { items: ['old-header', 'user-block', 'old-footer'] },
       };
@@ -230,8 +230,8 @@ describe('applyLayoutTemplate', () => {
       const newTemplateData = {
         '@id': '/templates/header-only',
         blocks: {
-          'new-header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'New Header' }] },
-          'new-default': { '@type': 'slate', placeholder: 'default', value: [] },
+          'new-header': { '@type': 'slate', fixed: true, slotId: 'header', value: [{ text: 'New Header' }] },
+          'new-default': { '@type': 'slate', slotId: 'default', value: [] },
         },
         blocks_layout: { items: ['new-header', 'new-default'] },
       };
@@ -241,10 +241,10 @@ describe('applyLayoutTemplate', () => {
       // User content preserved
       expect(result.blocks['user-block']).toBeDefined();
 
-      // Old footer should be gone (no matching placeholder)
+      // Old footer should be gone (no matching slot)
       expect(result.blocks['old-footer']).toBeUndefined();
 
-      // No footer placeholder in result
+      // No footer slot in result
       const footerBlocks = Object.entries(result.blocks).filter(
         ([_, b]) => b.slotId === 'footer'
       );
@@ -254,10 +254,10 @@ describe('applyLayoutTemplate', () => {
 });
 
 describe('mergeTemplateContent', () => {
-  test('collects multiple blocks per placeholder', async () => {
+  test('collects multiple blocks per slot', async () => {
     const target = {
       blocks: {
-        'target-default': { '@type': 'slate', templateId: '/templates/test', templateInstanceId: 'inst-1', placeholder: 'default', value: [] },
+        'target-default': { '@type': 'slate', templateId: '/templates/test', templateInstanceId: 'inst-1', slotId: 'default', value: [] },
       },
       blocks_layout: { items: ['target-default'] },
     };
@@ -265,8 +265,8 @@ describe('mergeTemplateContent', () => {
     const source = {
       '@id': '/templates/test',
       blocks: {
-        'source-1': { '@type': 'slate', placeholder: 'default', value: [{ text: 'Source 1' }] },
-        'source-2': { '@type': 'slate', placeholder: 'default', value: [{ text: 'Source 2' }] },
+        'source-1': { '@type': 'slate', slotId: 'default', value: [{ text: 'Source 1' }] },
+        'source-2': { '@type': 'slate', slotId: 'default', value: [{ text: 'Source 2' }] },
       },
       blocks_layout: { items: ['source-1', 'source-2'] },
     };
@@ -279,7 +279,7 @@ describe('mergeTemplateContent', () => {
   });
 });
 
-describe('fallback placement when no default placeholder', () => {
+describe('fallback placement when no default slot', () => {
   let counter = 0;
   const uuidGenerator = () => `fallback-uuid-${++counter}`;
 
@@ -287,7 +287,7 @@ describe('fallback placement when no default placeholder', () => {
     counter = 0;
   });
 
-  test('content goes to bottom placeholder (after last fixed block) when no default', async () => {
+  test('content goes to bottom slot (after last fixed block) when no default', async () => {
     const pageData = {
       blocks: {
         'user-block': { '@type': 'slate', value: [{ text: 'User content' }] },
@@ -299,9 +299,9 @@ describe('fallback placement when no default placeholder', () => {
     const templateData = {
       '@id': '/templates/bottom-slot',
       blocks: {
-        'header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'Header' }] },
-        'footer': { '@type': 'slate', fixed: true, placeholder: 'footer', value: [{ text: 'Footer' }] },
-        'post-footer': { '@type': 'slate', placeholder: 'post_footer', value: [] },
+        'header': { '@type': 'slate', fixed: true, slotId: 'header', value: [{ text: 'Header' }] },
+        'footer': { '@type': 'slate', fixed: true, slotId: 'footer', value: [{ text: 'Footer' }] },
+        'post-footer': { '@type': 'slate', slotId: 'post_footer', value: [] },
       },
       blocks_layout: { items: ['header', 'footer', 'post-footer'] },
     };
@@ -312,7 +312,7 @@ describe('fallback placement when no default placeholder', () => {
     // User content should exist
     expect(result.blocks['user-block']).toBeDefined();
 
-    // User content should have placeholder 'default' assigned
+    // User content should have slotId 'default' assigned
     expect(result.blocks['user-block'].slotId).toBe('default');
 
     // Find positions
@@ -323,7 +323,7 @@ describe('fallback placement when no default placeholder', () => {
     expect(userIndex).toBeGreaterThan(footerIndex);
   });
 
-  test('content goes to top placeholder (before first fixed block) when no default or bottom', async () => {
+  test('content goes to top slot (before first fixed block) when no default or bottom', async () => {
     const pageData = {
       blocks: {
         'user-block': { '@type': 'slate', value: [{ text: 'User content' }] },
@@ -335,9 +335,9 @@ describe('fallback placement when no default placeholder', () => {
     const templateData = {
       '@id': '/templates/top-slot',
       blocks: {
-        'pre-header': { '@type': 'slate', placeholder: 'pre_header', value: [] },
-        'header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'Header' }] },
-        'footer': { '@type': 'slate', fixed: true, placeholder: 'footer', value: [{ text: 'Footer' }] },
+        'pre-header': { '@type': 'slate', slotId: 'pre_header', value: [] },
+        'header': { '@type': 'slate', fixed: true, slotId: 'header', value: [{ text: 'Header' }] },
+        'footer': { '@type': 'slate', fixed: true, slotId: 'footer', value: [{ text: 'Footer' }] },
       },
       blocks_layout: { items: ['pre-header', 'header', 'footer'] },
     };
@@ -356,7 +356,7 @@ describe('fallback placement when no default placeholder', () => {
     expect(userIndex).toBeLessThan(headerIndex);
   });
 
-  test('content is dropped when no default, no bottom, no top placeholder', async () => {
+  test('content is dropped when no default, no bottom, no top slot', async () => {
     const pageData = {
       blocks: {
         'user-block': { '@type': 'slate', value: [{ text: 'User content' }] },
@@ -364,12 +364,12 @@ describe('fallback placement when no default placeholder', () => {
       blocks_layout: { items: ['user-block'] },
     };
 
-    // Template with ONLY fixed blocks - no placeholders for user content
+    // Template with ONLY fixed blocks - no slots for user content
     const templateData = {
       '@id': '/templates/fixed-only',
       blocks: {
-        'header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'Header' }] },
-        'footer': { '@type': 'slate', fixed: true, placeholder: 'footer', value: [{ text: 'Footer' }] },
+        'header': { '@type': 'slate', fixed: true, slotId: 'header', value: [{ text: 'Header' }] },
+        'footer': { '@type': 'slate', fixed: true, slotId: 'footer', value: [{ text: 'Footer' }] },
       },
       blocks_layout: { items: ['header', 'footer'] },
     };
@@ -384,7 +384,7 @@ describe('fallback placement when no default placeholder', () => {
     expect(layout.length).toBe(2);
   });
 
-  test('default placeholder takes priority over bottom/top slots', async () => {
+  test('default slot takes priority over bottom/top slots', async () => {
     const pageData = {
       blocks: {
         'user-block': { '@type': 'slate', value: [{ text: 'User content' }] },
@@ -396,10 +396,10 @@ describe('fallback placement when no default placeholder', () => {
     const templateData = {
       '@id': '/templates/default-and-bottom',
       blocks: {
-        'header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'Header' }] },
-        'default-slot': { '@type': 'slate', placeholder: 'default', value: [] },
-        'footer': { '@type': 'slate', fixed: true, placeholder: 'footer', value: [{ text: 'Footer' }] },
-        'post-footer': { '@type': 'slate', placeholder: 'post_footer', value: [] },
+        'header': { '@type': 'slate', fixed: true, slotId: 'header', value: [{ text: 'Header' }] },
+        'default-slot': { '@type': 'slate', slotId: 'default', value: [] },
+        'footer': { '@type': 'slate', fixed: true, slotId: 'footer', value: [{ text: 'Footer' }] },
+        'post-footer': { '@type': 'slate', slotId: 'post_footer', value: [] },
       },
       blocks_layout: { items: ['header', 'default-slot', 'footer', 'post-footer'] },
     };
@@ -428,7 +428,7 @@ describe('page reload merge - standalone blocks preserved', () => {
       blocks: {
         'standalone-before': {
           '@type': 'slate',
-          // No templateId, no placeholder - this is outside the template
+          // No templateId, no slotId - this is outside the template
           value: [{ text: 'Standalone before' }],
         },
         'template-header': {
@@ -437,14 +437,14 @@ describe('page reload merge - standalone blocks preserved', () => {
           readOnly: true,
           templateId: '/templates/test',
           templateInstanceId: 'inst-1',
-          placeholder: 'header',
+          slotId: 'header',
           value: [{ text: 'Old Header' }],
         },
         'user-content': {
           '@type': 'slate',
           templateId: '/templates/test',
           templateInstanceId: 'inst-1',
-          placeholder: 'default',
+          slotId: 'default',
           value: [{ text: 'User content' }],
         },
         'template-footer': {
@@ -453,12 +453,12 @@ describe('page reload merge - standalone blocks preserved', () => {
           readOnly: true,
           templateId: '/templates/test',
           templateInstanceId: 'inst-1',
-          placeholder: 'footer',
+          slotId: 'footer',
           value: [{ text: 'Old Footer' }],
         },
         'standalone-after': {
           '@type': 'slate',
-          // No templateId, no placeholder - this is outside the template
+          // No templateId, no slotId - this is outside the template
           value: [{ text: 'Standalone after' }],
         },
       },
@@ -474,19 +474,19 @@ describe('page reload merge - standalone blocks preserved', () => {
           '@type': 'slate',
           fixed: true,
           readOnly: true,
-          placeholder: 'header',
+          slotId: 'header',
           value: [{ text: 'New Header From Template' }],
         },
         'src-default': {
           '@type': 'slate',
-          placeholder: 'default',
+          slotId: 'default',
           value: [],
         },
         'src-footer': {
           '@type': 'slate',
           fixed: true,
           readOnly: true,
-          placeholder: 'footer',
+          slotId: 'footer',
           value: [{ text: 'New Footer From Template' }],
         },
       },
@@ -529,9 +529,9 @@ describe('reverse merge - page to template (for saving)', () => {
     const template = {
       '@id': '/templates/header-footer',
       blocks: {
-        'header': { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/header-footer', templateInstanceId: 'inst-1', placeholder: 'header', value: [{ text: 'Original Header' }] },
-        'default-slot': { '@type': 'slate', templateId: '/templates/header-footer', templateInstanceId: 'inst-1', placeholder: 'default', value: [] },
-        'footer': { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/header-footer', templateInstanceId: 'inst-1', placeholder: 'footer', value: [{ text: 'Original Footer' }] },
+        'header': { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/header-footer', templateInstanceId: 'inst-1', slotId: 'header', value: [{ text: 'Original Header' }] },
+        'default-slot': { '@type': 'slate', templateId: '/templates/header-footer', templateInstanceId: 'inst-1', slotId: 'default', value: [] },
+        'footer': { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/header-footer', templateInstanceId: 'inst-1', slotId: 'footer', value: [{ text: 'Original Footer' }] },
       },
       blocks_layout: { items: ['header', 'default-slot', 'footer'] },
     };
@@ -545,21 +545,21 @@ describe('reverse merge - page to template (for saving)', () => {
           readOnly: true,
           templateId: '/templates/header-footer',
           templateInstanceId: 'inst-1',
-          placeholder: 'header',
+          slotId: 'header',
           value: [{ text: 'User Edited Header' }], // User edited the header (in template edit mode)
         },
         'user-block-1': {
           '@type': 'slate',
           templateId: '/templates/header-footer',
           templateInstanceId: 'inst-1',
-          placeholder: 'default',
+          slotId: 'default',
           value: [{ text: 'User content 1' }],
         },
         'user-block-2': {
           '@type': 'slate',
           templateId: '/templates/header-footer',
           templateInstanceId: 'inst-1',
-          placeholder: 'default',
+          slotId: 'default',
           value: [{ text: 'User content 2' }],
         },
         'page-footer': {
@@ -568,7 +568,7 @@ describe('reverse merge - page to template (for saving)', () => {
           readOnly: true,
           templateId: '/templates/header-footer',
           templateInstanceId: 'inst-1',
-          placeholder: 'footer',
+          slotId: 'footer',
           value: [{ text: 'User Edited Footer' }], // User edited the footer (in template edit mode)
         },
       },
@@ -597,13 +597,13 @@ describe('reverse merge - page to template (for saving)', () => {
     // When saving to template:
     // - Fixed + readOnly block edits → transfer to template (template-owned content)
     // - Fixed + editable block edits → stay on page (page-level overrides)
-    // - User content in placeholders → stays on page
+    // - User content in slots → stays on page
     const template = {
       '@id': '/templates/mixed',
       blocks: {
-        'readonly-header': { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/mixed', templateInstanceId: 'inst-1', placeholder: 'header', value: [{ text: 'Original ReadOnly Header' }] },
-        'editable-banner': { '@type': 'slate', fixed: true, templateId: '/templates/mixed', templateInstanceId: 'inst-1', placeholder: 'banner', value: [{ text: 'Original Editable Banner' }] },
-        'default-slot': { '@type': 'slate', templateId: '/templates/mixed', templateInstanceId: 'inst-1', placeholder: 'default', value: [] },
+        'readonly-header': { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/mixed', templateInstanceId: 'inst-1', slotId: 'header', value: [{ text: 'Original ReadOnly Header' }] },
+        'editable-banner': { '@type': 'slate', fixed: true, templateId: '/templates/mixed', templateInstanceId: 'inst-1', slotId: 'banner', value: [{ text: 'Original Editable Banner' }] },
+        'default-slot': { '@type': 'slate', templateId: '/templates/mixed', templateInstanceId: 'inst-1', slotId: 'default', value: [] },
       },
       blocks_layout: { items: ['readonly-header', 'editable-banner', 'default-slot'] },
     };
@@ -616,7 +616,7 @@ describe('reverse merge - page to template (for saving)', () => {
           readOnly: true,
           templateId: '/templates/mixed',
           templateInstanceId: 'inst-1',
-          placeholder: 'header',
+          slotId: 'header',
           value: [{ text: 'Edited ReadOnly Header' }], // Template edit mode changed this
         },
         'page-banner': {
@@ -625,14 +625,14 @@ describe('reverse merge - page to template (for saving)', () => {
           // No readOnly - this is editable per-page
           templateId: '/templates/mixed',
           templateInstanceId: 'inst-1',
-          placeholder: 'banner',
+          slotId: 'banner',
           value: [{ text: 'Page-specific Banner' }], // Page override - should NOT go to template
         },
         'user-content': {
           '@type': 'slate',
           templateId: '/templates/mixed',
           templateInstanceId: 'inst-1',
-          placeholder: 'default',
+          slotId: 'default',
           value: [{ text: 'User content' }],
         },
       },
@@ -679,14 +679,14 @@ describe('expandTemplates preserves untouched blocks', () => {
         fixed: true,
         templateId: '/templates/test',
         templateInstanceId: 'inst-123',
-        placeholder: 'header',
+        slotId: 'header',
         value: [{ type: 'h1', nodeId: '0', children: [{ text: 'Header' }] }],
       },
       'existing-user-id': {
         '@type': 'slate',
         templateId: '/templates/test',
         templateInstanceId: 'inst-123',
-        placeholder: 'default',
+        slotId: 'default',
         value: [{ type: 'p', nodeId: '0', children: [{ text: 'User content' }] }],
       },
     };
@@ -695,8 +695,8 @@ describe('expandTemplates preserves untouched blocks', () => {
     const templateData = {
       '@id': '/templates/test',
       blocks: {
-        'tpl-header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ type: 'h1', children: [{ text: 'Template Header' }] }] },
-        'tpl-default': { '@type': 'slate', placeholder: 'default', value: [] },
+        'tpl-header': { '@type': 'slate', fixed: true, slotId: 'header', value: [{ type: 'h1', children: [{ text: 'Template Header' }] }] },
+        'tpl-default': { '@type': 'slate', slotId: 'default', value: [] },
       },
       blocks_layout: { items: ['tpl-header', 'tpl-default'] },
     };
@@ -727,8 +727,8 @@ describe('sequential layout switching', () => {
     // Source has readOnly header - content should NOT be preserved
     const pageData = {
       blocks: {
-        'old-header': { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/old', placeholder: 'header', value: [{ text: 'Old ReadOnly Header' }] },
-        'user-block': { '@type': 'slate', templateId: '/templates/old', placeholder: 'default', value: [{ text: 'User' }] },
+        'old-header': { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/old', slotId: 'header', value: [{ text: 'Old ReadOnly Header' }] },
+        'user-block': { '@type': 'slate', templateId: '/templates/old', slotId: 'default', value: [{ text: 'User' }] },
       },
       blocks_layout: { items: ['old-header', 'user-block'] },
     };
@@ -736,8 +736,8 @@ describe('sequential layout switching', () => {
     const newTemplateData = {
       '@id': '/templates/new',
       blocks: {
-        'new-header': { '@type': 'slate', fixed: true, readOnly: true, placeholder: 'header', value: [{ text: 'New ReadOnly Header' }] },
-        'new-default': { '@type': 'slate', placeholder: 'default', value: [] },
+        'new-header': { '@type': 'slate', fixed: true, readOnly: true, slotId: 'header', value: [{ text: 'New ReadOnly Header' }] },
+        'new-default': { '@type': 'slate', slotId: 'default', value: [] },
       },
       blocks_layout: { items: ['new-header', 'new-default'] },
     };
@@ -763,9 +763,9 @@ describe('sequential layout switching', () => {
     const layout1 = {
       '@id': '/templates/header-footer',
       blocks: {
-        'header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'Layout Header' }] },
-        'default-slot': { '@type': 'slate', placeholder: 'default', value: [] },
-        'footer': { '@type': 'slate', fixed: true, placeholder: 'footer', value: [{ text: 'Layout Footer' }] },
+        'header': { '@type': 'slate', fixed: true, slotId: 'header', value: [{ text: 'Layout Header' }] },
+        'default-slot': { '@type': 'slate', slotId: 'default', value: [] },
+        'footer': { '@type': 'slate', fixed: true, slotId: 'footer', value: [{ text: 'Layout Footer' }] },
       },
       blocks_layout: { items: ['header', 'default-slot', 'footer'] },
     };
@@ -782,8 +782,8 @@ describe('sequential layout switching', () => {
     const layout2 = {
       '@id': '/templates/header-only',
       blocks: {
-        'header2': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'Header Only' }] },
-        'default2': { '@type': 'slate', placeholder: 'default', value: [] },
+        'header2': { '@type': 'slate', fixed: true, slotId: 'header', value: [{ text: 'Header Only' }] },
+        'default2': { '@type': 'slate', slotId: 'default', value: [] },
       },
       blocks_layout: { items: ['header2', 'default2'] },
     };
@@ -817,8 +817,8 @@ describe('multiple template instances with shared templateState', () => {
   const mainTemplate = {
     '@id': '/templates/main-layout',
     blocks: {
-      'main-header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'Main Header' }] },
-      'main-default': { '@type': 'slate', placeholder: 'default', value: [] },
+      'main-header': { '@type': 'slate', fixed: true, slotId: 'header', value: [{ text: 'Main Header' }] },
+      'main-default': { '@type': 'slate', slotId: 'default', value: [] },
     },
     blocks_layout: { items: ['main-header', 'main-default'] },
   };
@@ -826,8 +826,8 @@ describe('multiple template instances with shared templateState', () => {
   const footerTemplate = {
     '@id': '/templates/footer-layout',
     blocks: {
-      'footer-branding': { '@type': 'slate', fixed: true, placeholder: 'branding', value: [{ text: 'Footer Branding' }] },
-      'footer-default': { '@type': 'slate', placeholder: 'default', value: [] },
+      'footer-branding': { '@type': 'slate', fixed: true, slotId: 'branding', value: [{ text: 'Footer Branding' }] },
+      'footer-default': { '@type': 'slate', slotId: 'default', value: [] },
     },
     blocks_layout: { items: ['footer-branding', 'footer-default'] },
   };
@@ -1013,7 +1013,7 @@ describe('nextSlotId and childSlotIds on fixed blocks', () => {
   test('nextSlotId is set on fixed block preceding a slot', async () => {
     const pageData = {
       blocks: {
-        'user-1': { '@type': 'slate', value: [{ text: 'User content' }], templateId: '/templates/t1', templateInstanceId: 'inst-1', placeholder: 'default' },
+        'user-1': { '@type': 'slate', value: [{ text: 'User content' }], templateId: '/templates/t1', templateInstanceId: 'inst-1', slotId: 'default' },
       },
       blocks_layout: { items: ['user-1'] },
     };
@@ -1021,9 +1021,9 @@ describe('nextSlotId and childSlotIds on fixed blocks', () => {
     const templateData = {
       '@id': '/templates/t1',
       blocks: {
-        'header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'Header' }] },
-        'slot': { '@type': 'slate', placeholder: 'default', value: [] },
-        'footer': { '@type': 'slate', fixed: true, placeholder: 'footer', value: [{ text: 'Footer' }] },
+        'header': { '@type': 'slate', fixed: true, slotId: 'header', value: [{ text: 'Header' }] },
+        'slot': { '@type': 'slate', slotId: 'default', value: [] },
+        'footer': { '@type': 'slate', fixed: true, slotId: 'footer', value: [{ text: 'Footer' }] },
       },
       blocks_layout: { items: ['header', 'slot', 'footer'] },
     };
@@ -1032,7 +1032,7 @@ describe('nextSlotId and childSlotIds on fixed blocks', () => {
     const blocks = result.blocks;
     const layout = result.blocks_layout.items;
 
-    // Header should have nextSlotId: 'default' (the placeholder after it)
+    // Header should have nextSlotId: 'default' (the slot after it)
     const headerBlock = blocks[layout[0]];
     expect(headerBlock.fixed).toBe(true);
     expect(headerBlock.slotId).toBe('header');
@@ -1048,21 +1048,21 @@ describe('nextSlotId and childSlotIds on fixed blocks', () => {
   test('nextSlotId not set when next block is another fixed block', async () => {
     const pageData = {
       blocks: {
-        'user-1': { '@type': 'slate', value: [{ text: 'User' }], templateId: '/templates/t1', templateInstanceId: 'inst-1', placeholder: 'default' },
+        'user-1': { '@type': 'slate', value: [{ text: 'User' }], templateId: '/templates/t1', templateInstanceId: 'inst-1', slotId: 'default' },
       },
       blocks_layout: { items: ['user-1'] },
     };
 
     // Template: header → grid (fixed) → slot → footer
     // header's next is grid (fixed), so header should NOT get nextSlotId
-    // grid's next is slot (placeholder), so grid SHOULD get nextSlotId
+    // grid's next is slot, so grid SHOULD get nextSlotId
     const templateData = {
       '@id': '/templates/t1',
       blocks: {
-        'header': { '@type': 'slate', fixed: true, placeholder: 'header', value: [{ text: 'Header' }] },
-        'grid': { '@type': 'slate', fixed: true, placeholder: 'grid', value: [{ text: 'Grid' }] },
-        'slot': { '@type': 'slate', placeholder: 'default', value: [] },
-        'footer': { '@type': 'slate', fixed: true, placeholder: 'footer', value: [{ text: 'Footer' }] },
+        'header': { '@type': 'slate', fixed: true, slotId: 'header', value: [{ text: 'Header' }] },
+        'grid': { '@type': 'slate', fixed: true, slotId: 'grid', value: [{ text: 'Grid' }] },
+        'slot': { '@type': 'slate', slotId: 'default', value: [] },
+        'footer': { '@type': 'slate', fixed: true, slotId: 'footer', value: [{ text: 'Footer' }] },
       },
       blocks_layout: { items: ['header', 'grid', 'slot', 'footer'] },
     };
@@ -1075,12 +1075,12 @@ describe('nextSlotId and childSlotIds on fixed blocks', () => {
     const headerBlock = blocks[layout[0]];
     expect(headerBlock.nextSlotId).toBeUndefined();
 
-    // grid → next is slot (placeholder: 'default') → nextSlotId: 'default'
+    // grid → next is slot (slotId: 'default') → nextSlotId: 'default'
     const gridBlock = blocks[layout[1]];
     expect(gridBlock.nextSlotId).toBe('default');
   });
 
-  test('childSlotIds set on container fixed block with nested placeholder', async () => {
+  test('childSlotIds set on container fixed block with nested slot', async () => {
     const pageData = {
       blocks: {},
       blocks_layout: { items: [] },
@@ -1092,14 +1092,14 @@ describe('nextSlotId and childSlotIds on fixed blocks', () => {
         'container': {
           '@type': 'gridBlock',
           fixed: true,
-          placeholder: 'container',
+          slotId: 'container',
           blocks: {
-            'cell-1': { '@type': 'slate', fixed: true, placeholder: 'cell-1', value: [{ text: 'Cell 1' }] },
-            'cell-2': { '@type': 'slate', placeholder: 'sidebar', value: [{ text: 'Sidebar content' }] },
+            'cell-1': { '@type': 'slate', fixed: true, slotId: 'cell-1', value: [{ text: 'Cell 1' }] },
+            'cell-2': { '@type': 'slate', slotId: 'sidebar', value: [{ text: 'Sidebar content' }] },
           },
           blocks_layout: { items: ['cell-1', 'cell-2'] },
         },
-        'slot': { '@type': 'slate', placeholder: 'default', value: [] },
+        'slot': { '@type': 'slate', slotId: 'default', value: [] },
       },
       blocks_layout: { items: ['container', 'slot'] },
     };
@@ -1108,7 +1108,7 @@ describe('nextSlotId and childSlotIds on fixed blocks', () => {
     const blocks = result.blocks;
     const layout = result.blocks_layout.items;
 
-    // Container block should have childSlotIds with the first non-fixed placeholder
+    // Container block should have childSlotIds with the first non-fixed slot
     const containerBlock = blocks[layout[0]];
     expect(containerBlock.fixed).toBe(true);
     expect(containerBlock.childSlotIds).toEqual({ blocks: 'sidebar' });
