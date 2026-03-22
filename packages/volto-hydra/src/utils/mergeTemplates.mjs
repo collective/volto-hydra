@@ -33,6 +33,7 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
     preloadedTemplates = {},
     blocksConfig,
     intl,
+    firstInsert,
   } = options;
 
   let result = { ...page };
@@ -56,6 +57,7 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
         allowedLayouts,
         uuidGenerator,
         filterInstanceId,
+        firstInsert,
       });
     }
 

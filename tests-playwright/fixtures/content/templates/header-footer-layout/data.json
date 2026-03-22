@@ -29,10 +29,10 @@
       "value": [
         {
           "type": "p",
-          "children": [{ "text": "" }]
+          "children": [{ "text": "Add your content here" }]
         }
       ],
-      "plaintext": ""
+      "plaintext": "Add your content here"
     },
     "fixed-footer": {
       "@type": "slate",

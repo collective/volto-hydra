@@ -9036,15 +9036,30 @@ export class Bridge {
   }
 
   /**
-   * Get the placeholder text for a given block field from its schema definition.
-   * Note: block.placeholder (data.placeholder) is NOT used here — in hydra it's
-   * used for template slot names, not hint text.
+   * Get the placeholder text for a given block field.
+   * Checks three sources in priority order:
+   * 1. Instance-level: block.fieldPlaceholders[fieldName] (from template authoring)
+   * 2. Schema-level: resolvedBlockSchema.properties[fieldName].placeholder
    * @param {string} blockUid - The block UID
    * @param {string} fieldName - The field name
    * @returns {string|undefined} Placeholder text or undefined
    */
   getFieldPlaceholder(blockUid, fieldName) {
     const resolved = this.resolveFieldPath(fieldName, blockUid);
+    // 1. Instance-level placeholder from template (fieldPlaceholders)
+    const block = this.getBlockData(resolved.blockId);
+    const instancePlaceholder = block?.fieldPlaceholders?.[resolved.fieldName];
+    if (instancePlaceholder) {
+      // For string fields, return directly. For slate arrays, extract text.
+      if (typeof instancePlaceholder === 'string') return instancePlaceholder;
+      if (Array.isArray(instancePlaceholder)) {
+        const text = instancePlaceholder.map(n =>
+          (n.children || []).map(c => c.text || '').join('')
+        ).join(' ').trim();
+        if (text) return text;
+      }
+    }
+    // 2. Schema-level placeholder
     const pathInfo = this.blockPathMap?.[resolved.blockId];
     const fieldDef = pathInfo?.resolvedBlockSchema?.properties?.[resolved.fieldName];
     return fieldDef?.placeholder || undefined;
@@ -11099,6 +11114,34 @@ function generateUUID() {
 }
 
 /**
+ * Extract content field values from a block to use as fieldPlaceholders.
+ * Skips system/template fields. Only includes fields with actual content.
+ * @param {Object} block - The block data
+ * @returns {Object} Map of fieldName -> value for non-empty content fields
+ */
+function extractFieldPlaceholders(block) {
+  const SYSTEM_FIELDS = new Set([
+    '@type', '@uid', 'templateId', 'templateInstanceId', 'slotId',
+    'fixed', 'readOnly', 'readOnly', 'fieldPlaceholders', 'fieldMappings',
+    'blocks', 'blocks_layout', 'nextSlotId', 'childSlotIds',
+  ]);
+  const placeholders = {};
+  for (const [key, value] of Object.entries(block)) {
+    if (SYSTEM_FIELDS.has(key)) continue;
+    if (typeof value === 'string' && value.trim()) {
+      placeholders[key] = value;
+    } else if (Array.isArray(value) && value.length > 0 && value[0]?.children) {
+      // Slate value — check if there's text content
+      const text = value.map(n =>
+        (n.children || []).map(c => c.text || '').join('')
+      ).join('').trim();
+      if (text) placeholders[key] = value;
+    }
+  }
+  return placeholders;
+}
+
+/**
  * Check if a template is a layout (has fixed blocks at edges).
  * Layout = first or last block has fixed: true (Volto standard property).
  *
@@ -11322,6 +11365,15 @@ export function insertSnippetBlocks(pageFormData, templateData, position, uuidGe
     // Preserve Volto's fixed/readOnly from template
     if (originalBlock?.fixed !== undefined) block.fixed = originalBlock.fixed;
     if (originalBlock?.readOnly !== undefined) block.readOnly = originalBlock.readOnly;
+
+    // Snippet insert is always a user action — store content as fieldPlaceholders
+    // for editable blocks so authored text shows as hints
+    if (!block.readOnly) {
+      const placeholders = extractFieldPlaceholders(originalBlock || block);
+      if (Object.keys(placeholders).length > 0) {
+        block.fieldPlaceholders = placeholders;
+      }
+    }
 
     result.blocks[newId] = block;
   }
@@ -11682,7 +11734,7 @@ function collectContentFromTree(container, instanceId, pendingContent, standalon
 function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateState, options, addItem, items) {
   const { templateBlocks, templateLayout } = nestedInfo;
   const { templateId, instanceId } = templateState;
-  const { uuidGenerator } = options;
+  const { uuidGenerator, firstInsert } = options;
 
   // Build a map of document blocks by slotId for user content lookup
   const docBlocksBySlotId = new Map();
@@ -11733,16 +11785,21 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
         }
       }
 
-      addItem(
-        {
-          ...tplBlock,
-          templateId: templateId,
-          templateInstanceId: instanceId,
-          ...(nextSlotId && { nextSlotId }),
-          ...(childSlotIds && { childSlotIds }),
-        },
-        blockId
-      );
+      const fixedBlock = {
+        ...tplBlock,
+        templateId: templateId,
+        templateInstanceId: instanceId,
+        ...(nextSlotId && { nextSlotId }),
+        ...(childSlotIds && { childSlotIds }),
+      };
+      // Fixed but editable blocks: store content as placeholders on first insert
+      if (firstInsert && !tplBlock.readOnly) {
+        const placeholders = extractFieldPlaceholders(tplBlock);
+        if (Object.keys(placeholders).length > 0) {
+          fixedBlock.fieldPlaceholders = placeholders;
+        }
+      }
+      addItem(fixedBlock, blockId);
 
       // Register further nested containers (blocks_layout and object_list)
       if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
@@ -11764,19 +11821,35 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
         }
       }
     } else if (tplBlock.slotId) {
-      // Placeholder slot - emit document content that goes here
+      // Slot block - emit document content that goes here
       const slotId = tplBlock.slotId;
       const userContent = docBlocksBySlotId.get(slotId) || [];
-      for (const { blockId, block } of userContent) {
-        addItem(
-          {
-            ...block,
-            templateId: templateId,
-            templateInstanceId: instanceId,
-            slotId: slotId,
-          },
-          blockId
-        );
+      if (userContent.length > 0) {
+        for (const { blockId, block } of userContent) {
+          addItem(
+            {
+              ...block,
+              templateId: templateId,
+              templateInstanceId: instanceId,
+              slotId: slotId,
+            },
+            blockId
+          );
+        }
+      } else if (firstInsert) {
+        // First insert with no user content — copy template slot block
+        // with its content values stored as fieldPlaceholders
+        const blockId = uuidGenerator ? uuidGenerator() : `${instanceId}::${tplBlockId}`;
+        const newBlock = {
+          ...tplBlock,
+          templateId: templateId,
+          templateInstanceId: instanceId,
+        };
+        const placeholders = extractFieldPlaceholders(tplBlock);
+        if (Object.keys(placeholders).length > 0) {
+          newBlock.fieldPlaceholders = placeholders;
+        }
+        addItem(newBlock, blockId);
       }
     }
     // Skip blocks without fixed or slotId - they're just template defaults
@@ -11977,6 +12050,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
     filterInstanceId,
     loadTemplate,
     idField,  // For object_list arrays: field name used as item ID (e.g. '@id', 'key')
+    firstInsert,  // When true, copy slot block defaults as fieldPlaceholders
   } = options;
 
   if (!templates) {
