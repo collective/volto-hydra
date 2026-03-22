@@ -103,17 +103,43 @@ test.describe('Inline Editing - Placeholders', () => {
     await helper.navigateToEdit('/test-page');
 
     const iframe = helper.getIframe();
-    const blockId = 'block-1-uuid'; // Slate block — no placeholder in schema
+    const blockId = 'block-4-hero';
 
-    // Select the slate block
+    // Select the hero block
+    await helper.clickBlockInIframe(blockId);
+
+    // Hero buttonText field has no placeholder in schema
+    const buttonField = iframe.locator(`[data-block-uid="${blockId}"] [data-edit-text="buttonText"]`);
+    await expect(buttonField).toBeVisible();
+    const hasPlaceholder = await buttonField.evaluate(el => el.hasAttribute('data-placeholder'));
+    expect(hasPlaceholder).toBe(false);
+  });
+
+  test('slate block shows Type text placeholder from schema', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+    const blockId = 'block-1-uuid'; // Slate block with text
+
     await helper.clickBlockInIframe(blockId);
 
     const editField = iframe.locator(`[data-block-uid="${blockId}"] [data-edit-text="value"]`);
     await expect(editField).toBeVisible();
+    await expect(editField).toHaveAttribute('data-placeholder', 'Type text…');
+  });
 
-    // Slate block 'value' field has no explicit placeholder in schema
-    // It should NOT have a data-placeholder attribute (unless block.placeholder is set)
-    const hasPlaceholder = await editField.evaluate(el => el.hasAttribute('data-placeholder'));
-    expect(hasPlaceholder).toBe(false);
+  test('page title field shows placeholder from content type schema', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Page title is rendered with data-edit-text="/title" (or "title")
+    const titleField = iframe.locator('[data-edit-text="/title"], [data-edit-text="title"]').first();
+    await expect(titleField).toBeVisible({ timeout: 10000 });
+    await expect(titleField).toHaveAttribute('data-placeholder', 'Type the title…');
   });
 });

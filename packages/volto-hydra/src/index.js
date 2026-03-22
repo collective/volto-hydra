@@ -1,4 +1,36 @@
+import { defineMessages } from 'react-intl';
 import filterSVG from '@plone/volto/icons/filter.svg';
+
+const messages = defineMessages({
+  typeText: {
+    id: 'Type text…',
+    defaultMessage: 'Type text…',
+  },
+  typeTitle: {
+    id: 'Type the title…',
+    defaultMessage: 'Type the title…',
+  },
+  addDescription: {
+    id: 'Add a description…',
+    defaultMessage: 'Add a description…',
+  },
+  videoPlaceholder: {
+    id: 'Type a Video (YouTube, Vimeo or mp4) URL',
+    defaultMessage: 'Type a Video (YouTube, Vimeo or mp4) URL',
+  },
+  mapsPlaceholder: {
+    id: 'Paste a Google Maps Embed URL',
+    defaultMessage: 'Paste a Google Maps Embed URL',
+  },
+  imagePlaceholder: {
+    id: 'Browse the site or type a URL',
+    defaultMessage: 'Browse the site or type a URL',
+  },
+  htmlPlaceholder: {
+    id: 'Add some HTML here',
+    defaultMessage: 'Add some HTML here',
+  },
+});
 import frontendPreviewUrl, { viewportPreset } from './reducers';
 import FrontendSwitcherPlug from './components/Toolbar/FrontendSwitcherPlug';
 import FrontendSwitcherPanel from './components/Toolbar/FrontendSwitcherPanel';
@@ -99,6 +131,7 @@ const applyConfig = (config) => {
       schema.properties.value = {
         title: 'Body',
         widget: 'slate',
+        placeholder: intl.formatMessage(messages.typeText),
       };
       // Defensive check - fieldsets may not exist when called from applyBlockDefaultsWithContext
       if (schema.fieldsets?.[0]?.fields) {
@@ -108,6 +141,74 @@ const applyConfig = (config) => {
     },
     sidebarTab: 1,
     mostUsed: true,
+  };
+
+  // Title block: renders page title with placeholder hint
+  config.blocks.blocksConfig.title = {
+    ...config.blocks.blocksConfig.title,
+    blockSchema: ({ intl: blockIntl }) => ({
+      title: 'Title',
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['title'] }],
+      properties: {
+        title: {
+          title: 'Title',
+          type: 'string',
+          placeholder: blockIntl.formatMessage(messages.typeTitle),
+        },
+      },
+      required: [],
+    }),
+  };
+
+  // Description block: renders page description with placeholder hint
+  config.blocks.blocksConfig.description = {
+    ...config.blocks.blocksConfig.description,
+    blockSchema: ({ intl: blockIntl }) => ({
+      title: 'Description',
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['description'] }],
+      properties: {
+        description: {
+          title: 'Description',
+          type: 'string',
+          widget: 'textarea',
+          placeholder: blockIntl.formatMessage(messages.addDescription),
+        },
+      },
+      required: [],
+    }),
+  };
+
+  // Video block: placeholder for URL input
+  config.blocks.blocksConfig.video = {
+    ...config.blocks.blocksConfig.video,
+    schemaEnhancer: ({ schema, intl: blockIntl }) => {
+      if (schema.properties.url) {
+        schema.properties.url = { ...schema.properties.url, placeholder: blockIntl.formatMessage(messages.videoPlaceholder) };
+      }
+      return schema;
+    },
+  };
+
+  // Maps block: placeholder for embed URL input
+  config.blocks.blocksConfig.maps = {
+    ...config.blocks.blocksConfig.maps,
+    schemaEnhancer: ({ schema, intl: blockIntl }) => {
+      if (schema.properties.url) {
+        schema.properties.url = { ...schema.properties.url, placeholder: blockIntl.formatMessage(messages.mapsPlaceholder) };
+      }
+      return schema;
+    },
+  };
+
+  // HTML block: placeholder for code input
+  config.blocks.blocksConfig.html = {
+    ...config.blocks.blocksConfig.html,
+    schemaEnhancer: ({ schema, intl: blockIntl }) => {
+      if (schema.properties.html) {
+        schema.properties.html = { ...schema.properties.html, placeholder: blockIntl.formatMessage(messages.htmlPlaceholder) };
+      }
+      return schema;
+    },
   };
 
   // Override Slate hotkeys: use Ctrl+Shift+S for strikethrough (del) instead of Ctrl+S
@@ -241,6 +342,7 @@ const applyConfig = (config) => {
           url: {
             title: 'Image URL',
             widget: 'image',
+            placeholder: props.intl?.formatMessage(messages.imagePlaceholder) || 'Browse the site or type a URL',
           },
         },
       };

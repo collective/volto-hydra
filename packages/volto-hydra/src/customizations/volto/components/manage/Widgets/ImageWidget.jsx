@@ -94,6 +94,7 @@ const UnconnectedImageInput = (props) => {
     restrictFileUpload = false,
     objectBrowserPickerType = 'image',
     description,
+    placeholder,
     showPreview = true, // HYDRA: New prop - set to false for inline use
     onClose, // HYDRA: Optional callback when form should close (for inline use)
   } = props;
@@ -367,7 +368,7 @@ const UnconnectedImageInput = (props) => {
       data={{ url: '' }}
       theme={{}}
       objectBrowserPickerType="image"
-      placeholder={description || intl.formatMessage(messages.addImage)}
+      placeholder={placeholder || description || intl.formatMessage(messages.addImage)}
       onChangeValue={handleUrlChange}
       onSelectItem={handleSelectItem}
       onClear={() => {}}
@@ -459,7 +460,7 @@ const UnconnectedImageInput = (props) => {
               </div>
               {/* "Add your Image" text */}
               <p style={{ color: '#333', fontSize: '14px', fontWeight: 500, marginBottom: '16px', textAlign: 'center' }}>
-                {description || intl.formatMessage(messages.addImage)}
+                {placeholder || description || intl.formatMessage(messages.addImage)}
               </p>
               {/* Action row with AddLinkForm */}
               <div className="toolbar-wrapper" style={{ display: 'flex', justifyContent: 'center' }}>

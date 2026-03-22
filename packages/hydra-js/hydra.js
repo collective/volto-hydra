@@ -5141,8 +5141,8 @@ export class Bridge {
     const editableFields = document.querySelectorAll('[data-edit-text]');
     editableFields.forEach((field) => {
       const blockEl = field.closest('[data-block-uid]');
-      if (!blockEl) return;
-      const blockUid = blockEl.getAttribute('data-block-uid');
+      // Page-level fields (outside any block) use _page as blockId
+      const blockUid = blockEl ? blockEl.getAttribute('data-block-uid') : PAGE_BLOCK_UID;
       const fieldPath = field.getAttribute('data-edit-text');
       const placeholder = this.getFieldPlaceholder(blockUid, fieldPath);
       if (placeholder) {

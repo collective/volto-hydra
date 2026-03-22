@@ -2413,6 +2413,13 @@ const Iframe = (props) => {
           // blocks_layout fields so buildBlockPathMap includes them in resolvedBlockSchema.
           // This lets hydra.js derive page-level field types from blockPathMap['_page'].
           const contentTypeFields = schema?.properties || {};
+          // Add placeholders for common page-level fields
+          if (contentTypeFields.title && !contentTypeFields.title.placeholder) {
+            contentTypeFields.title = { ...contentTypeFields.title, placeholder: intl.formatMessage({ id: 'Type the title…', defaultMessage: 'Type the title…' }) };
+          }
+          if (contentTypeFields.description && !contentTypeFields.description.placeholder) {
+            contentTypeFields.description = { ...contentTypeFields.description, placeholder: intl.formatMessage({ id: 'Add a description…', defaultMessage: 'Add a description…' }) };
+          }
           config.blocks.blocksConfig['_page'] = {
             id: '_page',
             schema: () => ({ properties: { ...contentTypeFields, ...pageBlocksFieldsDef } }),
