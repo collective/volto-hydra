@@ -49,7 +49,7 @@ test.describe('Inline Editing - Placeholders', () => {
     await headingField.click();
 
     // Select all and delete to clear the field
-    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.press('Backspace');
 
     // Verify text is actually cleared in the DOM
@@ -84,7 +84,7 @@ test.describe('Inline Editing - Placeholders', () => {
     await headingField.click();
 
     // Select all and delete to clear
-    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.press('Backspace');
 
     // Type new text
@@ -131,7 +131,9 @@ test.describe('Inline Editing - Placeholders', () => {
     await expect(editField).toHaveAttribute('data-placeholder', 'Type text…');
   });
 
-  test('page title field shows placeholder from content type schema', async ({ page }) => {
+  test('page title field shows placeholder from content type schema', async ({ page }, testInfo) => {
+    // Nuxt renders title only via title blocks — test-page has no title block in layout
+    test.skip(testInfo.project.name.includes('nuxt'), 'Nuxt test-page has no page-level title field');
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/test-page');
