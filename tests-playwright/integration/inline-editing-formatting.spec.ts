@@ -66,6 +66,10 @@ test.describe('Inline Editing - Formatting', () => {
     const boldSelector = helper.getFormatSelector('bold');
     await expect(editor.locator(boldSelector)).toBeVisible();
     expect(await editor.textContent()).toContain('Text to make bold');
+
+    // STEP 10: Verify no processing state remains after formatting
+    const hasProcessing = await editor.evaluate(el => el.classList.contains('hydra-processing'));
+    expect(hasProcessing, 'Editor should not have hydra-processing class after bold format').toBe(false);
   });
 
   test('bold formatting syncs with Admin UI', async ({ page }) => {

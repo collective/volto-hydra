@@ -394,6 +394,12 @@ test.describe('Inline Editing - Basic', () => {
     // Wait for the correct number of blocks to be created
     await helper.waitForBlockCountToBe(initialBlocks + 1, 5000);
 
+    // Verify no processing/wait state remains on the original block after split
+    const originalEditor = iframe.locator(`[data-block-uid="${blockId}"] [data-edit-text]`);
+    if (await originalEditor.count() > 0) {
+      await expect(originalEditor).not.toHaveClass(/hydra-processing/, { timeout: 5000 });
+    }
+
     // Check that no error toast appeared (Missing data-node-id)
     const errorToast = iframe.locator('#hydra-dev-warning');
     await expect(errorToast).not.toBeVisible({ timeout: 1000 });

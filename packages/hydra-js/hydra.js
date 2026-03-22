@@ -2555,11 +2555,11 @@ export class Bridge {
 
       this._ensureDocumentKeyboardBlocker();
 
-      // Visual feedback on current element
+      // Visual feedback — use CSS class (survives framework re-renders better than inline style)
       const block = this.queryBlockElement(blockId);
       const editableField = block ? this.getOwnFirstEditableField(block) : null;
       if (editableField) {
-        editableField.style.cursor = 'wait';
+        editableField.classList.add('hydra-processing');
       }
 
       // Store pending transform to match with FORM_DATA for unblocking
@@ -2573,12 +2573,11 @@ export class Bridge {
       // Clear blocked state
       this.blockedBlockId = null;
 
-      // Restore visual feedback on current element (may be new after re-render)
-      const block = this.queryBlockElement(blockId);
-      const editableField = block ? this.getOwnFirstEditableField(block) : null;
-      if (editableField) {
-        editableField.style.cursor = 'text';
-      }
+      // Clear processing state from ALL elements (not just blockId —
+      // after Enter split, blockId points to the new block, not the original)
+      document.querySelectorAll('.hydra-processing').forEach(el => {
+        el.classList.remove('hydra-processing');
+      });
 
       // Clear pending transform
       this.pendingTransform = null;
@@ -9798,6 +9797,9 @@ export class Bridge {
     style.innerHTML = `
         [contenteditable] {
           outline: 0px solid transparent;
+        }
+        .hydra-processing {
+          cursor: wait !important;
         }
         /* Placeholder for empty editable fields — shows schema placeholder text */
         [data-edit-text][data-placeholder][data-empty]::before {
