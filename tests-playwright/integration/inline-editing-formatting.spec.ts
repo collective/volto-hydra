@@ -217,10 +217,8 @@ test.describe('Inline Editing - Formatting', () => {
     await helper.clickFormatButton('bold');
     await helper.waitForFormattedText(editor, /Bold text/, 'bold');
 
-    // Move cursor to end and ensure editor has focus
+    // Move cursor to end (editor is already focused from format operation)
     await helper.moveCursorToEnd(editor);
-    await editor.click();
-    await expect(editor).toBeFocused({ timeout: 5000 });
 
     // Type more text at the end (use pressSequentially for reliable typing)
     await editor.pressSequentially(' more', { delay: 10 });

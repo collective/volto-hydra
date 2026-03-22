@@ -4837,7 +4837,9 @@ export class Bridge {
 
         // Render cycle complete — process any queued FORM_DATA.
         // Only the latest queued message matters (earlier ones are stale).
-        this._renderInProgress = false;
+        // NOTE: _renderInProgress stays true until AFTER the observer is reconnected
+        // at the end of this function. This prevents late framework DOM patches from
+        // triggering handleTextChange which would read mid-render DOM.
         if (this._formDataQueue) {
           const queued = this._formDataQueue;
           this._formDataQueue = null;
@@ -4863,9 +4865,13 @@ export class Bridge {
         if (this.selectedBlockUid) {
           const currentBlockEl = this.queryBlockElement(this.selectedBlockUid);
           if (currentBlockEl) {
+            const editField = currentBlockEl.querySelector('[data-edit-text]') || currentBlockEl;
             this.observeBlockTextChanges(currentBlockEl);
           }
         }
+        // Mark render complete AFTER observer reconnection to prevent late
+        // framework DOM patches from triggering handleTextChange
+        this._renderInProgress = false;
       });
     });
   }
@@ -5066,9 +5072,13 @@ export class Bridge {
       const expected = JSON.stringify(slateValue);
       for (let retry = 0; retry < maxRetries; retry++) {
         const domValue = this.readSlateValueFromDOM(fieldEl, slateValue);
-        if (JSON.stringify(domValue) === expected) break;
+        const domStr = JSON.stringify(domValue);
+        if (domStr === expected) {
+          log('waitForContentReady: MATCH on retry', retry, 'innerHTML:', fieldEl.innerHTML?.substring(0, 200));
+          break;
+        }
         if (retry === 0) {
-          log('waitForContentReady: content mismatch, waiting for render to complete');
+          log('waitForContentReady: content mismatch, waiting for render to complete. DOM:', fieldEl.innerHTML?.substring(0, 200), 'expected:', expected.substring(0, 100));
         }
         await new Promise(r => requestAnimationFrame(r));
       }
@@ -7889,44 +7899,21 @@ export class Bridge {
     }
 
     // Call the callback to trigger the render
-    // Support async callbacks (e.g., renderContentWithListings)
-    const callbackResult = callbackFn(this.formData);
+    callbackFn(this.formData);
 
     const afterRender = () => {
-      if (this._renderCommentObserver) {
-        this._renderCommentObserver.disconnect();
-        this._renderCommentObserver = null;
-      }
       this.afterContentRender(afterRenderOptions);
     };
 
-    // For async render callbacks, watch for new DOM nodes and eagerly
-    // materialize hydra comments. This ensures data-block-uid attributes
-    // from comment syntax are available as soon as blocks are appended,
-    // rather than waiting for the entire render (including slow listing/
-    // footer expansion) to complete. Safe to call repeatedly because
-    // applyHydraAttributes skips existing attributes.
-    if (callbackResult && typeof callbackResult.then === 'function') {
-      this._renderCommentObserver = new MutationObserver(() => {
-        this.materializeHydraComments();
-      });
-      this._renderCommentObserver.observe(document.body, { childList: true, subtree: true });
-    }
-
-    // Call afterRender after callback completes (async or sync)
-    if (callbackResult && typeof callbackResult.then === 'function') {
-      callbackResult.then(afterRender);
+    // Framework renders asynchronously (Vue, React, or sync innerHTML).
+    // If a transform or re-render is pending, wait for the actual DOM
+    // mutation before proceeding with selection restore and buffer replay.
+    const blockId = this.selectedBlockUid;
+    const blockEl = blockId && this.queryBlockElement(blockId);
+    if (blockEl && !afterRenderOptions.skipRender && (this.pendingTransform || this._reRenderBlocking)) {
+      this._waitForDomMutation(blockEl, afterRender);
     } else {
-      // Sync callback — framework may render asynchronously (Vue, React).
-      // If a transform or re-render is pending, wait for the actual DOM
-      // mutation before proceeding with selection restore and buffer replay.
-      const blockId = this.selectedBlockUid;
-      const blockEl = blockId && this.queryBlockElement(blockId);
-      if (blockEl && !afterRenderOptions.skipRender && (this.pendingTransform || this._reRenderBlocking)) {
-        this._waitForDomMutation(blockEl, afterRender);
-      } else {
-        afterRender();
-      }
+      afterRender();
     }
   }
 

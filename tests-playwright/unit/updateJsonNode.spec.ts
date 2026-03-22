@@ -423,6 +423,65 @@ test.describe('Bridge.readSlateValueFromDOM()', () => {
     });
   });
 
+  test('typing after bold: text goes into trailing empty span', async () => {
+    // Reproduces the "format persists" flaky test failure:
+    // User makes text bold, moves cursor to end, types " more"
+    // The browser puts " more" in the trailing empty <span> OUTSIDE the <strong>
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'f0b',
+
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'Bold text' }] },
+        { text: '' },
+      ]}],
+
+      // DOM: " more" is in the trailing span (outside bold)
+      dom:
+        '<div data-edit-text="value" data-node-id="0">' +
+          '<span></span>' +
+          '<span data-node-id="0.1"><span>Bold text</span></span>' +
+          '<span> more</span>' +
+        '</div>',
+
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'Bold text' }] },
+        { text: ' more' },
+      ]}],
+    });
+  });
+
+  test('typing after bold: mutation fires with only empty text visible', async () => {
+    // The actual failure case: observer fires on the empty text node
+    // before the strong span is fully rendered. The DOM at that moment
+    // only has the empty spans, not the strong content.
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'f0c',
+
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'Bold text' }] },
+        { text: '' },
+      ]}],
+
+      // DOM: only empty spans visible (mid-render state)
+      dom:
+        '<div data-edit-text="value" data-node-id="0">' +
+          '<span> </span>' +
+        '</div>',
+
+      // Should preserve the existing bold structure, not overwrite with empty
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'Bold text' }] },
+        { text: '' },
+      ]}],
+    });
+  });
+
   test('new text after toggling format off is captured', async () => {
     const body = helper.getIframe().locator('body');
     await testDomToSlate(body, {

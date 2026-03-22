@@ -2160,6 +2160,15 @@ export class AdminUIHelper {
       selection.removeAllRanges();
       selection.addRange(range);
     });
+
+    // Wait for the selection to settle at a collapsed position at the end
+    await expect(async () => {
+      const selInfo = await editor.evaluate((el: any) => {
+        const sel = el.ownerDocument.defaultView.getSelection();
+        return { collapsed: sel?.isCollapsed, offset: sel?.anchorOffset, text: sel?.anchorNode?.textContent?.substring(0, 20) };
+      });
+      expect(selInfo.collapsed, `Selection not collapsed: ${JSON.stringify(selInfo)}`).toBe(true);
+    }).toPass({ timeout: 2000 });
   }
 
   /**
