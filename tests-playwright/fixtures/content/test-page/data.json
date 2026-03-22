@@ -23,7 +23,11 @@
       "value": [
         {
           "type": "p",
-          "children": [{ "text": "This is a test paragraph" }]
+          "children": [
+            {
+              "text": "This is a test paragraph"
+            }
+          ]
         }
       ],
       "plaintext": "This is a test paragraph"
@@ -38,7 +42,11 @@
       "value": [
         {
           "type": "p",
-          "children": [{ "text": "Another paragraph for testing" }]
+          "children": [
+            {
+              "text": "Another paragraph for testing"
+            }
+          ]
         }
       ],
       "plaintext": "Another paragraph for testing"
@@ -48,10 +56,22 @@
       "heading": "Welcome Hero",
       "subheading": "This is the hero subtitle",
       "buttonText": "Click Me",
-      "buttonLink": [{ "@id": "/target-page", "title": "Target Page" }],
+      "buttonLink": [
+        {
+          "@id": "/target-page",
+          "title": "Target Page"
+        }
+      ],
       "image": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect width='100%25' height='100%25' fill='%234a90d9'/%3E%3Ctext x='50%25' y='50%25' fill='white' text-anchor='middle' font-size='24'%3EHero Image%3C/text%3E%3C/svg%3E",
       "description": [
-        { "type": "p", "children": [{ "text": "Rich text description" }] }
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Rich text description"
+            }
+          ]
+        }
       ]
     },
     "block-5-linked-image": {
@@ -69,7 +89,14 @@
     "block-7-filled-teaser": {
       "@type": "teaser",
       "overwrite": false,
-      "href": [{ "@id": "/target-page", "title": "Target Page", "description": "Target page description", "hasPreviewImage": true }]
+      "href": [
+        {
+          "@id": "/target-page",
+          "title": "Target Page",
+          "description": "Target page description",
+          "hasPreviewImage": true
+        }
+      ]
     },
     "block-8-grid": {
       "@type": "gridBlock",
@@ -78,14 +105,22 @@
           "@type": "teaser",
           "title": "Manual Item",
           "description": "This is a manually added teaser",
-          "href": [{ "@id": "/target-page", "title": "Target Page" }]
+          "href": [
+            {
+              "@id": "/target-page",
+              "title": "Target Page"
+            }
+          ]
         },
         "listing-in-grid": {
           "@type": "listing",
           "headline": "Featured Items",
           "variation": "teaser",
           "fieldMapping": {
-            "@id": { "field": "href", "type": "link" },
+            "@id": {
+              "field": "href",
+              "type": "link"
+            },
             "title": "title",
             "description": "description",
             "image": "preview_image"
@@ -95,7 +130,9 @@
               {
                 "i": "portal_type",
                 "o": "plone.app.querystring.operation.selection.any",
-                "v": ["Document"]
+                "v": [
+                  "Document"
+                ]
               }
             ],
             "sort_on": "effective",
@@ -104,7 +141,10 @@
         }
       },
       "blocks_layout": {
-        "items": ["manual-teaser", "listing-in-grid"]
+        "items": [
+          "manual-teaser",
+          "listing-in-grid"
+        ]
       }
     },
     "block-9-listing": {
@@ -112,7 +152,10 @@
       "headline": "Featured Items",
       "variation": "teaser",
       "fieldMapping": {
-        "@id": { "field": "href", "type": "link" },
+        "@id": {
+          "field": "href",
+          "type": "link"
+        },
         "title": "title",
         "description": "description",
         "image": "preview_image"
@@ -122,7 +165,9 @@
           {
             "i": "portal_type",
             "o": "plone.app.querystring.operation.selection.any",
-            "v": ["Document"]
+            "v": [
+              "Document"
+            ]
           },
           {
             "i": "path",
@@ -142,7 +187,9 @@
           {
             "i": "portal_type",
             "o": "plone.app.querystring.operation.selection.any",
-            "v": ["Document"]
+            "v": [
+              "Document"
+            ]
           },
           {
             "i": "path",
@@ -165,7 +212,11 @@
       "value": [
         {
           "type": "p",
-          "children": [{ "text": "Footer text content" }]
+          "children": [
+            {
+              "text": "Footer text content"
+            }
+          ]
         }
       ],
       "plaintext": "Footer text content"
@@ -177,9 +228,24 @@
     }
   },
   "blocks_layout": {
-    "items": ["block-1-uuid", "title-block", "block-2-uuid", "block-3-uuid", "block-4-hero", "block-5-linked-image", "block-6-empty-teaser", "block-7-filled-teaser", "block-8-grid", "block-9-listing", "block-10-listing-no-mapping", "skiplogic-test"]
+    "items": [
+      "block-1-uuid",
+      "block-2-uuid",
+      "block-3-uuid",
+      "block-4-hero",
+      "block-5-linked-image",
+      "block-6-empty-teaser",
+      "block-7-filled-teaser",
+      "block-8-grid",
+      "block-9-listing",
+      "block-10-listing-no-mapping",
+      "skiplogic-test"
+    ]
   },
   "footer_blocks": {
-    "items": ["footer-block-1", "footer-block-2"]
+    "items": [
+      "footer-block-1",
+      "footer-block-2"
+    ]
   }
 }

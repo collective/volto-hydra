@@ -138,8 +138,8 @@ test.describe('Inline Editing - Placeholders', () => {
 
     const iframe = helper.getIframe();
 
-    // The title block renders with data-edit-text="/title"
-    const titleField = iframe.locator('[data-edit-text="/title"]').first();
+    // Page title: mock frontend uses data-edit-text="title", Nuxt uses data-edit-text="/title"
+    const titleField = iframe.locator('[data-edit-text="/title"], #page-title[data-edit-text="title"]').first();
     await expect(titleField).toBeVisible({ timeout: 10000 });
     await expect(titleField).toHaveAttribute('data-placeholder', 'Type the title…');
   });
