@@ -420,8 +420,7 @@ test.describe('Inline Editing - Basic', () => {
     const isContentEditable = await newEditor.getAttribute('contenteditable');
     expect(isContentEditable).toBe('true');
 
-    // Type in the new block - need to use newEditor.pressSequentially for iframe content
-    await newEditor.click();
+    // Type in the new block immediately WITHOUT clicking — Enter should leave it focused
     await newEditor.pressSequentially('Second line', { delay: 10 });
     await helper.waitForEditorText(newEditor, /Second line/);
 

@@ -9056,7 +9056,7 @@ export class Bridge {
    * @param {HTMLElement} field - The editable field element
    */
   updateEmptyState(field) {
-    const text = field.textContent?.replace(/\u200B/g, '').trim();
+    const text = field.textContent?.replace(/[\u200B\uFEFF]/g, '').trim();
     field.toggleAttribute('data-empty', !text);
   }
 
@@ -9801,7 +9801,7 @@ export class Bridge {
         .hydra-processing {
           cursor: wait !important;
         }
-        /* Placeholder for empty editable fields — shows schema placeholder text */
+        /* Placeholder text for empty editable fields — keeps them visible/clickable */
         [data-edit-text][data-placeholder][data-empty]::before {
           content: attr(data-placeholder);
           color: #aaa;
@@ -9813,10 +9813,13 @@ export class Bridge {
         [data-edit-text][data-placeholder][data-empty]:focus::before {
           display: none;
         }
-        /* Ensure empty editable fields are visible/clickable */
-        [data-edit-text][data-empty] {
-          min-height: 1.5em;
+        /* Empty fields with placeholder: placeholder text provides the height */
+        [data-edit-text][data-placeholder][data-empty] {
           position: relative;
+        }
+        /* Empty fields without placeholder: min-height fallback so they stay clickable */
+        [data-edit-text][data-empty]:not([data-placeholder]) {
+          min-height: 1.5em;
         }
         /* Linkable field hover styles - indicate clickable link areas */
         /* Exclude fields inside readonly blocks (listing items, non-overwrite teasers) */
