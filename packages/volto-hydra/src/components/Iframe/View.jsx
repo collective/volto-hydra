@@ -1790,6 +1790,104 @@ const Iframe = (props) => {
               onChangeFormData(fd);
               dispatch(setSidebarTab(1));
             }
+          } else if (event.data.transformType === 'unwrapBlock' && event.data.isFirstField && !event.data.isEmpty && (() => {
+            // Check if block's root node is already a default paragraph — only then merge.
+            // Non-default types (headings, lists) should go to toolbar for unwrap first.
+            const checkBlock = event.data.data?.blocks?.[event.data.blockId];
+            const checkValue = checkBlock?.[event.data.fieldName || 'value'];
+            const defaultType = config.settings?.slate?.defaultBlockType || 'p';
+            return Array.isArray(checkValue) && checkValue[0]?.type === defaultType;
+          })()) {
+            // Backspace at start of non-empty default paragraph — merge with previous block
+            log('unwrapBlock merge handler reached for block:', event.data.blockId, 'fieldName:', event.data.fieldName);
+            try {
+              const { blockId: mergeBlockId, fieldName: mergeFieldName, requestId: mergeRequestId } = event.data;
+              const mergeForm = event.data.data;
+              const mergeBpm = buildBlockPathMap(mergeForm, config.blocks.blocksConfig, intl);
+              const mergePathInfo = mergeBpm[mergeBlockId];
+
+              // Find previous block in layout
+              const mergeParentId = mergePathInfo?.parentId;
+              const mergeField = mergePathInfo?.containerField || 'blocks_layout';
+              const mergeParent = mergeParentId === '_page' ? mergeForm : getBlockByPath(mergeForm, mergeBpm[mergeParentId]?.path);
+              const mergeLayout = mergeParent?.[mergeField]?.items || mergeParent?.blocks_layout?.items || [];
+              const mergeIdx = mergeLayout.indexOf(mergeBlockId);
+              const prevBlockId = mergeIdx > 0 ? mergeLayout[mergeIdx - 1] : null;
+
+              if (prevBlockId) {
+                const prevPathInfo = mergeBpm[prevBlockId];
+                const prevBlock = prevPathInfo?.path ? getBlockByPath(mergeForm, prevPathInfo.path) : mergeForm.blocks[prevBlockId];
+                const currentBlock = mergePathInfo?.path ? getBlockByPath(mergeForm, mergePathInfo.path) : mergeForm.blocks[mergeBlockId];
+                const fieldName = mergeFieldName || 'value';
+                const prevValue = prevBlock?.[fieldName];
+                const currentValue = currentBlock?.[fieldName];
+
+                // Only merge single-text-field blocks (e.g. slate paragraphs)
+                // Multi-field blocks (hero, teaser) should not merge
+                const prevSchema = prevPathInfo?.resolvedBlockSchema;
+                const prevEditableFields = prevSchema?.properties
+                  ? Object.entries(prevSchema.properties).filter(([, def]) => {
+                      const ft = getFieldTypeString(def);
+                      return ft?.includes('slate') || ft === 'string' || ft === 'string:text' || ft === 'string:textarea';
+                    })
+                  : [];
+                const isSingleTextField = prevEditableFields.length === 1 && prevEditableFields[0][0] === fieldName;
+
+                log('unwrapBlock merge check:', { prevBlockId, prevType: prevBlock?.['@type'], fieldName, isSingleTextField, prevEditableFields: prevEditableFields.map(([n]) => n), hasPrevValue: Array.isArray(prevValue), hasCurrentValue: Array.isArray(currentValue) });
+
+                if (isSingleTextField && Array.isArray(prevValue) && Array.isArray(currentValue)) {
+                  log('unwrapBlock merge: merging', mergeBlockId, 'into', prevBlockId);
+
+                  // Combine both values into a headless Slate editor and use
+                  // Transforms.mergeNodes — Slate handles normalization (merging
+                  // adjacent text nodes) and cursor positioning correctly.
+                  const { Transforms, Editor } = require('slate');
+                  const combined = [...prevValue, ...currentValue];
+                  const mergeEditor = slateTransforms.createHeadlessEditor(combined);
+                  // Position cursor at start of the node to merge (the join point)
+                  const joinIdx = prevValue.length;
+                  Transforms.select(mergeEditor, Editor.start(mergeEditor, [joinIdx]));
+                  // Merge the current block's first node into the previous block's last node
+                  Transforms.mergeNodes(mergeEditor, { at: [joinIdx] });
+                  const mergedValue = JSON.parse(JSON.stringify(mergeEditor.children));
+                  const cursorSelection = mergeEditor.selection;
+                  const updatedPrev = { ...prevBlock, [fieldName]: mergedValue };
+
+                  // Merge + delete in one atomic form data update using iframe's form data
+                  // (includes latest typed text from buffer)
+                  const mergeBpmForDelete = buildBlockPathMap(mergeForm, config.blocks.blocksConfig, intl);
+                  let newFormData = updateBlockById(mergeForm, mergeBpmForDelete, prevBlockId, updatedPrev);
+                  // Remove the merged block from blocks and layout
+                  newFormData = {
+                    ...newFormData,
+                    blocks: Object.fromEntries(
+                      Object.entries(newFormData.blocks || {}).filter(([id]) => id !== mergeBlockId)
+                    ),
+                    blocks_layout: {
+                      ...newFormData.blocks_layout,
+                      items: (newFormData.blocks_layout?.items || []).filter(id => id !== mergeBlockId),
+                    },
+                  };
+
+                  // Set pending state synchronously so the FORM_DATA effect sees it
+                  flushSync(() => {
+                    setIframeSyncState(prev => ({
+                      ...prev,
+                      pendingSelectBlockUid: prevBlockId,
+                      pendingFormatRequestId: mergeRequestId,
+                      pendingTransformedSelection: cursorSelection,
+                    }));
+                  });
+                  onChangeFormData(newFormData);
+                }
+              }
+            } catch (error) {
+              console.error('[VIEW] Error handling unwrapBlock merge:', error);
+              event.source.postMessage(
+                { type: 'SLATE_ERROR', blockId: event.data.blockId, error: error.message },
+                event.origin,
+              );
+            }
           } else {
             // Format, paste, delete, indent - let toolbar handle via transformAction
             // Build transformAction based on transformType
@@ -2872,6 +2970,7 @@ const Iframe = (props) => {
       selection: newSelection,
       _selectionSource: 'PROPS_SYNC',
       ...(hasPendingFormatRequest ? { pendingFormatRequestId: null } : {}),
+      pendingTransformedSelection: null,
     }));
 
     // Send updated data to iframe (duplicates already filtered above)
@@ -2883,6 +2982,7 @@ const Iframe = (props) => {
       blockPathMap: stripBlockPathMapForPostMessage(newBlockPathMap),
       ...(hasPendingSelect ? { selectedBlockUid: iframeSyncState.pendingSelectBlockUid } : {}),
       ...(hasPendingFormatRequest ? { formatRequestId: iframeSyncState.pendingFormatRequestId } : {}),
+      ...(iframeSyncState.pendingTransformedSelection ? { transformedSelection: iframeSyncState.pendingTransformedSelection } : {}),
     };
     log('Sending FORM_DATA to iframe. blockPathMap keys:', Object.keys(newBlockPathMap), 'selectedBlockUid:', hasPendingSelect ? iframeSyncState.pendingSelectBlockUid : '(not sent)', '_editSequence:', editSequenceRef.current);
     document.getElementById('previewIframe')?.contentWindow?.postMessage(

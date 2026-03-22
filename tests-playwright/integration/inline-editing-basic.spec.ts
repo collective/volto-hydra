@@ -433,6 +433,76 @@ test.describe('Inline Editing - Basic', () => {
     await expect(sidebarEditor).toContainText('Second line', { timeout: 5000 });
   });
 
+  test('Backspace at start of block joins with previous block', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // First, create two adjacent slate blocks by pressing Enter in block-1
+    const editor1 = await helper.enterEditMode('block-1-uuid');
+    await helper.selectAllTextInEditor(editor1);
+    await editor1.pressSequentially('First block', { delay: 10 });
+    await helper.waitForEditorText(editor1, /First block/);
+
+    const initialBlocks = await helper.getStableBlockCount();
+
+    // Press Enter to split — creates a new empty block right after block-1
+    await editor1.press('Enter');
+    await helper.waitForBlockCountToBe(initialBlocks + 1, 5000);
+
+    // Get the new block (right after block-1)
+    const blockOrder = await helper.getBlockOrder();
+    const block1Idx = blockOrder.indexOf('block-1-uuid');
+    const newBlockUid = blockOrder[block1Idx + 1];
+    expect(newBlockUid).toBeTruthy();
+
+    // Wait for new block to be selected and type into it
+    await helper.waitForBlockSelected(newBlockUid!);
+    const newEditor = await helper.getEditorLocator(newBlockUid!);
+    await newEditor.pressSequentially('Second block', { delay: 10 });
+    await helper.waitForEditorText(newEditor, /Second block/);
+
+    const blocksBeforeMerge = await helper.getStableBlockCount();
+
+    // Place cursor at the very start of the new block
+    await newEditor.evaluate(el => {
+      const sel = window.getSelection();
+      const range = document.createRange();
+      const firstText = el.querySelector('[data-node-id]') || el;
+      const textNode = firstText.firstChild || firstText;
+      range.setStart(textNode, 0);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    });
+
+    // Press Backspace — should merge new block's text into block-1
+    await newEditor.press('Backspace');
+
+    // Block count should decrease (new block merged into block-1)
+    await helper.waitForBlockCountToBe(blocksBeforeMerge - 1, 10000);
+
+    // The merged block should contain both texts
+    const mergedEditor = await helper.getEditorLocator('block-1-uuid');
+    await expect(mergedEditor).toContainText('First block', { timeout: 5000 });
+    await expect(mergedEditor).toContainText('Second block', { timeout: 5000 });
+
+    // No wait cursor should remain
+    if (await mergedEditor.count() > 0) {
+      await expect(mergedEditor).not.toHaveClass(/hydra-processing/, { timeout: 5000 });
+    }
+
+    // Wait for merged content to appear in the DOM before typing
+    await expect(mergedEditor).toContainText('First blockSecond block', { timeout: 5000 });
+
+    // Cursor should be at the join point — typing should insert between the two texts
+    await mergedEditor.pressSequentially(' JOINED ', { delay: 10 });
+    await helper.waitForEditorText(mergedEditor, /First block JOINED Second block/);
+  });
+
   test('editing text in Admin UI updates iframe', async ({ page }, testInfo) => {
     const RUN = `[RUN-${testInfo.repeatEachIndex}]`;
     const helper = new AdminUIHelper(page);

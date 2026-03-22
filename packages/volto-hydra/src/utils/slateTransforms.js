@@ -318,10 +318,57 @@ export function splitListAtItem(value, selection) {
 }
 
 // Export default for backwards compatibility
+/**
+ * Merge two slate block values. The inverse of splitBlock.
+ * Matches core Volto's mergeSlateWithBlockBackward logic:
+ * - If last prev node and first current node have same type, merge their children
+ * - Otherwise concatenate as separate nodes
+ * Cursor is placed at the join point.
+ *
+ * @param {Array} prevValue - Slate value from the previous block
+ * @param {Array} currentValue - Slate value from the current block
+ * @returns {{ mergedValue: Array, cursorPath: Object }} Merged value and cursor position at join point
+ */
+export function mergeBlockValues(prevValue, currentValue) {
+  const lastNode = prevValue[prevValue.length - 1];
+  const firstNode = currentValue[0];
+
+  let merged;
+  let cursorPath;
+
+  if (lastNode && firstNode && lastNode.type === firstNode.type) {
+    // Same type: merge children of last prev node with first current node
+    const mergedNode = {
+      ...lastNode,
+      children: [...(lastNode.children || []), ...(firstNode.children || [])],
+    };
+    merged = [
+      ...prevValue.slice(0, -1),
+      mergedNode,
+      ...currentValue.slice(1),
+    ];
+    // Cursor at the seam: end of prev's last node children
+    cursorPath = {
+      anchor: { path: [prevValue.length - 1, lastNode.children.length], offset: 0 },
+      focus: { path: [prevValue.length - 1, lastNode.children.length], offset: 0 },
+    };
+  } else {
+    // Different types: concatenate as separate nodes
+    merged = [...prevValue, ...currentValue];
+    cursorPath = {
+      anchor: { path: [prevValue.length, 0], offset: 0 },
+      focus: { path: [prevValue.length, 0], offset: 0 },
+    };
+  }
+
+  return { mergedValue: merged, cursorPath };
+}
+
 export default {
   createHeadlessEditor,
   htmlToSlate,
   splitBlock,
+  mergeBlockValues,
   isSelectionInList,
   isCurrentListItemEmpty,
   splitListItem,
