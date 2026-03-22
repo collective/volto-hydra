@@ -125,7 +125,8 @@ test.describe('Inline Editing - Placeholders', () => {
 
     await helper.clickBlockInIframe(blockId);
 
-    const editField = iframe.locator(`[data-block-uid="${blockId}"] [data-edit-text="value"]`);
+    // data-edit-text may be on the same element as data-block-uid (Nuxt) or a descendant (mock)
+    const editField = iframe.locator(`[data-block-uid="${blockId}"][data-edit-text="value"], [data-block-uid="${blockId}"] [data-edit-text="value"]`).first();
     await expect(editField).toBeVisible();
     await expect(editField).toHaveAttribute('data-placeholder', 'Type text…');
   });
@@ -137,8 +138,8 @@ test.describe('Inline Editing - Placeholders', () => {
 
     const iframe = helper.getIframe();
 
-    // Page title is rendered with data-edit-text="/title" (or "title")
-    const titleField = iframe.locator('[data-edit-text="/title"], [data-edit-text="title"]').first();
+    // The title block renders with data-edit-text="/title"
+    const titleField = iframe.locator('[data-edit-text="/title"]').first();
     await expect(titleField).toBeVisible({ timeout: 10000 });
     await expect(titleField).toHaveAttribute('data-placeholder', 'Type the title…');
   });

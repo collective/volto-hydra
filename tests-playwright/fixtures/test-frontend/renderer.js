@@ -162,6 +162,12 @@ async function renderBlock(blockId, block) {
     wrapper.setAttribute('data-block-uid', blockId);
 
     switch (block['@type']) {
+        case 'title':
+            wrapper.innerHTML = `<h1 data-edit-text="/title">${window._currentFormData?.title || ''}</h1>`;
+            break;
+        case 'description':
+            wrapper.innerHTML = `<p data-edit-text="/description">${window._currentFormData?.description || ''}</p>`;
+            break;
         case 'slate':
             wrapper.innerHTML = renderSlateBlock(block);
             break;

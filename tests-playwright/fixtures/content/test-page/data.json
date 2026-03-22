@@ -15,6 +15,9 @@
     }
   },
   "blocks": {
+    "title-block": {
+      "@type": "title"
+    },
     "block-1-uuid": {
       "@type": "slate",
       "value": [
@@ -174,7 +177,7 @@
     }
   },
   "blocks_layout": {
-    "items": ["block-1-uuid", "block-2-uuid", "block-3-uuid", "block-4-hero", "block-5-linked-image", "block-6-empty-teaser", "block-7-filled-teaser", "block-8-grid", "block-9-listing", "block-10-listing-no-mapping", "skiplogic-test"]
+    "items": ["title-block", "block-1-uuid", "block-2-uuid", "block-3-uuid", "block-4-hero", "block-5-linked-image", "block-6-empty-teaser", "block-7-filled-teaser", "block-8-grid", "block-9-listing", "block-10-listing-no-mapping", "skiplogic-test"]
   },
   "footer_blocks": {
     "items": ["footer-block-1", "footer-block-2"]
