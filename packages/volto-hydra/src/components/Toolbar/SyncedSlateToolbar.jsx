@@ -22,10 +22,9 @@ import { createLog } from '../../utils/log';
 
 const log = createLog('TOOLBAR');
 
-// Buttons that open a UI for user interaction before applying a transform.
-// These should NOT flush on mousedown — the flush happens when the transform
-// actually applies. Without this, the flush blocks the iframe and the
-// FORM_DATA response may never come if the user cancels.
+// Buttons that open a UI before applying a transform. These get flushed
+// (text synced) but without input blocking — the user needs pointer events
+// to interact with the UI and cancel by clicking back to the editor.
 const DEFERRED_BUTTONS = ['link'];
 
 /**
@@ -941,7 +940,11 @@ const SyncedSlateToolbar = ({
         if (format) {
           applyInlineFormat(format, requestId);
         } else {
-          // Non-format button - dispatch click event
+          // Non-format button (link editor, etc.) - flush already synced text.
+          // Re-dispatch the click. Set activeFormatRequestIdRef so the next
+          // onChange (from selection change or link apply) includes the
+          // requestId for unblocking. For cancel, the onChange with no data
+          // change sends skipRender FORM_DATA to unblock.
           activeFormatRequestIdRef.current = requestId;
           button.dataset.bypassCapture = 'true';
           const clickable = button.querySelector('a.ui.button') || button.querySelector('button') || button;
@@ -1033,13 +1036,6 @@ const SyncedSlateToolbar = ({
         return;
       }
 
-      // Skip flush for deferred buttons that open a UI before transforming
-      const buttonName = button.dataset?.toolbarButton
-        || button.closest('[data-toolbar-button]')?.dataset?.toolbarButton;
-      if (DEFERRED_BUTTONS.includes(buttonName)) {
-        return;
-      }
-
       // Prevent the immediate mousedown - we'll re-trigger after flush
       e.preventDefault();
       e.stopPropagation();
@@ -1048,10 +1044,16 @@ const SyncedSlateToolbar = ({
       const requestId = `flush-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       pendingFlushRef.current = { requestId, button };
 
+      // Deferred buttons (link editor) flush text but don't block —
+      // user needs pointer events to interact with the UI and cancel.
+      const buttonName = button.dataset?.toolbarButton
+        || button.closest('[data-toolbar-button]')?.dataset?.toolbarButton;
+      const shouldBlock = !DEFERRED_BUTTONS.includes(buttonName);
+
       // Send FLUSH_BUFFER to iframe - response will come via completedFlushRequestId prop
       const iframe = document.getElementById('previewIframe');
       if (iframe?.contentWindow) {
-        iframe.contentWindow.postMessage({ type: 'FLUSH_BUFFER', requestId, setBlocking: true }, '*');
+        iframe.contentWindow.postMessage({ type: 'FLUSH_BUFFER', requestId, setBlocking: shouldBlock }, '*');
       }
     },
     [],
