@@ -1051,7 +1051,7 @@ const SyncedSlateToolbar = ({
       // Send FLUSH_BUFFER to iframe - response will come via completedFlushRequestId prop
       const iframe = document.getElementById('previewIframe');
       if (iframe?.contentWindow) {
-        iframe.contentWindow.postMessage({ type: 'FLUSH_BUFFER', requestId }, '*');
+        iframe.contentWindow.postMessage({ type: 'FLUSH_BUFFER', requestId, setBlocking: true }, '*');
       }
     },
     [],

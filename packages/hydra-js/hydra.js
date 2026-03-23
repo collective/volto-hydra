@@ -2037,7 +2037,7 @@ export class Bridge {
             return;
           }
 
-          this._processFlushBuffer(requestId);
+          this._processFlushBuffer(requestId, event.data.setBlocking);
         } else if (event.data.type === 'SLATE_ERROR') {
           // Handle errors from Slate formatting operations
           console.error('[HYDRA] Received SLATE_ERROR:', event.data.error);
@@ -4826,7 +4826,7 @@ export class Bridge {
           const queuedFlush = this._flushBufferQueue;
           this._flushBufferQueue = null;
           log('Processing queued FLUSH_BUFFER after render complete');
-          this._processFlushBuffer(queuedFlush.requestId);
+          this._processFlushBuffer(queuedFlush.requestId, queuedFlush.setBlocking);
         }
 
         // Re-attach text change observer LAST, after all DOM operations
@@ -9459,9 +9459,10 @@ export class Bridge {
    * or deferred until afterContentRender when a render is in progress.
    * @param {string} requestId - The FLUSH_BUFFER requestId
    */
-  _processFlushBuffer(requestId) {
-    // Block input during format operation - will be unblocked when FORM_DATA arrives
-    if (this.selectedBlockUid) {
+  _processFlushBuffer(requestId, setBlocking = false) {
+    // Only block when a format operation follows (setBlocking=true).
+    // Non-format flushes (save, template exit) just sync text.
+    if (setBlocking && this.selectedBlockUid) {
       this.setBlockProcessing(this.selectedBlockUid, true, requestId);
     }
 
