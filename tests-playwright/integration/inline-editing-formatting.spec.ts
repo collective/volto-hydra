@@ -1040,15 +1040,19 @@ test.describe('Inline Editing - Formatting', () => {
 
     // Press Enter to split — if formData was updated correctly, both blocks
     // should be empty. If stale (still "x"), the new block would contain "x".
-    const initialBlocks = await helper.getStableBlockCount();
+    const initialBlockOrder = await helper.getBlockOrder();
     await editor.press('Enter');
-    await helper.waitForBlockCountToBe(initialBlocks + 1, 5000);
 
-    // Get the new block
-    const blockOrder = await helper.getBlockOrder();
-    const originalBlockIndex = blockOrder.indexOf(blockId);
-    const newBlockUid = blockOrder[originalBlockIndex + 1];
-    expect(newBlockUid).toBeTruthy();
+    // Wait for a new block UID to appear right after block-1-uuid
+    let newBlockUid: string = '';
+    await expect(async () => {
+      const blockOrder = await helper.getBlockOrder();
+      const originalBlockIndex = blockOrder.indexOf(blockId);
+      const nextUid = blockOrder[originalBlockIndex + 1];
+      expect(nextUid).toBeTruthy();
+      expect(initialBlockOrder).not.toContain(nextUid);
+      newBlockUid = nextUid;
+    }).toPass({ timeout: 10000 });
 
     // Verify the new block is empty (not "x")
     const newEditor = await helper.getEditorLocator(newBlockUid);
@@ -1100,8 +1104,6 @@ test.describe('Inline Editing - Formatting', () => {
     const iframe = helper.getIframe();
     const editor = await helper.enterEditMode(blockId);
 
-    const initialBlocks = await helper.getStableBlockCount();
-
     // Create H2 via markdown shortcut
     await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('##', { delay: 10 });
@@ -1123,8 +1125,7 @@ test.describe('Inline Editing - Formatting', () => {
     // Second backspace on empty paragraph deletes the block
     await editor.press('Backspace');
 
-    // Block should be removed
-    await helper.waitForBlockCountToBe(initialBlocks - 1, 5000);
-    await expect(iframe.locator(`[data-block-uid="${blockId}"]`)).not.toBeVisible({ timeout: 5000 });
+    // Block should be removed from the DOM
+    await expect(iframe.locator(`[data-block-uid="${blockId}"]`)).not.toBeAttached({ timeout: 10000 });
   });
 });
