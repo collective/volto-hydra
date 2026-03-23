@@ -1952,6 +1952,11 @@ export class Bridge {
             const needsBlockSwitch = adminSelectedBlockUid && adminSelectedBlockUid !== this.selectedBlockUid;
             if (needsBlockSwitch) {
               log('Switching selectedBlockUid from', this.selectedBlockUid, 'to', adminSelectedBlockUid);
+              // Cancel any pending initial-selection — admin is switching to a new block
+              if (this._pendingInitialSelectTimer) {
+                clearTimeout(this._pendingInitialSelectTimer);
+                this._pendingInitialSelectTimer = null;
+              }
             }
 
             // Check if incoming FORM_DATA is stale (our local sequence is higher)
@@ -4860,10 +4865,15 @@ export class Bridge {
       const pollUntilReady = (retries = 40) => {
         const block = this.selectedBlockUid ? this.queryBlockElement(this.selectedBlockUid) : null;
         const contentOk = !block || this.isContentReady(block);
-        const switchOk = !needsBlockSwitch || (() => {
-          const el = adminSelectedBlockUid ? this.queryBlockElement(adminSelectedBlockUid) : null;
-          return el && !this.isElementHidden(el);
-        })();
+        const switchEl = adminSelectedBlockUid ? this.queryBlockElement(adminSelectedBlockUid) : null;
+        const switchOk = !needsBlockSwitch || (switchEl && !this.isElementHidden(switchEl));
+
+        // If block exists but is hidden (carousel slide), navigate to it
+        if (needsBlockSwitch && switchEl && this.isElementHidden(switchEl)
+            && !this._navigatingToBlock) {
+          this.tryMakeBlockVisible(adminSelectedBlockUid);
+        }
+
         if ((contentOk && switchOk) || retries <= 0) {
           doAfterContentRender();
         } else {
