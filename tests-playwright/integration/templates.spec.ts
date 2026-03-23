@@ -589,16 +589,14 @@ test.describe('Templates', () => {
     const userContentBlock = iframe.locator('[data-block-uid="user-content-1"]');
     await helper.dragBlockWithMouse(dragHandle, userContentBlock, true); // insertAfter=true
 
-    // Wait for DOM to stabilize
-    await helper.getStableBlockCount();
-
-    // Verify standalone-block-2 is now right after user-content-1
-    const newOrder = await helper.getBlockOrder();
-    const newUserContentIndex = newOrder.indexOf('user-content-1');
-    const newStandalone2Index = newOrder.indexOf('standalone-block-2');
-
-    // standalone-block-2 should now be right after user-content-1
-    expect(newStandalone2Index).toBe(newUserContentIndex + 1);
+    // Wait for standalone-block-2 to appear right after user-content-1
+    // (async frameworks may take multiple frames to re-render template-expanded blocks)
+    await expect(async () => {
+      const newOrder = await helper.getBlockOrder();
+      const newUserContentIndex = newOrder.indexOf('user-content-1');
+      const newStandalone2Index = newOrder.indexOf('standalone-block-2');
+      expect(newStandalone2Index).toBe(newUserContentIndex + 1);
+    }).toPass({ timeout: 10000 });
   });
 
   test('inserted template fixed blocks render when not in allowedLayouts', async ({ page }) => {

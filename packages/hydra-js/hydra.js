@@ -5103,14 +5103,23 @@ export class Bridge {
     if (!blockData) return true;
     const editableFields = this.getEditableFields(blockElement);
     for (const [fieldName, fieldType] of Object.entries(editableFields)) {
-      if (!this.fieldTypeIsSlate(fieldType)) continue;
-      const slateValue = blockData[fieldName];
-      if (!slateValue || !Array.isArray(slateValue)) continue;
       const fieldEl = blockElement.querySelector(`[data-edit-text="${fieldName}"]`)
         || (blockElement.getAttribute('data-edit-text') === fieldName ? blockElement : null);
       if (!fieldEl) continue;
-      const domValue = this.readSlateValueFromDOM(fieldEl, slateValue);
-      if (JSON.stringify(domValue) !== JSON.stringify(slateValue)) return false;
+
+      if (this.fieldTypeIsSlate(fieldType)) {
+        const slateValue = blockData[fieldName];
+        if (!slateValue || !Array.isArray(slateValue)) continue;
+        const domValue = this.readSlateValueFromDOM(fieldEl, slateValue);
+        if (JSON.stringify(domValue) !== JSON.stringify(slateValue)) return false;
+      } else {
+        // Non-slate text fields: compare using same read as handleTextChange
+        const resolved = this.resolveFieldPath(fieldName, blockUid);
+        const targetData = this.getBlockData(resolved.blockId);
+        const expected = targetData?.[resolved.fieldName] ?? '';
+        const domText = this.stripZeroWidthSpaces(fieldEl.innerText || '');
+        if (domText !== String(expected)) return false;
+      }
     }
     return true;
   }
@@ -8038,13 +8047,27 @@ export class Bridge {
       this.afterContentRender(afterRenderOptions);
     };
 
-    // If content is already ready (sync render completed), run afterContentRender
-    // immediately. Otherwise wait for DOM mutation (async framework render).
+    // Check if content is ready and whether cursor needs immediate restoration.
+    // Fast path (synchronous): only when iframe has active cursor at risk
+    //   - pendingTransform: format/Enter/Backspace operation in flight
+    //   - _reRenderBlocking + _iframeFocused: echo FORM_DATA during inline typing
+    // Delayed path (rAF): everything else — gives async frameworks (Nuxt/Vue)
+    //   one frame to patch the DOM before afterContentRender reads it.
     const contentReady = this._areBlocksReady(blockId, blockEl, afterRenderOptions);
+    // adminSelectedBlockUid signals a structural change (block add/delete/move)
+    // — always give the framework time to render, even if content looks ready.
+    const isStructuralChange = !!afterRenderOptions.adminSelectedBlockUid;
+    const needsFastPath = this.pendingTransform
+      || (this._reRenderBlocking && this._iframeFocused && !isStructuralChange);
 
-    log('_executeRender: contentReady:', contentReady, 'skipRender:', !!afterRenderOptions.skipRender, 'pendingTransform:', !!this.pendingTransform, '_reRenderBlocking:', !!this._reRenderBlocking);
-    if (contentReady || afterRenderOptions.skipRender) {
+    log('_executeRender: contentReady:', contentReady, 'skipRender:', !!afterRenderOptions.skipRender, 'pendingTransform:', !!this.pendingTransform, '_reRenderBlocking:', !!this._reRenderBlocking, 'needsFastPath:', needsFastPath);
+    if (afterRenderOptions.skipRender) {
       afterRender();
+    } else if (needsFastPath && contentReady) {
+      afterRender();
+    } else if (contentReady) {
+      // Content matches but give framework one frame to patch DOM attributes
+      requestAnimationFrame(() => afterRender());
     } else {
       // Poll until both current and target blocks are ready in the DOM.
       // rAF-based polling handles both sync (ready on first check) and
