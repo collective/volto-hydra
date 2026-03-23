@@ -3247,13 +3247,13 @@ export class AdminUIHelper {
       throw new Error('Could not get iframe bounding box');
     }
 
-    // Position cursor at center of bottom/top half (55%/45%) - closer to center to avoid
-    // edge detection issues where hydra.js might detect the adjacent block instead
+    // Position cursor at 65%/35% of the block — far enough from the midpoint
+    // to avoid rounding issues on small blocks (e.g. 22px tall Nuxt blocks)
     const result = {
       x: iframeRect.x + rect.x + rect.width / 2,
       y: insertAfter
-        ? iframeRect.y + rect.y + rect.height * 0.55
-        : iframeRect.y + rect.y + rect.height * 0.45,
+        ? iframeRect.y + rect.y + rect.height * 0.65
+        : iframeRect.y + rect.y + rect.height * 0.35,
     };
 
     return result;
