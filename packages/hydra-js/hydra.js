@@ -396,8 +396,13 @@ export class Bridge {
     const text = blockData?.value?.[0]?.children?.[0]?.text?.substring(0, 40);
     log(`[setFormDataFromAdmin] source: ${source}, seq: ${seq}, block: ${this.selectedBlockUid}, text: ${JSON.stringify(text)}`);
 
-    this.formData = JSON.parse(JSON.stringify(data));
-    this.lastReceivedFormData = JSON.parse(JSON.stringify(data));
+    // Detect echo: incoming data identical to what we already have.
+    // Used by _executeRender to skip unnecessary re-renders during inline editing.
+    const newJson = JSON.stringify(data);
+    this._isEchoFormData = this.formData && JSON.stringify(this.formData) === newJson;
+
+    this.formData = JSON.parse(newJson);
+    this.lastReceivedFormData = JSON.parse(newJson);
   }
 
   /**
@@ -7978,17 +7983,12 @@ export class Bridge {
 
     const blockId = this.selectedBlockUid;
     const blockEl = blockId && this.queryBlockElement(blockId);
-    const isEchoFormData = this.isInlineEditing && this.focusedFieldName
-                         && !this.blockedBlockId && !this.pendingTransform;
 
-    // Skip re-render when inline editing and both blocks are ready:
-    // - Current block: data still in formData, DOM content matches
-    //   (if data gone = block was deleted, if DOM wrong = render needed)
-    // - New block (if switching): exists in DOM and content matches
-    //   (if missing = block was added, render needed)
-    if (isEchoFormData && !afterRenderOptions.skipRender
-        && this._areBlocksReady(blockId, blockEl, afterRenderOptions)) {
-      log('_executeRender: content unchanged during inline editing, skipping re-render');
+    // Skip re-render when formData is identical to what we already have
+    // (echo from admin after inline editing). Calling the callback with
+    // unchanged data would replace DOM nodes, destroying cursor/observer.
+    if (this._isEchoFormData && !afterRenderOptions.skipRender) {
+      log('_executeRender: echo FORM_DATA (identical data), skipping re-render');
       this._renderInProgress = false;
       return;
     }
