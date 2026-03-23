@@ -1664,6 +1664,7 @@ export class Bridge {
         this.setupScrollHandler();
         this.setupResizeHandler();
         this.setupMouseActivityReporter();
+        this.setupStructuralObserver();
 
         // Add beforeunload warning to prevent accidental navigation
         window.addEventListener('beforeunload', (e) => {
@@ -4595,8 +4596,6 @@ export class Bridge {
    * @param {string} [options.adminSelectedBlockUid] - Block uid admin wants selected
    */
   afterContentRender({ transformedSelection, formatRequestId, needsBlockSwitch, adminSelectedBlockUid } = {}) {
-    this.materializeHydraComments();
-
     // Run post-render tasks synchronously if content is ready, or poll until ready.
     // Avoiding async/rAF delay prevents races where the user changes the selection
     // before restoreSlateSelection runs.
@@ -4604,10 +4603,10 @@ export class Bridge {
     const ready = !contentBlock || this.isContentReady(contentBlock);
 
     const doAfterContentRender = () => {
-        this.materializeHydraComments();
-        this.markEmptyBlocks();
-        this.applyReadonlyVisuals();
-        this.applyPlaceholders();
+        // All-blocks operations (materializeHydraComments, markEmptyBlocks,
+        // applyReadonlyVisuals, applyPlaceholders) are handled by the
+        // structural observer — it fires whenever the framework patches the
+        // DOM, so these run at the right time regardless of sync/async render.
 
         // Re-attach observers/editors for the currently selected block
         if (this.selectedBlockUid) {
@@ -5051,6 +5050,37 @@ export class Bridge {
   /**
    * Synchronous check: does the DOM content match formData right now?
    */
+  /**
+   * Checks if the current and target blocks are ready in the DOM.
+   * - Current block: if its data is in formData, check DOM content matches.
+   *   If data is gone (block deleted), check element is gone from DOM.
+   * - Target block (if switching): must exist in DOM with matching content.
+   * Returns false if any block needs rendering.
+   */
+  _areBlocksReady(blockId, blockEl, afterRenderOptions = {}) {
+    // Current block
+    if (blockId) {
+      if (!blockEl) {
+        // Block should exist but isn't in DOM yet (e.g. new empty block)
+        return false;
+      }
+      if (this.getBlockData(blockId)) {
+        // Block still in formData — DOM content must match
+        if (!this.isContentReady(blockEl)) return false;
+      } else {
+        // Block deleted from formData — element should be gone from DOM
+        return false;
+      }
+    }
+    // Target block (if switching selection)
+    const newBlockId = afterRenderOptions.adminSelectedBlockUid;
+    if (newBlockId && newBlockId !== blockId) {
+      const newEl = this.queryBlockElement(newBlockId);
+      if (!newEl || !this.isContentReady(newEl)) return false;
+    }
+    return true;
+  }
+
   isContentReady(blockElement) {
     const blockUid = blockElement.getAttribute('data-block-uid');
     const blockData = this.getBlockData(blockUid);
@@ -7793,6 +7823,42 @@ export class Bridge {
     }
   }
 
+  /**
+   * Sets up a MutationObserver on document.body that watches for structural
+   * DOM changes (childList). When the framework adds/removes block elements,
+   * this runs all-blocks operations: materializeHydraComments, markEmptyBlocks,
+   * applyReadonlyVisuals, applyPlaceholders.
+   *
+   * Separate from blockTextMutationObserver (which tracks text changes in the
+   * selected block for inline editing). This observer is never disconnected
+   * during renders — it fires whenever the framework patches the DOM.
+   * Debounced via rAF to batch rapid mutations from a single render pass.
+   */
+  setupStructuralObserver() {
+    if (this._structuralObserver) return;
+
+    let pending = false;
+    const runAllBlocksOps = () => {
+      pending = false;
+      this.materializeHydraComments();
+      this.markEmptyBlocks();
+      this.applyReadonlyVisuals();
+      this.applyPlaceholders();
+    };
+
+    this._structuralObserver = new MutationObserver(() => {
+      if (!pending) {
+        pending = true;
+        requestAnimationFrame(runAllBlocksOps);
+      }
+    });
+
+    this._structuralObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
   observeBlockTextChanges(blockElement) {
     const blockUid = blockElement.getAttribute('data-block-uid');
     log('observeBlockTextChanges called for block:', blockUid);
@@ -7910,17 +7976,18 @@ export class Bridge {
   _executeRender(callbackFn, afterRenderOptions = {}) {
     this._renderInProgress = true;
 
-    // Check if DOM already matches formData BEFORE doing anything.
-    // If content hasn't changed AND we're inline editing with no pending
-    // transform, skip the re-render entirely — calling the callback would
-    // replace DOM nodes (innerHTML swap), destroying the cursor and observer.
     const blockId = this.selectedBlockUid;
     const blockEl = blockId && this.queryBlockElement(blockId);
-    const contentAlreadyReady = !blockEl || this.isContentReady(blockEl);
     const isEchoFormData = this.isInlineEditing && this.focusedFieldName
                          && !this.blockedBlockId && !this.pendingTransform;
 
-    if (contentAlreadyReady && isEchoFormData && !afterRenderOptions.skipRender) {
+    // Skip re-render when inline editing and both blocks are ready:
+    // - Current block: data still in formData, DOM content matches
+    //   (if data gone = block was deleted, if DOM wrong = render needed)
+    // - New block (if switching): exists in DOM and content matches
+    //   (if missing = block was added, render needed)
+    if (isEchoFormData && !afterRenderOptions.skipRender
+        && this._areBlocksReady(blockId, blockEl, afterRenderOptions)) {
       log('_executeRender: content unchanged during inline editing, skipping re-render');
       this._renderInProgress = false;
       return;
@@ -7959,17 +8026,24 @@ export class Bridge {
     };
 
     // If content is already ready (sync render completed), run afterContentRender
-    // immediately to avoid yielding the event loop (prevents selection race).
-    // Otherwise wait for DOM mutation (async framework render).
-    const contentReady = !blockEl || this.isContentReady(blockEl);
+    // immediately. Otherwise wait for DOM mutation (async framework render).
+    const contentReady = this._areBlocksReady(blockId, blockEl, afterRenderOptions);
 
     log('_executeRender: contentReady:', contentReady, 'skipRender:', !!afterRenderOptions.skipRender, 'pendingTransform:', !!this.pendingTransform, '_reRenderBlocking:', !!this._reRenderBlocking);
     if (contentReady || afterRenderOptions.skipRender) {
       afterRender();
-    } else if (blockEl && (this.pendingTransform || this._reRenderBlocking)) {
-      this._waitForDomMutation(blockEl, afterRender);
     } else {
-      afterRender();
+      // Poll until both current and target blocks are ready in the DOM.
+      // rAF-based polling handles both sync (ready on first check) and
+      // async (framework renders over multiple frames) renderers.
+      const pollBlocksReady = (retries = 40) => {
+        if (this._areBlocksReady(blockId, blockId && this.queryBlockElement(blockId), afterRenderOptions) || retries <= 0) {
+          afterRender();
+        } else {
+          requestAnimationFrame(() => pollBlocksReady(retries - 1));
+        }
+      };
+      requestAnimationFrame(() => pollBlocksReady());
     }
   }
 

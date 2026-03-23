@@ -1330,12 +1330,14 @@ const Iframe = (props) => {
     // Rebuild blockPathMap to reflect the deleted block
     // Do NOT set formData here - let the useEffect update it after sending FORM_DATA
     const newBlockPathMap = buildBlockPathMap(newFormData, mergedBlocksConfig, intl);
+    const selectAfterDeleteUid = selectPrev ? selectAfterDelete : null;
     setIframeSyncState(prev => ({
       ...prev,
       blockPathMap: newBlockPathMap,
+      ...(selectAfterDeleteUid ? { pendingSelectBlockUid: selectAfterDeleteUid } : {}),
     }));
     onChangeFormData(newFormData);
-    onSelectBlock(selectPrev ? selectAfterDelete : null);
+    onSelectBlock(selectAfterDeleteUid);
     setAddNewBlockOpened(false);
     dispatch(setSidebarTab(1));
   };
