@@ -394,11 +394,8 @@ test.describe('Inline Editing - Basic', () => {
     // Wait for the correct number of blocks to be created
     await helper.waitForBlockCountToBe(initialBlocks + 1, 5000);
 
-    // Verify no processing/wait state remains on the original block after split
-    const originalEditor = iframe.locator(`[data-block-uid="${blockId}"] [data-edit-text]`);
-    if (await originalEditor.count() > 0) {
-      await expect(originalEditor).not.toHaveClass(/hydra-processing/, { timeout: 5000 });
-    }
+    // Verify no processing/wait state remains after split
+    await helper.waitForPointerUnblocked();
 
     // Check that no error toast appeared (Missing data-node-id)
     const errorToast = iframe.locator('#hydra-dev-warning');
@@ -491,9 +488,7 @@ test.describe('Inline Editing - Basic', () => {
     await expect(mergedEditor).toContainText('Second block', { timeout: 5000 });
 
     // No wait cursor should remain
-    if (await mergedEditor.count() > 0) {
-      await expect(mergedEditor).not.toHaveClass(/hydra-processing/, { timeout: 5000 });
-    }
+    await helper.waitForPointerUnblocked();
 
     // Wait for merged content to appear in the DOM before typing
     await expect(mergedEditor).toContainText('First blockSecond block', { timeout: 5000 });

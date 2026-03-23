@@ -596,6 +596,7 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     // Click the add button (should appear below the facet since data-block-add="bottom")
     const addButton = page.locator('.volto-hydra-add-button');
     await expect(addButton).toBeVisible({ timeout: 5000 });
+    await addButton.scrollIntoViewIfNeeded();
     await addButton.click();
 
     // Block chooser opens (multiple facet types + slate/image are allowed)

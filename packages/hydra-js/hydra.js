@@ -2555,12 +2555,8 @@ export class Bridge {
 
       this._ensureDocumentKeyboardBlocker();
 
-      // Visual feedback — use CSS class (survives framework re-renders better than inline style)
-      const block = this.queryBlockElement(blockId);
-      const editableField = block ? this.getOwnFirstEditableField(block) : null;
-      if (editableField) {
-        editableField.classList.add('hydra-processing');
-      }
+      // Block pointer events on whole page via injected <style> (survives innerHTML replacement)
+      this._setPointerBlocking(true);
 
       // Store pending transform to match with FORM_DATA for unblocking
       this.pendingTransform = {
@@ -2573,11 +2569,8 @@ export class Bridge {
       // Clear blocked state
       this.blockedBlockId = null;
 
-      // Clear processing state from ALL elements (not just blockId —
-      // after Enter split, blockId points to the new block, not the original)
-      document.querySelectorAll('.hydra-processing').forEach(el => {
-        el.classList.remove('hydra-processing');
-      });
+      // Unblock pointer events
+      this._setPointerBlocking(false);
 
       // Clear pending transform
       this.pendingTransform = null;
@@ -4602,14 +4595,15 @@ export class Bridge {
    * @param {string} [options.adminSelectedBlockUid] - Block uid admin wants selected
    */
   afterContentRender({ transformedSelection, formatRequestId, needsBlockSwitch, adminSelectedBlockUid } = {}) {
-    // Materialize comments immediately so data-block-uid attributes are available
-    // before any waitFor selectors run. The rAF call below handles late-arriving
-    // async framework content (React Suspense, Vue async components).
     this.materializeHydraComments();
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(async () => {
-        // Re-materialize for any async framework content that arrived after initial call
+    // Run post-render tasks synchronously if content is ready, or poll until ready.
+    // Avoiding async/rAF delay prevents races where the user changes the selection
+    // before restoreSlateSelection runs.
+    const contentBlock = this.selectedBlockUid ? this.queryBlockElement(this.selectedBlockUid) : null;
+    const ready = !contentBlock || this.isContentReady(contentBlock);
+
+    const doAfterContentRender = () => {
         this.materializeHydraComments();
         this.markEmptyBlocks();
         this.applyReadonlyVisuals();
@@ -4708,70 +4702,43 @@ export class Bridge {
         if (blockUidToProcess) {
           let blockElement = this.queryBlockElement(blockUidToProcess);
 
+          // If block is hidden, try to make it visible (carousel navigation)
           if (blockElement && this.isElementHidden(blockElement)) {
-            if (this._blockSelectorNavigating || this._navigatingToBlock) {
-              log('afterContentRender: block hidden, waiting for animation:', blockUidToProcess);
-              for (let i = 0; i < 30; i++) {
-                await new Promise((resolve) => setTimeout(resolve, 50));
-                blockElement = this.queryBlockElement(blockUidToProcess);
-                if (blockElement && !this.isElementHidden(blockElement)) {
-                  log('afterContentRender: block now visible after animation');
-                  break;
-                }
-              }
-            } else {
-              log('afterContentRender: block is hidden, trying to make visible:', blockUidToProcess);
-              const madeVisible = this.tryMakeBlockVisible(blockUidToProcess);
-              if (madeVisible) {
-                for (let i = 0; i < 10; i++) {
-                  await new Promise((resolve) => setTimeout(resolve, 50));
-                  blockElement = this.queryBlockElement(blockUidToProcess);
-                  if (blockElement && !this.isElementHidden(blockElement)) {
-                    log('afterContentRender: block now visible');
-                    break;
-                  }
-                }
-              }
+            if (!(this._blockSelectorNavigating || this._navigatingToBlock)) {
+              this.tryMakeBlockVisible(blockUidToProcess);
             }
-          }
-
-          blockElement = this.queryBlockElement(blockUidToProcess);
-
-          if (!blockElement && needsBlockSwitch) {
-            for (let retry = 0; retry < 10 && !blockElement; retry++) {
-              await new Promise(r => setTimeout(r, 100));
-              blockElement = this.queryBlockElement(blockUidToProcess);
-              log('afterContentRender: retry', retry + 1, 'finding block', blockUidToProcess, 'found:', !!blockElement);
-            }
+            // Re-query after visibility attempt
+            blockElement = this.queryBlockElement(blockUidToProcess);
           }
 
           this.ensureElementsHaveMinSize();
-          if (blockElement) {
+          if (blockElement && !this.isElementHidden(blockElement)) {
             blockHandler(blockElement);
           } else if (needsBlockSwitch) {
-            log('afterContentRender: block element not found after retries:', blockUidToProcess);
+            log('afterContentRender: block not found or hidden:', blockUidToProcess);
           }
         }
 
-        // Wait for rendered DOM content to match formData before restoring
-        // selection. On mock frontends this matches immediately; on Nuxt, Vue's
-        // reactivity may trigger secondary renders that replace DOM nodes after
-        // the double-RAF. Proceeding before the render is complete would cause
-        // restoreSlateSelection to anchor on nodes that get replaced, destroying
-        // the selection.
-        if (this.selectedBlockUid && this.formData) {
-          const contentBlock = this.queryBlockElement(this.selectedBlockUid);
-          if (contentBlock) {
-            await this.waitForContentReady(contentBlock);
-          }
-        }
+        // Content is ready — isContentReady() confirmed before calling, or
+        // pollUntilReady() polled until ready.
 
         let selectionRestored = true;
         if (transformedSelection) {
           // expectedSelectionFromAdmin was already set before the render
           // (in the FORM_DATA handler) to suppress re-render selectionchanges.
           try {
-            selectionRestored = await this.restoreSlateSelection(transformedSelection, this.formData);
+            const result = this.restoreSlateSelection(transformedSelection, this.formData);
+            // Handle both sync return and promise (async retry path)
+            if (result && typeof result.then === 'function') {
+              result.then(ok => {
+                if (!ok) {
+                  log('Selection restore failed (async) — dropping buffered events');
+                  this.eventBuffer = [];
+                }
+              }).catch(e => console.error('[HYDRA] Error restoring selection:', e));
+            } else {
+              selectionRestored = result;
+            }
           } catch (e) {
             console.error('[HYDRA] Error restoring selection:', e);
             selectionRestored = false;
@@ -4811,7 +4778,7 @@ export class Bridge {
           if (!transformedSelection && this._preRenderSelection && this._iframeFocused) {
             log('Restoring pre-render selection for buffer replay:', JSON.stringify(this._preRenderSelection));
             try {
-              await this.restoreSlateSelection(this._preRenderSelection, this.formData);
+              this.restoreSlateSelection(this._preRenderSelection, this.formData);
             } catch (e) {
               log('Pre-render selection restore failed:', e.message);
             }
@@ -4830,6 +4797,7 @@ export class Bridge {
           // Clear blocking only if no format op is pending
           if (!this.pendingTransform) {
             this.blockedBlockId = null;
+            this._setPointerBlocking(false);
           }
         }
 
@@ -4869,11 +4837,37 @@ export class Bridge {
             this.observeBlockTextChanges(currentBlockEl);
           }
         }
-        // Mark render complete AFTER observer reconnection to prevent late
-        // framework DOM patches from triggering handleTextChange
+        // Mark render complete AFTER observer reconnection
         this._renderInProgress = false;
-      });
-    });
+    };
+
+    // Also check if block-switch target exists and is visible
+    const switchBlockReady = !needsBlockSwitch || (() => {
+      const el = adminSelectedBlockUid ? this.queryBlockElement(adminSelectedBlockUid) : null;
+      return el && !this.isElementHidden(el);
+    })();
+
+    if (ready && switchBlockReady) {
+      // Content matches and block visible — run synchronously to avoid yielding
+      // the event loop (which would let user actions race with restoreSlateSelection)
+      doAfterContentRender();
+    } else {
+      // Content or block not ready — poll with rAF until framework render completes
+      const pollUntilReady = (retries = 40) => {
+        const block = this.selectedBlockUid ? this.queryBlockElement(this.selectedBlockUid) : null;
+        const contentOk = !block || this.isContentReady(block);
+        const switchOk = !needsBlockSwitch || (() => {
+          const el = adminSelectedBlockUid ? this.queryBlockElement(adminSelectedBlockUid) : null;
+          return el && !this.isElementHidden(el);
+        })();
+        if ((contentOk && switchOk) || retries <= 0) {
+          doAfterContentRender();
+        } else {
+          requestAnimationFrame(() => pollUntilReady(retries - 1));
+        }
+      };
+      requestAnimationFrame(() => pollUntilReady());
+    }
   }
 
   /**
@@ -5054,6 +5048,27 @@ export class Bridge {
    * against the formData value. Returns immediately when content matches (zero
    * cost on mock); on Nuxt/Vue waits for secondary renders to complete.
    */
+  /**
+   * Synchronous check: does the DOM content match formData right now?
+   */
+  isContentReady(blockElement) {
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    const blockData = this.getBlockData(blockUid);
+    if (!blockData) return true;
+    const editableFields = this.getEditableFields(blockElement);
+    for (const [fieldName, fieldType] of Object.entries(editableFields)) {
+      if (!this.fieldTypeIsSlate(fieldType)) continue;
+      const slateValue = blockData[fieldName];
+      if (!slateValue || !Array.isArray(slateValue)) continue;
+      const fieldEl = blockElement.querySelector(`[data-edit-text="${fieldName}"]`)
+        || (blockElement.getAttribute('data-edit-text') === fieldName ? blockElement : null);
+      if (!fieldEl) continue;
+      const domValue = this.readSlateValueFromDOM(fieldEl, slateValue);
+      if (JSON.stringify(domValue) !== JSON.stringify(slateValue)) return false;
+    }
+    return true;
+  }
+
   async waitForContentReady(blockElement, maxRetries = 20) {
     const blockUid = blockElement.getAttribute('data-block-uid');
     const blockData = this.getBlockData(blockUid);
@@ -5100,6 +5115,27 @@ export class Bridge {
         blockElement.removeAttribute('data-hydra-empty');
       }
     });
+  }
+
+  /**
+   * Blocks or unblocks pointer events on all editable text fields.
+   * Uses a <style> element injected into <head> so it survives innerHTML
+   * replacement by framework re-renders (unlike CSS classes on elements).
+   * Called during re-render blocking and format-op blocking to prevent
+   * user clicks from racing with restoreSlateSelection.
+   */
+  _setPointerBlocking(blocking) {
+    if (!this._pointerBlockStyleEl) {
+      this._pointerBlockStyleEl = document.createElement('style');
+      this._pointerBlockStyleEl.type = 'text/css';
+      document.head.appendChild(this._pointerBlockStyleEl);
+    }
+    const newCSS = blocking
+      ? 'body { pointer-events: none !important; cursor: wait !important; }'
+      : '';
+    if (this._pointerBlockStyleEl.textContent !== newCSS) {
+      this._pointerBlockStyleEl.textContent = newCSS;
+    }
   }
 
   /**
@@ -7883,6 +7919,7 @@ export class Bridge {
       this._ensureDocumentKeyboardBlocker();
       this.blockedBlockId = this.selectedBlockUid;
       this._reRenderBlocking = true;
+      this._setPointerBlocking(true);
       // Save cursor position before re-render so we can restore it when
       // no transformedSelection is provided (e.g. sidebar-originated FORM_DATA).
       // Without this, the browser resets cursor to position 0 after DOM
@@ -7905,12 +7942,17 @@ export class Bridge {
       this.afterContentRender(afterRenderOptions);
     };
 
-    // Framework renders asynchronously (Vue, React, or sync innerHTML).
-    // If a transform or re-render is pending, wait for the actual DOM
-    // mutation before proceeding with selection restore and buffer replay.
+    // If content is already ready (sync render completed), run afterContentRender
+    // immediately to avoid yielding the event loop (prevents selection race).
+    // Otherwise wait for DOM mutation (async framework render).
     const blockId = this.selectedBlockUid;
     const blockEl = blockId && this.queryBlockElement(blockId);
-    if (blockEl && !afterRenderOptions.skipRender && (this.pendingTransform || this._reRenderBlocking)) {
+    const contentReady = !blockEl || this.isContentReady(blockEl);
+
+    log('_executeRender: contentReady:', contentReady, 'skipRender:', !!afterRenderOptions.skipRender, 'pendingTransform:', !!this.pendingTransform, '_reRenderBlocking:', !!this._reRenderBlocking);
+    if (contentReady || afterRenderOptions.skipRender) {
+      afterRender();
+    } else if (blockEl && (this.pendingTransform || this._reRenderBlocking)) {
       this._waitForDomMutation(blockEl, afterRender);
     } else {
       afterRender();
@@ -7932,14 +7974,10 @@ export class Bridge {
       log('_waitForDomMutation proceed via:', source);
       callback();
     };
-    let settleRaf = null;
     const observer = new MutationObserver(() => {
-      // Wait for mutations to settle: each mutation resets the wait.
-      // Frameworks may patch DOM across multiple microtask cycles (e.g.,
-      // Vue watchers triggering a second render pass). Proceeding after
-      // one rAF with no new mutations means the framework is done.
-      if (settleRaf) cancelAnimationFrame(settleRaf);
-      settleRaf = requestAnimationFrame(() => proceed('mutation-settled'));
+      // Proceed immediately on mutation — content readiness is checked
+      // by isContentReady/pollUntilReady in afterContentRender.
+      proceed('mutation');
     });
     observer.observe(element, { childList: true, subtree: true, characterData: true });
     // Fallback if no mutation (e.g., data didn't change visible content)
@@ -8368,7 +8406,7 @@ export class Bridge {
    * @param {Object} formData - Form data with Slate JSON (containing nodeIds)
    * @returns {Promise<boolean>} true if selection was restored, false if it failed
    */
-  async restoreSlateSelection(slateSelection, formData) {
+  restoreSlateSelection(slateSelection, formData) {
     log('restoreSlateSelection called with:', JSON.stringify(slateSelection));
     if (!slateSelection || !slateSelection.anchor || !slateSelection.focus) {
       console.warn('[HYDRA] restoreSlateSelection failed: invalid selection', slateSelection);
@@ -8426,19 +8464,10 @@ export class Bridge {
         anchorElement = blockElement.querySelector(`[data-node-id="${anchorResult.nodeId}"]`);
         focusElement = blockElement.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
 
-        // If elements not found, DOM may not be ready yet (async framework render)
-        // Wait and retry — afterContentRender awaits us, so buffer replay won't
-        // run until we finish and the selection is actually restored.
         if (!anchorElement || !focusElement) {
-          log('restoreSlateSelection: nodeId elements not found, waiting for DOM');
-          await new Promise(resolve => setTimeout(resolve, 50));
-          anchorElement = blockElement.querySelector(`[data-node-id="${anchorResult.nodeId}"]`);
-          focusElement = blockElement.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
-          if (!anchorElement || !focusElement) {
-            console.warn('[HYDRA] restoreSlateSelection failed: nodeId elements not found after retry',
-              { anchorNodeId: anchorResult.nodeId, focusNodeId: focusResult.nodeId });
-            return false;
-          }
+          console.warn('[HYDRA] restoreSlateSelection failed: nodeId elements not found',
+            { anchorNodeId: anchorResult.nodeId, focusNodeId: focusResult.nodeId });
+          return false;
           log('restoreSlateSelection: elements found after retry');
         }
 
@@ -9799,9 +9828,6 @@ export class Bridge {
     style.innerHTML = `
         [contenteditable] {
           outline: 0px solid transparent;
-        }
-        .hydra-processing {
-          cursor: wait !important;
         }
         /* Placeholder text for empty editable fields — keeps them visible/clickable */
         [data-edit-text][data-placeholder][data-empty]::before {

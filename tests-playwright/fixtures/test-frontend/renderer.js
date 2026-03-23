@@ -131,24 +131,29 @@ async function renderContent(content, containerId = 'content', renderGeneration)
 
     const container = document.getElementById(containerId);
     if (!container) return;
-    // Stale check before clearing DOM
+    // Stale check before rendering
     if (renderGeneration !== undefined && renderGeneration !== window._renderGeneration) return;
-    container.innerHTML = '';
 
     const { items } = content;
     if (!items) {
         // Expected for non-block content types (Image, File, etc.)
+        container.innerHTML = '';
         return;
     }
 
+    // Build all blocks into a fragment first, then swap atomically
+    // (avoids empty DOM state between clearing and adding)
+    const fragment = document.createDocumentFragment();
     for (const item of items) {
         // Pass @uid as blockId - this becomes data-block-uid
         const blockElement = await renderBlock(item['@uid'], item);
         if (renderGeneration !== undefined && renderGeneration !== window._renderGeneration) return; // stale
         if (blockElement) {
-            container.appendChild(blockElement);
+            fragment.appendChild(blockElement);
         }
     }
+    container.innerHTML = '';
+    container.appendChild(fragment);
 }
 
 /**

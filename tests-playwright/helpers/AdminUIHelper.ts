@@ -2124,7 +2124,25 @@ export class AdminUIHelper {
    * Finds the last non-whitespace text node and places cursor at the end of it.
    * This works correctly on both mock (flat structure) and Nuxt (nested p/span structure).
    */
+  /**
+   * Wait for hydra.js pointer-events blocking to clear.
+   * During re-render and format operations, hydra.js injects a <style> with
+   * `body { pointer-events: none }` into <head>. This must be cleared before
+   * any cursor or click interaction in the iframe.
+   */
+  async waitForPointerUnblocked(timeout = 5000): Promise<void> {
+    const iframe = this.getIframe();
+    await expect(async () => {
+      const blocked = await iframe.locator('body').evaluate((body: any) => {
+        return body.ownerDocument.defaultView.getComputedStyle(body).pointerEvents === 'none';
+      });
+      expect(blocked, 'pointer-events still blocked').toBe(false);
+    }).toPass({ timeout });
+  }
+
   async moveCursorToEnd(editor: any): Promise<void> {
+    await this.waitForPointerUnblocked();
+
     await editor.evaluate((el: any) => {
       const range = el.ownerDocument.createRange();
       const selection = el.ownerDocument.defaultView.getSelection();
