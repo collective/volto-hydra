@@ -7987,7 +7987,9 @@ export class Bridge {
     // Skip re-render when formData is identical to what we already have
     // (echo from admin after inline editing). Calling the callback with
     // unchanged data would replace DOM nodes, destroying cursor/observer.
-    if (this._isEchoFormData && !afterRenderOptions.skipRender) {
+    // Never skip when blockedBlockId is set — afterContentRender must run
+    // to clear blocking state (replayBufferAndUnblock / setBlockProcessing).
+    if (this._isEchoFormData && !afterRenderOptions.skipRender && !this.blockedBlockId) {
       log('_executeRender: echo FORM_DATA (identical data), skipping re-render');
       this._renderInProgress = false;
       return;

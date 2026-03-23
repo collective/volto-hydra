@@ -22,6 +22,12 @@ import { createLog } from '../../utils/log';
 
 const log = createLog('TOOLBAR');
 
+// Buttons that open a UI for user interaction before applying a transform.
+// These should NOT flush on mousedown — the flush happens when the transform
+// actually applies. Without this, the flush blocks the iframe and the
+// FORM_DATA response may never come if the user cancels.
+const DEFERRED_BUTTONS = ['link'];
+
 /**
  * Validates if a selection is valid for the given document structure.
  * Returns true if all paths in the selection exist in the document.
@@ -1024,6 +1030,13 @@ const SyncedSlateToolbar = ({
 
       // Check if this is a re-triggered event after flush
       if (button.dataset.bypassCapture === 'true') {
+        return;
+      }
+
+      // Skip flush for deferred buttons that open a UI before transforming
+      const buttonName = button.dataset?.toolbarButton
+        || button.closest('[data-toolbar-button]')?.dataset?.toolbarButton;
+      if (DEFERRED_BUTTONS.includes(buttonName)) {
         return;
       }
 
