@@ -5076,14 +5076,15 @@ export class Bridge {
     // Current block
     if (blockId) {
       if (!blockEl) {
-        // Block should exist but isn't in DOM yet (e.g. new empty block)
-        return false;
-      }
-      if (this.getBlockData(blockId)) {
-        // Block still in formData — DOM content must match
+        // Block not in DOM. If data is also gone from formData, the block
+        // was deleted — that's the correct state (ready). If data exists,
+        // the block hasn't rendered yet (not ready).
+        if (this.getBlockData(blockId)) return false;
+      } else if (this.getBlockData(blockId)) {
+        // Block in DOM and in formData — DOM content must match
         if (!this.isContentReady(blockEl)) return false;
       } else {
-        // Block deleted from formData — element should be gone from DOM
+        // Block in DOM but deleted from formData — element should be gone
         return false;
       }
     }
