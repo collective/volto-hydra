@@ -7910,6 +7910,22 @@ export class Bridge {
   _executeRender(callbackFn, afterRenderOptions = {}) {
     this._renderInProgress = true;
 
+    // Check if DOM already matches formData BEFORE doing anything.
+    // If content hasn't changed AND we're inline editing with no pending
+    // transform, skip the re-render entirely — calling the callback would
+    // replace DOM nodes (innerHTML swap), destroying the cursor and observer.
+    const blockId = this.selectedBlockUid;
+    const blockEl = blockId && this.queryBlockElement(blockId);
+    const contentAlreadyReady = !blockEl || this.isContentReady(blockEl);
+    const isEchoFormData = this.isInlineEditing && this.focusedFieldName
+                         && !this.blockedBlockId && !this.pendingTransform;
+
+    if (contentAlreadyReady && isEchoFormData && !afterRenderOptions.skipRender) {
+      log('_executeRender: content unchanged during inline editing, skipping re-render');
+      this._renderInProgress = false;
+      return;
+    }
+
     // Block keyboard input during re-render to prevent keystrokes hitting
     // detached DOM elements. The re-render callback replaces innerHTML, which
     // destroys the focused element; any keystroke arriving between now and
@@ -7945,8 +7961,6 @@ export class Bridge {
     // If content is already ready (sync render completed), run afterContentRender
     // immediately to avoid yielding the event loop (prevents selection race).
     // Otherwise wait for DOM mutation (async framework render).
-    const blockId = this.selectedBlockUid;
-    const blockEl = blockId && this.queryBlockElement(blockId);
     const contentReady = !blockEl || this.isContentReady(blockEl);
 
     log('_executeRender: contentReady:', contentReady, 'skipRender:', !!afterRenderOptions.skipRender, 'pendingTransform:', !!this.pendingTransform, '_reRenderBlocking:', !!this._reRenderBlocking);
@@ -8022,8 +8036,14 @@ export class Bridge {
    * @returns {HTMLElement|null}
    */
   queryBlockElement(uid) {
-    const all = document.querySelectorAll(`[data-block-uid="${uid}"]`);
-    if (all.length === 0) return null;
+    let all = document.querySelectorAll(`[data-block-uid="${uid}"]`);
+    if (all.length === 0) {
+      // Block not found — frontend may use hydra comments instead of
+      // data attributes. Materialize any comments and retry.
+      this.materializeHydraComments();
+      all = document.querySelectorAll(`[data-block-uid="${uid}"]`);
+      if (all.length === 0) return null;
+    }
     if (all.length === 1) return all[0];
     for (const el of all) {
       if (!this.isElementHidden(el)) return el;
