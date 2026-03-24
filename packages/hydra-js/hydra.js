@@ -5086,28 +5086,42 @@ export class Bridge {
    * Returns false if any block needs rendering.
    */
   _areBlocksReady(blockId, blockEl, afterRenderOptions = {}) {
-    // Current block
+    // Determine status of current block
+    let currentReady = true; // Default: no current block = ready
     if (blockId) {
       if (!blockEl) {
-        // Block not in DOM. If data is also gone from formData, the block
-        // was deleted — that's the correct state (ready). If data exists,
-        // the block hasn't rendered yet (not ready).
-        if (this.getBlockData(blockId)) return false;
+        // Not in DOM — deleted (data gone) = ready, otherwise not rendered yet
+        currentReady = !this.getBlockData(blockId);
       } else if (this.getBlockData(blockId)) {
-        // Block in DOM and in formData — DOM content must match
-        if (!this.isContentReady(blockEl)) return false;
+        currentReady = this.isContentReady(blockEl);
       } else {
-        // Block in DOM but deleted from formData — element should be gone
-        return false;
+        currentReady = false; // In DOM but data gone — stale element
       }
     }
-    // Target block (if switching selection)
+
+    // Determine status of target block (if switching selection)
     const newBlockId = afterRenderOptions.adminSelectedBlockUid;
-    if (newBlockId && newBlockId !== blockId) {
-      const newEl = this.queryBlockElement(newBlockId);
-      if (!newEl || !this.isContentReady(newEl)) return false;
+    if (!newBlockId || newBlockId === blockId) {
+      return currentReady;
     }
-    return true;
+
+    const newEl = this.queryBlockElement(newBlockId);
+    const targetVisible = newEl && !this.isElementHidden(newEl);
+    const targetReady = targetVisible && this.isContentReady(newEl);
+
+    if (currentReady && targetReady) return true;
+
+    // At least one block is ready = framework has rendered.
+    // The other is missing/hidden — carousel only shows one at a time.
+    // Navigate to make the target visible.
+    if ((currentReady || targetReady) && newEl && !targetVisible) {
+      if (!this._navigatingToBlock) {
+        this.tryMakeBlockVisible(newBlockId);
+      }
+    }
+
+    // Target visible and content-ready is what we need to proceed
+    return targetReady;
   }
 
   isContentReady(blockElement) {
@@ -8094,11 +8108,38 @@ export class Bridge {
     const needsFastPath = this.pendingTransform
       || (this._reRenderBlocking && this._iframeFocused && !isStructuralChange);
 
-    log('_executeRender: contentReady:', contentReady, 'skipRender:', !!afterRenderOptions.skipRender, 'pendingTransform:', !!this.pendingTransform, '_reRenderBlocking:', !!this._reRenderBlocking, 'needsFastPath:', needsFastPath);
+    // Poll until blocks are ready, then call afterRender.
+    const pollBlocksReady = (retries = 60) => {
+      const ready = this._areBlocksReady(blockId, blockId && this.queryBlockElement(blockId), afterRenderOptions);
+      if (ready || retries <= 0) {
+        const elapsed = this._renderStartTime ? (performance.now() - this._renderStartTime).toFixed(0) : '?';
+        log('pollBlocksReady: DONE +' + elapsed + 'ms retries=' + (60 - retries) + ' ready=' + ready);
+        afterRender();
+      } else {
+        requestAnimationFrame(() => pollBlocksReady(retries - 1));
+      }
+    };
+
+    log('_executeRender: contentReady:', contentReady, 'skipRender:', !!afterRenderOptions.skipRender, 'pendingTransform:', !!this.pendingTransform, '_reRenderBlocking:', !!this._reRenderBlocking, 'needsFastPath:', needsFastPath, 'isStructuralChange:', isStructuralChange);
     if (afterRenderOptions.skipRender) {
       afterRender();
     } else if (needsFastPath && contentReady) {
       afterRender();
+    } else if (isStructuralChange) {
+      // Structural change (block add/delete/move): wait for the DOM to settle
+      // (framework finishes rendering), then poll for target block readiness.
+      // Can't trust contentReady here — old DOM may still match while the
+      // framework hasn't rendered the new/deleted block yet.
+      const settleTimeout = setTimeout(() => {
+        if (this._onDomSettled) {
+          this._onDomSettled = null;
+          pollBlocksReady();
+        }
+      }, 200);
+      this._onDomSettled = () => {
+        clearTimeout(settleTimeout);
+        pollBlocksReady();
+      };
     } else if (contentReady) {
       // Content matches but the framework may still be rendering async
       // (innerHTML replacement, Vue patching, etc.). Wait for the structural
@@ -8116,19 +8157,7 @@ export class Bridge {
         afterRender();
       };
     } else {
-      // Poll until both current and target blocks are ready in the DOM.
-      // rAF-based polling handles both sync (ready on first check) and
-      // async (framework renders over multiple frames) renderers.
-      const pollBlocksReady = (retries = 40) => {
-        const ready = this._areBlocksReady(blockId, blockId && this.queryBlockElement(blockId), afterRenderOptions);
-        if (ready || retries <= 0) {
-          const elapsed = this._renderStartTime ? (performance.now() - this._renderStartTime).toFixed(0) : '?';
-          log('pollBlocksReady: DONE +' + elapsed + 'ms retries=' + (40 - retries) + ' ready=' + ready);
-          afterRender();
-        } else {
-          requestAnimationFrame(() => pollBlocksReady(retries - 1));
-        }
-      };
+      // Content not ready — poll until ready
       requestAnimationFrame(() => pollBlocksReady());
     }
   }

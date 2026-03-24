@@ -295,6 +295,11 @@ const getUrlWithAdminParams = (url, token, isEdit) => {
   if (isEdit) {
     params._edit = 'true';
   }
+  // Forward debug param to iframe so hydra.js enables logging
+  const adminUrl = new URL(window.location.href);
+  if (adminUrl.searchParams.has('_hydra_debug')) {
+    params._hydra_debug = '1';
+  }
   return addUrlParams(`${url}`, params, contentPath);
 };
 function _isObject(item) {
@@ -1100,7 +1105,7 @@ const Iframe = (props) => {
         const refIndex = existingItems.findIndex(item => item[idFld] === blockId);
         const position = action === 'after' ? refIndex + 1 : refIndex;
 
-        blockData = applyBlockDefaultsWithContext(blockData, {
+          blockData = applyBlockDefaultsWithContext(blockData, {
           position,
           insertAfter: action === 'after',
           items: existingItems,

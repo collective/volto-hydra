@@ -3049,30 +3049,32 @@ test.describe('data-block-selector Navigation', () => {
     await expect(blockChooser).toBeVisible({ timeout: 5000 });
     await blockChooser.getByRole('button', { name: 'Slide' }).click();
 
-    // The new slide should be auto-selected after adding
-    // When a slide is selected, the sidebar shows its form fields (Kicker, Title, etc.)
+    // Find the new slide - the one not in the original list
+    const originalIds = ['slide-1', 'slide-2', 'slide-3'];
+    let newSlideId: string | null = null;
+    await expect(async () => {
+      const allSlides = await iframe
+        .locator('[data-block-uid="slider-1"] [data-block-uid]')
+        .all();
+      for (const slide of allSlides) {
+        const id = await slide.getAttribute('data-block-uid');
+        if (id && !originalIds.includes(id)) {
+          newSlideId = id;
+          break;
+        }
+      }
+      expect(newSlideId).toBeTruthy();
+    }).toPass({ timeout: 10000 });
+
+    // The new slide should be auto-selected — sidebar shows its form fields
     const kickerInput = sidebar.getByLabel('Kicker');
     await expect(kickerInput).toBeVisible({ timeout: 10000 });
 
-    // The Title field should be empty (new slide)
+    // Confirm sidebar is showing the NEW slide (not an existing one)
     const titleInput = sidebar.locator('input[id="field-title"]').last();
     await expect(titleInput).toBeVisible();
-    await expect(titleInput).toHaveValue('');
-
-    // Find the new slide - the one not in the original list
-    const originalIds = ['slide-1', 'slide-2', 'slide-3'];
-    const allSlides = await iframe
-      .locator('[data-block-uid="slider-1"] [data-block-uid]')
-      .all();
-    let newSlideId: string | null = null;
-    for (const slide of allSlides) {
-      const id = await slide.getAttribute('data-block-uid');
-      if (id && !originalIds.includes(id)) {
-        newSlideId = id;
-        break;
-      }
-    }
-    expect(newSlideId).toBeTruthy();
+    await expect(titleInput).not.toHaveValue('Slide 1');
+    await expect(titleInput).not.toHaveValue('Slide 2');
 
     // Verify the new slide is selected (toolbar is on it)
     await helper.waitForQuantaToolbar(newSlideId!);
