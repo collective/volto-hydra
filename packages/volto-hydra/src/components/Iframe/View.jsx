@@ -3498,7 +3498,8 @@ const Iframe = (props) => {
             onChangeFormData={(newFieldValue, selection, formatRequestId, extraBlocks) => {
               log('onChangeFormData callback called, formatRequestId:', formatRequestId,
                 'hasFieldValue:', newFieldValue != null, 'extraBlocks:', extraBlocks?.length || 0,
-                'selectionPath:', JSON.stringify(selection?.anchor?.path), 'selectionOffset:', selection?.anchor?.offset);
+                'selectionPath:', JSON.stringify(selection?.anchor?.path), 'selectionOffset:', selection?.anchor?.offset,
+                'value[0].children:', JSON.stringify(newFieldValue?.[0]?.children?.map(c => c.type ? {type: c.type, text: c.children?.[0]?.text} : {text: c.text?.substring(0, 20)})));
 
               // Apply field value change and/or extra blocks to the latest
               // iframeSyncState (via prev), not the stale form prop snapshot.

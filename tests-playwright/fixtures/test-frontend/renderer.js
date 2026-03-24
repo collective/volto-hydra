@@ -132,26 +132,31 @@ async function renderContent(content, containerId = 'content', renderGeneration)
     const container = document.getElementById(containerId);
     if (!container) return;
     // Stale check before rendering
-    if (renderGeneration !== undefined && renderGeneration !== window._renderGeneration) return;
+    if (renderGeneration !== undefined && renderGeneration !== window._renderGeneration) {
+        tfLog('renderContent: STALE gen=' + renderGeneration + ' current=' + window._renderGeneration);
+        return;
+    }
 
     const { items } = content;
     if (!items) {
-        // Expected for non-block content types (Image, File, etc.)
         container.innerHTML = '';
         return;
     }
 
     // Build all blocks into a fragment first, then swap atomically
-    // (avoids empty DOM state between clearing and adding)
+    tfLog('renderContent: START gen=' + renderGeneration + ' items=' + items.length + ' t=' + performance.now().toFixed(0));
     const fragment = document.createDocumentFragment();
     for (const item of items) {
-        // Pass @uid as blockId - this becomes data-block-uid
         const blockElement = await renderBlock(item['@uid'], item);
-        if (renderGeneration !== undefined && renderGeneration !== window._renderGeneration) return; // stale
+        if (renderGeneration !== undefined && renderGeneration !== window._renderGeneration) {
+            tfLog('renderContent: STALE mid-loop gen=' + renderGeneration + ' current=' + window._renderGeneration);
+            return;
+        }
         if (blockElement) {
             fragment.appendChild(blockElement);
         }
     }
+    tfLog('renderContent: SWAP gen=' + renderGeneration + ' t=' + performance.now().toFixed(0));
     container.innerHTML = '';
     container.appendChild(fragment);
 }

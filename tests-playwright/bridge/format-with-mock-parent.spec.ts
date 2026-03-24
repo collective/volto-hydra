@@ -335,11 +335,13 @@ test.describe('Inline Editing with Mock Parent', () => {
     expect(html).toContain('Text');
     expect(html).toContain('to format');
 
-    // Verify selection is restored (should still select "Text")
-    const selectedText = await editable.evaluate((el) => {
-      return el.ownerDocument.defaultView.getSelection()?.toString() || '';
-    });
-    expect(selectedText).toBe('Text');
+    // Verify selection is restored within 500ms (should still select "Text")
+    await expect(async () => {
+      const selectedText = await editable.evaluate((el: any) => {
+        return el.ownerDocument.defaultView.getSelection()?.toString() || '';
+      });
+      expect(selectedText).toBe('Text');
+    }).toPass({ timeout: 500 });
   });
 
   test('should exchange correct postMessage types', async ({ helper, page }) => {

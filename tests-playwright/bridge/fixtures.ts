@@ -37,6 +37,15 @@ const test = base.extend<{ helper: AdminUIHelper }>({
     await page.goto(`http://localhost:8889/mock-parent.html${frontend}`);
     await helper.waitForIframeReady();
     await helper.waitForBlockSelected('mock-block-1');
+    // Wait for render to fully settle — content must stop changing
+    const iframe = helper.getIframe();
+    let prevHtml: string | null = null;
+    await expect(async () => {
+      const html = await iframe.locator('#content, main').first().innerHTML();
+      const settled = prevHtml !== null && html === prevHtml && html.length > 0;
+      prevHtml = html;
+      expect(settled).toBe(true);
+    }).toPass({ timeout: 5000, intervals: [100, 200, 300] });
     await use(helper);
   },
 });

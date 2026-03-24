@@ -262,9 +262,14 @@ test.describe('Inline Editing - Formatting', () => {
     await editor.press('ControlOrMeta+b');
 
     // Verify "test" is now bold in the HTML
-    // Note: We don't check button active state as selection may be lost after hotkey.
-    // The actual verification is that the text IS formatted, not the button state.
     await helper.waitForFormattedText(editor, /test/, 'bold', { timeout: 10000 });
+
+    // Selection must be restored within 500ms of formatting appearing
+    await expect(async () => {
+      const sel = await editor.evaluate((el: any) =>
+        el.ownerDocument.defaultView.getSelection()?.toString() || '');
+      expect(sel).toBe('test');
+    }).toPass({ timeout: 500 });
   });
 
   test('should handle bolding same text twice without path error', async ({ page }) => {

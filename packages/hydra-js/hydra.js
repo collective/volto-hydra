@@ -4611,13 +4611,13 @@ export class Bridge {
    * @param {string} [options.adminSelectedBlockUid] - Block uid admin wants selected
    */
   afterContentRender({ transformedSelection, formatRequestId, needsBlockSwitch, adminSelectedBlockUid } = {}) {
-    // Run post-render tasks synchronously if content is ready, or poll until ready.
-    // Avoiding async/rAF delay prevents races where the user changes the selection
-    // before restoreSlateSelection runs.
-    const contentBlock = this.selectedBlockUid ? this.queryBlockElement(this.selectedBlockUid) : null;
-    const ready = !contentBlock || this.isContentReady(contentBlock);
+    // _executeRender already ensured content is ready before calling us.
+    // No polling needed here — just run the post-render tasks.
 
     const doAfterContentRender = () => {
+        const elapsed = this._renderStartTime ? (performance.now() - this._renderStartTime).toFixed(0) : '?';
+        log('doAfterContentRender START +' + elapsed + 'ms');
+
         // All-blocks operations (materializeHydraComments, markEmptyBlocks,
         // applyReadonlyVisuals, applyPlaceholders) are handled by the
         // structural observer — it fires whenever the framework patches the
@@ -4855,38 +4855,9 @@ export class Bridge {
         this._renderInProgress = false;
     };
 
-    // Also check if block-switch target exists and is visible
-    const switchBlockReady = !needsBlockSwitch || (() => {
-      const el = adminSelectedBlockUid ? this.queryBlockElement(adminSelectedBlockUid) : null;
-      return el && !this.isElementHidden(el);
-    })();
-
-    if (ready && switchBlockReady) {
-      // Content matches and block visible — run synchronously to avoid yielding
-      // the event loop (which would let user actions race with restoreSlateSelection)
-      doAfterContentRender();
-    } else {
-      // Content or block not ready — poll with rAF until framework render completes
-      const pollUntilReady = (retries = 40) => {
-        const block = this.selectedBlockUid ? this.queryBlockElement(this.selectedBlockUid) : null;
-        const contentOk = !block || this.isContentReady(block);
-        const switchEl = adminSelectedBlockUid ? this.queryBlockElement(adminSelectedBlockUid) : null;
-        const switchOk = !needsBlockSwitch || (switchEl && !this.isElementHidden(switchEl));
-
-        // If block exists but is hidden (carousel slide), navigate to it
-        if (needsBlockSwitch && switchEl && this.isElementHidden(switchEl)
-            && !this._navigatingToBlock) {
-          this.tryMakeBlockVisible(adminSelectedBlockUid);
-        }
-
-        if ((contentOk && switchOk) || retries <= 0) {
-          doAfterContentRender();
-        } else {
-          requestAnimationFrame(() => pollUntilReady(retries - 1));
-        }
-      };
-      requestAnimationFrame(() => pollUntilReady());
-    }
+    // _executeRender already ensured content is ready (via polling,
+    // settlement, or fast path) before calling afterContentRender.
+    doAfterContentRender();
   }
 
   /**
@@ -5116,7 +5087,15 @@ export class Bridge {
         const slateValue = blockData[fieldName];
         if (!slateValue || !Array.isArray(slateValue)) continue;
         const domValue = this.readSlateValueFromDOM(fieldEl, slateValue);
-        if (JSON.stringify(domValue) !== JSON.stringify(slateValue)) return false;
+        const domStr = JSON.stringify(domValue);
+        const expStr = JSON.stringify(slateValue);
+        if (domStr !== expStr) {
+          log('isContentReady MISMATCH:', blockUid, fieldName, '+' + (this._renderStartTime ? (performance.now() - this._renderStartTime).toFixed(0) : '?') + 'ms');
+          log('  DOM:', domStr?.substring(0, 300));
+          log('  EXP:', expStr?.substring(0, 300));
+          log('  HTML:', fieldEl.innerHTML?.substring(0, 300));
+          return false;
+        }
       } else {
         // Non-slate text fields: compare using same read as handleTextChange
         const resolved = this.resolveFieldPath(fieldName, blockUid);
@@ -8013,6 +7992,7 @@ export class Bridge {
    */
   _executeRender(callbackFn, afterRenderOptions = {}) {
     this._renderInProgress = true;
+    this._renderStartTime = performance.now();
 
     const blockId = this.selectedBlockUid;
     const blockEl = blockId && this.queryBlockElement(blockId);
@@ -8099,7 +8079,10 @@ export class Bridge {
       // rAF-based polling handles both sync (ready on first check) and
       // async (framework renders over multiple frames) renderers.
       const pollBlocksReady = (retries = 40) => {
-        if (this._areBlocksReady(blockId, blockId && this.queryBlockElement(blockId), afterRenderOptions) || retries <= 0) {
+        const ready = this._areBlocksReady(blockId, blockId && this.queryBlockElement(blockId), afterRenderOptions);
+        if (ready || retries <= 0) {
+          const elapsed = this._renderStartTime ? (performance.now() - this._renderStartTime).toFixed(0) : '?';
+          log('pollBlocksReady: DONE +' + elapsed + 'ms retries=' + (40 - retries) + ' ready=' + ready);
           afterRender();
         } else {
           requestAnimationFrame(() => pollBlocksReady(retries - 1));
@@ -8697,12 +8680,18 @@ export class Bridge {
           return null; // Not a ZWS case, use normal positioning
         };
 
-        // Try ZWS positioning first
-        if (anchorResult.parentChildren) {
-          anchorPos = ensureZwsPosition(anchorResult, slateSelection.anchor.offset, anchorResult.parentChildren);
-        }
-        if (focusResult.parentChildren) {
-          focusPos = ensureZwsPosition(focusResult, slateSelection.focus.offset, focusResult.parentChildren);
+        // ZWS cursor-exit positioning only for collapsed selections (caret).
+        // Range selections must not create ZWS — it would shift the focus
+        // and include the ZWS character in the selected text.
+        const isCollapsed = slateSelection.anchor.path.toString() === slateSelection.focus.path.toString()
+          && slateSelection.anchor.offset === slateSelection.focus.offset;
+        if (isCollapsed) {
+          if (anchorResult.parentChildren) {
+            anchorPos = ensureZwsPosition(anchorResult, slateSelection.anchor.offset, anchorResult.parentChildren);
+          }
+          if (focusResult.parentChildren) {
+            focusPos = ensureZwsPosition(focusResult, slateSelection.focus.offset, focusResult.parentChildren);
+          }
         }
 
         // Fall back to offset calculation for non-ZWS cases
