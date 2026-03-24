@@ -4741,18 +4741,7 @@ export class Bridge {
           // expectedSelectionFromAdmin was already set before the render
           // (in the FORM_DATA handler) to suppress re-render selectionchanges.
           try {
-            const result = this.restoreSlateSelection(transformedSelection, this.formData);
-            // Handle both sync return and promise (async retry path)
-            if (result && typeof result.then === 'function') {
-              result.then(ok => {
-                if (!ok) {
-                  log('Selection restore failed (async) — dropping buffered events');
-                  this.eventBuffer = [];
-                }
-              }).catch(e => console.error('[HYDRA] Error restoring selection:', e));
-            } else {
-              selectionRestored = result;
-            }
+            selectionRestored = this.restoreSlateSelection(transformedSelection, this.formData);
           } catch (e) {
             console.error('[HYDRA] Error restoring selection:', e);
             selectionRestored = false;
@@ -8543,7 +8532,7 @@ export class Bridge {
    * Restore cursor/selection from Slate selection format.
    * @param {Object} slateSelection - Slate selection object with anchor and focus
    * @param {Object} formData - Form data with Slate JSON (containing nodeIds)
-   * @returns {Promise<boolean>} true if selection was restored, false if it failed
+   * @returns {boolean} true if selection was restored, false if it failed
    */
   restoreSlateSelection(slateSelection, formData) {
     log('restoreSlateSelection called with:', JSON.stringify(slateSelection));
@@ -8607,7 +8596,6 @@ export class Bridge {
           console.warn('[HYDRA] restoreSlateSelection failed: nodeId elements not found',
             { anchorNodeId: anchorResult.nodeId, focusNodeId: focusResult.nodeId });
           return false;
-          log('restoreSlateSelection: elements found after retry');
         }
 
         log('restoreSlateSelection: looking for nodeIds', {
