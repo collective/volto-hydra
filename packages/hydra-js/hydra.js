@@ -5124,12 +5124,10 @@ export class Bridge {
         const slateValue = blockData[fieldName];
         if (!slateValue || !Array.isArray(slateValue)) continue;
         const domValue = this.readSlateValueFromDOM(fieldEl, slateValue);
-        const domStr = JSON.stringify(domValue);
-        const expStr = JSON.stringify(slateValue);
-        if (domStr !== expStr) {
+        if (!this._deepEqual(domValue, slateValue)) {
           log('isContentReady MISMATCH:', blockUid, fieldName, '+' + (this._renderStartTime ? (performance.now() - this._renderStartTime).toFixed(0) : '?') + 'ms');
-          log('  DOM:', domStr?.substring(0, 300));
-          log('  EXP:', expStr?.substring(0, 300));
+          log('  DOM:', JSON.stringify(domValue)?.substring(0, 300));
+          log('  EXP:', JSON.stringify(slateValue)?.substring(0, 300));
           log('  HTML:', fieldEl.innerHTML?.substring(0, 300));
           return false;
         }
@@ -5160,16 +5158,14 @@ export class Bridge {
         || (blockElement.getAttribute('data-edit-text') === fieldName ? blockElement : null);
       if (!fieldEl) continue;
 
-      const expected = JSON.stringify(slateValue);
       for (let retry = 0; retry < maxRetries; retry++) {
         const domValue = this.readSlateValueFromDOM(fieldEl, slateValue);
-        const domStr = JSON.stringify(domValue);
-        if (domStr === expected) {
+        if (this._deepEqual(domValue, slateValue)) {
           log('waitForContentReady: MATCH on retry', retry, 'innerHTML:', fieldEl.innerHTML?.substring(0, 200));
           break;
         }
         if (retry === 0) {
-          log('waitForContentReady: content mismatch, waiting for render to complete. DOM:', fieldEl.innerHTML?.substring(0, 200), 'expected:', expected.substring(0, 100));
+          log('waitForContentReady: content mismatch, waiting for render to complete. DOM:', fieldEl.innerHTML?.substring(0, 200), 'expected:', JSON.stringify(slateValue).substring(0, 100));
         }
         await new Promise(r => requestAnimationFrame(r));
       }
@@ -9134,6 +9130,11 @@ export class Bridge {
     }
   }
 
+  /** Delegate to standalone deepEqual for key-order-independent comparison. */
+  _deepEqual(a, b) {
+    return deepEqual(a, b);
+  }
+
   /**
    * Get formData with nodeIds stripped for sending to Admin UI
    * NodeIds are internal to hydra.js for DOM<->Slate translation
@@ -9221,10 +9222,8 @@ export class Bridge {
     const copyB = JSON.parse(JSON.stringify(fieldB));
     this.resetJsonNodeIds(copyA);
     this.resetJsonNodeIds(copyB);
-    const strA = JSON.stringify(copyA);
-    const strB = JSON.stringify(copyB);
-    const isEqual = strA === strB;
-    log('focusedFieldValuesEqual:', isEqual, 'A:', strA.substring(0, 100), 'B:', strB.substring(0, 100));
+    const isEqual = deepEqual(copyA, copyB);
+    log('focusedFieldValuesEqual:', isEqual, 'A:', JSON.stringify(copyA).substring(0, 100), 'B:', JSON.stringify(copyB).substring(0, 100));
     return isEqual;
   }
 
@@ -11262,6 +11261,34 @@ export function isTextEditableFieldType(fieldType) {
 }
 
 /**
+ * Key-order-independent deep equality check for JSON-like objects.
+ * JSON.stringify comparison fails when the same data has different key ordering
+ * (e.g., Plone API returns {type, children} but Slate produces {children, type}).
+ */
+export function deepEqual(a, b) {
+  if (a === b) return true;
+  if (a == null || b == null) return a === b;
+  if (typeof a !== typeof b) return false;
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!deepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  if (typeof a === 'object') {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    for (const k of keysA) {
+      if (!b.hasOwnProperty(k) || !deepEqual(a[k], b[k])) return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
  * Compare two formData objects for content equality, ignoring _editSequence.
  * Used to detect if form content has actually changed vs just metadata.
  * @param {Object} formDataA - First formData object
@@ -11272,7 +11299,7 @@ export function formDataContentEqual(formDataA, formDataB) {
   if (!formDataA || !formDataB) return formDataA === formDataB;
   const { _editSequence: seqA, ...contentA } = formDataA;
   const { _editSequence: seqB, ...contentB } = formDataB;
-  return JSON.stringify(contentA) === JSON.stringify(contentB);
+  return deepEqual(contentA, contentB);
 }
 
 /**
