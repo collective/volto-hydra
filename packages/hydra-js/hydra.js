@@ -441,6 +441,25 @@ export class Bridge {
   }
 
   /**
+   * Get the resolved schema for a block from its blockPathMap entry.
+   * Looks up the deduplicated schema via _schemaRef in blockPathMap._schemas.
+   */
+  getBlockSchema(blockUid) {
+    const pathInfo = this.blockPathMap?.[blockUid];
+    if (!pathInfo?._schemaRef) {
+      if (pathInfo) log('getBlockSchema: no _schemaRef for', blockUid, 'keys:', Object.keys(pathInfo));
+      return null;
+    }
+    if (!this.blockPathMap?._schemas) {
+      log('getBlockSchema: no _schemas in blockPathMap');
+      return null;
+    }
+    const schema = this.blockPathMap._schemas[pathInfo._schemaRef];
+    if (!schema) log('getBlockSchema: schema not found for ref:', pathInfo._schemaRef, 'available:', Object.keys(this.blockPathMap._schemas));
+    return schema || null;
+  }
+
+  /**
    * Get the block type for a given block ID.
    * Uses blockPathMap as the single source of truth (works for both regular blocks and object_list items).
    * @param {string} blockId - The block ID
@@ -1982,6 +2001,13 @@ export class Bridge {
                 'formatRequestId:', event.data.formatRequestId,
                 'selectedBlockUid:', event.data.selectedBlockUid);
             }
+            if (event.data._sentAt) {
+              log('FORM_DATA postMessage delivery:', (Date.now() - event.data._sentAt) + 'ms');
+            }
+            if (this._transformSentAt && event.data.formatRequestId) {
+              log('FORM_DATA total round-trip:', (performance.now() - this._transformSentAt).toFixed(0) + 'ms');
+              this._transformSentAt = null;
+            }
             this.setFormDataFromAdmin(event.data.data, 'FORM_DATA', event.data.blockPathMap);
 
             // === Non-stale FORM_DATA - apply it fully ===
@@ -1991,10 +2017,11 @@ export class Bridge {
             this.addNodeIdsToAllSlateFields();
 
             // Detect echo: compare after addNodeIdsToAllSlateFields so both
-            // old and new formData have nodeIds. Without this, nodeId
-            // differences cause false negatives (echo not detected).
+            // old and new formData have nodeIds.
+            const echoT0 = performance.now();
             this._isEchoFormData = this._prevFormDataJson
               && JSON.stringify(this.formData) === this._prevFormDataJson;
+            log('echo detection took', (performance.now() - echoT0).toFixed(1) + 'ms, isEcho:', this._isEchoFormData);
 
             // Extract formatRequestId early so it's available in rAF callbacks
             const formatRequestId = event.data.formatRequestId;
@@ -4742,6 +4769,27 @@ export class Bridge {
           // (in the FORM_DATA handler) to suppress re-render selectionchanges.
           try {
             selectionRestored = this.restoreSlateSelection(transformedSelection, this.formData);
+            const sel = document.getSelection();
+            log('restoreSlateSelection result:', selectionRestored,
+              'selection:', sel?.toString()?.substring(0, 30),
+              'collapsed:', sel?.isCollapsed,
+              'anchorNode:', sel?.anchorNode?.nodeName,
+              'anchorOffset:', sel?.anchorOffset,
+              'focusOffset:', sel?.focusOffset);
+            // Track selection changes after restore to find what clears it
+            const trackTimer = setInterval(() => {
+              const s = document.getSelection();
+              const text = s?.toString() || '';
+              if (text !== this._lastTrackedSel) {
+                log('SELECTION SHIFTED to:', JSON.stringify(text?.substring(0, 30)),
+                  'collapsed:', s?.isCollapsed,
+                  'anchorNode:', s?.anchorNode?.nodeName,
+                  '+' + (performance.now() - this._renderStartTime).toFixed(0) + 'ms');
+                this._lastTrackedSel = text;
+              }
+            }, 16);
+            setTimeout(() => clearInterval(trackTimer), 2000);
+            this._lastTrackedSel = sel?.toString() || '';
           } catch (e) {
             console.error('[HYDRA] Error restoring selection:', e);
             selectionRestored = false;
@@ -7200,8 +7248,7 @@ export class Bridge {
 
           // Focus the contenteditable element for blocks with editable fields
           // This includes slate, string, and textarea field types
-          const pathInfo = this.blockPathMap?.[uid];
-          const schemaProps = pathInfo?.resolvedBlockSchema?.properties;
+          const schemaProps = this.getBlockSchema(uid)?.properties;
           const hasEditableFields = schemaProps && Object.keys(schemaProps).length > 0;
 
           if (hasEditableFields) {
@@ -7838,10 +7885,19 @@ export class Bridge {
     let pendingRAF = null;
     const runAllBlocksOps = () => {
       pendingRAF = null;
+      const t0 = performance.now();
       this.materializeHydraComments();
+      const t1 = performance.now();
       this.markEmptyBlocks();
+      const t2 = performance.now();
       this.applyReadonlyVisuals();
+      const t3 = performance.now();
       this.applyPlaceholders();
+      const t4 = performance.now();
+      const total = t4 - t0;
+      if (total > 5) {
+        log('runAllBlocksOps:', total.toFixed(0) + 'ms (materialize:', (t1-t0).toFixed(0), 'empty:', (t2-t1).toFixed(0), 'readonly:', (t3-t2).toFixed(0), 'placeholders:', (t4-t3).toFixed(0) + ')');
+      }
       // Signal DOM settled — but only if no new mutations arrived during
       // this rAF callback. If new mutations come, the observer will fire
       // again and we'll wait for the next settlement.
@@ -8363,6 +8419,7 @@ export class Bridge {
    * Uses blockPathMap to find all blocks, including those in containers
    */
   addNodeIdsToAllSlateFields() {
+    const t0 = performance.now();
     if (!this.formData) return;
 
     if (!this.blockPathMap) {
@@ -8375,19 +8432,22 @@ export class Bridge {
     const missingFromPathMap = formDataBlocks.filter(id => !pathMapBlocks.includes(id));
     log('addNodeIdsToAllSlateFields: pathMap has', pathMapBlocks.length, 'blocks, formData has', formDataBlocks.length, 'blocks, missing:', missingFromPathMap.length > 0 ? missingFromPathMap : 'none');
 
+    let slateCalls = 0;
     Object.entries(this.blockPathMap).forEach(([blockId, pathInfo]) => {
       const block = this.getBlockData(blockId);
       if (!block) return;
 
-      const schema = pathInfo.resolvedBlockSchema;
+      const schema = this.getBlockSchema(blockId);
       if (!schema?.properties) return;
 
       Object.entries(schema.properties).forEach(([fieldName, fieldDef]) => {
         if (isSlateFieldType(getFieldTypeString(fieldDef)) && block[fieldName]) {
           block[fieldName] = this.addNodeIds(block[fieldName]);
+          slateCalls++;
         }
       });
     });
+    log('addNodeIdsToAllSlateFields took', (performance.now() - t0).toFixed(1) + 'ms, slate fields:', slateCalls);
   }
 
   /**
@@ -9087,8 +9147,7 @@ export class Bridge {
       if (!blocks || typeof blocks !== 'object') return;
       for (const blockId of Object.keys(blocks)) {
         const block = blocks[blockId];
-        const pathInfo = this.blockPathMap?.[blockId];
-        const schema = pathInfo?.resolvedBlockSchema;
+        const schema = this.getBlockSchema(blockId);
         if (block && schema?.properties) {
           for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
             if (isSlateFieldType(getFieldTypeString(fieldDef)) && block[fieldName]) {
@@ -9177,8 +9236,7 @@ export class Bridge {
    */
   getFieldType(blockUid, fieldName) {
     const resolved = this.resolveFieldPath(fieldName, blockUid);
-    const pathInfo = this.blockPathMap?.[resolved.blockId];
-    const schema = pathInfo?.resolvedBlockSchema;
+    const schema = this.getBlockSchema(resolved.blockId);
     const fieldDef = schema?.properties?.[resolved.fieldName];
     if (!fieldDef) return undefined;
     return getFieldTypeString(fieldDef);
@@ -9209,8 +9267,7 @@ export class Bridge {
       }
     }
     // 2. Schema-level placeholder
-    const pathInfo = this.blockPathMap?.[resolved.blockId];
-    const fieldDef = pathInfo?.resolvedBlockSchema?.properties?.[resolved.fieldName];
+    const fieldDef = this.getBlockSchema(resolved.blockId)?.properties?.[resolved.fieldName];
     return fieldDef?.placeholder || undefined;
   }
 
@@ -9316,6 +9373,8 @@ export class Bridge {
       ...transformFields,
     }, this.adminOrigin);
 
+    this._transformSentAt = performance.now();
+    this._transformSentDateNow = Date.now();
     log(`SLATE_TRANSFORM_REQUEST (${transformType}) sent with data, requestId:`, requestId);
     return requestId;
   }

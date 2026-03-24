@@ -522,11 +522,10 @@ const SyncedSlateToolbar = ({
       }
     } else {
       // Range selection - use toggleInlineFormat to wrap/unwrap selected text
-      // Use rangeRef to track selection through the transform - wrapNodes creates
-      // the inline element, then Slate normalization adds empty text nodes before/after.
-      // Without rangeRef, the selection path becomes stale (points to empty text node).
+      const t0 = performance.now();
       const rangeRef = Editor.rangeRef(editor, editor.selection);
       toggleInlineFormat(editor, format);
+      console.log(`[TOOLBAR-TIMING] toggleInlineFormat: ${(performance.now() - t0).toFixed(0)}ms`);
       // Restore selection from tracked range (handles path shifts from wrapping/normalization)
       if (rangeRef.current) {
         try {

@@ -13,6 +13,7 @@ import {
   getBlockTypeSchema,
   getBlockSchema,
   getPageAllowedBlocksFromRestricted,
+  getResolvedSchema,
 } from '../../../hydra-js/buildBlockPathMap.js';
 
 /**
@@ -74,17 +75,46 @@ function stripFunctionsFromSchema(obj, seen = new WeakSet()) {
  * @returns {Object} - New blockPathMap with non-serializable values removed from schemas
  */
 export function stripBlockPathMapForPostMessage(blockPathMap) {
-  // Strip each entry independently so shared array/object references (e.g., the same
-  // fieldDef.allowedBlocks array used by multiple blocks) aren't falsely detected as
-  // circular by the seen set and stripped to undefined.
-  return Object.fromEntries(
-    Object.entries(blockPathMap).map(([key, value]) => [key, stripFunctionsFromSchema(value)])
-  );
+  // Strip functions from schemas and re-hash since stripping changes content.
+  // The _schemas store was built with pre-stripped schemas in buildBlockPathMap;
+  // after stripping, identical schemas may hash differently, so we rebuild.
+  const strippedSchemas = {};
+  const refMap = {}; // old ref → new ref
+
+  // First pass: strip and re-hash all schemas
+  if (blockPathMap._schemas) {
+    for (const [oldRef, schema] of Object.entries(blockPathMap._schemas)) {
+      const stripped = stripFunctionsFromSchema(schema);
+      const str = JSON.stringify(stripped);
+      // djb2 hash
+      let hash = 5381;
+      for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) + hash + str.charCodeAt(i)) & 0x7fffffff;
+      }
+      const newRef = 's' + hash.toString(36);
+      refMap[oldRef] = newRef;
+      if (!strippedSchemas[newRef]) {
+        strippedSchemas[newRef] = stripped;
+      }
+    }
+  }
+
+  // Second pass: strip entries and update refs
+  const result = { _schemas: strippedSchemas };
+  for (const [key, value] of Object.entries(blockPathMap)) {
+    if (key === '_schemas') continue;
+    const stripped = stripFunctionsFromSchema(value);
+    if (stripped?._schemaRef && refMap[stripped._schemaRef]) {
+      stripped._schemaRef = refMap[stripped._schemaRef];
+    }
+    result[key] = stripped;
+  }
+  return result;
 }
 
 // getBlockTypeSchema, getBlockSchema, getPageAllowedBlocksFromRestricted are imported
 // from buildBlockPathMap.js (Volto-free shared module) above.
-export { getBlockTypeSchema, getBlockSchema };
+export { getBlockTypeSchema, getBlockSchema, getResolvedSchema };
 
 /**
  * Get items array from a container (works for both object_list and blocks containers).
@@ -296,7 +326,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
     parentId = parentPathInfo.parentId;
   }
 
-  const schema = blockPathMap[parentId]?.resolvedBlockSchema;
+  const schema = getResolvedSchema(blockPathMap[parentId], blockPathMap);
   const fieldDef = schema?.properties?.[fieldName];
 
   // For object_list items, we already have most info in pathInfo
@@ -455,7 +485,7 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
 
   const blockType = blockId === PAGE_BLOCK_UID ? '_page' : pathInfo?.blockType;
   if (!blockType) return [];
-  const schema = pathInfo?.resolvedBlockSchema;
+  const schema = getResolvedSchema(pathInfo, blockPathMap);
 
   // Compute default allowed blocks (used when field doesn't specify allowedBlocks)
   const blockConfig = blocksConfig?.[blockType];
@@ -1341,7 +1371,7 @@ export function reorderBlocksInContainer(
   }
 
   // Detect if this is an object_list field
-  const schema = blockPathMap[effectiveParentId]?.resolvedBlockSchema;
+  const schema = getResolvedSchema(blockPathMap[effectiveParentId], blockPathMap);
   const fieldDef = schema?.properties?.[fieldName];
   const isObjectList = fieldDef?.widget === 'object_list';
 

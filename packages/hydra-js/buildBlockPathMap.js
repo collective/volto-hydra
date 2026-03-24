@@ -199,8 +199,43 @@ export function getPageAllowedBlocksFromRestricted(blocksConfig, context = {}) {
  * - Nested object list: ['blocks', 'table-1', 'table', 'rows', 0, 'cells', 1]
  * - Multiple page fields: ['header_blocks', 'header-1'], ['footer_blocks', 'footer-1']
  */
+/**
+ * Get the resolved schema for a block from its pathInfo entry.
+ * Schemas are deduplicated in pathMap._schemas by content hash.
+ * @param {Object} pathInfo - The block's pathMap entry
+ * @param {Object} pathMap - The full pathMap (contains _schemas)
+ * @returns {Object|null} The resolved block schema, or null
+ */
+export function getResolvedSchema(pathInfo, pathMap) {
+  if (!pathInfo?._schemaRef || !pathMap?._schemas) return null;
+  return pathMap._schemas[pathInfo._schemaRef] || null;
+}
+
+// djb2 hash for schema deduplication
+function _hashString(str) {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash + str.charCodeAt(i)) & 0x7fffffff;
+  }
+  return 's' + hash.toString(36);
+}
+
 export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
   const pathMap = {};
+  // Deduplicated schema store — most blocks of the same type share identical
+  // resolved schemas. Storing once per unique schema instead of per-block
+  // reduces postMessage payload dramatically (e.g., 2.5MB → ~200KB).
+  pathMap._schemas = {};
+  // Store a schema in the deduplicated _schemas map, return the ref key.
+  const storeSchema = (schema) => {
+    if (!schema) return undefined;
+    const str = JSON.stringify(schema);
+    const key = _hashString(str);
+    if (!pathMap._schemas[key]) {
+      pathMap._schemas[key] = schema;
+    }
+    return key;
+  };
   // Track created virtual containers for template instances
   const createdTemplateInstances = new Set();
 
@@ -410,7 +445,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         parentId: effectiveParentId,
         containerField: fieldName,
         blockType, // Block type for uniform lookups (single source of truth)
-        resolvedBlockSchema: blockSchema, // Full schema with functions — stripped only when sending to iframe
+        _schemaRef: storeSchema(blockSchema), // Deduplicated schema reference
         allowedSiblingTypes: fieldDef.allowedBlocks
           ? (parentId === PAGE_BLOCK_UID
             ? fieldDef.allowedBlocks.filter(t => defaultPageAllowedBlocks.includes(t))
@@ -556,7 +591,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         ...(itemIsReadonly && { isReadonly: true }),
         ...(!canInsertBefore && { canInsertBefore: false }),
         ...(!canInsertAfter && { canInsertAfter: false }),
-        resolvedBlockSchema: blockSchema, // Full schema with functions — stripped only when sending to iframe
+        _schemaRef: storeSchema(blockSchema), // Deduplicated schema reference
         itemSchema: effectiveItemSchema, // null for typed items (schema from blocksConfig)
         dataPath: effectiveDataPath, // Store for later use
         allowedSiblingTypes: hasAllowedBlocks ? fieldDef.allowedBlocks : [virtualType],
@@ -583,7 +618,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
     parentId: null, // Page has no parent
     containerField: null,
     blockType: '_page',
-    resolvedBlockSchema: pageSchema,
+    _schemaRef: storeSchema(pageSchema),
   };
 
   // Start traversal with page as root container

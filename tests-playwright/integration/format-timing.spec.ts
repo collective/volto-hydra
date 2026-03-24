@@ -1,18 +1,22 @@
 /**
- * Tests that partial bold formatting + selection restore completes within 500ms.
- * Uses heavier pages (container blocks, templates) to reproduce real-world timing.
+ * Tests that partial bold formatting appears within 500ms and selection is
+ * restored within 100ms after that. Uses a heavy page (150 blocks) to
+ * reproduce real-world conditions.
  */
 import { test, expect } from '@playwright/test';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
-for (const pagePath of ['/test-page', '/container-test-page', '/template-test-page']) {
-  test(`partial bold selection restored within 500ms on ${pagePath}`, async ({ page }) => {
+const pages: Record<string, string> = {
+  '/test-page': 'block-1-uuid',
+  '/heavy-slate-page': 'block-simple-para',
+};
+
+for (const [pagePath, blockId] of Object.entries(pages)) {
+  test(`partial bold + selection restore timing on ${pagePath}`, async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit(pagePath);
 
-    // Find the first text block
-    const blockId = 'block-1-uuid';
     const editor = await helper.enterEditMode(blockId);
 
     // Type text and select a word
@@ -23,23 +27,30 @@ for (const pagePath of ['/test-page', '/container-test-page', '/template-test-pa
     // Select "partially" (offset 13-22)
     await helper.selectTextRange(editor, 13, 22);
 
+    // Wait for everything to settle before timing the bold operation
+    await helper.getStableBlockCount();
+    await helper.waitForPointerUnblocked();
+    await page.waitForTimeout(500); // Let all renders, structural observer, etc. finish
+
     // Apply bold via Ctrl+B
     const t0 = Date.now();
     await page.keyboard.press('ControlOrMeta+b');
 
-    // Wait for bold to appear in DOM
-    await helper.waitForFormattedText(editor, /partially/, 'bold', { timeout: 5000 });
+    // Bold must appear within 500ms
+    await helper.waitForFormattedText(editor, /partially/, 'bold', { timeout: 500 });
     const tBold = Date.now();
 
-    // Selection must be restored within 500ms of bold appearing
+    // Selection must be restored within 100ms of bold appearing
     const iframe = helper.getIframe();
     await expect(async () => {
       const sel = await iframe.locator('[contenteditable="true"]:focus').evaluate(
         (el: any) => el.ownerDocument.defaultView.getSelection()?.toString() || '');
       expect(sel).toBe('partially');
-    }).toPass({ timeout: 500 });
+    }).toPass({ timeout: 100 });
     const tSel = Date.now();
 
-    console.log(`[TIMING ${pagePath}] Bold appeared: ${tBold - t0}ms, Selection restored: ${tSel - t0}ms (${tSel - tBold}ms after bold)`);
+    console.log(`[TIMING ${pagePath}] Bold: ${tBold - t0}ms, Selection: +${tSel - tBold}ms`);
+    expect(tBold - t0, `Bold took ${tBold - t0}ms (max 500ms)`).toBeLessThan(500);
+    expect(tSel - tBold, `Selection restore took ${tSel - tBold}ms after bold (max 100ms)`).toBeLessThan(100);
   });
 }

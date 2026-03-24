@@ -27,7 +27,7 @@ import { Icon } from '@plone/volto/components';
 import leftArrowSVG from '@plone/volto/icons/left-key.svg';
 import { SidebarPortalTargetContext } from './SidebarPortalTargetContext';
 import DropdownMenu from '../Toolbar/DropdownMenu';
-import { getBlockById, updateBlockById } from '../../utils/blockPath';
+import { getBlockById, updateBlockById, getResolvedSchema } from '../../utils/blockPath';
 import { HydraSchemaProvider } from '../../context';
 import { getConvertibleTypes, convertBlockType } from '../../utils/schemaInheritance';
 import { PAGE_BLOCK_UID, isBlockReadonly } from '@volto-hydra/hydra-js';
@@ -135,7 +135,7 @@ const getFilteredBlockSchema = (blockType, intl, blockPathMap, blockId, blockDat
   }
 
   // Use cached enhanced schema from pathMap (built during buildBlockPathMap)
-  const schema = pathInfo?.resolvedBlockSchema;
+  const schema = getResolvedSchema(pathInfo, blockPathMap);
   if (!schema) {
     console.error(`[getFilteredBlockSchema] No cached resolvedBlockSchema for '${blockId}' (type: ${blockType})`);
     return null;

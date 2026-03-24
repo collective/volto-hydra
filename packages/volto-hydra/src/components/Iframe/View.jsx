@@ -88,7 +88,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems } from '../../utils/blockPath';
+import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema } from '../../utils/blockPath';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
@@ -415,6 +415,9 @@ function recurseUpdateVoltoConfig(newConfig) {
 let persistedIframe = { frontendUrl: null, path: null, isEdit: null, src: null };
 
 const Iframe = (props) => {
+  if (window._formatT0) {
+    console.log('[VIEW-TIMING] Iframe render +' + (performance.now() - window._formatT0).toFixed(0) + 'ms');
+  }
   const {
     onSelectBlock,
     properties,
@@ -1569,6 +1572,8 @@ const Iframe = (props) => {
         }
 
         case 'SLATE_TRANSFORM_REQUEST':
+          window._formatT0 = performance.now();
+          console.log('[VIEW-TIMING] SLATE_TRANSFORM_REQUEST received');
           // Validate data from postMessage before using it
           validateAndLog(event.data.data, 'SLATE_TRANSFORM_REQUEST', blockFieldTypes);
 
@@ -1826,7 +1831,7 @@ const Iframe = (props) => {
 
                 // Only merge single-text-field blocks (e.g. slate paragraphs)
                 // Multi-field blocks (hero, teaser) should not merge
-                const prevSchema = prevPathInfo?.resolvedBlockSchema;
+                const prevSchema = getResolvedSchema(prevPathInfo, iframeSyncState.blockPathMap);
                 const prevEditableFields = prevSchema?.properties
                   ? Object.entries(prevSchema.properties).filter(([, def]) => {
                       const ft = getFieldTypeString(def);
@@ -1914,14 +1919,18 @@ const Iframe = (props) => {
               transformAction.isEmpty = event.data.isEmpty;
             }
 
+            const bpmT0 = performance.now();
+            const transformBpm = buildBlockPathMap(event.data.data, config.blocks.blocksConfig, intl);
+            console.log('[VIEW-TIMING] buildBlockPathMap: ' + (performance.now() - bpmT0).toFixed(0) + 'ms, keys:', Object.keys(transformBpm).length);
             setIframeSyncState(prev => ({
               ...prev,
               formData: event.data.data,
-              blockPathMap: buildBlockPathMap(event.data.data, config.blocks.blocksConfig, intl),
+              blockPathMap: transformBpm,
               selection: event.data.selection || null,
               _selectionSource: 'SLATE_TRANSFORM_REQUEST',
               transformAction: transformAction,
             }));
+            console.log('[VIEW-TIMING] setIframeSyncState done +' + (performance.now() - (window._formatT0 || 0)).toFixed(0) + 'ms');
           }
           break;
 
@@ -2681,6 +2690,7 @@ const Iframe = (props) => {
   // UNIFIED FORM SYNC: Syncs iframeSyncState AND sends FORM_DATA to iframe
   // Triggers when Form's properties change or toolbar completes a format operation
   useEffect(() => {
+    const useEffectT0 = performance.now();
     const formToUse = properties || form;
 
     // Skip if this is an echo from INLINE_EDIT_DATA we just processed
@@ -2691,6 +2701,7 @@ const Iframe = (props) => {
 
     // Case 1: Toolbar completed a format operation
     if (iframeSyncState.toolbarRequestDone) {
+      console.log('[VIEW-TIMING] Case 1 start, toolbarRequestDone:', iframeSyncState.toolbarRequestDone, '+' + (performance.now() - (window._formatT0 || 0)).toFixed(0) + 'ms');
       // Increment edit sequence for toolbar operations too
       editSequenceRef.current++;
       const formWithSequence = {
@@ -2717,15 +2728,38 @@ const Iframe = (props) => {
       if (skipRender) {
         message.skipRender = true;
       }
+      message._sentAt = Date.now();
+      console.log('[VIEW-TIMING] FORM_DATA prepared +' + (performance.now() - (window._formatT0 || 0)).toFixed(0) + 'ms (useEffect overhead: ' + (performance.now() - useEffectT0).toFixed(0) + 'ms), blockPathMap keys:', Object.keys(message.blockPathMap || {}).length);
       log('Sending FORM_DATA (Case 1: toolbar) formatRequestId:', message.formatRequestId,
         '_editSequence:', editSequenceRef.current, 'skipRender:', !!skipRender,
         'blockPathMap keys:', Object.keys(message.blockPathMap || {}),
         'cachedBPM keys:', Object.keys(iframeSyncState.blockPathMap || {}));
       const iframeEl = document.getElementById('previewIframe');
+      let msgSize;
+      try { msgSize = JSON.stringify(message).length; } catch { msgSize = -1; }
+      // One-time payload breakdown
+      if (!window._payloadLogged && message.formatRequestId) {
+        window._payloadLogged = true;
+        try {
+          const dataSize = JSON.stringify(message.data).length;
+          const bpmSize = JSON.stringify(message.blockPathMap).length;
+          const schemasSize = message.blockPathMap._schemas ? JSON.stringify(message.blockPathMap._schemas).length : 0;
+          const uniqueSchemas = message.blockPathMap._schemas ? Object.keys(message.blockPathMap._schemas).length : 0;
+          console.log('[PAYLOAD] total:', (msgSize/1024).toFixed(0) + 'KB',
+            'data:', (dataSize/1024).toFixed(0) + 'KB',
+            'blockPathMap:', (bpmSize/1024).toFixed(0) + 'KB',
+            'unique schemas:', uniqueSchemas, '(' + (schemasSize/1024).toFixed(0) + 'KB)');
+        } catch (e) {
+          console.log('[PAYLOAD] total:', (msgSize/1024).toFixed(0) + 'KB (detail error:', e.message + ')');
+        }
+      }
+      message._sentAt = Date.now();
+      const postT0 = performance.now();
       iframeEl?.contentWindow?.postMessage(
         message,
         iframeOriginRef.current,
       );
+      console.log('[VIEW-TIMING] postMessage call took', (performance.now() - postT0).toFixed(1) + 'ms, payload:', (msgSize / 1024).toFixed(0) + 'KB');
       // Strip _editSequence from Redux - sequences are for iframe echo detection only.
       // Keeping them in Redux causes sidebar edits to inherit stale sequences.
       const { _editSequence: _, ...formWithoutSeq } = formWithSequence;
