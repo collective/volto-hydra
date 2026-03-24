@@ -396,13 +396,12 @@ export class Bridge {
     const text = blockData?.value?.[0]?.children?.[0]?.text?.substring(0, 40);
     log(`[setFormDataFromAdmin] source: ${source}, seq: ${seq}, block: ${this.selectedBlockUid}, text: ${JSON.stringify(text)}`);
 
-    // Detect echo: incoming data identical to what we already have.
-    // Used by _executeRender to skip unnecessary re-renders during inline editing.
-    const newJson = JSON.stringify(data);
-    this._isEchoFormData = this.formData && JSON.stringify(this.formData) === newJson;
+    // Save previous formData for echo detection (done after addNodeIdsToAllSlateFields)
+    this._prevFormDataJson = this.formData ? JSON.stringify(this.formData) : null;
 
-    this.formData = JSON.parse(newJson);
-    this.lastReceivedFormData = JSON.parse(newJson);
+    const dataJson = JSON.stringify(data);
+    this.formData = JSON.parse(dataJson);
+    this.lastReceivedFormData = JSON.parse(dataJson);
   }
 
   /**
@@ -1990,6 +1989,12 @@ export class Bridge {
             // Add nodeIds to all slate blocks before rendering
             // Admin UI never sends nodeIds, so we always need to add them
             this.addNodeIdsToAllSlateFields();
+
+            // Detect echo: compare after addNodeIdsToAllSlateFields so both
+            // old and new formData have nodeIds. Without this, nodeId
+            // differences cause false negatives (echo not detected).
+            this._isEchoFormData = this._prevFormDataJson
+              && JSON.stringify(this.formData) === this._prevFormDataJson;
 
             // Extract formatRequestId early so it's available in rAF callbacks
             const formatRequestId = event.data.formatRequestId;
