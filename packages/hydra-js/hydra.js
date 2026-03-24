@@ -7867,20 +7867,28 @@ export class Bridge {
   setupStructuralObserver() {
     if (this._structuralObserver) return;
 
-    let pending = false;
+    let pendingRAF = null;
     const runAllBlocksOps = () => {
-      pending = false;
+      pendingRAF = null;
       this.materializeHydraComments();
       this.markEmptyBlocks();
       this.applyReadonlyVisuals();
       this.applyPlaceholders();
+      // Signal DOM settled — but only if no new mutations arrived during
+      // this rAF callback. If new mutations come, the observer will fire
+      // again and we'll wait for the next settlement.
+      if (this._onDomSettled && !pendingRAF) {
+        const cb = this._onDomSettled;
+        this._onDomSettled = null;
+        cb();
+      }
     };
 
     this._structuralObserver = new MutationObserver(() => {
-      if (!pending) {
-        pending = true;
-        requestAnimationFrame(runAllBlocksOps);
-      }
+      // Cancel previous pending rAF and schedule a new one.
+      // This ensures we wait for the LAST mutation, not the first.
+      if (pendingRAF) cancelAnimationFrame(pendingRAF);
+      pendingRAF = requestAnimationFrame(runAllBlocksOps);
     });
 
     this._structuralObserver.observe(document.body, {
@@ -8071,8 +8079,21 @@ export class Bridge {
     } else if (needsFastPath && contentReady) {
       afterRender();
     } else if (contentReady) {
-      // Content matches but give framework one frame to patch DOM attributes
-      requestAnimationFrame(() => afterRender());
+      // Content matches but the framework may still be rendering async
+      // (innerHTML replacement, Vue patching, etc.). Wait for the structural
+      // observer to signal DOM settlement before running afterContentRender.
+      // Fallback timeout ensures we don't wait forever if no mutation fires
+      // (e.g. echo FORM_DATA where the render produces identical DOM).
+      const settleTimeout = setTimeout(() => {
+        if (this._onDomSettled) {
+          this._onDomSettled = null;
+          afterRender();
+        }
+      }, 200);
+      this._onDomSettled = () => {
+        clearTimeout(settleTimeout);
+        afterRender();
+      };
     } else {
       // Poll until both current and target blocks are ready in the DOM.
       // rAF-based polling handles both sync (ready on first check) and
