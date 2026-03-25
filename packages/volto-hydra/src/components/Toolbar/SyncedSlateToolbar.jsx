@@ -796,6 +796,11 @@ const SyncedSlateToolbar = ({
           const hasStrongAfter = editor.children?.[0]?.children?.some(c => c.type === 'strong');
           log('FINALLY: _batchingTransform=false, calling handleChange. hasStrong:', hasStrongAfter);
           handleChange(editor.children);
+          // If handleChange skipped (values equal — e.g., View.jsx handled the
+          // merge instead of the toolbar), the formatRequestId ref is still set.
+          // Clear it so it doesn't leak into a later re-sync handleChange.
+          // The requestId flows through View.jsx's pendingFormatRequestId instead.
+          activeFormatRequestIdRef.current = null;
         }
         // else: outer batching context (replaceEditorContent) will call
         // handleChange once after withoutNormalizing exits + normalizes
@@ -886,6 +891,7 @@ const SyncedSlateToolbar = ({
           }
         }
         applyTransform();
+        onTransformApplied?.();
       }
       log('SYNC: After transform-only, editor has strong:', editor.children?.[0]?.children?.some(c => c.type === 'strong'), 'selection:', JSON.stringify(editor.selection));
 

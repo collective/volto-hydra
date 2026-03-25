@@ -653,32 +653,19 @@ test.describe('Inline Editing - Basic', () => {
     const remainingBlock = iframe.locator(`[data-block-uid="${remainingBlockId}"]`);
     await expect(remainingBlock.locator('li')).toHaveCount(2, { timeout: 5000 });
 
-    // Demoted block should be selected and cursor should be at its start
+    // Demoted block should be selected with cursor at offset 0
     await helper.waitForBlockSelected(demotedBlockId!);
-
-    // Verify cursor is inside the demoted block — typing should go there
-    const demotedEditorAfterSplit = await helper.getEditorLocator(demotedBlockId!);
-    await expect(demotedEditorAfterSplit).toBeVisible({ timeout: 5000 });
-    await demotedEditorAfterSplit.pressSequentially('X', { delay: 10 });
-    await expect(demotedBlock).toContainText('X', { timeout: 5000 });
-
-    // Now press Backspace again — the demoted paragraph should merge with
-    // the list above, becoming a new li at the end of that list.
-    // Result: [ul with 2 li], [ul with 2 li] = back to original block count
     const demotedEditor = await helper.getEditorLocator(demotedBlockId!);
     await expect(demotedEditor).toBeVisible({ timeout: 5000 });
-    await demotedEditor.evaluate((el: HTMLElement) => {
-      const sel = window.getSelection()!;
-      const range = document.createRange();
-      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-      const firstText = walker.nextNode();
-      if (firstText) {
-        range.setStart(firstText, 0);
-        range.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
-    });
+
+    // Check cursor is focused in the demoted block at position 0
+    await expect(async () => {
+      const info = await helper.getCursorInfo(demotedEditor);
+      expect(info.isFocused).toBe(true);
+      expect(info.cursorOffset).toBe(0);
+    }).toPass({ timeout: 5000 });
+
+    // Backspace at start of demoted block — should merge back into the list
     await demotedEditor.press('Backspace');
 
     // Demoted p merged into last li of list above (text combined),
@@ -715,6 +702,11 @@ test.describe('Inline Editing - Basic', () => {
     const blockOrder = await helper.getBlockOrder();
     const listIdx = blockOrder.indexOf('block-list-links');
     expect(listIdx).toBe(0); // list should still be the first block
+
+    // Verify cursor remains at the merge point after delayed re-renders.
+    // Reproduces bug where cursor resets ~1s after merge.
+    await page.waitForTimeout(2000);
+    await helper.waitForCursorPosition(editorAfterMerge, 'NUXT.js ExampleCURSOR');
   });
 
   test('Backspace at start of list item in sidebar Slate widget demotes to paragraph', async ({ page }) => {
