@@ -792,6 +792,7 @@ const SyncedSlateToolbar = ({
         if (!outerBatching) {
           // We own the batching — finalize: un-batch and send one handleChange
           editor._batchingTransform = false;
+
           const hasStrongAfter = editor.children?.[0]?.children?.some(c => c.type === 'strong');
           log('FINALLY: _batchingTransform=false, calling handleChange. hasStrong:', hasStrongAfter);
           handleChange(editor.children);

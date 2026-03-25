@@ -54,7 +54,7 @@ const getFieldTypeString = (field) => {
  * Scan all slate blocks for multi-node values and split them into
  * separate blocks. Returns null if no splits needed, or { formData, selectBlockId }.
  */
-function splitMultiNodeSlateBlocks(formData, blockPathMap, blocksConfig, uuidGenerator) {
+function splitMultiNodeSlateBlocks(formData, blockPathMap, blocksConfig, uuidGenerator, selection) {
   let result = formData;
   let selectBlockId = null;
 
@@ -97,8 +97,19 @@ function splitMultiNodeSlateBlocks(formData, blockPathMap, blocksConfig, uuidGen
         if (i === 0) selectBlockId = newBlockId;
       }
 
+      // Translate selection: cursor at [N, ...] in the unsplit value maps
+      // to [0, ...] in the Nth new block.
+      let newSelection = null;
+      if (selection?.anchor?.path?.[0] > 0) {
+        const translatePath = (p) => [0, ...p.slice(1)];
+        newSelection = {
+          anchor: { ...selection.anchor, path: translatePath(selection.anchor.path) },
+          focus: { ...selection.focus, path: translatePath(selection.focus.path) },
+        };
+      }
+
       // Only process one split per render cycle to avoid stale blockPathMap
-      return { formData: result, selectBlockId };
+      return { formData: result, selectBlockId, selection: newSelection };
     }
   }
 
@@ -112,11 +123,16 @@ function isSelectionValidForValue(selection, slateValue) {
   const doc = { children: slateValue };
 
   try {
+    // Paths must resolve to text leaves, not element nodes.
+    // A path like [0, 0] pointing to a li element is not a valid
+    // cursor position — it must reach a text node like [0, 0, 0].
     if (selection.anchor?.path) {
-      Node.get(doc, selection.anchor.path);
+      const node = Node.get(doc, selection.anchor.path);
+      if (typeof node.text !== 'string') return false;
     }
     if (selection.focus?.path) {
-      Node.get(doc, selection.focus.path);
+      const node = Node.get(doc, selection.focus.path);
+      if (typeof node.text !== 'string') return false;
     }
     return true;
   } catch (e) {
@@ -1925,6 +1941,7 @@ const Iframe = (props) => {
                     const lastListIdx = copy.length - 1;
                     const lastLiIdx = lastList.children.length - 1;
                     cursorSelection = { anchor: { path: [lastListIdx, lastLiIdx, joinChildIdx], offset: 0 }, focus: { path: [lastListIdx, lastLiIdx, joinChildIdx], offset: 0 } };
+                    log('unwrapBlock merge into list: joinChildIdx:', joinChildIdx);
                   } else {
                     // Standard merge: combine and use Transforms.mergeNodes
                     const allNodes = [...prevValue, ...currentValue];
@@ -1980,6 +1997,7 @@ const Iframe = (props) => {
                   flushSync(() => {
                     setIframeSyncState(prev => ({
                       ...prev,
+                      selection: cursorSelection,
                       pendingSelectBlockUid: prevBlockId,
                       pendingFormatRequestId: mergeRequestId,
                       pendingTransformedSelection: cursorSelection,
@@ -2804,23 +2822,44 @@ const Iframe = (props) => {
       console.log('[VIEW-TIMING] Case 1 start, toolbarRequestDone:', iframeSyncState.toolbarRequestDone, '+' + (performance.now() - (window._formatT0 || 0)).toFixed(0) + 'ms');
       // Increment edit sequence for toolbar operations too
       editSequenceRef.current++;
+      let toolbarFormData = iframeSyncState.formData;
+      // Always build blockPathMap from the form data being sent
+      let toolbarBlockPathMap = iframeSyncState.blockPathMap && Object.keys(iframeSyncState.blockPathMap).length > 0
+        ? iframeSyncState.blockPathMap
+        : buildBlockPathMap(toolbarFormData || formToUse, config.blocks.blocksConfig, intl);
+      // Split any multi-node slate blocks before sending to iframe
+      const toolbarSplit = splitMultiNodeSlateBlocks(toolbarFormData, toolbarBlockPathMap, config.blocks.blocksConfig, uuid, iframeSyncState.selection);
+      if (toolbarSplit) {
+        toolbarFormData = toolbarSplit.formData;
+        toolbarBlockPathMap = buildBlockPathMap(toolbarFormData, config.blocks.blocksConfig, intl);
+        if (toolbarSplit.selectBlockId) {
+          flushSync(() => {
+            setIframeSyncState(prev => ({
+              ...prev,
+              selection: toolbarSplit.selection || prev.selection,
+              pendingSelectBlockUid: toolbarSplit.selectBlockId,
+            }));
+          });
+        }
+      }
       const formWithSequence = {
-        ...iframeSyncState.formData,
+        ...toolbarFormData,
         _editSequence: editSequenceRef.current,
       };
       const skipRender = iframeSyncState.skipRenderOnSend;
-      // Always build blockPathMap from the form data being sent — never rely on
-      // potentially stale/undefined cached state
-      const toolbarBlockPathMap = iframeSyncState.blockPathMap && Object.keys(iframeSyncState.blockPathMap).length > 0
-        ? iframeSyncState.blockPathMap
-        : buildBlockPathMap(iframeSyncState.formData || formToUse, config.blocks.blocksConfig, intl);
       const message = {
         type: 'FORM_DATA',
         data: formWithSequence,
         blockPathMap: stripBlockPathMapForPostMessage(toolbarBlockPathMap),
         formatRequestId: iframeSyncState.toolbarRequestDone,
       };
-      if (iframeSyncState.selection) {
+      // When a split created new blocks, tell the iframe which block to select
+      if (toolbarSplit?.selectBlockId) {
+        message.selectedBlockUid = toolbarSplit.selectBlockId;
+        if (toolbarSplit.selection) {
+          message.transformedSelection = toolbarSplit.selection;
+        }
+      } else if (iframeSyncState.selection) {
         message.transformedSelection = iframeSyncState.selection;
       }
       // When data didn't change (e.g. link cancel), tell iframe to skip
@@ -3057,7 +3096,7 @@ const Iframe = (props) => {
     // This happens when the deleteBackward extension demotes a list item
     // to a paragraph, producing [ul, p] — two top-level nodes in one block.
     // Each top-level node becomes its own block.
-    const splitResult = splitMultiNodeSlateBlocks(formToUse, newBlockPathMap, config.blocks.blocksConfig, uuid);
+    const splitResult = splitMultiNodeSlateBlocks(formToUse, newBlockPathMap, config.blocks.blocksConfig, uuid, iframeSyncState.selection);
     if (splitResult) {
       formToUse = splitResult.formData;
       newBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
@@ -3066,6 +3105,7 @@ const Iframe = (props) => {
         flushSync(() => {
           setIframeSyncState(prev => ({
             ...prev,
+            selection: splitResult.selection || prev.selection,
             pendingSelectBlockUid: splitResult.selectBlockId,
           }));
         });

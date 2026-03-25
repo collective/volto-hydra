@@ -653,8 +653,14 @@ test.describe('Inline Editing - Basic', () => {
     const remainingBlock = iframe.locator(`[data-block-uid="${remainingBlockId}"]`);
     await expect(remainingBlock.locator('li')).toHaveCount(2, { timeout: 5000 });
 
-    // Demoted block should be selected
+    // Demoted block should be selected and cursor should be at its start
     await helper.waitForBlockSelected(demotedBlockId!);
+
+    // Verify cursor is inside the demoted block — typing should go there
+    const demotedEditorAfterSplit = await helper.getEditorLocator(demotedBlockId!);
+    await expect(demotedEditorAfterSplit).toBeVisible({ timeout: 5000 });
+    await demotedEditorAfterSplit.pressSequentially('X', { delay: 10 });
+    await expect(demotedBlock).toContainText('X', { timeout: 5000 });
 
     // Now press Backspace again — the demoted paragraph should merge with
     // the list above, becoming a new li at the end of that list.
@@ -697,6 +703,18 @@ test.describe('Inline Editing - Basic', () => {
     await expect(firstLi).toContainText('NUXT', { timeout: 5000 });
     await expect(firstLi).toContainText('CURSOR', { timeout: 5000 });
     await expect(firstLi).toContainText('Framework7', { timeout: 5000 });
+
+    // Verify stability: after 1s, block count and structure must not change.
+    // Reproduces bug where an empty P block appears ~1s after merge.
+    await expect(async () => {
+      const count = await helper.getBlockCount();
+      expect(count).toBe(blocksBeforeBackspace);
+    }).toPass({ timeout: 2000, intervals: [500, 500, 500] });
+
+    // No empty blocks should have been inserted before the list
+    const blockOrder = await helper.getBlockOrder();
+    const listIdx = blockOrder.indexOf('block-list-links');
+    expect(listIdx).toBe(0); // list should still be the first block
   });
 
   test('Backspace at start of list item in sidebar Slate widget demotes to paragraph', async ({ page }) => {
