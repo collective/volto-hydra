@@ -1105,19 +1105,40 @@ export class Bridge {
     const range = selection.getRangeAt(0);
     const node = range.startContainer;
 
-    // Backspace at absolute start of a slate field → send to admin to unwrap
-    if (key === 'Backspace' && this.isSlateField(blockUid, this.focusedFieldName)) {
+    // Backspace at start of a slate element → send to admin as a structural transform.
+    // Two cases:
+    // 1. Absolute start of field (textBefore === '') → unwrapBlock (merge/delete)
+    // 2. Start of an interior node-id element → let Slate handle (demote list item, etc.)
+    // In both cases the browser's native Backspace would corrupt the DOM structure.
+    if (key === 'Backspace' && range.collapsed && this.isSlateField(blockUid, this.focusedFieldName)) {
       const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
       const editField = blockEl.closest('[data-edit-text]');
       if (editField) {
-        const textRange = document.createRange();
-        textRange.setStart(editField, 0);
-        textRange.setEnd(range.startContainer, range.startOffset);
-        const textBefore = this.stripZeroWidthSpaces(textRange.toString());
+        // Check if cursor is at offset 0 of a data-node-id element
+        const nodeIdEl = blockEl.closest('[data-node-id]');
+        if (nodeIdEl && nodeIdEl !== editField) {
+          const elRange = document.createRange();
+          elRange.setStart(nodeIdEl, 0);
+          elRange.setEnd(range.startContainer, range.startOffset);
+          const textBeforeInEl = this.stripZeroWidthSpaces(elRange.toString());
 
-        if (textBefore === '') {
-          const selectedText = range.collapsed ? '' : this.stripZeroWidthSpaces(range.toString());
-          if (selectedText === '') {
+          if (textBeforeInEl === '') {
+            // Check if there's content before this element (not the first node in the field)
+            const fieldRange = document.createRange();
+            fieldRange.setStart(editField, 0);
+            fieldRange.setEnd(range.startContainer, range.startOffset);
+            const textBeforeInField = this.stripZeroWidthSpaces(fieldRange.toString());
+
+            if (textBeforeInField !== '') {
+              // Interior element boundary — send as delete transform for Slate to handle
+              log('Backspace at start of interior element - sending delete transform');
+              this.sendTransformRequest(blockUid, 'delete', {
+                direction: 'backward',
+              });
+              return true;
+            }
+
+            // Absolute start of field — unwrapBlock
             const blockElement = editField.closest('[data-block-uid]');
             const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
             const isFirstField = firstField === editField;

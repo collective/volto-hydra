@@ -676,6 +676,28 @@ const applyConfig = (config) => {
   //    Volto produces when creating tables normally.
   // Wrap the entire emitter array with a getter so fixes apply regardless of
   // addon load order (extractTables may be added after our config runs).
+  // Register backspaceListItem extension — Backspace at start of a non-first
+  // list item demotes it to a paragraph and splits the block.
+  // Also remove the old backspaceInList keyboard handler which merges list
+  // items instead of demoting them.
+  if (config.settings.slate) {
+    const { backspaceListItem } = require('./extensions/backspaceListItem');
+    // Register as a base editor extension so it applies to ALL Slate editors
+    // (sidebar widgets, synced toolbar, etc.) — not just textblock editors.
+    config.settings.slate.extensions = [
+      ...(config.settings.slate.extensions || []),
+      backspaceListItem,
+    ];
+    // Remove old keyboard handler that merges list items instead of demoting.
+    // Our deleteBackward extension replaces this behavior.
+    const handlers = config.settings.slate.textblockKeyboardHandlers;
+    if (handlers?.Backspace) {
+      handlers.Backspace = handlers.Backspace.filter(
+        (h) => h.name !== 'backspaceInList',
+      );
+    }
+  }
+
   if (config.settings.slate) {
     const fixTableBlock = (blockData) => {
       if (blockData['@type'] === 'table') {

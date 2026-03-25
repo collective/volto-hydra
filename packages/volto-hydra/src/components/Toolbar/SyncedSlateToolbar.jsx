@@ -661,13 +661,15 @@ const SyncedSlateToolbar = ({
           break;
         }
         case 'delete':
-          // When selection is collapsed, delete one character in the given direction
-          // When selection is a range, delete the entire selection (no unit option)
+          // When selection is collapsed, use Editor.deleteBackward/deleteForward
+          // (goes through Slate plugin system for list unwrapping etc.)
+          // When selection is a range, delete the entire selection.
           if (editor.selection && Range.isCollapsed(editor.selection)) {
-            Transforms.delete(editor, {
-              unit: 'character',
-              reverse: transformAction.direction === 'backward',
-            });
+            if (transformAction.direction === 'backward') {
+              Editor.deleteBackward(editor, { unit: 'character' });
+            } else {
+              Editor.deleteForward(editor, { unit: 'character' });
+            }
           } else {
             Transforms.delete(editor);
           }

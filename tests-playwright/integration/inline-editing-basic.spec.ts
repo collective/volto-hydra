@@ -499,6 +499,148 @@ test.describe('Inline Editing - Basic', () => {
     await helper.waitForEditorText(mergedEditor, /First block JOINED Second block/);
   });
 
+  test('Backspace at start of bullet list item demotes to paragraph', async ({ page }) => {
+    // When cursor is at the start of a bullet list item and Backspace is
+    // pressed, the list item should be "demoted" — unwrapped from the list
+    // and split into a new paragraph block. This is standard Slate/Notion behavior.
+    //
+    // Known bug: Backspace at start of a list item does not demote it.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+    const editor = await helper.enterEditMode('block-1-uuid');
+
+    // Create a bullet list with two items using markdown "- " then Enter.
+    await helper.selectAllTextInEditor(editor);
+    await editor.press('Backspace');
+    await page.waitForTimeout(200);
+    await editor.pressSequentially('- First item', { delay: 50 });
+    await page.waitForTimeout(500); // Let markdown handler fire
+
+    // Verify bullet list was created
+    const listItems = iframe.locator('[data-block-uid="block-1-uuid"] ul li, [data-block-uid="block-1-uuid"] ol li');
+    await expect(listItems.first()).toBeVisible({ timeout: 5000 });
+    await expect(listItems.first()).toContainText('First item');
+
+    // Press Enter to create second bullet item, then type
+    await editor.press('Enter');
+    await page.waitForTimeout(300);
+    await editor.pressSequentially('Second item', { delay: 10 });
+    await expect(listItems).toHaveCount(2, { timeout: 5000 });
+
+    // Place cursor at the very start of the SECOND list item
+    await editor.evaluate((el: HTMLElement) => {
+      const allLi = el.querySelectorAll('li');
+      const secondLi = allLi[1];
+      if (!secondLi) return;
+      const sel = window.getSelection();
+      const range = document.createRange();
+      const textNode = secondLi.querySelector('[data-node-id]')?.firstChild || secondLi.firstChild;
+      if (textNode) {
+        range.setStart(textNode, 0);
+        range.collapse(true);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      }
+    });
+
+    const blocksBeforeBackspace = await helper.getStableBlockCount();
+
+    // Press Backspace at start of second bullet — should demote it to a
+    // plain paragraph, splitting the block. The first bullet stays in the
+    // original block, the demoted text becomes a new block.
+    await editor.press('Backspace');
+
+    // Block count should increase (second bullet demoted to new paragraph block)
+    await helper.waitForBlockCountToBe(blocksBeforeBackspace + 1, 10000);
+
+    // Original block should still have the first bullet
+    await expect(iframe.locator('[data-block-uid="block-1-uuid"]')).toContainText('First item', { timeout: 5000 });
+
+    // Second item should be in a NEW block as a plain paragraph (not a list item)
+    const newBlockOrder = await helper.getBlockOrder();
+    const block1Idx = newBlockOrder.indexOf('block-1-uuid');
+    const newBlockId = newBlockOrder[block1Idx + 1];
+    expect(newBlockId).toBeTruthy();
+    const newBlock = iframe.locator(`[data-block-uid="${newBlockId}"]`);
+    await expect(newBlock).toContainText('Second item', { timeout: 5000 });
+    // The new block should NOT contain a list item
+    await expect(newBlock.locator('li')).toHaveCount(0);
+  });
+
+  test('Backspace at start of list item in sidebar Slate widget demotes to paragraph', async ({ page }) => {
+    // Same behavior as iframe test but via the sidebar Slate editor widget.
+    // Tests that the deleteBackward extension works in the sidebar path too.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Select a slate block and use the sidebar Slate editor
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+
+    const sidebarEditor = helper.getSidebarSlateEditor('value');
+    await expect(sidebarEditor).toBeVisible({ timeout: 5000 });
+
+    // Clear and type a bullet list using markdown "- "
+    await sidebarEditor.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(200);
+    await page.keyboard.type('- First item', { delay: 50 });
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+    await page.keyboard.type('Second item', { delay: 10 });
+
+    // Wait for two list items in the sidebar widget
+    await expect(sidebarEditor.locator('li')).toHaveCount(2, { timeout: 5000 });
+
+    // Place cursor at start of second li
+    await sidebarEditor.evaluate((el: HTMLElement) => {
+      const allLi = el.querySelectorAll('li');
+      const secondLi = allLi[1];
+      if (!secondLi) return;
+      const sel = window.getSelection();
+      const range = document.createRange();
+      const textNode = secondLi.firstChild?.firstChild || secondLi.firstChild;
+      if (textNode) {
+        range.setStart(textNode, 0);
+        range.collapse(true);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      }
+    });
+
+    const blocksBeforeBackspace = await helper.getStableBlockCount();
+
+    // Press Backspace — should demote second item and split the block
+    await page.keyboard.press('Backspace');
+
+    // Block count should increase (second item becomes a new block)
+    await helper.waitForBlockCountToBe(blocksBeforeBackspace + 1, 10000);
+
+    // Original block should still have the first bullet
+    const iframe = helper.getIframe();
+    await expect(iframe.locator('[data-block-uid="block-1-uuid"]')).toContainText('First item', { timeout: 5000 });
+
+    // Second item should be in a NEW block as a plain paragraph
+    const newBlockOrder = await helper.getBlockOrder();
+    const block1Idx = newBlockOrder.indexOf('block-1-uuid');
+    const newBlockId = newBlockOrder[block1Idx + 1];
+    expect(newBlockId).toBeTruthy();
+    const newBlock = iframe.locator(`[data-block-uid="${newBlockId}"]`);
+    await expect(newBlock).toContainText('Second item', { timeout: 5000 });
+    await expect(newBlock.locator('li')).toHaveCount(0);
+
+    // The new block should be selected
+    await helper.waitForBlockSelected(newBlockId!);
+  });
+
   test('editing text in Admin UI updates iframe', async ({ page }, testInfo) => {
     const RUN = `[RUN-${testInfo.repeatEachIndex}]`;
     const helper = new AdminUIHelper(page);

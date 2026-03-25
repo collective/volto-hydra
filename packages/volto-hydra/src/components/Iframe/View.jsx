@@ -50,6 +50,58 @@ const getFieldTypeString = (field) => {
  * Validates if a selection is valid for the given slate value.
  * Returns true if all paths in the selection exist in the document.
  */
+/**
+ * Scan all slate blocks for multi-node values and split them into
+ * separate blocks. Returns null if no splits needed, or { formData, selectBlockId }.
+ */
+function splitMultiNodeSlateBlocks(formData, blockPathMap, blocksConfig, uuidGenerator) {
+  let result = formData;
+  let selectBlockId = null;
+
+  for (const [blockId, pathInfo] of Object.entries(blockPathMap)) {
+    if (blockId.startsWith('_')) continue;
+    const blockType = pathInfo.blockType;
+    if (!blockType || blockType === 'title' || blockType === 'description') continue;
+
+    const block = getBlockById(result, blockPathMap, blockId);
+    if (!block) continue;
+
+    // Check slate fields for multiple top-level nodes
+    const schema = getResolvedSchema(pathInfo, blockPathMap);
+    if (!schema?.properties) continue;
+
+    for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
+      if (!isSlateFieldType(getFieldTypeString(fieldDef))) continue;
+      const value = block[fieldName];
+      if (!Array.isArray(value) || value.length <= 1) continue;
+
+      // Found a multi-node slate value — split it
+      const firstNode = [value[0]];
+      const restNodes = value.slice(1);
+
+      // Update current block to keep only the first node
+      const updatedBlock = { ...block, [fieldName]: firstNode };
+      result = updateBlockById(result, blockPathMap, blockId, updatedBlock);
+
+      // Create new blocks for each remaining top-level node
+      const containerConfig = getContainerFieldConfig(blockId, blockPathMap, result, blocksConfig);
+      for (let i = 0; i < restNodes.length; i++) {
+        const newBlockId = uuidGenerator();
+        const newBlockData = { '@type': 'slate', [fieldName]: [restNodes[i]] };
+        result = insertBlockInContainer(
+          result, blockPathMap, blockId, newBlockId, newBlockData, containerConfig, 'after',
+        );
+        if (i === 0) selectBlockId = newBlockId;
+      }
+
+      // Only process one split per render cycle to avoid stale blockPathMap
+      return { formData: result, selectBlockId };
+    }
+  }
+
+  return null;
+}
+
 function isSelectionValidForValue(selection, slateValue) {
   if (!selection) return true; // No selection is always valid
   if (!slateValue || !Array.isArray(slateValue)) return false;
@@ -2696,7 +2748,7 @@ const Iframe = (props) => {
   // Triggers when Form's properties change or toolbar completes a format operation
   useEffect(() => {
     const useEffectT0 = performance.now();
-    const formToUse = properties || form;
+    let formToUse = properties || form;
 
     // Skip if this is an echo from INLINE_EDIT_DATA we just processed
     if (processedInlineEditCounterRef.current < inlineEditCounterRef.current) {
@@ -2956,7 +3008,28 @@ const Iframe = (props) => {
     }
 
     // Build blockPathMap first - needed for applying defaults to nested blocks
-    const newBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
+    let newBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
+
+    // Split any slate blocks that have multiple top-level nodes.
+    // This happens when the deleteBackward extension demotes a list item
+    // to a paragraph, producing [ul, p] — two top-level nodes in one block.
+    // Each top-level node becomes its own block.
+    const splitResult = splitMultiNodeSlateBlocks(formToUse, newBlockPathMap, config.blocks.blocksConfig, uuid);
+    if (splitResult) {
+      formToUse = splitResult.formData;
+      newBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
+      // Select the new block that received the split content
+      if (splitResult.selectBlockId) {
+        flushSync(() => {
+          setIframeSyncState(prev => ({
+            ...prev,
+            pendingSelectBlockUid: splitResult.selectBlockId,
+          }));
+        });
+      }
+      // Update Redux so the split persists
+      onChangeFormData(formToUse);
+    }
 
     // Apply schema defaults BEFORE equality check (handles schemaEnhancer-computed defaults)
     // This ensures fields like fieldMapping get smart defaults even on initial load.
