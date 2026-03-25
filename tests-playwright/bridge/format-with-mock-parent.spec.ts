@@ -315,10 +315,11 @@ test.describe('Inline Editing with Mock Parent', () => {
     // Select just "Text" (first word) using helper that walks text nodes
     await helper.selectTextRange(editable, 0, 4);
 
-    // Verify selection was set
+    // Verify selection was set (strip BOM/ZWS for nextjs compatibility)
     const selectionResult = await editable.evaluate((el) => {
       const sel = el.ownerDocument.defaultView.getSelection();
-      return { text: sel?.toString(), collapsed: sel?.isCollapsed };
+      const text = (sel?.toString() || '').replace(/[\uFEFF\u200B]/g, '');
+      return { text, collapsed: sel?.isCollapsed };
     });
     expect(selectionResult.collapsed).toBe(false);
     expect(selectionResult.text).toBe('Text');
@@ -337,9 +338,7 @@ test.describe('Inline Editing with Mock Parent', () => {
 
     // Verify selection is restored within 500ms (should still select "Text")
     await expect(async () => {
-      const selectedText = await editable.evaluate((el: any) => {
-        return el.ownerDocument.defaultView.getSelection()?.toString() || '';
-      });
+      const selectedText = await helper.getCleanSelectionText(editable);
       expect(selectedText).toBe('Text');
     }).toPass({ timeout: 500 });
   });

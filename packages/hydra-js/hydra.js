@@ -1204,9 +1204,13 @@ export class Bridge {
       if (editField) {
         // Check if cursor is at offset 0 of a data-node-id element
         const nodeIdEl = blockEl.closest('[data-node-id]');
-        if (nodeIdEl && nodeIdEl !== editField) {
+        // nodeIdEl may equal editField when a single <p> has both data-edit-text
+        // and data-node-id (e.g. simple mock frontends). Treat that the same as
+        // having a separate nodeIdEl inside editField.
+        const effectiveNodeIdEl = nodeIdEl || editField;
+        if (effectiveNodeIdEl) {
           const elRange = document.createRange();
-          elRange.setStart(nodeIdEl, 0);
+          elRange.setStart(effectiveNodeIdEl, 0);
           elRange.setEnd(range.startContainer, range.startOffset);
           const textBeforeInEl = this.stripZeroWidthSpaces(elRange.toString());
 

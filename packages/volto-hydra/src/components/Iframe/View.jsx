@@ -491,7 +491,7 @@ function recurseUpdateVoltoConfig(newConfig) {
 let persistedIframe = { frontendUrl: null, path: null, isEdit: null, src: null };
 
 const Iframe = (props) => {
-  if (window._formatT0) {
+  if (typeof window !== 'undefined' && window._formatT0) {
     console.log('[VIEW-TIMING] Iframe render +' + (performance.now() - window._formatT0).toFixed(0) + 'ms');
   }
   const {
@@ -3488,6 +3488,10 @@ const Iframe = (props) => {
       setAddNewBlockOpened(true);
     }
   }, [iframeAllowedBlocks, selectedBlock, insertAndSelectBlock]);
+
+  // SSR guard: render nothing on server. All hooks above are safe (they don't
+  // access window/document directly), but the JSX below requires the browser.
+  if (typeof window === 'undefined') return null;
 
   return (
     <div id="iframeContainer">
