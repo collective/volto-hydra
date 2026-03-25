@@ -183,13 +183,17 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       };
       bridge.blockPathMap = {
         ...bridge.blockPathMap,
-        [blockId]: {
-          path: ['blocks', blockId],
-          resolvedBlockSchema: {
+        _schemas: {
+          ...(bridge.blockPathMap?._schemas || {}),
+          'test-schema': {
             properties: {
               value: { widget: 'slate' },
             },
           },
+        },
+        [blockId]: {
+          path: ['blocks', blockId],
+          _schemaRef: 'test-schema',
         },
       };
       bridge.selectedBlockUid = blockId;
