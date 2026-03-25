@@ -83,14 +83,17 @@ function splitMultiNodeSlateBlocks(formData, blockPathMap, blocksConfig, uuidGen
       const updatedBlock = { ...block, [fieldName]: firstNode };
       result = updateBlockById(result, blockPathMap, blockId, updatedBlock);
 
-      // Create new blocks for each remaining top-level node
+      // Create new blocks for each remaining top-level node.
+      // Chain inserts: each new block goes after the previous one.
       const containerConfig = getContainerFieldConfig(blockId, blockPathMap, result, blocksConfig);
+      let afterBlockId = blockId;
       for (let i = 0; i < restNodes.length; i++) {
         const newBlockId = uuidGenerator();
         const newBlockData = { '@type': 'slate', [fieldName]: [restNodes[i]] };
         result = insertBlockInContainer(
-          result, blockPathMap, blockId, newBlockId, newBlockData, containerConfig, 'after',
+          result, blockPathMap, afterBlockId, newBlockId, newBlockData, containerConfig, 'after',
         );
+        afterBlockId = newBlockId;
         if (i === 0) selectBlockId = newBlockId;
       }
 
@@ -1902,19 +1905,36 @@ const Iframe = (props) => {
                 if (isSingleTextField && Array.isArray(prevValue) && Array.isArray(currentValue)) {
                   log('unwrapBlock merge: merging', mergeBlockId, 'into', prevBlockId);
 
-                  // Combine both values into a headless Slate editor and use
-                  // Transforms.mergeNodes — Slate handles normalization (merging
-                  // adjacent text nodes) and cursor positioning correctly.
                   const { Transforms, Editor } = require('slate');
-                  const combined = [...prevValue, ...currentValue];
-                  const mergeEditor = slateTransforms.createHeadlessEditor(combined);
-                  // Position cursor at start of the node to merge (the join point)
-                  const joinIdx = prevValue.length;
-                  Transforms.select(mergeEditor, Editor.start(mergeEditor, [joinIdx]));
-                  // Merge the current block's first node into the previous block's last node
-                  Transforms.mergeNodes(mergeEditor, { at: [joinIdx] });
-                  const mergedValue = JSON.parse(JSON.stringify(mergeEditor.children));
-                  const cursorSelection = mergeEditor.selection;
+                  const { slate: slateConfig } = config.settings;
+                  const prevLastNode = prevValue[prevValue.length - 1];
+                  const isListPrev = prevLastNode && slateConfig?.listTypes?.includes(prevLastNode.type);
+
+                  let mergedValue, cursorSelection;
+
+                  if (isListPrev) {
+                    // Merging p into a list: append p's children to the last li
+                    // (standard behavior: Backspace after list joins into last item)
+                    const copy = JSON.parse(JSON.stringify(prevValue));
+                    const lastList = copy[copy.length - 1];
+                    const lastLi = lastList.children[lastList.children.length - 1];
+                    const pChildren = currentValue[0]?.children || [{ text: '' }];
+                    const joinChildIdx = lastLi.children.length;
+                    lastLi.children.push(...JSON.parse(JSON.stringify(pChildren)));
+                    mergedValue = copy;
+                    const lastListIdx = copy.length - 1;
+                    const lastLiIdx = lastList.children.length - 1;
+                    cursorSelection = { anchor: { path: [lastListIdx, lastLiIdx, joinChildIdx], offset: 0 }, focus: { path: [lastListIdx, lastLiIdx, joinChildIdx], offset: 0 } };
+                  } else {
+                    // Standard merge: combine and use Transforms.mergeNodes
+                    const allNodes = [...prevValue, ...currentValue];
+                    const mergeEditor = slateTransforms.createHeadlessEditor(allNodes);
+                    const joinIdx = prevValue.length;
+                    Transforms.select(mergeEditor, Editor.start(mergeEditor, [joinIdx]));
+                    Transforms.mergeNodes(mergeEditor, { at: [joinIdx] });
+                    mergedValue = JSON.parse(JSON.stringify(mergeEditor.children));
+                    cursorSelection = mergeEditor.selection;
+                  }
                   const updatedPrev = { ...prevBlock, [fieldName]: mergedValue };
 
                   // Merge + delete in one atomic form data update using iframe's form data
@@ -1932,6 +1952,29 @@ const Iframe = (props) => {
                       items: (newFormData.blocks_layout?.items || []).filter(id => id !== mergeBlockId),
                     },
                   };
+
+                  // After merge+delete, check if the next block is a list of the
+                  // same type as the previous block — if so, merge it in.
+                  // Lists are containers: two adjacent ul blocks are one split list.
+                  const prevRootType = mergedValue[0]?.type;
+                  if (prevRootType && slateConfig?.listTypes?.includes(prevRootType)) {
+                    const postLayout = newFormData.blocks_layout?.items || [];
+                    const prevIdx = postLayout.indexOf(prevBlockId);
+                    const nextBlockId = prevIdx >= 0 ? postLayout[prevIdx + 1] : null;
+                    if (nextBlockId) {
+                      const nextBpm = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
+                      const nextBlock = getBlockById(newFormData, nextBpm, nextBlockId);
+                      const nextValue = nextBlock?.[fieldName];
+                      if (Array.isArray(nextValue) && nextValue.length === 1
+                        && nextValue[0]?.type === prevRootType) {
+                        log('unwrapBlock: merging adjacent list block', nextBlockId);
+                        const combined = [{ ...mergedValue[0], children: [...mergedValue[0].children, ...nextValue[0].children] }];
+                        newFormData = updateBlockById(newFormData, nextBpm, prevBlockId, { ...updatedPrev, [fieldName]: combined });
+                        newFormData = deleteBlockFromContainer(newFormData, nextBpm, nextBlockId,
+                          getContainerFieldConfig(nextBlockId, nextBpm, newFormData, config.blocks.blocksConfig, intl));
+                      }
+                    }
+                  }
 
                   // Set pending state synchronously so the FORM_DATA effect sees it
                   flushSync(() => {

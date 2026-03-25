@@ -533,25 +533,24 @@ test.describe('Inline Editing - Basic', () => {
 
     // Place cursor at the very start of the SECOND list item
     await editor.evaluate((el: HTMLElement) => {
-      const allLi = el.querySelectorAll('li');
-      const secondLi = allLi[1];
+      const secondLi = el.querySelectorAll('li')[1];
       if (!secondLi) return;
-      const sel = window.getSelection();
+      const sel = window.getSelection()!;
       const range = document.createRange();
-      const textNode = secondLi.querySelector('[data-node-id]')?.firstChild || secondLi.firstChild;
-      if (textNode) {
-        range.setStart(textNode, 0);
+      const walker = document.createTreeWalker(secondLi, NodeFilter.SHOW_TEXT);
+      const firstText = walker.nextNode();
+      if (firstText) {
+        range.setStart(firstText, 0);
         range.collapse(true);
-        sel?.removeAllRanges();
-        sel?.addRange(range);
+        sel.removeAllRanges();
+        sel.addRange(range);
       }
     });
 
     const blocksBeforeBackspace = await helper.getStableBlockCount();
 
     // Press Backspace at start of second bullet — should demote it to a
-    // plain paragraph, splitting the block. The first bullet stays in the
-    // original block, the demoted text becomes a new block.
+    // plain paragraph, splitting the block.
     await editor.press('Backspace');
 
     // Block count should increase (second bullet demoted to new paragraph block)
@@ -560,15 +559,144 @@ test.describe('Inline Editing - Basic', () => {
     // Original block should still have the first bullet
     await expect(iframe.locator('[data-block-uid="block-1-uuid"]')).toContainText('First item', { timeout: 5000 });
 
-    // Second item should be in a NEW block as a plain paragraph (not a list item)
+    // Second item should be in a NEW block as a plain paragraph
     const newBlockOrder = await helper.getBlockOrder();
     const block1Idx = newBlockOrder.indexOf('block-1-uuid');
     const newBlockId = newBlockOrder[block1Idx + 1];
     expect(newBlockId).toBeTruthy();
     const newBlock = iframe.locator(`[data-block-uid="${newBlockId}"]`);
     await expect(newBlock).toContainText('Second item', { timeout: 5000 });
-    // The new block should NOT contain a list item
     await expect(newBlock.locator('li')).toHaveCount(0);
+
+    // Press Backspace again at start of the new block — should merge back
+    const newEditor = await helper.getEditorLocator(newBlockId!);
+    await expect(newEditor).toBeVisible({ timeout: 5000 });
+    await newEditor.evaluate((el: HTMLElement) => {
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const firstText = walker.nextNode();
+      if (firstText) {
+        range.setStart(firstText, 0);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    });
+    await newEditor.press('Backspace');
+
+    // Block count should decrease (merged back)
+    await helper.waitForBlockCountToBe(blocksBeforeBackspace, 10000);
+    await expect(iframe.locator('[data-block-uid="block-1-uuid"]')).toContainText('First item', { timeout: 5000 });
+    await expect(iframe.locator('[data-block-uid="block-1-uuid"]')).toContainText('Second item', { timeout: 5000 });
+  });
+
+  test('Backspace at start of list item with inline element (link) demotes to paragraph', async ({ page }) => {
+    // Uses complex-slate-page which has a ul block where each li starts with
+    // an empty text node then a <a> link element. The cursor at the start of
+    // the li may be inside the link's data-node-id element — the detection
+    // must still recognize this as a block-level boundary.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/complex-slate-page');
+
+    const iframe = helper.getIframe();
+
+    // block-list-links has a ul with 4 li items, each containing a link
+    const editor = await helper.enterEditMode('block-list-links');
+
+    const listItems = iframe.locator('[data-block-uid="block-list-links"] li');
+    await expect(listItems).toHaveCount(4, { timeout: 5000 });
+
+    // Place cursor at the very start of the SECOND list item
+    await editor.evaluate((el: HTMLElement) => {
+      const secondLi = el.querySelectorAll('li')[1];
+      if (!secondLi) return;
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      const walker = document.createTreeWalker(secondLi, NodeFilter.SHOW_TEXT);
+      const firstText = walker.nextNode();
+      if (firstText) {
+        range.setStart(firstText, 0);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    });
+
+    const blocksBeforeBackspace = await helper.getStableBlockCount();
+
+    // Press Backspace — should demote second li to a paragraph block.
+    // The remaining li items (3rd, 4th) stay as a list in a third block.
+    // Result: [ul with li[0]], [p from li[1]], [ul with li[2], li[3]]
+    await editor.press('Backspace');
+
+    // Block count increases by 2 (demoted paragraph + remaining list)
+    await helper.waitForBlockCountToBe(blocksBeforeBackspace + 2, 10000);
+
+    // Original block should still have the first li only
+    const originalBlock = iframe.locator('[data-block-uid="block-list-links"]');
+    await expect(originalBlock.locator('li')).toHaveCount(1, { timeout: 5000 });
+
+    // First new block should be a paragraph (NOT a list item)
+    const newBlockOrder = await helper.getBlockOrder();
+    const blockIdx = newBlockOrder.indexOf('block-list-links');
+    const demotedBlockId = newBlockOrder[blockIdx + 1];
+    expect(demotedBlockId).toBeTruthy();
+    const demotedBlock = iframe.locator(`[data-block-uid="${demotedBlockId}"]`);
+    await expect(demotedBlock.locator('li')).toHaveCount(0);
+
+    // Second new block should be a list with the remaining 2 items
+    const remainingBlockId = newBlockOrder[blockIdx + 2];
+    expect(remainingBlockId).toBeTruthy();
+    const remainingBlock = iframe.locator(`[data-block-uid="${remainingBlockId}"]`);
+    await expect(remainingBlock.locator('li')).toHaveCount(2, { timeout: 5000 });
+
+    // Demoted block should be selected
+    await helper.waitForBlockSelected(demotedBlockId!);
+
+    // Now press Backspace again — the demoted paragraph should merge with
+    // the list above, becoming a new li at the end of that list.
+    // Result: [ul with 2 li], [ul with 2 li] = back to original block count
+    const demotedEditor = await helper.getEditorLocator(demotedBlockId!);
+    await expect(demotedEditor).toBeVisible({ timeout: 5000 });
+    await demotedEditor.evaluate((el: HTMLElement) => {
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const firstText = walker.nextNode();
+      if (firstText) {
+        range.setStart(firstText, 0);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    });
+    await demotedEditor.press('Backspace');
+
+    // Demoted p merged into last li of list above (text combined),
+    // then adjacent list merged in. Back to single list block.
+    await helper.waitForBlockCountToBe(blocksBeforeBackspace, 10000);
+
+    // 1 combined li (item 1+2 text) + 2 li from remaining list = 3 total
+    await expect(originalBlock.locator('li')).toHaveCount(3, { timeout: 5000 });
+
+    // First li should contain text from both items (joined into one li)
+    const firstLi = originalBlock.locator('li').first();
+    await expect(firstLi).toContainText('NUXT', { timeout: 5000 });
+    await expect(firstLi).toContainText('Framework7', { timeout: 5000 });
+    // Remaining items should still be there
+    await expect(originalBlock).toContainText('Next.js', { timeout: 5000 });
+
+    // Cursor should be at the join point inside the first li
+    // (between NUXT link and Framework7 link). Typing should insert there.
+    const editorAfterMerge = await helper.getEditorLocator('block-list-links');
+    await expect(editorAfterMerge).toBeVisible({ timeout: 5000 });
+    await editorAfterMerge.pressSequentially('CURSOR', { delay: 10 });
+    await expect(firstLi).toContainText('NUXT', { timeout: 5000 });
+    await expect(firstLi).toContainText('CURSOR', { timeout: 5000 });
+    await expect(firstLi).toContainText('Framework7', { timeout: 5000 });
   });
 
   test('Backspace at start of list item in sidebar Slate widget demotes to paragraph', async ({ page }) => {

@@ -29,21 +29,26 @@ export const backspaceListItem = (editor) => {
     }
 
     const [listItem, listItemPath] = getCurrentListItem(editor);
+    console.log('[backspaceListItem]', 'listItem:', listItem?.type, 'path:', JSON.stringify(listItemPath), 'anchor:', JSON.stringify(anchor));
     if (!listItem) {
       return deleteBackward(...args);
     }
 
     const listItemIndex = listItemPath[listItemPath.length - 1];
     if (listItemIndex === 0) {
+      console.log('[backspaceListItem] first li, deferring');
       return deleteBackward(...args);
     }
 
-    // Verify cursor is at the very start of this list item
-    const start = Editor.start(editor, listItemPath);
-    if (
-      anchor.offset !== start.offset ||
-      anchor.path.join(',') !== start.path.join(',')
-    ) {
+    // Verify cursor is at the very start of this list item.
+    // Can't just compare paths — the cursor might be inside an inline element
+    // (link, bold) at offset 0 while Editor.start returns the empty text node
+    // before it. Check if there's any text content before the cursor.
+    const textBefore = Editor.string(editor, {
+      anchor: Editor.start(editor, listItemPath),
+      focus: anchor,
+    });
+    if (textBefore !== '') {
       return deleteBackward(...args);
     }
 
@@ -53,10 +58,14 @@ export const backspaceListItem = (editor) => {
     const defaultType = slate.defaultBlockType || 'p';
 
     Editor.withoutNormalizing(editor, () => {
-      // Split the list node at this li boundary
+      const isList = (n) => Element.isElement(n) && slate.listTypes?.includes(n.type);
+      const secondListChildren = editor.children[listPath[0]]?.children?.length || 0;
+      const hasItemsAfter = listItemIndex < secondListChildren - 1;
+
+      // Split the list at this li boundary
       Transforms.splitNodes(editor, {
         at: listItemPath,
-        match: (n) => Element.isElement(n) && slate.listTypes?.includes(n.type),
+        match: isList,
         always: true,
       });
 
@@ -66,21 +75,32 @@ export const backspaceListItem = (editor) => {
         ? [secondListIdx]
         : [...listPath.slice(0, -1), secondListIdx];
 
-      // Unwrap the second list — lifts li children to editor level
+      // If the second list has more than one item, split again to isolate
+      // just the first item (the one being demoted). Items after it stay
+      // as a list in a third fragment.
+      if (hasItemsAfter) {
+        Transforms.splitNodes(editor, {
+          at: [...secondListPath, 1], // split at second item of the second list
+          match: isList,
+          always: true,
+        });
+      }
+
+      // Now the second list has exactly one li — unwrap and demote it
       Transforms.unwrapNodes(editor, {
         at: secondListPath,
-        match: (n) => Element.isElement(n) && slate.listTypes?.includes(n.type),
+        match: isList,
       });
 
-      // Convert lifted li nodes to paragraphs
-      for (let i = secondListPath[0]; i < editor.children.length; i++) {
-        if (editor.children[i]?.type === slate.listItemType) {
-          Transforms.setNodes(editor, { type: defaultType }, { at: [i] });
-        }
+      // Convert the lifted li to a paragraph
+      const liftedNode = editor.children[secondListPath[0]];
+      if (liftedNode?.type === slate.listItemType) {
+        Transforms.setNodes(editor, { type: defaultType }, { at: secondListPath });
       }
     });
 
-    // Place cursor at start of first demoted paragraph
+    console.log('[backspaceListItem] after split, children:', JSON.stringify(editor.children.map(c => ({ type: c.type, childCount: c.children?.length }))));
+    // Place cursor at start of demoted paragraph
     const newNodeIdx = listPath[listPath.length - 1] + 1;
     const newNodePath = listPath.length === 1
       ? [newNodeIdx]
