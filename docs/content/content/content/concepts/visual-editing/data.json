@@ -29,83 +29,6 @@
             }
           ],
           "type": "p"
-        },
-        {
-          "children": [
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "data-block-uid=\"blockId\""
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " \u2014 Click-to-select blocks. Hydra.js adds click handlers and shows a blue outline and Quanta toolbar on selected blocks."
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "data-edit-text=\"fieldName\""
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " \u2014 Inline text editing. For simple text, click and type directly. For rich text (slate widget), select text to apply formatting via the Quanta toolbar."
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "data-edit-media=\"fieldName\""
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " \u2014 Visual media uploading. Editors can upload, pick or drag-and-drop images directly onto the element."
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "data-edit-link=\"fieldName\""
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " \u2014 Link editing. Click behaviour is replaced with a link picker to select content, enter an external URL, or open the link."
-                }
-              ],
-              "type": "li"
-            }
-          ],
-          "type": "ul"
-        },
-        {
-          "children": [
-            {
-              "text": "Example of a fully annotated slide block:"
-            }
-          ],
-          "type": "p"
         }
       ]
     },
@@ -199,14 +122,6 @@
             }
           ],
           "type": "ul"
-        },
-        {
-          "children": [
-            {
-              "text": "Supported attributes: block-uid, block-readonly, edit-text, edit-link, edit-media, block-add"
-            }
-          ],
-          "type": "p"
         }
       ]
     },
@@ -285,75 +200,6 @@
             }
           ],
           "type": "p"
-        },
-        {
-          "children": [
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "fieldName"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " \u2014 edit the block's own field (default)"
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "../fieldName"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " \u2014 edit the parent block's field"
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "../../fieldName"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " \u2014 edit the grandparent's field"
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "/fieldName"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " \u2014 edit the page metadata field"
-                }
-              ],
-              "type": "li"
-            }
-          ],
-          "type": "ul"
         }
       ]
     },
@@ -493,35 +339,6 @@
             }
           ],
           "type": "p"
-        },
-        {
-          "children": [
-            {
-              "children": [
-                {
-                  "text": "Element nodes (p, strong, em, etc.) must have data-node-id matching the Slate node's nodeId"
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Wrapper elements \u2014 If you add extra wrapper elements around a Slate node, ALL wrappers must have the same data-node-id as the inner element"
-                }
-              ],
-              "type": "li"
-            }
-          ],
-          "type": "ol"
-        },
-        {
-          "children": [
-            {
-              "text": "hydra.js uses node-ids to map between Slate's data model and your DOM. When restoring cursor position after formatting changes, it walks your DOM counting Slate children."
-            }
-          ],
-          "type": "p"
         }
       ]
     },
@@ -627,6 +444,219 @@
     },
     "ve-title-1": {
       "@type": "title"
+    },
+    "annotations-text-t0-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "data-block-uid=\"blockId\""
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " \u2014 Click-to-select blocks. Hydra.js adds click handlers and shows a blue outline and Quanta toolbar on selected blocks."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "data-edit-text=\"fieldName\""
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " \u2014 Inline text editing. For simple text, click and type directly. For rich text (slate widget), select text to apply formatting via the Quanta toolbar."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "data-edit-media=\"fieldName\""
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " \u2014 Visual media uploading. Editors can upload, pick or drag-and-drop images directly onto the element."
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "data-edit-link=\"fieldName\""
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " \u2014 Link editing. Click behaviour is replaced with a link picker to select content, enter an external URL, or open the link."
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        }
+      ]
+    },
+    "annotations-text-t0-split-2": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Example of a fully annotated slide block:"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "comment-text-t2-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Supported attributes: block-uid, block-readonly, edit-text, edit-link, edit-media, block-add"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "pathsyntax-text-t0-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "fieldName"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " \u2014 edit the block's own field (default)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "../fieldName"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " \u2014 edit the parent block's field"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "../../fieldName"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " \u2014 edit the grandparent's field"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "/fieldName"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " \u2014 edit the page metadata field"
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        }
+      ]
+    },
+    "nodeid-text-t0-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": "Element nodes (p, strong, em, etc.) must have data-node-id matching the Slate node's nodeId"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Wrapper elements \u2014 If you add extra wrapper elements around a Slate node, ALL wrappers must have the same data-node-id as the inner element"
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ol"
+        }
+      ]
+    },
+    "nodeid-text-t0-split-2": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "hydra.js uses node-ids to map between Slate's data model and your DOM. When restoring cursor position after formatting changes, it walks your DOM counting Slate children."
+            }
+          ],
+          "type": "p"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -634,16 +664,20 @@
       "ve-title-1",
       "annotations-heading",
       "annotations-text-t0",
+      "annotations-text-t0-split-1",
+      "annotations-text-t0-split-2",
       "annotations-text-c1",
       "comment-heading",
       "comment-text-t0",
       "comment-text-c1",
       "comment-text-t2",
+      "comment-text-t2-split-1",
       "linkable-heading",
       "linkable-text-t0",
       "linkable-text-c1",
       "pathsyntax-heading",
       "pathsyntax-text-t0",
+      "pathsyntax-text-t0-split-1",
       "pathsyntax-text-c1",
       "pathsyntax-text-t2",
       "readonly-heading",
@@ -653,6 +687,8 @@
       "readonly-text-c2",
       "nodeid-heading",
       "nodeid-text-t0",
+      "nodeid-text-t0-split-1",
+      "nodeid-text-t0-split-2",
       "nodeid-text-c1",
       "slateexample-heading",
       "slateexample-text-t0",

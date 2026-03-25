@@ -59,14 +59,6 @@
             }
           ],
           "type": "h2"
-        },
-        {
-          "children": [
-            {
-              "text": "Lorem ipsum vitae elit libero, a pharetra augue. Nulla vitae elit libero, a pharetra augue. Duis mollis, est non commodo luctus, nisi erat porttitor ligula, eget lacinia odio sem nec elit. Donec ullamcorper nulla non metus auctor fringilla. Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor. Vestibulum id ligula porta felis euismod semper."
-            }
-          ],
-          "type": "p"
         }
       ]
     },
@@ -123,6 +115,19 @@
           "code": "<script>\n  export let block;\n  export let content;\n</script>\n\n<div data-block-uid={block['@uid']} class=\"introduction-block\">\n  <h1 data-edit-text=\"/title\">{content.title}</h1>\n  {#if content.description}<p data-edit-text=\"/description\" class=\"description\">{content.description}</p>{/if}\n</div>"
         }
       ]
+    },
+    "d35f209e-12c1-4a30-ae36-52f84a4a0b7b-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Lorem ipsum vitae elit libero, a pharetra augue. Nulla vitae elit libero, a pharetra augue. Duis mollis, est non commodo luctus, nisi erat porttitor ligula, eget lacinia odio sem nec elit. Donec ullamcorper nulla non metus auctor fringilla. Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor. Vestibulum id ligula porta felis euismod semper."
+            }
+          ],
+          "type": "p"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -130,6 +135,7 @@
       "50727b9a-1f8a-4857-aab5-8acc6985bfc6",
       "d0438a28-aaaf-4db1-8887-c9b3351787d3",
       "d35f209e-12c1-4a30-ae36-52f84a4a0b7b",
+      "d35f209e-12c1-4a30-ae36-52f84a4a0b7b-split-1",
       "cec08900-0334-4288-9ece-f5d15d4dd6f1",
       "26accd80-9715-43ea-9b7c-aa0b3be7d0da",
       "177de529-ce72-4721-a58c-15feadaf285e",

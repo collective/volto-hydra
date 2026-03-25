@@ -166,25 +166,6 @@
             }
           ],
           "type": "p"
-        },
-        {
-          "children": [
-            {
-              "text": "You can override the look of the '+' button by rendering something inside the empty block and adding "
-            },
-            {
-              "children": [
-                {
-                  "text": "data-block-add=\"button\""
-                }
-              ],
-              "type": "strong"
-            },
-            {
-              "text": " to it."
-            }
-          ],
-          "type": "p"
         }
       ]
     },
@@ -606,6 +587,30 @@
           "type": "ul"
         }
       ]
+    },
+    "empty-text-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "You can override the look of the '+' button by rendering something inside the empty block and adding "
+            },
+            {
+              "children": [
+                {
+                  "text": "data-block-add=\"button\""
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " to it."
+            }
+          ],
+          "type": "p"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -633,6 +638,7 @@
       "table-text-c1",
       "empty-heading",
       "empty-text",
+      "empty-text-split-1",
       "inherit-heading",
       "inherit-text-t0",
       "inherit-text-c1",

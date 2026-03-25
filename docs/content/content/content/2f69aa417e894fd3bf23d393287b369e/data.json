@@ -69,14 +69,6 @@
             }
           ],
           "type": "h2"
-        },
-        {
-          "children": [
-            {
-              "text": "Lorem ipsum vitae elit libero, a pharetra augue. Nulla vitae elit libero, a pharetra augue. Duis mollis, est non commodo luctus, nisi erat porttitor ligula, eget lacinia odio sem nec elit. Donec ullamcorper nulla non metus auctor fringilla. Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor. Vestibulum id ligula porta felis euismod semper."
-            }
-          ],
-          "type": "p"
         }
       ]
     },
@@ -212,6 +204,19 @@
           "code": "<script>\n  export let block;\n</script>\n\n<svelte:element this={block.tag || 'h2'} data-block-uid={block['@uid']} data-edit-text=\"heading\">\n  {block.heading}\n</svelte:element>"
         }
       ]
+    },
+    "36960cee-ec85-458b-b0be-d2e7a5a41e5f-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Lorem ipsum vitae elit libero, a pharetra augue. Nulla vitae elit libero, a pharetra augue. Duis mollis, est non commodo luctus, nisi erat porttitor ligula, eget lacinia odio sem nec elit. Donec ullamcorper nulla non metus auctor fringilla. Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor. Vestibulum id ligula porta felis euismod semper."
+            }
+          ],
+          "type": "p"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -221,6 +226,7 @@
       "faabad67-4aa2-4774-a48c-b1accf288700",
       "fe637263-126e-4a7f-b4aa-36369c5155cc",
       "36960cee-ec85-458b-b0be-d2e7a5a41e5f",
+      "36960cee-ec85-458b-b0be-d2e7a5a41e5f-split-1",
       "e328753b-d914-4bcb-8b8b-2d5060476efe",
       "06a960a6-795c-409d-a55f-94d5047e3514",
       "b4691078-153d-451f-9b47-fa6f852a1e6c",

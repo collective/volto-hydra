@@ -29,12 +29,12 @@
     },
     "spa-heading": {
       "@type": "slate",
-      "plaintext": "SPA/Hybrid — Full Visual Editing",
+      "plaintext": "SPA/Hybrid \u2014 Full Visual Editing",
       "value": [
         {
           "children": [
             {
-              "text": "SPA/Hybrid — Full Visual Editing"
+              "text": "SPA/Hybrid \u2014 Full Visual Editing"
             }
           ],
           "type": "h2"
@@ -48,44 +48,7 @@
         {
           "children": [
             {
-              "text": "The simplest setup — your frontend handles both production and editing:"
-            }
-          ],
-          "type": "p"
-        },
-        {
-          "children": [
-            {
-              "children": [
-                {
-                  "text": "Deploy your frontend as SPA or Hybrid (SSR + client-side hydration)"
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Deploy Hydra and the Plone API server"
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "text": "Login to Hydra, go to user preferences, set your frontend URL"
-                }
-              ],
-              "type": "li"
-            }
-          ],
-          "type": "ol"
-        },
-        {
-          "children": [
-            {
-              "text": "This gives you all visual editing features including inline text editing, drag and drop, and realtime preview."
+              "text": "The simplest setup \u2014 your frontend handles both production and editing:"
             }
           ],
           "type": "p"
@@ -94,12 +57,12 @@
     },
     "ssg-heading": {
       "@type": "slate",
-      "plaintext": "SSG/SSR — Production Speed + Visual Editing",
+      "plaintext": "SSG/SSR \u2014 Production Speed + Visual Editing",
       "value": [
         {
           "children": [
             {
-              "text": "SSG/SSR — Production Speed + Visual Editing"
+              "text": "SSG/SSR \u2014 Production Speed + Visual Editing"
             }
           ],
           "type": "h2"
@@ -117,75 +80,6 @@
             }
           ],
           "type": "p"
-        },
-        {
-          "children": [
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "Production"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " — Deploy your frontend in SSG or SSR mode (fast, cacheable)"
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "Editing"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " — Deploy the same frontend in SPA mode to a separate URL (used only in Hydra)"
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "Hydra + Plone"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " — Only needs to run during editing, so scale-to-zero / serverless works"
-                }
-              ],
-              "type": "li"
-            },
-            {
-              "children": [
-                {
-                  "children": [
-                    {
-                      "text": "SSG rebuild"
-                    }
-                  ],
-                  "type": "strong"
-                },
-                {
-                  "text": " — For SSG, configure collective.webhook to trigger a rebuild on edit. SSR doesn't need this."
-                }
-              ],
-              "type": "li"
-            }
-          ],
-          "type": "ol"
         }
       ]
     },
@@ -214,7 +108,87 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "twowin-heading": {
+      "@type": "slate",
+      "plaintext": "Without Hydra (Two-Window Editing)",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Without Hydra (Two-Window Editing)"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "twowin-text": {
+      "@type": "slate",
+      "plaintext": "You can use Plone Headless without Hydra using Volto for editing and your frontend for viewing, but it won't be WYSIWYG.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "You can use Plone headless without Hydra \u2014 use Volto for editing and your custom frontend for viewing. But Volto's default theme won't match your frontend, so editors have to switch tabs to see the real result. For WYSIWYG editing, you'd need to recreate your design in Volto (duplicating work), or just use Hydra."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "spa-text-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": "Deploy your frontend as SPA or Hybrid (SSR + client-side hydration)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Deploy Hydra and the Plone API server"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "text": "Login to Hydra, go to user preferences, set your frontend URL"
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ol"
+        }
+      ]
+    },
+    "spa-text-split-2": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "This gives you all visual editing features including inline text editing, drag and drop, and realtime preview."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "ssg-text-split-1": {
+      "@type": "slate",
+      "value": [
         {
           "children": [
             {
@@ -228,7 +202,81 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — "
+                  "text": " \u2014 Deploy your frontend in SSG or SSR mode (fast, cacheable)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Editing"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " \u2014 Deploy the same frontend in SPA mode to a separate URL (used only in Hydra)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Hydra + Plone"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " \u2014 Only needs to run during editing, so scale-to-zero / serverless works"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "SSG rebuild"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " \u2014 For SSG, configure collective.webhook to trigger a rebuild on edit. SSR doesn't need this."
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ol"
+        }
+      ]
+    },
+    "example-text-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "Production"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " \u2014 "
                 },
                 {
                   "children": [
@@ -258,7 +306,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Same Nuxt codebase deployed as SPA to a different Netlify URL. Only loaded inside Hydra's iframe."
+                  "text": " \u2014 Same Nuxt codebase deployed as SPA to a different Netlify URL. Only loaded inside Hydra's iframe."
                 }
               ],
               "type": "li"
@@ -274,7 +322,7 @@
                   "type": "strong"
                 },
                 {
-                  "text": " — Deployed to "
+                  "text": " \u2014 Deployed to "
                 },
                 {
                   "children": [
@@ -295,39 +343,16 @@
             }
           ],
           "type": "ul"
-        },
+        }
+      ]
+    },
+    "example-text-split-2": {
+      "@type": "slate",
+      "value": [
         {
           "children": [
             {
               "text": "For most frameworks switching between SSG/SSR and SPA is just a config toggle, so you get the best of both worlds with minimal effort."
-            }
-          ],
-          "type": "p"
-        }
-      ]
-    },
-    "twowin-heading": {
-      "@type": "slate",
-      "plaintext": "Without Hydra (Two-Window Editing)",
-      "value": [
-        {
-          "children": [
-            {
-              "text": "Without Hydra (Two-Window Editing)"
-            }
-          ],
-          "type": "h2"
-        }
-      ]
-    },
-    "twowin-text": {
-      "@type": "slate",
-      "plaintext": "You can use Plone Headless without Hydra using Volto for editing and your frontend for viewing, but it won't be WYSIWYG.",
-      "value": [
-        {
-          "children": [
-            {
-              "text": "You can use Plone headless without Hydra — use Volto for editing and your custom frontend for viewing. But Volto's default theme won't match your frontend, so editors have to switch tabs to see the real result. For WYSIWYG editing, you'd need to recreate your design in Volto (duplicating work), or just use Hydra."
             }
           ],
           "type": "p"
@@ -342,10 +367,15 @@
       "sep-1",
       "spa-heading",
       "spa-text",
+      "spa-text-split-1",
+      "spa-text-split-2",
       "ssg-heading",
       "ssg-text",
+      "ssg-text-split-1",
       "example-heading",
       "example-text",
+      "example-text-split-1",
+      "example-text-split-2",
       "twowin-heading",
       "twowin-text"
     ]

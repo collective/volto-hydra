@@ -251,14 +251,6 @@
             }
           ],
           "type": "h2"
-        },
-        {
-          "children": [
-            {
-              "text": "Paragraph text (p, 24/33px) -> Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet."
-            }
-          ],
-          "type": "p"
         }
       ]
     },
@@ -535,6 +527,19 @@
           "type": "h2"
         }
       ]
+    },
+    "96e308ec-74e6-4ddd-bf31-4a9e66e0584e-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Paragraph text (p, 24/33px) -> Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet."
+            }
+          ],
+          "type": "p"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -553,6 +558,7 @@
       "9f276d9d-f3c9-4529-9a69-9c93f2d6c5ea",
       "55d58a5e-01a0-469e-b80b-3a5059593833",
       "96e308ec-74e6-4ddd-bf31-4a9e66e0584e",
+      "96e308ec-74e6-4ddd-bf31-4a9e66e0584e-split-1",
       "875e2811-edb6-4842-8cc0-246fa1be6f58",
       "f4104455-1f80-4209-827d-416f2f07dec9",
       "dc27e427-babe-4497-a6ae-fdefeaba2d13",

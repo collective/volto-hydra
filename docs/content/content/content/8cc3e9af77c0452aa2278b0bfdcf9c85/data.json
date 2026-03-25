@@ -51,7 +51,7 @@
       "@type": "image",
       "align": "left",
       "credit": {},
-      "description": "Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren.",
+      "description": "Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Aufl\u00f6sung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht n\u00f6tig ist Bilder manuell herunter zu skalieren.",
       "image_field": "image",
       "size": "l",
       "title": "Image - Light",
@@ -144,7 +144,7 @@
       "@type": "image",
       "align": "right",
       "credit": {},
-      "description": "Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren.",
+      "description": "Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Aufl\u00f6sung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht n\u00f6tig ist Bilder manuell herunter zu skalieren.",
       "image_field": "image",
       "size": "l",
       "title": "Image - Light",
@@ -229,7 +229,7 @@
       "@type": "image",
       "align": "center",
       "credit": {},
-      "description": "Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren.",
+      "description": "Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Aufl\u00f6sung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht n\u00f6tig ist Bilder manuell herunter zu skalieren.",
       "image_field": "image",
       "size": "l",
       "title": "Image - Light",
@@ -249,14 +249,6 @@
             }
           ],
           "type": "h2"
-        },
-        {
-          "children": [
-            {
-              "text": "Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. "
-            }
-          ],
-          "type": "p"
         }
       ],
       "templateId": "/templates/newsitem-view",
@@ -352,7 +344,7 @@
       "@type": "image",
       "align": "right",
       "credit": {},
-      "description": "Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren.",
+      "description": "Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Aufl\u00f6sung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht n\u00f6tig ist Bilder manuell herunter zu skalieren.",
       "image_field": "image",
       "size": "s",
       "styles": {
@@ -441,7 +433,7 @@
       "@type": "image",
       "align": "right",
       "credit": {},
-      "description": "Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren.",
+      "description": "Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Aufl\u00f6sung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht n\u00f6tig ist Bilder manuell herunter zu skalieren.",
       "image_field": "image",
       "size": "m",
       "styles": {
@@ -509,7 +501,7 @@
       "@type": "image",
       "align": "left",
       "credit": {},
-      "description": "Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren.",
+      "description": "Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Aufl\u00f6sung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht n\u00f6tig ist Bilder manuell herunter zu skalieren.",
       "image_field": "image",
       "size": "m",
       "styles": {
@@ -577,7 +569,7 @@
       "@type": "image",
       "align": "left",
       "credit": {},
-      "description": "Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren.",
+      "description": "Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Aufl\u00f6sung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht n\u00f6tig ist Bilder manuell herunter zu skalieren.",
       "image_field": "image",
       "size": "s",
       "styles": {
@@ -763,7 +755,7 @@
       "@type": "image",
       "align": "wide",
       "credit": {},
-      "description": "Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Auflösung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht nötig ist Bilder manuell herunter zu skalieren.",
+      "description": "Der Inhaltstyp Bild kann verwendet werden um ein Bild in verschiedenen Formate (JPG, GIF, PNG, SVG) hochzuladen. Das hochgeladene Bild sollte dabei immer eine hohe Aufl\u00f6sung haben, damit es flexibel, z.B. auch als Banner-Bild eingesetzt werden kann. Plone liefert die Bilder automatisch in der besten Skalierung aus, so dass es nicht n\u00f6tig ist Bilder manuell herunter zu skalieren.",
       "image_field": "image",
       "size": "l",
       "title": "Inhaltstyp: Image-1",
@@ -798,6 +790,19 @@
       "templateId": "/templates/newsitem-view",
       "templateInstanceId": "tpl-ni-def",
       "slotId": "date"
+    },
+    "4ad62079-8826-4677-9a53-4bce2ebb0caf-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. "
+            }
+          ],
+          "type": "p"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -807,6 +812,7 @@
       "f16a700c-3b02-47aa-9d08-ade7dea4f683",
       "b5b151a1-fb13-458a-8232-4a87bb8c2904",
       "4ad62079-8826-4677-9a53-4bce2ebb0caf",
+      "4ad62079-8826-4677-9a53-4bce2ebb0caf-split-1",
       "9c1f17e7-4c01-4f6f-8241-7ee47b7f1ce9",
       "83af2a96-6f44-4c03-9178-bd6b3678d524",
       "fa56fc9a-574e-4a7f-b6ef-703bccc54667",
