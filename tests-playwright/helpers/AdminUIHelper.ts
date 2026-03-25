@@ -1334,6 +1334,12 @@ export class AdminUIHelper {
    * Get selection state info from an editor element.
    * Useful for debugging selection/focus issues.
    */
+  async getCleanSelectionText(locator: Locator): Promise<string> {
+    return await locator.evaluate(() => {
+      return (window.getSelection()?.toString() || '').replace(/[\uFEFF\u200B]/g, '');
+    });
+  }
+
   async getSelectionInfo(editor: Locator): Promise<{
     rangeCount: number;
     isCollapsed: boolean;

@@ -2008,12 +2008,19 @@ export class Bridge {
               log('FORM_DATA total round-trip:', (performance.now() - this._transformSentAt).toFixed(0) + 'ms');
               this._transformSentAt = null;
             }
+            // If a render is already in progress, queue this FORM_DATA.
+            // Don't call setFormDataFromAdmin — this.formData must stay in sync
+            // with what onEditChange rendered, otherwise isContentReady compares
+            // DOM against data the framework never received.
+            if (this._renderInProgress) {
+              log('FORM_DATA: render in progress, queuing');
+              this._formDataQueue = event.data;
+              return;
+            }
+
             this.setFormDataFromAdmin(event.data.data, 'FORM_DATA', event.data.blockPathMap);
 
-            // === Non-stale FORM_DATA - apply it fully ===
-
             // Add nodeIds to all slate blocks before rendering
-            // Admin UI never sends nodeIds, so we always need to add them
             this.addNodeIdsToAllSlateFields();
 
             // Detect echo: compare after addNodeIdsToAllSlateFields so both
@@ -2025,16 +2032,6 @@ export class Bridge {
 
             // Extract formatRequestId early so it's available in rAF callbacks
             const formatRequestId = event.data.formatRequestId;
-
-            // If a render is already in progress, queue this FORM_DATA.
-            // Processing two concurrent renders causes MutationObserver to fire
-            // mid-render, corrupting formData. Process the queue after the
-            // current render's afterContentRender completes.
-            if (this._renderInProgress) {
-              log('FORM_DATA: render in progress, queuing');
-              this._formDataQueue = event.data;
-              return;
-            }
             // Set expectedSelectionFromAdmin BEFORE the render so that any
             // selectionchange from DOM re-render is suppressed. Without this,
             // the selectionchange fires before afterContentRender's double-rAF
