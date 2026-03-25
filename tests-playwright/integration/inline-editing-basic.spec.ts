@@ -456,9 +456,10 @@ test.describe('Inline Editing - Basic', () => {
     const newBlockUid = blockOrder[block1Idx + 1];
     expect(newBlockUid).toBeTruthy();
 
-    // Wait for new block to be selected and type into it
+    // Wait for new block to be selected and editable
     await helper.waitForBlockSelected(newBlockUid!);
     const newEditor = await helper.getEditorLocator(newBlockUid!);
+    await expect(newEditor).toBeVisible({ timeout: 5000 });
     await newEditor.pressSequentially('Second block', { delay: 10 });
     await helper.waitForEditorText(newEditor, /Second block/);
 

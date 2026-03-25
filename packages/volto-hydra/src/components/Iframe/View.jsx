@@ -1836,7 +1836,7 @@ const Iframe = (props) => {
 
                 // Only merge single-text-field blocks (e.g. slate paragraphs)
                 // Multi-field blocks (hero, teaser) should not merge
-                const prevSchema = getResolvedSchema(prevPathInfo, iframeSyncState.blockPathMap);
+                const prevSchema = getResolvedSchema(prevPathInfo, mergeBpm);
                 const prevEditableFields = prevSchema?.properties
                   ? Object.entries(prevSchema.properties).filter(([, def]) => {
                       const ft = getFieldTypeString(def);
