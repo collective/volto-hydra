@@ -1056,6 +1056,90 @@ export class Bridge {
    * @param {HTMLElement} editableField - The editable field element
    * @param {boolean} shiftKey - Whether shift is held (extend selection)
    */
+  /**
+   * Replay a single non-text key action (arrow, delete, home, end, etc.)
+   * on the given editable field. Handles ZWS/BOM nodes that interfere with
+   * cursor movement. Used by buffer replay and testable independently.
+   * @returns {boolean} true if handled
+   */
+  replayOneKey(blockId, key, editableField, shiftKey = false) {
+    if (key === 'Backspace') {
+      if (!this.handleDeleteKey(blockId, 'Backspace')) {
+        if (!this.preserveLastCharDelete()) {
+          document.execCommand('delete', false);
+        }
+      }
+      return true;
+    }
+    if (key === 'Delete') {
+      this._skipZwsNode('forward');
+      if (!this.handleDeleteKey(blockId, 'Delete')) {
+        if (!this.preserveLastCharDelete()) {
+          // Use Range API to delete one character forward. execCommand
+          // forwardDelete is deprecated and unreliable after programmatic
+          // cursor positioning (it may act on the wrong node).
+          const sel = window.getSelection();
+          if (sel?.isCollapsed && sel.focusNode?.nodeType === Node.TEXT_NODE) {
+            const text = sel.focusNode.textContent || '';
+            if (sel.focusOffset < text.length) {
+              const range = document.createRange();
+              range.setStart(sel.focusNode, sel.focusOffset);
+              range.setEnd(sel.focusNode, sel.focusOffset + 1);
+              range.deleteContents();
+            }
+          }
+        }
+      }
+      return true;
+    }
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
+      this.moveArrowKey(key, editableField, shiftKey);
+      return true;
+    }
+    if (key === 'Home' || key === 'End') {
+      const sel = window.getSelection();
+      if (sel) {
+        const dir = key === 'Home' ? 'backward' : 'forward';
+        sel.modify(shiftKey ? 'extend' : 'move', dir, 'lineboundary');
+        // Skip ZWS at line boundary
+        this._skipZwsNode(dir === 'backward' ? 'forward' : 'backward');
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * If the cursor is inside a ZWS/BOM-only text node, move it out in the
+   * given direction. This prevents arrow keys, Delete, and Backspace from
+   * "wasting" a move on an invisible character.
+   */
+  _skipZwsNode(direction) {
+    const sel = window.getSelection();
+    if (!sel?.focusNode || sel.focusNode.nodeType !== Node.TEXT_NODE) return;
+    const text = sel.focusNode.textContent?.replace(/[\uFEFF\u200B]/g, '');
+    if (text === '') {
+      // Cursor is in a ZWS-only node. Instead of using sel.modify (which
+      // may overshoot by landing after the first char of the next node),
+      // find the adjacent visible text node and set cursor at its edge.
+      // Walk from the contenteditable root (not the immediate parent) so
+      // we can find text nodes across element boundaries.
+      const root = sel.focusNode.closest?.('[contenteditable="true"]')
+        || sel.focusNode.parentElement?.closest?.('[contenteditable="true"]')
+        || document.body;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      walker.currentNode = sel.focusNode;
+      const target = direction === 'forward' ? walker.nextNode() : walker.previousNode();
+      if (target) {
+        const range = document.createRange();
+        range.setStart(target, direction === 'forward' ? 0 : target.textContent.length);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    }
+  }
+
   moveArrowKey(key, editableField, shiftKey = false) {
     const navActions = {
       ArrowLeft: ['backward', 'character'],
@@ -1080,6 +1164,10 @@ export class Bridge {
 
     const beforeNode = sel.focusNode;
     const beforeOffset = sel.focusOffset;
+    // Skip out of ZWS-only nodes before moving — otherwise the move
+    // crosses the invisible node boundary instead of a visible character.
+    this._skipZwsNode(navActions[key][0]);
+
     sel.modify('move', navActions[key][0], navActions[key][1]);
 
     if (sel.focusNode === beforeNode && sel.focusOffset === beforeOffset) {
@@ -2538,10 +2626,10 @@ export class Bridge {
   _ensureDocumentKeyboardBlocker() {
     if (this._documentKeyboardBlocker) return;
     this._documentKeyboardBlocker = (e) => {
-      // DEBUG: log ALL keydown events through the blocker
-      if (e.type === 'keydown') {
-        log('DEBUG blocker entry:', e.key, 'blockedBlockId:', this.blockedBlockId,
-            'target:', e.target?.nodeName);
+      // DEBUG: log events through the blocker (only when blocked)
+      if (this.blockedBlockId) {
+        log('DEBUG blocker:', e.type, e.key || e.inputType || '?', 'target:', e.target?.nodeName,
+          'block:', e.target?.closest?.('[data-block-uid]')?.getAttribute('data-block-uid'));
       }
       if (!this.blockedBlockId) return;
 
@@ -2662,6 +2750,8 @@ export class Bridge {
 
     const { blockId, requestId: originalRequestId } = this.pendingTransform;
     log('[HYDRA-DEBUG] replayBufferAndUnblock:', { blockId, requestId: originalRequestId, bufferLen: this.eventBuffer.length, remainderLen: this._replayRemainder?.length || 0, context });
+    const editEl = this.queryBlockElement(blockId)?.querySelector('[data-edit-text]') || this.queryBlockElement(blockId);
+    if (editEl) log('[HYDRA-DEBUG] replayBufferAndUnblock DOM:', editEl.innerHTML?.substring(0, 200));
 
     // Prepare buffer for replay. Include any remainder from a previous replay
     // that was interrupted by a transform (e.g. Enter→split mid-replay).
@@ -2818,29 +2908,8 @@ export class Bridge {
     const replayKey = (evt) => {
       log('Replaying buffered key:', evt.key, { ctrl: evt.ctrlKey, meta: evt.metaKey, shift: evt.shiftKey });
 
-      // Backspace/Delete: shared handler checks for special cases (unwrap, delete
-      // block, boundary). Only use native execCommand if handler didn't act.
-      if (evt.key === 'Backspace') {
-        if (!this.handleDeleteKey(blockId, 'Backspace')) {
-          // preserveLastCharDelete handles the case where execCommand would
-          // remove the last char from an inline element — execCommand doesn't
-          // fire beforeinput so the editableField handler can't catch it.
-          if (!this.preserveLastCharDelete()) {
-            document.execCommand('delete', false);
-          }
-        }
-        return;
-      }
-      if (evt.key === 'Delete') {
-        if (!this.handleDeleteKey(blockId, 'Delete')) {
-          if (!this.preserveLastCharDelete()) {
-            document.execCommand('forwardDelete', false);
-          }
-        }
-        return;
-      }
-      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(evt.key)) {
-        this.moveArrowKey(evt.key, currentEditable, evt.shiftKey);
+      // Try replayOneKey for Backspace, Delete, arrows, Home, End
+      if (this.replayOneKey(blockId, evt.key, currentEditable, evt.shiftKey)) {
         return;
       }
       if (navMap[evt.key]) {
@@ -3187,6 +3256,15 @@ export class Bridge {
       return false;
     }
 
+    // BOM/ZWS-only text nodes inside wrapper elements without data-node-id
+    // are invalid. This catches nextjs BOM spans (<span>﻿</span>) inside a
+    // valid data-node-id ancestor. But ZWS nodes that are DIRECT children
+    // of a data-node-id element (cursor exit positioning) are valid.
+    const visibleText = node.textContent?.replace(/[\uFEFF\u200B\s]/g, '');
+    if (visibleText === '' && node.parentElement && !node.parentElement.hasAttribute?.('data-node-id')) {
+      return true;
+    }
+
     // Find the editable field container
     let editableField = null;
     let current = node.parentNode;
@@ -3378,9 +3456,36 @@ export class Bridge {
     // Must disconnect (not just set a flag) because MutationObserver fires async.
     this._suppressObserver();
 
-    // Get corrected positions using shared helper
-    const anchorPos = this.getValidatedPosition(range.startContainer, range.startOffset);
-    const focusPos = this.getValidatedPosition(range.endContainer, range.endOffset);
+    // Get corrected positions using shared helper.
+    // For range selections, if both endpoints are on invalid whitespace,
+    // move anchor to start of first visible text and focus to end of last
+    // visible text — otherwise both resolve to the same position and the
+    // range collapses.
+    let anchorPos, focusPos;
+    if (!range.collapsed && anchorOnWhitespace && focusOnWhitespace) {
+      const editField = range.startContainer.parentElement?.closest('[data-edit-text], [contenteditable="true"]');
+      if (editField) {
+        const walker = document.createTreeWalker(editField, NodeFilter.SHOW_TEXT);
+        let firstVisible = null;
+        let lastVisible = null;
+        let node;
+        while ((node = walker.nextNode())) {
+          const vis = node.textContent?.replace(/[\uFEFF\u200B\s]/g, '');
+          if (vis) {
+            if (!firstVisible) firstVisible = node;
+            lastVisible = node;
+          }
+        }
+        anchorPos = firstVisible ? { node: firstVisible, offset: 0 } : this.getValidatedPosition(range.startContainer, range.startOffset);
+        focusPos = lastVisible ? { node: lastVisible, offset: lastVisible.textContent.length } : this.getValidatedPosition(range.endContainer, range.endOffset);
+      } else {
+        anchorPos = this.getValidatedPosition(range.startContainer, range.startOffset);
+        focusPos = this.getValidatedPosition(range.endContainer, range.endOffset);
+      }
+    } else {
+      anchorPos = this.getValidatedPosition(range.startContainer, range.startOffset);
+      focusPos = this.getValidatedPosition(range.endContainer, range.endOffset);
+    }
 
     log('correctInvalidWhitespaceSelection: anchorPos:', anchorPos, 'focusPos:', focusPos);
 

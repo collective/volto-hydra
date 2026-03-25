@@ -1231,7 +1231,7 @@ export class AdminUIHelper {
         async () => {
           return await editor.evaluate(() => {
             const selection = window.getSelection();
-            return selection ? selection.toString() : '';
+            return selection ? selection.toString().replace(/[\uFEFF\u200B]/g, '') : '';
           });
         },
         {

@@ -114,7 +114,7 @@ test.describe('Inline Editing with Mock Parent', () => {
     await editable.click();
     await page.keyboard.press('ControlOrMeta+a');
     await expect.poll(() =>
-      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+      helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
 
     // Apply bold using keyboard shortcut to trigger transform
