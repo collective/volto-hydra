@@ -4922,22 +4922,18 @@ export class Bridge {
           : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
 
         if (blockUidToProcess) {
-          let blockElement = this.queryBlockElement(blockUidToProcess);
+          const blockElement = this.queryBlockElement(blockUidToProcess);
 
-          // If block is hidden, try to make it visible (carousel navigation)
-          if (blockElement && this.isElementHidden(blockElement)) {
-            if (!(this._blockSelectorNavigating || this._navigatingToBlock)) {
-              this.tryMakeBlockVisible(blockUidToProcess);
-            }
-            // Re-query after visibility attempt
-            blockElement = this.queryBlockElement(blockUidToProcess);
-          }
-
+          // Navigation is handled by the poller in _executeRender — not here.
+          // We only proceed if the block is visible. If it's hidden/missing
+          // after a block switch, the poller already timed out or navigation
+          // failed — selecting a hidden block would produce a zero-rect
+          // BLOCK_SELECTED that confuses the admin UI.
           this.ensureElementsHaveMinSize();
           if (blockElement && !this.isElementHidden(blockElement)) {
             blockHandler(blockElement);
           } else if (needsBlockSwitch) {
-            log('afterContentRender: block not found or hidden:', blockUidToProcess);
+            log('afterContentRender: block not visible, skipping select:', blockUidToProcess);
           }
         }
 
@@ -5324,6 +5320,20 @@ export class Bridge {
    * - Target block (if switching): must exist in DOM with matching content.
    * Returns false if any block needs rendering.
    */
+  /**
+   * Pure readiness check — no side effects.
+   *
+   * A block is "ready" when it's visible in the viewport AND its rendered DOM
+   * matches the formData (isContentReady). We cannot assume a block is rendered
+   * but hidden — some implementations (carousels, tabs, lazy containers) may
+   * not render a block's content at all until it is navigated to. "Not in DOM"
+   * and "in DOM but not visible" are treated the same: not ready.
+   *
+   * @returns {{ ready: boolean, targetVisible: boolean }} ready=true means all
+   *   blocks are ready to proceed. targetVisible indicates whether the target
+   *   block (if switching) is visible — used by the poller to decide whether
+   *   to navigate or give up on timeout.
+   */
   _areBlocksReady(blockId, blockEl, afterRenderOptions = {}) {
     // Determine status of current block
     let currentReady = true; // Default: no current block = ready
@@ -5341,26 +5351,17 @@ export class Bridge {
     // Determine status of target block (if switching selection)
     const newBlockId = afterRenderOptions.adminSelectedBlockUid;
     if (!newBlockId || newBlockId === blockId) {
-      return currentReady;
+      return { ready: currentReady, targetVisible: true };
     }
 
     const newEl = this.queryBlockElement(newBlockId);
     const targetVisible = newEl && !this.isElementHidden(newEl);
     const targetReady = targetVisible && this.isContentReady(newEl);
 
-    if (currentReady && targetReady) return true;
-
-    // At least one block is ready = framework has rendered.
-    // The other is missing/hidden — carousel only shows one at a time.
-    // Navigate to make the target visible.
-    if ((currentReady || targetReady) && newEl && !targetVisible) {
-      if (!this._navigatingToBlock) {
-        this.tryMakeBlockVisible(newBlockId);
-      }
-    }
-
-    // Target visible and content-ready is what we need to proceed
-    return targetReady;
+    return {
+      ready: currentReady && targetReady,
+      targetVisible: !!targetVisible,
+    };
   }
 
   isContentReady(blockElement) {
@@ -8365,7 +8366,7 @@ export class Bridge {
     //   - _reRenderBlocking + _iframeFocused: echo FORM_DATA during inline typing
     // Delayed path (rAF): everything else — gives async frameworks (Nuxt/Vue)
     //   one frame to patch the DOM before afterContentRender reads it.
-    const contentReady = this._areBlocksReady(blockId, blockEl, afterRenderOptions);
+    const { ready: contentReady } = this._areBlocksReady(blockId, blockEl, afterRenderOptions);
     // adminSelectedBlockUid signals a structural change (block add/delete/move)
     // — always give the framework time to render, even if content looks ready.
     const isStructuralChange = !!afterRenderOptions.adminSelectedBlockUid;
@@ -8373,15 +8374,91 @@ export class Bridge {
       || (this._reRenderBlocking && this._iframeFocused && !isStructuralChange);
 
     // Poll until blocks are ready, then call afterRender.
-    const pollBlocksReady = (retries = 60) => {
-      const ready = this._areBlocksReady(blockId, blockId && this.queryBlockElement(blockId), afterRenderOptions);
-      if (ready || retries <= 0) {
+    //
+    // Navigation rules for target blocks (carousel slides, tabs, etc.):
+    // - Target visible → poll content ready. On timeout, give up and proceed
+    //   (rendered, just can't verify content match).
+    // - Target not visible, navigation possible → trigger tryMakeBlockVisible
+    //   once, keep polling. When target becomes visible, reset content retries.
+    // - Target not visible, no navigation possible → wait for framework to
+    //   render. On timeout, give up without selecting (block never appeared).
+    let navigationTriggered = false;
+    let contentRetryBudget = 0; // set when target becomes visible after navigation
+    const CONTENT_RETRIES = 60; // ~1s at rAF rate
+    const NAV_CONTENT_RETRIES = 60; // fresh budget after navigation completes
+
+    const pollBlocksReady = (retries = CONTENT_RETRIES) => {
+      const newBlockId = afterRenderOptions.adminSelectedBlockUid;
+      const result = this._areBlocksReady(blockId, blockId && this.queryBlockElement(blockId), afterRenderOptions);
+
+      if (result.ready) {
         const elapsed = this._renderStartTime ? (performance.now() - this._renderStartTime).toFixed(0) : '?';
-        log('pollBlocksReady: DONE +' + elapsed + 'ms retries=' + (60 - retries) + ' ready=' + ready);
+        log('pollBlocksReady: DONE +' + elapsed + 'ms ready=true');
         afterRender();
-      } else {
-        requestAnimationFrame(() => pollBlocksReady(retries - 1));
+        return;
       }
+
+      // Target not visible — try navigation (once)
+      if (newBlockId && !result.targetVisible && !navigationTriggered) {
+        if (!this._navigatingToBlock) {
+          this.tryMakeBlockVisible(newBlockId);
+        }
+        navigationTriggered = true;
+      }
+
+      // Target just became visible after navigation — reset content retries (once)
+      if (navigationTriggered && result.targetVisible && !contentRetryBudget) {
+        contentRetryBudget = NAV_CONTENT_RETRIES;
+        log('pollBlocksReady: target visible after navigation, resetting content retries');
+      }
+
+      // Use post-navigation budget if active, otherwise pre-navigation retries
+      if (contentRetryBudget > 0) {
+        contentRetryBudget--;
+        if (contentRetryBudget <= 0) {
+          // Post-navigation content retries exhausted — target is visible but
+          // content doesn't match. Give up and proceed (rendered, can't verify).
+          const elapsed = this._renderStartTime ? (performance.now() - this._renderStartTime).toFixed(0) : '?';
+          log('pollBlocksReady: TIMEOUT +' + elapsed + 'ms target visible after nav, proceeding');
+          afterRender();
+          return;
+        }
+      } else if (retries <= 0) {
+        const elapsed = this._renderStartTime ? (performance.now() - this._renderStartTime).toFixed(0) : '?';
+        if (result.targetVisible || !newBlockId) {
+          // No navigation needed, content just doesn't match — give up and proceed.
+          log('pollBlocksReady: TIMEOUT +' + elapsed + 'ms proceeding anyway');
+          afterRender();
+        } else {
+          // Target never became visible. Fall back to selecting whatever IS
+          // visible: previous block, parent container, or deselect.
+          log('pollBlocksReady: TIMEOUT +' + elapsed + 'ms target NOT visible, falling back');
+          const prevEl = blockId && this.queryBlockElement(blockId);
+          if (prevEl && !this.isElementHidden(prevEl)) {
+            log('pollBlocksReady: fallback to previous block:', blockId);
+            afterRenderOptions.adminSelectedBlockUid = null;
+            afterRenderOptions.needsBlockSwitch = false;
+            this.selectBlock(prevEl);
+          } else {
+            // Check parent container
+            const targetEl = newBlockId && this.queryBlockElement(newBlockId);
+            const container = (targetEl || prevEl)?.closest?.('[data-block-uid]');
+            if (container && !this.isElementHidden(container)) {
+              const containerId = container.getAttribute('data-block-uid');
+              log('pollBlocksReady: fallback to parent container:', containerId);
+              afterRenderOptions.adminSelectedBlockUid = null;
+              this.selectBlock(container);
+            } else {
+              log('pollBlocksReady: nothing visible, deselecting');
+              this.sendMessageToParent({ type: 'BLOCK_DESELECTED' });
+            }
+          }
+          afterRender();
+        }
+        return;
+      }
+
+      requestAnimationFrame(() => pollBlocksReady(retries - 1));
     };
 
     log('_executeRender: contentReady:', contentReady, 'skipRender:', !!afterRenderOptions.skipRender, 'pendingTransform:', !!this.pendingTransform, '_reRenderBlocking:', !!this._reRenderBlocking, 'needsFastPath:', needsFastPath, 'isStructuralChange:', isStructuralChange);
