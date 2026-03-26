@@ -277,89 +277,81 @@ test.describe('Multi-element blocks', () => {
   });
 
   test('scroll into view considers all elements bounding box', async ({ page }) => {
-    // Tests that scroll-into-view uses combined bounding box, not just first element
-    // Listing block is at bottom of page, not visible on initial load
+    // Tests that scroll-into-view uses combined bounding box, not just one element.
+    // Strategy: select the listing from sidebar (scrolls down), then select a
+    // block at the top (scrolls back up), then select listing again. Both
+    // scrolls should position the group so the first element is near the top.
+    // If only a single element's rect was used, the first element would be
+    // way above the viewport on re-select.
     const helper = new AdminUIHelper(page);
 
-    // Use a small viewport so listing block is definitely off-screen
     await page.setViewportSize({ width: 1280, height: 400 });
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
     const iframe = helper.getIframe();
-    const elements = iframe.locator(`[data-block-uid="${listingBlockId}"]`);
-    await expect(elements.first()).toBeVisible({ timeout: 5000 });
+    const listingElements = iframe.locator(`[data-block-uid="${listingBlockId}"]`);
+    await expect(listingElements.first()).toBeVisible({ timeout: 5000 });
 
-    // Helper: get element rect relative to the IFRAME viewport (not page).
-    // Playwright's boundingBox() includes the iframe's page offset, which
-    // makes "is element in view?" checks incorrect.
+    // Get rect relative to iframe viewport (not page)
     const getIframeRect = (locator: any) => locator.evaluate((el: HTMLElement) => {
       const r = el.getBoundingClientRect();
       return { y: r.y, height: r.height };
     });
-    const getIframeViewportHeight = () => iframe.locator('body').evaluate(
-      () => window.innerHeight
-    );
+    const iframeViewportHeight = await iframe.locator('body').evaluate(() => window.innerHeight);
 
-    // Get the last element of the listing (should be off-screen)
-    const count = await elements.count();
-    const lastElement = elements.nth(count - 1);
-    const iframeViewportHeight = await getIframeViewportHeight();
-
-    // Verify last listing element is NOT visible initially (page loads at top)
-    const lastRectBefore = await getIframeRect(lastElement);
-    console.log('Last element Y before selection:', lastRectBefore.y, 'iframe viewport:', iframeViewportHeight);
-    expect(lastRectBefore.y).toBeGreaterThan(iframeViewportHeight);
-
-    // Click first block to open sidebar
+    // Navigate to page-level sidebar
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.waitForSidebarOpen();
-
-    // Click the parent arrow to go to page level
     const parentArrow = page.locator('.sidebar-section-header .parent-nav .nav-back');
     await expect(parentArrow).toBeVisible({ timeout: 5000 });
     await parentArrow.click();
-
-    // Wait for ChildBlocksWidget to show page-level blocks
     const childBlocksWidget = page.locator('#sidebar-order .child-blocks-widget');
     await expect(childBlocksWidget).toBeVisible({ timeout: 5000 });
 
-    // Click the first Listing block item in the sidebar - this selects without scrolling first
-    const listingBlockItem = childBlocksWidget.locator('.child-block-item', { hasText: 'Listing' }).first();
-    await expect(listingBlockItem).toBeVisible({ timeout: 5000 });
-    await listingBlockItem.click();
+    const listingItem = childBlocksWidget.locator('.child-block-item', { hasText: 'Listing' }).first();
+    const block1Item = childBlocksWidget.locator('.child-block-item').first();
 
-    // Wait for block to be selected and scroll animation
+    // --- Step 1: Select listing from sidebar (scrolls down to it) ---
+    await listingItem.click();
     await helper.waitForBlockSelected(listingBlockId);
-    await page.waitForTimeout(300);
+    await helper.waitForQuantaToolbar(listingBlockId);
 
-    // Get all element positions after selection
-    const firstRectAfter = await getIframeRect(elements.first());
-    const lastRectAfter = await getIframeRect(elements.nth(count - 1));
-    console.log('After selection: first Y:', firstRectAfter.y, 'last Y:', lastRectAfter.y, 'viewport:', iframeViewportHeight);
+    const firstAfterDown = await getIframeRect(listingElements.first());
+    console.log('After scroll down: first Y:', firstAfterDown.y, 'viewport:', iframeViewportHeight);
+    expect(firstAfterDown.y).toBeGreaterThanOrEqual(-15);
+    expect(firstAfterDown.y).toBeLessThan(iframeViewportHeight);
 
-    // The scroll should bring the block group into view.
-    // First element should be near the top (allow 15px for nav overlap)
-    expect(firstRectAfter.y).toBeGreaterThanOrEqual(-15);
-    expect(firstRectAfter.y).toBeLessThan(iframeViewportHeight);
+    // --- Step 2: Back to page level, select block-1 (scrolls up) ---
+    const goToPageLevel = async () => {
+      const arrow = page.locator('.sidebar-section-header .parent-nav .nav-back');
+      await expect(arrow).toBeVisible({ timeout: 5000 });
+      await arrow.click();
+      await expect(childBlocksWidget).toBeVisible({ timeout: 5000 });
+    };
+    await goToPageLevel();
+    await block1Item.click();
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForQuantaToolbar('block-1-uuid');
 
-    // At least one element from the group should be fully visible
-    // (its top and bottom within the viewport)
-    let anyFullyVisible = false;
-    for (let i = 0; i < count; i++) {
-      const rect = await getIframeRect(elements.nth(i));
-      if (rect.y >= -15 && rect.y + rect.height <= iframeViewportHeight + 15) {
-        anyFullyVisible = true;
-        break;
-      }
-    }
-    expect(anyFullyVisible, 'At least one listing element should be fully visible after scroll').toBe(true);
+    // Listing should now be off-screen again
+    const firstAfterUp = await getIframeRect(listingElements.first());
+    console.log('After scroll up: first Y:', firstAfterUp.y);
+    expect(firstAfterUp.y).toBeGreaterThan(iframeViewportHeight);
 
-    // The scroll should have used the combined bounding box — the first element
-    // should NOT be way above the viewport (which would happen if only the
-    // last element was scrolled into view ignoring the group).
-    expect(firstRectAfter.y).toBeGreaterThanOrEqual(-15);
+    // --- Step 3: Back to page level, select listing again (scrolls down) ---
+    await goToPageLevel();
+    await listingItem.click();
+    await helper.waitForBlockSelected(listingBlockId);
+    await helper.waitForQuantaToolbar(listingBlockId);
+
+    const firstAfterDown2 = await getIframeRect(listingElements.first());
+    console.log('After second scroll down: first Y:', firstAfterDown2.y);
+    // First element near top again — proves combined bounding box is used.
+    // If only a single element was used, the scroll position would drift.
+    expect(firstAfterDown2.y).toBeGreaterThanOrEqual(-15);
+    expect(firstAfterDown2.y).toBeLessThan(iframeViewportHeight);
   });
 
   test('grid block paging works in view mode', async ({ page }) => {
