@@ -3261,13 +3261,36 @@ export class AdminUIHelper {
       throw new Error('Could not get iframe bounding box');
     }
 
-    // Position cursor at 65%/35% of the block — far enough from the midpoint
-    // to avoid rounding issues on small blocks (e.g. 22px tall Nuxt blocks)
+    // Drop in the gap between target block and its neighbor — unambiguously
+    // "after" or "before". The drop logic uses blockSize/2 as the threshold,
+    // so landing in the gap (past the block edge) is always correct.
+    // Fall back to 2px from the edge if no sibling is found.
+    const siblings = await targetBlock.evaluateAll(
+      (els: Element[], after: boolean) => {
+        const el = after ? els[els.length - 1] : els[0];
+        const sibling = after ? el.nextElementSibling : el.previousElementSibling;
+        if (!sibling) return null;
+        const r = sibling.getBoundingClientRect();
+        return { y: r.y, height: r.height };
+      },
+      insertAfter,
+    );
+    let targetY: number;
+    if (siblings && insertAfter) {
+      // Midpoint between target bottom and next sibling top
+      targetY = iframeRect.y + rect.y + rect.height + (siblings.y - (rect.y + rect.height)) / 2;
+    } else if (siblings && !insertAfter) {
+      // Midpoint between previous sibling bottom and target top
+      targetY = iframeRect.y + (siblings.y + siblings.height) + (rect.y - (siblings.y + siblings.height)) / 2;
+    } else {
+      // No sibling — use edge
+      targetY = insertAfter
+        ? iframeRect.y + rect.y + rect.height - 2
+        : iframeRect.y + rect.y + 2;
+    }
     const result = {
       x: iframeRect.x + rect.x + rect.width / 2,
-      y: insertAfter
-        ? iframeRect.y + rect.y + rect.height * 0.65
-        : iframeRect.y + rect.y + rect.height * 0.35,
+      y: targetY,
     };
 
     return result;
