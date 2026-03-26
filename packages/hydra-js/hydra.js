@@ -1691,6 +1691,10 @@ export class Bridge {
       return; // Exit if not in a browser environment
     }
 
+    // Register document-level keyboard handlers early so no keystrokes are lost
+    // during block transitions (field destroyed → new field not ready yet).
+    this._ensureDocumentKeyboardBlocker();
+
     if (window.self !== window.top) {
       // ... (iframe-specific setup: navigation detection, token retrieval, etc.)
       // This will set the listners for hashchange & pushstate
@@ -2714,6 +2718,37 @@ export class Bridge {
     document.addEventListener('keypress', this._documentKeyboardBlocker, true);
     document.addEventListener('input', this._documentKeyboardBlocker, true);
     document.addEventListener('beforeinput', this._documentKeyboardBlocker, true);
+
+    // Document-level keydown fallback: buffers keys that arrive on body during
+    // block transitions (field destroyed by re-render, new field not ready yet).
+    // Per-field listeners handle the normal case; this catches the gap.
+    // Uses capture phase so nothing can block it.
+    if (!this._documentKeydownFallback) {
+      this._documentKeydownFallback = (e) => {
+        if (e.type !== 'keydown') return;
+        if (!this.selectedBlockUid) return;
+        if (this.blockedBlockId) return; // _documentKeyboardBlocker handles blocked state
+
+        // Only buffer when focus fell to body (field was destroyed)
+        const isBodyTarget = e.target === document.body || e.target === document.documentElement;
+        if (!isBodyTarget) return;
+
+        // Skip modifiers and Tab
+        if (['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key)) return;
+
+        log('Document fallback: buffering', e.key, 'for', this.selectedBlockUid);
+        e.preventDefault();
+        this.eventBuffer.push({
+          _type: 'keydown',
+          key: e.key,
+          shiftKey: e.shiftKey,
+          ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey,
+          altKey: e.altKey,
+        });
+      };
+      document.addEventListener('keydown', this._documentKeydownFallback, true);
+    }
   }
 
   setBlockProcessing(blockId, processing = true, requestId = null) {
@@ -7775,8 +7810,32 @@ export class Bridge {
         }
       });
 
-      // Add keydown listener for Enter, Delete, Backspace, Undo, Redo, and formatting shortcuts
+      // Per-field keydown listener: handles keys when the field has focus.
+      // The document-level fallback (registered in init) buffers keys that
+      // arrive on body during block transitions when this field doesn't exist yet.
       editableField.addEventListener('keydown', (e) => {
+        this._handleFieldKeydown(e, blockUid, editableField);
+      });
+
+      // Replay any keys buffered during block transition (focus was on body,
+      // document-level handler captured them). Now the field is ready.
+      if (this.eventBuffer.length > 0 && !this.blockedBlockId) {
+        const buffer = this.eventBuffer.splice(0);
+        log('restoreContentEditableOnFields: replaying', buffer.length, 'buffered keys for', blockUid);
+        for (const evt of buffer) {
+          if (evt._type === 'keydown') {
+            this.replayOneKey(blockUid, evt.key, editableField, evt.shiftKey);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Handle keydown events for an editable field. Shared entry point called from
+   * both per-field listeners and the document-level fallback listener.
+   */
+  _handleFieldKeydown(e, blockUid, editableField) {
         // DEBUG: trace End/Backspace key arrival and selection state
         if (e.key === 'End' || e.key === 'Backspace') {
           const sel = window.getSelection();
@@ -8047,8 +8106,6 @@ export class Bridge {
             e.preventDefault();
           }
         }
-      });
-    }
   }
 
   /**
