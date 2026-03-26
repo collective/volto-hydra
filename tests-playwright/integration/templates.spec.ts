@@ -578,16 +578,11 @@ test.describe('Templates', () => {
     const initialOrder = await helper.getBlockOrder();
     expect(initialOrder.indexOf('standalone-block-2')).toBeGreaterThan(initialOrder.indexOf(footerBlockId));
 
-    // Select standalone-block-2
-    await helper.clickBlockInIframe('standalone-block-2');
-    await helper.waitForSidebarOpen();
-
-    // Get drag handle
-    const dragHandle = await helper.getDragHandle();
+    // Wait for all template blocks to finish rendering
+    await helper.getStableBlockCount();
 
     // Drag standalone-block-2 to after user-content-1 (which is in the placeholder region)
-    const userContentBlock = iframe.locator('[data-block-uid="user-content-1"]');
-    await helper.dragBlockWithMouse(dragHandle, userContentBlock, true); // insertAfter=true
+    await helper.dragBlockAfter('standalone-block-2', 'user-content-1');
 
     // Wait for standalone-block-2 to appear right after user-content-1
     // (async frameworks may take multiple frames to re-render template-expanded blocks)
