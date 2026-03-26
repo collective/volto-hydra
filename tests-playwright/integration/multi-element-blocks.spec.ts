@@ -291,15 +291,26 @@ test.describe('Multi-element blocks', () => {
     const elements = iframe.locator(`[data-block-uid="${listingBlockId}"]`);
     await expect(elements.first()).toBeVisible({ timeout: 5000 });
 
+    // Helper: get element rect relative to the IFRAME viewport (not page).
+    // Playwright's boundingBox() includes the iframe's page offset, which
+    // makes "is element in view?" checks incorrect.
+    const getIframeRect = (locator: any) => locator.evaluate((el: HTMLElement) => {
+      const r = el.getBoundingClientRect();
+      return { y: r.y, height: r.height };
+    });
+    const getIframeViewportHeight = () => iframe.locator('body').evaluate(
+      () => window.innerHeight
+    );
+
     // Get the last element of the listing (should be off-screen)
     const count = await elements.count();
     const lastElement = elements.nth(count - 1);
-    const viewportHeight = page.viewportSize()?.height || 400;
+    const iframeViewportHeight = await getIframeViewportHeight();
 
     // Verify last listing element is NOT visible initially (page loads at top)
-    const lastElementRectBefore = await lastElement.boundingBox();
-    console.log('Last element Y before selection:', lastElementRectBefore?.y, 'viewport:', viewportHeight);
-    expect(lastElementRectBefore!.y).toBeGreaterThan(viewportHeight);
+    const lastRectBefore = await getIframeRect(lastElement);
+    console.log('Last element Y before selection:', lastRectBefore.y, 'iframe viewport:', iframeViewportHeight);
+    expect(lastRectBefore.y).toBeGreaterThan(iframeViewportHeight);
 
     // Click first block to open sidebar
     await helper.clickBlockInIframe('block-1-uuid');
@@ -323,15 +334,32 @@ test.describe('Multi-element blocks', () => {
     await helper.waitForBlockSelected(listingBlockId);
     await page.waitForTimeout(300);
 
-    // Get first element position after selection (should be scrolled into view)
-    const firstElementRectAfter = await elements.first().boundingBox();
-    console.log('First element Y after selection:', firstElementRectAfter?.y);
+    // Get all element positions after selection
+    const firstRectAfter = await getIframeRect(elements.first());
+    const lastRectAfter = await getIframeRect(elements.nth(count - 1));
+    console.log('After selection: first Y:', firstRectAfter.y, 'last Y:', lastRectAfter.y, 'viewport:', iframeViewportHeight);
 
-    // KEY ASSERTION: First element should be visible after selecting
-    // The block should be scrolled so at least the first element is in view
-    // Allow small tolerance for floating point rounding (-1px)
-    expect(firstElementRectAfter!.y).toBeLessThan(viewportHeight);
-    expect(firstElementRectAfter!.y).toBeGreaterThanOrEqual(-1);
+    // The scroll should bring the block group into view.
+    // First element should be near the top (allow 15px for nav overlap)
+    expect(firstRectAfter.y).toBeGreaterThanOrEqual(-15);
+    expect(firstRectAfter.y).toBeLessThan(iframeViewportHeight);
+
+    // At least one element from the group should be fully visible
+    // (its top and bottom within the viewport)
+    let anyFullyVisible = false;
+    for (let i = 0; i < count; i++) {
+      const rect = await getIframeRect(elements.nth(i));
+      if (rect.y >= -15 && rect.y + rect.height <= iframeViewportHeight + 15) {
+        anyFullyVisible = true;
+        break;
+      }
+    }
+    expect(anyFullyVisible, 'At least one listing element should be fully visible after scroll').toBe(true);
+
+    // The scroll should have used the combined bounding box — the first element
+    // should NOT be way above the viewport (which would happen if only the
+    // last element was scrolled into view ignoring the group).
+    expect(firstRectAfter.y).toBeGreaterThanOrEqual(-15);
   });
 
   test('grid block paging works in view mode', async ({ page }) => {
