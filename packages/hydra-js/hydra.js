@@ -1198,51 +1198,70 @@ export class Bridge {
     // 1. Absolute start of field (textBefore === '') → unwrapBlock (merge/delete)
     // 2. Start of an interior node-id element → let Slate handle (demote list item, etc.)
     // In both cases the browser's native Backspace would corrupt the DOM structure.
-    if (key === 'Backspace' && range.collapsed && this.isSlateField(blockUid, this.focusedFieldName)) {
+    if (key === 'Backspace' && this.isSlateField(blockUid, this.focusedFieldName)) {
       const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-      const editField = blockEl.closest('[data-edit-text]');
+      const editField = blockEl?.closest('[data-edit-text]');
       if (editField) {
-        // Check if cursor is at offset 0 of a data-node-id element
-        const nodeIdEl = blockEl.closest('[data-node-id]');
-        // nodeIdEl may equal editField when a single <p> has both data-edit-text
-        // and data-node-id (e.g. simple mock frontends). Treat that the same as
-        // having a separate nodeIdEl inside editField.
-        const effectiveNodeIdEl = nodeIdEl || editField;
-        if (effectiveNodeIdEl) {
-          const elRange = document.createRange();
-          elRange.setStart(effectiveNodeIdEl, 0);
-          elRange.setEnd(range.startContainer, range.startOffset);
-          const textBeforeInEl = this.stripZeroWidthSpaces(elRange.toString());
+        // Check if the field is empty (only ZWS/BOM) — regardless of selection state.
+        // After preserveLastCharDelete, the field may contain only ZWS and the
+        // selection may be non-collapsed spanning multiple ZWS text nodes.
+        const fieldText = this.stripZeroWidthSpaces(editField.textContent || '');
+        if (fieldText === '' && range.collapsed === false) {
+          // Empty field with non-collapsed selection — treat as empty block backspace
+          const blockElement = editField.closest('[data-block-uid]');
+          const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
+          const isFirstField = firstField === editField;
 
-          if (textBeforeInEl === '') {
-            // Check if there's content before this element (not the first node in the field)
-            const fieldRange = document.createRange();
-            fieldRange.setStart(editField, 0);
-            fieldRange.setEnd(range.startContainer, range.startOffset);
-            const textBeforeInField = this.stripZeroWidthSpaces(fieldRange.toString());
+          log('Backspace in empty slate field (non-collapsed ZWS selection) - sending unwrapBlock, isFirstField:', isFirstField);
+          this.sendTransformRequest(blockUid, 'unwrapBlock', {
+            isFirstField,
+            isEmpty: true,
+          });
+          return true;
+        }
 
-            if (textBeforeInField !== '') {
-              // Interior element boundary — send as delete transform for Slate to handle
-              log('Backspace at start of interior element - sending delete transform');
-              this.sendTransformRequest(blockUid, 'delete', {
-                direction: 'backward',
+        if (range.collapsed) {
+          // Check if cursor is at offset 0 of a data-node-id element
+          const nodeIdEl = blockEl.closest('[data-node-id]');
+          // nodeIdEl may equal editField when a single <p> has both data-edit-text
+          // and data-node-id (e.g. simple mock frontends). Treat that the same as
+          // having a separate nodeIdEl inside editField.
+          const effectiveNodeIdEl = nodeIdEl || editField;
+          if (effectiveNodeIdEl) {
+            const elRange = document.createRange();
+            elRange.setStart(effectiveNodeIdEl, 0);
+            elRange.setEnd(range.startContainer, range.startOffset);
+            const textBeforeInEl = this.stripZeroWidthSpaces(elRange.toString());
+
+            if (textBeforeInEl === '') {
+              // Check if there's content before this element (not the first node in the field)
+              const fieldRange = document.createRange();
+              fieldRange.setStart(editField, 0);
+              fieldRange.setEnd(range.startContainer, range.startOffset);
+              const textBeforeInField = this.stripZeroWidthSpaces(fieldRange.toString());
+
+              if (textBeforeInField !== '') {
+                // Interior element boundary — send as delete transform for Slate to handle
+                log('Backspace at start of interior element - sending delete transform');
+                this.sendTransformRequest(blockUid, 'delete', {
+                  direction: 'backward',
+                });
+                return true;
+              }
+
+              // Absolute start of field — unwrapBlock
+              const blockElement = editField.closest('[data-block-uid]');
+              const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
+              const isFirstField = firstField === editField;
+              const isEmpty = fieldText === '';
+
+              log('Backspace at start of slate field - sending unwrapBlock, isFirstField:', isFirstField, 'isEmpty:', isEmpty);
+              this.sendTransformRequest(blockUid, 'unwrapBlock', {
+                isFirstField,
+                isEmpty,
               });
               return true;
             }
-
-            // Absolute start of field — unwrapBlock
-            const blockElement = editField.closest('[data-block-uid]');
-            const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
-            const isFirstField = firstField === editField;
-            const fieldText = this.stripZeroWidthSpaces(editField.textContent || '');
-            const isEmpty = fieldText === '';
-
-            log('Backspace at start of slate field - sending unwrapBlock, isFirstField:', isFirstField, 'isEmpty:', isEmpty);
-            this.sendTransformRequest(blockUid, 'unwrapBlock', {
-              isFirstField,
-              isEmpty,
-            });
-            return true;
           }
         }
       }
@@ -5075,13 +5094,71 @@ export class Bridge {
   }
 
   /**
+   * Collect all attribute values from an element and its descendants.
+   * Used by domNodeToSlate in matchMetadataFromDom mode to check which
+   * formData metadata values are visible in the rendered DOM.
+   * @param {HTMLElement} el
+   * @returns {Set<string>} all attribute values found
+   */
+  _collectDomAttributeValues(el) {
+    const values = new Set();
+    const walk = (node) => {
+      if (!(node instanceof HTMLElement)) return;
+      for (const attr of node.attributes) {
+        if (attr.value) values.add(attr.value);
+      }
+      for (const child of node.children) walk(child);
+    };
+    walk(el);
+    return values;
+  }
+
+  /**
+   * Filter metadata to only include values that appear in the DOM.
+   * Walks the metadata object and keeps only leaf values (strings, numbers,
+   * booleans) that match an attribute value found in the DOM element.
+   * @param {Object} fullMeta - metadata from formData metadataMap
+   * @param {Set<string>} domValues - attribute values from _collectDomAttributeValues
+   * @returns {Object} filtered metadata with only DOM-visible values
+   */
+  _filterMetadataByDom(fullMeta, domValues) {
+    const result = {};
+    for (const [key, val] of Object.entries(fullMeta)) {
+      if (val && typeof val === 'object' && !Array.isArray(val)) {
+        const filtered = this._filterMetadataByDom(val, domValues);
+        if (Object.keys(filtered).length > 0) result[key] = filtered;
+      } else if (typeof val === 'string' && domValues.has(val)) {
+        result[key] = val;
+      } else if ((typeof val === 'number' || typeof val === 'boolean') && domValues.has(String(val))) {
+        result[key] = val;
+      }
+    }
+    return result;
+  }
+
+  /**
    * Convert a DOM element with data-node-id into a Slate JSON node.
    * Text nodes become {text: "..."}, elements with data-node-id recurse.
-   * Metadata (type, data, marks) comes from the metadataMap, not the DOM.
+   *
+   * @param {HTMLElement} el - Element with data-node-id
+   * @param {Object} metadataMap - nodeId → metadata from formData
+   * @param {boolean} matchMetadataFromDom - When true, only include metadata
+   *   values that are visible in the DOM (as attribute values). Used by
+   *   isContentReady to detect rendered changes like link URL updates.
+   *   When false (default), include all metadata from metadataMap.
    */
-  domNodeToSlate(el, metadataMap) {
+  domNodeToSlate(el, metadataMap, matchMetadataFromDom = false) {
     const nodeId = el.getAttribute('data-node-id');
-    const metadata = (nodeId && metadataMap[nodeId]) || {};
+    const fullMeta = (nodeId && metadataMap[nodeId]) || {};
+    let metadata;
+    if (matchMetadataFromDom) {
+      const domValues = this._collectDomAttributeValues(el);
+      metadata = this._filterMetadataByDom(fullMeta, domValues);
+      // type is the node identity (comes with nodeId), not a rendered value
+      if (fullMeta.type) metadata.type = fullMeta.type;
+    } else {
+      metadata = fullMeta;
+    }
     const children = [];
 
     for (const child of el.childNodes) {
@@ -5092,7 +5169,7 @@ export class Bridge {
       } else if (child.nodeType === Node.ELEMENT_NODE) {
         const childNodeId = child.getAttribute('data-node-id');
         if (childNodeId && isValidNodeId(childNodeId)) {
-          children.push(this.domNodeToSlate(child, metadataMap));
+          children.push(this.domNodeToSlate(child, metadataMap, matchMetadataFromDom));
         } else {
           // Element without valid nodeId (e.g. Vue wrapper span, Next.js leaf span)
           // — treat its text content as a text node, including empty text which
@@ -5170,7 +5247,7 @@ export class Bridge {
    * This is the single source of truth for DOM → Slate conversion.
    * Used by both handleTextChange and waitForContentReady.
    */
-  readSlateValueFromDOM(fieldEl, existingValue) {
+  readSlateValueFromDOM(fieldEl, existingValue, { matchMetadataFromDom = false } = {}) {
     const metadataMap = this.buildNodeMetadataMap(existingValue);
 
     // Two valid DOM patterns:
@@ -5179,7 +5256,7 @@ export class Bridge {
     // Both produce the same Slate value.
     const fieldNodeId = fieldEl.getAttribute('data-node-id');
     if (fieldNodeId && isValidNodeId(fieldNodeId)) {
-      return [this.domNodeToSlate(fieldEl, metadataMap)];
+      return [this.domNodeToSlate(fieldEl, metadataMap, matchMetadataFromDom)];
     }
 
     const topNodes = [];
@@ -5187,7 +5264,7 @@ export class Bridge {
       if (child.nodeType === Node.ELEMENT_NODE) {
         const nodeId = child.getAttribute('data-node-id');
         if (nodeId && isValidNodeId(nodeId)) {
-          topNodes.push(this.domNodeToSlate(child, metadataMap));
+          topNodes.push(this.domNodeToSlate(child, metadataMap, matchMetadataFromDom));
         }
       }
     }
@@ -5264,7 +5341,7 @@ export class Bridge {
       if (this.fieldTypeIsSlate(fieldType)) {
         const slateValue = blockData[fieldName];
         if (!slateValue || !Array.isArray(slateValue)) continue;
-        const domValue = this.readSlateValueFromDOM(fieldEl, slateValue);
+        const domValue = this.readSlateValueFromDOM(fieldEl, slateValue, { matchMetadataFromDom: true });
         if (!this._deepEqual(domValue, slateValue)) {
           log('isContentReady MISMATCH:', blockUid, fieldName, '+' + (this._renderStartTime ? (performance.now() - this._renderStartTime).toFixed(0) : '?') + 'ms');
           log('  DOM:', JSON.stringify(domValue)?.substring(0, 300));
@@ -7706,6 +7783,9 @@ export class Bridge {
           log('DEBUG keydown:', e.key, 'isTrusted:', e.isTrusted,
               'collapsed:', sel?.isCollapsed, 'anchorOffset:', sel?.anchorOffset,
               'focusOffset:', sel?.focusOffset, 'anchorNode:', sel?.anchorNode?.nodeName,
+              'focusNode:', sel?.focusNode?.nodeName,
+              'sameNode:', sel?.anchorNode === sel?.focusNode,
+              'rangeCollapsed:', sel?.rangeCount ? sel.getRangeAt(0).collapsed : 'no-range',
               'blockedBlockId:', this.blockedBlockId);
         }
         // Ensure cursor is inside a data-node-id element before processing.
@@ -9433,7 +9513,12 @@ export class Bridge {
    */
   updateEmptyState(field) {
     const text = field.textContent?.replace(/[\u200B\uFEFF]/g, '').trim();
-    field.toggleAttribute('data-empty', !text);
+    const isEmpty = !text;
+    // Don't show placeholder (data-empty) while the field is focused —
+    // it would flash between keystrokes as the user types/deletes.
+    const doc = field.ownerDocument;
+    const isFocused = doc && (doc.activeElement === field || field.contains(doc.activeElement));
+    field.toggleAttribute('data-empty', isEmpty && !isFocused);
   }
 
   /**

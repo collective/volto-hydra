@@ -1923,35 +1923,17 @@ const Iframe = (props) => {
 
                   const { Transforms, Editor } = require('slate');
                   const { slate: slateConfig } = config.settings;
-                  const prevLastNode = prevValue[prevValue.length - 1];
-                  const isListPrev = prevLastNode && slateConfig?.listTypes?.includes(prevLastNode.type);
-
-                  let mergedValue, cursorSelection;
-
-                  if (isListPrev) {
-                    // Merging p into a list: append p's children to the last li
-                    // (standard behavior: Backspace after list joins into last item)
-                    const copy = JSON.parse(JSON.stringify(prevValue));
-                    const lastList = copy[copy.length - 1];
-                    const lastLi = lastList.children[lastList.children.length - 1];
-                    const pChildren = currentValue[0]?.children || [{ text: '' }];
-                    const joinChildIdx = lastLi.children.length;
-                    lastLi.children.push(...JSON.parse(JSON.stringify(pChildren)));
-                    mergedValue = copy;
-                    const lastListIdx = copy.length - 1;
-                    const lastLiIdx = lastList.children.length - 1;
-                    cursorSelection = { anchor: { path: [lastListIdx, lastLiIdx, joinChildIdx], offset: 0 }, focus: { path: [lastListIdx, lastLiIdx, joinChildIdx], offset: 0 } };
-                    log('unwrapBlock merge into list: joinChildIdx:', joinChildIdx);
-                  } else {
-                    // Standard merge: combine and use Transforms.mergeNodes
-                    const allNodes = [...prevValue, ...currentValue];
-                    const mergeEditor = slateTransforms.createHeadlessEditor(allNodes);
-                    const joinIdx = prevValue.length;
-                    Transforms.select(mergeEditor, Editor.start(mergeEditor, [joinIdx]));
-                    Transforms.mergeNodes(mergeEditor, { at: [joinIdx] });
-                    mergedValue = JSON.parse(JSON.stringify(mergeEditor.children));
-                    cursorSelection = mergeEditor.selection;
-                  }
+                  // Merge using a headless Slate editor — handles all cases
+                  // (p into p, p into list, heading into p, etc.) and normalizes
+                  // the result (merges adjacent text nodes, ensures inline spacing).
+                  const allNodes = [...prevValue, ...currentValue];
+                  const mergeEditor = slateTransforms.createHeadlessEditor(allNodes);
+                  const joinIdx = prevValue.length;
+                  Transforms.select(mergeEditor, Editor.start(mergeEditor, [joinIdx]));
+                  Editor.deleteBackward(mergeEditor, { unit: 'character' });
+                  const mergedValue = JSON.parse(JSON.stringify(mergeEditor.children));
+                  const cursorSelection = mergeEditor.selection;
+                  log('unwrapBlock merge: joinIdx:', joinIdx, 'result nodes:', mergedValue.length, 'selection:', JSON.stringify(cursorSelection));
                   const updatedPrev = { ...prevBlock, [fieldName]: mergedValue };
 
                   // Merge + delete in one atomic form data update using iframe's form data
@@ -1985,7 +1967,9 @@ const Iframe = (props) => {
                       if (Array.isArray(nextValue) && nextValue.length === 1
                         && nextValue[0]?.type === prevRootType) {
                         log('unwrapBlock: merging adjacent list block', nextBlockId);
-                        const combined = [{ ...mergedValue[0], children: [...mergedValue[0].children, ...nextValue[0].children] }];
+                        const adjEditor = slateTransforms.createHeadlessEditor([...mergedValue, ...nextValue]);
+                        Transforms.mergeNodes(adjEditor, { at: [mergedValue.length] });
+                        const combined = JSON.parse(JSON.stringify(adjEditor.children));
                         newFormData = updateBlockById(newFormData, nextBpm, prevBlockId, { ...updatedPrev, [fieldName]: combined });
                         newFormData = deleteBlockFromContainer(newFormData, nextBpm, nextBlockId,
                           getContainerFieldConfig(nextBlockId, nextBpm, newFormData, config.blocks.blocksConfig, intl));
@@ -3488,10 +3472,6 @@ const Iframe = (props) => {
       setAddNewBlockOpened(true);
     }
   }, [iframeAllowedBlocks, selectedBlock, insertAndSelectBlock]);
-
-  // SSR guard: render nothing on server. All hooks above are safe (they don't
-  // access window/document directly), but the JSX below requires the browser.
-  if (typeof window === 'undefined') return null;
 
   return (
     <div id="iframeContainer">
