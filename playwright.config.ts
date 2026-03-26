@@ -99,7 +99,7 @@ export default defineConfig({
    *   integration/ — Full Volto admin UI tests, run on mock + nuxt only
    */
   projects: [
-    // --- Unit tests (run once) ---
+    // --- Unit tests ---
     {
       name: 'unit',
       testDir: 'tests-playwright/unit',
@@ -107,6 +107,14 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
+      },
+    },
+    {
+      name: 'unit-firefox',
+      testDir: 'tests-playwright/unit',
+      use: {
+        ...devices['Desktop Firefox'],
+        viewport: { width: 1280, height: 720 },
       },
     },
 
@@ -129,6 +137,15 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-nuxt.json',
+      },
+    },
+    {
+      name: 'nuxt-firefox',
+      testDir: 'tests-playwright/bridge',
+      use: {
+        ...devices['Desktop Firefox'],
+        viewport: { width: 1280, height: 720 },
         storageState: 'tests-playwright/fixtures/storage-nuxt.json',
       },
     },
@@ -176,6 +193,14 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
+      },
+    },
+    {
+      name: 'nextjs-firefox',
+      testDir: 'tests-playwright/bridge',
+      use: {
+        ...devices['Desktop Firefox'],
+        viewport: { width: 1280, height: 720 },
       },
     },
     {
