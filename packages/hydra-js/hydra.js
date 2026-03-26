@@ -1988,8 +1988,9 @@ export class Bridge {
           document.addEventListener('mousedown', () => { this._mouseButtonDown = true; }, true);
           document.addEventListener('mouseup', () => { this._mouseButtonDown = false; }, true);
           document.addEventListener('focus', (e) => {
-            const target = e.target;
-            const blockElement = target.closest('[data-block-uid]');
+            // Firefox may fire focus on text nodes; get the nearest Element
+            const target = e.target instanceof Element ? e.target : e.target?.parentElement;
+            const blockElement = target?.closest('[data-block-uid]');
             const blockUid = blockElement?.getAttribute('data-block-uid');
             if (!blockUid || !this.selectedBlockUid) return;
 
