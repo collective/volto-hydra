@@ -183,8 +183,16 @@ export class AdminUIHelper {
     const currentUrl = this.page.url();
     const isOnVoltoPage = currentUrl.startsWith(this.adminUrl);
 
+    // Navigate to edit mode first (reliable), then switch to view.
+    // Direct pushState to view mode triggers Volto SSR which may crash
+    // with "window is not defined" on pages with iframe components.
     if (isOnVoltoPage) {
-      // Client-side navigation via pushState + popstate
+      await this.page.evaluate((path) => {
+        window.history.pushState({}, '', path + '/edit');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }, contentPath);
+      await this.page.waitForURL(`${this.adminUrl}${contentPath}/edit`, { timeout: 10000 });
+      // Switch to view mode
       await this.page.evaluate((path) => {
         window.history.pushState({}, '', path);
         window.dispatchEvent(new PopStateEvent('popstate'));
