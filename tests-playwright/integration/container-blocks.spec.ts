@@ -3106,16 +3106,16 @@ test.describe('data-block-selector Navigation', () => {
     const iframe = helper.getIframe();
     const iframeElement = page.locator('#previewIframe');
 
-    // Wait for the slider block to be visible
-    const sliderBlock = iframe.locator('[data-block-uid="slider-1"]');
-    await expect(sliderBlock).toBeVisible({ timeout: 10000 });
+    // Wait for all blocks to render and stabilize
+    await helper.getStableBlockCount();
 
     // Find the first slide
     const slide1 = iframe.locator('[data-block-uid="slide-1"]');
     await expect(slide1).toBeVisible({ timeout: 5000 });
 
     // Click on the slide to select it
-    await slide1.click({ force: true });
+    await helper.clickBlockInIframe('slide-1');
+    await helper.waitForQuantaToolbar('slide-1');
 
     // Wait for add button to appear
     const addButton = page.locator('.volto-hydra-add-button');

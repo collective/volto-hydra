@@ -1622,6 +1622,7 @@ const SyncedSlateToolbar = ({
         return (
           <button
             key={`clear-${fieldName}`}
+            id={`clear-media-${fieldName}`}
             title="Clear image"
             onClick={() => {
               if (onFieldLinkChange) {
