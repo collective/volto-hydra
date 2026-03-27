@@ -92,8 +92,12 @@
 // getTokenFromCookie
 // onEditChange
 
-// Debug logging - disabled by default, enable via initBridge options or window.HYDRA_DEBUG
-let debugEnabled = typeof window !== 'undefined' && window.HYDRA_DEBUG;
+// Debug logging - disabled by default, enable via initBridge options,
+// window.HYDRA_DEBUG, or _hydra_debug URL param (set by admin iframe src)
+let debugEnabled = typeof window !== 'undefined' && (
+  window.HYDRA_DEBUG ||
+  new URLSearchParams(window.location?.search).has('_hydra_debug')
+);
 const log = (...args) => {
   if (!debugEnabled) return;
   const runId = typeof window !== 'undefined' && window.__testRunId;
@@ -1075,17 +1079,38 @@ export class Bridge {
       this._skipZwsNode('forward');
       if (!this.handleDeleteKey(blockId, 'Delete')) {
         if (!this.preserveLastCharDelete()) {
-          // Use Range API to delete one character forward. execCommand
-          // forwardDelete is deprecated and unreliable after programmatic
-          // cursor positioning (it may act on the wrong node).
+          // Use Range API to delete one character forward.
           const sel = window.getSelection();
-          if (sel?.isCollapsed && sel.focusNode?.nodeType === Node.TEXT_NODE) {
-            const text = sel.focusNode.textContent || '';
-            if (sel.focusOffset < text.length) {
-              const range = document.createRange();
-              range.setStart(sel.focusNode, sel.focusOffset);
-              range.setEnd(sel.focusNode, sel.focusOffset + 1);
-              range.deleteContents();
+          if (sel?.isCollapsed) {
+            let targetNode = sel.focusNode;
+            let targetOffset = sel.focusOffset;
+            // Firefox may leave cursor on an Element node (e.g., empty <span>).
+            // Walk forward to find the nearest text node.
+            if (targetNode?.nodeType !== Node.TEXT_NODE) {
+              const walker = document.createTreeWalker(
+                editableField || targetNode,
+                NodeFilter.SHOW_TEXT,
+              );
+              walker.currentNode = targetNode;
+              const nextText = walker.nextNode();
+              if (nextText) {
+                targetNode = nextText;
+                targetOffset = 0;
+              }
+            }
+            if (targetNode?.nodeType === Node.TEXT_NODE) {
+              const text = targetNode.textContent || '';
+              // Skip ZWS/BOM at cursor position
+              while (targetOffset < text.length &&
+                (text[targetOffset] === '\uFEFF' || text[targetOffset] === '\u200B')) {
+                targetOffset++;
+              }
+              if (targetOffset < text.length) {
+                const range = document.createRange();
+                range.setStart(targetNode, targetOffset);
+                range.setEnd(targetNode, targetOffset + 1);
+                range.deleteContents();
+              }
             }
           }
         }
@@ -1302,9 +1327,17 @@ export class Bridge {
 
     // At node boundary with different formatting → delete transform
     const atStart = range.startOffset === 0;
-    const atEnd =
-      range.startOffset === node.textContent?.length ||
-      range.startOffset === node.length;
+    // Check if cursor is at the end of the entire field, not just the current
+    // node. An empty wrapper element (e.g. <span></span> on Firefox) has
+    // offset 0 = length 0, but there may be content after it in the field.
+    const editFieldForEnd = (node.nodeType === Node.TEXT_NODE ? node.parentElement : node)?.closest('[data-edit-text]');
+    let atEnd = false;
+    if (editFieldForEnd && range.startOffset === (node.textContent?.length ?? node.length ?? 0)) {
+      const afterRange = document.createRange();
+      afterRange.setStart(range.endContainer, range.endOffset);
+      afterRange.setEnd(editFieldForEnd, editFieldForEnd.childNodes.length);
+      atEnd = this.stripZeroWidthSpaces(afterRange.toString()) === '';
+    }
 
     if ((key === 'Backspace' && atStart) || (key === 'Delete' && atEnd)) {
       const parentElement =

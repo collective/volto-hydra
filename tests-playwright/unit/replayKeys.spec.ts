@@ -215,6 +215,17 @@ test.describe('replayOneKey — cursor movement and editing', () => {
     expect(r.textBefore).toBe('');
   });
 
+  test('Home then Delete with nextjs bold DOM (empty spans, font-weight style)', async () => {
+    // Exact DOM captured from Firefox + nextjs CI failure.
+    // Empty <span></span> wrappers (no BOM), bold via style not <strong>.
+    const r = await replay(helper.getIframe(),
+      '<span></span><span style="font-weight: bold" data-node-id="0.1"><span>Text to format</span></span><span></span>',
+      'end',
+      ['Home', 'Delete']);
+    expect(r.text).toBe('ext to format');
+    expect(r.textBefore).toBe('');
+  });
+
   // --- Bold with BOM between elements ---
 
   test('ArrowLeft through bold boundary with BOM', async () => {
