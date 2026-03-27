@@ -12,16 +12,18 @@ import { AdminUIHelper } from '../helpers/AdminUIHelper';
  * Set up DOM, place cursor, replay keys, return { text, textBefore }.
  * `html` is set on the block's edit field.
  * `cursorAt` is visible character offset (skips ZWS/BOM), or 'start'/'end'.
- * `keys` are key names passed to bridge.replayOneKey.
+ * `keys` are key names or event objects passed to bridge.replayOneKey.
+ * Strings are converted to event objects with no modifiers.
+ * Use { key, ctrlKey, metaKey, shiftKey } for modifier combos.
  */
 async function replay(
   iframe: ReturnType<AdminUIHelper['getIframe']>,
   html: string,
   cursorAt: 'start' | 'end' | number,
-  keys: string[],
+  keys: (string | { key: string; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean; altKey?: boolean })[],
 ) {
   return await iframe.locator('body').evaluate(
-    (_el: Element, { html, cursorAt, keys }: { html: string; cursorAt: string | number; keys: string[] }) => {
+    (_el: Element, { html, cursorAt, keys }: { html: string; cursorAt: string | number; keys: any[] }) => {
       const bridge = (window as any).bridge;
       const blockId = 'mock-block-1';
       const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
@@ -74,14 +76,12 @@ async function replay(
       sel.addRange(range);
 
       // Replay via the real replayBufferAndUnblock — same code as production
-      bridge.eventBuffer = keys.map((key: string) => ({
-        key,
-        code: key,
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      }));
+      bridge.eventBuffer = keys.map((k: any) => {
+        if (typeof k === 'string') {
+          return { key: k, code: k, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false };
+        }
+        return { code: k.key, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, ...k };
+      });
       bridge.pendingTransform = { blockId, requestId: 'test-replay' };
       bridge.blockedBlockId = blockId;
       bridge.replayBufferAndUnblock('unit-test');
@@ -237,6 +237,60 @@ test.describe('replayOneKey — cursor movement and editing', () => {
       ['!', ' ', 'w', 'o', 'r', 'l', 'd']);
     // Browser may convert space to NBSP in contenteditable
     expect(r.text.replace(/\u00A0/g, ' ')).toBe('Hello! world');
+  });
+
+  // --- Modifier combos ---
+
+  test('Ctrl+A selects all text', async () => {
+    const r = await replay(helper.getIframe(),
+      '<p data-node-id="0">Hello world</p>',
+      3, // cursor at position 3
+      [{ key: 'a', ctrlKey: true }]);
+    // After select-all, textBefore should be empty (cursor at start of selection)
+    // or full text (selection covers all). The selection itself covers all text.
+    expect(r.text).toBe('Hello world');
+  });
+
+  test('composed accented character inserts correctly', async () => {
+    // Dead key compositions arrive as single characters (e.g. è, ü, ñ)
+    const r = await replay(helper.getIframe(),
+      '<p data-node-id="0">cafe</p>',
+      'end',
+      ['é']); // composed character, key.length === 1
+    expect(r.text).toBe('cafeé');
+  });
+
+  test('special characters insert correctly', async () => {
+    const r = await replay(helper.getIframe(),
+      '<p data-node-id="0">price </p>',
+      'end',
+      ['€', ' ', '1', '0', '0']);
+    expect(r.text.replace(/\u00A0/g, ' ')).toBe('price € 100');
+  });
+
+  test('Shift+Arrow extends selection', async () => {
+    const r = await replay(helper.getIframe(),
+      '<p data-node-id="0">Hello world</p>',
+      5, // cursor after "Hello"
+      [{ key: 'ArrowRight', shiftKey: true },
+       { key: 'ArrowRight', shiftKey: true },
+       { key: 'ArrowRight', shiftKey: true }]);
+    // Focus moved 3 chars right, textBefore measures to focus position
+    expect(r.textBefore).toBe('Hello wo');
+  });
+
+  test('selection replacement: typing replaces selected text', async () => {
+    // Select "world" then type "earth"
+    const r = await replay(helper.getIframe(),
+      '<p data-node-id="0">Hello world</p>',
+      6, // cursor at 'w'
+      [{ key: 'ArrowRight', shiftKey: true },
+       { key: 'ArrowRight', shiftKey: true },
+       { key: 'ArrowRight', shiftKey: true },
+       { key: 'ArrowRight', shiftKey: true },
+       { key: 'ArrowRight', shiftKey: true },
+       'E', 'a', 'r', 't', 'h']);
+    expect(r.text).toBe('Hello Earth');
   });
 
   // --- Bold with BOM between elements ---
