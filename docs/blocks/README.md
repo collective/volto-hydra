@@ -65,3 +65,28 @@ Common `widget` values used in block schemas:
 | `object_list` | Array of typed items | `[{ "@id": "...", ... }]` |
 | `boolean` | Checkbox toggle | `true` / `false` |
 | `integer` | Number input | `42` |
+
+```{toctree}
+:hidden:
+
+slate
+image
+teaser
+table
+listing
+search
+hero
+columns
+accordion
+slider
+form
+introduction
+heading
+highlight
+maps
+separator
+button
+toc
+video
+```
+
