@@ -226,6 +226,19 @@ test.describe('replayOneKey — cursor movement and editing', () => {
     expect(r.textBefore).toBe('');
   });
 
+  // --- Text character replay ---
+
+  test('buffered text characters are inserted via insertText', async () => {
+    // When focus falls to body during re-render, typed characters get buffered.
+    // replayOneKey should insert them via execCommand('insertText').
+    const r = await replay(helper.getIframe(),
+      '<p data-node-id="0">Hello</p>',
+      'end',
+      ['!', ' ', 'w', 'o', 'r', 'l', 'd']);
+    // Browser may convert space to NBSP in contenteditable
+    expect(r.text.replace(/\u00A0/g, ' ')).toBe('Hello! world');
+  });
+
   // --- Bold with BOM between elements ---
 
   test('ArrowLeft through bold boundary with BOM', async () => {
