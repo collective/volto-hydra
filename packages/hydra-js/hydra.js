@@ -1198,6 +1198,14 @@ export class Bridge {
    * @param {string} key - 'Backspace' or 'Delete'
    * @returns {boolean} true if handled (caller should preventDefault / skip native action)
    */
+  /**
+   * Get the nearest Element from a node (returns node itself if Element,
+   * or parentElement if text node). Used for closest() lookups.
+   */
+  _toElement(node) {
+    return node?.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+  }
+
   handleDeleteKey(blockUid, key) {
     const selection = window.getSelection();
     if (!selection || !selection.rangeCount) return false;
@@ -1210,7 +1218,7 @@ export class Bridge {
     // 2. Start of an interior node-id element → let Slate handle (demote list item, etc.)
     // In both cases the browser's native Backspace would corrupt the DOM structure.
     if (key === 'Backspace' && this.isSlateField(blockUid, this.focusedFieldName)) {
-      const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+      const blockEl = this._toElement(node);
       const editField = blockEl?.closest('[data-edit-text]');
       if (editField) {
         // Check if the field is empty (only ZWS/BOM) — regardless of selection state.
@@ -1277,7 +1285,7 @@ export class Bridge {
 
     // Backspace in empty first simple text field → delete block
     if (key === 'Backspace' && !this.isSlateField(blockUid, this.focusedFieldName)) {
-      const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+      const blockEl = this._toElement(node);
       const editField = blockEl.closest('[data-edit-text]');
       if (editField) {
         const fieldText = (editField.textContent || '').trim();
@@ -1313,15 +1321,14 @@ export class Bridge {
     // Check if cursor is at the end of the entire field, not just the current
     // node. An empty wrapper element (e.g. <span></span> on Firefox) has
     // offset 0 = length 0, but there may be content after it in the field.
-    const editFieldForEnd = (node.nodeType === Node.TEXT_NODE ? node.parentElement : node)?.closest('[data-edit-text]');
+    const editFieldForEnd = this._toElement(node)?.closest('[data-edit-text]');
     let atEnd = false;
     if (editFieldForEnd && range.startOffset === (node.textContent?.length ?? node.length ?? 0)) {
       atEnd = this.getFieldTextAroundCursor(range, editFieldForEnd, 'after') === '';
     }
 
     if ((key === 'Backspace' && atStart) || (key === 'Delete' && atEnd)) {
-      const parentElement =
-        node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+      const parentElement = this._toElement(node);
       const hasNodeId = parentElement?.closest('[data-node-id]');
 
       if (hasNodeId) {
@@ -1402,7 +1409,7 @@ export class Bridge {
 
     const range = sel.getRangeAt(0);
     const node = range.startContainer;
-    const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    const blockEl = this._toElement(node);
     const editableField = blockEl.closest('[data-edit-text]');
     if (!editableField) return false;
 
@@ -8069,7 +8076,7 @@ export class Bridge {
             const selection = window.getSelection();
             if (selection.rangeCount) {
               const tabNode = selection.getRangeAt(0).startContainer;
-              const tabEl = tabNode.nodeType === Node.TEXT_NODE ? tabNode.parentElement : tabNode;
+              const tabEl = this._toElement(tabNode);
               if (tabEl?.closest('li')) {
                 e.preventDefault();
                 this.sendTransformRequest(blockUid, e.shiftKey ? 'outdent' : 'indent', {});
@@ -8121,8 +8128,7 @@ export class Bridge {
           const range = selection.getRangeAt(0);
           const node = range.startContainer;
 
-          const parentElement =
-            node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+          const parentElement = this._toElement(node);
           const hasNodeId = parentElement?.closest('[data-node-id]');
           log('Has data-node-id?', !!hasNodeId);
 
