@@ -94,10 +94,13 @@
 
 // Debug logging - disabled by default, enable via initBridge options,
 // window.HYDRA_DEBUG, or _hydra_debug URL param (set by admin iframe src)
-let debugEnabled = typeof window !== 'undefined' && (
-  window.HYDRA_DEBUG ||
-  new URLSearchParams(window.location?.search).has('_hydra_debug')
-);
+let debugEnabled = false;
+try {
+  debugEnabled = typeof window !== 'undefined' && !!(
+    window.HYDRA_DEBUG ||
+    (window.location?.search && new URLSearchParams(window.location.search).has('_hydra_debug'))
+  );
+} catch { /* SSR or restricted environment */ }
 const log = (...args) => {
   if (!debugEnabled) return;
   const runId = typeof window !== 'undefined' && window.__testRunId;
@@ -1120,24 +1123,28 @@ export class Bridge {
   }
 
   /**
-   * If the cursor is on a ZWS/BOM-only text node or an empty Element (Firefox),
-   * move it to the nearest visible text node in the given direction.
-   * Prevents arrow keys, Delete, and Backspace from acting on invisible content.
+   * Check if a node contains only ZWS/BOM characters (no visible text).
+   * Does NOT treat whitespace as invisible — spaces between words are real content.
+   */
+  _hasNoVisibleText(node) {
+    if (!node) return true;
+    return this.stripZeroWidthSpaces(node.textContent || '') === '';
+  }
+
+  /**
+   * If the cursor is on a node with no visible text (ZWS/BOM-only text node
+   * or empty Element on Firefox), move it to the nearest visible text node
+   * in the given direction. Prevents keys from acting on invisible content.
    */
   _skipZwsNode(direction) {
     const sel = window.getSelection();
     if (!sel?.focusNode) return;
 
     const node = sel.focusNode;
-    const isEmptyElement = node.nodeType !== Node.TEXT_NODE &&
-      this.stripZeroWidthSpaces(node.textContent || '') === '';
-    const isZwsText = node.nodeType === Node.TEXT_NODE &&
-      (node.textContent?.replace(/[\uFEFF\u200B]/g, '') === '');
-
-    if (!isEmptyElement && !isZwsText) return;
+    if (!this._hasNoVisibleText(node)) return;
 
     // Walk from contenteditable root to find text across element boundaries
-    const root = (node instanceof Element ? node : node.parentElement)
+    const root = this._toElement(node)
       ?.closest?.('[contenteditable="true"]') || document.body;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     walker.currentNode = node;
@@ -1224,8 +1231,7 @@ export class Bridge {
         // Check if the field is empty (only ZWS/BOM) — regardless of selection state.
         // After preserveLastCharDelete, the field may contain only ZWS and the
         // selection may be non-collapsed spanning multiple ZWS text nodes.
-        const fieldText = this.stripZeroWidthSpaces(editField.textContent || '');
-        if (fieldText === '' && range.collapsed === false) {
+        if (this._hasNoVisibleText(editField) && range.collapsed === false) {
           // Empty field with non-collapsed selection — treat as empty block backspace
           const blockElement = editField.closest('[data-block-uid]');
           const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
@@ -1269,7 +1275,7 @@ export class Bridge {
               const blockElement = editField.closest('[data-block-uid]');
               const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
               const isFirstField = firstField === editField;
-              const isEmpty = fieldText === '';
+              const isEmpty = this._hasNoVisibleText(editField);
 
               log('Backspace at start of slate field - sending unwrapBlock, isFirstField:', isFirstField, 'isEmpty:', isEmpty);
               this.sendTransformRequest(blockUid, 'unwrapBlock', {
@@ -1288,8 +1294,7 @@ export class Bridge {
       const blockEl = this._toElement(node);
       const editField = blockEl.closest('[data-edit-text]');
       if (editField) {
-        const fieldText = (editField.textContent || '').trim();
-        if (fieldText === '') {
+        if (this._hasNoVisibleText(editField) || (editField.textContent || '').trim() === '') {
           const blockElement = editField.closest('[data-block-uid]');
           const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
           if (firstField === editField) {
