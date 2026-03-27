@@ -1119,6 +1119,11 @@ export class Bridge {
       }
       return true;
     }
+    // Text character — insert into contenteditable
+    if (key.length === 1) {
+      document.execCommand('insertText', false, key);
+      return true;
+    }
     return false;
   }
 
