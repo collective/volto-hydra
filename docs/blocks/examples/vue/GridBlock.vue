@@ -1,9 +1,8 @@
 <template>
-  <div :data-block-uid="id" class="grid-block">
-    <div :style="{ display: 'grid', gridTemplateColumns: `repeat(${columns.length}, 1fr)`, gap: '1rem' }">
-      <div v-for="col in columns" :key="col['@id']" :data-block-uid="col['@id']" class="grid-column">
-        <Block v-for="item in expand(col.blocks_layout?.items || [], col.blocks, col['@id'])"
-          :key="item['@uid']" :data="item" />
+  <div :data-block-uid="block['@uid']" class="grid-block">
+    <div :style="{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }">
+      <div v-for="id in items" :key="id" class="grid-cell">
+        <Block :data="{ ...block.blocks?.[id], '@uid': id }" />
       </div>
     </div>
   </div>
@@ -11,10 +10,6 @@
 
 <script setup>
 import { computed } from 'vue';
-import { expandListingBlocks } from '@hydra-js/hydra.js';
-const props = defineProps({ block: Object, id: String });
-const columns = computed(() => props.block.columns || []);
-function expand(layout, blocks, containerId) {
-  return expandListingBlocks(layout, { blocks, containerId });
-}
+const props = defineProps({ block: Object });
+const items = computed(() => props.block.blocks_layout?.items || []);
 </script>

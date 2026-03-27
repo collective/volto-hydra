@@ -1,22 +1,15 @@
-import { expandListingBlocks } from '@hydra-js/hydra.js';
-
-function GridBlock({ block, blockId }) {
-  const columns = block.columns || [];
-
-  function expand(layout, blocks, containerId) {
-    return expandListingBlocks(layout, { blocks, containerId });
-  }
+function GridBlock({ block }) {
+  const blocks = block.blocks || {};
+  const items = block.blocks_layout?.items || [];
 
   return (
-    <div data-block-uid={blockId} className="grid-block">
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns.length}, 1fr)`, gap: '1rem' }}>
-        {columns.map(col => {
-          const items = expand(col.blocks_layout?.items || [], col.blocks, col['@id']);
+    <div data-block-uid={block['@uid']} className="grid-block">
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }}>
+        {items.map(id => {
+          const child = { ...blocks[id], '@uid': id };
           return (
-            <div key={col['@id']} data-block-uid={col['@id']} className="grid-column">
-              {items.map(item => (
-                <BlockRenderer key={item['@uid']} block={item} />
-              ))}
+            <div key={id} className="grid-cell">
+              <BlockRenderer block={child} />
             </div>
           );
         })}
