@@ -28,7 +28,7 @@
       "plaintext": "Stale Header - Should Be Replaced By Merge",
       "templateId": "resolveuid/test-layout-template-uid",
       "templateInstanceId": "tpl-instance-1",
-      "placeholder": "header"
+      "slotId": "header"
     },
     "user-content-1": {
       "@type": "slate",
@@ -43,7 +43,7 @@
       "plaintext": "User content - different from template default",
       "templateId": "resolveuid/test-layout-template-uid",
       "templateInstanceId": "tpl-instance-1",
-      "placeholder": "primary"
+      "slotId": "primary"
     },
     "user-content-2": {
       "@type": "slate",
@@ -58,7 +58,7 @@
       "plaintext": "Second user content block in placeholder",
       "templateId": "resolveuid/test-layout-template-uid",
       "templateInstanceId": "tpl-instance-1",
-      "placeholder": "primary"
+      "slotId": "primary"
     },
     "template-slider": {
       "@type": "slider",
@@ -66,7 +66,7 @@
       "readOnly": true,
       "templateId": "resolveuid/test-layout-template-uid",
       "templateInstanceId": "tpl-instance-1",
-      "placeholder": "slider",
+      "slotId": "slider",
       "slides": [
         {
           "@id": "tpl-slide-1",
@@ -103,7 +103,7 @@
       "plaintext": "Stale Footer - Should Be Replaced By Merge",
       "templateId": "resolveuid/test-layout-template-uid",
       "templateInstanceId": "tpl-instance-1",
-      "placeholder": "footer"
+      "slotId": "footer"
     },
     "standalone-block-2": {
       "@type": "slate",

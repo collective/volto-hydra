@@ -150,35 +150,21 @@ test.describe('Inline image editing', () => {
     const initialSrc = await heroImage.getAttribute('src');
     expect(initialSrc).toBeTruthy();
 
-    // Scroll the hero block into view and click to select it
-    await heroBlock.scrollIntoViewIfNeeded();
-    await heroBlock.click();
+    // Select the hero block and wait for block UI to settle
+    await helper.clickBlockInIframe('block-4-hero');
+    await helper.waitForQuantaToolbar('block-4-hero');
 
-    // Wait for the clear button overlay to appear (top-right X button)
-    // This should appear when the block is selected, not just when the image is clicked
-    const clearButton = page.locator('button[title="Clear image"]');
+    // Wait for the image clear button overlay to appear and click it
+    const clearButton = page.locator('#clear-media-image');
     await expect(clearButton).toBeVisible({ timeout: 5000 });
-
-    // Scroll to ensure clear button is clickable
-    await clearButton.scrollIntoViewIfNeeded();
     await clearButton.click();
 
-    // Verify the image was cleared - the element should now be the empty placeholder
-    // or have an empty/placeholder src
-    const heroImagePlaceholder = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
-    await expect(heroImagePlaceholder).toBeVisible({ timeout: 5000 });
-
-    // Check that either:
-    // 1. The src is now empty/different from before, OR
-    // 2. The element changed to a div placeholder (not img)
-    const tagName = await heroImagePlaceholder.evaluate(el => el.tagName.toLowerCase());
-    if (tagName === 'img') {
-      const newSrc = await heroImagePlaceholder.getAttribute('src');
-      expect(newSrc).not.toBe(initialSrc);
-    } else {
-      // It's now a placeholder div, which means image was cleared
-      expect(tagName).toBe('div');
-    }
+    // Wait for the image URL to disappear from the rendered block
+    const heroMediaEl = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
+    await expect(async () => {
+      const src = await heroMediaEl.getAttribute('src');
+      expect(src).not.toBe(initialSrc);
+    }).toPass({ timeout: 5000 });
 
     // Verify the AddLinkForm appears inside the hero block's image area (not at page bottom)
     const addLinkForm = page.locator('.empty-image-overlay');

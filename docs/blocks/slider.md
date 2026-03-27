@@ -147,6 +147,8 @@ This is a **custom** block — register it via `initBridge`.
 
 <!-- file: examples/react/SliderBlock.jsx -->
 ```jsx
+import { getImageUrl } from './utils.js';
+
 function SliderBlock({ block }) {
   const [current, setCurrent] = useState(0);
   const slides = block.slides || [];
@@ -163,7 +165,7 @@ function SliderBlock({ block }) {
           {slide.preview_image && (
             <img
               data-edit-media="preview_image"
-              src={slide.preview_image[0]?.['@id'] || slide.preview_image}
+              src={getImageUrl(slide.preview_image)}
               alt=""
             />
           )}
@@ -199,7 +201,7 @@ function SliderBlock({ block }) {
       <img
         v-if="slide.preview_image"
         data-edit-media="preview_image"
-        :src="slide.preview_image[0]?.['@id'] || slide.preview_image"
+        :src="getImageUrl(slide.preview_image)"
         alt=""
       />
       <span data-edit-text="head_title">{{ slide.head_title }}</span>
@@ -220,6 +222,7 @@ function SliderBlock({ block }) {
 
 <script setup>
 import { ref } from 'vue';
+import { getImageUrl } from './utils.js';
 defineProps({ block: Object });
 const current = ref(0);
 </script>
@@ -230,6 +233,7 @@ const current = ref(0);
 <!-- file: examples/svelte/SliderBlock.svelte -->
 ```svelte
 <script>
+  import { getImageUrl } from './utils.js';
   export let block;
   let current = 0;
 </script>
@@ -244,7 +248,7 @@ const current = ref(0);
       {#if slide.preview_image}
         <img
           data-edit-media="preview_image"
-          src={slide.preview_image[0]?.['@id'] || slide.preview_image}
+          src={getImageUrl(slide.preview_image)}
           alt=""
         />
       {/if}

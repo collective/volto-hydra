@@ -4,7 +4,7 @@
  * Tests that:
  * 1. Templates appear in BlockChooser when allowedTemplates is configured
  * 2. Selecting a template inserts blocks with proper template fields
- * 3. Existing content is preserved in the placeholder region
+ * 3. Existing content is preserved in the slot region
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
@@ -61,6 +61,16 @@ test.describe('Template Insertion', () => {
     // test-layout has: header, main-placeholder, footer
     await helper.waitForBlockByContent('Template Header');
     await helper.waitForBlockByContent('Template Footer');
+
+    // Slot block content should be stored as fieldPlaceholders
+    // The main-placeholder slot block has "Default placeholder content"
+    const iframe = helper.getIframe();
+    const placeholderBlock = iframe.locator('[data-block-uid]').filter({ hasText: 'Default placeholder content' });
+    if (await placeholderBlock.count() > 0) {
+      // The slot block's text should show as a placeholder (data-placeholder attr)
+      const editField = placeholderBlock.locator('[data-edit-text]').first();
+      await expect(editField).toHaveAttribute('data-placeholder', /Default placeholder content/);
+    }
   });
 
   test('inserted template blocks show in sidebar hierarchy', async ({ page }) => {

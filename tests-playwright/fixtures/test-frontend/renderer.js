@@ -131,24 +131,34 @@ async function renderContent(content, containerId = 'content', renderGeneration)
 
     const container = document.getElementById(containerId);
     if (!container) return;
-    // Stale check before clearing DOM
-    if (renderGeneration !== undefined && renderGeneration !== window._renderGeneration) return;
-    container.innerHTML = '';
-
-    const { items } = content;
-    if (!items) {
-        // Expected for non-block content types (Image, File, etc.)
+    // Stale check before rendering
+    if (renderGeneration !== undefined && renderGeneration !== window._renderGeneration) {
+        tfLog('renderContent: STALE gen=' + renderGeneration + ' current=' + window._renderGeneration);
         return;
     }
 
+    const { items } = content;
+    if (!items) {
+        container.innerHTML = '';
+        return;
+    }
+
+    // Build all blocks into a fragment first, then swap atomically
+    tfLog('renderContent: START gen=' + renderGeneration + ' items=' + items.length + ' t=' + performance.now().toFixed(0));
+    const fragment = document.createDocumentFragment();
     for (const item of items) {
-        // Pass @uid as blockId - this becomes data-block-uid
         const blockElement = await renderBlock(item['@uid'], item);
-        if (renderGeneration !== undefined && renderGeneration !== window._renderGeneration) return; // stale
+        if (renderGeneration !== undefined && renderGeneration !== window._renderGeneration) {
+            tfLog('renderContent: STALE mid-loop gen=' + renderGeneration + ' current=' + window._renderGeneration);
+            return;
+        }
         if (blockElement) {
-            container.appendChild(blockElement);
+            fragment.appendChild(blockElement);
         }
     }
+    tfLog('renderContent: SWAP gen=' + renderGeneration + ' t=' + performance.now().toFixed(0));
+    container.innerHTML = '';
+    container.appendChild(fragment);
 }
 
 /**
@@ -162,6 +172,12 @@ async function renderBlock(blockId, block) {
     wrapper.setAttribute('data-block-uid', blockId);
 
     switch (block['@type']) {
+        case 'title':
+            wrapper.innerHTML = `<h1 data-edit-text="/title">${window._currentFormData?.title || ''}</h1>`;
+            break;
+        case 'description':
+            wrapper.innerHTML = `<p data-edit-text="/description">${window._currentFormData?.description || ''}</p>`;
+            break;
         case 'slate':
             wrapper.innerHTML = renderSlateBlock(block);
             break;

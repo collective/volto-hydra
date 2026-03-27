@@ -12,7 +12,7 @@
       "readOnly": true,
       "templateId": "resolveuid/test-layout-template-uid",
       "templateInstanceId": "test-layout-def-instance",
-      "placeholder": "header",
+      "slotId": "header",
       "value": [
         {
           "type": "h1",
@@ -27,7 +27,7 @@
       "readOnly": true,
       "templateId": "resolveuid/test-layout-template-uid",
       "templateInstanceId": "test-layout-def-instance",
-      "placeholder": "grid",
+      "slotId": "grid",
       "blocks": {
         "tpl-grid-cell-1": {
           "@type": "slate",
@@ -35,7 +35,7 @@
           "readOnly": true,
           "templateId": "resolveuid/test-layout-template-uid",
           "templateInstanceId": "test-layout-def-instance",
-          "placeholder": "grid-cell-1",
+          "slotId": "grid-cell-1",
           "value": [{ "type": "p", "children": [{ "text": "Template Grid Cell 1" }] }],
           "plaintext": "Template Grid Cell 1"
         },
@@ -51,7 +51,7 @@
       "@type": "slate",
       "templateId": "resolveuid/test-layout-template-uid",
       "templateInstanceId": "test-layout-def-instance",
-      "placeholder": "primary",
+      "slotId": "primary",
       "value": [
         {
           "type": "p",
@@ -66,7 +66,7 @@
       "readOnly": true,
       "templateId": "resolveuid/test-layout-template-uid",
       "templateInstanceId": "test-layout-def-instance",
-      "placeholder": "footer",
+      "slotId": "footer",
       "value": [
         {
           "type": "p",

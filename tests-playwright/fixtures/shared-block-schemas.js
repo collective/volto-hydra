@@ -6,6 +6,22 @@
  */
 
 export const sharedBlocksConfig = {
+    slate: {
+        id: 'slate',
+        title: 'Text',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['value'] }],
+            properties: {
+                value: {
+                    title: 'Text',
+                    type: 'array',
+                    widget: 'slate',
+                    placeholder: 'Type text…',
+                },
+            },
+            required: [],
+        },
+    },
     hero: {
         id: 'hero',
         title: 'Hero',
@@ -24,11 +40,13 @@ export const sharedBlocksConfig = {
                 heading: {
                     title: 'Heading',
                     type: 'string',
+                    placeholder: 'Enter hero heading…',
                 },
                 subheading: {
                     title: 'Subheading',
                     type: 'string',
                     widget: 'textarea',
+                    placeholder: 'Enter subheading…',
                 },
                 buttonText: {
                     title: 'Button Text',

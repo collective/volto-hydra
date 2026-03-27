@@ -12,7 +12,7 @@
       "readOnly": true,
       "templateId": "resolveuid/header-only-layout-uid",
       "templateInstanceId": "header-only-def-instance",
-      "placeholder": "header",
+      "slotId": "header",
       "value": [
         {
           "type": "h1",
@@ -25,7 +25,7 @@
       "@type": "slate",
       "templateId": "resolveuid/header-only-layout-uid",
       "templateInstanceId": "header-only-def-instance",
-      "placeholder": "default",
+      "slotId": "default",
       "value": [
         {
           "type": "p",

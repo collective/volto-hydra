@@ -68,7 +68,137 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "enhancers-heading": {
+      "@type": "slate",
+      "plaintext": "Schema Enhancers",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Schema Enhancers"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "enhancers-text-t0": {
+      "@type": "slate",
+      "plaintext": "Schema enhancers modify block schemas dynamically:",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Schema enhancers modify block schemas dynamically:"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "enhancers-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "enhancers-text-c1-javascript-92cb55",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "const bridge = initBridge({\n    blocks: {\n        myBlock: {\n            blockSchema: {\n                properties: {\n                    mode: {\n                        title: 'Mode', widget: 'select',\n                        choices: [['simple', 'Simple'], ['advanced', 'Advanced']],\n                    },\n                    advancedOptions: { title: 'Advanced Options', type: 'string' },\n                },\n            },\n            schemaEnhancer: {\n                fieldRules: {\n                    advancedOptions: { when: { mode: 'advanced' }, else: false },\n                },\n            },\n        },\n    },\n});"
+        }
+      ]
+    },
+    "enhancers-text-t2": {
+      "@type": "slate",
+      "plaintext": "fieldRules: Add, remove, or conditionally modify field definitions. Condition operators: is, isNot, isSet, isNotSet, gt, gte, lt, lteField paths: ../field for parent block, /field for root",
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "text": "fieldRules"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": ": Add, remove, or conditionally modify field definitions."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "conversion-heading": {
+      "@type": "slate",
+      "plaintext": "Block Conversion & fieldMappings",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Block Conversion & fieldMappings"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "conversion-text-t0": {
+      "@type": "slate",
+      "plaintext": "If a block type has a fieldMappings defined it will enable a \"Convert to...\" UI action. You specify either conversions to a specific type, or to a generic search result schema (@id, title, preview-image, description):",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "If a block type has a "
+            },
+            {
+              "children": [
+                {
+                  "text": "fieldMappings"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " defined it will enable a \"Convert to...\" UI action. You specify either conversions to a specific type, or to a generic search result schema (@id, title, preview-image, description):"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "conversion-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "conversion-text-c1-javascript-970ef0",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "blocks: {\n    teaser: {\n        fieldMappings: {\n            '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },\n            image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },\n        },\n    },\n    image: {\n        fieldMappings: {\n            '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },\n            teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },\n        },\n    },\n}"
+        }
+      ]
+    },
+    "conversion-text-t2": {
+      "@type": "slate",
+      "plaintext": "Transitive conversions are performed automatically by using paths through intermediate types (e.g., hero -> teaser -> image). Any fields that don't match will still be kept in the data so if the block is converted back that data will reappear.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Transitive conversions are performed automatically by using paths through intermediate types (e.g., hero -> teaser -> image). Any fields that don't match will still be kept in the data so if the block is converted back that data will reappear."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "custom-text-t2-split-1": {
+      "@type": "slate",
+      "value": [
         {
           "children": [
             {
@@ -152,65 +282,9 @@
         }
       ]
     },
-    "enhancers-heading": {
+    "enhancers-text-t2-split-1": {
       "@type": "slate",
-      "plaintext": "Schema Enhancers",
       "value": [
-        {
-          "children": [
-            {
-              "text": "Schema Enhancers"
-            }
-          ],
-          "type": "h2"
-        }
-      ]
-    },
-    "enhancers-text-t0": {
-      "@type": "slate",
-      "plaintext": "Schema enhancers modify block schemas dynamically:",
-      "value": [
-        {
-          "children": [
-            {
-              "text": "Schema enhancers modify block schemas dynamically:"
-            }
-          ],
-          "type": "p"
-        }
-      ]
-    },
-    "enhancers-text-c1": {
-      "@type": "codeExample",
-      "tabs": [
-        {
-          "@id": "enhancers-text-c1-javascript-92cb55",
-          "label": "JavaScript",
-          "language": "javascript",
-          "code": "const bridge = initBridge({\n    blocks: {\n        myBlock: {\n            blockSchema: {\n                properties: {\n                    mode: {\n                        title: 'Mode', widget: 'select',\n                        choices: [['simple', 'Simple'], ['advanced', 'Advanced']],\n                    },\n                    advancedOptions: { title: 'Advanced Options', type: 'string' },\n                },\n            },\n            schemaEnhancer: {\n                fieldRules: {\n                    advancedOptions: { when: { mode: 'advanced' }, else: false },\n                },\n            },\n        },\n    },\n});"
-        }
-      ]
-    },
-    "enhancers-text-t2": {
-      "@type": "slate",
-      "plaintext": "fieldRules: Add, remove, or conditionally modify field definitions. Condition operators: is, isNot, isSet, isNotSet, gt, gte, lt, lteField paths: ../field for parent block, /field for root",
-      "value": [
-        {
-          "children": [
-            {
-              "children": [
-                {
-                  "text": "fieldRules"
-                }
-              ],
-              "type": "strong"
-            },
-            {
-              "text": ": Add, remove, or conditionally modify field definitions."
-            }
-          ],
-          "type": "p"
-        },
         {
           "children": [
             {
@@ -233,70 +307,6 @@
           "type": "ul"
         }
       ]
-    },
-    "conversion-heading": {
-      "@type": "slate",
-      "plaintext": "Block Conversion & fieldMappings",
-      "value": [
-        {
-          "children": [
-            {
-              "text": "Block Conversion & fieldMappings"
-            }
-          ],
-          "type": "h2"
-        }
-      ]
-    },
-    "conversion-text-t0": {
-      "@type": "slate",
-      "plaintext": "If a block type has a fieldMappings defined it will enable a \"Convert to...\" UI action. You specify either conversions to a specific type, or to a generic search result schema (@id, title, preview-image, description):",
-      "value": [
-        {
-          "children": [
-            {
-              "text": "If a block type has a "
-            },
-            {
-              "children": [
-                {
-                  "text": "fieldMappings"
-                }
-              ],
-              "type": "strong"
-            },
-            {
-              "text": " defined it will enable a \"Convert to...\" UI action. You specify either conversions to a specific type, or to a generic search result schema (@id, title, preview-image, description):"
-            }
-          ],
-          "type": "p"
-        }
-      ]
-    },
-    "conversion-text-c1": {
-      "@type": "codeExample",
-      "tabs": [
-        {
-          "@id": "conversion-text-c1-javascript-970ef0",
-          "label": "JavaScript",
-          "language": "javascript",
-          "code": "blocks: {\n    teaser: {\n        fieldMappings: {\n            '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },\n            image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },\n        },\n    },\n    image: {\n        fieldMappings: {\n            '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },\n            teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },\n        },\n    },\n}"
-        }
-      ]
-    },
-    "conversion-text-t2": {
-      "@type": "slate",
-      "plaintext": "Transitive conversions are performed automatically by using paths through intermediate types (e.g., hero -> teaser -> image). Any fields that don't match will still be kept in the data so if the block is converted back that data will reappear.",
-      "value": [
-        {
-          "children": [
-            {
-              "text": "Transitive conversions are performed automatically by using paths through intermediate types (e.g., hero -> teaser -> image). Any fields that don't match will still be kept in the data so if the block is converted back that data will reappear."
-            }
-          ],
-          "type": "p"
-        }
-      ]
     }
   },
   "blocks_layout": {
@@ -306,10 +316,12 @@
       "custom-text-t0",
       "custom-text-c1",
       "custom-text-t2",
+      "custom-text-t2-split-1",
       "enhancers-heading",
       "enhancers-text-t0",
       "enhancers-text-c1",
       "enhancers-text-t2",
+      "enhancers-text-t2-split-1",
       "conversion-heading",
       "conversion-text-t0",
       "conversion-text-c1",

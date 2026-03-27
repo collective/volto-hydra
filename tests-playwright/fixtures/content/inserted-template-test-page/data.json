@@ -21,7 +21,7 @@
       "readOnly": true,
       "templateId": "resolveuid/snippet-template-uid",
       "templateInstanceId": "snippet-inst-1",
-      "placeholder": "snippet-heading",
+      "slotId": "snippet-heading",
       "value": [
         {
           "type": "h2",
@@ -34,7 +34,7 @@
       "@type": "slate",
       "templateId": "resolveuid/snippet-template-uid",
       "templateInstanceId": "snippet-inst-1",
-      "placeholder": "snippet-body",
+      "slotId": "snippet-body",
       "value": [
         {
           "type": "p",

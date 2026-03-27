@@ -277,61 +277,81 @@ test.describe('Multi-element blocks', () => {
   });
 
   test('scroll into view considers all elements bounding box', async ({ page }) => {
-    // Tests that scroll-into-view uses combined bounding box, not just first element
-    // Listing block is at bottom of page, not visible on initial load
+    // Tests that scroll-into-view uses combined bounding box, not just one element.
+    // Strategy: select the listing from sidebar (scrolls down), then select a
+    // block at the top (scrolls back up), then select listing again. Both
+    // scrolls should position the group so the first element is near the top.
+    // If only a single element's rect was used, the first element would be
+    // way above the viewport on re-select.
     const helper = new AdminUIHelper(page);
 
-    // Use a small viewport so listing block is definitely off-screen
     await page.setViewportSize({ width: 1280, height: 400 });
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
     const iframe = helper.getIframe();
-    const elements = iframe.locator(`[data-block-uid="${listingBlockId}"]`);
-    await expect(elements.first()).toBeVisible({ timeout: 5000 });
+    const listingElements = iframe.locator(`[data-block-uid="${listingBlockId}"]`);
+    await expect(listingElements.first()).toBeVisible({ timeout: 5000 });
 
-    // Get the last element of the listing (should be off-screen)
-    const count = await elements.count();
-    const lastElement = elements.nth(count - 1);
-    const viewportHeight = page.viewportSize()?.height || 400;
+    // Get rect relative to iframe viewport (not page)
+    const getIframeRect = (locator: any) => locator.evaluate((el: HTMLElement) => {
+      const r = el.getBoundingClientRect();
+      return { y: r.y, height: r.height };
+    });
+    const iframeViewportHeight = await iframe.locator('body').evaluate(() => window.innerHeight);
 
-    // Verify last listing element is NOT visible initially (page loads at top)
-    const lastElementRectBefore = await lastElement.boundingBox();
-    console.log('Last element Y before selection:', lastElementRectBefore?.y, 'viewport:', viewportHeight);
-    expect(lastElementRectBefore!.y).toBeGreaterThan(viewportHeight);
-
-    // Click first block to open sidebar
+    // Navigate to page-level sidebar
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.waitForSidebarOpen();
-
-    // Click the parent arrow to go to page level
     const parentArrow = page.locator('.sidebar-section-header .parent-nav .nav-back');
     await expect(parentArrow).toBeVisible({ timeout: 5000 });
     await parentArrow.click();
-
-    // Wait for ChildBlocksWidget to show page-level blocks
     const childBlocksWidget = page.locator('#sidebar-order .child-blocks-widget');
     await expect(childBlocksWidget).toBeVisible({ timeout: 5000 });
 
-    // Click the first Listing block item in the sidebar - this selects without scrolling first
-    const listingBlockItem = childBlocksWidget.locator('.child-block-item', { hasText: 'Listing' }).first();
-    await expect(listingBlockItem).toBeVisible({ timeout: 5000 });
-    await listingBlockItem.click();
+    const listingItem = childBlocksWidget.locator('.child-block-item', { hasText: 'Listing' }).first();
+    const block1Item = childBlocksWidget.locator('.child-block-item').first();
 
-    // Wait for block to be selected and scroll animation
+    // --- Step 1: Select listing from sidebar (scrolls down to it) ---
+    await listingItem.click();
     await helper.waitForBlockSelected(listingBlockId);
-    await page.waitForTimeout(300);
+    await helper.waitForQuantaToolbar(listingBlockId);
 
-    // Get first element position after selection (should be scrolled into view)
-    const firstElementRectAfter = await elements.first().boundingBox();
-    console.log('First element Y after selection:', firstElementRectAfter?.y);
+    const firstAfterDown = await getIframeRect(listingElements.first());
+    console.log('After scroll down: first Y:', firstAfterDown.y, 'viewport:', iframeViewportHeight);
+    expect(firstAfterDown.y).toBeGreaterThanOrEqual(-15);
+    expect(firstAfterDown.y).toBeLessThan(iframeViewportHeight);
 
-    // KEY ASSERTION: First element should be visible after selecting
-    // The block should be scrolled so at least the first element is in view
-    // Allow small tolerance for floating point rounding (-1px)
-    expect(firstElementRectAfter!.y).toBeLessThan(viewportHeight);
-    expect(firstElementRectAfter!.y).toBeGreaterThanOrEqual(-1);
+    // --- Step 2: Back to page level, select block-1 (scrolls up) ---
+    const goToPageLevel = async () => {
+      const arrow = page.locator('.sidebar-section-header .parent-nav .nav-back');
+      await expect(arrow).toBeVisible({ timeout: 5000 });
+      await arrow.click();
+      await expect(childBlocksWidget).toBeVisible({ timeout: 5000 });
+    };
+    await goToPageLevel();
+    await block1Item.click();
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForQuantaToolbar('block-1-uuid');
+
+    // Listing should now be off-screen again
+    const firstAfterUp = await getIframeRect(listingElements.first());
+    console.log('After scroll up: first Y:', firstAfterUp.y);
+    expect(firstAfterUp.y).toBeGreaterThan(iframeViewportHeight);
+
+    // --- Step 3: Back to page level, select listing again (scrolls down) ---
+    await goToPageLevel();
+    await listingItem.click();
+    await helper.waitForBlockSelected(listingBlockId);
+    await helper.waitForQuantaToolbar(listingBlockId);
+
+    const firstAfterDown2 = await getIframeRect(listingElements.first());
+    console.log('After second scroll down: first Y:', firstAfterDown2.y);
+    // First element near top again — proves combined bounding box is used.
+    // If only a single element was used, the scroll position would drift.
+    expect(firstAfterDown2.y).toBeGreaterThanOrEqual(-15);
+    expect(firstAfterDown2.y).toBeLessThan(iframeViewportHeight);
   });
 
   test('grid block paging works in view mode', async ({ page }) => {

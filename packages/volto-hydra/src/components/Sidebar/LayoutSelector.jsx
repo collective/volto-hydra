@@ -129,6 +129,7 @@ const LayoutSelector = ({
         uuidGenerator: uuid,
         blocksConfig: config.blocks.blocksConfig,
         intl,
+        firstInsert: true,
       });
 
       // Merge with existing formData (preserve other fields)

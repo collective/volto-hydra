@@ -29,25 +29,6 @@
             }
           ],
           "type": "p"
-        },
-        {
-          "children": [
-            {
-              "text": "You tell it which block types need fetching via a "
-            },
-            {
-              "children": [
-                {
-                  "text": "fetchItems"
-                }
-              ],
-              "type": "strong"
-            },
-            {
-              "text": " map \u2014 keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:"
-            }
-          ],
-          "type": "p"
         }
       ]
     },
@@ -272,14 +253,6 @@
             }
           ],
           "type": "p"
-        },
-        {
-          "children": [
-            {
-              "text": "For non-Plone backends (RSS feeds, external APIs, etc.), write your own fetcher: async (block, { start, size }) => { items, total }."
-            }
-          ],
-          "type": "p"
         }
       ]
     },
@@ -438,7 +411,141 @@
             }
           ],
           "type": "p"
-        },
+        }
+      ]
+    },
+    "notes-heading": {
+      "@type": "slate",
+      "plaintext": "Notes",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Notes"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "notes-text": {
+      "@type": "slate",
+      "plaintext": "Expanded listing items share the listing block's @uid. Selecting any expanded item selects the parent listing block.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Expanded listing items share the listing block's @uid. Selecting any expanded item selects the parent listing block."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "pathtransform-heading": {
+      "@type": "slate",
+      "plaintext": "Path Transformation (pathToApiPath)",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Path Transformation (pathToApiPath)"
+            }
+          ],
+          "type": "h2"
+        }
+      ]
+    },
+    "pathtransform-text-t0": {
+      "@type": "slate",
+      "plaintext": "If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS.",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "pathtransform-text-c1": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "pathtransform-text-c1-javascript-76182e",
+          "label": "JavaScript",
+          "language": "javascript",
+          "code": "const bridge = initBridge({\n    page: { ... },\n    // Transform frontend path to API path by stripping paging segments\n    // e.g., /test-page/@pg_block-8-grid_1 -> /test-page\n    pathToApiPath: (path) => path.replace(/\\/@pg_[^/]+_\\d+/, ''),\n});"
+        }
+      ]
+    },
+    "pathtransform-text-t2": {
+      "@type": "slate",
+      "plaintext": "The pathToApiPath function is called whenever hydra.js sends a PATH_CHANGE message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state).",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "The "
+            },
+            {
+              "children": [
+                {
+                  "text": "pathToApiPath"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " function is called whenever hydra.js sends a PATH_CHANGE message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state)."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "intro-1-t0-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "You tell it which block types need fetching via a "
+            },
+            {
+              "children": [
+                {
+                  "text": "fetchItems"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " map \u2014 keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:"
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "plonefetch-text-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "For non-Plone backends (RSS feeds, external APIs, etc.), write your own fetcher: async (block, { start, size }) => { items, total }."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "paging-text-split-1": {
+      "@type": "slate",
+      "value": [
         {
           "children": [
             {
@@ -557,104 +664,13 @@
           "type": "ul"
         }
       ]
-    },
-    "notes-heading": {
-      "@type": "slate",
-      "plaintext": "Notes",
-      "value": [
-        {
-          "children": [
-            {
-              "text": "Notes"
-            }
-          ],
-          "type": "h2"
-        }
-      ]
-    },
-    "notes-text": {
-      "@type": "slate",
-      "plaintext": "Expanded listing items share the listing block's @uid. Selecting any expanded item selects the parent listing block.",
-      "value": [
-        {
-          "children": [
-            {
-              "text": "Expanded listing items share the listing block's @uid. Selecting any expanded item selects the parent listing block."
-            }
-          ],
-          "type": "p"
-        }
-      ]
-    },
-    "pathtransform-heading": {
-      "@type": "slate",
-      "plaintext": "Path Transformation (pathToApiPath)",
-      "value": [
-        {
-          "children": [
-            {
-              "text": "Path Transformation (pathToApiPath)"
-            }
-          ],
-          "type": "h2"
-        }
-      ]
-    },
-    "pathtransform-text-t0": {
-      "@type": "slate",
-      "plaintext": "If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS.",
-      "value": [
-        {
-          "children": [
-            {
-              "text": "If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS."
-            }
-          ],
-          "type": "p"
-        }
-      ]
-    },
-    "pathtransform-text-c1": {
-      "@type": "codeExample",
-      "tabs": [
-        {
-          "@id": "pathtransform-text-c1-javascript-76182e",
-          "label": "JavaScript",
-          "language": "javascript",
-          "code": "const bridge = initBridge({\n    page: { ... },\n    // Transform frontend path to API path by stripping paging segments\n    // e.g., /test-page/@pg_block-8-grid_1 -> /test-page\n    pathToApiPath: (path) => path.replace(/\\/@pg_[^/]+_\\d+/, ''),\n});"
-        }
-      ]
-    },
-    "pathtransform-text-t2": {
-      "@type": "slate",
-      "plaintext": "The pathToApiPath function is called whenever hydra.js sends a PATH_CHANGE message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state).",
-      "value": [
-        {
-          "children": [
-            {
-              "text": "The "
-            },
-            {
-              "children": [
-                {
-                  "text": "pathToApiPath"
-                }
-              ],
-              "type": "strong"
-            },
-            {
-              "text": " function is called whenever hydra.js sends a PATH_CHANGE message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state)."
-            }
-          ],
-          "type": "p"
-        }
-      ]
     }
   },
   "blocks_layout": {
     "items": [
       "title-1",
       "intro-1-t0",
+      "intro-1-t0-split-1",
       "intro-1-c1",
       "sep-1",
       "example-heading",
@@ -664,6 +680,7 @@
       "options-text",
       "plonefetch-heading",
       "plonefetch-text",
+      "plonefetch-text-split-1",
       "fieldmapping-heading",
       "fieldmapping-text-t0",
       "fieldmapping-text-c1",
@@ -676,6 +693,7 @@
       "pathtransform-text-t2",
       "paging-heading",
       "paging-text",
+      "paging-text-split-1",
       "notes-heading",
       "notes-text"
     ]

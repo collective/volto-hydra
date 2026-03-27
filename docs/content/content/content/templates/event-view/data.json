@@ -12,20 +12,20 @@
       "fixed": true,
       "templateId": "/templates/event-view",
       "templateInstanceId": "tpl-ev-def",
-      "placeholder": "title"
+      "slotId": "title"
     },
     "tpl-ev-metadata": {
       "@type": "eventMetadata",
       "fixed": true,
       "templateId": "/templates/event-view",
       "templateInstanceId": "tpl-ev-def",
-      "placeholder": "event-metadata"
+      "slotId": "event-metadata"
     },
     "tpl-ev-content": {
       "@type": "slate",
       "templateId": "/templates/event-view",
       "templateInstanceId": "tpl-ev-def",
-      "placeholder": "content",
+      "slotId": "content",
       "plaintext": "",
       "value": [{ "type": "p", "children": [{ "text": "" }] }]
     }

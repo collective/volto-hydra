@@ -1,7 +1,16 @@
 {
   "@type": "Document",
+  "UID": "test-data-root",
   "id": "_test_data",
   "title": "Test Data",
   "description": "Test content for automated tests",
-  "is_folderish": true
+  "is_folderish": true,
+  "blocks": {
+    "title-block": {
+      "@type": "title"
+    }
+  },
+  "blocks_layout": {
+    "items": ["title-block"]
+  }
 }

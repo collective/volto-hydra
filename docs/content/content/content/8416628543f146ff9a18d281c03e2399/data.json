@@ -201,7 +201,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-highlight",
-      "placeholder": "schema",
+      "slotId": "schema",
       "tabs": [
         {
           "@id": "ref-highlight-schema-javascript-80590c",
@@ -215,7 +215,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-highlight",
-      "placeholder": "json-data",
+      "slotId": "json-data",
       "tabs": [
         {
           "@id": "ref-highlight-json-data-json-a2bfa3",
@@ -229,13 +229,13 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-highlight",
-      "placeholder": "rendering",
+      "slotId": "rendering",
       "tabs": [
         {
           "@id": "ref-highlight-rendering-jsx-659b6c",
           "label": "React",
           "language": "jsx",
-          "code": "const highlightGradients = {\n  'highlight-custom-color-1': 'linear-gradient(135deg, #1e3a5f, #2563eb)',\n  'highlight-custom-color-2': 'linear-gradient(135deg, #064e3b, #059669)',\n  'highlight-custom-color-3': 'linear-gradient(135deg, #581c87, #9333ea)',\n  'highlight-custom-color-4': 'linear-gradient(135deg, #78350f, #d97706)',\n  'highlight-custom-color-5': 'linear-gradient(135deg, #881337, #e11d48)',\n};\n\nfunction HighlightBlock({ block }) {\n  const title = block.title || '';\n  const description = block.description || [];\n  const imageSrc = block.image || '';\n  const ctaText = block.cta_title || '';\n  const ctaLink = block.cta_link?.[0]?.['@id'] || '';\n  const gradient = highlightGradients[block.styles?.descriptionColor] || 'linear-gradient(135deg, #334, #556)';\n  const bgStyle = imageSrc\n    ? { backgroundImage: `url(${imageSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' }\n    : { background: gradient };\n\n  return (\n    <section\n      data-block-uid={block['@uid']}\n      className=\"highlight-block\"\n      style={{ ...bgStyle, padding: '40px 20px', color: 'white', borderRadius: '8px' }}\n    >\n      <div className=\"highlight-overlay\" style={{ background: 'rgba(0,0,0,0.4)', padding: '30px', borderRadius: '8px' }}>\n        <h2 data-edit-text=\"title\">{title}</h2>\n        <div className=\"highlight-body\">\n          {description.map((node, i) => (\n            <SlateNode key={i} node={node} />\n          ))}\n        </div>\n        {ctaText && (\n          <a href={ctaLink} data-edit-text=\"cta_title\" data-edit-link=\"cta_link\" className=\"highlight-cta\"\n            style={{ display: 'inline-block', padding: '10px 20px', background: '#007eb1', color: 'white', textDecoration: 'none', borderRadius: '4px', marginTop: '16px' }}>\n            {ctaText}\n          </a>\n        )}\n      </div>\n    </section>\n  );\n}"
+          "code": "const highlightGradients = {\n  'highlight-custom-color-1': 'linear-gradient(135deg, #1e3a5f, #2563eb)',\n  'highlight-custom-color-2': 'linear-gradient(135deg, #064e3b, #059669)',\n  'highlight-custom-color-3': 'linear-gradient(135deg, #581c87, #9333ea)',\n  'highlight-custom-color-4': 'linear-gradient(135deg, #78350f, #d97706)',\n  'highlight-custom-color-5': 'linear-gradient(135deg, #881337, #e11d48)',\n};\n\nimport { getImageUrl } from './utils.js';\n\nfunction HighlightBlock({ block }) {\n  const title = block.title || '';\n  const description = block.description || [];\n  const imageSrc = getImageUrl(block.image);\n  const ctaText = block.cta_title || '';\n  const ctaLink = block.cta_link?.[0]?.['@id'] || '';\n  const gradient = highlightGradients[block.styles?.descriptionColor] || 'linear-gradient(135deg, #334, #556)';\n  const bgStyle = imageSrc\n    ? { backgroundImage: `url(${imageSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' }\n    : { background: gradient };\n\n  return (\n    <section\n      data-block-uid={block['@uid']}\n      className=\"highlight-block\"\n      style={{ ...bgStyle, padding: '40px 20px', color: 'white', borderRadius: '8px' }}\n    >\n      <div className=\"highlight-overlay\" style={{ background: 'rgba(0,0,0,0.4)', padding: '30px', borderRadius: '8px' }}>\n        <h2 data-edit-text=\"title\">{title}</h2>\n        <div className=\"highlight-body\">\n          {description.map((node, i) => (\n            <SlateNode key={i} node={node} />\n          ))}\n        </div>\n        {ctaText && (\n          <a href={ctaLink} data-edit-text=\"cta_title\" data-edit-link=\"cta_link\" className=\"highlight-cta\"\n            style={{ display: 'inline-block', padding: '10px 20px', background: '#007eb1', color: 'white', textDecoration: 'none', borderRadius: '4px', marginTop: '16px' }}>\n            {ctaText}\n          </a>\n        )}\n      </div>\n    </section>\n  );\n}"
         },
         {
           "@id": "ref-highlight-rendering-vue-dd8730",

@@ -183,13 +183,17 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
       };
       bridge.blockPathMap = {
         ...bridge.blockPathMap,
-        [blockId]: {
-          path: ['blocks', blockId],
-          resolvedBlockSchema: {
+        _schemas: {
+          ...(bridge.blockPathMap?._schemas || {}),
+          'test-schema': {
             properties: {
               value: { widget: 'slate' },
             },
           },
+        },
+        [blockId]: {
+          path: ['blocks', blockId],
+          _schemaRef: 'test-schema',
         },
       };
       bridge.selectedBlockUid = blockId;
@@ -303,6 +307,40 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     // The real protection is in the other functions we already fixed.
     // Still, the walk-up SHOULD skip invalid nodeIds for correctness.
     expect(result.textResult).toBe(true);
+  });
+
+  test('isOnInvalidWhitespace: BOM text in span inside valid data-node-id is invalid', async () => {
+    // Nextjs bold: <p data-node-id="0"><span>﻿</span><strong data-node-id="0.1">...</strong></p>
+    // The BOM text node is inside <span> which is inside <p data-node-id="0">.
+    // The walk-up finds <p> with valid nodeId and returns false (thinks it's valid).
+    // But BOM-only text nodes should always be invalid — the cursor should be
+    // in visible text, not in an invisible boundary character.
+    const iframe = helper.getIframe();
+    const body = iframe.locator('body');
+
+    const result = await body.evaluate(() => {
+      const bridge = (window as any).bridge;
+
+      const container = document.createElement('div');
+      container.setAttribute('data-block-uid', 'test-bom');
+      container.setAttribute('data-edit-text', 'value');
+      container.innerHTML =
+        '<p data-node-id="0">' +
+        '<span>\uFEFF</span>' +
+        '<strong data-node-id="0.1"><span>Text to format</span></strong>' +
+        '<span>\uFEFF</span>' +
+        '</p>';
+      document.body.appendChild(container);
+
+      const bomSpan = container.querySelector('span')!;
+      const bomTextNode = bomSpan.firstChild!;
+      const isInvalid = bridge.isOnInvalidWhitespace(bomTextNode);
+
+      container.remove();
+      return { isInvalid };
+    });
+
+    expect(result.isInvalid).toBe(true);
   });
 
   test('saveCursorPosition skips invalid data-node-id="undefined" span (Next.js pattern)', async () => {

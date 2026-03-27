@@ -44,26 +44,27 @@ test.describe('Bridge.readSlateValueFromDOM()', () => {
    */
   async function testDomToSlate(
     body: any,
-    { id, existing, dom, expected }: {
+    { id, existing, dom, expected, matchMetadataFromDom }: {
       id: string;
       existing: any[];
       dom: string;
       expected: any[];
+      matchMetadataFromDom?: boolean;
     },
   ) {
     const htmlWithId = dom.replace('data-edit-text=', `id="${id}" data-edit-text=`);
     const result = await body.evaluate(
       (_el: any, json: string) => {
-        const { html, id: elId, existing: existingValue } = JSON.parse(json);
+        const { html, id: elId, existing: existingValue, matchMetadataFromDom: mmfd } = JSON.parse(json);
         const bridge = (window as any).bridge;
         const fragment = (window as any).preserveWhitespaceDOM(html);
         document.body.appendChild(fragment);
         const el = document.getElementById(elId)!;
-        const result = bridge.readSlateValueFromDOM(el, existingValue);
+        const result = bridge.readSlateValueFromDOM(el, existingValue, mmfd ? { matchMetadataFromDom: true } : undefined);
         el.remove();
         return result;
       },
-      JSON.stringify({ html: htmlWithId, id, existing }),
+      JSON.stringify({ html: htmlWithId, id, existing, matchMetadataFromDom }),
     );
 
     expect(result, `readSlateValueFromDOM result`).toEqual(expected);
@@ -423,6 +424,38 @@ test.describe('Bridge.readSlateValueFromDOM()', () => {
     });
   });
 
+  test('typing after bold: text goes into trailing empty span', async () => {
+    // Reproduces the "format persists" flaky test failure:
+    // User makes text bold, moves cursor to end, types " more"
+    // The browser puts " more" in the trailing empty <span> OUTSIDE the <strong>
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'f0b',
+
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'Bold text' }] },
+        { text: '' },
+      ]}],
+
+      // DOM: " more" is in the trailing span (outside bold)
+      dom:
+        '<div data-edit-text="value" data-node-id="0">' +
+          '<span></span>' +
+          '<span data-node-id="0.1"><span>Bold text</span></span>' +
+          '<span> more</span>' +
+        '</div>',
+
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'strong', nodeId: '0.1', children: [{ text: 'Bold text' }] },
+        { text: ' more' },
+      ]}],
+    });
+  });
+
+
+
   test('new text after toggling format off is captured', async () => {
     const body = helper.getIframe().locator('body');
     await testDomToSlate(body, {
@@ -614,5 +647,105 @@ test.describe('Bridge.readSlateValueFromDOM()', () => {
     });
 
     expect(result.unchanged).toBe(true);
+  });
+
+  // ── matchMetadataFromDom mode (isContentReady) ──────────────────────
+
+  test('matchMetadataFromDom: merged list with two links matches', async () => {
+    // After merge, li has two links. Both rendered as <a href>.
+    // matchMetadataFromDom finds href values in DOM → metadata included.
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'mmd1',
+      matchMetadataFromDom: true,
+
+      existing: [{ type: 'ul', nodeId: '0', children: [{
+        type: 'li', nodeId: '0.0', children: [
+          { text: '' },
+          { type: 'link', data: { url: 'https://nuxt.example.com/' }, children: [{ text: 'NUXT' }], nodeId: '0.0.1' },
+          { text: '' },
+          { text: '' },
+          { type: 'link', data: { url: 'https://f7.example.com/' }, children: [{ text: 'F7' }], nodeId: '0.0.4' },
+          { text: '' },
+        ],
+      }]}],
+
+      dom:
+        '<div data-edit-text="value">' +
+          '<ul data-node-id="0"><li data-node-id="0.0">' +
+            '<span></span>' +
+            '<a href="https://nuxt.example.com/" data-node-id="0.0.1"><span>NUXT</span></a>' +
+            '<span></span><span></span>' +
+            '<a href="https://f7.example.com/" data-node-id="0.0.4"><span>F7</span></a>' +
+            '<span></span>' +
+          '</li></ul>' +
+        '</div>',
+
+      // Adjacent empty <span></span> between links merge into one text node
+      expected: [{ type: 'ul', nodeId: '0', children: [{
+        type: 'li', nodeId: '0.0', children: [
+          { text: '' },
+          { type: 'link', data: { url: 'https://nuxt.example.com/' }, children: [{ text: 'NUXT' }], nodeId: '0.0.1' },
+          { text: '' },
+          { type: 'link', data: { url: 'https://f7.example.com/' }, children: [{ text: 'F7' }], nodeId: '0.0.4' },
+          { text: '' },
+        ],
+      }]}],
+    });
+  });
+
+  test('matchMetadataFromDom: old URL not in DOM causes mismatch', async () => {
+    // DOM has new URL, formData has old URL. matchMetadataFromDom should
+    // NOT include old URL (not in DOM) → result won't match formData.
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'mmd2',
+      matchMetadataFromDom: true,
+
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'link', data: { url: 'https://OLD.example.com/' }, children: [{ text: 'Click' }], nodeId: '0.1' },
+        { text: '' },
+      ]}],
+
+      dom:
+        '<div data-edit-text="value">' +
+          '<p data-node-id="0"><span></span>' +
+            '<a href="https://NEW.example.com/" data-node-id="0.1"><span>Click</span></a>' +
+            '<span></span>' +
+          '</p>' +
+        '</div>',
+
+      // OLD url not in DOM, so data.url excluded. type stays (comes with nodeId).
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'link', children: [{ text: 'Click' }], nodeId: '0.1' },
+        { text: '' },
+      ]}],
+    });
+  });
+
+  test('bold text with leading BOM (Nuxt)', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'bom1',
+
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'strong', children: [{ text: 'Text' }], nodeId: '0.0' },
+        { text: ' to format' },
+      ]}],
+
+      dom:
+        '<div data-edit-text="value">' +
+          '<p data-node-id="0">\uFEFF<strong data-node-id="0.0">Text</strong> to format</p>' +
+        '</div>',
+
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: '' },
+        { type: 'strong', children: [{ text: 'Text' }], nodeId: '0.0' },
+        { text: ' to format' },
+      ]}],
+    });
   });
 });

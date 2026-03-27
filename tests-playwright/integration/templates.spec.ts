@@ -578,27 +578,20 @@ test.describe('Templates', () => {
     const initialOrder = await helper.getBlockOrder();
     expect(initialOrder.indexOf('standalone-block-2')).toBeGreaterThan(initialOrder.indexOf(footerBlockId));
 
-    // Select standalone-block-2
-    await helper.clickBlockInIframe('standalone-block-2');
-    await helper.waitForSidebarOpen();
-
-    // Get drag handle
-    const dragHandle = await helper.getDragHandle();
-
-    // Drag standalone-block-2 to after user-content-1 (which is in the placeholder region)
-    const userContentBlock = iframe.locator('[data-block-uid="user-content-1"]');
-    await helper.dragBlockWithMouse(dragHandle, userContentBlock, true); // insertAfter=true
-
-    // Wait for DOM to stabilize
+    // Wait for all template blocks to finish rendering
     await helper.getStableBlockCount();
 
-    // Verify standalone-block-2 is now right after user-content-1
-    const newOrder = await helper.getBlockOrder();
-    const newUserContentIndex = newOrder.indexOf('user-content-1');
-    const newStandalone2Index = newOrder.indexOf('standalone-block-2');
+    // Drag standalone-block-2 to after user-content-1 (which is in the placeholder region)
+    await helper.dragBlockAfter('standalone-block-2', 'user-content-1');
 
-    // standalone-block-2 should now be right after user-content-1
-    expect(newStandalone2Index).toBe(newUserContentIndex + 1);
+    // Wait for standalone-block-2 to appear right after user-content-1
+    // (async frameworks may take multiple frames to re-render template-expanded blocks)
+    await expect(async () => {
+      const newOrder = await helper.getBlockOrder();
+      const newUserContentIndex = newOrder.indexOf('user-content-1');
+      const newStandalone2Index = newOrder.indexOf('standalone-block-2');
+      expect(newStandalone2Index).toBe(newUserContentIndex + 1);
+    }).toPass({ timeout: 10000 });
   });
 
   test('inserted template fixed blocks render when not in allowedLayouts', async ({ page }) => {

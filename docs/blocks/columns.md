@@ -127,18 +127,25 @@ Container blocks render their children by iterating `blocks_layout.items` and lo
 
 <!-- file: examples/react/GridBlock.jsx -->
 ```jsx
-function GridBlock({ block }) {
-  const blocks = block.blocks || {};
-  const items = block.blocks_layout?.items || [];
+import { expandListingBlocks } from '@hydra-js/hydra.js';
+
+function GridBlock({ block, blockId }) {
+  const columns = block.columns || [];
+
+  function expand(layout, blocks, containerId) {
+    return expandListingBlocks(layout, { blocks, containerId });
+  }
 
   return (
-    <div data-block-uid={block['@uid']} className="grid-block">
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }}>
-        {items.map(id => {
-          const child = { ...blocks[id], '@uid': id };
+    <div data-block-uid={blockId} className="grid-block">
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns.length}, 1fr)`, gap: '1rem' }}>
+        {columns.map(col => {
+          const items = expand(col.blocks_layout?.items || [], col.blocks, col['@id']);
           return (
-            <div key={id} className="grid-cell">
-              <BlockRenderer block={child} />
+            <div key={col['@id']} data-block-uid={col['@id']} className="grid-column">
+              {items.map(item => (
+                <BlockRenderer key={item['@uid']} block={item} />
+              ))}
             </div>
           );
         })}
@@ -153,10 +160,11 @@ function GridBlock({ block }) {
 <!-- file: examples/vue/GridBlock.vue -->
 ```vue
 <template>
-  <div :data-block-uid="block['@uid']" class="grid-block">
-    <div :style="{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }">
-      <div v-for="id in items" :key="id" class="grid-cell">
-        <BlockRenderer :block="{ ...block.blocks[id], '@uid': id }" />
+  <div :data-block-uid="id" class="grid-block">
+    <div :style="{ display: 'grid', gridTemplateColumns: `repeat(${columns.length}, 1fr)`, gap: '1rem' }">
+      <div v-for="col in columns" :key="col['@id']" :data-block-uid="col['@id']" class="grid-column">
+        <Block v-for="item in expand(col.blocks_layout?.items || [], col.blocks, col['@id'])"
+          :key="item['@uid']" :data="item" />
       </div>
     </div>
   </div>
@@ -164,8 +172,12 @@ function GridBlock({ block }) {
 
 <script setup>
 import { computed } from 'vue';
-const props = defineProps({ block: Object });
-const items = computed(() => props.block.blocks_layout?.items || []);
+import { expandListingBlocks } from '@hydra-js/hydra.js';
+const props = defineProps({ block: Object, id: String });
+const columns = computed(() => props.block.columns || []);
+function expand(layout, blocks, containerId) {
+  return expandListingBlocks(layout, { blocks, containerId });
+}
 </script>
 ```
 
@@ -175,16 +187,22 @@ const items = computed(() => props.block.blocks_layout?.items || []);
 ```svelte
 <script>
   import BlockRenderer from './BlockRenderer.svelte';
+  import { expandListingBlocks } from '@hydra-js/hydra.js';
   export let block;
-  $: blocks = block.blocks || {};
-  $: items = block.blocks_layout?.items || [];
+  export let blockId;
+  $: columns = block.columns || [];
+  function expand(layout, blocks, containerId) {
+    return expandListingBlocks(layout, { blocks, containerId });
+  }
 </script>
 
-<div data-block-uid={block['@uid']} class="grid-block">
-  <div style="display: grid; grid-template-columns: repeat({items.length}, 1fr); gap: 1rem">
-    {#each items as id (id)}
-      <div class="grid-cell">
-        <BlockRenderer block={{ ...blocks[id], '@uid': id }} />
+<div data-block-uid={blockId} class="grid-block">
+  <div style="display: grid; grid-template-columns: repeat({columns.length}, 1fr); gap: 1rem">
+    {#each columns as col (col['@id'])}
+      <div data-block-uid={col['@id']} class="grid-column">
+        {#each expand(col.blocks_layout?.items || [], col.blocks, col['@id']) as item (item['@uid'])}
+          <BlockRenderer block={item} />
+        {/each}
       </div>
     {/each}
   </div>

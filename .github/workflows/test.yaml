@@ -52,6 +52,7 @@ jobs:
   # ── Bridge + unit tests (no Volto needed) ────────────────────────────────
   test-bridge-unit:
     runs-on: 'ubuntu-latest'
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -84,13 +85,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
+        run: pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
           node tests-playwright/fixtures/mock-api-server.js &
@@ -109,7 +110,7 @@ jobs:
           done
           echo "All servers ready"
       - name: Run tests
-        run: pnpm exec playwright test --project=unit --project=mock --project=react --project=svelte --project=vue --reporter=github,list,html
+        run: pnpm exec playwright test --project=unit --project=unit-firefox --project=mock --project=react --project=svelte --project=vue --reporter=github,list,html
         env:
           CI: true
           NO_WEBSERVER: true
@@ -175,13 +176,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
+        run: pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
           node tests-playwright/fixtures/mock-api-server.js &
@@ -259,13 +260,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
+        run: pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
           node tests-playwright/fixtures/mock-api-server.js &
@@ -279,7 +280,7 @@ jobs:
           done
           echo "All servers ready"
       - name: Run tests
-        run: pnpm exec playwright test --project=nuxt --reporter=github,list,html
+        run: pnpm exec playwright test --project=nuxt --project=nuxt-firefox --reporter=github,list,html
         env:
           CI: true
           NO_WEBSERVER: true
@@ -339,13 +340,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
+        run: pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
           node tests-playwright/fixtures/mock-api-server.js &
@@ -419,13 +420,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium firefox
       - name: Install Playwright deps only
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
+        run: pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
           node tests-playwright/fixtures/mock-api-server.js &
@@ -444,7 +445,7 @@ jobs:
           done
           echo "All servers ready"
       - name: Run tests
-        run: pnpm exec playwright test --project=nextjs --project=f7 --reporter=github,list,html
+        run: pnpm exec playwright test --project=nextjs --project=nextjs-firefox --project=f7 --reporter=github,list,html
         env:
           CI: true
           NO_WEBSERVER: true

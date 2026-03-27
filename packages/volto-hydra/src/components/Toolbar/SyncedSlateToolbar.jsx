@@ -22,6 +22,11 @@ import { createLog } from '../../utils/log';
 
 const log = createLog('TOOLBAR');
 
+// Buttons that open a UI before applying a transform. These get flushed
+// (text synced) but without input blocking — the user needs pointer events
+// to interact with the UI and cancel by clicking back to the editor.
+const DEFERRED_BUTTONS = ['link'];
+
 /**
  * Validates if a selection is valid for the given document structure.
  * Returns true if all paths in the selection exist in the document.
@@ -517,11 +522,10 @@ const SyncedSlateToolbar = ({
       }
     } else {
       // Range selection - use toggleInlineFormat to wrap/unwrap selected text
-      // Use rangeRef to track selection through the transform - wrapNodes creates
-      // the inline element, then Slate normalization adds empty text nodes before/after.
-      // Without rangeRef, the selection path becomes stale (points to empty text node).
+      const t0 = performance.now();
       const rangeRef = Editor.rangeRef(editor, editor.selection);
       toggleInlineFormat(editor, format);
+      console.log(`[TOOLBAR-TIMING] toggleInlineFormat: ${(performance.now() - t0).toFixed(0)}ms`);
       // Restore selection from tracked range (handles path shifts from wrapping/normalization)
       if (rangeRef.current) {
         try {
@@ -657,13 +661,15 @@ const SyncedSlateToolbar = ({
           break;
         }
         case 'delete':
-          // When selection is collapsed, delete one character in the given direction
-          // When selection is a range, delete the entire selection (no unit option)
+          // When selection is collapsed, use Editor.deleteBackward/deleteForward
+          // (goes through Slate plugin system for list unwrapping etc.)
+          // When selection is a range, delete the entire selection.
           if (editor.selection && Range.isCollapsed(editor.selection)) {
-            Transforms.delete(editor, {
-              unit: 'character',
-              reverse: transformAction.direction === 'backward',
-            });
+            if (transformAction.direction === 'backward') {
+              Editor.deleteBackward(editor, { unit: 'character' });
+            } else {
+              Editor.deleteForward(editor, { unit: 'character' });
+            }
           } else {
             Transforms.delete(editor);
           }
@@ -786,89 +792,49 @@ const SyncedSlateToolbar = ({
         if (!outerBatching) {
           // We own the batching — finalize: un-batch and send one handleChange
           editor._batchingTransform = false;
+
           const hasStrongAfter = editor.children?.[0]?.children?.some(c => c.type === 'strong');
           log('FINALLY: _batchingTransform=false, calling handleChange. hasStrong:', hasStrongAfter);
           handleChange(editor.children);
+          // If handleChange skipped (values equal — e.g., View.jsx handled the
+          // merge instead of the toolbar), the formatRequestId ref is still set.
+          // Clear it so it doesn't leak into a later re-sync handleChange.
+          // The requestId flows through View.jsx's pendingFormatRequestId instead.
+          activeFormatRequestIdRef.current = null;
         }
         // else: outer batching context (replaceEditorContent) will call
         // handleChange once after withoutNormalizing exits + normalizes
       }
     };
 
-    // === EXECUTE ===
-    if (contentNeedsSync) {
-      // Content changed from external source - sync it
-      log('SYNC: Syncing content from iframe, fieldValue[0].children[0].text:', JSON.stringify(fieldValue?.[0]?.children?.[0]?.text?.substring(0, 30)));
-      // Debug: log full children structure to diagnose missing "w" bug
-      if (fieldValue?.[0]?.children) {
-        log('SYNC: Full children structure:', JSON.stringify(fieldValue[0].children));
-      }
+    // === EXECUTE: single unified flow for sync + transform ===
+    // 1. Sync content if needed
+    // 2. Apply transform if needed
+    // 3. Call handleChange once
+    // 4. Clean up transform state
+    const needsSync = contentNeedsSync || (hasUnprocessedTransform && contentIsDifferent);
+    const needsTransform = hasUnprocessedTransform;
 
-      // If there's a transform, run it in the same batch
-      const transformCallback = hasUnprocessedTransform ? () => {
+    if (needsSync || needsTransform) {
+      // Mark transform as processed early to prevent re-processing on re-render
+      if (needsTransform) {
         processedTransformRequestIdRef.current = transformAction.requestId;
-        // Set the requestId so handleChange includes it in FORM_DATA for iframe unblocking
-        // This is needed for delete/paste transforms that don't go through applyInlineFormat
         activeFormatRequestIdRef.current = transformAction.requestId;
-        log('SYNC: Applying transform in batch');
-        applyTransform();
-        onTransformApplied?.();
-      } : null;
-
-      // When running a transform inside replaceEditorContent, suppress ALL
-      // intermediate onChange→handleChange calls. Without this, each Slate
-      // operation (removeNodes, insertNodes, select, normalize) fires
-      // editor.onChange→handleChange→onChangeFormData with intermediate state.
-      // The normalization after withoutNormalizing can send a stale selection
-      // that overwrites the correct post-transform selection.
-      if (transformCallback) {
-        editor._batchingTransform = true;
-      }
-      replaceEditorContent(fieldValue, currentSelection, transformCallback);
-      if (transformCallback) {
-        // Single handleChange with the final post-transform + normalized state
-        editor._batchingTransform = false;
-        handleChange(editor.children);
       }
 
-      // Debug: check what editor.children looks like after replace
-      log('SYNC: After replaceEditorContent, editor.children[0].children[0].text:',
-        JSON.stringify(editor.children?.[0]?.children?.[0]?.text?.substring(0, 40)));
-      // Debug: show full editor children after replace to diagnose missing "w"
-      if (editor.children?.[0]?.children) {
-        log('SYNC: After replace, full editor.children[0].children:', JSON.stringify(editor.children[0].children));
-      }
+      // Batch all operations (sync + transform) into a single handleChange
+      editor._batchingTransform = true;
 
-      // Update internalValueRef from editor.children AFTER transform (not fieldValue)
-      internalValueRef.current = editor.children;
-      log('SYNC: After content+transform batch, editor has strong:', editor.children?.[0]?.children?.some(c => c.type === 'strong'), 'selection:', JSON.stringify(editor.selection));
-
-    } else if (hasUnprocessedTransform) {
-      // No content sync needed (sequence check passed), but transform is pending
-      processedTransformRequestIdRef.current = transformAction.requestId;
-      // Set the requestId so handleChange includes it in FORM_DATA for iframe unblocking
-      // This is needed for delete/paste transforms that don't go through applyInlineFormat
-      activeFormatRequestIdRef.current = transformAction.requestId;
-
-      // IMPORTANT: Even if hasNewData is false, the transform request includes the iframe's
-      // current content. If content differs, sync it first. This handles cases where the
-      // iframe typed text but the sequence didn't change (e.g., typing during blocking).
-      if (contentIsDifferent) {
-        log('SYNC: Content differs, syncing before transform');
-        editor._batchingTransform = true;
-        replaceEditorContent(fieldValue, currentSelection, () => {
-          log('SYNC: Applying transform after content sync');
+      if (needsSync) {
+        log('SYNC: Syncing content', needsTransform ? '+ transform' : '(no transform)');
+        const transformCallback = needsTransform ? () => {
+          log('SYNC: Applying transform in batch');
           applyTransform();
-        });
-        editor._batchingTransform = false;
-        handleChange(editor.children);
-        internalValueRef.current = editor.children;
-      } else {
+        } : null;
+        replaceEditorContent(fieldValue, currentSelection, transformCallback);
+      } else if (needsTransform) {
         log('SYNC: Applying transform (content already synced)');
-        // IMPORTANT: Apply the selection from the iframe before running the transform
-        // The transform request includes the selection where the format should be applied,
-        // but the editor's selection may be stale (e.g., at end of paragraph instead of
-        // the selected text range). We need to update editor.selection first.
+        // Apply selection from iframe before transform
         if (currentSelection && !isEqual(currentSelection, editor.selection) &&
             isSelectionValidForDocument(currentSelection, editor.children)) {
           log('SYNC: Applying selection before transform:', JSON.stringify(currentSelection));
@@ -880,7 +846,19 @@ const SyncedSlateToolbar = ({
         }
         applyTransform();
       }
-      log('SYNC: After transform-only, editor has strong:', editor.children?.[0]?.children?.some(c => c.type === 'strong'), 'selection:', JSON.stringify(editor.selection));
+
+      // Single handleChange with final state
+      editor._batchingTransform = false;
+      handleChange(editor.children);
+
+      // Clean up: clear stale refs and notify View.jsx
+      activeFormatRequestIdRef.current = null;
+      if (needsTransform) {
+        onTransformApplied?.();
+      }
+
+      internalValueRef.current = editor.children;
+      log('SYNC: Done. selection:', JSON.stringify(editor.selection));
 
     } else if (!contentNeedsSync && !hasUnprocessedTransform) {
       // Log editor state when no sync/transform needed — helps trace format overwrite
@@ -935,7 +913,11 @@ const SyncedSlateToolbar = ({
         if (format) {
           applyInlineFormat(format, requestId);
         } else {
-          // Non-format button - dispatch click event
+          // Non-format button (link editor, etc.) - flush already synced text.
+          // Re-dispatch the click. Set activeFormatRequestIdRef so the next
+          // onChange (from selection change or link apply) includes the
+          // requestId for unblocking. For cancel, the onChange with no data
+          // change sends skipRender FORM_DATA to unblock.
           activeFormatRequestIdRef.current = requestId;
           button.dataset.bypassCapture = 'true';
           const clickable = button.querySelector('a.ui.button') || button.querySelector('button') || button;
@@ -1035,10 +1017,16 @@ const SyncedSlateToolbar = ({
       const requestId = `flush-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       pendingFlushRef.current = { requestId, button };
 
+      // Deferred buttons (link editor) flush text but don't block —
+      // user needs pointer events to interact with the UI and cancel.
+      const buttonName = button.dataset?.toolbarButton
+        || button.closest('[data-toolbar-button]')?.dataset?.toolbarButton;
+      const shouldBlock = !DEFERRED_BUTTONS.includes(buttonName);
+
       // Send FLUSH_BUFFER to iframe - response will come via completedFlushRequestId prop
       const iframe = document.getElementById('previewIframe');
       if (iframe?.contentWindow) {
-        iframe.contentWindow.postMessage({ type: 'FLUSH_BUFFER', requestId }, '*');
+        iframe.contentWindow.postMessage({ type: 'FLUSH_BUFFER', requestId, setBlocking: shouldBlock }, '*');
       }
     },
     [],
@@ -1634,6 +1622,7 @@ const SyncedSlateToolbar = ({
         return (
           <button
             key={`clear-${fieldName}`}
+            id={`clear-media-${fieldName}`}
             title="Clear image"
             onClick={() => {
               if (onFieldLinkChange) {

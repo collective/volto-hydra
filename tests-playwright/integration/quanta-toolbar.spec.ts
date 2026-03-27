@@ -564,13 +564,16 @@ test.describe('Quanta Toolbar - Overflow', () => {
     const toolbar = page.locator('.quanta-toolbar');
     await expect(toolbar).toBeVisible({ timeout: 5000 });
 
-    // Get toolbar and iframe bounding boxes
-    const toolbarBox = await toolbar.boundingBox();
+    // Get toolbar and iframe bounding boxes (retry — toolbar can briefly
+    // lose its box during FORM_DATA echo re-render)
     const iframeElement = page.locator('#previewIframe');
-    const iframeBox = await iframeElement.boundingBox();
-
-    expect(toolbarBox).not.toBeNull();
-    expect(iframeBox).not.toBeNull();
+    let toolbarBox: any, iframeBox: any;
+    await expect(async () => {
+      toolbarBox = await toolbar.boundingBox();
+      iframeBox = await iframeElement.boundingBox();
+      expect(toolbarBox).not.toBeNull();
+      expect(iframeBox).not.toBeNull();
+    }).toPass({ timeout: 5000 });
 
     // Toolbar's right edge should not extend past iframe's right edge
     const toolbarRight = toolbarBox!.x + toolbarBox!.width;
@@ -602,13 +605,16 @@ test.describe('Quanta Toolbar - Overflow', () => {
     const toolbar = page.locator('.quanta-toolbar');
     await expect(toolbar).toBeVisible({ timeout: 5000 });
 
-    // Get toolbar and iframe bounding boxes
-    const toolbarBox = await toolbar.boundingBox();
+    // Get toolbar and iframe bounding boxes (retry — toolbar can briefly
+    // lose its box during FORM_DATA echo re-render)
     const iframeElement = page.locator('#previewIframe');
-    const iframeBox = await iframeElement.boundingBox();
-
-    expect(toolbarBox).not.toBeNull();
-    expect(iframeBox).not.toBeNull();
+    let toolbarBox: any, iframeBox: any;
+    await expect(async () => {
+      toolbarBox = await toolbar.boundingBox();
+      iframeBox = await iframeElement.boundingBox();
+      expect(toolbarBox).not.toBeNull();
+      expect(iframeBox).not.toBeNull();
+    }).toPass({ timeout: 5000 });
 
     // Toolbar's right edge should not extend past iframe's right edge
     const toolbarRight = toolbarBox!.x + toolbarBox!.width;

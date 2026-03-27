@@ -83,12 +83,14 @@ This is a **custom** block — register it via `initBridge`.
 
 <!-- file: examples/react/HeroBlock.jsx -->
 ```jsx
+import { getImageUrl } from './utils.js';
+
 function HeroBlock({ block }) {
   const heading = block.heading || '';
   const subheading = (block.subheading || '').replace(/\n/g, '<br>');
   const buttonText = block.buttonText || '';
   const buttonLink = block.buttonLink?.[0]?.['@id'] || '';
-  const imageSrc = block.image || '';
+  const imageSrc = getImageUrl(block.image);
 
   return (
     <div data-block-uid={block['@uid']} className="hero-block">
@@ -116,7 +118,7 @@ function HeroBlock({ block }) {
 ```vue
 <template>
   <div :data-block-uid="block['@uid']" class="hero-block">
-    <img v-if="block.image" data-edit-media="image" :src="block.image" alt="Hero image" />
+    <img v-if="block.image" data-edit-media="image" :src="heroImageSrc" alt="Hero image" />
     <h1 data-edit-text="heading">{{ block.heading }}</h1>
     <p data-edit-text="subheading" v-html="subheadingHtml" />
     <div class="hero-description">
@@ -130,9 +132,11 @@ function HeroBlock({ block }) {
 
 <script setup>
 import { computed } from 'vue';
+import { getImageUrl } from './utils.js';
 const props = defineProps({ block: Object });
 const subheadingHtml = computed(() => (props.block.subheading || '').replace(/\n/g, '<br>'));
 const buttonLink = computed(() => props.block.buttonLink?.[0]?.['@id'] || '');
+const heroImageSrc = computed(() => getImageUrl(props.block.image));
 </script>
 ```
 
@@ -142,15 +146,17 @@ const buttonLink = computed(() => props.block.buttonLink?.[0]?.['@id'] || '');
 ```svelte
 <script>
   import SlateNode from './SlateNode.svelte';
+  import { getImageUrl } from './utils.js';
   export let block;
 
   $: subheadingHtml = (block.subheading || '').replace(/\n/g, '<br>');
   $: buttonLink = block.buttonLink?.[0]?.['@id'] || '';
+  $: heroImageSrc = getImageUrl(block.image);
 </script>
 
 <div data-block-uid={block['@uid']} class="hero-block">
   {#if block.image}
-    <img data-edit-media="image" src={block.image} alt="Hero image" />
+    <img data-edit-media="image" src={heroImageSrc} alt="Hero image" />
   {/if}
   <h1 data-edit-text="heading">{block.heading}</h1>
   <p data-edit-text="subheading">{@html subheadingHtml}</p>

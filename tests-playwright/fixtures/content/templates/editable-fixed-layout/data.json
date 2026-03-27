@@ -11,7 +11,7 @@
       "fixed": true,
       "templateId": "resolveuid/editable-fixed-layout-uid",
       "templateInstanceId": "editable-fixed-def-instance",
-      "placeholder": "header",
+      "slotId": "header",
       "value": [
         {
           "type": "h1",
@@ -24,7 +24,7 @@
       "@type": "slate",
       "templateId": "resolveuid/editable-fixed-layout-uid",
       "templateInstanceId": "editable-fixed-def-instance",
-      "placeholder": "default",
+      "slotId": "default",
       "value": [
         {
           "type": "p",
@@ -38,7 +38,7 @@
       "fixed": true,
       "templateId": "resolveuid/editable-fixed-layout-uid",
       "templateInstanceId": "editable-fixed-def-instance",
-      "placeholder": "footer",
+      "slotId": "footer",
       "value": [
         {
           "type": "p",

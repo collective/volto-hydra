@@ -73,7 +73,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 // isLayoutTemplate
-// findPlaceholderRegions
+// findSlotRegions
 // isTemplateAllowedIn
 // getLayoutTemplates
 // getSnippetTemplates
@@ -92,8 +92,15 @@
 // getTokenFromCookie
 // onEditChange
 
-// Debug logging - disabled by default, enable via initBridge options or window.HYDRA_DEBUG
-let debugEnabled = typeof window !== 'undefined' && window.HYDRA_DEBUG;
+// Debug logging - disabled by default, enable via initBridge options,
+// window.HYDRA_DEBUG, or _hydra_debug URL param (set by admin iframe src)
+let debugEnabled = false;
+try {
+  debugEnabled = typeof window !== 'undefined' && !!(
+    window.HYDRA_DEBUG ||
+    (window.location?.search && new URLSearchParams(window.location.search).has('_hydra_debug'))
+  );
+} catch { /* SSR or restricted environment */ }
 const log = (...args) => {
   if (!debugEnabled) return;
   const runId = typeof window !== 'undefined' && window.__testRunId;
@@ -396,8 +403,12 @@ export class Bridge {
     const text = blockData?.value?.[0]?.children?.[0]?.text?.substring(0, 40);
     log(`[setFormDataFromAdmin] source: ${source}, seq: ${seq}, block: ${this.selectedBlockUid}, text: ${JSON.stringify(text)}`);
 
-    this.formData = JSON.parse(JSON.stringify(data));
-    this.lastReceivedFormData = JSON.parse(JSON.stringify(data));
+    // Save previous formData for echo detection (done after addNodeIdsToAllSlateFields)
+    this._prevFormDataJson = this.formData ? JSON.stringify(this.formData) : null;
+
+    const dataJson = JSON.stringify(data);
+    this.formData = JSON.parse(dataJson);
+    this.lastReceivedFormData = JSON.parse(dataJson);
   }
 
   /**
@@ -434,6 +445,25 @@ export class Bridge {
     }
     // No fallback - blockPathMap is the single source of truth
     return undefined;
+  }
+
+  /**
+   * Get the resolved schema for a block from its blockPathMap entry.
+   * Looks up the deduplicated schema via _schemaRef in blockPathMap._schemas.
+   */
+  getBlockSchema(blockUid) {
+    const pathInfo = this.blockPathMap?.[blockUid];
+    if (!pathInfo?._schemaRef) {
+      if (pathInfo) log('getBlockSchema: no _schemaRef for', blockUid, 'keys:', Object.keys(pathInfo));
+      return null;
+    }
+    if (!this.blockPathMap?._schemas) {
+      log('getBlockSchema: no _schemas in blockPathMap');
+      return null;
+    }
+    const schema = this.blockPathMap._schemas[pathInfo._schemaRef];
+    if (!schema) log('getBlockSchema: schema not found for ref:', pathInfo._schemaRef, 'available:', Object.keys(this.blockPathMap._schemas));
+    return schema || null;
   }
 
   /**
@@ -1033,6 +1063,195 @@ export class Bridge {
    * @param {HTMLElement} editableField - The editable field element
    * @param {boolean} shiftKey - Whether shift is held (extend selection)
    */
+  /**
+   * Replay a single non-text key action (arrow, delete, home, end, etc.)
+   * on the given editable field. Handles ZWS/BOM nodes that interfere with
+   * cursor movement. Used by buffer replay and testable independently.
+   * @returns {boolean} true if handled
+   */
+  replayOneKey(blockId, evt, editableField) {
+    const { key, shiftKey = false, ctrlKey = false, metaKey = false } = evt;
+    const hasMod = ctrlKey || metaKey;
+
+    // Paste (Ctrl+V with stored clipboard data)
+    if (evt._type === 'paste' || (hasMod && key?.toLowerCase() === 'v')) {
+      if (evt.html) this._doPaste(blockId, evt.html);
+      return true;
+    }
+
+    // Format hotkeys (Ctrl+B, Ctrl+I, etc.)
+    if (hasMod && this.slateConfig?.hotkeys) {
+      for (const [shortcut, config] of Object.entries(this.slateConfig.hotkeys)) {
+        const parts = shortcut.toLowerCase().split('+');
+        const hasmod = parts.includes('mod');
+        const hasShift = parts.includes('shift');
+        const hasAlt = parts.includes('alt');
+        const hotkey = parts[parts.length - 1];
+        if ((hasmod ? hasMod : true) &&
+            (hasShift ? shiftKey : !shiftKey) &&
+            (hasAlt ? evt.altKey : !evt.altKey) &&
+            key?.toLowerCase() === hotkey && config.type === 'inline') {
+          log('Replaying format hotkey:', config.format);
+          this.sendTransformRequest(blockId, 'format', { format: config.format });
+          return true;
+        }
+      }
+    }
+
+    // Modifier shortcuts
+    if (hasMod && key?.toLowerCase() === 'a') {
+      // Select all — use text node endpoints to avoid correctInvalidWhitespaceSelection
+      const sel = window.getSelection();
+      if (sel && editableField) {
+        const walker = document.createTreeWalker(editableField, NodeFilter.SHOW_TEXT);
+        const firstText = walker.firstChild();
+        let lastText = firstText;
+        while (walker.nextNode()) lastText = walker.currentNode;
+        if (firstText && lastText) {
+          const range = document.createRange();
+          range.setStart(firstText, 0);
+          range.setEnd(lastText, lastText.length);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+      return true;
+    }
+    if (hasMod && key.toLowerCase() === 'c') {
+      document.execCommand('copy');
+      return true;
+    }
+    if (hasMod && key.toLowerCase() === 'x') {
+      this._doCut(blockId);
+      return true;
+    }
+    if (hasMod && key.toLowerCase() === 'z') {
+      // Undo/redo — not replayable, skip
+      return true;
+    }
+
+    // Space: check markdown first, then insert as text
+    if (key === ' ' && !hasMod) {
+      if (this.handleSpaceKey(blockId)) {
+        return true; // markdown transform sent
+      }
+      // Fall through to text insertion
+    }
+
+    // Text character (including space without markdown)
+    // Run the same preprocessing as the live keydown handler, then insert.
+    if (key?.length === 1 && !hasMod) {
+      this.correctInvalidWhitespaceSelection();
+      this.ensureValidInsertionTarget();
+      this._insertTextAtCursor(key, editableField);
+      return true;
+    }
+
+    // Delete keys
+    if (key === 'Backspace') {
+      if (!this.handleDeleteKey(blockId, 'Backspace')) {
+        if (!this.preserveLastCharDelete()) {
+          document.execCommand('delete', false);
+        }
+      }
+      return true;
+    }
+    if (key === 'Delete') {
+      this._skipZwsNode('forward');
+      if (!this.handleDeleteKey(blockId, 'Delete')) {
+        if (!this.preserveLastCharDelete()) {
+          const sel = window.getSelection();
+          if (sel?.isCollapsed && sel.focusNode?.nodeType === Node.TEXT_NODE) {
+            const text = sel.focusNode.textContent || '';
+            let offset = sel.focusOffset;
+            while (offset < text.length &&
+              (text[offset] === '\uFEFF' || text[offset] === '\u200B')) {
+              offset++;
+            }
+            if (offset < text.length) {
+              const range = document.createRange();
+              range.setStart(sel.focusNode, offset);
+              range.setEnd(sel.focusNode, offset + 1);
+              range.deleteContents();
+            }
+          }
+        }
+      }
+      return true;
+    }
+
+    // Navigation keys
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
+      this.moveArrowKey(key, editableField, shiftKey);
+      return true;
+    }
+    if (key === 'Home' || key === 'End') {
+      const sel = window.getSelection();
+      if (sel) {
+        const dir = key === 'Home' ? 'backward' : 'forward';
+        sel.modify(shiftKey ? 'extend' : 'move', dir, 'lineboundary');
+        this._skipZwsNode(dir === 'backward' ? 'forward' : 'backward');
+      }
+      return true;
+    }
+
+    // Keys needing full field context (Enter→split, Tab→indent)
+    // Call the field keydown handler directly instead of synthetic event dispatch
+    if (key === 'Enter' || key === 'Tab') {
+      const syntheticEvt = new KeyboardEvent('keydown', {
+        key, code: evt.code, shiftKey, ctrlKey, metaKey,
+        altKey: evt.altKey, bubbles: true, cancelable: true,
+      });
+      this._handleFieldKeydown(syntheticEvt, blockId, editableField);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if a node contains only ZWS/BOM characters (no visible text).
+   * Does NOT treat whitespace as invisible — spaces between words are real content.
+   */
+  _hasNoVisibleText(node) {
+    if (!node) return true;
+    return this.stripZeroWidthSpaces(node.textContent || '') === '';
+  }
+
+  /**
+   * If the cursor is on a node with no visible text (ZWS/BOM-only text node
+   * or empty Element on Firefox), move it to the nearest visible text node
+   * in the given direction. Prevents keys from acting on invisible content.
+   */
+  _skipZwsNode(direction) {
+    const sel = window.getSelection();
+    if (!sel?.focusNode) return;
+
+    const node = sel.focusNode;
+    // Two cases where cursor needs to be moved:
+    // 1. Text node with only ZWS/BOM — skip to real text
+    // 2. Element node (Firefox can leave cursor on <p>, <span> instead of
+    //    inside text nodes) — move into the nearest text node
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (!this._hasNoVisibleText(node)) return; // real text, nothing to skip
+    }
+    // Element nodes always need repositioning into a text node
+
+    // Walk from contenteditable root to find text across element boundaries
+    const root = this._toElement(node)
+      ?.closest?.('[contenteditable="true"]') || document.body;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    walker.currentNode = node;
+    const target = direction === 'forward' ? walker.nextNode() : walker.previousNode();
+    if (target) {
+      const range = document.createRange();
+      range.setStart(target, direction === 'forward' ? 0 : target.textContent.length);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  }
+
   moveArrowKey(key, editableField, shiftKey = false) {
     const navActions = {
       ArrowLeft: ['backward', 'character'],
@@ -1057,6 +1276,10 @@ export class Bridge {
 
     const beforeNode = sel.focusNode;
     const beforeOffset = sel.focusOffset;
+    // Skip out of ZWS-only nodes before moving — otherwise the move
+    // crosses the invisible node boundary instead of a visible character.
+    this._skipZwsNode(navActions[key][0]);
+
     sel.modify('move', navActions[key][0], navActions[key][1]);
 
     if (sel.focusNode === beforeNode && sel.focusOffset === beforeOffset) {
@@ -1076,37 +1299,131 @@ export class Bridge {
    * @param {string} key - 'Backspace' or 'Delete'
    * @returns {boolean} true if handled (caller should preventDefault / skip native action)
    */
+  /**
+   * Insert text at the current cursor position using Range API.
+   * Handles NBSP conversion for spaces, ZWS cleanup, and triggers
+   * handleTextChange. Used by replayOneKey for all text insertion.
+   */
+  _insertTextAtCursor(text, editableField) {
+    const sel = window.getSelection();
+    if (!sel?.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) range.deleteContents();
+
+    // NBSP for spaces to prevent CSS whitespace collapse in inline elements.
+    // handleTextChange converts NBSP back to regular space in the model.
+    const insertionText = text.replace(/^ /, '\u00A0').replace(/ $/, '\u00A0');
+    const textNode = document.createTextNode(insertionText);
+    range.insertNode(textNode);
+
+    // Clean up adjacent ZWS/BOM nodes (left by restoreSlateSelection)
+    const parent = textNode.parentNode;
+    if (parent) {
+      for (const sibling of [...parent.childNodes]) {
+        if (sibling !== textNode && sibling.nodeType === Node.TEXT_NODE &&
+            sibling.textContent.replace(/[\uFEFF\u200B]/g, '') === '') {
+          sibling.remove();
+        }
+      }
+    }
+
+    // Position cursor after inserted text
+    range.setStart(textNode, textNode.length);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    this.prospectiveInlineElement = null;
+
+    // Trigger handleTextChange — insertNode creates childList mutation
+    // but MutationObserver only watches characterData
+    if (editableField) {
+      const editField = editableField.closest?.('[data-edit-text]') || editableField;
+      if (this.isInlineEditing) {
+        this.handleTextChange(editField, textNode.parentElement, textNode);
+      }
+    }
+  }
+
+  /**
+   * Get the nearest Element from a node (returns node itself if Element,
+   * or parentElement if text node). Used for closest() lookups.
+   */
+  _toElement(node) {
+    return node?.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+  }
+
   handleDeleteKey(blockUid, key) {
     const selection = window.getSelection();
     if (!selection || !selection.rangeCount) return false;
     const range = selection.getRangeAt(0);
     const node = range.startContainer;
 
-    // Backspace at absolute start of a slate field → send to admin to unwrap
+    // Backspace at start of a slate element → send to admin as a structural transform.
+    // Two cases:
+    // 1. Absolute start of field (textBefore === '') → unwrapBlock (merge/delete)
+    // 2. Start of an interior node-id element → let Slate handle (demote list item, etc.)
+    // In both cases the browser's native Backspace would corrupt the DOM structure.
     if (key === 'Backspace' && this.isSlateField(blockUid, this.focusedFieldName)) {
-      const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-      const editField = blockEl.closest('[data-edit-text]');
+      const blockEl = this._toElement(node);
+      const editField = blockEl?.closest('[data-edit-text]');
       if (editField) {
-        const textRange = document.createRange();
-        textRange.setStart(editField, 0);
-        textRange.setEnd(range.startContainer, range.startOffset);
-        const textBefore = this.stripZeroWidthSpaces(textRange.toString());
+        // Check if the field is empty (only ZWS/BOM) — regardless of selection state.
+        // After preserveLastCharDelete, the field may contain only ZWS and the
+        // selection may be non-collapsed spanning multiple ZWS text nodes.
+        if (this._hasNoVisibleText(editField) && range.collapsed === false) {
+          // Empty field with non-collapsed selection — treat as empty block backspace
+          const blockElement = editField.closest('[data-block-uid]');
+          const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
+          const isFirstField = firstField === editField;
 
-        if (textBefore === '') {
-          const selectedText = range.collapsed ? '' : this.stripZeroWidthSpaces(range.toString());
-          if (selectedText === '') {
-            const blockElement = editField.closest('[data-block-uid]');
-            const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
-            const isFirstField = firstField === editField;
-            const fieldText = this.stripZeroWidthSpaces(editField.textContent || '');
-            const isEmpty = fieldText === '';
+          log('Backspace in empty slate field (non-collapsed ZWS selection) - sending unwrapBlock, isFirstField:', isFirstField);
+          this.sendTransformRequest(blockUid, 'unwrapBlock', {
+            isFirstField,
+            isEmpty: true,
+          });
+          return true;
+        }
 
-            log('Backspace at start of slate field - sending unwrapBlock, isFirstField:', isFirstField, 'isEmpty:', isEmpty);
-            this.sendTransformRequest(blockUid, 'unwrapBlock', {
-              isFirstField,
-              isEmpty,
-            });
-            return true;
+        if (range.collapsed) {
+          // Check if cursor is at offset 0 of a data-node-id element
+          const nodeIdEl = blockEl.closest('[data-node-id]');
+          // nodeIdEl may equal editField when a single <p> has both data-edit-text
+          // and data-node-id (e.g. simple mock frontends). Treat that the same as
+          // having a separate nodeIdEl inside editField.
+          const effectiveNodeIdEl = nodeIdEl || editField;
+          if (effectiveNodeIdEl) {
+            const elRange = document.createRange();
+            elRange.setStart(effectiveNodeIdEl, 0);
+            elRange.setEnd(range.startContainer, range.startOffset);
+            const textBeforeInEl = this.stripZeroWidthSpaces(elRange.toString());
+
+            if (textBeforeInEl === '') {
+              // Check if there's content before this element (not the first node in the field)
+              const textBeforeInField = this.getFieldTextAroundCursor(range, editField, 'before');
+
+              if (textBeforeInField !== '') {
+                // Interior element boundary — send as delete transform for Slate to handle
+                log('Backspace at start of interior element - sending delete transform');
+                this.sendTransformRequest(blockUid, 'delete', {
+                  direction: 'backward',
+                });
+                return true;
+              }
+
+              // Absolute start of field — unwrapBlock
+              const blockElement = editField.closest('[data-block-uid]');
+              const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
+              const isFirstField = firstField === editField;
+              const isEmpty = this._hasNoVisibleText(editField);
+
+              log('Backspace at start of slate field - sending unwrapBlock, isFirstField:', isFirstField, 'isEmpty:', isEmpty);
+              this.sendTransformRequest(blockUid, 'unwrapBlock', {
+                isFirstField,
+                isEmpty,
+              });
+              return true;
+            }
           }
         }
       }
@@ -1114,11 +1431,10 @@ export class Bridge {
 
     // Backspace in empty first simple text field → delete block
     if (key === 'Backspace' && !this.isSlateField(blockUid, this.focusedFieldName)) {
-      const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+      const blockEl = this._toElement(node);
       const editField = blockEl.closest('[data-edit-text]');
       if (editField) {
-        const fieldText = (editField.textContent || '').trim();
-        if (fieldText === '') {
+        if (this._hasNoVisibleText(editField) || (editField.textContent || '').trim() === '') {
           const blockElement = editField.closest('[data-block-uid]');
           const firstField = blockElement ? this.getOwnFirstEditableField(blockElement) : null;
           if (firstField === editField) {
@@ -1147,13 +1463,17 @@ export class Bridge {
 
     // At node boundary with different formatting → delete transform
     const atStart = range.startOffset === 0;
-    const atEnd =
-      range.startOffset === node.textContent?.length ||
-      range.startOffset === node.length;
+    // Check if cursor is at the end of the entire field, not just the current
+    // node. An empty wrapper element (e.g. <span></span> on Firefox) has
+    // offset 0 = length 0, but there may be content after it in the field.
+    const editFieldForEnd = this._toElement(node)?.closest('[data-edit-text]');
+    let atEnd = false;
+    if (editFieldForEnd && range.startOffset === (node.textContent?.length ?? node.length ?? 0)) {
+      atEnd = this.getFieldTextAroundCursor(range, editFieldForEnd, 'after') === '';
+    }
 
     if ((key === 'Backspace' && atStart) || (key === 'Delete' && atEnd)) {
-      const parentElement =
-        node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+      const parentElement = this._toElement(node);
       const hasNodeId = parentElement?.closest('[data-node-id]');
 
       if (hasNodeId) {
@@ -1165,6 +1485,26 @@ export class Bridge {
     }
 
     return false;
+  }
+
+  /**
+   * Check if there's real text content before or after the cursor in the field.
+   * Used by handleDeleteKey to distinguish block boundaries from interior positions.
+   * @param {Range} range - current selection range
+   * @param {HTMLElement} editField - the [data-edit-text] field element
+   * @param {'before'|'after'} direction - check text before or after cursor
+   * @returns {string} stripped text content (empty = at boundary)
+   */
+  getFieldTextAroundCursor(range, editField, direction) {
+    const fieldRange = document.createRange();
+    if (direction === 'before') {
+      fieldRange.setStart(editField, 0);
+      fieldRange.setEnd(range.startContainer, range.startOffset);
+    } else {
+      fieldRange.setStart(range.endContainer, range.endOffset);
+      fieldRange.setEnd(editField, editField.childNodes.length);
+    }
+    return this.stripZeroWidthSpaces(fieldRange.toString());
   }
 
   /**
@@ -1214,7 +1554,7 @@ export class Bridge {
 
     const range = sel.getRangeAt(0);
     const node = range.startContainer;
-    const blockEl = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    const blockEl = this._toElement(node);
     const editableField = blockEl.closest('[data-edit-text]');
     if (!editableField) return false;
 
@@ -1536,6 +1876,10 @@ export class Bridge {
       return; // Exit if not in a browser environment
     }
 
+    // Register document-level keyboard handlers early so no keystrokes are lost
+    // during block transitions (field destroyed → new field not ready yet).
+    this._ensureDocumentKeyboardBlocker();
+
     if (window.self !== window.top) {
       // ... (iframe-specific setup: navigation detection, token retrieval, etc.)
       // This will set the listners for hashchange & pushstate
@@ -1664,6 +2008,7 @@ export class Bridge {
         this.setupScrollHandler();
         this.setupResizeHandler();
         this.setupMouseActivityReporter();
+        this.setupStructuralObserver();
 
         // Add beforeunload warning to prevent accidental navigation
         window.addEventListener('beforeunload', (e) => {
@@ -1828,8 +2173,9 @@ export class Bridge {
           document.addEventListener('mousedown', () => { this._mouseButtonDown = true; }, true);
           document.addEventListener('mouseup', () => { this._mouseButtonDown = false; }, true);
           document.addEventListener('focus', (e) => {
-            const target = e.target;
-            const blockElement = target.closest('[data-block-uid]');
+            // Firefox may fire focus on text nodes; get the nearest Element
+            const target = e.target instanceof Element ? e.target : e.target?.parentElement;
+            const blockElement = target?.closest('[data-block-uid]');
             const blockUid = blockElement?.getAttribute('data-block-uid');
             if (!blockUid || !this.selectedBlockUid) return;
 
@@ -1946,6 +2292,11 @@ export class Bridge {
             const needsBlockSwitch = adminSelectedBlockUid && adminSelectedBlockUid !== this.selectedBlockUid;
             if (needsBlockSwitch) {
               log('Switching selectedBlockUid from', this.selectedBlockUid, 'to', adminSelectedBlockUid);
+              // Cancel any pending initial-selection — admin is switching to a new block
+              if (this._pendingInitialSelectTimer) {
+                clearTimeout(this._pendingInitialSelectTimer);
+                this._pendingInitialSelectTimer = null;
+              }
             }
 
             // Check if incoming FORM_DATA is stale (our local sequence is higher)
@@ -1972,26 +2323,37 @@ export class Bridge {
                 'formatRequestId:', event.data.formatRequestId,
                 'selectedBlockUid:', event.data.selectedBlockUid);
             }
-            this.setFormDataFromAdmin(event.data.data, 'FORM_DATA', event.data.blockPathMap);
-
-            // === Non-stale FORM_DATA - apply it fully ===
-
-            // Add nodeIds to all slate blocks before rendering
-            // Admin UI never sends nodeIds, so we always need to add them
-            this.addNodeIdsToAllSlateFields();
-
-            // Extract formatRequestId early so it's available in rAF callbacks
-            const formatRequestId = event.data.formatRequestId;
-
+            if (event.data._sentAt) {
+              log('FORM_DATA postMessage delivery:', (Date.now() - event.data._sentAt) + 'ms');
+            }
+            if (this._transformSentAt && event.data.formatRequestId) {
+              log('FORM_DATA total round-trip:', (performance.now() - this._transformSentAt).toFixed(0) + 'ms');
+              this._transformSentAt = null;
+            }
             // If a render is already in progress, queue this FORM_DATA.
-            // Processing two concurrent renders causes MutationObserver to fire
-            // mid-render, corrupting formData. Process the queue after the
-            // current render's afterContentRender completes.
+            // Don't call setFormDataFromAdmin — this.formData must stay in sync
+            // with what onEditChange rendered, otherwise isContentReady compares
+            // DOM against data the framework never received.
             if (this._renderInProgress) {
               log('FORM_DATA: render in progress, queuing');
               this._formDataQueue = event.data;
               return;
             }
+
+            this.setFormDataFromAdmin(event.data.data, 'FORM_DATA', event.data.blockPathMap);
+
+            // Add nodeIds to all slate blocks before rendering
+            this.addNodeIdsToAllSlateFields();
+
+            // Detect echo: compare after addNodeIdsToAllSlateFields so both
+            // old and new formData have nodeIds.
+            const echoT0 = performance.now();
+            this._isEchoFormData = this._prevFormDataJson
+              && JSON.stringify(this.formData) === this._prevFormDataJson;
+            log('echo detection took', (performance.now() - echoT0).toFixed(1) + 'ms, isEcho:', this._isEchoFormData);
+
+            // Extract formatRequestId early so it's available in rAF callbacks
+            const formatRequestId = event.data.formatRequestId;
             // Set expectedSelectionFromAdmin BEFORE the render so that any
             // selectionchange from DOM re-render is suppressed. Without this,
             // the selectionchange fires before afterContentRender's double-rAF
@@ -2031,7 +2393,7 @@ export class Bridge {
             return;
           }
 
-          this._processFlushBuffer(requestId);
+          this._processFlushBuffer(requestId, event.data.setBlocking);
         } else if (event.data.type === 'SLATE_ERROR') {
           // Handle errors from Slate formatting operations
           console.error('[HYDRA] Received SLATE_ERROR:', event.data.error);
@@ -2477,12 +2839,31 @@ export class Bridge {
   _ensureDocumentKeyboardBlocker() {
     if (this._documentKeyboardBlocker) return;
     this._documentKeyboardBlocker = (e) => {
-      // DEBUG: log ALL keydown events through the blocker
-      if (e.type === 'keydown') {
-        log('DEBUG blocker entry:', e.key, 'blockedBlockId:', this.blockedBlockId,
-            'target:', e.target?.nodeName);
+      // DEBUG: log events through the blocker (only when blocked)
+      if (this.blockedBlockId) {
+        log('DEBUG blocker:', e.type, e.key || e.inputType || '?', 'target:', e.target?.nodeName,
+          'block:', e.target?.closest?.('[data-block-uid]')?.getAttribute('data-block-uid'));
       }
-      if (!this.blockedBlockId) return;
+      // Not blocked: capture body-focused keys (field destroyed by re-render).
+      // Same buffer — replayed by restoreContentEditableOnFields when field is ready.
+      if (!this.blockedBlockId) {
+        if (e.type === 'keydown' && this.selectedBlockUid) {
+          const isBodyTarget = e.target === document.body || e.target === document.documentElement;
+          if (isBodyTarget && !['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key)) {
+            log('Buffering body-focused key:', e.key, 'for', this.selectedBlockUid);
+            this.eventBuffer.push({
+              key: e.key,
+              code: e.code,
+              ctrlKey: e.ctrlKey,
+              metaKey: e.metaKey,
+              shiftKey: e.shiftKey,
+              altKey: e.altKey,
+            });
+            e.preventDefault();
+          }
+        }
+        return;
+      }
 
       // During transforms, the renderer replaces innerHTML which destroys the
       // focused element. Focus falls to document.body, so keystrokes arrive
@@ -2501,6 +2882,12 @@ export class Bridge {
       }
 
       if (e.type === 'keydown') {
+        // Skip modifier-only keys — they don't produce actions on their own
+        if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
         // Paste (Cmd+V): read clipboard data now while we have user gesture
         // context, store in buffer entry for replay. The async read completes
         // well before the transform finishes and replay starts.
@@ -2542,6 +2929,7 @@ export class Bridge {
     document.addEventListener('keypress', this._documentKeyboardBlocker, true);
     document.addEventListener('input', this._documentKeyboardBlocker, true);
     document.addEventListener('beforeinput', this._documentKeyboardBlocker, true);
+
   }
 
   setBlockProcessing(blockId, processing = true, requestId = null) {
@@ -2555,12 +2943,8 @@ export class Bridge {
 
       this._ensureDocumentKeyboardBlocker();
 
-      // Visual feedback on current element
-      const block = this.queryBlockElement(blockId);
-      const editableField = block ? this.getOwnFirstEditableField(block) : null;
-      if (editableField) {
-        editableField.style.cursor = 'wait';
-      }
+      // Block pointer events on whole page via injected <style> (survives innerHTML replacement)
+      this._setPointerBlocking(true);
 
       // Store pending transform to match with FORM_DATA for unblocking
       this.pendingTransform = {
@@ -2573,12 +2957,8 @@ export class Bridge {
       // Clear blocked state
       this.blockedBlockId = null;
 
-      // Restore visual feedback on current element (may be new after re-render)
-      const block = this.queryBlockElement(blockId);
-      const editableField = block ? this.getOwnFirstEditableField(block) : null;
-      if (editableField) {
-        editableField.style.cursor = 'text';
-      }
+      // Unblock pointer events
+      this._setPointerBlocking(false);
 
       // Clear pending transform
       this.pendingTransform = null;
@@ -2609,6 +2989,8 @@ export class Bridge {
 
     const { blockId, requestId: originalRequestId } = this.pendingTransform;
     log('[HYDRA-DEBUG] replayBufferAndUnblock:', { blockId, requestId: originalRequestId, bufferLen: this.eventBuffer.length, remainderLen: this._replayRemainder?.length || 0, context });
+    const editEl = this.queryBlockElement(blockId)?.querySelector('[data-edit-text]') || this.queryBlockElement(blockId);
+    if (editEl) log('[HYDRA-DEBUG] replayBufferAndUnblock DOM:', editEl.innerHTML?.substring(0, 200));
 
     // Prepare buffer for replay. Include any remainder from a previous replay
     // that was interrupted by a transform (e.g. Enter→split mid-replay).
@@ -2669,261 +3051,23 @@ export class Bridge {
 
     this.pendingBufferReplay = null;
 
-    // Navigation key → selection.modify() mapping
-    const navMap = {
-      ArrowLeft: ['backward', 'character'],
-      ArrowRight: ['forward', 'character'],
-      ArrowUp: ['backward', 'line'],
-      ArrowDown: ['forward', 'line'],
-      Home: ['backward', 'lineboundary'],
-      End: ['forward', 'lineboundary'],
-    };
-
-    // Helper: detect format hotkey from a buffered event
-    const getFormatFromHotkey = (evt) => {
-      if (!(evt.ctrlKey || evt.metaKey) || !this.slateConfig?.hotkeys) return null;
-      for (const [shortcut, config] of Object.entries(this.slateConfig.hotkeys)) {
-        const parts = shortcut.toLowerCase().split('+');
-        const hasmod = parts.includes('mod');
-        const hasShift = parts.includes('shift');
-        const hasAlt = parts.includes('alt');
-        const key = parts[parts.length - 1];
-        if ((hasmod ? (evt.ctrlKey || evt.metaKey) : true) &&
-            (hasShift ? evt.shiftKey : !evt.shiftKey) &&
-            (hasAlt ? evt.altKey : !evt.altKey) &&
-            evt.key.toLowerCase() === key && config.type === 'inline') {
-          return config.format;
-        }
-      }
-      return null;
-    };
-
-    // Helper: insert accumulated text using Selection API
-    const insertText = (text) => {
-      // Ensure cursor is inside a data-node-id element, not on Vue/Nuxt
-      // template whitespace. After a transform, the framework may re-render
-      // and leave the cursor on whitespace outside the content element.
-      this.correctInvalidWhitespaceSelection();
-
-      const selection = window.getSelection();
-      if (!selection || !selection.rangeCount) return;
-      const range = selection.getRangeAt(0);
-
-      if (!range.collapsed) {
-        range.deleteContents();
-      }
-
-      // Prevent CSS whitespace collapse: replace leading/trailing spaces with
-      // NBSP. Browsers do this automatically for native typing, but
-      // range.insertNode with a raw text node doesn't get that fixup.
-      // handleTextChange's stripZeroWidthSpaces converts NBSP back to regular
-      // space when building the Slate data, so this doesn't leak into the model.
-      let insertionText = text.replace(/^ /, '\u00A0').replace(/ $/, '\u00A0');
-
-      const textNode = document.createTextNode(insertionText);
-      range.insertNode(textNode);
-
-      // Clean up ZWS text nodes left by restoreSlateSelection's ensureZwsPosition
-      const parentEl = textNode.parentNode;
-      if (parentEl) {
-        for (const sibling of [...parentEl.childNodes]) {
-          if (sibling !== textNode && sibling.nodeType === Node.TEXT_NODE) {
-            const cleaned = sibling.textContent.replace(/[\uFEFF\u200B]/g, '');
-            if (cleaned === '') {
-              sibling.remove();
-            }
-          }
-        }
-      }
-
-      // Position cursor inside the text node (not after it) to prevent
-      // browser text-node normalization on next keystroke
-      range.setStart(textNode, textNode.textContent.length);
-      range.setEnd(textNode, textNode.textContent.length);
-      selection.removeAllRanges();
-      selection.addRange(range);
-
-      log('[HYDRA-DEBUG] insertText:', JSON.stringify(text), 'parent:', textNode.parentElement?.tagName, 'nodeId:', textNode.parentElement?.getAttribute('data-node-id'));
-      log('Inserted buffered text:', text);
-
-      this.prospectiveInlineElement = null;
-
-      // Manually trigger text change handler since insertNode creates a
-      // childList mutation but our MutationObserver only watches characterData
-      const editableField = currentEditable.closest('[data-edit-text]') || currentEditable;
-      if (editableField && this.isInlineEditing) {
-        this.handleTextChange(editableField, textNode.parentElement, textNode);
-      }
-    };
-
-    // Helper: replay a non-text key.
-    // Known native actions (Backspace, Delete, navigation, Ctrl+A) are executed
-    // directly — synthetic KeyboardEvents are untrusted and browsers won't
-    // perform native actions from them.
-    // Unknown keys are dispatched as synthetic keydown so our keydown handler
-    // can process them (e.g. Enter→split, Tab→indent set blockedBlockId).
-    const replayKey = (evt) => {
-      log('Replaying buffered key:', evt.key, { ctrl: evt.ctrlKey, meta: evt.metaKey, shift: evt.shiftKey });
-
-      // Backspace/Delete: shared handler checks for special cases (unwrap, delete
-      // block, boundary). Only use native execCommand if handler didn't act.
-      if (evt.key === 'Backspace') {
-        if (!this.handleDeleteKey(blockId, 'Backspace')) {
-          // preserveLastCharDelete handles the case where execCommand would
-          // remove the last char from an inline element — execCommand doesn't
-          // fire beforeinput so the editableField handler can't catch it.
-          if (!this.preserveLastCharDelete()) {
-            document.execCommand('delete', false);
-          }
-        }
-        return;
-      }
-      if (evt.key === 'Delete') {
-        if (!this.handleDeleteKey(blockId, 'Delete')) {
-          if (!this.preserveLastCharDelete()) {
-            document.execCommand('forwardDelete', false);
-          }
-        }
-        return;
-      }
-      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(evt.key)) {
-        this.moveArrowKey(evt.key, currentEditable, evt.shiftKey);
-        return;
-      }
-      if (navMap[evt.key]) {
-        const sel = window.getSelection();
-        if (sel) {
-          const alter = evt.shiftKey ? 'extend' : 'move';
-          sel.modify(alter, navMap[evt.key][0], navMap[evt.key][1]);
-        }
-        return;
-      }
-      if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'a') {
-        const sel = window.getSelection();
-        if (sel && currentEditable) {
-          // Use text node endpoints instead of selectNodeContents on the container,
-          // because the selectionchange listener's correctInvalidWhitespaceSelection
-          // treats selections anchored on the data-edit-text container as invalid
-          // (since the container has data-node-id children) and "corrects" them.
-          const walker = document.createTreeWalker(currentEditable, NodeFilter.SHOW_TEXT);
-          const firstText = walker.firstChild();
-          let lastText = firstText;
-          while (walker.nextNode()) lastText = walker.currentNode;
-          if (firstText && lastText) {
-            const range = document.createRange();
-            range.setStart(firstText, 0);
-            range.setEnd(lastText, lastText.length);
-            sel.removeAllRanges();
-            sel.addRange(range);
-          } else {
-            // Fallback: no text nodes, use selectNodeContents
-            const range = document.createRange();
-            range.selectNodeContents(currentEditable);
-            sel.removeAllRanges();
-            sel.addRange(range);
-          }
-          log('Ctrl+A replay: selection set to:', JSON.stringify(sel.toString()), 'on', currentEditable.tagName, currentEditable.getAttribute('data-edit-text'));
-        }
-        return;
-      }
-
-      // Copy: execCommand triggers trusted copy event → _doCopy cleans clipboard
-      if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'c') {
-        document.execCommand('copy');
-        return;
-      }
-      // Cut: copy cleaned selection + delete via transform
-      if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'x') {
-        this._doCut(blockId);
-        return;
-      }
-
-      // Unknown keys — dispatch synthetic event for our keydown handler
-      const syntheticEvent = new KeyboardEvent('keydown', {
-        key: evt.key,
-        code: evt.code,
-        shiftKey: evt.shiftKey,
-        ctrlKey: evt.ctrlKey,
-        metaKey: evt.metaKey,
-        altKey: evt.altKey,
-        bubbles: true,
-        cancelable: true,
-      });
-      currentEditable.dispatchEvent(syntheticEvent);
-    };
-
-    // Process buffer events sequentially to preserve ordering.
-    // If a replayed event triggers a new transform (e.g. Enter→split,
-    // Tab→indent), stop and save remaining events for the next replay cycle.
     // Clear blockedBlockId so the capture-phase blocker doesn't interfere;
     // if a replayed event starts a new transform, blockedBlockId gets re-set.
     const savedBlockedId = this.blockedBlockId;
     this.blockedBlockId = null;
 
-    let textBatch = '';
     for (let i = 0; i < buffer.length; i++) {
       // A replayed event started a new transform — save remainder for next cycle
       if (this.blockedBlockId) {
-        if (textBatch) {
-          // Flush any pending text before saving remainder
-          insertText(textBatch);
-          textBatch = '';
-        }
         this._replayRemainder = buffer.slice(i);
         log('Replay interrupted by transform, saved', this._replayRemainder.length, 'events for next cycle');
         break;
       }
 
       const evt = buffer[i];
+      log('Replaying buffered key:', evt.key || evt._type, { ctrl: evt.ctrlKey, meta: evt.metaKey, shift: evt.shiftKey });
 
-      // Buffered paste: replay with stored clipboard data
-      if (evt._type === 'paste') {
-        if (textBatch) { insertText(textBatch); textBatch = ''; }
-        if (evt.html) {
-          this._doPaste(blockId, evt.html);
-        }
-        continue;
-      }
-
-      const isTextChar = evt.key.length === 1 && !evt.ctrlKey && !evt.metaKey;
-
-      if (isTextChar) {
-        // Space may trigger markdown autoformat — flush text first so the DOM
-        // has the preceding text, then check via shared handler
-        if (evt.key === ' ') {
-          if (textBatch) {
-            insertText(textBatch);
-            textBatch = '';
-          }
-          if (!this.handleSpaceKey(blockId)) {
-            insertText(' ');
-          }
-        } else {
-          textBatch += evt.key;
-        }
-      } else {
-        // Flush accumulated text before handling a non-text event
-        if (textBatch) {
-          insertText(textBatch);
-          textBatch = '';
-        }
-
-        const format = getFormatFromHotkey(evt);
-        if (format) {
-          log('Replaying buffered format hotkey:', format);
-          this.sendTransformRequest(blockId, 'format', { format });
-        } else {
-          // Dispatch synthetic keydown for all non-text keys. Our keydown handler
-          // gets a chance to process it (Enter, Tab, etc.), and replayKey applies
-          // manual fallbacks for native actions browsers won't do from untrusted events.
-          replayKey(evt);
-        }
-      }
-    }
-
-    // Flush any remaining text batch
-    if (textBatch && !this.blockedBlockId) {
-      insertText(textBatch);
+      this.replayOneKey(blockId, evt, currentEditable);
     }
 
     // Restore blockedBlockId if no replayed event started a new transform.
@@ -3134,6 +3278,15 @@ export class Bridge {
       return false;
     }
 
+    // BOM/ZWS-only text nodes inside wrapper elements without data-node-id
+    // are invalid. This catches nextjs BOM spans (<span>﻿</span>) inside a
+    // valid data-node-id ancestor. But ZWS nodes that are DIRECT children
+    // of a data-node-id element (cursor exit positioning) are valid.
+    const visibleText = node.textContent?.replace(/[\uFEFF\u200B\s]/g, '');
+    if (visibleText === '' && node.parentElement && !node.parentElement.hasAttribute?.('data-node-id')) {
+      return true;
+    }
+
     // Find the editable field container
     let editableField = null;
     let current = node.parentNode;
@@ -3325,9 +3478,36 @@ export class Bridge {
     // Must disconnect (not just set a flag) because MutationObserver fires async.
     this._suppressObserver();
 
-    // Get corrected positions using shared helper
-    const anchorPos = this.getValidatedPosition(range.startContainer, range.startOffset);
-    const focusPos = this.getValidatedPosition(range.endContainer, range.endOffset);
+    // Get corrected positions using shared helper.
+    // For range selections, if both endpoints are on invalid whitespace,
+    // move anchor to start of first visible text and focus to end of last
+    // visible text — otherwise both resolve to the same position and the
+    // range collapses.
+    let anchorPos, focusPos;
+    if (!range.collapsed && anchorOnWhitespace && focusOnWhitespace) {
+      const editField = range.startContainer.parentElement?.closest('[data-edit-text], [contenteditable="true"]');
+      if (editField) {
+        const walker = document.createTreeWalker(editField, NodeFilter.SHOW_TEXT);
+        let firstVisible = null;
+        let lastVisible = null;
+        let node;
+        while ((node = walker.nextNode())) {
+          const vis = node.textContent?.replace(/[\uFEFF\u200B\s]/g, '');
+          if (vis) {
+            if (!firstVisible) firstVisible = node;
+            lastVisible = node;
+          }
+        }
+        anchorPos = firstVisible ? { node: firstVisible, offset: 0 } : this.getValidatedPosition(range.startContainer, range.startOffset);
+        focusPos = lastVisible ? { node: lastVisible, offset: lastVisible.textContent.length } : this.getValidatedPosition(range.endContainer, range.endOffset);
+      } else {
+        anchorPos = this.getValidatedPosition(range.startContainer, range.startOffset);
+        focusPos = this.getValidatedPosition(range.endContainer, range.endOffset);
+      }
+    } else {
+      anchorPos = this.getValidatedPosition(range.startContainer, range.startOffset);
+      focusPos = this.getValidatedPosition(range.endContainer, range.endOffset);
+    }
 
     log('correctInvalidWhitespaceSelection: anchorPos:', anchorPos, 'focusPos:', focusPos);
 
@@ -3409,7 +3589,17 @@ export class Bridge {
             return false;
           }
         }
-        if (current.hasAttribute?.('data-edit-text')) break;
+        if (current.hasAttribute?.('data-edit-text')) {
+          // Before giving up, check if the field itself has visible content.
+          // A space inside an empty inline (e.g. bold span) is still valid
+          // content if the surrounding field has text — the user typed it.
+          const fieldText = this.stripZeroWidthSpaces(current.textContent);
+          if (fieldText.trim() !== '') {
+            log('ensureValidInsertionTarget: skipping, field has content:', fieldText.substring(0, 30));
+            return false;
+          }
+          break;
+        }
       }
       current = current.parentNode;
     }
@@ -4136,7 +4326,13 @@ export class Bridge {
       // Only set contenteditable for text-editable fields (string, textarea, slate)
       if (this.fieldTypeIsTextEditable(fieldType)) {
         field.setAttribute('contenteditable', 'true');
-        log(`  ${fieldPath}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})`);
+        // Set placeholder from schema or block data
+        const placeholder = this.getFieldPlaceholder(blockUid, fieldPath);
+        if (placeholder) {
+          field.setAttribute('data-placeholder', placeholder);
+        }
+        this.updateEmptyState(field);
+        log(`  ${fieldPath}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})${placeholder ? ` placeholder: "${placeholder}"` : ''}`);
 
         // For <pre> elements, handle Enter (newline) and Tab (indent) properly
         const isPreElement = field.tagName === 'PRE' || !!field.closest('pre');
@@ -4282,6 +4478,14 @@ export class Bridge {
     if (!isAlreadyFocused) {
       fieldElement.focus({ preventScroll: options.preventScroll });
       log(`activateEditableField: focused field`);
+    }
+
+    // Hide placeholder on focus — remove data-empty so CSS ::before hides
+    fieldElement.removeAttribute('data-empty');
+    // Re-add on blur if still empty
+    if (!fieldElement._placeholderBlurHandler) {
+      fieldElement._placeholderBlurHandler = () => this.updateEmptyState(fieldElement);
+      fieldElement.addEventListener('blur', fieldElement._placeholderBlurHandler);
     }
 
     // If field was already editable AND already focused, browser already handled
@@ -4589,17 +4793,17 @@ export class Bridge {
    * @param {string} [options.adminSelectedBlockUid] - Block uid admin wants selected
    */
   afterContentRender({ transformedSelection, formatRequestId, needsBlockSwitch, adminSelectedBlockUid } = {}) {
-    // Materialize comments immediately so data-block-uid attributes are available
-    // before any waitFor selectors run. The rAF call below handles late-arriving
-    // async framework content (React Suspense, Vue async components).
-    this.materializeHydraComments();
+    // _executeRender already ensured content is ready before calling us.
+    // No polling needed here — just run the post-render tasks.
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(async () => {
-        // Re-materialize for any async framework content that arrived after initial call
-        this.materializeHydraComments();
-        this.markEmptyBlocks();
-        this.applyReadonlyVisuals();
+    const doAfterContentRender = () => {
+        const elapsed = this._renderStartTime ? (performance.now() - this._renderStartTime).toFixed(0) : '?';
+        log('doAfterContentRender START +' + elapsed + 'ms');
+
+        // All-blocks operations (materializeHydraComments, markEmptyBlocks,
+        // applyReadonlyVisuals, applyPlaceholders) are handled by the
+        // structural observer — it fires whenever the framework patches the
+        // DOM, so these run at the right time regardless of sync/async render.
 
         // Re-attach observers/editors for the currently selected block
         if (this.selectedBlockUid) {
@@ -4692,72 +4896,51 @@ export class Bridge {
           : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
 
         if (blockUidToProcess) {
-          let blockElement = this.queryBlockElement(blockUidToProcess);
+          const blockElement = this.queryBlockElement(blockUidToProcess);
 
-          if (blockElement && this.isElementHidden(blockElement)) {
-            if (this._blockSelectorNavigating || this._navigatingToBlock) {
-              log('afterContentRender: block hidden, waiting for animation:', blockUidToProcess);
-              for (let i = 0; i < 30; i++) {
-                await new Promise((resolve) => setTimeout(resolve, 50));
-                blockElement = this.queryBlockElement(blockUidToProcess);
-                if (blockElement && !this.isElementHidden(blockElement)) {
-                  log('afterContentRender: block now visible after animation');
-                  break;
-                }
-              }
-            } else {
-              log('afterContentRender: block is hidden, trying to make visible:', blockUidToProcess);
-              const madeVisible = this.tryMakeBlockVisible(blockUidToProcess);
-              if (madeVisible) {
-                for (let i = 0; i < 10; i++) {
-                  await new Promise((resolve) => setTimeout(resolve, 50));
-                  blockElement = this.queryBlockElement(blockUidToProcess);
-                  if (blockElement && !this.isElementHidden(blockElement)) {
-                    log('afterContentRender: block now visible');
-                    break;
-                  }
-                }
-              }
-            }
-          }
-
-          blockElement = this.queryBlockElement(blockUidToProcess);
-
-          if (!blockElement && needsBlockSwitch) {
-            for (let retry = 0; retry < 10 && !blockElement; retry++) {
-              await new Promise(r => setTimeout(r, 100));
-              blockElement = this.queryBlockElement(blockUidToProcess);
-              log('afterContentRender: retry', retry + 1, 'finding block', blockUidToProcess, 'found:', !!blockElement);
-            }
-          }
-
+          // Navigation is handled by the poller in _executeRender — not here.
+          // We only proceed if the block is visible. If it's hidden/missing
+          // after a block switch, the poller already timed out or navigation
+          // failed — selecting a hidden block would produce a zero-rect
+          // BLOCK_SELECTED that confuses the admin UI.
           this.ensureElementsHaveMinSize();
-          if (blockElement) {
+          if (blockElement && !this.isElementHidden(blockElement)) {
             blockHandler(blockElement);
           } else if (needsBlockSwitch) {
-            log('afterContentRender: block element not found after retries:', blockUidToProcess);
+            log('afterContentRender: block not visible, skipping select:', blockUidToProcess);
           }
         }
 
-        // Wait for rendered DOM content to match formData before restoring
-        // selection. On mock frontends this matches immediately; on Nuxt, Vue's
-        // reactivity may trigger secondary renders that replace DOM nodes after
-        // the double-RAF. Proceeding before the render is complete would cause
-        // restoreSlateSelection to anchor on nodes that get replaced, destroying
-        // the selection.
-        if (this.selectedBlockUid && this.formData) {
-          const contentBlock = this.queryBlockElement(this.selectedBlockUid);
-          if (contentBlock) {
-            await this.waitForContentReady(contentBlock);
-          }
-        }
+        // Content is ready — isContentReady() confirmed before calling, or
+        // pollUntilReady() polled until ready.
 
         let selectionRestored = true;
         if (transformedSelection) {
           // expectedSelectionFromAdmin was already set before the render
           // (in the FORM_DATA handler) to suppress re-render selectionchanges.
           try {
-            selectionRestored = await this.restoreSlateSelection(transformedSelection, this.formData);
+            selectionRestored = this.restoreSlateSelection(transformedSelection, this.formData);
+            const sel = document.getSelection();
+            log('restoreSlateSelection result:', selectionRestored,
+              'selection:', sel?.toString()?.substring(0, 30),
+              'collapsed:', sel?.isCollapsed,
+              'anchorNode:', sel?.anchorNode?.nodeName,
+              'anchorOffset:', sel?.anchorOffset,
+              'focusOffset:', sel?.focusOffset);
+            // Track selection changes after restore to find what clears it
+            const trackTimer = setInterval(() => {
+              const s = document.getSelection();
+              const text = s?.toString() || '';
+              if (text !== this._lastTrackedSel) {
+                log('SELECTION SHIFTED to:', JSON.stringify(text?.substring(0, 30)),
+                  'collapsed:', s?.isCollapsed,
+                  'anchorNode:', s?.anchorNode?.nodeName,
+                  '+' + (performance.now() - this._renderStartTime).toFixed(0) + 'ms');
+                this._lastTrackedSel = text;
+              }
+            }, 16);
+            setTimeout(() => clearInterval(trackTimer), 2000);
+            this._lastTrackedSel = sel?.toString() || '';
           } catch (e) {
             console.error('[HYDRA] Error restoring selection:', e);
             selectionRestored = false;
@@ -4797,7 +4980,7 @@ export class Bridge {
           if (!transformedSelection && this._preRenderSelection && this._iframeFocused) {
             log('Restoring pre-render selection for buffer replay:', JSON.stringify(this._preRenderSelection));
             try {
-              await this.restoreSlateSelection(this._preRenderSelection, this.formData);
+              this.restoreSlateSelection(this._preRenderSelection, this.formData);
             } catch (e) {
               log('Pre-render selection restore failed:', e.message);
             }
@@ -4816,6 +4999,7 @@ export class Bridge {
           // Clear blocking only if no format op is pending
           if (!this.pendingTransform) {
             this.blockedBlockId = null;
+            this._setPointerBlocking(false);
           }
         }
 
@@ -4823,7 +5007,9 @@ export class Bridge {
 
         // Render cycle complete — process any queued FORM_DATA.
         // Only the latest queued message matters (earlier ones are stale).
-        this._renderInProgress = false;
+        // NOTE: _renderInProgress stays true until AFTER the observer is reconnected
+        // at the end of this function. This prevents late framework DOM patches from
+        // triggering handleTextChange which would read mid-render DOM.
         if (this._formDataQueue) {
           const queued = this._formDataQueue;
           this._formDataQueue = null;
@@ -4838,7 +5024,7 @@ export class Bridge {
           const queuedFlush = this._flushBufferQueue;
           this._flushBufferQueue = null;
           log('Processing queued FLUSH_BUFFER after render complete');
-          this._processFlushBuffer(queuedFlush.requestId);
+          this._processFlushBuffer(queuedFlush.requestId, queuedFlush.setBlocking);
         }
 
         // Re-attach text change observer LAST, after all DOM operations
@@ -4849,11 +5035,17 @@ export class Bridge {
         if (this.selectedBlockUid) {
           const currentBlockEl = this.queryBlockElement(this.selectedBlockUid);
           if (currentBlockEl) {
+            const editField = currentBlockEl.querySelector('[data-edit-text]') || currentBlockEl;
             this.observeBlockTextChanges(currentBlockEl);
           }
         }
-      });
-    });
+        // Mark render complete AFTER observer reconnection
+        this._renderInProgress = false;
+    };
+
+    // _executeRender already ensured content is ready (via polling,
+    // settlement, or fast path) before calling afterContentRender.
+    doAfterContentRender();
   }
 
   /**
@@ -4907,13 +5099,71 @@ export class Bridge {
   }
 
   /**
+   * Collect all attribute values from an element and its descendants.
+   * Used by domNodeToSlate in matchMetadataFromDom mode to check which
+   * formData metadata values are visible in the rendered DOM.
+   * @param {HTMLElement} el
+   * @returns {Set<string>} all attribute values found
+   */
+  _collectDomAttributeValues(el) {
+    const values = new Set();
+    const walk = (node) => {
+      if (!(node instanceof HTMLElement)) return;
+      for (const attr of node.attributes) {
+        if (attr.value) values.add(attr.value);
+      }
+      for (const child of node.children) walk(child);
+    };
+    walk(el);
+    return values;
+  }
+
+  /**
+   * Filter metadata to only include values that appear in the DOM.
+   * Walks the metadata object and keeps only leaf values (strings, numbers,
+   * booleans) that match an attribute value found in the DOM element.
+   * @param {Object} fullMeta - metadata from formData metadataMap
+   * @param {Set<string>} domValues - attribute values from _collectDomAttributeValues
+   * @returns {Object} filtered metadata with only DOM-visible values
+   */
+  _filterMetadataByDom(fullMeta, domValues) {
+    const result = {};
+    for (const [key, val] of Object.entries(fullMeta)) {
+      if (val && typeof val === 'object' && !Array.isArray(val)) {
+        const filtered = this._filterMetadataByDom(val, domValues);
+        if (Object.keys(filtered).length > 0) result[key] = filtered;
+      } else if (typeof val === 'string' && domValues.has(val)) {
+        result[key] = val;
+      } else if ((typeof val === 'number' || typeof val === 'boolean') && domValues.has(String(val))) {
+        result[key] = val;
+      }
+    }
+    return result;
+  }
+
+  /**
    * Convert a DOM element with data-node-id into a Slate JSON node.
    * Text nodes become {text: "..."}, elements with data-node-id recurse.
-   * Metadata (type, data, marks) comes from the metadataMap, not the DOM.
+   *
+   * @param {HTMLElement} el - Element with data-node-id
+   * @param {Object} metadataMap - nodeId → metadata from formData
+   * @param {boolean} matchMetadataFromDom - When true, only include metadata
+   *   values that are visible in the DOM (as attribute values). Used by
+   *   isContentReady to detect rendered changes like link URL updates.
+   *   When false (default), include all metadata from metadataMap.
    */
-  domNodeToSlate(el, metadataMap) {
+  domNodeToSlate(el, metadataMap, matchMetadataFromDom = false) {
     const nodeId = el.getAttribute('data-node-id');
-    const metadata = (nodeId && metadataMap[nodeId]) || {};
+    const fullMeta = (nodeId && metadataMap[nodeId]) || {};
+    let metadata;
+    if (matchMetadataFromDom) {
+      const domValues = this._collectDomAttributeValues(el);
+      metadata = this._filterMetadataByDom(fullMeta, domValues);
+      // type is the node identity (comes with nodeId), not a rendered value
+      if (fullMeta.type) metadata.type = fullMeta.type;
+    } else {
+      metadata = fullMeta;
+    }
     const children = [];
 
     for (const child of el.childNodes) {
@@ -4924,7 +5174,7 @@ export class Bridge {
       } else if (child.nodeType === Node.ELEMENT_NODE) {
         const childNodeId = child.getAttribute('data-node-id');
         if (childNodeId && isValidNodeId(childNodeId)) {
-          children.push(this.domNodeToSlate(child, metadataMap));
+          children.push(this.domNodeToSlate(child, metadataMap, matchMetadataFromDom));
         } else {
           // Element without valid nodeId (e.g. Vue wrapper span, Next.js leaf span)
           // — treat its text content as a text node, including empty text which
@@ -5002,7 +5252,7 @@ export class Bridge {
    * This is the single source of truth for DOM → Slate conversion.
    * Used by both handleTextChange and waitForContentReady.
    */
-  readSlateValueFromDOM(fieldEl, existingValue) {
+  readSlateValueFromDOM(fieldEl, existingValue, { matchMetadataFromDom = false } = {}) {
     const metadataMap = this.buildNodeMetadataMap(existingValue);
 
     // Two valid DOM patterns:
@@ -5011,7 +5261,7 @@ export class Bridge {
     // Both produce the same Slate value.
     const fieldNodeId = fieldEl.getAttribute('data-node-id');
     if (fieldNodeId && isValidNodeId(fieldNodeId)) {
-      return [this.domNodeToSlate(fieldEl, metadataMap)];
+      return [this.domNodeToSlate(fieldEl, metadataMap, matchMetadataFromDom)];
     }
 
     const topNodes = [];
@@ -5019,7 +5269,7 @@ export class Bridge {
       if (child.nodeType === Node.ELEMENT_NODE) {
         const nodeId = child.getAttribute('data-node-id');
         if (nodeId && isValidNodeId(nodeId)) {
-          topNodes.push(this.domNodeToSlate(child, metadataMap));
+          topNodes.push(this.domNodeToSlate(child, metadataMap, matchMetadataFromDom));
         }
       }
     }
@@ -5034,6 +5284,93 @@ export class Bridge {
    * against the formData value. Returns immediately when content matches (zero
    * cost on mock); on Nuxt/Vue waits for secondary renders to complete.
    */
+  /**
+   * Synchronous check: does the DOM content match formData right now?
+   */
+  /**
+   * Checks if the current and target blocks are ready in the DOM.
+   * - Current block: if its data is in formData, check DOM content matches.
+   *   If data is gone (block deleted), check element is gone from DOM.
+   * - Target block (if switching): must exist in DOM with matching content.
+   * Returns false if any block needs rendering.
+   */
+  /**
+   * Pure readiness check — no side effects.
+   *
+   * A block is "ready" when it's visible in the viewport AND its rendered DOM
+   * matches the formData (isContentReady). We cannot assume a block is rendered
+   * but hidden — some implementations (carousels, tabs, lazy containers) may
+   * not render a block's content at all until it is navigated to. "Not in DOM"
+   * and "in DOM but not visible" are treated the same: not ready.
+   *
+   * @returns {{ ready: boolean, targetVisible: boolean }} ready=true means all
+   *   blocks are ready to proceed. targetVisible indicates whether the target
+   *   block (if switching) is visible — used by the poller to decide whether
+   *   to navigate or give up on timeout.
+   */
+  _areBlocksReady(blockId, blockEl, afterRenderOptions = {}) {
+    // Determine status of current block
+    let currentReady = true; // Default: no current block = ready
+    if (blockId) {
+      if (!blockEl) {
+        // Not in DOM — deleted (data gone) = ready, otherwise not rendered yet
+        currentReady = !this.getBlockData(blockId);
+      } else if (this.getBlockData(blockId)) {
+        currentReady = this.isContentReady(blockEl);
+      } else {
+        currentReady = false; // In DOM but data gone — stale element
+      }
+    }
+
+    // Determine status of target block (if switching selection)
+    const newBlockId = afterRenderOptions.adminSelectedBlockUid;
+    if (!newBlockId || newBlockId === blockId) {
+      return { ready: currentReady, targetVisible: true };
+    }
+
+    const newEl = this.queryBlockElement(newBlockId);
+    const targetVisible = newEl && !this.isElementHidden(newEl);
+    const targetReady = targetVisible && this.isContentReady(newEl);
+
+    return {
+      ready: currentReady && targetReady,
+      targetVisible: !!targetVisible,
+    };
+  }
+
+  isContentReady(blockElement) {
+    const blockUid = blockElement.getAttribute('data-block-uid');
+    const blockData = this.getBlockData(blockUid);
+    if (!blockData) return true;
+    const editableFields = this.getEditableFields(blockElement);
+    for (const [fieldName, fieldType] of Object.entries(editableFields)) {
+      const fieldEl = blockElement.querySelector(`[data-edit-text="${fieldName}"]`)
+        || (blockElement.getAttribute('data-edit-text') === fieldName ? blockElement : null);
+      if (!fieldEl) continue;
+
+      if (this.fieldTypeIsSlate(fieldType)) {
+        const slateValue = blockData[fieldName];
+        if (!slateValue || !Array.isArray(slateValue)) continue;
+        const domValue = this.readSlateValueFromDOM(fieldEl, slateValue, { matchMetadataFromDom: true });
+        if (!this._deepEqual(domValue, slateValue)) {
+          log('isContentReady MISMATCH:', blockUid, fieldName, '+' + (this._renderStartTime ? (performance.now() - this._renderStartTime).toFixed(0) : '?') + 'ms');
+          log('  DOM:', JSON.stringify(domValue)?.substring(0, 300));
+          log('  EXP:', JSON.stringify(slateValue)?.substring(0, 300));
+          log('  HTML:', fieldEl.innerHTML?.substring(0, 300));
+          return false;
+        }
+      } else {
+        // Non-slate text fields: compare using same read as handleTextChange
+        const resolved = this.resolveFieldPath(fieldName, blockUid);
+        const targetData = this.getBlockData(resolved.blockId);
+        const expected = targetData?.[resolved.fieldName] ?? '';
+        const domText = this.stripZeroWidthSpaces(fieldEl.innerText || '');
+        if (domText !== String(expected)) return false;
+      }
+    }
+    return true;
+  }
+
   async waitForContentReady(blockElement, maxRetries = 20) {
     const blockUid = blockElement.getAttribute('data-block-uid');
     const blockData = this.getBlockData(blockUid);
@@ -5049,12 +5386,14 @@ export class Bridge {
         || (blockElement.getAttribute('data-edit-text') === fieldName ? blockElement : null);
       if (!fieldEl) continue;
 
-      const expected = JSON.stringify(slateValue);
       for (let retry = 0; retry < maxRetries; retry++) {
         const domValue = this.readSlateValueFromDOM(fieldEl, slateValue);
-        if (JSON.stringify(domValue) === expected) break;
+        if (this._deepEqual(domValue, slateValue)) {
+          log('waitForContentReady: MATCH on retry', retry, 'innerHTML:', fieldEl.innerHTML?.substring(0, 200));
+          break;
+        }
         if (retry === 0) {
-          log('waitForContentReady: content mismatch, waiting for render to complete');
+          log('waitForContentReady: content mismatch, waiting for render to complete. DOM:', fieldEl.innerHTML?.substring(0, 200), 'expected:', JSON.stringify(slateValue).substring(0, 100));
         }
         await new Promise(r => requestAnimationFrame(r));
       }
@@ -5076,6 +5415,27 @@ export class Bridge {
         blockElement.removeAttribute('data-hydra-empty');
       }
     });
+  }
+
+  /**
+   * Blocks or unblocks pointer events on all editable text fields.
+   * Uses a <style> element injected into <head> so it survives innerHTML
+   * replacement by framework re-renders (unlike CSS classes on elements).
+   * Called during re-render blocking and format-op blocking to prevent
+   * user clicks from racing with restoreSlateSelection.
+   */
+  _setPointerBlocking(blocking) {
+    if (!this._pointerBlockStyleEl) {
+      this._pointerBlockStyleEl = document.createElement('style');
+      this._pointerBlockStyleEl.type = 'text/css';
+      document.head.appendChild(this._pointerBlockStyleEl);
+    }
+    const newCSS = blocking
+      ? 'body { pointer-events: none !important; cursor: wait !important; }'
+      : '';
+    if (this._pointerBlockStyleEl.textContent !== newCSS) {
+      this._pointerBlockStyleEl.textContent = newCSS;
+    }
   }
 
   /**
@@ -5114,6 +5474,29 @@ export class Bridge {
     if (this._readonlyStyleEl.textContent !== newCSS) {
       this._readonlyStyleEl.textContent = newCSS;
     }
+  }
+
+  /**
+   * Apply placeholder attributes to all editable text fields in the document.
+   * Sets data-placeholder (from schema) and data-empty (based on content) on
+   * every [data-edit-text] element whose block has a resolvedBlockSchema.
+   * Called from afterContentRender so placeholders survive framework re-renders.
+   */
+  applyPlaceholders() {
+    const editableFields = document.querySelectorAll('[data-edit-text]');
+    editableFields.forEach((field) => {
+      const blockEl = field.closest('[data-block-uid]');
+      // Page-level fields (outside any block) use _page as blockId
+      const blockUid = blockEl ? blockEl.getAttribute('data-block-uid') : PAGE_BLOCK_UID;
+      const fieldPath = field.getAttribute('data-edit-text');
+      const placeholder = this.getFieldPlaceholder(blockUid, fieldPath);
+      if (placeholder) {
+        field.setAttribute('data-placeholder', placeholder);
+      } else {
+        field.removeAttribute('data-placeholder');
+      }
+      this.updateEmptyState(field);
+    });
   }
 
   /**
@@ -7089,8 +7472,7 @@ export class Bridge {
 
           // Focus the contenteditable element for blocks with editable fields
           // This includes slate, string, and textarea field types
-          const pathInfo = this.blockPathMap?.[uid];
-          const schemaProps = pathInfo?.resolvedBlockSchema?.properties;
+          const schemaProps = this.getBlockSchema(uid)?.properties;
           const hasEditableFields = schemaProps && Object.keys(schemaProps).length > 0;
 
           if (hasEditableFields) {
@@ -7403,14 +7785,39 @@ export class Bridge {
         }
       });
 
-      // Add keydown listener for Enter, Delete, Backspace, Undo, Redo, and formatting shortcuts
+      // Per-field keydown listener: handles keys when the field has focus.
+      // The document-level fallback (registered in init) buffers keys that
+      // arrive on body during block transitions when this field doesn't exist yet.
       editableField.addEventListener('keydown', (e) => {
+        this._handleFieldKeydown(e, blockUid, editableField);
+      });
+
+      // Replay any keys buffered during block transition (focus was on body,
+      // document-level handler captured them). Uses the same replay logic as
+      // transform unblock — handles transform interruption mid-replay.
+      if (this.eventBuffer.length > 0 && !this.blockedBlockId) {
+        const buffer = this.eventBuffer.splice(0);
+        log('restoreContentEditableOnFields: replaying', buffer.length, 'buffered keys for', blockUid);
+        this.pendingBufferReplay = { blockId: blockUid, buffer };
+        this.replayBufferedEvents();
+      }
+    }
+  }
+
+  /**
+   * Handle keydown events for an editable field. Shared entry point called from
+   * both per-field listeners and the document-level fallback listener.
+   */
+  _handleFieldKeydown(e, blockUid, editableField) {
         // DEBUG: trace End/Backspace key arrival and selection state
         if (e.key === 'End' || e.key === 'Backspace') {
           const sel = window.getSelection();
           log('DEBUG keydown:', e.key, 'isTrusted:', e.isTrusted,
               'collapsed:', sel?.isCollapsed, 'anchorOffset:', sel?.anchorOffset,
               'focusOffset:', sel?.focusOffset, 'anchorNode:', sel?.anchorNode?.nodeName,
+              'focusNode:', sel?.focusNode?.nodeName,
+              'sameNode:', sel?.anchorNode === sel?.focusNode,
+              'rangeCollapsed:', sel?.rangeCount ? sel.getRangeAt(0).collapsed : 'no-range',
               'blockedBlockId:', this.blockedBlockId);
         }
         // Ensure cursor is inside a data-node-id element before processing.
@@ -7600,7 +8007,7 @@ export class Bridge {
             const selection = window.getSelection();
             if (selection.rangeCount) {
               const tabNode = selection.getRangeAt(0).startContainer;
-              const tabEl = tabNode.nodeType === Node.TEXT_NODE ? tabNode.parentElement : tabNode;
+              const tabEl = this._toElement(tabNode);
               if (tabEl?.closest('li')) {
                 e.preventDefault();
                 this.sendTransformRequest(blockUid, e.shiftKey ? 'outdent' : 'indent', {});
@@ -7652,8 +8059,7 @@ export class Bridge {
           const range = selection.getRangeAt(0);
           const node = range.startContainer;
 
-          const parentElement =
-            node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+          const parentElement = this._toElement(node);
           const hasNodeId = parentElement?.closest('[data-node-id]');
           log('Has data-node-id?', !!hasNodeId);
 
@@ -7672,8 +8078,6 @@ export class Bridge {
             e.preventDefault();
           }
         }
-      });
-    }
   }
 
   /**
@@ -7708,6 +8112,59 @@ export class Bridge {
         childList: true,
       });
     }
+  }
+
+  /**
+   * Sets up a MutationObserver on document.body that watches for structural
+   * DOM changes (childList). When the framework adds/removes block elements,
+   * this runs all-blocks operations: materializeHydraComments, markEmptyBlocks,
+   * applyReadonlyVisuals, applyPlaceholders.
+   *
+   * Separate from blockTextMutationObserver (which tracks text changes in the
+   * selected block for inline editing). This observer is never disconnected
+   * during renders — it fires whenever the framework patches the DOM.
+   * Debounced via rAF to batch rapid mutations from a single render pass.
+   */
+  setupStructuralObserver() {
+    if (this._structuralObserver) return;
+
+    let pendingRAF = null;
+    const runAllBlocksOps = () => {
+      pendingRAF = null;
+      const t0 = performance.now();
+      this.materializeHydraComments();
+      const t1 = performance.now();
+      this.markEmptyBlocks();
+      const t2 = performance.now();
+      this.applyReadonlyVisuals();
+      const t3 = performance.now();
+      this.applyPlaceholders();
+      const t4 = performance.now();
+      const total = t4 - t0;
+      if (total > 5) {
+        log('runAllBlocksOps:', total.toFixed(0) + 'ms (materialize:', (t1-t0).toFixed(0), 'empty:', (t2-t1).toFixed(0), 'readonly:', (t3-t2).toFixed(0), 'placeholders:', (t4-t3).toFixed(0) + ')');
+      }
+      // Signal DOM settled — but only if no new mutations arrived during
+      // this rAF callback. If new mutations come, the observer will fire
+      // again and we'll wait for the next settlement.
+      if (this._onDomSettled && !pendingRAF) {
+        const cb = this._onDomSettled;
+        this._onDomSettled = null;
+        cb();
+      }
+    };
+
+    this._structuralObserver = new MutationObserver(() => {
+      // Cancel previous pending rAF and schedule a new one.
+      // This ensures we wait for the LAST mutation, not the first.
+      if (pendingRAF) cancelAnimationFrame(pendingRAF);
+      pendingRAF = requestAnimationFrame(runAllBlocksOps);
+    });
+
+    this._structuralObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
   }
 
   observeBlockTextChanges(blockElement) {
@@ -7826,6 +8283,21 @@ export class Bridge {
    */
   _executeRender(callbackFn, afterRenderOptions = {}) {
     this._renderInProgress = true;
+    this._renderStartTime = performance.now();
+
+    const blockId = this.selectedBlockUid;
+    const blockEl = blockId && this.queryBlockElement(blockId);
+
+    // Skip re-render when formData is identical to what we already have
+    // (echo from admin after inline editing). Calling the callback with
+    // unchanged data would replace DOM nodes, destroying cursor/observer.
+    // Never skip when blockedBlockId is set — afterContentRender must run
+    // to clear blocking state (replayBufferAndUnblock / setBlockProcessing).
+    if (this._isEchoFormData && !afterRenderOptions.skipRender && !this.blockedBlockId) {
+      log('_executeRender: echo FORM_DATA (identical data), skipping re-render');
+      this._renderInProgress = false;
+      return;
+    }
 
     // Block keyboard input during re-render to prevent keystrokes hitting
     // detached DOM elements. The re-render callback replaces innerHTML, which
@@ -7836,6 +8308,7 @@ export class Bridge {
       this._ensureDocumentKeyboardBlocker();
       this.blockedBlockId = this.selectedBlockUid;
       this._reRenderBlocking = true;
+      this._setPointerBlocking(true);
       // Save cursor position before re-render so we can restore it when
       // no transformedSelection is provided (e.g. sidebar-originated FORM_DATA).
       // Without this, the browser resets cursor to position 0 after DOM
@@ -7852,44 +8325,152 @@ export class Bridge {
     }
 
     // Call the callback to trigger the render
-    // Support async callbacks (e.g., renderContentWithListings)
-    const callbackResult = callbackFn(this.formData);
+    callbackFn(this.formData);
 
     const afterRender = () => {
-      if (this._renderCommentObserver) {
-        this._renderCommentObserver.disconnect();
-        this._renderCommentObserver = null;
-      }
       this.afterContentRender(afterRenderOptions);
     };
 
-    // For async render callbacks, watch for new DOM nodes and eagerly
-    // materialize hydra comments. This ensures data-block-uid attributes
-    // from comment syntax are available as soon as blocks are appended,
-    // rather than waiting for the entire render (including slow listing/
-    // footer expansion) to complete. Safe to call repeatedly because
-    // applyHydraAttributes skips existing attributes.
-    if (callbackResult && typeof callbackResult.then === 'function') {
-      this._renderCommentObserver = new MutationObserver(() => {
-        this.materializeHydraComments();
-      });
-      this._renderCommentObserver.observe(document.body, { childList: true, subtree: true });
-    }
+    // Check if content is ready and whether cursor needs immediate restoration.
+    // Fast path (synchronous): only when iframe has active cursor at risk
+    //   - pendingTransform: format/Enter/Backspace operation in flight
+    //   - _reRenderBlocking + _iframeFocused: echo FORM_DATA during inline typing
+    // Delayed path (rAF): everything else — gives async frameworks (Nuxt/Vue)
+    //   one frame to patch the DOM before afterContentRender reads it.
+    const { ready: contentReady } = this._areBlocksReady(blockId, blockEl, afterRenderOptions);
+    // adminSelectedBlockUid signals a structural change (block add/delete/move)
+    // — always give the framework time to render, even if content looks ready.
+    const isStructuralChange = !!afterRenderOptions.adminSelectedBlockUid;
+    const needsFastPath = this.pendingTransform
+      || (this._reRenderBlocking && this._iframeFocused && !isStructuralChange);
 
-    // Call afterRender after callback completes (async or sync)
-    if (callbackResult && typeof callbackResult.then === 'function') {
-      callbackResult.then(afterRender);
-    } else {
-      // Sync callback — framework may render asynchronously (Vue, React).
-      // If a transform or re-render is pending, wait for the actual DOM
-      // mutation before proceeding with selection restore and buffer replay.
-      const blockId = this.selectedBlockUid;
-      const blockEl = blockId && this.queryBlockElement(blockId);
-      if (blockEl && !afterRenderOptions.skipRender && (this.pendingTransform || this._reRenderBlocking)) {
-        this._waitForDomMutation(blockEl, afterRender);
-      } else {
+    // Poll until blocks are ready, then call afterRender.
+    //
+    // Navigation rules for target blocks (carousel slides, tabs, etc.):
+    // - Target visible → poll content ready. On timeout, give up and proceed
+    //   (rendered, just can't verify content match).
+    // - Target not visible, navigation possible → trigger tryMakeBlockVisible
+    //   once, keep polling. When target becomes visible, reset content retries.
+    // - Target not visible, no navigation possible → wait for framework to
+    //   render. On timeout, give up without selecting (block never appeared).
+    let navigationTriggered = false;
+    let contentRetryBudget = 0; // set when target becomes visible after navigation
+    const CONTENT_RETRIES = 60; // ~1s at rAF rate
+    const NAV_CONTENT_RETRIES = 60; // fresh budget after navigation completes
+
+    const pollBlocksReady = (retries = CONTENT_RETRIES) => {
+      const newBlockId = afterRenderOptions.adminSelectedBlockUid;
+      const result = this._areBlocksReady(blockId, blockId && this.queryBlockElement(blockId), afterRenderOptions);
+
+      if (result.ready) {
+        const elapsed = this._renderStartTime ? (performance.now() - this._renderStartTime).toFixed(0) : '?';
+        log('pollBlocksReady: DONE +' + elapsed + 'ms ready=true');
         afterRender();
+        return;
       }
+
+      // Target not visible — try navigation (once)
+      if (newBlockId && !result.targetVisible && !navigationTriggered) {
+        if (!this._navigatingToBlock) {
+          this.tryMakeBlockVisible(newBlockId);
+        }
+        navigationTriggered = true;
+      }
+
+      // Target just became visible after navigation — reset content retries (once)
+      if (navigationTriggered && result.targetVisible && !contentRetryBudget) {
+        contentRetryBudget = NAV_CONTENT_RETRIES;
+        log('pollBlocksReady: target visible after navigation, resetting content retries');
+      }
+
+      // Use post-navigation budget if active, otherwise pre-navigation retries
+      if (contentRetryBudget > 0) {
+        contentRetryBudget--;
+        if (contentRetryBudget <= 0) {
+          // Post-navigation content retries exhausted — target is visible but
+          // content doesn't match. Give up and proceed (rendered, can't verify).
+          const elapsed = this._renderStartTime ? (performance.now() - this._renderStartTime).toFixed(0) : '?';
+          log('pollBlocksReady: TIMEOUT +' + elapsed + 'ms target visible after nav, proceeding');
+          afterRender();
+          return;
+        }
+      } else if (retries <= 0) {
+        const elapsed = this._renderStartTime ? (performance.now() - this._renderStartTime).toFixed(0) : '?';
+        if (result.targetVisible || !newBlockId) {
+          // No navigation needed, content just doesn't match — give up and proceed.
+          log('pollBlocksReady: TIMEOUT +' + elapsed + 'ms proceeding anyway');
+          afterRender();
+        } else {
+          // Target never became visible. Fall back to selecting whatever IS
+          // visible: previous block, parent container, or deselect.
+          log('pollBlocksReady: TIMEOUT +' + elapsed + 'ms target NOT visible, falling back');
+          const prevEl = blockId && this.queryBlockElement(blockId);
+          if (prevEl && !this.isElementHidden(prevEl)) {
+            log('pollBlocksReady: fallback to previous block:', blockId);
+            afterRenderOptions.adminSelectedBlockUid = null;
+            afterRenderOptions.needsBlockSwitch = false;
+            this.selectBlock(prevEl);
+          } else {
+            // Check parent container
+            const targetEl = newBlockId && this.queryBlockElement(newBlockId);
+            const container = (targetEl || prevEl)?.closest?.('[data-block-uid]');
+            if (container && !this.isElementHidden(container)) {
+              const containerId = container.getAttribute('data-block-uid');
+              log('pollBlocksReady: fallback to parent container:', containerId);
+              afterRenderOptions.adminSelectedBlockUid = null;
+              this.selectBlock(container);
+            } else {
+              log('pollBlocksReady: nothing visible, deselecting');
+              this.sendMessageToParent({ type: 'BLOCK_DESELECTED' });
+            }
+          }
+          afterRender();
+        }
+        return;
+      }
+
+      requestAnimationFrame(() => pollBlocksReady(retries - 1));
+    };
+
+    log('_executeRender: contentReady:', contentReady, 'skipRender:', !!afterRenderOptions.skipRender, 'pendingTransform:', !!this.pendingTransform, '_reRenderBlocking:', !!this._reRenderBlocking, 'needsFastPath:', needsFastPath, 'isStructuralChange:', isStructuralChange);
+    if (afterRenderOptions.skipRender) {
+      afterRender();
+    } else if (needsFastPath && contentReady) {
+      afterRender();
+    } else if (isStructuralChange) {
+      // Structural change (block add/delete/move): wait for the DOM to settle
+      // (framework finishes rendering), then poll for target block readiness.
+      // Can't trust contentReady here — old DOM may still match while the
+      // framework hasn't rendered the new/deleted block yet.
+      const settleTimeout = setTimeout(() => {
+        if (this._onDomSettled) {
+          this._onDomSettled = null;
+          pollBlocksReady();
+        }
+      }, 200);
+      this._onDomSettled = () => {
+        clearTimeout(settleTimeout);
+        pollBlocksReady();
+      };
+    } else if (contentReady) {
+      // Content matches but the framework may still be rendering async
+      // (innerHTML replacement, Vue patching, etc.). Wait for the structural
+      // observer to signal DOM settlement before running afterContentRender.
+      // Fallback timeout ensures we don't wait forever if no mutation fires
+      // (e.g. echo FORM_DATA where the render produces identical DOM).
+      const settleTimeout = setTimeout(() => {
+        if (this._onDomSettled) {
+          this._onDomSettled = null;
+          afterRender();
+        }
+      }, 200);
+      this._onDomSettled = () => {
+        clearTimeout(settleTimeout);
+        afterRender();
+      };
+    } else {
+      // Content not ready — poll until ready
+      requestAnimationFrame(() => pollBlocksReady());
     }
   }
 
@@ -7908,14 +8489,10 @@ export class Bridge {
       log('_waitForDomMutation proceed via:', source);
       callback();
     };
-    let settleRaf = null;
     const observer = new MutationObserver(() => {
-      // Wait for mutations to settle: each mutation resets the wait.
-      // Frameworks may patch DOM across multiple microtask cycles (e.g.,
-      // Vue watchers triggering a second render pass). Proceeding after
-      // one rAF with no new mutations means the framework is done.
-      if (settleRaf) cancelAnimationFrame(settleRaf);
-      settleRaf = requestAnimationFrame(() => proceed('mutation-settled'));
+      // Proceed immediately on mutation — content readiness is checked
+      // by isContentReady/pollUntilReady in afterContentRender.
+      proceed('mutation');
     });
     observer.observe(element, { childList: true, subtree: true, characterData: true });
     // Fallback if no mutation (e.g., data didn't change visible content)
@@ -7960,8 +8537,14 @@ export class Bridge {
    * @returns {HTMLElement|null}
    */
   queryBlockElement(uid) {
-    const all = document.querySelectorAll(`[data-block-uid="${uid}"]`);
-    if (all.length === 0) return null;
+    let all = document.querySelectorAll(`[data-block-uid="${uid}"]`);
+    if (all.length === 0) {
+      // Block not found — frontend may use hydra comments instead of
+      // data attributes. Materialize any comments and retry.
+      this.materializeHydraComments();
+      all = document.querySelectorAll(`[data-block-uid="${uid}"]`);
+      if (all.length === 0) return null;
+    }
     if (all.length === 1) return all[0];
     for (const el of all) {
       if (!this.isElementHidden(el)) return el;
@@ -8173,6 +8756,7 @@ export class Bridge {
    * Uses blockPathMap to find all blocks, including those in containers
    */
   addNodeIdsToAllSlateFields() {
+    const t0 = performance.now();
     if (!this.formData) return;
 
     if (!this.blockPathMap) {
@@ -8185,19 +8769,22 @@ export class Bridge {
     const missingFromPathMap = formDataBlocks.filter(id => !pathMapBlocks.includes(id));
     log('addNodeIdsToAllSlateFields: pathMap has', pathMapBlocks.length, 'blocks, formData has', formDataBlocks.length, 'blocks, missing:', missingFromPathMap.length > 0 ? missingFromPathMap : 'none');
 
+    let slateCalls = 0;
     Object.entries(this.blockPathMap).forEach(([blockId, pathInfo]) => {
       const block = this.getBlockData(blockId);
       if (!block) return;
 
-      const schema = pathInfo.resolvedBlockSchema;
+      const schema = this.getBlockSchema(blockId);
       if (!schema?.properties) return;
 
       Object.entries(schema.properties).forEach(([fieldName, fieldDef]) => {
         if (isSlateFieldType(getFieldTypeString(fieldDef)) && block[fieldName]) {
           block[fieldName] = this.addNodeIds(block[fieldName]);
+          slateCalls++;
         }
       });
     });
+    log('addNodeIdsToAllSlateFields took', (performance.now() - t0).toFixed(1) + 'ms, slate fields:', slateCalls);
   }
 
   /**
@@ -8342,9 +8929,9 @@ export class Bridge {
    * Restore cursor/selection from Slate selection format.
    * @param {Object} slateSelection - Slate selection object with anchor and focus
    * @param {Object} formData - Form data with Slate JSON (containing nodeIds)
-   * @returns {Promise<boolean>} true if selection was restored, false if it failed
+   * @returns {boolean} true if selection was restored, false if it failed
    */
-  async restoreSlateSelection(slateSelection, formData) {
+  restoreSlateSelection(slateSelection, formData) {
     log('restoreSlateSelection called with:', JSON.stringify(slateSelection));
     if (!slateSelection || !slateSelection.anchor || !slateSelection.focus) {
       console.warn('[HYDRA] restoreSlateSelection failed: invalid selection', slateSelection);
@@ -8402,20 +8989,10 @@ export class Bridge {
         anchorElement = blockElement.querySelector(`[data-node-id="${anchorResult.nodeId}"]`);
         focusElement = blockElement.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
 
-        // If elements not found, DOM may not be ready yet (async framework render)
-        // Wait and retry — afterContentRender awaits us, so buffer replay won't
-        // run until we finish and the selection is actually restored.
         if (!anchorElement || !focusElement) {
-          log('restoreSlateSelection: nodeId elements not found, waiting for DOM');
-          await new Promise(resolve => setTimeout(resolve, 50));
-          anchorElement = blockElement.querySelector(`[data-node-id="${anchorResult.nodeId}"]`);
-          focusElement = blockElement.querySelector(`[data-node-id="${focusResult.nodeId}"]`);
-          if (!anchorElement || !focusElement) {
-            console.warn('[HYDRA] restoreSlateSelection failed: nodeId elements not found after retry',
-              { anchorNodeId: anchorResult.nodeId, focusNodeId: focusResult.nodeId });
-            return false;
-          }
-          log('restoreSlateSelection: elements found after retry');
+          console.warn('[HYDRA] restoreSlateSelection failed: nodeId elements not found',
+            { anchorNodeId: anchorResult.nodeId, focusNodeId: focusResult.nodeId });
+          return false;
         }
 
         log('restoreSlateSelection: looking for nodeIds', {
@@ -8488,12 +9065,18 @@ export class Bridge {
           return null; // Not a ZWS case, use normal positioning
         };
 
-        // Try ZWS positioning first
-        if (anchorResult.parentChildren) {
-          anchorPos = ensureZwsPosition(anchorResult, slateSelection.anchor.offset, anchorResult.parentChildren);
-        }
-        if (focusResult.parentChildren) {
-          focusPos = ensureZwsPosition(focusResult, slateSelection.focus.offset, focusResult.parentChildren);
+        // ZWS cursor-exit positioning only for collapsed selections (caret).
+        // Range selections must not create ZWS — it would shift the focus
+        // and include the ZWS character in the selected text.
+        const isCollapsed = slateSelection.anchor.path.toString() === slateSelection.focus.path.toString()
+          && slateSelection.anchor.offset === slateSelection.focus.offset;
+        if (isCollapsed) {
+          if (anchorResult.parentChildren) {
+            anchorPos = ensureZwsPosition(anchorResult, slateSelection.anchor.offset, anchorResult.parentChildren);
+          }
+          if (focusResult.parentChildren) {
+            focusPos = ensureZwsPosition(focusResult, slateSelection.focus.offset, focusResult.parentChildren);
+          }
         }
 
         // Fall back to offset calculation for non-ZWS cases
@@ -8888,6 +9471,11 @@ export class Bridge {
     }
   }
 
+  /** Delegate to standalone deepEqual for key-order-independent comparison. */
+  _deepEqual(a, b) {
+    return deepEqual(a, b);
+  }
+
   /**
    * Get formData with nodeIds stripped for sending to Admin UI
    * NodeIds are internal to hydra.js for DOM<->Slate translation
@@ -8901,8 +9489,7 @@ export class Bridge {
       if (!blocks || typeof blocks !== 'object') return;
       for (const blockId of Object.keys(blocks)) {
         const block = blocks[blockId];
-        const pathInfo = this.blockPathMap?.[blockId];
-        const schema = pathInfo?.resolvedBlockSchema;
+        const schema = this.getBlockSchema(blockId);
         if (block && schema?.properties) {
           for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
             if (isSlateFieldType(getFieldTypeString(fieldDef)) && block[fieldName]) {
@@ -8976,10 +9563,8 @@ export class Bridge {
     const copyB = JSON.parse(JSON.stringify(fieldB));
     this.resetJsonNodeIds(copyA);
     this.resetJsonNodeIds(copyB);
-    const strA = JSON.stringify(copyA);
-    const strB = JSON.stringify(copyB);
-    const isEqual = strA === strB;
-    log('focusedFieldValuesEqual:', isEqual, 'A:', strA.substring(0, 100), 'B:', strB.substring(0, 100));
+    const isEqual = deepEqual(copyA, copyB);
+    log('focusedFieldValuesEqual:', isEqual, 'A:', JSON.stringify(copyA).substring(0, 100), 'B:', JSON.stringify(copyB).substring(0, 100));
     return isEqual;
   }
 
@@ -8991,11 +9576,54 @@ export class Bridge {
    */
   getFieldType(blockUid, fieldName) {
     const resolved = this.resolveFieldPath(fieldName, blockUid);
-    const pathInfo = this.blockPathMap?.[resolved.blockId];
-    const schema = pathInfo?.resolvedBlockSchema;
+    const schema = this.getBlockSchema(resolved.blockId);
     const fieldDef = schema?.properties?.[resolved.fieldName];
     if (!fieldDef) return undefined;
     return getFieldTypeString(fieldDef);
+  }
+
+  /**
+   * Get the placeholder text for a given block field.
+   * Checks three sources in priority order:
+   * 1. Instance-level: block.fieldPlaceholders[fieldName] (from template authoring)
+   * 2. Schema-level: resolvedBlockSchema.properties[fieldName].placeholder
+   * @param {string} blockUid - The block UID
+   * @param {string} fieldName - The field name
+   * @returns {string|undefined} Placeholder text or undefined
+   */
+  getFieldPlaceholder(blockUid, fieldName) {
+    const resolved = this.resolveFieldPath(fieldName, blockUid);
+    // 1. Instance-level placeholder from template (fieldPlaceholders)
+    const block = this.getBlockData(resolved.blockId);
+    const instancePlaceholder = block?.fieldPlaceholders?.[resolved.fieldName];
+    if (instancePlaceholder) {
+      // For string fields, return directly. For slate arrays, extract text.
+      if (typeof instancePlaceholder === 'string') return instancePlaceholder;
+      if (Array.isArray(instancePlaceholder)) {
+        const text = instancePlaceholder.map(n =>
+          (n.children || []).map(c => c.text || '').join('')
+        ).join(' ').trim();
+        if (text) return text;
+      }
+    }
+    // 2. Schema-level placeholder
+    const fieldDef = this.getBlockSchema(resolved.blockId)?.properties?.[resolved.fieldName];
+    return fieldDef?.placeholder || undefined;
+  }
+
+  /**
+   * Update the data-empty attribute on an editable field based on its text content.
+   * Treats ZWS-only content as empty.
+   * @param {HTMLElement} field - The editable field element
+   */
+  updateEmptyState(field) {
+    const text = field.textContent?.replace(/[\u200B\uFEFF]/g, '').trim();
+    const isEmpty = !text;
+    // Don't show placeholder (data-empty) while the field is focused —
+    // it would flash between keystrokes as the user types/deletes.
+    const doc = field.ownerDocument;
+    const isFocused = doc && (doc.activeElement === field || field.contains(doc.activeElement));
+    field.toggleAttribute('data-empty', isEmpty && !isFocused);
   }
 
   /**
@@ -9090,6 +9718,8 @@ export class Bridge {
       ...transformFields,
     }, this.adminOrigin);
 
+    this._transformSentAt = performance.now();
+    this._transformSentDateNow = Date.now();
     log(`SLATE_TRANSFORM_REQUEST (${transformType}) sent with data, requestId:`, requestId);
     return requestId;
   }
@@ -9159,6 +9789,9 @@ export class Bridge {
         log('handleTextChange: updated field:', resolved.fieldName);
       }
     }
+
+    // Update empty state for placeholder visibility
+    this.updateEmptyState(target);
 
     // Buffer the update - text and selection are captured together
     this.bufferUpdate(this.fieldTypeIsSlate(fieldType) ? 'textChangeSlate' : 'textChange');
@@ -9267,9 +9900,10 @@ export class Bridge {
    * or deferred until afterContentRender when a render is in progress.
    * @param {string} requestId - The FLUSH_BUFFER requestId
    */
-  _processFlushBuffer(requestId) {
-    // Block input during format operation - will be unblocked when FORM_DATA arrives
-    if (this.selectedBlockUid) {
+  _processFlushBuffer(requestId, setBlocking = false) {
+    // Only block when a format operation follows (setBlocking=true).
+    // Non-format flushes (save, template exit) just sync text.
+    if (setBlocking && this.selectedBlockUid) {
       this.setBlockProcessing(this.selectedBlockUid, true, requestId);
     }
 
@@ -9733,10 +10367,25 @@ export class Bridge {
         [contenteditable] {
           outline: 0px solid transparent;
         }
-        /* Ensure empty editable fields are visible/clickable */
-        [data-edit-text]:empty {
+        /* Placeholder text for empty editable fields — keeps them visible/clickable */
+        [data-edit-text][data-placeholder][data-empty]::before {
+          content: attr(data-placeholder);
+          color: #aaa;
+          font-style: italic;
+          pointer-events: none;
+          position: absolute;
+        }
+        /* Hide placeholder when field is focused (user is editing) */
+        [data-edit-text][data-placeholder][data-empty]:focus::before {
+          display: none;
+        }
+        /* Empty fields with placeholder: placeholder text provides the height */
+        [data-edit-text][data-placeholder][data-empty] {
+          position: relative;
+        }
+        /* Empty fields without placeholder: min-height fallback so they stay clickable */
+        [data-edit-text][data-empty]:not([data-placeholder]) {
           min-height: 1.5em;
-          display: block;
         }
         /* Linkable field hover styles - indicate clickable link areas */
         /* Exclude fields inside readonly blocks (listing items, non-overwrite teasers) */
@@ -10958,6 +11607,34 @@ export function isTextEditableFieldType(fieldType) {
 }
 
 /**
+ * Key-order-independent deep equality check for JSON-like objects.
+ * JSON.stringify comparison fails when the same data has different key ordering
+ * (e.g., Plone API returns {type, children} but Slate produces {children, type}).
+ */
+export function deepEqual(a, b) {
+  if (a === b) return true;
+  if (a == null || b == null) return a === b;
+  if (typeof a !== typeof b) return false;
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!deepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  if (typeof a === 'object') {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    for (const k of keysA) {
+      if (!b.hasOwnProperty(k) || !deepEqual(a[k], b[k])) return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
  * Compare two formData objects for content equality, ignoring _editSequence.
  * Used to detect if form content has actually changed vs just metadata.
  * @param {Object} formDataA - First formData object
@@ -10968,7 +11645,7 @@ export function formDataContentEqual(formDataA, formDataB) {
   if (!formDataA || !formDataB) return formDataA === formDataB;
   const { _editSequence: seqA, ...contentA } = formDataA;
   const { _editSequence: seqB, ...contentB } = formDataB;
-  return JSON.stringify(contentA) === JSON.stringify(contentB);
+  return deepEqual(contentA, contentB);
 }
 
 /**
@@ -10991,7 +11668,7 @@ export function calculateDragHandlePosition(blockRect, viewportOffset = { top: 0
 ////////////////////////////////////////////////////////////////////////////////
 // Template Utilities
 // For discovering, filtering, and merging templates.
-// Templates are Documents with blocks that have template fields (templateId, templateInstanceId, placeholder).
+// Templates are Documents with blocks that have template fields (templateId, templateInstanceId, slotId).
 // Uses Volto's standard fixed/readOnly properties for block behavior.
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -11001,7 +11678,7 @@ export const TEMPLATE_MARKER = '_template';
 // Template blocks use flat fields directly on the block:
 // - templateId: string - the template document path (e.g., '/templates/test-layout')
 // - templateInstanceId: string - unique ID for this template application instance
-// - placeholder: string - placeholder region name (e.g., 'primary', 'header')
+// - slotId: string - slot region name (e.g., 'primary', 'header')
 
 /**
  * Simple UUID generator for block IDs.
@@ -11013,6 +11690,34 @@ function generateUUID() {
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
+}
+
+/**
+ * Extract content field values from a block to use as fieldPlaceholders.
+ * Skips system/template fields. Only includes fields with actual content.
+ * @param {Object} block - The block data
+ * @returns {Object} Map of fieldName -> value for non-empty content fields
+ */
+function extractFieldPlaceholders(block) {
+  const SYSTEM_FIELDS = new Set([
+    '@type', '@uid', 'templateId', 'templateInstanceId', 'slotId',
+    'fixed', 'readOnly', 'readOnly', 'fieldPlaceholders', 'fieldMappings',
+    'blocks', 'blocks_layout', 'nextSlotId', 'childSlotIds',
+  ]);
+  const placeholders = {};
+  for (const [key, value] of Object.entries(block)) {
+    if (SYSTEM_FIELDS.has(key)) continue;
+    if (typeof value === 'string' && value.trim()) {
+      placeholders[key] = value;
+    } else if (Array.isArray(value) && value.length > 0 && value[0]?.children) {
+      // Slate value — check if there's text content
+      const text = value.map(n =>
+        (n.children || []).map(c => c.text || '').join('')
+      ).join('').trim();
+      if (text) placeholders[key] = value;
+    }
+  }
+  return placeholders;
 }
 
 /**
@@ -11038,31 +11743,31 @@ export function isLayoutTemplate(templateData) {
 }
 
 /**
- * Find placeholder regions in a template.
- * Placeholder blocks (fixed: false) with same placeholder form a region.
+ * Find slot regions in a template.
+ * Slot blocks (fixed: false) with same slotId form a region.
  *
  * @param {Object} templateData - Template document
- * @returns {Object} { placeholder: { blockIds: [], allowedBlocks: [] } }
+ * @returns {Object} { slotId: { blockIds: [], allowedBlocks: [] } }
  */
-export function findPlaceholderRegions(templateData) {
+export function findSlotRegions(templateData) {
   const { blocks, blocks_layout } = templateData;
   const layout = blocks_layout?.items || [];
   const regions = {};
 
   for (const blockId of layout) {
     const block = blocks?.[blockId];
-    // Placeholder blocks have fixed: false (or undefined) and a placeholder
+    // Slot blocks have fixed: false (or undefined) and a slotId
     if (block?.fixed) continue; // Skip fixed blocks
 
-    const placeholder = block?.placeholder;
-    if (placeholder) {
-      if (!regions[placeholder]) {
-        regions[placeholder] = {
+    const slotId = block?.slotId;
+    if (slotId) {
+      if (!regions[slotId]) {
+        regions[slotId] = {
           blockIds: [],
           allowedBlocks: null,
         };
       }
-      regions[placeholder].blockIds.push(blockId);
+      regions[slotId].blockIds.push(blockId);
     }
   }
   return regions;
@@ -11157,7 +11862,7 @@ export function cloneBlocksWithNewIds(blocks, layout, uuidGenerator = generateUU
 
 /**
  * Clone a block, recursively filtering nested blocks without template markers.
- * Only nested blocks with `placeholder` or `templateId` are included.
+ * Only nested blocks with `slotId` or `templateId` are included.
  *
  * @param {Object} block - Block to clone
  * @param {Function} uuidGenerator - Function to generate UUIDs
@@ -11177,7 +11882,7 @@ function cloneBlockFilteringNested(block, uuidGenerator) {
       if (!nestedBlock) continue;
 
       // Only include nested blocks that have template markers
-      if (nestedBlock.placeholder || nestedBlock.templateId) {
+      if (nestedBlock.slotId || nestedBlock.templateId) {
         const newNestedId = uuidGenerator();
         // Recursively filter this nested block's children too
         nestedBlocks[newNestedId] = cloneBlockFilteringNested(nestedBlock, uuidGenerator);
@@ -11196,7 +11901,7 @@ function cloneBlockFilteringNested(block, uuidGenerator) {
 /**
  * Insert snippet blocks at a specific position.
  * - Clones snippet blocks with new IDs
- * - Adds template fields (templateId, templateInstanceId, placeholder)
+ * - Adds template fields (templateId, templateInstanceId, slotId)
  * - Preserves Volto's fixed/readOnly properties
  * - Inserts at the specified position
  *
@@ -11234,11 +11939,20 @@ export function insertSnippetBlocks(pageFormData, templateData, position, uuidGe
     // Set flat template fields
     block.templateId = templateId;
     block.templateInstanceId = instanceId;
-    block.placeholder = originalBlock?.placeholder || originalId;
+    block.slotId = originalBlock?.slotId || originalId;
 
     // Preserve Volto's fixed/readOnly from template
     if (originalBlock?.fixed !== undefined) block.fixed = originalBlock.fixed;
     if (originalBlock?.readOnly !== undefined) block.readOnly = originalBlock.readOnly;
+
+    // Snippet insert is always a user action — store content as fieldPlaceholders
+    // for editable blocks so authored text shows as hints
+    if (!block.readOnly) {
+      const placeholders = extractFieldPlaceholders(originalBlock || block);
+      if (Object.keys(placeholders).length > 0) {
+        block.fieldPlaceholders = placeholders;
+      }
+    }
 
     result.blocks[newId] = block;
   }
@@ -11280,8 +11994,8 @@ export function isFixedTemplateBlock(block) {
 }
 
 /**
- * Check if a block is placeholder content (can be moved freely).
- * Placeholder blocks have templateId but fixed: false (or undefined).
+ * Check if a block is slot content (can be moved freely).
+ * Slot blocks have templateId but fixed: false (or undefined).
  *
  * @param {Object} block - Block data
  * @returns {boolean}
@@ -11428,7 +12142,7 @@ export function getBlockAddability(blockId, blockPathMap, blockData, templateEdi
 
   // Apply static restrictions
   // In template edit mode, ignore restrictions for blocks in the template being edited
-  // (the restrictions are for normal mode to prevent adding outside placeholders)
+  // (the restrictions are for normal mode to prevent adding outside slots)
   if (templateEditMode && targetInTemplate) {
     result.canInsertBefore = true;
     result.canInsertAfter = true;
@@ -11520,8 +12234,8 @@ function isBlocksMap(obj) {
  *
  * @param {Object} container - Container object to scan
  * @param {string} instanceId - Template instance ID to match
- * @param {Map} pendingContent - Map of placeholder -> [{blockId, block}]
- * @param {Array} standaloneBlocks - Blocks without placeholder
+ * @param {Map} pendingContent - Map of slotId -> [{blockId, block}]
+ * @param {Array} standaloneBlocks - Blocks without slotId
  * @param {Set} visited - Already visited objects (prevent cycles)
  */
 function collectContentFromTree(container, instanceId, pendingContent, standaloneBlocks, existingFixedBlockIds, visited = new Set()) {
@@ -11559,20 +12273,20 @@ function collectContentFromTree(container, instanceId, pendingContent, standalon
 
       // Only collect blocks matching our instance
       if (block.templateInstanceId === instanceId) {
-        const placeholder = block.placeholder;
-        if (placeholder) {
+        const slotId = block.slotId;
+        if (slotId) {
           if (block.fixed) {
             // Track existing fixed block ID and content for reuse
-            existingFixedBlockIds.set(placeholder, { blockId, block });
+            existingFixedBlockIds.set(slotId, { blockId, block });
           } else {
             // User content block
-            if (!pendingContent.has(placeholder)) {
-              pendingContent.set(placeholder, []);
+            if (!pendingContent.has(slotId)) {
+              pendingContent.set(slotId, []);
             }
-            pendingContent.get(placeholder).push({ blockId, block });
+            pendingContent.get(slotId).push({ blockId, block });
           }
         }
-      } else if (!block.templateId && !block.placeholder) {
+      } else if (!block.templateId && !block.slotId) {
         // Standalone block (no template markers) - track position
         standaloneBlocks.push({ blockId, block });
       }
@@ -11599,22 +12313,22 @@ function collectContentFromTree(container, instanceId, pendingContent, standalon
 function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateState, options, addItem, items) {
   const { templateBlocks, templateLayout } = nestedInfo;
   const { templateId, instanceId } = templateState;
-  const { uuidGenerator } = options;
+  const { uuidGenerator, firstInsert } = options;
 
-  // Build a map of document blocks by placeholder for user content lookup
-  const docBlocksByPlaceholder = new Map();
+  // Build a map of document blocks by slotId for user content lookup
+  const docBlocksBySlotId = new Map();
   for (const blockId of docLayout) {
     const block = docBlocks[blockId];
-    if (block?.placeholder) {
-      if (!docBlocksByPlaceholder.has(block.placeholder)) {
-        docBlocksByPlaceholder.set(block.placeholder, []);
+    if (block?.slotId) {
+      if (!docBlocksBySlotId.has(block.slotId)) {
+        docBlocksBySlotId.set(block.slotId, []);
       }
-      docBlocksByPlaceholder.get(block.placeholder).push({ blockId, block });
+      docBlocksBySlotId.get(block.slotId).push({ blockId, block });
     }
   }
 
   // Process the template layout at this nested level
-  // Only emit blocks that have template markers (fixed or placeholder)
+  // Only emit blocks that have template markers (fixed or slotId)
   // Blocks without markers are just defaults and should NOT be synced
   for (const tplBlockId of templateLayout) {
     const tplBlock = templateBlocks[tplBlockId];
@@ -11624,42 +12338,47 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
       // Fixed block - emit template version
       const blockId = uuidGenerator ? uuidGenerator() : `${instanceId}::${tplBlockId}`;
 
-      // Look ahead for next non-fixed placeholder at this nested level
+      // Look ahead for next non-fixed slot at this nested level
       const tplIdx = templateLayout.indexOf(tplBlockId);
-      let nextPlaceholder = undefined;
+      let nextSlotId = undefined;
       for (let i = tplIdx + 1; i < templateLayout.length; i++) {
         const nextTplBlock = templateBlocks[templateLayout[i]];
-        if (nextTplBlock && !nextTplBlock.fixed && nextTplBlock.placeholder) {
-          nextPlaceholder = nextTplBlock.placeholder;
+        if (nextTplBlock && !nextTplBlock.fixed && nextTplBlock.slotId) {
+          nextSlotId = nextTplBlock.slotId;
           break;
         }
         if (nextTplBlock?.fixed) break;
       }
 
-      // childPlaceholders for nested containers
-      let childPlaceholders = undefined;
+      // childSlotIds for nested containers
+      let childSlotIds = undefined;
       if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
         const innerLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
         for (const nestedId of innerLayout) {
           const nested = tplBlock.blocks[nestedId];
-          if (nested && !nested.fixed && nested.placeholder) {
-            if (!childPlaceholders) childPlaceholders = {};
-            childPlaceholders['blocks'] = nested.placeholder;
+          if (nested && !nested.fixed && nested.slotId) {
+            if (!childSlotIds) childSlotIds = {};
+            childSlotIds['blocks'] = nested.slotId;
             break;
           }
         }
       }
 
-      addItem(
-        {
-          ...tplBlock,
-          templateId: templateId,
-          templateInstanceId: instanceId,
-          ...(nextPlaceholder && { nextPlaceholder }),
-          ...(childPlaceholders && { childPlaceholders }),
-        },
-        blockId
-      );
+      const fixedBlock = {
+        ...tplBlock,
+        templateId: templateId,
+        templateInstanceId: instanceId,
+        ...(nextSlotId && { nextSlotId }),
+        ...(childSlotIds && { childSlotIds }),
+      };
+      // Fixed but editable blocks: store content as placeholders on first insert
+      if (firstInsert && !tplBlock.readOnly) {
+        const placeholders = extractFieldPlaceholders(tplBlock);
+        if (Object.keys(placeholders).length > 0) {
+          fixedBlock.fieldPlaceholders = placeholders;
+        }
+      }
+      addItem(fixedBlock, blockId);
 
       // Register further nested containers (blocks_layout and object_list)
       if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
@@ -11680,23 +12399,39 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
           });
         }
       }
-    } else if (tplBlock.placeholder) {
-      // Placeholder slot - emit document content that goes here
-      const placeholder = tplBlock.placeholder;
-      const userContent = docBlocksByPlaceholder.get(placeholder) || [];
-      for (const { blockId, block } of userContent) {
-        addItem(
-          {
-            ...block,
-            templateId: templateId,
-            templateInstanceId: instanceId,
-            placeholder: placeholder,
-          },
-          blockId
-        );
+    } else if (tplBlock.slotId) {
+      // Slot block - emit document content that goes here
+      const slotId = tplBlock.slotId;
+      const userContent = docBlocksBySlotId.get(slotId) || [];
+      if (userContent.length > 0) {
+        for (const { blockId, block } of userContent) {
+          addItem(
+            {
+              ...block,
+              templateId: templateId,
+              templateInstanceId: instanceId,
+              slotId: slotId,
+            },
+            blockId
+          );
+        }
+      } else if (firstInsert) {
+        // First insert with no user content — copy template slot block
+        // with its content values stored as fieldPlaceholders
+        const blockId = uuidGenerator ? uuidGenerator() : `${instanceId}::${tplBlockId}`;
+        const newBlock = {
+          ...tplBlock,
+          templateId: templateId,
+          templateInstanceId: instanceId,
+        };
+        const placeholders = extractFieldPlaceholders(tplBlock);
+        if (Object.keys(placeholders).length > 0) {
+          newBlock.fieldPlaceholders = placeholders;
+        }
+        addItem(newBlock, blockId);
       }
     }
-    // Skip blocks without fixed or placeholder - they're just template defaults
+    // Skip blocks without fixed or slotId - they're just template defaults
     // and should NOT be synced to the document
   }
 
@@ -11894,6 +12629,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
     filterInstanceId,
     loadTemplate,
     idField,  // For object_list arrays: field name used as item ID (e.g. '@id', 'key')
+    firstInsert,  // When true, copy slot block defaults as fieldPlaceholders
   } = options;
 
   if (!templates) {
@@ -12018,7 +12754,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
     removingTemplate = true;
     templateId = '__none__';
     templates['__none__'] = {
-      blocks: { '__default__': { '@type': 'slate', placeholder: 'default' } },
+      blocks: { '__default__': { '@type': 'slate', slotId: 'default' } },
       blocks_layout: { items: ['__default__'] },
     };
   }
@@ -12055,7 +12791,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
   // Get or create instance context.
   // Always rebuild ctx when the instanceId is re-encountered (e.g. after save,
   // the API returns blocks with the same templateInstanceId but different content).
-  // The ctx is mutated during processing (pendingContent consumed, emittedPlaceholders
+  // The ctx is mutated during processing (pendingContent consumed, emittedSlotIds
   // populated) so it cannot be reused.
   let ctx = templateState.instances[instanceId];
   if (ctx) {
@@ -12068,7 +12804,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
       templateId,
       template: null,
       instanceId,
-      emittedPlaceholders: new Set(),
+      emittedSlotIds: new Set(),
       pendingContent: new Map(),
       existingFixedBlockIds: new Map(),
       leadingStandaloneBlocks: [],
@@ -12102,7 +12838,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
         const blockId = layout[i];
         const block = blocks[blockId];
         if (!block) continue;
-        if (!block.templateId && !block.templateInstanceId && !block.placeholder) {
+        if (!block.templateId && !block.templateInstanceId && !block.slotId) {
           if (!foundFirstTemplateBlock || i < layout.indexOf(layout.find((id, idx) => {
             const b = blocks[id];
             return b?.templateInstanceId === existingInstanceId && idx <= lastTemplateBlockIndex;
@@ -12122,17 +12858,17 @@ export function expandTemplatesSync(inputItems, options = {}) {
         }
         if (block.fixed && block.templateId && block.templateId !== templateId) {
           if (block.readOnly) continue;
-          if (block.placeholder) {
-            ctx.existingFixedBlockIds.set(block.placeholder, { blockId, block });
+          if (block.slotId) {
+            ctx.existingFixedBlockIds.set(block.slotId, { blockId, block });
           }
           continue;
         }
-        if (block.placeholder) {
-          const placeholder = block.placeholder;
-          if (!ctx.pendingContent.has(placeholder)) {
-            ctx.pendingContent.set(placeholder, []);
+        if (block.slotId) {
+          const slotId = block.slotId;
+          if (!ctx.pendingContent.has(slotId)) {
+            ctx.pendingContent.set(slotId, []);
           }
-          ctx.pendingContent.get(placeholder).push({ blockId, block });
+          ctx.pendingContent.get(slotId).push({ blockId, block });
         } else {
           if (!ctx.pendingContent.has('default')) {
             ctx.pendingContent.set('default', []);
@@ -12159,7 +12895,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
     ctx.template = template;
   }
 
-  const { template, emittedPlaceholders, pendingContent, leadingStandaloneBlocks, trailingStandaloneBlocks, existingFixedBlockIds } = ctx;
+  const { template, emittedSlotIds, pendingContent, leadingStandaloneBlocks, trailingStandaloneBlocks, existingFixedBlockIds } = ctx;
 
   // Process template (same as async version from here)
   const templateLayout = template.blocks_layout?.items || [];
@@ -12169,17 +12905,17 @@ export function expandTemplatesSync(inputItems, options = {}) {
 
   for (let i = 0; i < templateLayout.length; i++) {
     const tplBlock = template.blocks?.[templateLayout[i]];
-    if (!tplBlock?.placeholder) continue;
+    if (!tplBlock?.slotId) continue;
     if (tplBlock.fixed) {
       if (firstFixedIndex === -1) firstFixedIndex = i;
       lastFixedIndex = i;
     } else {
       if (firstFixedIndex === -1) {
-        slotPositions[tplBlock.placeholder] = 'top';
+        slotPositions[tplBlock.slotId] = 'top';
       } else if (i > lastFixedIndex) {
-        slotPositions[tplBlock.placeholder] = 'bottom';
+        slotPositions[tplBlock.slotId] = 'bottom';
       } else {
-        slotPositions[tplBlock.placeholder] = 'middle';
+        slotPositions[tplBlock.slotId] = 'middle';
       }
     }
   }
@@ -12197,8 +12933,8 @@ export function expandTemplatesSync(inputItems, options = {}) {
     if (!tplBlock) continue;
 
     if (tplBlock.fixed) {
-      const placeholder = tplBlock.placeholder;
-      const existing = placeholder && existingFixedBlockIds?.get(placeholder);
+      const slotId = tplBlock.slotId;
+      const existing = slotId && existingFixedBlockIds?.get(slotId);
       const blockId = existing?.blockId
         ? existing.blockId
         : (uuidGenerator ? uuidGenerator() : `${instanceId}::${tplBlockId}`);
@@ -12208,23 +12944,23 @@ export function expandTemplatesSync(inputItems, options = {}) {
         blockContent = { ...tplBlock, value: existing.block.value };
       }
 
-      // Look ahead in template layout for the next non-fixed placeholder at this level.
-      // This preserves placeholder info even when all placeholder blocks are deleted.
+      // Look ahead in template layout for the next non-fixed slot at this level.
+      // This preserves slot info even when all slot blocks are deleted.
       const tplIdx = templateLayout.indexOf(tplBlockId);
-      let nextPlaceholder = undefined;
+      let nextSlotId = undefined;
       for (let i = tplIdx + 1; i < templateLayout.length; i++) {
         const nextTplBlock = template.blocks?.[templateLayout[i]];
-        if (nextTplBlock && !nextTplBlock.fixed && nextTplBlock.placeholder) {
-          nextPlaceholder = nextTplBlock.placeholder;
+        if (nextTplBlock && !nextTplBlock.fixed && nextTplBlock.slotId) {
+          nextSlotId = nextTplBlock.slotId;
           break;
         }
         if (nextTplBlock?.fixed) break; // Stop at next fixed block
       }
 
       // For container blocks, filter nested blocks to only those with template markers
-      // (placeholder or templateId). Blocks without these are template-internal details
-      // that should not be synced to pages. Also compute childPlaceholders.
-      let childPlaceholders = undefined;
+      // (slotId or templateId). Blocks without these are template-internal details
+      // that should not be synced to pages. Also compute childSlotIds.
+      let childSlotIds = undefined;
       let filteredBlocks = blockContent.blocks;
       let filteredLayout = blockContent.blocks_layout;
       if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
@@ -12234,12 +12970,12 @@ export function expandTemplatesSync(inputItems, options = {}) {
         for (const nestedId of nestedLayout) {
           const nested = tplBlock.blocks[nestedId];
           if (!nested) continue;
-          if (nested.placeholder || nested.templateId) {
+          if (nested.slotId || nested.templateId) {
             newNestedBlocks[nestedId] = nested;
             newNestedLayout.push(nestedId);
-            if (!nested.fixed && nested.placeholder) {
-              if (!childPlaceholders) childPlaceholders = {};
-              if (!childPlaceholders['blocks']) childPlaceholders['blocks'] = nested.placeholder;
+            if (!nested.fixed && nested.slotId) {
+              if (!childSlotIds) childSlotIds = {};
+              if (!childSlotIds['blocks']) childSlotIds['blocks'] = nested.slotId;
             }
           }
         }
@@ -12254,8 +12990,8 @@ export function expandTemplatesSync(inputItems, options = {}) {
           blocks_layout: filteredLayout,
           templateId: templateId,
           templateInstanceId: instanceId,
-          ...(nextPlaceholder && { nextPlaceholder }),
-          ...(childPlaceholders && { childPlaceholders }),
+          ...(nextSlotId && { nextSlotId }),
+          ...(childSlotIds && { childSlotIds }),
         },
         blockId
       );
@@ -12279,48 +13015,48 @@ export function expandTemplatesSync(inputItems, options = {}) {
         }
       }
     } else {
-      const placeholder = tplBlock.placeholder || 'default';
+      const slotId = tplBlock.slotId || 'default';
       const insertIndex = items.length;
 
-      if (placeholder === 'default') {
+      if (slotId === 'default') {
         defaultInsertIndex = insertIndex;
       }
-      const position = slotPositions[placeholder];
+      const position = slotPositions[slotId];
       if (position === 'bottom' && bottomSlotInsertIndex === -1) {
         bottomSlotInsertIndex = insertIndex;
       } else if (position === 'top' && topSlotInsertIndex === -1) {
         topSlotInsertIndex = insertIndex;
       }
 
-      if (!emittedPlaceholders.has(placeholder)) {
-        emittedPlaceholders.add(placeholder);
-        const content = pendingContent.get(placeholder) || [];
+      if (!emittedSlotIds.has(slotId)) {
+        emittedSlotIds.add(slotId);
+        const content = pendingContent.get(slotId) || [];
         for (const { blockId, block } of content) {
           addItem(
             {
               ...block,
               templateId: templateId,
               templateInstanceId: instanceId,
-              placeholder: placeholder,
+              slotId: slotId,
             },
             blockId
           );
         }
-        pendingContent.delete(placeholder);
+        pendingContent.delete(slotId);
       }
     }
   }
 
   const remainingContent = [];
-  for (const [placeholder, content] of pendingContent) {
-    if (!emittedPlaceholders.has(placeholder)) {
-      emittedPlaceholders.add(placeholder);
+  for (const [slotId, content] of pendingContent) {
+    if (!emittedSlotIds.has(slotId)) {
+      emittedSlotIds.add(slotId);
       for (const { blockId, block } of content) {
         remainingContent.push({
           ...block,
           templateId: templateId,
           templateInstanceId: instanceId,
-          placeholder: 'default',
+          slotId: 'default',
           _orphaned: true,
           '@uid': blockId,
         });
@@ -12352,11 +13088,11 @@ export function expandTemplatesSync(inputItems, options = {}) {
     for (const item of items) {
       delete item.templateId;
       delete item.templateInstanceId;
-      delete item.placeholder;
+      delete item.slotId;
       delete item.fixed;
       delete item.readOnly;
-      delete item.nextPlaceholder;
-      delete item.childPlaceholders;
+      delete item.nextSlotId;
+      delete item.childSlotIds;
       delete item._orphaned;
     }
   }

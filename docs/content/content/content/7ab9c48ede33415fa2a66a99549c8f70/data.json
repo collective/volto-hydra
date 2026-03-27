@@ -199,14 +199,6 @@
             }
           ],
           "type": "h2"
-        },
-        {
-          "children": [
-            {
-              "text": "Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. "
-            }
-          ],
-          "type": "p"
         }
       ]
     },
@@ -624,6 +616,19 @@
           "type": "p"
         }
       ]
+    },
+    "441b2392-e6e4-4ef6-b8c5-f20f2ad236c6-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "Lorem ipsum dolor sit amet adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. "
+            }
+          ],
+          "type": "p"
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -632,6 +637,7 @@
       "7c36a063-bd02-487b-b49a-fcbf1b00fbda",
       "4ee2efb5-8180-41ec-90df-d8b9462bdd2a",
       "441b2392-e6e4-4ef6-b8c5-f20f2ad236c6",
+      "441b2392-e6e4-4ef6-b8c5-f20f2ad236c6-split-1",
       "bcfce434-1072-4162-aa44-269f1ef07936",
       "7624cf59-05d0-4055-8f55-5fd6597d84b0",
       "c053b9ef-3446-4b6c-8de5-05b25b89d658",

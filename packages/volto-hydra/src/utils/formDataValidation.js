@@ -272,11 +272,11 @@ export function validateAndLog(formData, source, blockFieldTypes = {}) {
 // ============================================================================
 
 /**
- * Validate template placeholder structure.
+ * Validate template slot structure.
  *
  * Rules:
- * 1. Blocks with the same placeholder must be adjacent (contiguous)
- * 2. Different placeholder groups must be separated by a fixed block
+ * 1. Blocks with the same slotId must be adjacent (contiguous)
+ * 2. Different slot groups must be separated by a fixed block
  *
  * @param {Object} formData - Page data with blocks and blocks_layout
  * @returns {{ valid: boolean, blocksErrors: Object }} Validation result with Volto-compatible blocksErrors
@@ -286,9 +286,9 @@ export function validateTemplatePlaceholders(formData) {
   const layout = formData.blocks_layout?.items || [];
   const blocks = formData.blocks || {};
 
-  // Track placeholder groups and their positions
-  const placeholderGroups = new Map(); // placeholder -> [{ blockId, index }]
-  let lastPlaceholder = null;
+  // Track slot groups and their positions
+  const slotGroups = new Map(); // slotId -> [{ blockId, index }]
+  let lastSlotId = null;
 
   for (let i = 0; i < layout.length; i++) {
     const blockId = layout[i];
@@ -296,35 +296,35 @@ export function validateTemplatePlaceholders(formData) {
     const isFixed = block?.fixed === true;
 
     if (isFixed) {
-      lastPlaceholder = null; // Reset - fixed block separates groups
+      lastSlotId = null; // Reset - fixed block separates groups
       continue;
     }
 
-    const placeholder = block?.placeholder;
-    if (!placeholder) continue;
+    const slotId = block?.slotId;
+    if (!slotId) continue;
 
     // Track for contiguity check
-    if (!placeholderGroups.has(placeholder)) {
-      placeholderGroups.set(placeholder, []);
+    if (!slotGroups.has(slotId)) {
+      slotGroups.set(slotId, []);
     }
-    placeholderGroups.get(placeholder).push({ blockId, index: i });
+    slotGroups.get(slotId).push({ blockId, index: i });
 
-    // Check: different placeholder groups adjacent without fixed block between
-    if (lastPlaceholder !== null && lastPlaceholder !== placeholder) {
-      // We transitioned from one placeholder group to another without a fixed block
+    // Check: different slot groups adjacent without fixed block between
+    if (lastSlotId !== null && lastSlotId !== slotId) {
+      // We transitioned from one slot group to another without a fixed block
       blocksErrors[blockId] = {
         _layout: {
           title: 'Missing Fixed Block',
-          message: `Placeholder groups "${lastPlaceholder}" and "${placeholder}" must be separated by a fixed block.`,
+          message: `Slot groups "${lastSlotId}" and "${slotId}" must be separated by a fixed block.`,
         },
       };
     }
 
-    lastPlaceholder = placeholder;
+    lastSlotId = slotId;
   }
 
-  // Check: same placeholder blocks must be contiguous
-  for (const [placeholder, entries] of placeholderGroups) {
+  // Check: same slotId blocks must be contiguous
+  for (const [slotId, entries] of slotGroups) {
     if (entries.length > 1) {
       for (let i = 1; i < entries.length; i++) {
         if (entries[i].index !== entries[i - 1].index + 1) {
@@ -335,7 +335,7 @@ export function validateTemplatePlaceholders(formData) {
             blocksErrors[blockId] = {
               _layout: {
                 title: 'Placeholder Position',
-                message: `This placeholder block is not adjacent to others in the "${placeholder}" group. Move this block or the previous one to make them contiguous.`,
+                message: `This slot block is not adjacent to others in the "${slotId}" group. Move this block or the previous one to make them contiguous.`,
               },
             };
           }

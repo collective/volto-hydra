@@ -12,7 +12,7 @@
       "readOnly": true,
       "templateId": "resolveuid/header-footer-layout-uid",
       "templateInstanceId": "header-footer-def-instance",
-      "placeholder": "header",
+      "slotId": "header",
       "value": [
         {
           "type": "h1",
@@ -25,14 +25,14 @@
       "@type": "slate",
       "templateId": "resolveuid/header-footer-layout-uid",
       "templateInstanceId": "header-footer-def-instance",
-      "placeholder": "default",
+      "slotId": "default",
       "value": [
         {
           "type": "p",
-          "children": [{ "text": "" }]
+          "children": [{ "text": "Add your content here" }]
         }
       ],
-      "plaintext": ""
+      "plaintext": "Add your content here"
     },
     "fixed-footer": {
       "@type": "slate",
@@ -40,7 +40,7 @@
       "readOnly": true,
       "templateId": "resolveuid/header-footer-layout-uid",
       "templateInstanceId": "header-footer-def-instance",
-      "placeholder": "footer",
+      "slotId": "footer",
       "value": [
         {
           "type": "p",
