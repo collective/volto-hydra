@@ -1079,38 +1079,23 @@ export class Bridge {
       this._skipZwsNode('forward');
       if (!this.handleDeleteKey(blockId, 'Delete')) {
         if (!this.preserveLastCharDelete()) {
-          // Use Range API to delete one character forward.
+          // Delete one character forward using Range API.
+          // _skipZwsNode already moved cursor past empty/ZWS nodes to a real
+          // text node (handles both text nodes and Element nodes on Firefox).
           const sel = window.getSelection();
-          if (sel?.isCollapsed) {
-            let targetNode = sel.focusNode;
-            let targetOffset = sel.focusOffset;
-            // Firefox may leave cursor on an Element node (e.g., empty <span>).
-            // Walk forward to find the nearest text node.
-            if (targetNode?.nodeType !== Node.TEXT_NODE) {
-              const walker = document.createTreeWalker(
-                editableField || targetNode,
-                NodeFilter.SHOW_TEXT,
-              );
-              walker.currentNode = targetNode;
-              const nextText = walker.nextNode();
-              if (nextText) {
-                targetNode = nextText;
-                targetOffset = 0;
-              }
+          if (sel?.isCollapsed && sel.focusNode?.nodeType === Node.TEXT_NODE) {
+            const text = sel.focusNode.textContent || '';
+            let offset = sel.focusOffset;
+            // Skip any remaining ZWS/BOM at cursor position
+            while (offset < text.length &&
+              (text[offset] === '\uFEFF' || text[offset] === '\u200B')) {
+              offset++;
             }
-            if (targetNode?.nodeType === Node.TEXT_NODE) {
-              const text = targetNode.textContent || '';
-              // Skip ZWS/BOM at cursor position
-              while (targetOffset < text.length &&
-                (text[targetOffset] === '\uFEFF' || text[targetOffset] === '\u200B')) {
-                targetOffset++;
-              }
-              if (targetOffset < text.length) {
-                const range = document.createRange();
-                range.setStart(targetNode, targetOffset);
-                range.setEnd(targetNode, targetOffset + 1);
-                range.deleteContents();
-              }
+            if (offset < text.length) {
+              const range = document.createRange();
+              range.setStart(sel.focusNode, offset);
+              range.setEnd(sel.focusNode, offset + 1);
+              range.deleteContents();
             }
           }
         }
@@ -1135,33 +1120,34 @@ export class Bridge {
   }
 
   /**
-   * If the cursor is inside a ZWS/BOM-only text node, move it out in the
-   * given direction. This prevents arrow keys, Delete, and Backspace from
-   * "wasting" a move on an invisible character.
+   * If the cursor is on a ZWS/BOM-only text node or an empty Element (Firefox),
+   * move it to the nearest visible text node in the given direction.
+   * Prevents arrow keys, Delete, and Backspace from acting on invisible content.
    */
   _skipZwsNode(direction) {
     const sel = window.getSelection();
-    if (!sel?.focusNode || sel.focusNode.nodeType !== Node.TEXT_NODE) return;
-    const text = sel.focusNode.textContent?.replace(/[\uFEFF\u200B]/g, '');
-    if (text === '') {
-      // Cursor is in a ZWS-only node. Instead of using sel.modify (which
-      // may overshoot by landing after the first char of the next node),
-      // find the adjacent visible text node and set cursor at its edge.
-      // Walk from the contenteditable root (not the immediate parent) so
-      // we can find text nodes across element boundaries.
-      const root = sel.focusNode.closest?.('[contenteditable="true"]')
-        || sel.focusNode.parentElement?.closest?.('[contenteditable="true"]')
-        || document.body;
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-      walker.currentNode = sel.focusNode;
-      const target = direction === 'forward' ? walker.nextNode() : walker.previousNode();
-      if (target) {
-        const range = document.createRange();
-        range.setStart(target, direction === 'forward' ? 0 : target.textContent.length);
-        range.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
+    if (!sel?.focusNode) return;
+
+    const node = sel.focusNode;
+    const isEmptyElement = node.nodeType !== Node.TEXT_NODE &&
+      this.stripZeroWidthSpaces(node.textContent || '') === '';
+    const isZwsText = node.nodeType === Node.TEXT_NODE &&
+      (node.textContent?.replace(/[\uFEFF\u200B]/g, '') === '');
+
+    if (!isEmptyElement && !isZwsText) return;
+
+    // Walk from contenteditable root to find text across element boundaries
+    const root = (node instanceof Element ? node : node.parentElement)
+      ?.closest?.('[contenteditable="true"]') || document.body;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    walker.currentNode = node;
+    const target = direction === 'forward' ? walker.nextNode() : walker.previousNode();
+    if (target) {
+      const range = document.createRange();
+      range.setStart(target, direction === 'forward' ? 0 : target.textContent.length);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
     }
   }
 
@@ -1260,10 +1246,7 @@ export class Bridge {
 
             if (textBeforeInEl === '') {
               // Check if there's content before this element (not the first node in the field)
-              const fieldRange = document.createRange();
-              fieldRange.setStart(editField, 0);
-              fieldRange.setEnd(range.startContainer, range.startOffset);
-              const textBeforeInField = this.stripZeroWidthSpaces(fieldRange.toString());
+              const textBeforeInField = this.getFieldTextAroundCursor(range, editField, 'before');
 
               if (textBeforeInField !== '') {
                 // Interior element boundary — send as delete transform for Slate to handle
@@ -1333,10 +1316,7 @@ export class Bridge {
     const editFieldForEnd = (node.nodeType === Node.TEXT_NODE ? node.parentElement : node)?.closest('[data-edit-text]');
     let atEnd = false;
     if (editFieldForEnd && range.startOffset === (node.textContent?.length ?? node.length ?? 0)) {
-      const afterRange = document.createRange();
-      afterRange.setStart(range.endContainer, range.endOffset);
-      afterRange.setEnd(editFieldForEnd, editFieldForEnd.childNodes.length);
-      atEnd = this.stripZeroWidthSpaces(afterRange.toString()) === '';
+      atEnd = this.getFieldTextAroundCursor(range, editFieldForEnd, 'after') === '';
     }
 
     if ((key === 'Backspace' && atStart) || (key === 'Delete' && atEnd)) {
@@ -1353,6 +1333,26 @@ export class Bridge {
     }
 
     return false;
+  }
+
+  /**
+   * Check if there's real text content before or after the cursor in the field.
+   * Used by handleDeleteKey to distinguish block boundaries from interior positions.
+   * @param {Range} range - current selection range
+   * @param {HTMLElement} editField - the [data-edit-text] field element
+   * @param {'before'|'after'} direction - check text before or after cursor
+   * @returns {string} stripped text content (empty = at boundary)
+   */
+  getFieldTextAroundCursor(range, editField, direction) {
+    const fieldRange = document.createRange();
+    if (direction === 'before') {
+      fieldRange.setStart(editField, 0);
+      fieldRange.setEnd(range.startContainer, range.startOffset);
+    } else {
+      fieldRange.setStart(range.endContainer, range.endOffset);
+      fieldRange.setEnd(editField, editField.childNodes.length);
+    }
+    return this.stripZeroWidthSpaces(fieldRange.toString());
   }
 
   /**
