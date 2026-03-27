@@ -1130,12 +1130,20 @@ export class Bridge {
       return true;
     }
 
-    // Space may trigger markdown — check via shared handler
+    // Space: check markdown first, then insert as text
     if (key === ' ' && !hasMod) {
       if (this.handleSpaceKey(blockId)) {
-        return true; // markdown transform sent, caller should check blockedBlockId
+        return true; // markdown transform sent
       }
-      document.execCommand('insertText', false, ' ');
+      // Fall through to text insertion
+    }
+
+    // Text character (including space without markdown)
+    // Run the same preprocessing as the live keydown handler, then insert.
+    if (key?.length === 1 && !hasMod) {
+      this.correctInvalidWhitespaceSelection();
+      this.ensureValidInsertionTarget();
+      this._insertTextAtCursor(key, editableField);
       return true;
     }
 
@@ -1187,9 +1195,14 @@ export class Bridge {
       return true;
     }
 
-    // Text character — insert only when no modifier held
-    if (key.length === 1 && !hasMod) {
-      document.execCommand('insertText', false, key);
+    // Keys needing full field context (Enter→split, Tab→indent)
+    // Call the field keydown handler directly instead of synthetic event dispatch
+    if (key === 'Enter' || key === 'Tab') {
+      const syntheticEvt = new KeyboardEvent('keydown', {
+        key, code: evt.code, shiftKey, ctrlKey, metaKey,
+        altKey: evt.altKey, bubbles: true, cancelable: true,
+      });
+      this._handleFieldKeydown(syntheticEvt, blockId, editableField);
       return true;
     }
 
@@ -1286,6 +1299,52 @@ export class Bridge {
    * @param {string} key - 'Backspace' or 'Delete'
    * @returns {boolean} true if handled (caller should preventDefault / skip native action)
    */
+  /**
+   * Insert text at the current cursor position using Range API.
+   * Handles NBSP conversion for spaces, ZWS cleanup, and triggers
+   * handleTextChange. Used by replayOneKey for all text insertion.
+   */
+  _insertTextAtCursor(text, editableField) {
+    const sel = window.getSelection();
+    if (!sel?.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) range.deleteContents();
+
+    // NBSP for spaces to prevent CSS whitespace collapse in inline elements.
+    // handleTextChange converts NBSP back to regular space in the model.
+    const insertionText = text.replace(/^ /, '\u00A0').replace(/ $/, '\u00A0');
+    const textNode = document.createTextNode(insertionText);
+    range.insertNode(textNode);
+
+    // Clean up adjacent ZWS/BOM nodes (left by restoreSlateSelection)
+    const parent = textNode.parentNode;
+    if (parent) {
+      for (const sibling of [...parent.childNodes]) {
+        if (sibling !== textNode && sibling.nodeType === Node.TEXT_NODE &&
+            sibling.textContent.replace(/[\uFEFF\u200B]/g, '') === '') {
+          sibling.remove();
+        }
+      }
+    }
+
+    // Position cursor after inserted text
+    range.setStart(textNode, textNode.length);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    this.prospectiveInlineElement = null;
+
+    // Trigger handleTextChange — insertNode creates childList mutation
+    // but MutationObserver only watches characterData
+    if (editableField) {
+      const editField = editableField.closest?.('[data-edit-text]') || editableField;
+      if (this.isInlineEditing) {
+        this.handleTextChange(editField, textNode.parentElement, textNode);
+      }
+    }
+  }
+
   /**
    * Get the nearest Element from a node (returns node itself if Element,
    * or parentElement if text node). Used for closest() lookups.
@@ -2992,127 +3051,23 @@ export class Bridge {
 
     this.pendingBufferReplay = null;
 
-    // Helper: insert accumulated text using Selection API
-    const insertText = (text) => {
-      // Ensure cursor is inside a data-node-id element, not on Vue/Nuxt
-      // template whitespace. After a transform, the framework may re-render
-      // and leave the cursor on whitespace outside the content element.
-      this.correctInvalidWhitespaceSelection();
-
-      const selection = window.getSelection();
-      if (!selection || !selection.rangeCount) return;
-      const range = selection.getRangeAt(0);
-
-      if (!range.collapsed) {
-        range.deleteContents();
-      }
-
-      // Prevent CSS whitespace collapse: replace leading/trailing spaces with
-      // NBSP. Browsers do this automatically for native typing, but
-      // range.insertNode with a raw text node doesn't get that fixup.
-      // handleTextChange's stripZeroWidthSpaces converts NBSP back to regular
-      // space when building the Slate data, so this doesn't leak into the model.
-      let insertionText = text.replace(/^ /, '\u00A0').replace(/ $/, '\u00A0');
-
-      const textNode = document.createTextNode(insertionText);
-      range.insertNode(textNode);
-
-      // Clean up ZWS text nodes left by restoreSlateSelection's ensureZwsPosition
-      const parentEl = textNode.parentNode;
-      if (parentEl) {
-        for (const sibling of [...parentEl.childNodes]) {
-          if (sibling !== textNode && sibling.nodeType === Node.TEXT_NODE) {
-            const cleaned = sibling.textContent.replace(/[\uFEFF\u200B]/g, '');
-            if (cleaned === '') {
-              sibling.remove();
-            }
-          }
-        }
-      }
-
-      // Position cursor inside the text node (not after it) to prevent
-      // browser text-node normalization on next keystroke
-      range.setStart(textNode, textNode.textContent.length);
-      range.setEnd(textNode, textNode.textContent.length);
-      selection.removeAllRanges();
-      selection.addRange(range);
-
-      log('[HYDRA-DEBUG] insertText:', JSON.stringify(text), 'parent:', textNode.parentElement?.tagName, 'nodeId:', textNode.parentElement?.getAttribute('data-node-id'));
-      log('Inserted buffered text:', text);
-
-      this.prospectiveInlineElement = null;
-
-      // Manually trigger text change handler since insertNode creates a
-      // childList mutation but our MutationObserver only watches characterData
-      const editableField = currentEditable.closest('[data-edit-text]') || currentEditable;
-      if (editableField && this.isInlineEditing) {
-        this.handleTextChange(editableField, textNode.parentElement, textNode);
-      }
-    };
-
-    // Helper: replay a non-text key.
-    // Known native actions (Backspace, Delete, navigation, Ctrl+A) are executed
-    // directly — synthetic KeyboardEvents are untrusted and browsers won't
-    // perform native actions from them.
-    // Unknown keys are dispatched as synthetic keydown so our keydown handler
-    // can process them (e.g. Enter→split, Tab→indent set blockedBlockId).
-    const replayKey = (evt) => {
-      log('Replaying buffered key:', evt.key || evt._type, { ctrl: evt.ctrlKey, meta: evt.metaKey, shift: evt.shiftKey });
-
-      if (this.replayOneKey(blockId, evt, currentEditable)) {
-        return;
-      }
-
-      // Unknown keys — dispatch synthetic event for our keydown handler
-      // (e.g. Enter→split, Tab→indent which set blockedBlockId)
-      const syntheticEvent = new KeyboardEvent('keydown', {
-        key: evt.key,
-        code: evt.code,
-        shiftKey: evt.shiftKey,
-        ctrlKey: evt.ctrlKey,
-        metaKey: evt.metaKey,
-        altKey: evt.altKey,
-        bubbles: true,
-        cancelable: true,
-      });
-      currentEditable.dispatchEvent(syntheticEvent);
-    };
-
-    // Process buffer events sequentially to preserve ordering.
-    // If a replayed event triggers a new transform (e.g. Enter→split,
-    // Tab→indent), stop and save remaining events for the next replay cycle.
     // Clear blockedBlockId so the capture-phase blocker doesn't interfere;
     // if a replayed event starts a new transform, blockedBlockId gets re-set.
     const savedBlockedId = this.blockedBlockId;
     this.blockedBlockId = null;
 
-    // Batch consecutive text characters for efficiency (one insertText call
-    // instead of one per character). Flush before any non-text event.
-    let textBatch = '';
     for (let i = 0; i < buffer.length; i++) {
       // A replayed event started a new transform — save remainder for next cycle
       if (this.blockedBlockId) {
-        if (textBatch) { insertText(textBatch); textBatch = ''; }
         this._replayRemainder = buffer.slice(i);
         log('Replay interrupted by transform, saved', this._replayRemainder.length, 'events for next cycle');
         break;
       }
 
       const evt = buffer[i];
-      const isTextChar = evt.key?.length === 1 && !evt.ctrlKey && !evt.metaKey && evt.key !== ' ';
+      log('Replaying buffered key:', evt.key || evt._type, { ctrl: evt.ctrlKey, meta: evt.metaKey, shift: evt.shiftKey });
 
-      if (isTextChar) {
-        textBatch += evt.key;
-      } else {
-        // Flush text batch before any non-text event
-        if (textBatch) { insertText(textBatch); textBatch = ''; }
-        replayKey(evt);
-      }
-    }
-
-    // Flush remaining text batch
-    if (textBatch && !this.blockedBlockId) {
-      insertText(textBatch);
+      this.replayOneKey(blockId, evt, currentEditable);
     }
 
     // Restore blockedBlockId if no replayed event started a new transform.
@@ -3634,7 +3589,17 @@ export class Bridge {
             return false;
           }
         }
-        if (current.hasAttribute?.('data-edit-text')) break;
+        if (current.hasAttribute?.('data-edit-text')) {
+          // Before giving up, check if the field itself has visible content.
+          // A space inside an empty inline (e.g. bold span) is still valid
+          // content if the surrounding field has text — the user typed it.
+          const fieldText = this.stripZeroWidthSpaces(current.textContent);
+          if (fieldText.trim() !== '') {
+            log('ensureValidInsertionTarget: skipping, field has content:', fieldText.substring(0, 30));
+            return false;
+          }
+          break;
+        }
       }
       current = current.parentNode;
     }
