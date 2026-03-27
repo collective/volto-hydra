@@ -1069,7 +1069,77 @@ export class Bridge {
    * cursor movement. Used by buffer replay and testable independently.
    * @returns {boolean} true if handled
    */
-  replayOneKey(blockId, key, editableField, shiftKey = false) {
+  replayOneKey(blockId, evt, editableField) {
+    const { key, shiftKey = false, ctrlKey = false, metaKey = false } = evt;
+    const hasMod = ctrlKey || metaKey;
+
+    // Paste (Ctrl+V with stored clipboard data)
+    if (evt._type === 'paste' || (hasMod && key?.toLowerCase() === 'v')) {
+      if (evt.html) this._doPaste(blockId, evt.html);
+      return true;
+    }
+
+    // Format hotkeys (Ctrl+B, Ctrl+I, etc.)
+    if (hasMod && this.slateConfig?.hotkeys) {
+      for (const [shortcut, config] of Object.entries(this.slateConfig.hotkeys)) {
+        const parts = shortcut.toLowerCase().split('+');
+        const hasmod = parts.includes('mod');
+        const hasShift = parts.includes('shift');
+        const hasAlt = parts.includes('alt');
+        const hotkey = parts[parts.length - 1];
+        if ((hasmod ? hasMod : true) &&
+            (hasShift ? shiftKey : !shiftKey) &&
+            (hasAlt ? evt.altKey : !evt.altKey) &&
+            key?.toLowerCase() === hotkey && config.type === 'inline') {
+          log('Replaying format hotkey:', config.format);
+          this.sendTransformRequest(blockId, 'format', { format: config.format });
+          return true;
+        }
+      }
+    }
+
+    // Modifier shortcuts
+    if (hasMod && key?.toLowerCase() === 'a') {
+      // Select all — use text node endpoints to avoid correctInvalidWhitespaceSelection
+      const sel = window.getSelection();
+      if (sel && editableField) {
+        const walker = document.createTreeWalker(editableField, NodeFilter.SHOW_TEXT);
+        const firstText = walker.firstChild();
+        let lastText = firstText;
+        while (walker.nextNode()) lastText = walker.currentNode;
+        if (firstText && lastText) {
+          const range = document.createRange();
+          range.setStart(firstText, 0);
+          range.setEnd(lastText, lastText.length);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+      return true;
+    }
+    if (hasMod && key.toLowerCase() === 'c') {
+      document.execCommand('copy');
+      return true;
+    }
+    if (hasMod && key.toLowerCase() === 'x') {
+      this._doCut(blockId);
+      return true;
+    }
+    if (hasMod && key.toLowerCase() === 'z') {
+      // Undo/redo — not replayable, skip
+      return true;
+    }
+
+    // Space may trigger markdown — check via shared handler
+    if (key === ' ' && !hasMod) {
+      if (this.handleSpaceKey(blockId)) {
+        return true; // markdown transform sent, caller should check blockedBlockId
+      }
+      document.execCommand('insertText', false, ' ');
+      return true;
+    }
+
+    // Delete keys
     if (key === 'Backspace') {
       if (!this.handleDeleteKey(blockId, 'Backspace')) {
         if (!this.preserveLastCharDelete()) {
@@ -1082,14 +1152,10 @@ export class Bridge {
       this._skipZwsNode('forward');
       if (!this.handleDeleteKey(blockId, 'Delete')) {
         if (!this.preserveLastCharDelete()) {
-          // Delete one character forward using Range API.
-          // _skipZwsNode already moved cursor past empty/ZWS nodes to a real
-          // text node (handles both text nodes and Element nodes on Firefox).
           const sel = window.getSelection();
           if (sel?.isCollapsed && sel.focusNode?.nodeType === Node.TEXT_NODE) {
             const text = sel.focusNode.textContent || '';
             let offset = sel.focusOffset;
-            // Skip any remaining ZWS/BOM at cursor position
             while (offset < text.length &&
               (text[offset] === '\uFEFF' || text[offset] === '\u200B')) {
               offset++;
@@ -1105,6 +1171,8 @@ export class Bridge {
       }
       return true;
     }
+
+    // Navigation keys
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
       this.moveArrowKey(key, editableField, shiftKey);
       return true;
@@ -1114,16 +1182,17 @@ export class Bridge {
       if (sel) {
         const dir = key === 'Home' ? 'backward' : 'forward';
         sel.modify(shiftKey ? 'extend' : 'move', dir, 'lineboundary');
-        // Skip ZWS at line boundary
         this._skipZwsNode(dir === 'backward' ? 'forward' : 'backward');
       }
       return true;
     }
-    // Text character — insert into contenteditable
-    if (key.length === 1) {
+
+    // Text character — insert only when no modifier held
+    if (key.length === 1 && !hasMod) {
       document.execCommand('insertText', false, key);
       return true;
     }
+
     return false;
   }
 
@@ -2754,6 +2823,12 @@ export class Bridge {
       }
 
       if (e.type === 'keydown') {
+        // Skip modifier-only keys — they don't produce actions on their own
+        if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
         // Paste (Cmd+V): read clipboard data now while we have user gesture
         // context, store in buffer entry for replay. The async read completes
         // well before the transform finishes and replay starts.
@@ -2917,35 +2992,6 @@ export class Bridge {
 
     this.pendingBufferReplay = null;
 
-    // Navigation key → selection.modify() mapping
-    const navMap = {
-      ArrowLeft: ['backward', 'character'],
-      ArrowRight: ['forward', 'character'],
-      ArrowUp: ['backward', 'line'],
-      ArrowDown: ['forward', 'line'],
-      Home: ['backward', 'lineboundary'],
-      End: ['forward', 'lineboundary'],
-    };
-
-    // Helper: detect format hotkey from a buffered event
-    const getFormatFromHotkey = (evt) => {
-      if (!(evt.ctrlKey || evt.metaKey) || !this.slateConfig?.hotkeys) return null;
-      for (const [shortcut, config] of Object.entries(this.slateConfig.hotkeys)) {
-        const parts = shortcut.toLowerCase().split('+');
-        const hasmod = parts.includes('mod');
-        const hasShift = parts.includes('shift');
-        const hasAlt = parts.includes('alt');
-        const key = parts[parts.length - 1];
-        if ((hasmod ? (evt.ctrlKey || evt.metaKey) : true) &&
-            (hasShift ? evt.shiftKey : !evt.shiftKey) &&
-            (hasAlt ? evt.altKey : !evt.altKey) &&
-            evt.key.toLowerCase() === key && config.type === 'inline') {
-          return config.format;
-        }
-      }
-      return null;
-    };
-
     // Helper: insert accumulated text using Selection API
     const insertText = (text) => {
       // Ensure cursor is inside a data-node-id element, not on Vue/Nuxt
@@ -3011,61 +3057,14 @@ export class Bridge {
     // Unknown keys are dispatched as synthetic keydown so our keydown handler
     // can process them (e.g. Enter→split, Tab→indent set blockedBlockId).
     const replayKey = (evt) => {
-      log('Replaying buffered key:', evt.key, { ctrl: evt.ctrlKey, meta: evt.metaKey, shift: evt.shiftKey });
+      log('Replaying buffered key:', evt.key || evt._type, { ctrl: evt.ctrlKey, meta: evt.metaKey, shift: evt.shiftKey });
 
-      // Try replayOneKey for Backspace, Delete, arrows, Home, End
-      if (this.replayOneKey(blockId, evt.key, currentEditable, evt.shiftKey)) {
-        return;
-      }
-      if (navMap[evt.key]) {
-        const sel = window.getSelection();
-        if (sel) {
-          const alter = evt.shiftKey ? 'extend' : 'move';
-          sel.modify(alter, navMap[evt.key][0], navMap[evt.key][1]);
-        }
-        return;
-      }
-      if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'a') {
-        const sel = window.getSelection();
-        if (sel && currentEditable) {
-          // Use text node endpoints instead of selectNodeContents on the container,
-          // because the selectionchange listener's correctInvalidWhitespaceSelection
-          // treats selections anchored on the data-edit-text container as invalid
-          // (since the container has data-node-id children) and "corrects" them.
-          const walker = document.createTreeWalker(currentEditable, NodeFilter.SHOW_TEXT);
-          const firstText = walker.firstChild();
-          let lastText = firstText;
-          while (walker.nextNode()) lastText = walker.currentNode;
-          if (firstText && lastText) {
-            const range = document.createRange();
-            range.setStart(firstText, 0);
-            range.setEnd(lastText, lastText.length);
-            sel.removeAllRanges();
-            sel.addRange(range);
-          } else {
-            // Fallback: no text nodes, use selectNodeContents
-            const range = document.createRange();
-            range.selectNodeContents(currentEditable);
-            sel.removeAllRanges();
-            sel.addRange(range);
-          }
-          log('Ctrl+A replay: selection set to:', JSON.stringify(sel.toString()), 'on', currentEditable.tagName, currentEditable.getAttribute('data-edit-text'));
-        }
-        return;
-      }
-
-      // Copy: execCommand triggers trusted copy event → _doCopy cleans clipboard
-      if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'c') {
-        document.execCommand('copy');
-        return;
-      }
-      // Cut: copy cleaned selection + delete via transform
-      if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'x') {
-        this._doCut(blockId);
+      if (this.replayOneKey(blockId, evt, currentEditable)) {
         return;
       }
 
       // Unknown keys — dispatch synthetic event for our keydown handler
+      // (e.g. Enter→split, Tab→indent which set blockedBlockId)
       const syntheticEvent = new KeyboardEvent('keydown', {
         key: evt.key,
         code: evt.code,
@@ -3087,68 +3086,31 @@ export class Bridge {
     const savedBlockedId = this.blockedBlockId;
     this.blockedBlockId = null;
 
+    // Batch consecutive text characters for efficiency (one insertText call
+    // instead of one per character). Flush before any non-text event.
     let textBatch = '';
     for (let i = 0; i < buffer.length; i++) {
       // A replayed event started a new transform — save remainder for next cycle
       if (this.blockedBlockId) {
-        if (textBatch) {
-          // Flush any pending text before saving remainder
-          insertText(textBatch);
-          textBatch = '';
-        }
+        if (textBatch) { insertText(textBatch); textBatch = ''; }
         this._replayRemainder = buffer.slice(i);
         log('Replay interrupted by transform, saved', this._replayRemainder.length, 'events for next cycle');
         break;
       }
 
       const evt = buffer[i];
-
-      // Buffered paste: replay with stored clipboard data
-      if (evt._type === 'paste') {
-        if (textBatch) { insertText(textBatch); textBatch = ''; }
-        if (evt.html) {
-          this._doPaste(blockId, evt.html);
-        }
-        continue;
-      }
-
-      const isTextChar = evt.key.length === 1 && !evt.ctrlKey && !evt.metaKey;
+      const isTextChar = evt.key?.length === 1 && !evt.ctrlKey && !evt.metaKey && evt.key !== ' ';
 
       if (isTextChar) {
-        // Space may trigger markdown autoformat — flush text first so the DOM
-        // has the preceding text, then check via shared handler
-        if (evt.key === ' ') {
-          if (textBatch) {
-            insertText(textBatch);
-            textBatch = '';
-          }
-          if (!this.handleSpaceKey(blockId)) {
-            insertText(' ');
-          }
-        } else {
-          textBatch += evt.key;
-        }
+        textBatch += evt.key;
       } else {
-        // Flush accumulated text before handling a non-text event
-        if (textBatch) {
-          insertText(textBatch);
-          textBatch = '';
-        }
-
-        const format = getFormatFromHotkey(evt);
-        if (format) {
-          log('Replaying buffered format hotkey:', format);
-          this.sendTransformRequest(blockId, 'format', { format });
-        } else {
-          // Dispatch synthetic keydown for all non-text keys. Our keydown handler
-          // gets a chance to process it (Enter, Tab, etc.), and replayKey applies
-          // manual fallbacks for native actions browsers won't do from untrusted events.
-          replayKey(evt);
-        }
+        // Flush text batch before any non-text event
+        if (textBatch) { insertText(textBatch); textBatch = ''; }
+        replayKey(evt);
       }
     }
 
-    // Flush any remaining text batch
+    // Flush remaining text batch
     if (textBatch && !this.blockedBlockId) {
       insertText(textBatch);
     }
