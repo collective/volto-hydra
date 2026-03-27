@@ -69,14 +69,16 @@ The `href` field (optional) wraps the image in a link. Format is an array with o
 
 <!-- file: examples/react/ImageBlock.jsx -->
 ```jsx
+import { getImageUrl } from './utils.js';
+
 function ImageBlock({ block }) {
-  const src = block.url || '';
+  const src = getImageUrl(block.url);
   const alt = block.alt || '';
   const href = block.href?.[0]?.['@id'] || block.href;
 
-  const img = (
-    <img data-edit-media="url" src={src} alt={alt} />
-  );
+  const img = src
+    ? <img data-edit-media="url" src={src} alt={alt} />
+    : <div data-edit-media="url" style={{height:100,background:'#e5e7eb',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:4,cursor:'pointer'}}>Click to add image</div>;
 
   return (
     <div data-block-uid={block['@uid']}>
@@ -97,16 +99,18 @@ function ImageBlock({ block }) {
 <template>
   <div :data-block-uid="block['@uid']">
     <a v-if="href" :href="href" data-edit-link="href">
-      <img data-edit-media="url" :src="block.url" :alt="block.alt" />
+      <img data-edit-media="url" :src="imgSrc" :alt="block.alt" />
     </a>
-    <img v-else data-edit-media="url" :src="block.url" :alt="block.alt" />
+    <img v-else data-edit-media="url" :src="imgSrc" :alt="block.alt" />
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue';
+import { getImageUrl } from './utils.js';
 const props = defineProps({ block: Object });
 const href = computed(() => props.block.href?.[0]?.['@id'] || props.block.href);
+const imgSrc = computed(() => getImageUrl(props.block.url));
 </script>
 ```
 
@@ -115,17 +119,19 @@ const href = computed(() => props.block.href?.[0]?.['@id'] || props.block.href);
 <!-- file: examples/svelte/ImageBlock.svelte -->
 ```svelte
 <script>
+  import { getImageUrl } from './utils.js';
   export let block;
   $: href = block.href?.[0]?.['@id'] || block.href;
+  $: imgSrc = getImageUrl(block.url);
 </script>
 
 <div data-block-uid={block['@uid']}>
   {#if href}
     <a {href} data-edit-link="href">
-      <img data-edit-media="url" src={block.url} alt={block.alt} />
+      <img data-edit-media="url" src={imgSrc} alt={block.alt} />
     </a>
   {:else}
-    <img data-edit-media="url" src={block.url} alt={block.alt} />
+    <img data-edit-media="url" src={imgSrc} alt={block.alt} />
   {/if}
 </div>
 ```

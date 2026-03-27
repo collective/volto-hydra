@@ -1,127 +1,89 @@
 # Grid Block
 
-A responsive grid layout container. Each cell is a child block (teaser, slate, image, etc.) rendered inside the grid. This is the built-in Volto grid block (`gridBlock`).
-
-This is a **built-in** block.
+A responsive grid layout container. Each column is a container that can hold any blocks inside it. Columns are defined as an `object_list` with an inline schema — each item has its own `blocks_layout` for nested content. No separate column block type is needed.
 
 ## Schema
 
 ```json
 {
-  "columns": {
+  "gridBlock": {
     "blockSchema": {
       "properties": {
-        "title": {
-          "title": "Title"
-        },
-        "top_images": {
-          "title": "Top Images",
-          "widget": "blocks_layout",
-          "allowedBlocks": [
-            "image"
-          ]
-        },
         "columns": {
           "title": "Columns",
-          "widget": "blocks_layout",
-          "allowedBlocks": [
-            "column"
-          ],
-          "maxLength": 4
-        }
-      }
-    }
-  },
-  "column": {
-    "blockSchema": {
-      "properties": {
-        "title": {
-          "title": "Title"
-        },
-        "blocks_layout": {
-          "title": "Content",
-          "widget": "blocks_layout",
-          "allowedBlocks": [
-            "slate",
-            "image"
-          ],
-          "defaultBlockType": "slate"
+          "widget": "object_list",
+          "schema": {
+            "properties": {
+              "blocks_layout": {
+                "title": "Content",
+                "widget": "blocks_layout",
+                "defaultBlockType": "slate"
+              }
+            }
+          }
         }
       }
     }
   }
 }
 ```
-
 
 ## JSON Block Data
 
 ```json
 {
-  "@type": "columns",
-  "title": "Our Services",
-  "blocks": {
-    "col-1": {
-      "@type": "column",
-      "title": "Design",
+  "@type": "gridBlock",
+  "columns": [
+    {
+      "@id": "col-1",
       "blocks": {
+        "heading-1": {
+          "@type": "slate",
+          "value": [{"type": "h3", "children": [{"text": "Design"}]}]
+        },
         "text-1": {
           "@type": "slate",
-          "value": [
-            {
-              "type": "p",
-              "children": [
-                {
-                  "text": "We craft beautiful interfaces."
-                }
-              ]
-            }
-          ]
+          "value": [{"type": "p", "children": [{"text": "We craft beautiful interfaces that users love."}]}]
         }
       },
       "blocks_layout": {
-        "items": [
-          "text-1"
-        ]
+        "items": ["heading-1", "text-1"]
       }
     },
-    "col-2": {
-      "@type": "column",
-      "title": "Engineering",
+    {
+      "@id": "col-2",
       "blocks": {
-        "text-2": {
-          "@type": "slate",
-          "value": [
-            {
-              "type": "p",
-              "children": [
-                {
-                  "text": "We build robust systems."
-                }
-              ]
-            }
-          ]
+        "img-1": {
+          "@type": "image",
+          "url": "https://placehold.co/600x400",
+          "alt": "Placeholder"
         }
       },
       "blocks_layout": {
-        "items": [
-          "text-2"
-        ]
+        "items": ["img-1"]
+      }
+    },
+    {
+      "@id": "col-3",
+      "blocks": {
+        "teaser-1": {
+          "@type": "teaser",
+          "title": "Learn More",
+          "description": "Explore the full documentation.",
+          "href": [{"@id": "/concepts/architecture"}]
+        }
+      },
+      "blocks_layout": {
+        "items": ["teaser-1"]
       }
     }
-  },
-  "columns": {
-    "items": [
-      "col-1",
-      "col-2"
-    ]
-  }
+  ]
 }
 ```
 
 ## Rendering
 
-Container blocks render their children by iterating `blocks_layout.items` and looking up each block in the `blocks` dict.
+Each column in the `columns` array is a container with its own `blocks` and `blocks_layout`. Use `expandListingBlocks` to expand each column's nested blocks — this assigns `@uid` to each block for editing support.
 
 ### React
 

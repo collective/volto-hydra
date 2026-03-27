@@ -333,22 +333,6 @@
         }
       ]
     },
-    "ref-slate-sep": {
-      "@type": "separator",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-slate",
-      "slotId": "sep"
-    },
-    "ref-slate-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-slate",
-      "slotId": "heading"
-    },
     "ref-slate-schema": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
@@ -423,8 +407,6 @@
       "486c4646-de10-40a9-9470-58b7b1449240",
       "f0a56edf-a963-4177-877c-76d9a4d6c20b",
       "00146980-5c86-4ecd-a84e-d373183231ad",
-      "ref-slate-sep",
-      "ref-slate-heading",
       "ref-text-schema",
       "ref-text-json-data",
       "ref-text-rendering"

@@ -508,6 +508,83 @@
           "label": "Hello World"
         }
       ]
+    },
+    "ex-grid": {
+      "@type": "gridBlock",
+      "columns": [
+        {
+          "@id": "col-1",
+          "blocks": {
+            "heading-1": {
+              "@type": "slate",
+              "value": [
+                {
+                  "type": "h3",
+                  "children": [
+                    {
+                      "text": "Design"
+                    }
+                  ]
+                }
+              ]
+            },
+            "text-1": {
+              "@type": "slate",
+              "value": [
+                {
+                  "type": "p",
+                  "children": [
+                    {
+                      "text": "We craft beautiful interfaces that users love."
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "blocks_layout": {
+            "items": [
+              "heading-1",
+              "text-1"
+            ]
+          }
+        },
+        {
+          "@id": "col-2",
+          "blocks": {
+            "img-1": {
+              "@type": "image",
+              "url": "https://placehold.co/600x400",
+              "alt": "Placeholder"
+            }
+          },
+          "blocks_layout": {
+            "items": [
+              "img-1"
+            ]
+          }
+        },
+        {
+          "@id": "col-3",
+          "blocks": {
+            "teaser-1": {
+              "@type": "teaser",
+              "title": "Learn More",
+              "description": "Explore the full documentation.",
+              "href": [
+                {
+                  "@id": "/concepts/architecture"
+                }
+              ]
+            }
+          },
+          "blocks_layout": {
+            "items": [
+              "teaser-1"
+            ]
+          }
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -531,7 +608,8 @@
       "ex-video",
       "ex-maps",
       "ex-toc",
-      "ex-codeExample"
+      "ex-codeExample",
+      "ex-grid"
     ]
   },
   "is_folderish": false,

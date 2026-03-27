@@ -79,6 +79,8 @@ When `overwrite` is `false` (default), the renderer should use `href[0].title` a
 
 <!-- file: examples/react/TeaserBlock.jsx -->
 ```jsx
+import { getImageUrl } from './utils.js';
+
 function TeaserBlock({ block }) {
   const hrefObj = block.href?.[0] || null;
   const useBlockData = block.overwrite || !hrefObj?.title;
@@ -87,8 +89,8 @@ function TeaserBlock({ block }) {
   const description = useBlockData ? block.description : hrefObj?.description || '';
   const href = hrefObj?.['@id'] || '';
   const imageSrc = block.preview_image
-    ? (typeof block.preview_image === 'string' ? block.preview_image : block.preview_image['@id'])
-    : (hrefObj?.hasPreviewImage ? `${href}/@@images/preview_image` : '');
+    ? getImageUrl(block.preview_image)
+    : (hrefObj?.hasPreviewImage ? getImageUrl({ '@id': `${href}/@@images/preview_image` }) : '');
 
   if (!href) {
     return (
@@ -129,6 +131,7 @@ function TeaserBlock({ block }) {
 
 <script setup>
 import { computed } from 'vue';
+import { getImageUrl } from './utils.js';
 const props = defineProps({ block: Object });
 
 const hrefObj = computed(() => props.block.href?.[0] || null);
@@ -138,11 +141,9 @@ const description = computed(() => useBlockData.value ? props.block.description 
 const href = computed(() => hrefObj.value?.['@id'] || '');
 const imageSrc = computed(() => {
   if (props.block.preview_image) {
-    return typeof props.block.preview_image === 'string'
-      ? props.block.preview_image
-      : props.block.preview_image['@id'];
+    return getImageUrl(props.block.preview_image);
   }
-  return hrefObj.value?.hasPreviewImage ? `${href.value}/@@images/preview_image` : '';
+  return hrefObj.value?.hasPreviewImage ? getImageUrl(`${href.value}/@@images/preview_image`) : '';
 });
 </script>
 ```
@@ -152,6 +153,7 @@ const imageSrc = computed(() => {
 <!-- file: examples/svelte/TeaserBlock.svelte -->
 ```svelte
 <script>
+  import { getImageUrl } from './utils.js';
   export let block;
 
   $: hrefObj = block.href?.[0] || null;
@@ -160,8 +162,8 @@ const imageSrc = computed(() => {
   $: description = useBlockData ? block.description : hrefObj?.description || '';
   $: href = hrefObj?.['@id'] || '';
   $: imageSrc = block.preview_image
-    ? (typeof block.preview_image === 'string' ? block.preview_image : block.preview_image['@id'])
-    : (hrefObj?.hasPreviewImage ? `${href}/@@images/preview_image` : '');
+    ? getImageUrl(block.preview_image)
+    : (hrefObj?.hasPreviewImage ? getImageUrl(`${href}/@@images/preview_image`) : '');
 </script>
 
 {#if !href}
