@@ -2716,7 +2716,26 @@ export class Bridge {
         log('DEBUG blocker:', e.type, e.key || e.inputType || '?', 'target:', e.target?.nodeName,
           'block:', e.target?.closest?.('[data-block-uid]')?.getAttribute('data-block-uid'));
       }
-      if (!this.blockedBlockId) return;
+      // Not blocked: capture body-focused keys (field destroyed by re-render).
+      // Same buffer — replayed by restoreContentEditableOnFields when field is ready.
+      if (!this.blockedBlockId) {
+        if (e.type === 'keydown' && this.selectedBlockUid) {
+          const isBodyTarget = e.target === document.body || e.target === document.documentElement;
+          if (isBodyTarget && !['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key)) {
+            log('Buffering body-focused key:', e.key, 'for', this.selectedBlockUid);
+            this.eventBuffer.push({
+              key: e.key,
+              code: e.code,
+              ctrlKey: e.ctrlKey,
+              metaKey: e.metaKey,
+              shiftKey: e.shiftKey,
+              altKey: e.altKey,
+            });
+            e.preventDefault();
+          }
+        }
+        return;
+      }
 
       // During transforms, the renderer replaces innerHTML which destroys the
       // focused element. Focus falls to document.body, so keystrokes arrive
@@ -2777,36 +2796,6 @@ export class Bridge {
     document.addEventListener('input', this._documentKeyboardBlocker, true);
     document.addEventListener('beforeinput', this._documentKeyboardBlocker, true);
 
-    // Document-level keydown fallback: buffers keys that arrive on body during
-    // block transitions (field destroyed by re-render, new field not ready yet).
-    // Per-field listeners handle the normal case; this catches the gap.
-    // Uses capture phase so nothing can block it.
-    if (!this._documentKeydownFallback) {
-      this._documentKeydownFallback = (e) => {
-        if (e.type !== 'keydown') return;
-        if (!this.selectedBlockUid) return;
-        if (this.blockedBlockId) return; // _documentKeyboardBlocker handles blocked state
-
-        // Only buffer when focus fell to body (field was destroyed)
-        const isBodyTarget = e.target === document.body || e.target === document.documentElement;
-        if (!isBodyTarget) return;
-
-        // Skip modifiers and Tab
-        if (['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key)) return;
-
-        log('Document fallback: buffering', e.key, 'for', this.selectedBlockUid);
-        e.preventDefault();
-        this.eventBuffer.push({
-          _type: 'keydown',
-          key: e.key,
-          shiftKey: e.shiftKey,
-          ctrlKey: e.ctrlKey,
-          metaKey: e.metaKey,
-          altKey: e.altKey,
-        });
-      };
-      document.addEventListener('keydown', this._documentKeydownFallback, true);
-    }
   }
 
   setBlockProcessing(blockId, processing = true, requestId = null) {
@@ -7877,15 +7866,13 @@ export class Bridge {
       });
 
       // Replay any keys buffered during block transition (focus was on body,
-      // document-level handler captured them). Now the field is ready.
+      // document-level handler captured them). Uses the same replay logic as
+      // transform unblock — handles transform interruption mid-replay.
       if (this.eventBuffer.length > 0 && !this.blockedBlockId) {
         const buffer = this.eventBuffer.splice(0);
         log('restoreContentEditableOnFields: replaying', buffer.length, 'buffered keys for', blockUid);
-        for (const evt of buffer) {
-          if (evt._type === 'keydown') {
-            this.replayOneKey(blockUid, evt.key, editableField, evt.shiftKey);
-          }
-        }
+        this.pendingBufferReplay = { blockId: blockUid, buffer };
+        this.replayBufferedEvents();
       }
     }
   }
