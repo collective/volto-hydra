@@ -3249,48 +3249,25 @@ export class AdminUIHelper {
     insertAfter: boolean
   ): Promise<{ x: number; y: number }> {
     // For multi-element blocks (listings), use first/last element depending on direction
-    // - insertAfter=true: target last element (drop below the listing)
-    // - insertAfter=false: target first element (drop above the listing)
     const mode = insertAfter ? 'last' : 'first';
-    const rect = await this.getCombinedBoundingBox(targetBlock, mode);
 
-    // Get iframe position in page coordinates
-    const iframeEl = this.page.locator('#previewIframe');
-    const iframeRect = await iframeEl.boundingBox();
-    if (!iframeRect) {
-      throw new Error('Could not get iframe bounding box');
+    // Use Playwright's boundingBox() which returns correct page coordinates
+    // for elements inside iframes — no manual iframe offset math needed.
+    const elements = await targetBlock.all();
+    const targetEl = mode === 'last' ? elements[elements.length - 1] : elements[0];
+    const box = await targetEl.boundingBox();
+    if (!box) {
+      throw new Error('Could not get target block bounding box');
     }
 
-    // Drop in the gap between target block and its neighbor — unambiguously
-    // "after" or "before". The drop logic uses blockSize/2 as the threshold,
-    // so landing in the gap (past the block edge) is always correct.
-    // Fall back to 2px from the edge if no sibling is found.
-    const siblings = await targetBlock.evaluateAll(
-      (els: Element[], after: boolean) => {
-        const el = after ? els[els.length - 1] : els[0];
-        const sibling = after ? el.nextElementSibling : el.previousElementSibling;
-        if (!sibling) return null;
-        const r = sibling.getBoundingClientRect();
-        return { y: r.y, height: r.height };
-      },
-      insertAfter,
-    );
-    let targetY: number;
-    if (siblings && insertAfter) {
-      // Midpoint between target bottom and next sibling top
-      targetY = iframeRect.y + rect.y + rect.height + (siblings.y - (rect.y + rect.height)) / 2;
-    } else if (siblings && !insertAfter) {
-      // Midpoint between previous sibling bottom and target top
-      targetY = iframeRect.y + (siblings.y + siblings.height) + (rect.y - (siblings.y + siblings.height)) / 2;
-    } else {
-      // No sibling — use edge
-      targetY = insertAfter
-        ? iframeRect.y + rect.y + rect.height - 2
-        : iframeRect.y + rect.y + 2;
-    }
+    // Position cursor at 75% (after) or 25% (before) of the block.
+    // The drop logic uses blockSize/2 as threshold. Cursor must be inside
+    // the block so elementFromPoint hits it.
     const result = {
-      x: iframeRect.x + rect.x + rect.width / 2,
-      y: targetY,
+      x: box.x + box.width / 2,
+      y: insertAfter
+        ? box.y + box.height * 0.75
+        : box.y + box.height * 0.25,
     };
 
     return result;
