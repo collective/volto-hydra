@@ -1141,7 +1141,14 @@ export class Bridge {
     if (!sel?.focusNode) return;
 
     const node = sel.focusNode;
-    if (!this._hasNoVisibleText(node)) return;
+    // Two cases where cursor needs to be moved:
+    // 1. Text node with only ZWS/BOM — skip to real text
+    // 2. Element node (Firefox can leave cursor on <p>, <span> instead of
+    //    inside text nodes) — move into the nearest text node
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (!this._hasNoVisibleText(node)) return; // real text, nothing to skip
+    }
+    // Element nodes always need repositioning into a text node
 
     // Walk from contenteditable root to find text across element boundaries
     const root = this._toElement(node)
