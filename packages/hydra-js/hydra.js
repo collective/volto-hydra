@@ -2732,9 +2732,15 @@ export class Bridge {
         }
 
         // Multi-selection: Shift or Ctrl/Meta click
+        // Only in block mode — in text mode, Shift+Click extends text selection (browser native)
+        // Ctrl/Meta+Click always toggles block selection regardless of mode
         if (event.shiftKey || event.ctrlKey || event.metaKey) {
-          this._handleMultiSelectClick(blockUid, event);
-          return;
+          const isTextMode = !!document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]');
+          if (!isTextMode || event.ctrlKey || event.metaKey) {
+            this._handleMultiSelectClick(blockUid, event);
+            return;
+          }
+          // In text mode with Shift — fall through to normal click handling (text selection)
         }
 
         // Plain click clears multi-selection
@@ -2904,22 +2910,66 @@ export class Bridge {
       document.addEventListener('keydown', this._escapeKeyHandler, true);
     }
 
-    // Add global ArrowDown handler for "no block selected" → select first page-level block
+    // Arrow Up/Down handler — three contexts:
+    //   No block selected: select first/last page-level block
+    //   Block mode (selected, no field focused): move to adjacent block
+    //   Block mode + Shift: extend multi-selection to adjacent block
     if (!this._arrowDownNoSelectionHandler) {
       this._arrowDownNoSelectionHandler = (e) => {
         if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-        if (this.selectedBlockUid) return;
 
+        // In text mode (editing a field), let browser handle arrow keys
+        if (document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]')) return;
+
+        // Get sibling blocks at the same level as the selected block
         const allBlocks = document.querySelectorAll('[data-block-uid]');
-        // Find page-level blocks (not nested inside another block)
         const pageBlocks = Array.from(allBlocks).filter(el =>
           !el.parentElement?.closest('[data-block-uid]'),
         );
         if (pageBlocks.length === 0) return;
 
+        // No block selected: select first or last
+        if (!this.selectedBlockUid) {
+          e.preventDefault();
+          const target = e.key === 'ArrowDown' ? pageBlocks[0] : pageBlocks[pageBlocks.length - 1];
+          this.selectBlock(target);
+          return;
+        }
+
+        // Block mode: find current block's index among siblings
+        const currentIdx = pageBlocks.findIndex(el =>
+          el.getAttribute('data-block-uid') === this.selectedBlockUid,
+        );
+        if (currentIdx === -1) return;
+
+        const nextIdx = e.key === 'ArrowDown' ? currentIdx + 1 : currentIdx - 1;
+        if (nextIdx < 0 || nextIdx >= pageBlocks.length) return;
+
         e.preventDefault();
-        const target = e.key === 'ArrowDown' ? pageBlocks[0] : pageBlocks[pageBlocks.length - 1];
-        this.selectBlock(target);
+        const nextBlock = pageBlocks[nextIdx];
+        const nextUid = nextBlock.getAttribute('data-block-uid');
+
+        if (e.shiftKey) {
+          // Shift+Arrow: extend multi-selection
+          if (this.multiSelectedBlockUids.length === 0) {
+            // Start multi-selection from current block
+            this.multiSelectedBlockUids = [this.selectedBlockUid, nextUid];
+          } else if (this.multiSelectedBlockUids.includes(nextUid)) {
+            // Shrink: remove current anchor from selection
+            this.multiSelectedBlockUids = this.multiSelectedBlockUids.filter(
+              uid => uid !== this.selectedBlockUid,
+            );
+          } else {
+            // Extend: add next block
+            this.multiSelectedBlockUids.push(nextUid);
+          }
+          this.selectedBlockUid = nextUid;
+          this._sendMultiBlockSelected();
+        } else {
+          // Plain arrow: move to adjacent block (clear multi-selection)
+          this.multiSelectedBlockUids = [];
+          this.selectBlock(nextBlock);
+        }
       };
       document.addEventListener('keydown', this._arrowDownNoSelectionHandler);
     }

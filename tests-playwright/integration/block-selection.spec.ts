@@ -582,6 +582,43 @@ test.describe('Block Mode (Escape state machine)', () => {
     // Field should become contenteditable again
     await expect(iframe.locator('[data-block-uid="block-1-uuid"] [data-edit-text][contenteditable="true"]')).toBeVisible({ timeout: 5000 });
   });
+
+  test('Arrow Down in block mode moves to next block', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click block-1, enter block mode
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+
+    // Arrow Down should move to block-2 (image block)
+    await page.keyboard.press('ArrowDown');
+    await helper.waitForBlockSelected('block-2-uuid');
+  });
+
+  test('Shift+Arrow Down in block mode extends multi-selection', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click block-1, enter block mode
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+
+    // Shift+ArrowDown should extend selection to include block-2
+    await page.keyboard.press('Shift+ArrowDown');
+
+    // Multi-selection outline should cover both blocks (larger than single block)
+    await expect(async () => {
+      const outline = page.locator('.volto-hydra-block-outline');
+      const box = await outline.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.height).toBeGreaterThan(100);
+    }).toPass({ timeout: 5000 });
+  });
 });
 
 test.describe('Multi-Block Selection', () => {
@@ -592,9 +629,10 @@ test.describe('Multi-Block Selection', () => {
 
     const iframe = helper.getIframe();
 
-    // Click first block to select it
+    // Click first block and enter block mode (Shift+Click only works in block mode)
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
 
     // Get single block outline height for comparison
     const singleOutline = page.locator('.volto-hydra-block-outline');
@@ -648,9 +686,10 @@ test.describe('Multi-Block Selection', () => {
 
     const iframe = helper.getIframe();
 
-    // Create multi-selection via Shift+Click
+    // Create multi-selection via Shift+Click (need block mode first)
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
     await iframe.locator('[data-block-uid="block-3-uuid"]').click({ modifiers: ['Shift'] });
 
     // Verify outline is multi-block sized

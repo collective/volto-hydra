@@ -860,9 +860,9 @@ const Iframe = (props) => {
   // Sync effect will send INITIAL_DATA after templates are merged
   const pendingInitialDataRef = useRef(null);
 
-  // Handle Escape key in Admin UI to navigate to parent block
-  // This is needed because when selecting via sidebar, focus stays in Admin UI,
-  // not iframe, so the iframe's Escape handler doesn't receive the event.
+  // Handle Escape key in Admin UI — three-state machine (same as iframe):
+  //   Text mode (sidebar field focused) → Block mode (blur field, stay on block)
+  //   Block mode → Parent block (or deselect if at page level)
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key !== 'Escape') return;
@@ -877,18 +877,37 @@ const Iframe = (props) => {
       if (linkEditorVisible) return;
 
       // Don't handle if focus is in iframe - let iframe's handler do it
-      const iframe = document.getElementById('previewIframe');
-      if (iframe && iframe.contains(document.activeElement)) return;
+      const iframeEl = document.getElementById('previewIframe');
+      if (iframeEl && iframeEl.contains(document.activeElement)) return;
 
       e.preventDefault();
 
-      // Get parent from blockPathMap
+      // Check if a sidebar form field has focus (sidebar text mode)
+      const sidebarField = document.activeElement?.closest?.('.field-wrapper input, .field-wrapper textarea, .field-wrapper [contenteditable="true"], .field-wrapper select');
+      if (sidebarField) {
+        // FIRST ESCAPE: Sidebar text mode → Block mode (blur field, stay on block)
+        log('Admin Escape key - entering block mode (blurring sidebar field)');
+        (document.activeElement as HTMLElement)?.blur?.();
+        return;
+      }
+
+      // SECOND ESCAPE: Block mode → Parent (or deselect)
       const pathInfo = iframeSyncState.blockPathMap?.[selectedBlock];
       const parentId = pathInfo?.parentId || null;
       log('Admin Escape key - selecting parent:', parentId, 'from:', selectedBlock);
 
       // Select parent (or deselect if no parent)
       onSelectBlock(parentId);
+
+      // Tell the iframe to select the parent (or deselect) — otherwise the iframe
+      // still has the old block selected and keeps sending BLOCK_SELECTED messages
+      const iframeWindow = iframeEl?.contentWindow;
+      if (iframeWindow) {
+        iframeWindow.postMessage(
+          { type: 'SELECT_BLOCK', uid: parentId, method: 'select' },
+          '*',
+        );
+      }
     };
 
     document.addEventListener('keydown', handleEscape, true);

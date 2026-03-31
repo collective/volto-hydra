@@ -775,15 +775,24 @@ export class AdminUIHelper {
    * If already in block mode (not editing), only one Escape is needed.
    */
   async escapeToParent(): Promise<void> {
-    const iframe = this.getIframe();
-    // Check if we're in text mode (any contenteditable="true" field in the selected block)
-    const hasEditableField = await iframe.locator('[contenteditable="true"][data-edit-text]').count() > 0;
-    if (hasEditableField) {
-      // First escape: text mode → block mode
+    // Get current sidebar header count to detect navigation
+    const headersBefore = await this.page
+      .locator('.sidebar-section-header.sticky-header')
+      .count();
+
+    await this.page.keyboard.press('Escape');
+
+    // Check if we actually navigated (header count changed) or just entered block mode
+    // If still on same level after 300ms, press Escape again
+    await this.page.waitForTimeout(300);
+    const headersAfter = await this.page
+      .locator('.sidebar-section-header.sticky-header')
+      .count();
+
+    if (headersAfter >= headersBefore) {
+      // Didn't navigate — we entered block mode. Press again.
       await this.page.keyboard.press('Escape');
     }
-    // Second escape: block mode → parent
-    await this.page.keyboard.press('Escape');
   }
 
   /**

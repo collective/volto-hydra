@@ -3327,17 +3327,15 @@ test.describe('slateTable Container', () => {
 
     // Navigate up via Escape: cell -> row -> table
     await helper.escapeToParent();
-    await page.waitForTimeout(200);
 
     // Now should have 3 headers: Page, Table, Row
-    await expect(stickyHeaders).toHaveCount(3);
+    await expect(stickyHeaders).toHaveCount(3, { timeout: 5000 });
     await expect(stickyHeaders.nth(2)).toContainText('Row');
 
     await helper.escapeToParent();
-    await page.waitForTimeout(200);
 
     // Now should have 2 headers: Page, Table
-    await expect(stickyHeaders).toHaveCount(2);
+    await expect(stickyHeaders).toHaveCount(2, { timeout: 5000 });
     await expect(stickyHeaders.nth(1)).toContainText('Table');
 
     // Verify table-1 is now selected (outline visible on table)
