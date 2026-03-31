@@ -511,6 +511,7 @@ const Iframe = (props) => {
     closeObjectBrowser,
     schema, // Content type schema for page-level field types
     saveTemplatesRef, // Ref that Form.jsx uses to trigger template save
+    multiSelected = [], // Array of block UIDs in multi-selection
   } = props;
 
   const dispatch = useDispatch();
@@ -563,6 +564,7 @@ const Iframe = (props) => {
   const iframeName = `hydra-${isEditMode ? 'edit' : 'view'}:${adminOrigin}`;
 
   const [pendingFieldMedia, setPendingFieldMedia] = useState(null); // { fieldName, blockUid } for field-level image selection
+  const [multiSelectState, setMultiSelectState] = useState({ blockUids: [], rects: {} }); // Multi-block selection
   const blockChooserRef = useRef();
   const [slashMenu, setSlashMenu] = useState(null); // { blockId, filter } or null
   const [slashMenuIndex, setSlashMenuIndex] = useState(0);
@@ -2328,9 +2330,25 @@ const Iframe = (props) => {
           lastSentSelectBlockRef.current = event.data.blockUid;
 
           // Call onSelectBlock OUTSIDE setBlockUI callback to avoid React warning
-          if (isNewBlock) {
-            log('BLOCK_SELECTED calling onSelectBlock:', event.data.blockUid);
-            onSelectBlock(event.data.blockUid);
+          if (event.data.isMultipleSelection) {
+            log('BLOCK_SELECTED multi-select:', event.data.blockUids?.length, 'blocks');
+            // hydra.js owns multi-selection state — it sends the full list
+            // of selected block UIDs and their rects. Store for outline rendering.
+            setMultiSelectState({
+              blockUids: event.data.blockUids || [],
+              rects: event.data.rects || {},
+            });
+            // Deselect single block — sidebar shows common parent
+            onSelectBlock(null);
+          } else {
+            // Single-block selection — clear any multi-selection
+            if (multiSelectState.blockUids.length > 0) {
+              setMultiSelectState({ blockUids: [], rects: {} });
+            }
+            if (isNewBlock) {
+              log('BLOCK_SELECTED calling onSelectBlock:', event.data.blockUid);
+              onSelectBlock(event.data.blockUid);
+            }
           }
 
           // Deselection: just call onSelectBlock(null) — skip blockUI/addability updates.
@@ -2374,6 +2392,9 @@ const Iframe = (props) => {
                 prevBlockUI.rect?.width === event.data.rect?.width &&
                 prevBlockUI.rect?.height === event.data.rect?.height &&
                 !mediaFieldsChanged) {
+              // focusedFieldRect intentionally excluded — it changes during typing
+              // (field height shifts) and re-renders from that cause perf issues.
+              // The underline updates when other fields trigger a state change.
               return prevBlockUI; // Return same reference to skip re-render
             }
             // Note: Zero rect check happens earlier (before onSelectBlock) so we return before reaching here
@@ -2394,6 +2415,7 @@ const Iframe = (props) => {
               blockUid: event.data.blockUid,
               rect: event.data.rect,
               focusedFieldName: event.data.focusedFieldName, // Track which editable field is focused
+              focusedFieldRect: event.data.focusedFieldRect, // Rect of focused field for underline positioning
               focusedLinkableField: event.data.focusedLinkableField, // Track which linkable field is focused
               focusedMediaField: event.data.focusedMediaField, // Track which media field is focused
               editableFields: event.data.editableFields, // Map of fieldName -> fieldType from iframe
@@ -3625,43 +3647,77 @@ const Iframe = (props) => {
         />
       )}
 
-      {/* Block UI Overlays - rendered in parent window, positioned over iframe */}
-      {blockUI && blockUI.rect && referenceElement && (() => {
-        // Determine outline style based on block type and number of editable fields
-        // Container blocks always get full border (they contain child blocks)
-        // Single field non-container blocks get bottom line
-        // Multi-field non-container blocks get full border
-        const editableFieldCount = Object.keys(blockUI.editableFields || {}).length;
-        const isContainer = getAllContainerFields(
-          selectedBlock,
-          iframeSyncState.blockPathMap,
-          properties,
-          config.blocks.blocksConfig,
-          intl,
-          iframeSyncState.templateEditMode,
-        ).length > 0;
-        // Multi-element blocks (e.g., listings) always get full border to show combined bounding box
-        const showBottomLine = editableFieldCount === 1 && !isContainer && !blockUI.isMultiElement;
+      {/* Multi-block selection outline — combined bounding box */}
+      {multiSelectState.blockUids.length > 1 && referenceElement && (() => {
+        const allRects = Object.values(multiSelectState.rects);
+        if (allRects.length === 0) return null;
+        const iframeRect = referenceElement.getBoundingClientRect();
+        const minTop = Math.min(...allRects.map(r => r.top));
+        const minLeft = Math.min(...allRects.map(r => r.left));
+        const maxBottom = Math.max(...allRects.map(r => r.top + r.height));
+        const maxRight = Math.max(...allRects.map(r => r.left + r.width));
         return (
-        <>
-          {/* Selection Outline - blue border or bottom line depending on field count */}
           <div
             className="volto-hydra-block-outline"
-            data-outline-style={showBottomLine ? 'bottom-line' : 'border'}
+            data-outline-style="border"
             style={{
               position: 'fixed',
-              left: `${referenceElement.getBoundingClientRect().left + blockUI.rect.left}px`,
-              top: showBottomLine
-                ? `${referenceElement.getBoundingClientRect().top + blockUI.rect.top + blockUI.rect.height - 1}px`
-                : `${referenceElement.getBoundingClientRect().top + blockUI.rect.top - 2}px`,
-              width: `${blockUI.rect.width}px`,
-              height: showBottomLine ? '3px' : `${blockUI.rect.height + 4}px`,
-              background: showBottomLine ? '#007eb1' : 'transparent',
-              border: showBottomLine ? 'none' : '2px solid #007eb1',
+              left: `${iframeRect.left + minLeft - 2}px`,
+              top: `${iframeRect.top + minTop - 2}px`,
+              width: `${maxRight - minLeft + 4}px`,
+              height: `${maxBottom - minTop + 4}px`,
+              background: 'transparent',
+              border: '2px solid #007eb1',
               pointerEvents: 'none',
               zIndex: 1,
             }}
           />
+        );
+      })()}
+
+      {/* Block UI Overlays - rendered in parent window, positioned over iframe */}
+      {blockUI && blockUI.rect && referenceElement && (() => {
+        // Two outline modes based on editing state:
+        //   Text mode (focusedFieldName set): subtle border on block + underline on field
+        //   Block mode (no focusedFieldName): full solid border on block
+        const isTextMode = !!blockUI.focusedFieldName;
+        const iframeLeft = referenceElement.getBoundingClientRect().left;
+        const iframeTop = referenceElement.getBoundingClientRect().top;
+        return (
+        <>
+          {/* Block outline — full border in block mode, subtle in text mode */}
+          <div
+            className="volto-hydra-block-outline"
+            data-outline-style={isTextMode ? 'subtle' : 'border'}
+            style={{
+              position: 'fixed',
+              left: `${iframeLeft + blockUI.rect.left - 2}px`,
+              top: `${iframeTop + blockUI.rect.top - 2}px`,
+              width: `${blockUI.rect.width + 4}px`,
+              height: `${blockUI.rect.height + 4}px`,
+              background: 'transparent',
+              border: isTextMode ? '1px solid rgba(0, 126, 177, 0.3)' : '2px solid #007eb1',
+              pointerEvents: 'none',
+              zIndex: 1,
+            }}
+          />
+
+          {/* Field underline — only in text mode when we have the field rect */}
+          {isTextMode && blockUI.focusedFieldRect && (
+            <div
+              className="volto-hydra-field-underline"
+              style={{
+                position: 'fixed',
+                left: `${iframeLeft + blockUI.focusedFieldRect.left}px`,
+                top: `${iframeTop + blockUI.focusedFieldRect.top + blockUI.focusedFieldRect.height - 1}px`,
+                width: `${blockUI.focusedFieldRect.width}px`,
+                height: '3px',
+                background: '#007eb1',
+                pointerEvents: 'none',
+                zIndex: 2,
+              }}
+            />
+          )}
 
           {/* Quanta Toolbar with real Slate buttons */}
           <SyncedSlateToolbar

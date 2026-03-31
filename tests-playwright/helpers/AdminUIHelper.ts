@@ -759,6 +759,34 @@ export class AdminUIHelper {
   }
 
   /**
+   * Press Escape once to exit text editing and enter block mode.
+   * Block stays selected but fields are no longer contenteditable.
+   */
+  async escapeFromEditing(): Promise<void> {
+    await this.page.keyboard.press('Escape');
+    // Wait for outline to switch to block mode (full border)
+    await expect(this.page.locator('.volto-hydra-block-outline[data-outline-style="border"]'))
+      .toBeVisible({ timeout: 3000 });
+  }
+
+  /**
+   * Press Escape twice to navigate from text editing to parent block (or deselect).
+   * First Escape: text mode → block mode. Second Escape: block mode → parent.
+   * If already in block mode (not editing), only one Escape is needed.
+   */
+  async escapeToParent(): Promise<void> {
+    const iframe = this.getIframe();
+    // Check if we're in text mode (any contenteditable="true" field in the selected block)
+    const hasEditableField = await iframe.locator('[contenteditable="true"][data-edit-text]').count() > 0;
+    if (hasEditableField) {
+      // First escape: text mode → block mode
+      await this.page.keyboard.press('Escape');
+    }
+    // Second escape: block mode → parent
+    await this.page.keyboard.press('Escape');
+  }
+
+  /**
    * Check if the sidebar is open.
    */
   async isSidebarOpen(): Promise<boolean> {

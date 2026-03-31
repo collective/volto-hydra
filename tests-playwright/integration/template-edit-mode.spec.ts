@@ -137,7 +137,7 @@ test.describe('Template Creation', () => {
     await helper.waitForSidebarOpen();
 
     // Navigate up to template instance
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     // Sidebar should have "Edit Template" toggle
@@ -176,7 +176,7 @@ test.describe('Template Edit Mode - Editability', () => {
     await helper.waitForSidebarOpen();
 
     // Navigate to template instance
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     // Toggle edit mode on
@@ -218,7 +218,7 @@ test.describe('Template Edit Mode - Editability', () => {
     const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
@@ -250,7 +250,7 @@ test.describe('Template Edit Mode - Editability', () => {
     // Enter template edit mode
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
@@ -266,7 +266,7 @@ test.describe('Template Edit Mode - Editability', () => {
     expect(await templateEditor.getAttribute('contenteditable')).toBe('true');
 
     // Exit edit mode
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
     await editToggle.click();
     await expect(editCheckbox).not.toBeChecked();
@@ -299,7 +299,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     // Enter template edit mode
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
@@ -338,7 +338,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await expect(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`)).toBeVisible({ timeout: 15000 });
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
@@ -407,7 +407,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await expect(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`)).toBeVisible({ timeout: 15000 });
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
@@ -463,7 +463,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await expect(iframe.locator(`[data-block-uid="${STANDALONE_BLOCK_1}"]`)).toBeVisible({ timeout: 15000 });
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
@@ -513,7 +513,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await expect(iframe.locator(`[data-block-uid="${STANDALONE_BLOCK_1}"]`)).toBeVisible({ timeout: 15000 });
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
@@ -568,7 +568,7 @@ test.describe('Template Edit Mode - Validation', () => {
     await expect(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`)).toBeVisible({ timeout: 15000 });
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
@@ -582,7 +582,7 @@ test.describe('Template Edit Mode - Validation', () => {
     await helper.dragBlockAfter(USER_CONTENT_2, footerBlockId);
 
     // Try to exit edit mode - should fail validation
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     // Click the label to try to exit (validation should prevent state change)
@@ -622,7 +622,7 @@ test.describe('Template Edit Mode - Validation', () => {
     await expect(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`)).toBeVisible({ timeout: 15000 });
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
@@ -638,7 +638,7 @@ test.describe('Template Edit Mode - Validation', () => {
     await slotIdField.fill('secondary');
 
     // Try to exit edit mode - should fail validation
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     // Click the label to try to exit (validation should prevent state change)
@@ -671,7 +671,7 @@ test.describe('Template Edit Mode - Validation', () => {
     // Enter template edit mode
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
@@ -693,7 +693,7 @@ test.describe('Template Edit Mode - Validation', () => {
     await expect(headerBlock).toContainText('edited', { timeout: 5000 });
 
     // Exit edit mode
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
     // Click to exit template edit mode - waits for async flush before toggling
     await editToggle.click();
@@ -744,7 +744,7 @@ test.describe('Template Edit Mode - Block Settings', () => {
     await expect(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`)).toBeVisible({ timeout: 15000 });
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
@@ -782,7 +782,7 @@ test.describe('Template Edit Mode - Block Settings', () => {
     await expect(iframe.locator(`[data-block-uid="${USER_CONTENT_1}"]`)).toBeVisible({ timeout: 15000 });
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
@@ -873,7 +873,7 @@ test.describe('Template Edit Mode - Object List Items', () => {
     await helper.waitForSidebarCurrentBlock('Slide');
 
     // Navigate up to the parent slider block
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await page.waitForTimeout(300);
 
     // The parent slider's sidebar form should NOT have interactive inputs
@@ -900,7 +900,7 @@ test.describe('Template Edit Mode - Object List Items', () => {
     // Enter template edit mode via the header block
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
@@ -946,7 +946,7 @@ test.describe('Template Edit Mode - Object List Items', () => {
 
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
@@ -1058,7 +1058,7 @@ test.describe('Template Edit Mode - UI Restrictions', () => {
     // Enter template edit mode
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
@@ -1160,7 +1160,7 @@ test.describe('Template Edit Mode - UI Restrictions', () => {
     // Enter template edit mode
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar(templateBlockIds);
 
     // Click the label instead of the hidden checkbox input

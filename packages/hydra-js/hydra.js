@@ -157,6 +157,7 @@ export class Bridge {
     this.blockTextMutationObserver = null;
     this.attributeMutationObserver = null;
     this.selectedBlockUid = null;
+    this.multiSelectedBlockUids = []; // Array of block UIDs in multi-selection
     this.focusedFieldName = null; // Track which editable field within the block has focus
     this.focusedLinkableField = null; // Track which linkable field has focus (for link editing)
     this.focusedMediaField = null; // Track which media field has focus (for image selection)
@@ -1784,6 +1785,23 @@ export class Bridge {
       dragHandle.style.display = 'block';
     }
 
+    // Get focused field rect for text-mode underline positioning
+    // Round to integers to avoid sub-pixel jitter causing unnecessary state updates
+    let focusedFieldRect = null;
+    if (focusedFieldName && elementForFields) {
+      const focusedEl = elementForFields.querySelector(`[data-edit-text="${focusedFieldName}"]`)
+        || (elementForFields.getAttribute('data-edit-text') === focusedFieldName ? elementForFields : null);
+      if (focusedEl) {
+        const fr = focusedEl.getBoundingClientRect();
+        focusedFieldRect = {
+          top: Math.round(fr.top),
+          left: Math.round(fr.left),
+          width: Math.round(fr.width),
+          height: Math.round(fr.height),
+        };
+      }
+    }
+
     const message = {
       type: 'BLOCK_SELECTED',
       src,
@@ -1798,6 +1816,7 @@ export class Bridge {
       linkableFields,
       mediaFields,
       focusedFieldName,
+      focusedFieldRect,
       focusedLinkableField,
       focusedMediaField,
       addDirection,
@@ -1810,6 +1829,76 @@ export class Bridge {
     }
 
     window.parent.postMessage(message, this.adminOrigin);
+  }
+
+  /**
+   * Handle Shift/Ctrl/Meta click for multi-block selection.
+   * Updates multiSelectedBlockUids and sends combined rect to admin.
+   */
+  _handleMultiSelectClick(blockUid, event) {
+    const layout = this.formData?.blocks_layout?.items || [];
+
+    if (event.shiftKey) {
+      // Shift+Click: select range from anchor to clicked block
+      const anchor = this.multiSelectedBlockUids.length > 0
+        ? this.multiSelectedBlockUids[0]
+        : this.selectedBlockUid;
+      const anchorIdx = layout.indexOf(anchor);
+      const focusIdx = layout.indexOf(blockUid);
+
+      if (anchorIdx >= 0 && focusIdx >= 0) {
+        const start = Math.min(anchorIdx, focusIdx);
+        const end = Math.max(anchorIdx, focusIdx);
+        this.multiSelectedBlockUids = layout.slice(start, end + 1);
+      } else {
+        this.multiSelectedBlockUids = [blockUid];
+      }
+    } else {
+      // Ctrl/Meta+Click: toggle block in/out of selection
+      const current = this.multiSelectedBlockUids.length > 0
+        ? [...this.multiSelectedBlockUids]
+        : this.selectedBlockUid ? [this.selectedBlockUid] : [];
+
+      const idx = current.indexOf(blockUid);
+      if (idx >= 0) {
+        current.splice(idx, 1);
+      } else {
+        current.push(blockUid);
+      }
+      this.multiSelectedBlockUids = current;
+    }
+
+    log('Multi-select:', this.multiSelectedBlockUids.length, 'blocks:', this.multiSelectedBlockUids);
+
+    // Clear single selection — multi-selection takes over
+    this.selectedBlockUid = null;
+    this.isInlineEditing = false;
+
+    this._sendMultiBlockSelected();
+  }
+
+  /**
+   * Send BLOCK_SELECTED with all multi-selected block UIDs and their rects.
+   * The admin uses these to render combined outline and determine common parent.
+   */
+  _sendMultiBlockSelected() {
+    const rects = {};
+    for (const uid of this.multiSelectedBlockUids) {
+      const el = this.queryBlockElement(uid);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        rects[uid] = { top: r.top, left: r.left, width: r.width, height: r.height };
+      }
+    }
+
+    this.sendMessageToParent({
+      type: 'BLOCK_SELECTED',
+      src: 'multiSelect',
+      blockUid: null,
+      blockUids: this.multiSelectedBlockUids,
+      rects,
+      isMultipleSelection: true,
+    });
   }
 
   /**
@@ -2641,6 +2730,18 @@ export class Bridge {
           clearTimeout(this._pendingInitialSelectTimer);
           this._pendingInitialSelectTimer = null;
         }
+
+        // Multi-selection: Shift or Ctrl/Meta click
+        if (event.shiftKey || event.ctrlKey || event.metaKey) {
+          this._handleMultiSelectClick(blockUid, event);
+          return;
+        }
+
+        // Plain click clears multi-selection
+        if (this.multiSelectedBlockUids.length > 0) {
+          this.multiSelectedBlockUids = [];
+        }
+
         this.selectBlock(blockElement);
       } else {
         // No block - check for page-level fields
@@ -2733,8 +2834,9 @@ export class Bridge {
       document.addEventListener('keydown', this._interactiveSpaceHandler, true);
     }
 
-    // Add global keydown handler for Escape to select parent block
-    // This allows navigating up the block hierarchy with keyboard
+    // Add global keydown handler for Escape — three-state machine:
+    //   Text editing → Block mode (unfocus, stay on block)
+    //   Block mode    → Parent block (or deselect if at page level)
     if (!this._escapeKeyHandler) {
       this._escapeKeyHandler = (e) => {
         if (e.key !== 'Escape') return;
@@ -2752,7 +2854,31 @@ export class Bridge {
 
         e.preventDefault();
 
-        // Get parent from blockPathMap
+        // Check if we're currently in text editing mode (an editable field has focus)
+        const activeEditField = document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]');
+        if (activeEditField) {
+          // FIRST ESCAPE: Text editing → Block mode
+          // Remove contenteditable from all fields in this block, blur the field.
+          // Block stays selected (outline visible, quanta toolbar visible).
+          log('Escape key - entering block mode from text editing:', this.selectedBlockUid);
+          const blockElement = this.queryBlockElement(this.selectedBlockUid);
+          if (blockElement) {
+            const editableFields = blockElement.querySelectorAll('[data-edit-text][contenteditable="true"]');
+            editableFields.forEach((field) => {
+              field.setAttribute('contenteditable', 'false');
+            });
+          }
+          activeEditField.blur();
+          // Clear focused field and re-send BLOCK_SELECTED so admin sees
+          // focusedFieldName=null → block mode outline (full border)
+          this.focusedFieldName = null;
+          if (blockElement) {
+            this.sendBlockSelected('escapeToBlockMode', blockElement, { focusedFieldName: null });
+          }
+          return;
+        }
+
+        // SECOND ESCAPE: Block mode → Parent (or deselect)
         const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
         const parentId = pathInfo?.parentId || null;
         log('Escape key - selecting parent:', parentId, 'from:', this.selectedBlockUid);

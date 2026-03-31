@@ -575,7 +575,7 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     // checkboxes in the iframe. Press Escape to get to page level, then
     // drill down: Search block → Content Type facet.
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
 
     const pageChildBlocks = page.locator('#sidebar-order .child-blocks-widget');
     await expect(pageChildBlocks).toBeVisible({ timeout: 5000 });
