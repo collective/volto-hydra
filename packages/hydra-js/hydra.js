@@ -3037,6 +3037,74 @@ export class Bridge {
       document.addEventListener('keydown', this._blockModeDeleteHandler);
     }
 
+    // Cmd+A / Ctrl+A escalation: text → block → all siblings
+    if (!this._selectAllHandler) {
+      this._selectAllHandler = (e) => {
+        if (e.key !== 'a' || !(e.ctrlKey || e.metaKey)) return;
+        if (!this.selectedBlockUid) return;
+
+        const activeEditField = document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]');
+
+        if (activeEditField) {
+          // Text mode: check if all text is already selected
+          const sel = window.getSelection();
+          if (!sel || sel.rangeCount === 0) return; // let browser handle
+
+          const range = sel.getRangeAt(0);
+          const fieldText = activeEditField.textContent || '';
+          const selText = sel.toString();
+
+          // If selection doesn't cover all text, let browser select all (first Cmd+A)
+          if (selText.length < fieldText.replace(/[\uFEFF\u200B]/g, '').length) return;
+
+          // All text selected → escalate to block mode (second Cmd+A)
+          e.preventDefault();
+          const blockElement = this.queryBlockElement(this.selectedBlockUid);
+          if (blockElement) {
+            const editableFields = blockElement.querySelectorAll('[data-edit-text][contenteditable="true"]');
+            editableFields.forEach(f => f.setAttribute('contenteditable', 'false'));
+          }
+          activeEditField.blur();
+          window.getSelection()?.removeAllRanges();
+          this.focusedFieldName = null;
+          if (blockElement) {
+            this.sendBlockSelected('selectAllBlock', blockElement, { focusedFieldName: null });
+          }
+          return;
+        }
+
+        // Block mode (single block) → select all sibling blocks
+        if (this.multiSelectedBlockUids.length > 0) return; // already multi-selected
+
+        e.preventDefault();
+        const direction = 'forward';
+        // Collect all siblings using _resolveNavigationTarget
+        const siblings = [this.selectedBlockUid];
+        // Walk backward to find first sibling
+        let uid = this.selectedBlockUid;
+        while (true) {
+          const prev = this._resolveNavigationTarget(uid, 'backward', false);
+          if (!prev) break;
+          siblings.unshift(prev);
+          uid = prev;
+        }
+        // Walk forward to find last sibling
+        uid = this.selectedBlockUid;
+        while (true) {
+          const next = this._resolveNavigationTarget(uid, 'forward', false);
+          if (!next) break;
+          siblings.push(next);
+          uid = next;
+        }
+
+        if (siblings.length > 1) {
+          this.multiSelectedBlockUids = siblings;
+          this._sendMultiBlockSelected();
+        }
+      };
+      document.addEventListener('keydown', this._selectAllHandler, true);
+    }
+
     // Add global Enter handler for "block selected, no field focused" → add block after
     if (!this._enterKeyHandler) {
       this._enterKeyHandler = (e) => {

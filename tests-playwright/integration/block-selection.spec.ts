@@ -622,6 +622,100 @@ test.describe('Block Mode (Escape state machine)', () => {
       .toBeVisible({ timeout: 3000 });
   });
 
+  test('Cmd+A in text mode selects all text, second enters block mode, third selects all siblings', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click text-1a inside col-1 — enters text mode
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+
+    // Verify text mode (subtle border)
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
+      .toBeVisible({ timeout: 3000 });
+
+    // First Cmd+A: selects all text in field (browser native)
+    await page.keyboard.press('ControlOrMeta+a');
+
+    // Should still be in text mode with text selected
+    const hasTextSelection = await iframe.locator('body').evaluate(() => {
+      const sel = window.getSelection();
+      return sel ? sel.toString().length > 0 : false;
+    });
+    expect(hasTextSelection).toBe(true);
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
+      .toBeVisible({ timeout: 2000 });
+
+    // Second Cmd+A: enters block mode (selects block, not text)
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="border"]'))
+      .toBeVisible({ timeout: 3000 });
+
+    // Third Cmd+A: selects all sibling blocks (multi-selection)
+    await page.keyboard.press('ControlOrMeta+a');
+
+    // Should have multi-selection outline covering both text-1a and text-1b
+    await expect(async () => {
+      const outline = page.locator('.volto-hydra-block-outline');
+      const box = await outline.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.height).toBeGreaterThan(50);
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('Cmd+A in block mode selects all sibling blocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Click text-1a, enter block mode
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.escapeFromEditing();
+
+    // Verify block mode
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="border"]'))
+      .toBeVisible({ timeout: 3000 });
+
+    // Cmd+A should select all siblings (text-1a + text-1b)
+    await page.keyboard.press('ControlOrMeta+a');
+
+    await expect(async () => {
+      const outline = page.locator('.volto-hydra-block-outline');
+      const box = await outline.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.height).toBeGreaterThan(50);
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('Cmd+A on non-editable block selects all sibling blocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click image block (non-editable — no contenteditable fields)
+    await helper.clickBlockInIframe('block-2-uuid');
+    await helper.waitForBlockSelected('block-2-uuid');
+
+    // Already in block mode (image has no editable fields)
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="border"]'))
+      .toBeVisible({ timeout: 3000 });
+
+    // Cmd+A should select all page-level siblings
+    await page.keyboard.press('ControlOrMeta+a');
+
+    await expect(async () => {
+      const outline = page.locator('.volto-hydra-block-outline');
+      const box = await outline.boundingBox();
+      expect(box).not.toBeNull();
+      // Should cover many blocks — much taller than single image
+      expect(box!.height).toBeGreaterThan(200);
+    }).toPass({ timeout: 5000 });
+  });
+
   test('Shift+Arrow extend and shrink shows correct outline at each step', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
