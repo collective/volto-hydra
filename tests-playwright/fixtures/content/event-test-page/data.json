@@ -22,14 +22,14 @@
       "readOnly": true,
       "templateId": "resolveuid/tpl-ct-event-view",
       "templateInstanceId": "tpl-ev-def",
-      "placeholder": "title"
+      "slotId": "title"
     },
     "ev-metadata-1": {
       "@type": "eventMetadata",
       "fixed": true,
       "templateId": "resolveuid/tpl-ct-event-view",
       "templateInstanceId": "tpl-ev-def",
-      "placeholder": "event-metadata"
+      "slotId": "event-metadata"
     },
     "ev-body-1": {
       "@type": "slate",
@@ -37,7 +37,7 @@
       "plaintext": "Event description goes here.",
       "templateId": "resolveuid/tpl-ct-event-view",
       "templateInstanceId": "tpl-ev-def",
-      "placeholder": "content"
+      "slotId": "content"
     }
   },
   "blocks_layout": {

@@ -651,11 +651,8 @@ test.describe('Enter Key to Add/Navigate', () => {
     // Backspace in the empty block should remove it
     await newEditor.press('Backspace');
 
-    // Wait for block count to stabilize — not just reach the target.
-    // A stale toolbar onChange can briefly remove the block then re-add it,
-    // so we need the count to settle at initialBlocks, not just hit it once.
-    const stableCount = await helper.getStableBlockCount();
-    expect(stableCount).toBe(initialBlocks);
+    // Wait for the block to be deleted
+    await helper.waitForBlockCountToBe(initialBlocks, 10000);
 
     // The new block should be gone
     await expect(iframe.locator(`[data-block-uid="${newBlockUid}"]`)).not.toBeVisible({ timeout: 5000 });

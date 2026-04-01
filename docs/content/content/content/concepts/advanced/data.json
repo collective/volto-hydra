@@ -206,6 +206,85 @@
           ]
         }
       ]
+    },
+    "lazy-text-t0-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "hydra-edit:<origin>"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " \u2014 edit mode (e.g., hydra-edit:http://localhost:3001)"
+                }
+              ],
+              "type": "li"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "text": "hydra-view:<origin>"
+                    }
+                  ],
+                  "type": "strong"
+                },
+                {
+                  "text": " \u2014 view mode (e.g., hydra-view:http://localhost:3001)"
+                }
+              ],
+              "type": "li"
+            }
+          ],
+          "type": "ul"
+        }
+      ]
+    },
+    "lazy-text-t0-split-2": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "This persists across SPA navigation within the iframe, allowing your frontend to detect it's in the admin even after client-side route changes. In view mode, render from your API immediately but still load the bridge for navigation tracking. In edit mode, wait for onEditChange before rendering."
+            }
+          ],
+          "type": "p"
+        }
+      ]
+    },
+    "auth-text-t0-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "The access_token is passed as a URL parameter on initial load and automatically stored in sessionStorage by hydra.js. On SPA navigation, the URL param is gone but the token persists in sessionStorage. Use the "
+            },
+            {
+              "children": [
+                {
+                  "text": "getAccessToken()"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " helper:"
+            }
+          ],
+          "type": "p"
+        }
+      ]
     }
   },
   "blocks_layout": {

@@ -4,8 +4,8 @@
  * Tests that:
  * 1. Fixed editable blocks can be edited but not moved
  * 2. Removing a layout preserves content
- * 3. Deleting a template instance preserves placeholder content
- * 4. Non-matching placeholder content goes to default placeholder
+ * 3. Deleting a template instance preserves slot content
+ * 4. Non-matching slot content goes to default slot
  *
  * TODO: Add test where the same template is inserted twice on a page
  */
@@ -101,7 +101,7 @@ test.describe('Remove Layout', () => {
     // Wait for layout to render in the iframe
     await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Layout Header' })).toBeVisible({ timeout: 10000 });
 
-    // Verify original content is still there (in default placeholder)
+    // Verify original content is still there (in default slot)
     const afterLayoutBlocks = await iframe.locator('main [data-block-uid], #content [data-block-uid]').allTextContents();
     const contentPreserved = afterLayoutBlocks.some(t => t.includes('another test page'));
     expect(contentPreserved).toBe(true);
@@ -119,7 +119,7 @@ test.describe('Remove Layout', () => {
 });
 
 test.describe('Delete Template Instance', () => {
-  test('deleting template block via Remove moves placeholder content out', async ({ page }) => {
+  test('deleting template block via Remove moves slot content out', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     const iframe = helper.getIframe();
 
@@ -161,7 +161,7 @@ test.describe('Delete Template Instance', () => {
 });
 
 test.describe('Non-matching Placeholder Content', () => {
-  test('content with unknown placeholder goes to default slot', async ({ page }) => {
+  test('content with unknown slotId goes to default slot', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     const iframe = helper.getIframe();
 
@@ -169,14 +169,14 @@ test.describe('Non-matching Placeholder Content', () => {
     await helper.navigateToEdit('/another-page');
     await helper.waitForIframeReady();
 
-    // another-page has content without placeholder names
-    // When we apply a layout, it should go into the "default" placeholder
+    // another-page has content without slot names
+    // When we apply a layout, it should go into the "default" slot
 
     // Get initial block count
     const initialBlocks = await iframe.locator('main [data-block-uid], #content [data-block-uid]').allTextContents();
     expect(initialBlocks.length).toBeGreaterThan(0);
 
-    // Apply header-footer layout (which has a "default" placeholder)
+    // Apply header-footer layout (which has a "default" slot)
     await page.locator('.sidebar-section-header .section-title').click();
     const layoutSelector = page.locator('.layout-selector select');
     await expect(layoutSelector).toBeVisible({ timeout: 5000 });
@@ -200,7 +200,7 @@ test.describe('Non-matching Placeholder Content', () => {
 });
 
 test.describe('Template Placeholder Replacement', () => {
-  test('replacing placeholder blocks with new content persists after reload', async ({ page }) => {
+  test('replacing slot blocks with new content persists after reload', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     const iframe = helper.getIframe();
 
@@ -212,14 +212,14 @@ test.describe('Template Placeholder Replacement', () => {
     const headerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Header' }).first();
     await expect(headerBlock).toContainText('Template Header - From Template', { timeout: 15000 });
 
-    // Verify placeholder blocks exist
+    // Verify slot blocks exist
     await expect(iframe.locator('[data-block-uid="user-content-1"]')).toBeVisible();
     await expect(iframe.locator('[data-block-uid="user-content-2"]')).toBeVisible();
 
     const initialCount = await helper.getBlockCount();
 
-    // Remove BOTH placeholder blocks - this is the bug scenario:
-    // all placeholder info for "primary" is now gone from the instance
+    // Remove BOTH slot blocks - this is the bug scenario:
+    // all slot info for "primary" is now gone from the instance
     await helper.clickBlockInIframe('user-content-1');
     await helper.openQuantaToolbarMenu('user-content-1');
     await helper.clickQuantaToolbarMenuOption('user-content-1', 'Remove');
@@ -230,7 +230,7 @@ test.describe('Template Placeholder Replacement', () => {
     await helper.clickQuantaToolbarMenuOption('user-content-2', 'Remove');
     await helper.waitForBlockToDisappear('user-content-2');
 
-    // All placeholder blocks are gone. After deleting user-content-2,
+    // All slot blocks are gone. After deleting user-content-2,
     // selection auto-moves to the previous block (the grid or its cell).
     // The grid block (fixed) has nextPlaceholder: "primary" from the merge,
     // so the add button should be visible at the page level.
@@ -264,15 +264,15 @@ test.describe('Template Placeholder Replacement', () => {
     const slateField = helper.getSlateField(newBlock);
     await expect(slateField).toBeVisible({ timeout: 5000 });
     await slateField.click();
-    await page.keyboard.type('New placeholder content');
-    await expect(slateField).toContainText('New placeholder content');
+    await page.keyboard.type('New slot content');
+    await expect(slateField).toContainText('New slot content');
 
     // Save (goes to view mode) — verify the new block persists after merge
     await helper.saveContent();
 
     // In view mode the bridge runs the merge again.
-    // The new block should survive because it inherited placeholder: "primary".
-    const newContentBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'New placeholder content' });
+    // The new block should survive because it inherited slotId: "primary".
+    const newContentBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'New slot content' });
     await expect(newContentBlock).toBeVisible({ timeout: 15000 });
 
     // Verify order after reload: header, grid, new content, footer
@@ -282,7 +282,7 @@ test.describe('Template Placeholder Replacement', () => {
 });
 
 test.describe('Template Sidebar Placeholder Sections', () => {
-  test('sidebar groups template children by placeholder with fixed blocks between', async ({ page }) => {
+  test('sidebar groups template children by slotId with fixed blocks between', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -317,7 +317,7 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     const primaryItems = primarySection.locator('.child-block-item');
     await expect(primaryItems).toHaveCount(2);
 
-    // Drag handles should be visible on placeholder blocks (they're draggable)
+    // Drag handles should be visible on slot blocks (they're draggable)
     const dragHandles = primarySection.locator('.drag-handle');
     await expect(dragHandles).toHaveCount(2);
 
@@ -327,7 +327,7 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     }
   });
 
-  test('DnD reorders blocks within a placeholder section', async ({ page }) => {
+  test('DnD reorders blocks within a slot section', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     const iframe = helper.getIframe();
 
@@ -343,7 +343,7 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     await page.locator('.sidebar-section-header[data-is-current="true"] .nav-back').click();
     await page.waitForTimeout(200);
 
-    // Find the Primary placeholder section
+    // Find the Primary slot section
     const primarySection = page.locator('.container-field-section').filter({
       has: page.locator('.widget-title', { hasText: 'Primary' }),
     });
@@ -379,7 +379,7 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     }).toPass({ timeout: 5000 });
   });
 
-  test('add block into placeholder section via sidebar [+] button', async ({ page }) => {
+  test('add block into slot section via sidebar [+] button', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     const iframe = helper.getIframe();
 
@@ -395,7 +395,7 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     await page.locator('.sidebar-section-header[data-is-current="true"] .nav-back').click();
     await page.waitForTimeout(200);
 
-    // Find the Primary placeholder section
+    // Find the Primary slot section
     const primarySection = page.locator('.container-field-section').filter({
       has: page.locator('.widget-title', { hasText: 'Primary' }),
     });

@@ -410,6 +410,30 @@
           ]
         }
       ]
+    },
+    "empty-text-split-1": {
+      "@type": "slate",
+      "value": [
+        {
+          "children": [
+            {
+              "text": "You can override the look of the '+' button by rendering something inside the empty block and adding "
+            },
+            {
+              "children": [
+                {
+                  "text": "data-block-add=\"button\""
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "text": " to it."
+            }
+          ],
+          "type": "p"
+        }
+      ]
     }
   },
   "blocks_layout": {

@@ -32,13 +32,13 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-grid",
-      "placeholder": "schema",
+      "slotId": "schema",
       "tabs": [
         {
           "@id": "ref-grid-schema-javascript-af1095",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  \"columns\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"top_images\": {\n          \"title\": \"Top Images\",\n          \"widget\": \"blocks_layout\",\n          \"allowedBlocks\": [\n            \"image\"\n          ]\n        },\n        \"columns\": {\n          \"title\": \"Columns\",\n          \"widget\": \"blocks_layout\",\n          \"allowedBlocks\": [\n            \"column\"\n          ],\n          \"maxLength\": 4\n        }\n      }\n    }\n  },\n  \"column\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"blocks_layout\": {\n          \"title\": \"Content\",\n          \"widget\": \"blocks_layout\",\n          \"allowedBlocks\": [\n            \"slate\",\n            \"image\"\n          ],\n          \"defaultBlockType\": \"slate\"\n        }\n      }\n    }\n  }\n}"
+          "code": "{\n  \"gridBlock\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"columns\": {\n          \"title\": \"Columns\",\n          \"widget\": \"object_list\",\n          \"schema\": {\n            \"properties\": {\n              \"blocks_layout\": {\n                \"title\": \"Content\",\n                \"widget\": \"blocks_layout\",\n                \"defaultBlockType\": \"slate\"\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },
@@ -46,13 +46,13 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-grid",
-      "placeholder": "json-data",
+      "slotId": "json-data",
       "tabs": [
         {
           "@id": "ref-grid-json-data-json-5ff79e",
           "label": "JSON Block Data",
           "language": "json",
-          "code": "{\n  \"@type\": \"columns\",\n  \"title\": \"Our Services\",\n  \"blocks\": {\n    \"col-1\": {\n      \"@type\": \"column\",\n      \"title\": \"Design\",\n      \"blocks\": {\n        \"text-1\": {\n          \"@type\": \"slate\",\n          \"value\": [\n            {\n              \"type\": \"p\",\n              \"children\": [\n                {\n                  \"text\": \"We craft beautiful interfaces.\"\n                }\n              ]\n            }\n          ]\n        }\n      },\n      \"blocks_layout\": {\n        \"items\": [\n          \"text-1\"\n        ]\n      }\n    },\n    \"col-2\": {\n      \"@type\": \"column\",\n      \"title\": \"Engineering\",\n      \"blocks\": {\n        \"text-2\": {\n          \"@type\": \"slate\",\n          \"value\": [\n            {\n              \"type\": \"p\",\n              \"children\": [\n                {\n                  \"text\": \"We build robust systems.\"\n                }\n              ]\n            }\n          ]\n        }\n      },\n      \"blocks_layout\": {\n        \"items\": [\n          \"text-2\"\n        ]\n      }\n    }\n  },\n  \"columns\": {\n    \"items\": [\n      \"col-1\",\n      \"col-2\"\n    ]\n  }\n}"
+          "code": "{\n  \"@type\": \"gridBlock\",\n  \"columns\": [\n    {\n      \"@id\": \"col-1\",\n      \"blocks\": {\n        \"heading-1\": {\n          \"@type\": \"slate\",\n          \"value\": [{\"type\": \"h3\", \"children\": [{\"text\": \"Design\"}]}]\n        },\n        \"text-1\": {\n          \"@type\": \"slate\",\n          \"value\": [{\"type\": \"p\", \"children\": [{\"text\": \"We craft beautiful interfaces that users love.\"}]}]\n        }\n      },\n      \"blocks_layout\": {\n        \"items\": [\"heading-1\", \"text-1\"]\n      }\n    },\n    {\n      \"@id\": \"col-2\",\n      \"blocks\": {\n        \"img-1\": {\n          \"@type\": \"image\",\n          \"url\": \"https://placehold.co/600x400\",\n          \"alt\": \"Placeholder\"\n        }\n      },\n      \"blocks_layout\": {\n        \"items\": [\"img-1\"]\n      }\n    },\n    {\n      \"@id\": \"col-3\",\n      \"blocks\": {\n        \"teaser-1\": {\n          \"@type\": \"teaser\",\n          \"title\": \"Learn More\",\n          \"description\": \"Explore the full documentation.\",\n          \"href\": [{\"@id\": \"/concepts/architecture\"}]\n        }\n      },\n      \"blocks_layout\": {\n        \"items\": [\"teaser-1\"]\n      }\n    }\n  ]\n}"
         }
       ]
     },
@@ -60,49 +60,33 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-grid",
-      "placeholder": "rendering",
+      "slotId": "rendering",
       "tabs": [
         {
           "@id": "ref-grid-rendering-jsx-f30d80",
           "label": "React",
           "language": "jsx",
-          "code": "function GridBlock({ block }) {\n  const blocks = block.blocks || {};\n  const items = block.blocks_layout?.items || [];\n\n  return (\n    <div data-block-uid={block['@uid']} className=\"grid-block\">\n      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }}>\n        {items.map(id => {\n          const child = { ...blocks[id], '@uid': id };\n          return (\n            <div key={id} className=\"grid-cell\">\n              <BlockRenderer block={child} />\n            </div>\n          );\n        })}\n      </div>\n    </div>\n  );\n}"
+          "code": "import { expandListingBlocks } from '@hydra-js/hydra.js';\n\nfunction GridBlock({ block, blockId }) {\n  const columns = block.columns || [];\n\n  function expand(layout, blocks, containerId) {\n    return expandListingBlocks(layout, { blocks, containerId });\n  }\n\n  return (\n    <div data-block-uid={blockId} className=\"grid-block\">\n      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns.length}, 1fr)`, gap: '1rem' }}>\n        {columns.map(col => {\n          const items = expand(col.blocks_layout?.items || [], col.blocks, col['@id']);\n          return (\n            <div key={col['@id']} data-block-uid={col['@id']} className=\"grid-column\">\n              {items.map(item => (\n                <BlockRenderer key={item['@uid']} block={item} />\n              ))}\n            </div>\n          );\n        })}\n      </div>\n    </div>\n  );\n}"
         },
         {
           "@id": "ref-grid-rendering-vue-1d61ab",
           "label": "Vue",
           "language": "vue",
-          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"grid-block\">\n    <div :style=\"{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }\">\n      <div v-for=\"id in items\" :key=\"id\" class=\"grid-cell\">\n        <BlockRenderer :block=\"{ ...block.blocks[id], '@uid': id }\" />\n      </div>\n    </div>\n  </div>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nconst props = defineProps({ block: Object });\nconst items = computed(() => props.block.blocks_layout?.items || []);\n</script>"
+          "code": "<template>\n  <div :data-block-uid=\"id\" class=\"grid-block\">\n    <div :style=\"{ display: 'grid', gridTemplateColumns: `repeat(${columns.length}, 1fr)`, gap: '1rem' }\">\n      <div v-for=\"col in columns\" :key=\"col['@id']\" :data-block-uid=\"col['@id']\" class=\"grid-column\">\n        <Block v-for=\"item in expand(col.blocks_layout?.items || [], col.blocks, col['@id'])\"\n          :key=\"item['@uid']\" :data=\"item\" />\n      </div>\n    </div>\n  </div>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nimport { expandListingBlocks } from '@hydra-js/hydra.js';\nconst props = defineProps({ block: Object, id: String });\nconst columns = computed(() => props.block.columns || []);\nfunction expand(layout, blocks, containerId) {\n  return expandListingBlocks(layout, { blocks, containerId });\n}\n</script>"
         },
         {
           "@id": "ref-grid-rendering-svelte-8158ec",
           "label": "Svelte",
           "language": "svelte",
-          "code": "<script>\n  import BlockRenderer from './BlockRenderer.svelte';\n  export let block;\n  $: blocks = block.blocks || {};\n  $: items = block.blocks_layout?.items || [];\n</script>\n\n<div data-block-uid={block['@uid']} class=\"grid-block\">\n  <div style=\"display: grid; grid-template-columns: repeat({items.length}, 1fr); gap: 1rem\">\n    {#each items as id (id)}\n      <div class=\"grid-cell\">\n        <BlockRenderer block={{ ...blocks[id], '@uid': id }} />\n      </div>\n    {/each}\n  </div>\n</div>"
+          "code": "<script>\n  import BlockRenderer from './BlockRenderer.svelte';\n  import { expandListingBlocks } from '@hydra-js/hydra.js';\n  export let block;\n  export let blockId;\n  $: columns = block.columns || [];\n  function expand(layout, blocks, containerId) {\n    return expandListingBlocks(layout, { blocks, containerId });\n  }\n</script>\n\n<div data-block-uid={blockId} class=\"grid-block\">\n  <div style=\"display: grid; grid-template-columns: repeat({columns.length}, 1fr); gap: 1rem\">\n    {#each columns as col (col['@id'])}\n      <div data-block-uid={col['@id']} class=\"grid-column\">\n        {#each expand(col.blocks_layout?.items || [], col.blocks, col['@id']) as item (item['@uid'])}\n          <BlockRenderer block={item} />\n        {/each}\n      </div>\n    {/each}\n  </div>\n</div>"
         }
       ]
-    },
-    "ref-columns-sep": {
-      "@type": "separator",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-columns",
-      "placeholder": "sep"
-    },
-    "ref-columns-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-columns",
-      "placeholder": "heading"
     },
     "ref-columns-schema": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-columns",
-      "placeholder": "schema",
+      "slotId": "schema",
       "tabs": [
         {
           "@id": "ref-columns-schema-javascript-fc2b91",
@@ -116,7 +100,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-columns",
-      "placeholder": "json-data",
+      "slotId": "json-data",
       "tabs": [
         {
           "@id": "ref-columns-json-data-json-b525fc",
@@ -130,7 +114,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-columns",
-      "placeholder": "rendering",
+      "slotId": "rendering",
       "tabs": [
         {
           "@id": "ref-columns-rendering-jsx-4200f0",
@@ -158,8 +142,6 @@
       "d3f1c443-583f-4e8e-a682-3bf25752a300",
       "616b625c-b79f-4881-8536-b67a9e401a7d",
       "7624cf59-05d0-4055-8f55-5fd6597d84b0",
-      "ref-columns-sep",
-      "ref-columns-heading",
       "ref-grid-schema",
       "ref-grid-json-data",
       "ref-grid-rendering"

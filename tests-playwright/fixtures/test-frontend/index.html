@@ -340,7 +340,7 @@
                                 properties: {
                                     blocks_layout: {
                                         title: 'Blocks',
-                                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest'],
+                                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest', 'title', 'description'],
                                         allowedTemplates: ['/_test_data/templates/test-layout'],
                                         allowedLayouts: [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
                                     },
@@ -355,7 +355,7 @@
                         blocks: { ...sharedBlocksConfig },
                         debug: true,
                         // Pass onEditChange before init() sends INIT to avoid race condition
-                        onEditChange: async (formData) => {
+                        onEditChange: (formData) => {
                             window._formDataCount++;
                             tfLog(`FORM_DATA #${window._formDataCount} received, blocks_layout:`, formData.blocks_layout?.items);
 
@@ -379,8 +379,8 @@
                             // Store formData globally so block renderers (e.g. TOC) can access page context
                             window._currentFormData = formData;
 
-                            // Re-render content with updated data
-                            // Return promise so hydra.js can materialize comments after DOM is ready
+                            // Re-render content with updated data (fire and forget —
+                            // hydra.js uses waitForContentReady to know when DOM is ready)
                             if (formData.blocks && formData.blocks_layout) {
                                 // Debug: Log column contents
                                 const col1 = formData.blocks?.['columns-1']?.columns?.['col-1'];
@@ -390,7 +390,7 @@
                                     tfLog('col-2 blocks_layout:', col2?.blocks_layout?.items);
                                 }
                                 tfLog('Re-rendering blocks with updated data');
-                                return await renderContentWithListings(formData);
+                                renderContentWithListings(formData);
                             }
                         },
                     });

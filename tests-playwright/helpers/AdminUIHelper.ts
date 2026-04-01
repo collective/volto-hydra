@@ -183,8 +183,16 @@ export class AdminUIHelper {
     const currentUrl = this.page.url();
     const isOnVoltoPage = currentUrl.startsWith(this.adminUrl);
 
+    // Navigate to edit mode first (reliable), then switch to view.
+    // Direct pushState to view mode triggers Volto SSR which may crash
+    // with "window is not defined" on pages with iframe components.
     if (isOnVoltoPage) {
-      // Client-side navigation via pushState + popstate
+      await this.page.evaluate((path) => {
+        window.history.pushState({}, '', path + '/edit');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }, contentPath);
+      await this.page.waitForURL(`${this.adminUrl}${contentPath}/edit`, { timeout: 10000 });
+      // Switch to view mode
       await this.page.evaluate((path) => {
         window.history.pushState({}, '', path);
         window.dispatchEvent(new PopStateEvent('popstate'));
@@ -805,7 +813,7 @@ export class AdminUIHelper {
    */
   async expectTemplateSettingsCount(expected: number, timeout: number = 5000): Promise<void> {
     const container = this.page.locator('#sidebar-template-settings');
-    const sections = container.locator('.field-wrapper-placeholder');
+    const sections = container.locator('.field-wrapper-slotId');
     await expect(sections).toHaveCount(expected, { timeout });
   }
 
@@ -1231,7 +1239,7 @@ export class AdminUIHelper {
         async () => {
           return await editor.evaluate(() => {
             const selection = window.getSelection();
-            return selection ? selection.toString() : '';
+            return selection ? selection.toString().replace(/[\uFEFF\u200B]/g, '') : '';
           });
         },
         {
@@ -1334,6 +1342,12 @@ export class AdminUIHelper {
    * Get selection state info from an editor element.
    * Useful for debugging selection/focus issues.
    */
+  async getCleanSelectionText(locator: Locator): Promise<string> {
+    return await locator.evaluate(() => {
+      return (window.getSelection()?.toString() || '').replace(/[\uFEFF\u200B]/g, '');
+    });
+  }
+
   async getSelectionInfo(editor: Locator): Promise<{
     rangeCount: number;
     isCollapsed: boolean;
@@ -2124,7 +2138,25 @@ export class AdminUIHelper {
    * Finds the last non-whitespace text node and places cursor at the end of it.
    * This works correctly on both mock (flat structure) and Nuxt (nested p/span structure).
    */
+  /**
+   * Wait for hydra.js pointer-events blocking to clear.
+   * During re-render and format operations, hydra.js injects a <style> with
+   * `body { pointer-events: none }` into <head>. This must be cleared before
+   * any cursor or click interaction in the iframe.
+   */
+  async waitForPointerUnblocked(timeout = 5000): Promise<void> {
+    const iframe = this.getIframe();
+    await expect(async () => {
+      const blocked = await iframe.locator('body').evaluate((body: any) => {
+        return body.ownerDocument.defaultView.getComputedStyle(body).pointerEvents === 'none';
+      });
+      expect(blocked, 'pointer-events still blocked').toBe(false);
+    }).toPass({ timeout });
+  }
+
   async moveCursorToEnd(editor: any): Promise<void> {
+    await this.waitForPointerUnblocked();
+
     await editor.evaluate((el: any) => {
       const range = el.ownerDocument.createRange();
       const selection = el.ownerDocument.defaultView.getSelection();
@@ -2160,6 +2192,15 @@ export class AdminUIHelper {
       selection.removeAllRanges();
       selection.addRange(range);
     });
+
+    // Wait for the selection to settle at a collapsed position at the end
+    await expect(async () => {
+      const selInfo = await editor.evaluate((el: any) => {
+        const sel = el.ownerDocument.defaultView.getSelection();
+        return { collapsed: sel?.isCollapsed, offset: sel?.anchorOffset, text: sel?.anchorNode?.textContent?.substring(0, 20) };
+      });
+      expect(selInfo.collapsed, `Selection not collapsed: ${JSON.stringify(selInfo)}`).toBe(true);
+    }).toPass({ timeout: 2000 });
   }
 
   /**
@@ -3208,25 +3249,25 @@ export class AdminUIHelper {
     insertAfter: boolean
   ): Promise<{ x: number; y: number }> {
     // For multi-element blocks (listings), use first/last element depending on direction
-    // - insertAfter=true: target last element (drop below the listing)
-    // - insertAfter=false: target first element (drop above the listing)
     const mode = insertAfter ? 'last' : 'first';
-    const rect = await this.getCombinedBoundingBox(targetBlock, mode);
 
-    // Get iframe position in page coordinates
-    const iframeEl = this.page.locator('#previewIframe');
-    const iframeRect = await iframeEl.boundingBox();
-    if (!iframeRect) {
-      throw new Error('Could not get iframe bounding box');
+    // Use Playwright's boundingBox() which returns correct page coordinates
+    // for elements inside iframes — no manual iframe offset math needed.
+    const elements = await targetBlock.all();
+    const targetEl = mode === 'last' ? elements[elements.length - 1] : elements[0];
+    const box = await targetEl.boundingBox();
+    if (!box) {
+      throw new Error('Could not get target block bounding box');
     }
 
-    // Position cursor at center of bottom/top half (55%/45%) - closer to center to avoid
-    // edge detection issues where hydra.js might detect the adjacent block instead
+    // Position cursor at 75% (after) or 25% (before) of the block.
+    // The drop logic uses blockSize/2 as threshold. Cursor must be inside
+    // the block so elementFromPoint hits it.
     const result = {
-      x: iframeRect.x + rect.x + rect.width / 2,
+      x: box.x + box.width / 2,
       y: insertAfter
-        ? iframeRect.y + rect.y + rect.height * 0.55
-        : iframeRect.y + rect.y + rect.height * 0.45,
+        ? box.y + box.height * 0.75
+        : box.y + box.height * 0.25,
     };
 
     return result;

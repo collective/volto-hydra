@@ -14,15 +14,15 @@ import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '
 export { getBlockTypeSchema };
 
 /**
- * Generate a unique placeholder name based on block type.
+ * Generate a unique slotId name based on block type.
  * Format: "blocktype-N" where N is the next available number.
  */
-function generatePlaceholder(blockType, allBlocks) {
+function generateSlotId(blockType, allBlocks) {
   const baseType = blockType || 'block';
   const existingNames = new Set();
 
   for (const block of Object.values(allBlocks || {})) {
-    if (block?.placeholder) existingNames.add(block.placeholder);
+    if (block?.slotId) existingNames.add(block.slotId);
   }
 
   let counter = 1;
@@ -35,8 +35,8 @@ function generatePlaceholder(blockType, allBlocks) {
 
 /**
  * Check if a position is inside a template by looking at neighbor blocks.
- * Returns { templateId, templateInstanceId, placeholder } if inside a template, undefined otherwise.
- * The placeholder is inherited from adjacent non-fixed placeholder blocks.
+ * Returns { templateId, templateInstanceId, slotId } if inside a template, undefined otherwise.
+ * The slotId is inherited from adjacent non-fixed slot blocks.
  *
  * Template membership is determined by the TARGET block of the insertion:
  * - "insert after X" → inherit from X (the block we're inserting after)
@@ -64,16 +64,16 @@ function getTemplateInfoFromNeighbors(context) {
   const containerLength = items ? items.length : layoutItems?.length || 0;
 
   if (containerLength === 0) {
-    // Empty container — check if parent container has childPlaceholders for this field.
-    // This handles the case where all blocks in a placeholder region inside a container
+    // Empty container — check if parent container has childSlotIds for this field.
+    // This handles the case where all blocks in a slot region inside a container
     // have been deleted, leaving the container field empty.
     if (containerId && field && allBlocks) {
       const parentBlock = allBlocks?.[containerId];
-      if (parentBlock?.templateId && parentBlock?.childPlaceholders?.[field]) {
+      if (parentBlock?.templateId && parentBlock?.childSlotIds?.[field]) {
         return {
           templateId: parentBlock.templateId,
           templateInstanceId: parentBlock.templateInstanceId,
-          placeholder: parentBlock.childPlaceholders[field],
+          slotId: parentBlock.childSlotIds[field],
           fixed: true,
           readOnly: true,
         };
@@ -104,28 +104,28 @@ function getTemplateInfoFromNeighbors(context) {
     readOnly: primaryNeighbor.readOnly || false,
   };
 
-  // Inherit placeholder from the primary neighbor if it's not fixed
-  // For placeholder inheritance, also check the secondary neighbor
-  let inheritedPlaceholder = null;
+  // Inherit slotId from the primary neighbor if it's not fixed
+  // For slotId inheritance, also check the secondary neighbor
+  let inheritedSlotId = null;
   const secondaryNeighbor = insertAfter ? nextNeighbor : prevNeighbor;
 
   let fromNextPlaceholder = false;
   for (const neighbor of [primaryNeighbor, secondaryNeighbor].filter(Boolean)) {
     if (neighbor?.templateId === templateInfo.templateId) {
-      // Same template - can inherit placeholder
-      if (!neighbor.fixed && neighbor.placeholder && !inheritedPlaceholder) {
-        inheritedPlaceholder = neighbor.placeholder;
+      // Same template - can inherit slotId
+      if (!neighbor.fixed && neighbor.slotId && !inheritedSlotId) {
+        inheritedSlotId = neighbor.slotId;
       }
-      // Fixed blocks with nextPlaceholder indicate an adjacent placeholder region.
-      // This preserves placeholder info even when all placeholder blocks are deleted.
-      if (neighbor.fixed && neighbor.nextPlaceholder && !inheritedPlaceholder) {
-        inheritedPlaceholder = neighbor.nextPlaceholder;
+      // Fixed blocks with nextSlotId indicate an adjacent slot region.
+      // This preserves slot info even when all slot blocks are deleted.
+      if (neighbor.fixed && neighbor.nextSlotId && !inheritedSlotId) {
+        inheritedSlotId = neighbor.nextSlotId;
         fromNextPlaceholder = true;
       }
     }
   }
 
-  // nextPlaceholder overrides: the new block is in a placeholder region,
+  // nextSlotId overrides: the new block is in a slot region,
   // so it should not inherit fixed/readOnly from the fixed neighbor.
   if (fromNextPlaceholder) {
     templateInfo.fixed = false;
@@ -134,7 +134,7 @@ function getTemplateInfoFromNeighbors(context) {
 
   return {
     ...templateInfo,
-    placeholder: inheritedPlaceholder,
+    slotId: inheritedSlotId,
   };
 }
 
@@ -145,7 +145,7 @@ function getTemplateInfoFromNeighbors(context) {
  *
  * Also handles template field inheritance: if adding a block inside
  * a template (adjacent to blocks with templateId), inherits
- * the template fields with a generated placeholder name.
+ * the template fields with a generated slotId.
  *
  * @param {Object} blockData - The new block's data (with @type)
  * @param {Object} context - Extended context for defaults
@@ -187,8 +187,8 @@ export function applyBlockDefaultsWithContext(blockData, context) {
     // Inside a template - derive the template fields
     const derivedTemplateId = neighborTemplateInfo.templateId;
     const derivedInstanceId = neighborTemplateInfo.templateInstanceId;
-    // Priority: keep existing placeholder > inherit from neighbors > generate new
-    const derivedPlaceholder = blockData.placeholder || neighborTemplateInfo.placeholder || generatePlaceholder(blockType, allBlocks);
+    // Priority: keep existing slotId > inherit from neighbors > generate new
+    const derivedSlotId = blockData.slotId || neighborTemplateInfo.slotId || generateSlotId(blockType, allBlocks);
 
     schema.properties.templateId = {
       choices: [derivedTemplateId],
@@ -198,9 +198,9 @@ export function applyBlockDefaultsWithContext(blockData, context) {
       choices: [derivedInstanceId],
       default: derivedInstanceId,
     };
-    schema.properties.placeholder = {
-      choices: [derivedPlaceholder],
-      default: derivedPlaceholder,
+    schema.properties.slotId = {
+      choices: [derivedSlotId],
+      default: derivedSlotId,
     };
     schema.properties.fixed = {
       default: neighborTemplateInfo.fixed,
@@ -218,7 +218,7 @@ export function applyBlockDefaultsWithContext(blockData, context) {
       choices: [undefined],
       default: undefined,
     };
-    schema.properties.placeholder = {
+    schema.properties.slotId = {
       choices: [undefined],
       default: undefined,
     };

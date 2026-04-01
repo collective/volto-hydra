@@ -11,6 +11,7 @@ export default defineNuxtConfig({
     preset: 'static',
     prerender: {
       failOnError: false, // IPX image routes may 500 during local build
+      requestTimeout: 30000, // 30s timeout for SSG fetch requests (default 10s)
     },
   },
   app: {

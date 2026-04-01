@@ -148,7 +148,7 @@
           "@id": "ce-7-json-a9738a",
           "label": "Json",
           "language": "json",
-          "code": "{\n  \"blocks\": {\n    \"header\": { \"@type\": \"slate\", \"fixed\": true,\n               \"readOnly\": true, \"placeholder\": \"header\" },\n    \"content\": { \"@type\": \"slate\", \"placeholder\": \"default\" },\n    \"footer\": { \"@type\": \"slate\", \"fixed\": true,\n               \"readOnly\": true, \"placeholder\": \"footer\" }\n  }\n}"
+          "code": "{\n  \"blocks\": {\n    \"header\": { \"@type\": \"slate\", \"fixed\": true,\n               \"readOnly\": true, \"slotId\": \"header\" },\n    \"content\": { \"@type\": \"slate\", \"slotId\": \"default\" },\n    \"footer\": { \"@type\": \"slate\", \"fixed\": true,\n               \"readOnly\": true, \"slotId\": \"footer\" }\n  }\n}"
         }
       ]
     },
@@ -420,7 +420,6 @@
     },
     "h-22": {
       "@type": "slate",
-      "plaintext": "How the Merge Works",
       "value": [
         {
           "type": "h2",
@@ -465,7 +464,7 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Insert in their place the template content: if fixed and readOnly, just insert it; if fixed, copy block content (not including block fields) from a page block with the same placeholder name; if a placeholder, don't insert it, but insert the previous blocks with the same placeholder name."
+                  "text": "Insert in their place the template content: if fixed and readOnly, just insert it; if fixed, copy block content (not including block fields) from a page block with the same slotId; if a slot block, don't insert it, but insert the previous blocks with the same slotId."
                 }
               ]
             },
@@ -481,7 +480,7 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Any placeholder blocks left over are inserted at the end of a special placeholder called \"default\" if it exists, otherwise are dropped."
+                  "text": "Any slot blocks left over are inserted at the end of a special slot called \"default\" if it exists, otherwise are dropped."
                 }
               ]
             }
@@ -497,7 +496,7 @@
           "type": "p",
           "children": [
             {
-              "text": "When a layout is applied, the rules are the same but applied across a whole blocks field. Content without a placeholder name ends up:"
+              "text": "When a layout is applied, the rules are the same but applied across a whole blocks field. Content without a slotId ends up:"
             }
           ]
         }
@@ -514,7 +513,7 @@
               "type": "li",
               "children": [
                 {
-                  "text": "In the \"default\" placeholder if it exists"
+                  "text": "In the \"default\" slot if it exists"
                 }
               ]
             },
@@ -522,7 +521,7 @@
               "type": "li",
               "children": [
                 {
-                  "text": "In the bottom placeholder outside the last fixed template block"
+                  "text": "In the bottom slot outside the last fixed template block"
                 }
               ]
             },
@@ -530,7 +529,7 @@
               "type": "li",
               "children": [
                 {
-                  "text": "In the top placeholder outside the first fixed template block"
+                  "text": "In the top slot outside the first fixed template block"
                 }
               ]
             },
@@ -652,7 +651,7 @@
   "creators": [
     "admin"
   ],
-  "description": "Configure templates in initBridge, use fixed/placeholder blocks, and render with expandTemplatesSync",
+  "description": "Configure templates in initBridge, use fixed/slot blocks, and render with expandTemplatesSync",
   "effective": "2025-01-01T00:00:00",
   "exclude_from_nav": false,
   "expires": null,

@@ -128,7 +128,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // Select all text
     await page.keyboard.press('ControlOrMeta+a');
     await expect.poll(() =>
-      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+      helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
 
     // Apply bold — this blocks input for 500ms
@@ -172,7 +172,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // Select all and apply bold to create formatted content
     await page.keyboard.press('ControlOrMeta+a');
     await expect.poll(() =>
-      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+      helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
     await page.keyboard.press('ControlOrMeta+b');
 
@@ -182,7 +182,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // Now select all the bold text
     await page.keyboard.press('ControlOrMeta+a');
     await expect.poll(() =>
-      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+      helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
 
     // Backspace deletes the formatted selection → triggers delete transform (300ms delay)
@@ -223,7 +223,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // Apply bold to create formatted content
     await page.keyboard.press('ControlOrMeta+a');
     await expect.poll(() =>
-      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+      helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
     await page.keyboard.press('ControlOrMeta+b');
     await helper.waitForFormattedText(editable, 'Text to format', 'bold', { timeout: 5000 });
@@ -231,7 +231,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // Select all bold text and delete — triggers delete transform
     await page.keyboard.press('ControlOrMeta+a');
     await expect.poll(() =>
-      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+      helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
     await page.keyboard.press('Backspace');
 
@@ -265,7 +265,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // Apply bold to create formatted content
     await page.keyboard.press('ControlOrMeta+a');
     await expect.poll(() =>
-      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+      helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
     await page.keyboard.press('ControlOrMeta+b');
     await helper.waitForFormattedText(editable, 'Text to format', 'bold', { timeout: 5000 });
@@ -273,7 +273,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // Select all bold text and delete — triggers delete transform
     await page.keyboard.press('ControlOrMeta+a');
     await expect.poll(() =>
-      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+      helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
     await page.keyboard.press('Backspace');
 
@@ -343,7 +343,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // Select all and apply bold — blocks input for 500ms
     await page.keyboard.press('ControlOrMeta+a');
     await expect.poll(() =>
-      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+      helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
     await page.keyboard.press('ControlOrMeta+b');
     await page.waitForTimeout(50); // Let blocking kick in
@@ -374,7 +374,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // Select all text and apply bold — blocks input for 500ms
     await page.keyboard.press('ControlOrMeta+a');
     await expect.poll(() =>
-      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+      helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
     await page.keyboard.press('ControlOrMeta+b');
     await page.waitForTimeout(50);
@@ -408,7 +408,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // Select all text and apply bold — blocks input for 500ms
     await page.keyboard.press('ControlOrMeta+a');
     await expect.poll(() =>
-      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+      helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
     await page.keyboard.press('ControlOrMeta+b');
     await page.waitForTimeout(50);
@@ -447,7 +447,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // Select all text and apply bold — blocks input for 500ms
     await page.keyboard.press('ControlOrMeta+a');
     await expect.poll(() =>
-      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+      helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
     await page.keyboard.press('ControlOrMeta+b');
     await page.waitForTimeout(50);
@@ -487,7 +487,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // Select all text and apply bold — blocks input for 500ms
     await page.keyboard.press('ControlOrMeta+a');
     await expect.poll(() =>
-      iframe.locator('[contenteditable="true"]').evaluate(() => window.getSelection()?.toString())
+      helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
     await page.keyboard.press('ControlOrMeta+b');
     await page.waitForTimeout(50);

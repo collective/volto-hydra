@@ -283,7 +283,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-text",
-      "placeholder": "schema",
+      "slotId": "schema",
       "tabs": [
         {
           "@id": "ref-text-schema-javascript-6ffd2e",
@@ -297,7 +297,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-text",
-      "placeholder": "json-data",
+      "slotId": "json-data",
       "tabs": [
         {
           "@id": "ref-text-json-data-json-f6d82b",
@@ -311,7 +311,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-text",
-      "placeholder": "rendering",
+      "slotId": "rendering",
       "tabs": [
         {
           "@id": "ref-text-rendering-jsx-076433",
@@ -333,27 +333,11 @@
         }
       ]
     },
-    "ref-slate-sep": {
-      "@type": "separator",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-slate",
-      "placeholder": "sep"
-    },
-    "ref-slate-heading": {
-      "@type": "slate",
-      "fixed": true,
-      "readOnly": true,
-      "templateId": "resolveuid/tpl-block-reference-layout",
-      "templateInstanceId": "tpl-inst-slate",
-      "placeholder": "heading"
-    },
     "ref-slate-schema": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
-      "placeholder": "schema",
+      "slotId": "schema",
       "tabs": [
         {
           "@id": "ref-slate-schema-javascript-36f411",
@@ -367,7 +351,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
-      "placeholder": "json-data",
+      "slotId": "json-data",
       "tabs": [
         {
           "@id": "ref-slate-json-data-json-0fbdba",
@@ -381,7 +365,7 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slate",
-      "placeholder": "rendering",
+      "slotId": "rendering",
       "tabs": [
         {
           "@id": "ref-slate-rendering-jsx-7f46e2",
@@ -423,8 +407,6 @@
       "486c4646-de10-40a9-9470-58b7b1449240",
       "f0a56edf-a963-4177-877c-76d9a4d6c20b",
       "00146980-5c86-4ecd-a84e-d373183231ad",
-      "ref-slate-sep",
-      "ref-slate-heading",
       "ref-text-schema",
       "ref-text-json-data",
       "ref-text-rendering"

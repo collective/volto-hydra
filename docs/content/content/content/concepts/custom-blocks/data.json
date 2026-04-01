@@ -91,7 +91,6 @@
     },
     "h-5": {
       "@type": "slate",
-      "plaintext": "Schema Enhancers",
       "value": [
         {
           "type": "h2",

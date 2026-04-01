@@ -23,13 +23,13 @@
     },
     "h-2": {
       "@type": "slate",
-      "plaintext": "SPA/Hybrid — Full Visual Editing",
+      "plaintext": "SPA/Hybrid \u2014 Full Visual Editing",
       "value": [
         {
           "type": "h2",
           "children": [
             {
-              "text": "SPA/Hybrid — Full Visual Editing"
+              "text": "SPA/Hybrid \u2014 Full Visual Editing"
             }
           ]
         }
@@ -100,13 +100,13 @@
     },
     "h-6": {
       "@type": "slate",
-      "plaintext": "SSG/SSR — Production Speed + Visual Editing",
+      "plaintext": "SSG/SSR \u2014 Production Speed + Visual Editing",
       "value": [
         {
           "type": "h2",
           "children": [
             {
-              "text": "SSG/SSR — Production Speed + Visual Editing"
+              "text": "SSG/SSR \u2014 Production Speed + Visual Editing"
             }
           ]
         }

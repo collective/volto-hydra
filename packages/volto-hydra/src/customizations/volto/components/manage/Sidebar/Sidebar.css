@@ -180,7 +180,18 @@
 }
 
 .hydra-sidebar .child-blocks-list {
-  padding: 8px 0;
+  padding: 0;
+}
+
+/* Remove margins from react-beautiful-dnd draggable wrappers and
+   any Semantic UI form field styling that leaks into the blocks list */
+.hydra-sidebar .child-blocks-list > div {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.hydra-sidebar .child-blocks-list [data-rbd-draggable-context-id] {
+  margin: 0 !important;
 }
 
 .hydra-sidebar .child-block-item {

@@ -116,7 +116,7 @@ for (const mdFile of mdFiles) {
 const MD_TO_CONTENT_UID = {
   'accordion.md': 'f8cd4a2d8d7c4703b4e41d2093b21aed',
   'button.md': '405582582e70493c96a6c549444a1eaa',
-  'columns.md': '99c70917b6894af08dd306fdbc0eff6a',
+  'grid.md': '99c70917b6894af08dd306fdbc0eff6a',
   'form.md': '13de82575e16493fbc54514e548a9f3c',
   'heading.md': '2f69aa417e894fd3bf23d393287b369e',
   'highlight.md': '8416628543f146ff9a18d281c03e2399',

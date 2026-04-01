@@ -50,6 +50,72 @@ const getFieldTypeString = (field) => {
  * Validates if a selection is valid for the given slate value.
  * Returns true if all paths in the selection exist in the document.
  */
+/**
+ * Scan all slate blocks for multi-node values and split them into
+ * separate blocks. Returns null if no splits needed, or { formData, selectBlockId }.
+ */
+function splitMultiNodeSlateBlocks(formData, blockPathMap, blocksConfig, uuidGenerator, selection) {
+  let result = formData;
+  let selectBlockId = null;
+
+  for (const [blockId, pathInfo] of Object.entries(blockPathMap)) {
+    if (blockId.startsWith('_')) continue;
+    const blockType = pathInfo.blockType;
+    if (!blockType || blockType === 'title' || blockType === 'description') continue;
+
+    const block = getBlockById(result, blockPathMap, blockId);
+    if (!block) continue;
+
+    // Check slate fields for multiple top-level nodes
+    const schema = getResolvedSchema(pathInfo, blockPathMap);
+    if (!schema?.properties) continue;
+
+    for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
+      if (!isSlateFieldType(getFieldTypeString(fieldDef))) continue;
+      const value = block[fieldName];
+      if (!Array.isArray(value) || value.length <= 1) continue;
+
+      // Found a multi-node slate value — split it
+      const firstNode = [value[0]];
+      const restNodes = value.slice(1);
+
+      // Update current block to keep only the first node
+      const updatedBlock = { ...block, [fieldName]: firstNode };
+      result = updateBlockById(result, blockPathMap, blockId, updatedBlock);
+
+      // Create new blocks for each remaining top-level node.
+      // Chain inserts: each new block goes after the previous one.
+      const containerConfig = getContainerFieldConfig(blockId, blockPathMap, result, blocksConfig);
+      let afterBlockId = blockId;
+      for (let i = 0; i < restNodes.length; i++) {
+        const newBlockId = uuidGenerator();
+        const newBlockData = { '@type': 'slate', [fieldName]: [restNodes[i]] };
+        result = insertBlockInContainer(
+          result, blockPathMap, afterBlockId, newBlockId, newBlockData, containerConfig, 'after',
+        );
+        afterBlockId = newBlockId;
+        if (i === 0) selectBlockId = newBlockId;
+      }
+
+      // Translate selection: cursor at [N, ...] in the unsplit value maps
+      // to [0, ...] in the Nth new block.
+      let newSelection = null;
+      if (selection?.anchor?.path?.[0] > 0) {
+        const translatePath = (p) => [0, ...p.slice(1)];
+        newSelection = {
+          anchor: { ...selection.anchor, path: translatePath(selection.anchor.path) },
+          focus: { ...selection.focus, path: translatePath(selection.focus.path) },
+        };
+      }
+
+      // Only process one split per render cycle to avoid stale blockPathMap
+      return { formData: result, selectBlockId, selection: newSelection };
+    }
+  }
+
+  return null;
+}
+
 function isSelectionValidForValue(selection, slateValue) {
   if (!selection) return true; // No selection is always valid
   if (!slateValue || !Array.isArray(slateValue)) return false;
@@ -57,11 +123,16 @@ function isSelectionValidForValue(selection, slateValue) {
   const doc = { children: slateValue };
 
   try {
+    // Paths must resolve to text leaves, not element nodes.
+    // A path like [0, 0] pointing to a li element is not a valid
+    // cursor position — it must reach a text node like [0, 0, 0].
     if (selection.anchor?.path) {
-      Node.get(doc, selection.anchor.path);
+      const node = Node.get(doc, selection.anchor.path);
+      if (typeof node.text !== 'string') return false;
     }
     if (selection.focus?.path) {
-      Node.get(doc, selection.focus.path);
+      const node = Node.get(doc, selection.focus.path);
+      if (typeof node.text !== 'string') return false;
     }
     return true;
   } catch (e) {
@@ -88,7 +159,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems } from '../../utils/blockPath';
+import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema } from '../../utils/blockPath';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
@@ -295,6 +366,11 @@ const getUrlWithAdminParams = (url, token, isEdit) => {
   if (isEdit) {
     params._edit = 'true';
   }
+  // Forward debug param to iframe so hydra.js enables logging
+  const adminUrl = new URL(window.location.href);
+  if (adminUrl.searchParams.has('_hydra_debug')) {
+    params._hydra_debug = '1';
+  }
   return addUrlParams(`${url}`, params, contentPath);
 };
 function _isObject(item) {
@@ -415,6 +491,9 @@ function recurseUpdateVoltoConfig(newConfig) {
 let persistedIframe = { frontendUrl: null, path: null, isEdit: null, src: null };
 
 const Iframe = (props) => {
+  if (typeof window !== 'undefined' && window._formatT0) {
+    console.log('[VIEW-TIMING] Iframe render +' + (performance.now() - window._formatT0).toFixed(0) + 'ms');
+  }
   const {
     onSelectBlock,
     properties,
@@ -1097,7 +1176,7 @@ const Iframe = (props) => {
         const refIndex = existingItems.findIndex(item => item[idFld] === blockId);
         const position = action === 'after' ? refIndex + 1 : refIndex;
 
-        blockData = applyBlockDefaultsWithContext(blockData, {
+          blockData = applyBlockDefaultsWithContext(blockData, {
           position,
           insertAfter: action === 'after',
           items: existingItems,
@@ -1330,12 +1409,14 @@ const Iframe = (props) => {
     // Rebuild blockPathMap to reflect the deleted block
     // Do NOT set formData here - let the useEffect update it after sending FORM_DATA
     const newBlockPathMap = buildBlockPathMap(newFormData, mergedBlocksConfig, intl);
+    const selectAfterDeleteUid = selectPrev ? selectAfterDelete : null;
     setIframeSyncState(prev => ({
       ...prev,
       blockPathMap: newBlockPathMap,
+      ...(selectAfterDeleteUid ? { pendingSelectBlockUid: selectAfterDeleteUid } : {}),
     }));
     onChangeFormData(newFormData);
-    onSelectBlock(selectPrev ? selectAfterDelete : null);
+    onSelectBlock(selectAfterDeleteUid);
     setAddNewBlockOpened(false);
     dispatch(setSidebarTab(1));
   };
@@ -1567,6 +1648,8 @@ const Iframe = (props) => {
         }
 
         case 'SLATE_TRANSFORM_REQUEST':
+          window._formatT0 = performance.now();
+          console.log('[VIEW-TIMING] SLATE_TRANSFORM_REQUEST received');
           // Validate data from postMessage before using it
           validateAndLog(event.data.data, 'SLATE_TRANSFORM_REQUEST', blockFieldTypes);
 
@@ -1790,6 +1873,130 @@ const Iframe = (props) => {
               onChangeFormData(fd);
               dispatch(setSidebarTab(1));
             }
+          } else if (event.data.transformType === 'unwrapBlock' && event.data.isFirstField && !event.data.isEmpty && (() => {
+            // Check if block's root node is already a default paragraph — only then merge.
+            // Non-default types (headings, lists) should go to toolbar for unwrap first.
+            const checkBlock = event.data.data?.blocks?.[event.data.blockId];
+            const checkValue = checkBlock?.[event.data.fieldName || 'value'];
+            const defaultType = config.settings?.slate?.defaultBlockType || 'p';
+            return Array.isArray(checkValue) && checkValue[0]?.type === defaultType;
+          })()) {
+            // Backspace at start of non-empty default paragraph — merge with previous block
+            log('unwrapBlock merge handler reached for block:', event.data.blockId, 'fieldName:', event.data.fieldName);
+            try {
+              const { blockId: mergeBlockId, fieldName: mergeFieldName, requestId: mergeRequestId } = event.data;
+              const mergeForm = event.data.data;
+              const mergeBpm = buildBlockPathMap(mergeForm, config.blocks.blocksConfig, intl);
+              const mergePathInfo = mergeBpm[mergeBlockId];
+
+              // Find previous block in layout
+              const mergeParentId = mergePathInfo?.parentId;
+              const mergeField = mergePathInfo?.containerField || 'blocks_layout';
+              const mergeParent = mergeParentId === '_page' ? mergeForm : getBlockByPath(mergeForm, mergeBpm[mergeParentId]?.path);
+              const mergeLayout = mergeParent?.[mergeField]?.items || mergeParent?.blocks_layout?.items || [];
+              const mergeIdx = mergeLayout.indexOf(mergeBlockId);
+              const prevBlockId = mergeIdx > 0 ? mergeLayout[mergeIdx - 1] : null;
+
+              if (prevBlockId) {
+                const prevPathInfo = mergeBpm[prevBlockId];
+                const prevBlock = prevPathInfo?.path ? getBlockByPath(mergeForm, prevPathInfo.path) : mergeForm.blocks[prevBlockId];
+                const currentBlock = mergePathInfo?.path ? getBlockByPath(mergeForm, mergePathInfo.path) : mergeForm.blocks[mergeBlockId];
+                const fieldName = mergeFieldName || 'value';
+                const prevValue = prevBlock?.[fieldName];
+                const currentValue = currentBlock?.[fieldName];
+
+                // Only merge single-text-field blocks (e.g. slate paragraphs)
+                // Multi-field blocks (hero, teaser) should not merge
+                const prevSchema = getResolvedSchema(prevPathInfo, mergeBpm);
+                const prevEditableFields = prevSchema?.properties
+                  ? Object.entries(prevSchema.properties).filter(([, def]) => {
+                      const ft = getFieldTypeString(def);
+                      return ft?.includes('slate') || ft === 'string' || ft === 'string:text' || ft === 'string:textarea';
+                    })
+                  : [];
+                const isSingleTextField = prevEditableFields.length === 1 && prevEditableFields[0][0] === fieldName;
+
+                log('unwrapBlock merge check:', { prevBlockId, prevType: prevBlock?.['@type'], fieldName, isSingleTextField, prevEditableFields: prevEditableFields.map(([n]) => n), hasPrevValue: Array.isArray(prevValue), hasCurrentValue: Array.isArray(currentValue) });
+
+                if (isSingleTextField && Array.isArray(prevValue) && Array.isArray(currentValue)) {
+                  log('unwrapBlock merge: merging', mergeBlockId, 'into', prevBlockId);
+
+                  const { Transforms, Editor } = require('slate');
+                  const { slate: slateConfig } = config.settings;
+                  // Merge using a headless Slate editor — handles all cases
+                  // (p into p, p into list, heading into p, etc.) and normalizes
+                  // the result (merges adjacent text nodes, ensures inline spacing).
+                  const allNodes = [...prevValue, ...currentValue];
+                  const mergeEditor = slateTransforms.createHeadlessEditor(allNodes);
+                  const joinIdx = prevValue.length;
+                  Transforms.select(mergeEditor, Editor.start(mergeEditor, [joinIdx]));
+                  Editor.deleteBackward(mergeEditor, { unit: 'character' });
+                  const mergedValue = JSON.parse(JSON.stringify(mergeEditor.children));
+                  const cursorSelection = mergeEditor.selection;
+                  log('unwrapBlock merge: joinIdx:', joinIdx, 'result nodes:', mergedValue.length, 'selection:', JSON.stringify(cursorSelection));
+                  const updatedPrev = { ...prevBlock, [fieldName]: mergedValue };
+
+                  // Merge + delete in one atomic form data update using iframe's form data
+                  // (includes latest typed text from buffer)
+                  const mergeBpmForDelete = buildBlockPathMap(mergeForm, config.blocks.blocksConfig, intl);
+                  let newFormData = updateBlockById(mergeForm, mergeBpmForDelete, prevBlockId, updatedPrev);
+                  // Remove the merged block from blocks and layout
+                  newFormData = {
+                    ...newFormData,
+                    blocks: Object.fromEntries(
+                      Object.entries(newFormData.blocks || {}).filter(([id]) => id !== mergeBlockId)
+                    ),
+                    blocks_layout: {
+                      ...newFormData.blocks_layout,
+                      items: (newFormData.blocks_layout?.items || []).filter(id => id !== mergeBlockId),
+                    },
+                  };
+
+                  // After merge+delete, check if the next block is a list of the
+                  // same type as the previous block — if so, merge it in.
+                  // Lists are containers: two adjacent ul blocks are one split list.
+                  const prevRootType = mergedValue[0]?.type;
+                  if (prevRootType && slateConfig?.listTypes?.includes(prevRootType)) {
+                    const postLayout = newFormData.blocks_layout?.items || [];
+                    const prevIdx = postLayout.indexOf(prevBlockId);
+                    const nextBlockId = prevIdx >= 0 ? postLayout[prevIdx + 1] : null;
+                    if (nextBlockId) {
+                      const nextBpm = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
+                      const nextBlock = getBlockById(newFormData, nextBpm, nextBlockId);
+                      const nextValue = nextBlock?.[fieldName];
+                      if (Array.isArray(nextValue) && nextValue.length === 1
+                        && nextValue[0]?.type === prevRootType) {
+                        log('unwrapBlock: merging adjacent list block', nextBlockId);
+                        const adjEditor = slateTransforms.createHeadlessEditor([...mergedValue, ...nextValue]);
+                        Transforms.mergeNodes(adjEditor, { at: [mergedValue.length] });
+                        const combined = JSON.parse(JSON.stringify(adjEditor.children));
+                        newFormData = updateBlockById(newFormData, nextBpm, prevBlockId, { ...updatedPrev, [fieldName]: combined });
+                        newFormData = deleteBlockFromContainer(newFormData, nextBpm, nextBlockId,
+                          getContainerFieldConfig(nextBlockId, nextBpm, newFormData, config.blocks.blocksConfig, intl));
+                      }
+                    }
+                  }
+
+                  // Set pending state synchronously so the FORM_DATA effect sees it
+                  flushSync(() => {
+                    setIframeSyncState(prev => ({
+                      ...prev,
+                      selection: cursorSelection,
+                      pendingSelectBlockUid: prevBlockId,
+                      pendingFormatRequestId: mergeRequestId,
+                      pendingTransformedSelection: cursorSelection,
+                    }));
+                  });
+                  onChangeFormData(newFormData);
+                }
+              }
+            } catch (error) {
+              console.error('[VIEW] Error handling unwrapBlock merge:', error);
+              event.source.postMessage(
+                { type: 'SLATE_ERROR', blockId: event.data.blockId, error: error.message },
+                event.origin,
+              );
+            }
           } else {
             // Format, paste, delete, indent - let toolbar handle via transformAction
             // Build transformAction based on transformType
@@ -1814,14 +2021,18 @@ const Iframe = (props) => {
               transformAction.isEmpty = event.data.isEmpty;
             }
 
+            const bpmT0 = performance.now();
+            const transformBpm = buildBlockPathMap(event.data.data, config.blocks.blocksConfig, intl);
+            console.log('[VIEW-TIMING] buildBlockPathMap: ' + (performance.now() - bpmT0).toFixed(0) + 'ms, keys:', Object.keys(transformBpm).length);
             setIframeSyncState(prev => ({
               ...prev,
               formData: event.data.data,
-              blockPathMap: buildBlockPathMap(event.data.data, config.blocks.blocksConfig, intl),
+              blockPathMap: transformBpm,
               selection: event.data.selection || null,
               _selectionSource: 'SLATE_TRANSFORM_REQUEST',
               transformAction: transformAction,
             }));
+            console.log('[VIEW-TIMING] setIframeSyncState done +' + (performance.now() - (window._formatT0 || 0)).toFixed(0) + 'ms');
           }
           break;
 
@@ -1983,7 +2194,7 @@ const Iframe = (props) => {
 
           if (newFormData) {
             // Apply defaults to moved blocks based on their new position
-            // This updates template fields (templateId, templateInstanceId, placeholder)
+            // This updates template fields (templateId, templateInstanceId, slotId)
             // based on neighboring blocks at the new location
             let updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
             for (const moveBlockId of blocksToMove) {
@@ -2018,7 +2229,7 @@ const Iframe = (props) => {
               if (updatedBlockData !== blockData) {
                 newFormData = updateBlockById(newFormData, updatedPathMap, moveBlockId, updatedBlockData);
                 updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
-                log('MOVE_BLOCK: Applied defaults to moved block:', moveBlockId, 'templateId:', updatedBlockData.templateId, 'placeholder:', updatedBlockData.placeholder);
+                log('MOVE_BLOCK: Applied defaults to moved block:', moveBlockId, 'templateId:', updatedBlockData.templateId, 'slotId:', updatedBlockData.slotId);
               }
             }
 
@@ -2413,6 +2624,13 @@ const Iframe = (props) => {
           // blocks_layout fields so buildBlockPathMap includes them in resolvedBlockSchema.
           // This lets hydra.js derive page-level field types from blockPathMap['_page'].
           const contentTypeFields = schema?.properties || {};
+          // Add placeholders for common page-level fields
+          if (contentTypeFields.title && !contentTypeFields.title.placeholder) {
+            contentTypeFields.title = { ...contentTypeFields.title, placeholder: intl.formatMessage({ id: 'Type the title…', defaultMessage: 'Type the title…' }) };
+          }
+          if (contentTypeFields.description && !contentTypeFields.description.placeholder) {
+            contentTypeFields.description = { ...contentTypeFields.description, placeholder: intl.formatMessage({ id: 'Add a description…', defaultMessage: 'Add a description…' }) };
+          }
           config.blocks.blocksConfig['_page'] = {
             id: '_page',
             schema: () => ({ properties: { ...contentTypeFields, ...pageBlocksFieldsDef } }),
@@ -2574,7 +2792,8 @@ const Iframe = (props) => {
   // UNIFIED FORM SYNC: Syncs iframeSyncState AND sends FORM_DATA to iframe
   // Triggers when Form's properties change or toolbar completes a format operation
   useEffect(() => {
-    const formToUse = properties || form;
+    const useEffectT0 = performance.now();
+    let formToUse = properties || form;
 
     // Skip if this is an echo from INLINE_EDIT_DATA we just processed
     if (processedInlineEditCounterRef.current < inlineEditCounterRef.current) {
@@ -2584,25 +2803,47 @@ const Iframe = (props) => {
 
     // Case 1: Toolbar completed a format operation
     if (iframeSyncState.toolbarRequestDone) {
+      console.log('[VIEW-TIMING] Case 1 start, toolbarRequestDone:', iframeSyncState.toolbarRequestDone, '+' + (performance.now() - (window._formatT0 || 0)).toFixed(0) + 'ms');
       // Increment edit sequence for toolbar operations too
       editSequenceRef.current++;
+      let toolbarFormData = iframeSyncState.formData;
+      // Always build blockPathMap from the form data being sent
+      let toolbarBlockPathMap = iframeSyncState.blockPathMap && Object.keys(iframeSyncState.blockPathMap).length > 0
+        ? iframeSyncState.blockPathMap
+        : buildBlockPathMap(toolbarFormData || formToUse, config.blocks.blocksConfig, intl);
+      // Split any multi-node slate blocks before sending to iframe
+      const toolbarSplit = splitMultiNodeSlateBlocks(toolbarFormData, toolbarBlockPathMap, config.blocks.blocksConfig, uuid, iframeSyncState.selection);
+      if (toolbarSplit) {
+        toolbarFormData = toolbarSplit.formData;
+        toolbarBlockPathMap = buildBlockPathMap(toolbarFormData, config.blocks.blocksConfig, intl);
+        if (toolbarSplit.selectBlockId) {
+          flushSync(() => {
+            setIframeSyncState(prev => ({
+              ...prev,
+              selection: toolbarSplit.selection || prev.selection,
+              pendingSelectBlockUid: toolbarSplit.selectBlockId,
+            }));
+          });
+        }
+      }
       const formWithSequence = {
-        ...iframeSyncState.formData,
+        ...toolbarFormData,
         _editSequence: editSequenceRef.current,
       };
       const skipRender = iframeSyncState.skipRenderOnSend;
-      // Always build blockPathMap from the form data being sent — never rely on
-      // potentially stale/undefined cached state
-      const toolbarBlockPathMap = iframeSyncState.blockPathMap && Object.keys(iframeSyncState.blockPathMap).length > 0
-        ? iframeSyncState.blockPathMap
-        : buildBlockPathMap(iframeSyncState.formData || formToUse, config.blocks.blocksConfig, intl);
       const message = {
         type: 'FORM_DATA',
         data: formWithSequence,
         blockPathMap: stripBlockPathMapForPostMessage(toolbarBlockPathMap),
         formatRequestId: iframeSyncState.toolbarRequestDone,
       };
-      if (iframeSyncState.selection) {
+      // When a split created new blocks, tell the iframe which block to select
+      if (toolbarSplit?.selectBlockId) {
+        message.selectedBlockUid = toolbarSplit.selectBlockId;
+        if (toolbarSplit.selection) {
+          message.transformedSelection = toolbarSplit.selection;
+        }
+      } else if (iframeSyncState.selection) {
         message.transformedSelection = iframeSyncState.selection;
       }
       // When data didn't change (e.g. link cancel), tell iframe to skip
@@ -2610,15 +2851,38 @@ const Iframe = (props) => {
       if (skipRender) {
         message.skipRender = true;
       }
+      message._sentAt = Date.now();
+      console.log('[VIEW-TIMING] FORM_DATA prepared +' + (performance.now() - (window._formatT0 || 0)).toFixed(0) + 'ms (useEffect overhead: ' + (performance.now() - useEffectT0).toFixed(0) + 'ms), blockPathMap keys:', Object.keys(message.blockPathMap || {}).length);
       log('Sending FORM_DATA (Case 1: toolbar) formatRequestId:', message.formatRequestId,
         '_editSequence:', editSequenceRef.current, 'skipRender:', !!skipRender,
         'blockPathMap keys:', Object.keys(message.blockPathMap || {}),
         'cachedBPM keys:', Object.keys(iframeSyncState.blockPathMap || {}));
       const iframeEl = document.getElementById('previewIframe');
+      let msgSize;
+      try { msgSize = JSON.stringify(message).length; } catch { msgSize = -1; }
+      // One-time payload breakdown
+      if (!window._payloadLogged && message.formatRequestId) {
+        window._payloadLogged = true;
+        try {
+          const dataSize = JSON.stringify(message.data).length;
+          const bpmSize = JSON.stringify(message.blockPathMap).length;
+          const schemasSize = message.blockPathMap._schemas ? JSON.stringify(message.blockPathMap._schemas).length : 0;
+          const uniqueSchemas = message.blockPathMap._schemas ? Object.keys(message.blockPathMap._schemas).length : 0;
+          console.log('[PAYLOAD] total:', (msgSize/1024).toFixed(0) + 'KB',
+            'data:', (dataSize/1024).toFixed(0) + 'KB',
+            'blockPathMap:', (bpmSize/1024).toFixed(0) + 'KB',
+            'unique schemas:', uniqueSchemas, '(' + (schemasSize/1024).toFixed(0) + 'KB)');
+        } catch (e) {
+          console.log('[PAYLOAD] total:', (msgSize/1024).toFixed(0) + 'KB (detail error:', e.message + ')');
+        }
+      }
+      message._sentAt = Date.now();
+      const postT0 = performance.now();
       iframeEl?.contentWindow?.postMessage(
         message,
         iframeOriginRef.current,
       );
+      console.log('[VIEW-TIMING] postMessage call took', (performance.now() - postT0).toFixed(1) + 'ms, payload:', (msgSize / 1024).toFixed(0) + 'KB');
       // Strip _editSequence from Redux - sequences are for iframe echo detection only.
       // Keeping them in Redux causes sidebar edits to inherit stale sequences.
       const { _editSequence: _, ...formWithoutSeq } = formWithSequence;
@@ -2810,7 +3074,29 @@ const Iframe = (props) => {
     }
 
     // Build blockPathMap first - needed for applying defaults to nested blocks
-    const newBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
+    let newBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
+
+    // Split any slate blocks that have multiple top-level nodes.
+    // This happens when the deleteBackward extension demotes a list item
+    // to a paragraph, producing [ul, p] — two top-level nodes in one block.
+    // Each top-level node becomes its own block.
+    const splitResult = splitMultiNodeSlateBlocks(formToUse, newBlockPathMap, config.blocks.blocksConfig, uuid, iframeSyncState.selection);
+    if (splitResult) {
+      formToUse = splitResult.formData;
+      newBlockPathMap = buildBlockPathMap(formToUse, config.blocks.blocksConfig, intl);
+      // Select the new block that received the split content
+      if (splitResult.selectBlockId) {
+        flushSync(() => {
+          setIframeSyncState(prev => ({
+            ...prev,
+            selection: splitResult.selection || prev.selection,
+            pendingSelectBlockUid: splitResult.selectBlockId,
+          }));
+        });
+      }
+      // Update Redux so the split persists
+      onChangeFormData(formToUse);
+    }
 
     // Apply schema defaults BEFORE equality check (handles schemaEnhancer-computed defaults)
     // This ensures fields like fieldMapping get smart defaults even on initial load.
@@ -2865,6 +3151,7 @@ const Iframe = (props) => {
       selection: newSelection,
       _selectionSource: 'PROPS_SYNC',
       ...(hasPendingFormatRequest ? { pendingFormatRequestId: null } : {}),
+      pendingTransformedSelection: null,
     }));
 
     // Send updated data to iframe (duplicates already filtered above)
@@ -2876,6 +3163,7 @@ const Iframe = (props) => {
       blockPathMap: stripBlockPathMapForPostMessage(newBlockPathMap),
       ...(hasPendingSelect ? { selectedBlockUid: iframeSyncState.pendingSelectBlockUid } : {}),
       ...(hasPendingFormatRequest ? { formatRequestId: iframeSyncState.pendingFormatRequestId } : {}),
+      ...(iframeSyncState.pendingTransformedSelection ? { transformedSelection: iframeSyncState.pendingTransformedSelection } : {}),
     };
     log('Sending FORM_DATA to iframe. blockPathMap keys:', Object.keys(newBlockPathMap), 'selectedBlockUid:', hasPendingSelect ? iframeSyncState.pendingSelectBlockUid : '(not sent)', '_editSequence:', editSequenceRef.current);
     document.getElementById('previewIframe')?.contentWindow?.postMessage(
@@ -3389,7 +3677,8 @@ const Iframe = (props) => {
             onChangeFormData={(newFieldValue, selection, formatRequestId, extraBlocks) => {
               log('onChangeFormData callback called, formatRequestId:', formatRequestId,
                 'hasFieldValue:', newFieldValue != null, 'extraBlocks:', extraBlocks?.length || 0,
-                'selectionPath:', JSON.stringify(selection?.anchor?.path), 'selectionOffset:', selection?.anchor?.offset);
+                'selectionPath:', JSON.stringify(selection?.anchor?.path), 'selectionOffset:', selection?.anchor?.offset,
+                'value[0].children:', JSON.stringify(newFieldValue?.[0]?.children?.map(c => c.type ? {type: c.type, text: c.children?.[0]?.text} : {text: c.text?.substring(0, 20)})));
 
               // Apply field value change and/or extra blocks to the latest
               // iframeSyncState (via prev), not the stale form prop snapshot.
@@ -3658,7 +3947,7 @@ const Iframe = (props) => {
                 ...blockData,
                 templateId: newTemplateId,
                 templateInstanceId: newInstanceId,
-                placeholder: 'primary', // Default placeholder name
+                slotId: 'primary', // Default slot name
               };
 
               // Update the block in formData
@@ -3991,7 +4280,7 @@ const Iframe = (props) => {
           if (prevInstanceId && !instanceId) {
             const formData = iframeSyncState.formData;
 
-            // Validate template placeholder structure before allowing exit
+            // Validate template slot structure before allowing exit
             const validation = validateTemplatePlaceholders(formData);
             if (!validation.valid) {
               // Show validation error - user must fix structure before exiting
@@ -4041,7 +4330,7 @@ const Iframe = (props) => {
         onSelectBlock={onSelectBlock}
         onAddBlock={(parentBlockId, fieldName, options) => {
           if (options?.afterBlockId) {
-            // Template placeholder section: add after specific block
+            // Template slot section: add after specific block
             const afterId = options.afterBlockId;
             const afterPathInfo = iframeSyncState.blockPathMap?.[afterId];
             const allowed = afterPathInfo?.allowedSiblingTypes || null;
