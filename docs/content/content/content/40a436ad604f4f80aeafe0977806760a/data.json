@@ -244,19 +244,19 @@
           "@id": "ref-image-rendering-jsx-a59bc5",
           "label": "React",
           "language": "jsx",
-          "code": "function ImageBlock({ block }) {\n  const src = block.url || '';\n  const alt = block.alt || '';\n  const href = block.href?.[0]?.['@id'] || block.href;\n\n  const img = (\n    <img data-edit-media=\"url\" src={src} alt={alt} />\n  );\n\n  return (\n    <div data-block-uid={block['@uid']}>\n      {href ? (\n        <a href={href} data-edit-link=\"href\">{img}</a>\n      ) : (\n        <>{img}</>\n      )}\n    </div>\n  );\n}"
+          "code": "import { getImageUrl } from './utils.js';\n\nfunction ImageBlock({ block }) {\n  const src = getImageUrl(block.url);\n  const alt = block.alt || '';\n  const href = block.href?.[0]?.['@id'] || block.href;\n\n  const img = src\n    ? <img data-edit-media=\"url\" src={src} alt={alt} />\n    : <div data-edit-media=\"url\" style={{height:100,background:'#e5e7eb',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:4,cursor:'pointer'}}>Click to add image</div>;\n\n  return (\n    <div data-block-uid={block['@uid']}>\n      {href ? (\n        <a href={href} data-edit-link=\"href\">{img}</a>\n      ) : (\n        <>{img}</>\n      )}\n    </div>\n  );\n}"
         },
         {
           "@id": "ref-image-rendering-vue-c3dead",
           "label": "Vue",
           "language": "vue",
-          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\">\n    <a v-if=\"href\" :href=\"href\" data-edit-link=\"href\">\n      <img data-edit-media=\"url\" :src=\"block.url\" :alt=\"block.alt\" />\n    </a>\n    <img v-else data-edit-media=\"url\" :src=\"block.url\" :alt=\"block.alt\" />\n  </div>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nconst props = defineProps({ block: Object });\nconst href = computed(() => props.block.href?.[0]?.['@id'] || props.block.href);\n</script>"
+          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\">\n    <a v-if=\"href\" :href=\"href\" data-edit-link=\"href\">\n      <img data-edit-media=\"url\" :src=\"imgSrc\" :alt=\"block.alt\" />\n    </a>\n    <img v-else data-edit-media=\"url\" :src=\"imgSrc\" :alt=\"block.alt\" />\n  </div>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nimport { getImageUrl } from './utils.js';\nconst props = defineProps({ block: Object });\nconst href = computed(() => props.block.href?.[0]?.['@id'] || props.block.href);\nconst imgSrc = computed(() => getImageUrl(props.block.url));\n</script>"
         },
         {
           "@id": "ref-image-rendering-svelte-52a7e2",
           "label": "Svelte",
           "language": "svelte",
-          "code": "<script>\n  export let block;\n  $: href = block.href?.[0]?.['@id'] || block.href;\n</script>\n\n<div data-block-uid={block['@uid']}>\n  {#if href}\n    <a {href} data-edit-link=\"href\">\n      <img data-edit-media=\"url\" src={block.url} alt={block.alt} />\n    </a>\n  {:else}\n    <img data-edit-media=\"url\" src={block.url} alt={block.alt} />\n  {/if}\n</div>"
+          "code": "<script>\n  import { getImageUrl } from './utils.js';\n  export let block;\n  $: href = block.href?.[0]?.['@id'] || block.href;\n  $: imgSrc = getImageUrl(block.url);\n</script>\n\n<div data-block-uid={block['@uid']}>\n  {#if href}\n    <a {href} data-edit-link=\"href\">\n      <img data-edit-media=\"url\" src={imgSrc} alt={block.alt} />\n    </a>\n  {:else}\n    <img data-edit-media=\"url\" src={imgSrc} alt={block.alt} />\n  {/if}\n</div>"
         }
       ]
     }

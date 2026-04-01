@@ -7,174 +7,146 @@
     "title-1": {
       "@type": "title"
     },
-    "intro-1": {
+    "p-1": {
       "@type": "slate",
-      "plaintext": "To make your site editable with Hydra you load hydra.js in your frontend and call initBridge(). This sets up a two-way communication channel that handles authentication, page navigation, and live content updates.",
+      "plaintext": "To make your site editable with Hydra you load hydra.js in your frontend and call `initBridge()`. This sets up a two-way communication channel that handles authentication, page navigation, and live content updates.",
       "value": [
         {
+          "type": "p",
           "children": [
             {
-              "text": "To make your site editable with Hydra you load hydra.js in your frontend and call initBridge(). This sets up a two-way communication channel that handles authentication, page navigation, and live content updates."
+              "text": "To make your site editable with Hydra you load hydra.js in your frontend and call `initBridge()`. This sets up a two-way communication channel that handles authentication, page navigation, and live content updates."
             }
-          ],
-          "type": "p"
+          ]
         }
       ]
     },
-    "sep-1": {
-      "@type": "separator",
-      "styles": {
-        "align": "full"
-      }
-    },
-    "bridge-heading": {
+    "h-2": {
       "@type": "slate",
       "plaintext": "Setting Up the Bridge",
       "value": [
         {
+          "type": "h2",
           "children": [
             {
               "text": "Setting Up the Bridge"
             }
-          ],
-          "type": "h2"
+          ]
         }
       ]
     },
-    "bridge-text-t0": {
+    "p-3": {
       "@type": "slate",
-      "plaintext": "Call initBridge() with an onEditChange callback to receive live content updates as the user edits. Your frontend re-renders in real time. Outside edit mode, fetch content from the API as normal.",
+      "plaintext": "Call `initBridge()` with an `onEditChange` callback to receive live content updates as the user edits. Your frontend re-renders in real time. Outside edit mode, fetch content from the API as normal.",
       "value": [
         {
+          "type": "p",
           "children": [
             {
-              "text": "Call initBridge() with an onEditChange callback to receive live content updates as the user edits. Your frontend re-renders in real time. Outside edit mode, fetch content from the API as normal."
+              "text": "Call `initBridge()` with an `onEditChange` callback to receive live content updates as the user edits. Your frontend re-renders in real time. Outside edit mode, fetch content from the API as normal."
             }
-          ],
-          "type": "p"
+          ]
         }
       ]
     },
-    "bridge-text-c1": {
+    "ce-4": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "bridge-text-c1-javascript",
-          "label": "JavaScript",
+          "@id": "ce-4-javascript-3ad2d6",
+          "label": "Javascript",
           "language": "javascript",
           "code": "import { initBridge } from './hydra.js';\n\nlet bridge;\nif (window.name.startsWith('hydra')) {\n    bridge = initBridge({\n        onEditChange: (formData) => renderPage(formData),\n    });\n} else {\n    renderPage(await fetchContent(window.location.pathname));\n}"
         }
       ]
     },
-    "bridge-text-t2": {
+    "p-5": {
       "@type": "slate",
-      "plaintext": "The formData passed to onEditChange has the same structure as the Plone REST API response, so the same rendering code works for both live editing and normal page display.",
+      "plaintext": "The `formData` passed to `onEditChange` has the same structure as the Plone REST API response, so the same rendering code works for both live editing and normal page display.",
       "value": [
         {
+          "type": "p",
           "children": [
             {
-              "text": "The formData passed to onEditChange has the same structure as the Plone REST API response, so the same rendering code works for both live editing and normal page display."
+              "text": "The `formData` passed to `onEditChange` has the same structure as the Plone REST API response, so the same rendering code works for both live editing and normal page display."
             }
-          ],
-          "type": "p"
+          ]
         }
       ]
     },
-    "renderer-heading": {
+    "h-6": {
       "@type": "slate",
       "plaintext": "A Simple Page Renderer",
       "value": [
         {
+          "type": "h2",
           "children": [
             {
               "text": "A Simple Page Renderer"
             }
-          ],
-          "type": "h2"
+          ]
         }
       ]
     },
-    "renderer-text-t0": {
+    "p-7": {
       "@type": "slate",
-      "plaintext": "Iterate blocks_layout.items and render each block by type. Add data-block-uid so Hydra knows which block the user clicked.",
+      "plaintext": "Iterate `blocks_layout.items` and render each block by type. Add `data-block-uid` so Hydra knows which block the user clicked.",
       "value": [
         {
+          "type": "p",
           "children": [
             {
-              "text": "Iterate "
-            },
-            {
-              "children": [
-                {
-                  "text": "blocks_layout.items"
-                }
-              ],
-              "type": "strong"
-            },
-            {
-              "text": " and render each block by type. Add "
-            },
-            {
-              "children": [
-                {
-                  "text": "data-block-uid"
-                }
-              ],
-              "type": "strong"
-            },
-            {
-              "text": " so Hydra knows which block the user clicked."
+              "text": "Iterate `blocks_layout.items` and render each block by type. Add `data-block-uid` so Hydra knows which block the user clicked."
             }
-          ],
-          "type": "p"
+          ]
         }
       ]
     },
-    "renderer-text-c1": {
+    "ce-8": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "renderer-text-c1-javascript",
-          "label": "JavaScript",
+          "@id": "ce-8-javascript-e4c68c",
+          "label": "Javascript",
           "language": "javascript",
           "code": "<!DOCTYPE html>\n<html>\n<head>\n    <script type=\"module\">\n    import { initBridge } from './hydra.js';\n\n    if (window.name.startsWith('hydra')) {\n        initBridge({\n            onEditChange: (formData) => renderPage(formData),\n        });\n    } else {\n        renderPage(await fetchContent(window.location.pathname));\n    }\n\n    function renderPage(data) {\n        document.getElementById('content').innerHTML =\n            data.blocks_layout.items.map(id => {\n                const block = data.blocks[id];\n                return `<div data-block-uid=\"${id}\">\n                    ${renderBlock(block)}\n                </div>`;\n            }).join('');\n    }\n\n    function renderBlock(block) {\n        switch (block['@type']) {\n            case 'slate':\n                return renderSlate(block.value);\n            case 'image':\n                return `<img src=\"${block.url}/@@images/image\" />`;\n            default:\n                return `<pre>${JSON.stringify(block, null, 2)}</pre>`;\n        }\n    }\n    </script>\n</head>\n<body>\n    <div id=\"content\"></div>\n</body>\n</html>"
         }
       ]
     },
-    "multi-heading": {
+    "h-9": {
       "@type": "slate",
       "plaintext": "Allowed Blocks and Page Regions",
       "value": [
         {
+          "type": "h2",
           "children": [
             {
               "text": "Allowed Blocks and Page Regions"
             }
-          ],
-          "type": "h2"
+          ]
         }
       ]
     },
-    "multi-text-t0": {
+    "p-10": {
       "@type": "slate",
       "plaintext": "When initialising the bridge, you can configure rules for what blocks can be added to the page and where. Pages can have multiple blocks fields for different regions (e.g., header, content, footer), each with its own allowed block types and limits. These show as separate sections in the sidebar when no block is selected:",
       "value": [
         {
+          "type": "p",
           "children": [
             {
               "text": "When initialising the bridge, you can configure rules for what blocks can be added to the page and where. Pages can have multiple blocks fields for different regions (e.g., header, content, footer), each with its own allowed block types and limits. These show as separate sections in the sidebar when no block is selected:"
             }
-          ],
-          "type": "p"
+          ]
         }
       ]
     },
-    "multi-text-c1": {
+    "ce-11": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "multi-text-c1-javascript-9aa419",
-          "label": "JavaScript",
+          "@id": "ce-11-javascript-c24b68",
+          "label": "Javascript",
           "language": "javascript",
           "code": "bridge = initBridge({\n    page: {\n        schema: {\n            properties: {\n                blocks_layout: {\n                    title: 'Content',\n                    allowedBlocks: ['slate', 'image', 'hero', 'columns'],\n                },\n                header_blocks: {\n                    title: 'Header',\n                    allowedBlocks: ['slate', 'image'],\n                    maxLength: 3,\n                },\n                footer_blocks: {\n                    title: 'Footer',\n                    allowedBlocks: ['slate', 'link'],\n                },\n            },\n        },\n    },\n});"
         }
@@ -184,18 +156,17 @@
   "blocks_layout": {
     "items": [
       "title-1",
-      "intro-1",
-      "sep-1",
-      "bridge-heading",
-      "bridge-text-t0",
-      "bridge-text-c1",
-      "bridge-text-t2",
-      "renderer-heading",
-      "renderer-text-t0",
-      "renderer-text-c1",
-      "multi-heading",
-      "multi-text-t0",
-      "multi-text-c1"
+      "p-1",
+      "h-2",
+      "p-3",
+      "ce-4",
+      "p-5",
+      "h-6",
+      "p-7",
+      "ce-8",
+      "h-9",
+      "p-10",
+      "ce-11"
     ]
   },
   "contributors": [],
