@@ -7,209 +7,205 @@
     "title-1": {
       "@type": "title"
     },
-    "intro-1": {
+    "p-1": {
       "@type": "slate",
-      "plaintext": "Instead of combining editing and rendering into one framework, Hydra separates them and uses an iframe bridge for two-way communication during editing.",
+      "plaintext": "Instead of combining editing and rendering into one framework and codebase, these are separated and during editing a two way communication channel is opened across an iframe so that the editing UI is no longer part of the frontend code. Instead a small JS file called hydra.js is included in your frontend during editing that handles the iframe bridge communication to Hydra which is running in the same browser window.",
       "value": [
         {
+          "type": "p",
           "children": [
             {
               "text": "Instead of combining editing and rendering into one framework and codebase, these are separated and during editing a two way communication channel is opened across an iframe so that the editing UI is no longer part of the frontend code. Instead a small JS file called hydra.js is included in your frontend during editing that handles the iframe bridge communication to Hydra which is running in the same browser window."
             }
-          ],
-          "type": "p"
+          ]
         }
       ]
     },
-    "sep-1": {
-      "@type": "separator",
-      "styles": {
-        "align": "full"
-      }
-    },
-    "diagram-heading": {
+    "h-2": {
       "@type": "slate",
       "plaintext": "Architecture Overview",
       "value": [
         {
+          "type": "h2",
           "children": [
             {
               "text": "Architecture Overview"
             }
-          ],
-          "type": "h2"
+          ]
         }
       ]
     },
-    "guide-heading": {
-      "@type": "slate",
-      "plaintext": "Building a Frontend for Headless Plone",
-      "value": [
-        {
-          "children": [
-            {
-              "text": "Building a Frontend for Headless Plone"
-            }
-          ],
-          "type": "h2"
-        }
-      ]
-    },
-    "guide-text": {
-      "@type": "slate",
-      "plaintext": "A 12-step guide to building a frontend for Headless Plone, applicable to any framework.",
-      "value": [
-        {
-          "children": [
-            {
-              "text": "The steps involved in creating a frontend are roughly the same for all frameworks:"
-            }
-          ],
-          "type": "p"
-        }
-      ]
-    },
-    "diagram-text": {
+    "p-3": {
       "@type": "slate",
       "plaintext": "You could think of it as splitting Volto into two parts, Rendering and CMS UI/Admin UI while keeping the same UI and then making the Rendering part easily replaceable with other implementations.",
       "value": [
         {
+          "type": "p",
           "children": [
             {
               "text": "You could think of it as splitting Volto into two parts, Rendering and CMS UI/Admin UI while keeping the same UI and then making the Rendering part easily replaceable with other implementations."
             }
-          ],
-          "type": "p"
+          ]
         }
       ]
     },
-    "diagram-text-c1": {
+    "ce-4": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "diagram-text-c1-bash-1b6fcd",
+          "@id": "ce-4-bash-e34a53",
           "label": "Architecture",
           "language": "bash",
-          "code": "                      Browser            RestAPI             Server\n\n                  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                       \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n Anon/Editing     \u2502    Volto     \u2502\u25c4\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25ba\u2502    Plone    \u2502\n                  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518                       \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n              \u2502   \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                       \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n              \u2502   \u2502   Frontend   \u2502\u25c4\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524    Plone    \u2502\n              \u2502   \u2514\u2500\u2500hydra.js\u2500\u2500\u2500\u2500\u2518                       \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n              \u2502          \u25b2                                  \u25b2\n Editing     UI          \u2502 iFrame Bridge                    \u2502\n              \u2502          \u25bc                                  \u2502\n              \u2502   \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                          \u2502\n              \u2502   \u2502    Hydra     \u2502\u25c4\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n              \u2502   \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n                  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                       \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n Anon             \u2502   Frontend   \u2502\u25c4\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524    Plone    \u2502\n                  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518                       \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518"
+          "code": "                  Browser            RestAPI             Server\n\n              ┌──────────────┐                       ┌─────────────┐\n Anon/Editing │    Volto     │◄─────────────────────►│    Plone    │\n              └──────────────┘                       └─────────────┘\n\n──────────────────────────────────────────────────────────────────────────\n\n          │   ┌──────────────┐                       ┌─────────────┐\n          │   │   Frontend   │◄──────────────────────┤    Plone    │\n          │   └──hydra.js────┘                       └─────────────┘\n          │          ▲                                  ▲\n Editing UI          │ iFrame Bridge                    │\n          │          ▼                                  │\n          │   ┌──────────────┐                          │\n          │   │    Hydra     │◄─────────────────────────┘\n          │   └──────────────┘\n\n              ┌──────────────┐                       ┌─────────────┐\n Anon         │   Frontend   │◄──────────────────────┤    Plone    │\n              └──────────────┘                       └─────────────┘"
         }
       ]
     },
-    "guide-text-split-1": {
+    "h-5": {
       "@type": "slate",
+      "plaintext": "Building a Frontend for Headless Plone",
       "value": [
         {
+          "type": "h2",
           "children": [
             {
+              "text": "Building a Frontend for Headless Plone"
+            }
+          ]
+        }
+      ]
+    },
+    "p-6": {
+      "@type": "slate",
+      "plaintext": "The steps involved in creating a frontend are roughly the same for all frameworks:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The steps involved in creating a frontend are roughly the same for all frameworks:"
+            }
+          ]
+        }
+      ]
+    },
+    "ol-7": {
+      "@type": "slate",
+      "plaintext": "Create a route for any path which goes to a single page (e.g., in Nuxt.js create `pages/[..slug].vue`) The page has a template with static parts of your theme like header and footer. Check content type to render each differently. On page setup, take the path and make a REST API call to the contents endpoint to get the JSON for this page. Fill title etc from the content metadata. For navigation, use `@expand` to return navigation data in the same call. Create a nav component using this JSON. For Blocks: create a Block component that takes id and block JSON, check `@type` to determine rendering, call recursively for containers, iterate `blocks_layout` to render. Create helpers: URL generation for links (convert API-relative URLs to frontend URLs), image URL generation (blocks have image data in many formats). Listing Blocks: Use the Listing Helpers (`staticBlocks`/`expandListingBlocks`) or make your own REST API query calls. Redirects: Handle REST API redirects as internal redirects in your framework. For SSG, query all redirects at generate time. Error Pages: Handle REST API errors with appropriate status codes. Search Blocks: Render facets/filters, build queries using the REST API querystring endpoint. Form Blocks: Render field types, produce compatible JSON submissions to the form-block endpoint, handle validation and thank you page.",
+      "value": [
+        {
+          "type": "ol",
+          "children": [
+            {
+              "type": "li",
               "children": [
                 {
-                  "text": "Create a route for any path which goes to a single page (e.g., in Nuxt.js create pages/[..slug].vue)"
+                  "text": "Create a route for any path which goes to a single page (e.g., in Nuxt.js create `pages/[..slug].vue`)"
                 }
-              ],
-              "type": "li"
+              ]
             },
             {
+              "type": "li",
               "children": [
                 {
                   "text": "The page has a template with static parts of your theme like header and footer. Check content type to render each differently."
                 }
-              ],
-              "type": "li"
+              ]
             },
             {
+              "type": "li",
               "children": [
                 {
                   "text": "On page setup, take the path and make a REST API call to the contents endpoint to get the JSON for this page."
                 }
-              ],
-              "type": "li"
+              ]
             },
             {
+              "type": "li",
               "children": [
                 {
                   "text": "Fill title etc from the content metadata."
                 }
-              ],
-              "type": "li"
+              ]
             },
             {
+              "type": "li",
               "children": [
                 {
-                  "text": "For navigation, use @expand to return navigation data in the same call. Create a nav component using this JSON."
+                  "text": "For navigation, use `@expand` to return navigation data in the same call. Create a nav component using this JSON."
                 }
-              ],
-              "type": "li"
+              ]
             },
             {
+              "type": "li",
               "children": [
                 {
-                  "text": "For Blocks: create a Block component that takes id and block JSON, check @type to determine rendering, call recursively for containers, iterate blocks_layout to render."
+                  "text": "For Blocks: create a Block component that takes id and block JSON, check `@type` to determine rendering, call recursively for containers, iterate `blocks_layout` to render."
                 }
-              ],
-              "type": "li"
+              ]
             },
             {
+              "type": "li",
               "children": [
                 {
                   "text": "Create helpers: URL generation for links (convert API-relative URLs to frontend URLs), image URL generation (blocks have image data in many formats)."
                 }
-              ],
-              "type": "li"
+              ]
             },
             {
+              "type": "li",
               "children": [
                 {
-                  "text": "Listing Blocks: Use the Listing Helpers (staticBlocks/expandListingBlocks) or make your own REST API query calls."
+                  "text": "Listing Blocks: Use the Listing Helpers (`staticBlocks`/`expandListingBlocks`) or make your own REST API query calls."
                 }
-              ],
-              "type": "li"
+              ]
             },
             {
+              "type": "li",
               "children": [
                 {
                   "text": "Redirects: Handle REST API redirects as internal redirects in your framework. For SSG, query all redirects at generate time."
                 }
-              ],
-              "type": "li"
+              ]
             },
             {
+              "type": "li",
               "children": [
                 {
                   "text": "Error Pages: Handle REST API errors with appropriate status codes."
                 }
-              ],
-              "type": "li"
+              ]
             },
             {
+              "type": "li",
               "children": [
                 {
                   "text": "Search Blocks: Render facets/filters, build queries using the REST API querystring endpoint."
                 }
-              ],
-              "type": "li"
+              ]
             },
             {
+              "type": "li",
               "children": [
                 {
                   "text": "Form Blocks: Render field types, produce compatible JSON submissions to the form-block endpoint, handle validation and thank you page."
                 }
-              ],
-              "type": "li"
+              ]
             }
-          ],
-          "type": "ol"
+          ]
         }
       ]
     },
-    "guide-text-split-2": {
+    "p-8": {
       "@type": "slate",
+      "plaintext": "See the example frontends for reference implementations: [Nuxt.js](https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter), [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs), and [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7).",
       "value": [
         {
+          "type": "p",
           "children": [
             {
-              "text": "See the example frontends for reference implementations: Nuxt.js, Next.js, and F7-Vue."
+              "text": "See the example frontends for reference implementations: [Nuxt.js](https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter), [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs), and [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7)."
             }
-          ],
-          "type": "p"
+          ]
         }
       ]
     }
@@ -217,15 +213,14 @@
   "blocks_layout": {
     "items": [
       "title-1",
-      "intro-1",
-      "sep-1",
-      "diagram-heading",
-      "diagram-text",
-      "diagram-text-c1",
-      "guide-heading",
-      "guide-text",
-      "guide-text-split-1",
-      "guide-text-split-2"
+      "p-1",
+      "h-2",
+      "p-3",
+      "ce-4",
+      "h-5",
+      "p-6",
+      "ol-7",
+      "p-8"
     ]
   },
   "contributors": [],

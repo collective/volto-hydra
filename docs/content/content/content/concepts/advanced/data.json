@@ -7,165 +7,203 @@
     "title-1": {
       "@type": "title"
     },
-    "intro-1": {
+    "p-1": {
       "@type": "slate",
       "plaintext": "Advanced topics for optimising your Hydra integration: lazy loading the bridge, authentication, and preventing reloads.",
       "value": [
         {
+          "type": "p",
           "children": [
             {
               "text": "Advanced topics for optimising your Hydra integration: lazy loading the bridge, authentication, and preventing reloads."
             }
-          ],
-          "type": "p"
+          ]
         }
       ]
     },
-    "sep-1": {
-      "@type": "separator",
-      "styles": {
-        "align": "full"
-      }
-    },
-    "lazy-heading": {
+    "h-2": {
       "@type": "slate",
       "plaintext": "Lazy Load the Bridge",
       "value": [
         {
+          "type": "h2",
           "children": [
             {
               "text": "Lazy Load the Bridge"
             }
-          ],
-          "type": "h2"
+          ]
         }
       ]
     },
-    "lazy-text-t0": {
+    "p-3": {
       "@type": "slate",
-      "plaintext": "Detect the admin iframe and load the bridge only when needed. window.name is set by Hydra to indicate mode: hydra-edit:<origin> \u2014 edit mode (e.g., hydra-edit:http://localhost:3001)hydra-view:<origin> \u2014 view mode (e.g., hydra-view:http://localhost:3001) This persists across SPA navigation within the iframe, allowing your frontend to detect it's in the admin even after client-side route changes. In view mode, render from your API immediately but still load the bridge for navigation tracking. In edit mode, wait for onEditChange before rendering.",
+      "plaintext": "Detect the admin iframe and load the bridge only when needed. `window.name` is set by Hydra to indicate mode:",
       "value": [
         {
+          "type": "p",
           "children": [
             {
-              "text": "Detect the admin iframe and load the bridge only when needed. "
-            },
-            {
-              "children": [
-                {
-                  "text": "window.name"
-                }
-              ],
-              "type": "strong"
-            },
-            {
-              "text": " is set by Hydra to indicate mode:"
+              "text": "Detect the admin iframe and load the bridge only when needed. `window.name` is set by Hydra to indicate mode:"
             }
-          ],
-          "type": "p"
+          ]
         }
       ]
     },
-    "lazy-text-c1": {
+    "ul-4": {
+      "@type": "slate",
+      "plaintext": "**`hydra-edit:<origin>`** — edit mode (e.g., `hydra-edit:http://localhost:3001`) **`hydra-view:<origin>`** — view mode (e.g., `hydra-view:http://localhost:3001`)",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "**`hydra-edit:<origin>`** — edit mode (e.g., `hydra-edit:http://localhost:3001`)"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "**`hydra-view:<origin>`** — view mode (e.g., `hydra-view:http://localhost:3001`)"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-5": {
+      "@type": "slate",
+      "plaintext": "This persists across SPA navigation within the iframe, allowing your frontend to detect it's in the admin even after client-side route changes. In view mode, render from your API immediately but still load the bridge for navigation tracking. In edit mode, wait for `onEditChange` before rendering.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This persists across SPA navigation within the iframe, allowing your frontend to detect it's in the admin even after client-side route changes. In view mode, render from your API immediately but still load the bridge for navigation tracking. In edit mode, wait for `onEditChange` before rendering."
+            }
+          ]
+        }
+      ]
+    },
+    "ce-6": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "lazy-text-c1-javascript-548599",
-          "label": "JavaScript",
+          "@id": "ce-6-javascript-1f50f1",
+          "label": "Javascript",
           "language": "javascript",
           "code": "function loadBridge(callback) {\n    const existingScript = document.getElementById(\"hydraBridge\");\n    if (!existingScript) {\n      const script = document.createElement(\"script\");\n      script.src = \"your-hydra-js-path\";\n      script.id = \"hydraBridge\";\n      document.body.appendChild(script);\n      script.onload = () => callback();\n    } else {\n      callback();\n    }\n}\n\nconst isHydraEdit = window.name.startsWith('hydra-edit:');\nconst isHydraView = window.name.startsWith('hydra-view:');\nconst inAdminIframe = isHydraEdit || isHydraView;\n\n// View mode or not in admin: render from API\nif (!isHydraEdit) {\n    renderPage(await fetchContent(path));\n}\n\n// Load bridge only in admin iframe\nif (inAdminIframe) {\n    loadBridge(() => {\n        initBridge({\n            onEditChange: (formData) => renderPage(formData),\n        });\n    });\n}"
         }
       ]
     },
-    "auth-heading": {
+    "h-7": {
       "@type": "slate",
       "plaintext": "Authentication",
       "value": [
         {
+          "type": "h2",
           "children": [
             {
               "text": "Authentication"
             }
-          ],
-          "type": "h2"
+          ]
         }
       ]
     },
-    "auth-text-t0": {
+    "p-8": {
       "@type": "slate",
-      "plaintext": "As soon as the editor logs into the hydra editor, your frontend should use the same auth token to access the REST API with the same privileges and render private content. The access_token is passed as a URL parameter on initial load and automatically stored in sessionStorage by hydra.js. On SPA navigation, the URL param is gone but the token persists in sessionStorage. Use the getAccessToken() helper:",
+      "plaintext": "As soon as the editor logs into the hydra editor, your frontend should use the same auth token to access the REST API with the same privileges and render private content.",
       "value": [
         {
+          "type": "p",
           "children": [
             {
               "text": "As soon as the editor logs into the hydra editor, your frontend should use the same auth token to access the REST API with the same privileges and render private content."
             }
-          ],
-          "type": "p"
+          ]
         }
       ]
     },
-    "auth-text-c1": {
+    "p-9": {
+      "@type": "slate",
+      "plaintext": "The `access_token` is passed as a URL parameter on initial load and automatically stored in `sessionStorage` by hydra.js. On SPA navigation, the URL param is gone but the token persists in `sessionStorage`. Use the `getAccessToken()` helper:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The `access_token` is passed as a URL parameter on initial load and automatically stored in `sessionStorage` by hydra.js. On SPA navigation, the URL param is gone but the token persists in `sessionStorage`. Use the `getAccessToken()` helper:"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-10": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "auth-text-c1-javascript-1935b7",
-          "label": "JavaScript",
+          "@id": "ce-10-javascript-d19975",
+          "label": "Javascript",
           "language": "javascript",
           "code": "import { getAccessToken } from '@hydra-js/hydra.js';\n\nconst token = getAccessToken();\n// Returns token from URL param (if present)\n// or sessionStorage (for SPA navigation)"
         }
       ]
     },
-    "auth-text-t1": {
+    "p-11": {
       "@type": "slate",
       "plaintext": "Example using Next.js 14 and ploneClient:",
       "value": [
         {
+          "type": "p",
           "children": [
             {
               "text": "Example using Next.js 14 and ploneClient:"
             }
-          ],
-          "type": "p"
+          ]
         }
       ]
     },
-    "auth-text-c2": {
+    "ce-12": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "auth-text-c2-javascript-ca5bc8",
-          "label": "JavaScript",
+          "@id": "ce-12-javascript-9b62b0",
+          "label": "Javascript",
           "language": "javascript",
           "code": "import ploneClient from \"@plone/client\";\nimport { useQuery } from \"@tanstack/react-query\";\nimport { getAccessToken } from '@hydra-js/hydra.js';\n\nexport default function Blog({ params }) {\n  const token = getAccessToken();\n\n  const client = ploneClient.initialize({\n    apiPath: \"http://localhost:8080/Plone/\",\n    token: token,\n  });\n\n  const { getContentQuery } = client;\n  const { data, isLoading } = useQuery(\n    getContentQuery({ path: '/blogs' })\n  );\n\n  if (isLoading) return <div>Loading...</div>;\n  return <div>{data.title}</div>;\n}"
         }
       ]
     },
-    "reload-heading": {
+    "h-13": {
       "@type": "slate",
       "plaintext": "Preventing Reloads",
       "value": [
         {
+          "type": "h2",
           "children": [
             {
               "text": "Preventing Reloads"
             }
-          ],
-          "type": "h2"
+          ]
         }
       ]
     },
-    "reload-text": {
+    "p-14": {
       "@type": "slate",
-      "plaintext": "Register onRoute callbacks to prevent the frontend being forced to reload at certain times (TODO).",
+      "plaintext": "If you wish to make the editing experience smoother you can register for `onRoute` callbacks to prevent the frontend being forced to reload at certain times using the hydra editor. (TODO)",
       "value": [
         {
+          "type": "p",
           "children": [
             {
-              "text": "If you wish to make the editing experience smoother you can register for onRoute callbacks to prevent the frontend being forced to reload at certain times using the hydra editor. (TODO)"
+              "text": "If you wish to make the editing experience smoother you can register for `onRoute` callbacks to prevent the frontend being forced to reload at certain times using the hydra editor. (TODO)"
             }
-          ],
-          "type": "p"
+          ]
         }
       ]
     },
@@ -252,21 +290,20 @@
   "blocks_layout": {
     "items": [
       "title-1",
-      "intro-1",
-      "sep-1",
-      "lazy-heading",
-      "lazy-text-t0",
-      "lazy-text-t0-split-1",
-      "lazy-text-t0-split-2",
-      "lazy-text-c1",
-      "auth-heading",
-      "auth-text-t0",
-      "auth-text-t0-split-1",
-      "auth-text-c1",
-      "auth-text-t1",
-      "auth-text-c2",
-      "reload-heading",
-      "reload-text"
+      "p-1",
+      "h-2",
+      "p-3",
+      "ul-4",
+      "p-5",
+      "ce-6",
+      "h-7",
+      "p-8",
+      "p-9",
+      "ce-10",
+      "p-11",
+      "ce-12",
+      "h-13",
+      "p-14"
     ]
   },
   "contributors": [],

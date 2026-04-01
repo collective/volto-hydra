@@ -139,3 +139,27 @@ example-nuxt-admin:
 .PHONY: example-nuxt-frontend
 example-nuxt-frontend: ## Starts nuxt example frontend
 	cd examples/nuxt-blog-starter && npm install && npm run dev
+
+######################
+### DOCUMENTATION ###
+######################
+
+.PHONY: docs-install
+docs-install: ## Install documentation dependencies
+	@echo "$(GREEN)==> Installing documentation dependencies$(RESET)"
+	pip install -r docs/requirements.txt
+
+.PHONY: docs
+docs: ## Build HTML documentation
+	@echo "$(GREEN)==> Building documentation$(RESET)"
+	$(MAKE) -C docs html
+
+.PHONY: docs-clean
+docs-clean: ## Clean documentation build
+	@echo "$(GREEN)==> Cleaning documentation build$(RESET)"
+	$(MAKE) -C docs clean
+
+.PHONY: docs-live
+docs-live: ## Start live-reloading documentation server
+	@echo "$(GREEN)==> Starting live documentation server$(RESET)"
+	$(MAKE) -C docs livehtml

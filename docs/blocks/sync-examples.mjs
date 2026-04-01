@@ -475,6 +475,251 @@ if (existsSync(examplesPath)) {
   console.log('Created: examples.json');
 }
 
+// --- Phase 4: Sync concepts markdown into Plone content JSON ---
+
+// Map concepts markdown filename -> concepts content JSON folder name
+const CONCEPTS_MD_TO_FOLDER = {
+  'architecture.md': 'architecture',
+  'live-preview.md': 'integration-levels',
+  'custom-blocks.md': 'custom-blocks',
+  'container-blocks.md': 'container-blocks',
+  'visual-editing.md': 'visual-editing',
+  'listings.md': 'listings',
+  'templates.md': 'templates',
+  'deployment.md': 'deployment',
+  'advanced.md': 'advanced',
+};
+
+const CONCEPTS_DIR = join(__dirname, '..', 'concepts');
+const CONCEPTS_CONTENT_DIR = join(CONTENT_DIR, 'concepts');
+
+/**
+ * Convert plain text to a Slate paragraph value array.
+ */
+function textToSlate(text) {
+  return [{ type: 'p', children: [{ text }] }];
+}
+
+/**
+ * Parse a markdown file into a sequence of Plone blocks + layout items.
+ * Handles: # title (skip — title block already in JSON), ## headings,
+ * paragraphs, bullet/numbered lists, and <!-- codeExample: lang [label="..."] --> markers.
+ */
+function parseConceptsMd(mdContent) {
+  const blocks = {};
+  const items = [];
+  const lines = mdContent.split('\n');
+  let i = 0;
+  let blockCounter = 0;
+
+  function addBlock(id, block) {
+    blocks[id] = block;
+    items.push(id);
+  }
+
+  function nextId(prefix) {
+    return `${prefix}-${++blockCounter}`;
+  }
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Skip H1 title — the title block in the JSON handles it
+    if (line.startsWith('# ')) {
+      i++;
+      continue;
+    }
+
+    // H2 heading → slate h2 block
+    if (line.startsWith('## ')) {
+      const text = line.slice(3).trim();
+      const id = nextId('h');
+      addBlock(id, {
+        '@type': 'slate',
+        plaintext: text,
+        value: [{ type: 'h2', children: [{ text }] }],
+      });
+      i++;
+      continue;
+    }
+
+    // <!-- codeExample: lang [label="..."] --> marker
+    const ceMatch = line.match(/^<!-- codeExample: (\w+)(?:\s+label="([^"]+)")?\s*-->$/);
+    if (ceMatch) {
+      const lang = ceMatch[1];
+      const label = ceMatch[2] || lang.charAt(0).toUpperCase() + lang.slice(1);
+      i++;
+      // Next non-empty line should be the opening fence
+      while (i < lines.length && lines[i].trim() === '') i++;
+      if (lines[i] && lines[i].startsWith('```')) {
+        i++; // skip opening fence
+        const codeLines = [];
+        while (i < lines.length && !lines[i].startsWith('```')) {
+          codeLines.push(lines[i]);
+          i++;
+        }
+        i++; // skip closing fence
+        const id = nextId('ce');
+        addBlock(id, {
+          '@type': 'codeExample',
+          tabs: [{
+            '@id': `${id}-${lang}-${hexSuffix()}`,
+            label,
+            language: lang,
+            code: codeLines.join('\n').trimEnd(),
+          }],
+        });
+      }
+      continue;
+    }
+
+    // Bullet list (lines starting with '- ')
+    if (line.startsWith('- ') || line.startsWith('* ')) {
+      const listChildren = [];
+      while (i < lines.length && (lines[i].startsWith('- ') || lines[i].startsWith('* '))) {
+        listChildren.push({ type: 'li', children: [{ text: lines[i].slice(2).trim() }] });
+        i++;
+      }
+      const id = nextId('ul');
+      const plaintext = listChildren.map(c => c.children[0].text).join(' ');
+      addBlock(id, {
+        '@type': 'slate',
+        plaintext,
+        value: [{ type: 'ul', children: listChildren }],
+      });
+      continue;
+    }
+
+    // Numbered list (lines starting with '1. ', '2. ', etc.)
+    if (/^\d+\.\s/.test(line)) {
+      const listChildren = [];
+      while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
+        listChildren.push({ type: 'li', children: [{ text: lines[i].replace(/^\d+\.\s/, '').trim() }] });
+        i++;
+      }
+      const id = nextId('ol');
+      const plaintext = listChildren.map(c => c.children[0].text).join(' ');
+      addBlock(id, {
+        '@type': 'slate',
+        plaintext,
+        value: [{ type: 'ol', children: listChildren }],
+      });
+      continue;
+    }
+
+    // Fenced code block without a codeExample marker — wrap as codeExample
+    if (line.startsWith('```')) {
+      const lang = line.slice(3).trim() || 'text';
+      i++;
+      const codeLines = [];
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      i++; // skip closing fence
+      const id = nextId('ce');
+      const label = lang.charAt(0).toUpperCase() + lang.slice(1);
+      addBlock(id, {
+        '@type': 'codeExample',
+        tabs: [{
+          '@id': `${id}-${lang}-${hexSuffix()}`,
+          label,
+          language: lang,
+          code: codeLines.join('\n').trimEnd(),
+        }],
+      });
+      continue;
+    }
+
+    // Non-empty paragraph line — collect until blank line
+    if (line.trim() !== '') {
+      const paraLines = [];
+      while (i < lines.length && lines[i].trim() !== '') {
+        // Stop if next line is a heading, list, or code fence
+        if (lines[i].startsWith('#') || lines[i].startsWith('- ') ||
+            lines[i].startsWith('* ') || /^\d+\.\s/.test(lines[i]) ||
+            lines[i].startsWith('```') || lines[i].startsWith('<!--')) {
+          break;
+        }
+        paraLines.push(lines[i]);
+        i++;
+      }
+      if (paraLines.length > 0) {
+        const text = paraLines.join(' ').trim();
+        const id = nextId('p');
+        addBlock(id, {
+          '@type': 'slate',
+          plaintext: text,
+          value: textToSlate(text),
+        });
+      }
+      continue;
+    }
+
+    i++;
+  }
+
+  return { blocks, items };
+}
+
+const conceptsMdFiles = Object.keys(CONCEPTS_MD_TO_FOLDER);
+
+for (const mdFile of conceptsMdFiles) {
+  const folder = CONCEPTS_MD_TO_FOLDER[mdFile];
+  const jsonPath = join(CONCEPTS_CONTENT_DIR, folder, 'data.json');
+  if (!existsSync(jsonPath)) {
+    console.error(`WARNING: concepts content JSON not found for ${mdFile}: ${jsonPath}`);
+    continue;
+  }
+
+  const mdPath = join(CONCEPTS_DIR, mdFile);
+  if (!existsSync(mdPath)) {
+    console.error(`WARNING: concepts markdown not found: ${mdPath}`);
+    continue;
+  }
+
+  const mdContent = readFileSync(mdPath, 'utf-8');
+  const { blocks: newBlocks, items: newItems } = parseConceptsMd(mdContent);
+
+  const originalJson = readFileSync(jsonPath, 'utf-8');
+  const data = JSON.parse(originalJson);
+
+  // Preserve the title block and any non-generated metadata blocks
+  const titleBlock = Object.entries(data.blocks).find(([, b]) => b['@type'] === 'title');
+  const titleId = titleBlock ? titleBlock[0] : 'title-1';
+
+  // Preserve existing tab @id values to keep JSON stable across runs
+  for (const [id, block] of Object.entries(newBlocks)) {
+    if (block['@type'] === 'codeExample' && data.blocks[id]?.tabs) {
+      block.tabs.forEach((tab, idx) => {
+        if (data.blocks[id].tabs[idx]?.['@id']) {
+          tab['@id'] = data.blocks[id].tabs[idx]['@id'];
+        }
+      });
+    }
+  }
+
+  const updatedBlocks = { [titleId]: { '@type': 'title' }, ...newBlocks };
+  const updatedItems = [titleId, ...newItems];
+
+  const updatedData = {
+    ...data,
+    blocks: updatedBlocks,
+    blocks_layout: { items: updatedItems },
+  };
+
+  const updatedJson = JSON.stringify(updatedData, null, 2) + '\n';
+  if (updatedJson !== originalJson) {
+    outOfSync = true;
+    if (checkMode) {
+      console.error(`OUT OF SYNC: concepts content JSON for ${mdFile}`);
+    } else {
+      writeFileSync(jsonPath, updatedJson, 'utf-8');
+      console.log(`Updated concepts content JSON: ${mdFile} -> concepts/${folder}/data.json`);
+    }
+  }
+}
+
 if (checkMode && outOfSync) {
   console.error('\nFiles are out of sync with example files. Run: node docs/blocks/sync-examples.mjs');
   process.exit(1);
