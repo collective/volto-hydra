@@ -2871,7 +2871,8 @@ export class Bridge {
           return;
         }
 
-        // Don't interfere with escape in modals, dropdowns, etc.
+        // Don't interfere with escape in modals, dropdowns, slash menu, etc.
+        if (this._slashMenuActive) return;
         const isInPopup = e.target.closest('.volto-hydra-dropdown-menu, .blocks-chooser, [role="dialog"]');
         if (isInPopup) return;
 
@@ -2927,75 +2928,67 @@ export class Bridge {
       document.addEventListener('keydown', this._escapeKeyHandler, true);
     }
 
-    // Arrow Up/Down handler — three contexts:
+    // Arrow key handler for block mode and no-selection state.
+    // Text mode arrows are handled by field-level _arrowNavHandler (in restoreContentEditableOnFields).
+    // This handler covers:
     //   No block selected: select first/last page-level block
-    //   Block mode (selected, no field focused): move to adjacent block
-    //   Block mode + Shift: extend multi-selection to adjacent block
-    if (!this._arrowDownNoSelectionHandler) {
-      this._arrowDownNoSelectionHandler = (e) => {
-        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    //   Block mode (selected, no field focused): navigate via blockPathMap
+    //   Block mode + Shift: extend/shrink multi-selection
+    if (!this._arrowBlockModeHandler) {
+      this._arrowBlockModeHandler = (e) => {
+        if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
 
-        // In text mode (editing a field), let browser handle arrow keys
+        // In text mode (editing a field), let field-level _arrowNavHandler handle it
         if (document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]')) return;
-
-        // Find sibling blocks at the same container level as the selected block.
-        // For nested blocks (grids, columns), siblings share the same parent
-        // [data-block-uid]. For page-level blocks, siblings have no parent block.
-        const selectedEl = this.selectedBlockUid ? this.queryBlockElement(this.selectedBlockUid) : null;
-        const parentBlock = selectedEl?.parentElement?.closest('[data-block-uid]');
-        const allBlocks = document.querySelectorAll('[data-block-uid]');
-        const siblingBlocks = parentBlock
-          ? Array.from(allBlocks).filter(el =>
-              el.parentElement?.closest('[data-block-uid]') === parentBlock,
-            )
-          : Array.from(allBlocks).filter(el =>
-              !el.parentElement?.closest('[data-block-uid]'),
-            );
-        if (siblingBlocks.length === 0) return;
 
         // No block selected: select first or last page-level block
         if (!this.selectedBlockUid) {
+          if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+          const allBlocks = document.querySelectorAll('[data-block-uid]');
+          const pageBlocks = Array.from(allBlocks).filter(el =>
+            !el.parentElement?.closest('[data-block-uid]'),
+          );
+          if (pageBlocks.length === 0) return;
           e.preventDefault();
-          const target = e.key === 'ArrowDown' ? siblingBlocks[0] : siblingBlocks[siblingBlocks.length - 1];
+          const target = e.key === 'ArrowDown' ? pageBlocks[0] : pageBlocks[pageBlocks.length - 1];
           this.selectBlock(target);
           return;
         }
 
-        // Block mode: find current block's index among siblings
-        const currentIdx = siblingBlocks.findIndex(el =>
-          el.getAttribute('data-block-uid') === this.selectedBlockUid,
-        );
-        if (currentIdx === -1) return;
+        // Block mode: use _resolveNavigationTarget (same as handleArrowAtEdge)
+        // for proper layout-aware navigation including table mode and templates
+        const direction = (e.key === 'ArrowDown' || e.key === 'ArrowRight') ? 'forward' : 'backward';
+        const isVerticalKey = (e.key === 'ArrowUp' || e.key === 'ArrowDown');
+        const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
+        const isTableMode = pathInfo?.parentAddMode === 'table';
+        const isTableVertical = isTableMode && isVerticalKey;
 
-        const nextIdx = e.key === 'ArrowDown' ? currentIdx + 1 : currentIdx - 1;
-        if (nextIdx < 0 || nextIdx >= siblingBlocks.length) return;
+        const adjacentId = this._resolveNavigationTarget(this.selectedBlockUid, direction, isTableVertical);
+        if (!adjacentId) return;
+        const adjacentEl = this.queryBlockElement(adjacentId);
+        if (!adjacentEl) return;
 
         e.preventDefault();
-        const nextBlock = siblingBlocks[nextIdx];
-        const nextUid = nextBlock.getAttribute('data-block-uid');
 
         if (e.shiftKey) {
-          // Shift+Arrow: extend multi-selection
+          // Shift+Arrow: extend/shrink multi-selection
           if (this.multiSelectedBlockUids.length === 0) {
-            // Start multi-selection from current block
-            this.multiSelectedBlockUids = [this.selectedBlockUid, nextUid];
-          } else if (this.multiSelectedBlockUids.includes(nextUid)) {
-            // Shrink: remove current anchor from selection
+            this.multiSelectedBlockUids = [this.selectedBlockUid, adjacentId];
+          } else if (this.multiSelectedBlockUids.includes(adjacentId)) {
+            // Shrink: remove current block from selection
             this.multiSelectedBlockUids = this.multiSelectedBlockUids.filter(
               uid => uid !== this.selectedBlockUid,
             );
           } else {
-            // Extend: add next block
-            this.multiSelectedBlockUids.push(nextUid);
+            this.multiSelectedBlockUids.push(adjacentId);
           }
-          this.selectedBlockUid = nextUid;
+          this.selectedBlockUid = adjacentId;
           // If shrunk back to single block, exit multi-select → block mode
           if (this.multiSelectedBlockUids.length <= 1) {
-            const singleUid = this.multiSelectedBlockUids[0] || nextUid;
+            const singleUid = this.multiSelectedBlockUids[0] || adjacentId;
             this.multiSelectedBlockUids = [];
             this.selectedBlockUid = singleUid;
             this.focusedFieldName = null;
-            // Clear browser text selection that Shift+Arrow may have created
             window.getSelection()?.removeAllRanges();
             const el = this.queryBlockElement(singleUid);
             if (el) this.sendBlockSelected('shiftArrowSingle', el, { focusedFieldName: null });
@@ -3003,14 +2996,14 @@ export class Bridge {
             this._sendMultiBlockSelected();
           }
         } else {
-          // Plain arrow: move to adjacent block in block mode (don't enter text mode)
+          // Plain arrow: navigate to adjacent block, stay in block mode
           this.multiSelectedBlockUids = [];
-          this.selectedBlockUid = nextUid;
+          this.selectedBlockUid = adjacentId;
           this.focusedFieldName = null;
-          this.sendBlockSelected('arrowBlockMode', nextBlock, { focusedFieldName: null });
+          this.sendBlockSelected('arrowBlockMode', adjacentEl, { focusedFieldName: null });
         }
       };
-      document.addEventListener('keydown', this._arrowDownNoSelectionHandler);
+      document.addEventListener('keydown', this._arrowBlockModeHandler);
     }
 
     // Delete/Backspace in block mode: delete selected block(s)

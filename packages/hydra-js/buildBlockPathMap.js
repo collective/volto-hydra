@@ -227,9 +227,30 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
   // reduces postMessage payload dramatically (e.g., 2.5MB → ~200KB).
   pathMap._schemas = {};
   // Store a schema in the deduplicated _schemas map, return the ref key.
+  // Extract text from React elements (JSX) recursively.
+  // Schemas may have JSX in description fields (e.g., Image block's
+  // alt.description). These capture React context refs that create
+  // circular structures in JSON.stringify.
+  const reactElementToText = (el) => {
+    if (!el) return '';
+    if (typeof el === 'string') return el;
+    if (typeof el === 'number') return String(el);
+    if (Array.isArray(el)) return el.map(reactElementToText).join('');
+    if (el.$$typeof && el.props) {
+      const children = el.props.children;
+      return reactElementToText(children);
+    }
+    return '';
+  };
+
   const storeSchema = (schema) => {
     if (!schema) return undefined;
-    const str = JSON.stringify(schema);
+    const str = JSON.stringify(schema, (key, value) => {
+      if (typeof value === 'function') return undefined;
+      // Convert React elements (JSX) to plain text
+      if (value?.$$typeof) return reactElementToText(value);
+      return value;
+    });
     const key = _hashString(str);
     if (!pathMap._schemas[key]) {
       pathMap._schemas[key] = schema;
