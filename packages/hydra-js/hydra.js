@@ -1836,20 +1836,30 @@ export class Bridge {
    * Updates multiSelectedBlockUids and sends combined rect to admin.
    */
   _handleMultiSelectClick(blockUid, event) {
-    const layout = this.formData?.blocks_layout?.items || [];
-
     if (event.shiftKey) {
       // Shift+Click: select range from anchor to clicked block
+      // Find siblings at the same container level using DOM, not page-level layout
       const anchor = this.multiSelectedBlockUids.length > 0
         ? this.multiSelectedBlockUids[0]
         : this.selectedBlockUid;
-      const anchorIdx = layout.indexOf(anchor);
-      const focusIdx = layout.indexOf(blockUid);
+      const anchorEl = anchor ? this.queryBlockElement(anchor) : null;
+      const parentBlock = anchorEl?.parentElement?.closest('[data-block-uid]');
+      const allBlocks = document.querySelectorAll('[data-block-uid]');
+      const siblings = parentBlock
+        ? Array.from(allBlocks).filter(el =>
+            el.parentElement?.closest('[data-block-uid]') === parentBlock,
+          )
+        : Array.from(allBlocks).filter(el =>
+            !el.parentElement?.closest('[data-block-uid]'),
+          );
+      const siblingUids = siblings.map(el => el.getAttribute('data-block-uid'));
+      const anchorIdx = siblingUids.indexOf(anchor);
+      const focusIdx = siblingUids.indexOf(blockUid);
 
       if (anchorIdx >= 0 && focusIdx >= 0) {
         const start = Math.min(anchorIdx, focusIdx);
         const end = Math.max(anchorIdx, focusIdx);
-        this.multiSelectedBlockUids = layout.slice(start, end + 1);
+        this.multiSelectedBlockUids = siblingUids.slice(start, end + 1);
       } else {
         this.multiSelectedBlockUids = [blockUid];
       }
@@ -2735,8 +2745,15 @@ export class Bridge {
         // Only in block mode — in text mode, Shift+Click extends text selection (browser native)
         // Ctrl/Meta+Click always toggles block selection regardless of mode
         if (event.shiftKey || event.ctrlKey || event.metaKey) {
-          const isTextMode = !!document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]');
-          if (!isTextMode || event.ctrlKey || event.metaKey) {
+          // Text mode = the selected block has contenteditable="true" fields
+          // (set by restoreContentEditableOnFields, removed by Escape → block mode)
+          const selectedEl = this.selectedBlockUid ? this.queryBlockElement(this.selectedBlockUid) : null;
+          const isTextMode = selectedEl
+            ? selectedEl.querySelector('[data-edit-text][contenteditable="true"]') !== null
+            : false;
+          // Shift+Click on the same block in block mode → enter text mode (not multi-select)
+          const isSameBlock = blockUid === this.selectedBlockUid;
+          if ((!isTextMode && !isSameBlock) || event.ctrlKey || event.metaKey) {
             this._handleMultiSelectClick(blockUid, event);
             return;
           }
@@ -2921,32 +2938,40 @@ export class Bridge {
         // In text mode (editing a field), let browser handle arrow keys
         if (document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]')) return;
 
-        // Get sibling blocks at the same level as the selected block
+        // Find sibling blocks at the same container level as the selected block.
+        // For nested blocks (grids, columns), siblings share the same parent
+        // [data-block-uid]. For page-level blocks, siblings have no parent block.
+        const selectedEl = this.selectedBlockUid ? this.queryBlockElement(this.selectedBlockUid) : null;
+        const parentBlock = selectedEl?.parentElement?.closest('[data-block-uid]');
         const allBlocks = document.querySelectorAll('[data-block-uid]');
-        const pageBlocks = Array.from(allBlocks).filter(el =>
-          !el.parentElement?.closest('[data-block-uid]'),
-        );
-        if (pageBlocks.length === 0) return;
+        const siblingBlocks = parentBlock
+          ? Array.from(allBlocks).filter(el =>
+              el.parentElement?.closest('[data-block-uid]') === parentBlock,
+            )
+          : Array.from(allBlocks).filter(el =>
+              !el.parentElement?.closest('[data-block-uid]'),
+            );
+        if (siblingBlocks.length === 0) return;
 
-        // No block selected: select first or last
+        // No block selected: select first or last page-level block
         if (!this.selectedBlockUid) {
           e.preventDefault();
-          const target = e.key === 'ArrowDown' ? pageBlocks[0] : pageBlocks[pageBlocks.length - 1];
+          const target = e.key === 'ArrowDown' ? siblingBlocks[0] : siblingBlocks[siblingBlocks.length - 1];
           this.selectBlock(target);
           return;
         }
 
         // Block mode: find current block's index among siblings
-        const currentIdx = pageBlocks.findIndex(el =>
+        const currentIdx = siblingBlocks.findIndex(el =>
           el.getAttribute('data-block-uid') === this.selectedBlockUid,
         );
         if (currentIdx === -1) return;
 
         const nextIdx = e.key === 'ArrowDown' ? currentIdx + 1 : currentIdx - 1;
-        if (nextIdx < 0 || nextIdx >= pageBlocks.length) return;
+        if (nextIdx < 0 || nextIdx >= siblingBlocks.length) return;
 
         e.preventDefault();
-        const nextBlock = pageBlocks[nextIdx];
+        const nextBlock = siblingBlocks[nextIdx];
         const nextUid = nextBlock.getAttribute('data-block-uid');
 
         if (e.shiftKey) {
@@ -2964,14 +2989,59 @@ export class Bridge {
             this.multiSelectedBlockUids.push(nextUid);
           }
           this.selectedBlockUid = nextUid;
-          this._sendMultiBlockSelected();
+          // If shrunk back to single block, exit multi-select → block mode
+          if (this.multiSelectedBlockUids.length <= 1) {
+            const singleUid = this.multiSelectedBlockUids[0] || nextUid;
+            this.multiSelectedBlockUids = [];
+            this.selectedBlockUid = singleUid;
+            this.focusedFieldName = null;
+            // Clear browser text selection that Shift+Arrow may have created
+            window.getSelection()?.removeAllRanges();
+            const el = this.queryBlockElement(singleUid);
+            if (el) this.sendBlockSelected('shiftArrowSingle', el, { focusedFieldName: null });
+          } else {
+            this._sendMultiBlockSelected();
+          }
         } else {
-          // Plain arrow: move to adjacent block (clear multi-selection)
+          // Plain arrow: move to adjacent block in block mode (don't enter text mode)
           this.multiSelectedBlockUids = [];
-          this.selectBlock(nextBlock);
+          this.selectedBlockUid = nextUid;
+          this.focusedFieldName = null;
+          this.sendBlockSelected('arrowBlockMode', nextBlock, { focusedFieldName: null });
         }
       };
       document.addEventListener('keydown', this._arrowDownNoSelectionHandler);
+    }
+
+    // Delete/Backspace in block mode: delete selected block(s)
+    if (!this._blockModeDeleteHandler) {
+      this._blockModeDeleteHandler = (e) => {
+        if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+        if (!this.selectedBlockUid) return;
+        // Only in block mode (no editable field focused)
+        if (document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]')) return;
+
+        e.preventDefault();
+
+        if (this.multiSelectedBlockUids.length > 0) {
+          // Multi-selection: delete all selected blocks
+          log('Block mode Delete: deleting', this.multiSelectedBlockUids.length, 'blocks');
+          this.sendMessageToParent({
+            type: 'DELETE_BLOCKS',
+            uids: [...this.multiSelectedBlockUids],
+          });
+          this.multiSelectedBlockUids = [];
+          this.selectedBlockUid = null;
+        } else {
+          // Single block: delete current block
+          log('Block mode Delete: deleting single block', this.selectedBlockUid);
+          this.sendMessageToParent({
+            type: 'DELETE_BLOCK',
+            uid: this.selectedBlockUid,
+          });
+        }
+      };
+      document.addEventListener('keydown', this._blockModeDeleteHandler);
     }
 
     // Add global Enter handler for "block selected, no field focused" → add block after

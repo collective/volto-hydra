@@ -1538,6 +1538,33 @@ const Iframe = (props) => {
           setPendingDelete({ uid: event.data.uid, selectPrev: true });
           break;
 
+        case 'DELETE_BLOCKS': {
+          // Multi-block delete: batch-delete all selected blocks in one formData update
+          const uidsToDelete = event.data.uids || [];
+          log('DELETE_BLOCKS: deleting', uidsToDelete.length, 'blocks:', uidsToDelete);
+          const mergedBlocksConfig = config.blocks.blocksConfig;
+          let newFormData = { ...properties };
+
+          // Delete each block from the accumulated formData
+          for (const uid of uidsToDelete) {
+            const containerConfig = getContainerFieldConfig(
+              uid, iframeSyncState.blockPathMap, newFormData, mergedBlocksConfig, intl,
+            );
+            newFormData = deleteBlockFromContainer(
+              newFormData, iframeSyncState.blockPathMap, uid, containerConfig,
+            );
+          }
+
+          // Rebuild blockPathMap and update
+          const newBlockPathMap = buildBlockPathMap(newFormData, mergedBlocksConfig, intl);
+          setIframeSyncState(prev => ({ ...prev, blockPathMap: newBlockPathMap }));
+          onChangeFormData(newFormData);
+          onSelectBlock(null);
+          setBlockUI(null);
+          setMultiSelectState({ blockUids: [], rects: {} });
+          break;
+        }
+
         case 'ADD_BLOCK_AFTER': {
           // Determine the default block type from the container's schema
           const containerFieldConfig = getContainerFieldConfig(
@@ -2360,10 +2387,9 @@ const Iframe = (props) => {
             // Deselect single block — sidebar shows common parent
             onSelectBlock(null);
           } else {
-            // Single-block selection — clear any multi-selection
-            if (multiSelectState.blockUids.length > 0) {
-              setMultiSelectState({ blockUids: [], rects: {} });
-            }
+            // Single-block selection — always clear multi-selection state
+            // (can't use multiSelectState in condition — stale closure)
+            setMultiSelectState({ blockUids: [], rects: {} });
             if (isNewBlock) {
               log('BLOCK_SELECTED calling onSelectBlock:', event.data.blockUid);
               onSelectBlock(event.data.blockUid);

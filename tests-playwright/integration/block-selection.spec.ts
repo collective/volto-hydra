@@ -593,9 +593,83 @@ test.describe('Block Mode (Escape state machine)', () => {
     await helper.waitForBlockSelected('block-1-uuid');
     await helper.escapeFromEditing();
 
-    // Arrow Down should move to block-2 (image block)
+    // Arrow Down twice to reach block-3 (Slate text block) — must stay in block mode
     await page.keyboard.press('ArrowDown');
-    await helper.waitForBlockSelected('block-2-uuid');
+    await page.keyboard.press('ArrowDown');
+    await helper.waitForBlockSelected('block-3-uuid');
+
+    // Should still be in block mode (full border, not subtle/text mode)
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="border"]'))
+      .toBeVisible({ timeout: 3000 });
+  });
+
+  test('Arrow Down navigates between nested blocks inside a container', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Click text-1a (inside col-1 of columns-1), enter block mode
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.escapeFromEditing();
+
+    // Arrow Down should move to text-1b (sibling inside same column)
+    await page.keyboard.press('ArrowDown');
+    await helper.waitForBlockSelected('text-1b');
+
+    // Should still be in block mode
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="border"]'))
+      .toBeVisible({ timeout: 3000 });
+  });
+
+  test('Shift+Arrow extend and shrink shows correct outline at each step', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+    const outline = page.locator('.volto-hydra-block-outline');
+
+    // Click text-1a inside col-1, enter block mode
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.escapeFromEditing();
+
+    // Step 1: Single block — full border around text-1a only
+    await expect(outline).toHaveAttribute('data-outline-style', 'border', { timeout: 3000 });
+    const singleBox = await outline.boundingBox();
+    expect(singleBox).not.toBeNull();
+
+    // Step 2: Shift+ArrowDown — multi-select text-1a + text-1b
+    await page.keyboard.press('Shift+ArrowDown');
+    await expect(async () => {
+      const box = await outline.boundingBox();
+      expect(box).not.toBeNull();
+      // Combined box must be taller than single block
+      expect(box!.height).toBeGreaterThan(singleBox!.height + 10);
+    }).toPass({ timeout: 5000 });
+
+    // Step 3: Shift+ArrowUp — shrink back to single block (text-1a)
+    await page.keyboard.press('Shift+ArrowUp');
+
+    // Should be exactly one outline with block mode border, NOT multi-select
+    await expect(outline).toHaveCount(1, { timeout: 3000 });
+    await expect(outline).toHaveAttribute('data-outline-style', 'border', { timeout: 3000 });
+
+    // Outline should be back to single-block size (not the combined box)
+    await expect(async () => {
+      const box = await outline.boundingBox();
+      expect(box).not.toBeNull();
+      // Should be approximately the same height as the original single block
+      expect(Math.abs(box!.height - singleBox!.height)).toBeLessThan(20);
+    }).toPass({ timeout: 5000 });
+
+    // No browser text selection should remain
+    const hasTextSelection = await iframe.locator('body').evaluate(() => {
+      const sel = window.getSelection();
+      return sel ? sel.toString().length > 0 : false;
+    });
+    expect(hasTextSelection).toBe(false);
   });
 
   test('Shift+Arrow Down in block mode extends multi-selection', async ({ page }) => {
@@ -622,6 +696,65 @@ test.describe('Block Mode (Escape state machine)', () => {
 });
 
 test.describe('Multi-Block Selection', () => {
+  test('Shift+Click on same block in block mode enters text mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click text-1a, enter block mode
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.escapeFromEditing();
+
+    // Verify block mode
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="border"]'))
+      .toBeVisible({ timeout: 3000 });
+
+    // Shift+Click on the SAME block (text-1a)
+    await iframe.locator('[data-block-uid="text-1a"] [data-edit-text]').click({ modifiers: ['Shift'] });
+
+    // Should enter text mode: subtle border + field underline + toolbar
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
+      .toBeVisible({ timeout: 3000 });
+    await expect(page.locator('.volto-hydra-field-underline')).toBeVisible({ timeout: 3000 });
+    await helper.waitForQuantaToolbar('text-1a');
+  });
+
+  test('Shift+Click on text block from block mode multi-selects (not text mode)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click block-1 (Slate text) and enter block mode
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+
+    // Verify we're in block mode (full border, not subtle)
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="border"]'))
+      .toBeVisible({ timeout: 3000 });
+
+    // Shift+Click directly on the TEXT inside block-3 (another Slate block)
+    // This must trigger multi-select, NOT enter text editing on block-3
+    await iframe.locator('[data-block-uid="block-3-uuid"] [data-edit-text]').click({ modifiers: ['Shift'] });
+
+    // Should have multi-selection outline (combined bounding box, taller than single)
+    await expect(async () => {
+      const outline = page.locator('.volto-hydra-block-outline');
+      const box = await outline.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.height).toBeGreaterThan(100);
+    }).toPass({ timeout: 5000 });
+
+    // Should NOT be in text mode — no field should be contenteditable
+    const editableField = iframe.locator('[data-block-uid="block-3-uuid"] [data-edit-text][contenteditable="true"]');
+    await expect(editableField).toHaveCount(0, { timeout: 2000 });
+  });
+
   test('Shift+Click selects range of blocks', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -707,5 +840,43 @@ test.describe('Multi-Block Selection', () => {
 
     // Quanta toolbar should be back (single-select mode)
     await helper.waitForQuantaToolbar('block-2-uuid');
+  });
+
+  test('Delete key removes all multi-selected blocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Verify block-1 and block-3 exist
+    await expect(iframe.locator('[data-block-uid="block-1-uuid"]')).toBeVisible();
+    await expect(iframe.locator('[data-block-uid="block-3-uuid"]')).toBeVisible();
+
+    // Select block-1, enter block mode, Shift+ArrowDown twice to select block-1 + block-2 + block-3
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+    await page.keyboard.press('Shift+ArrowDown');
+    await page.keyboard.press('Shift+ArrowDown');
+
+    // Verify multi-selection outline is visible
+    await expect(async () => {
+      const outline = page.locator('.volto-hydra-block-outline');
+      const box = await outline.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.height).toBeGreaterThan(100);
+    }).toPass({ timeout: 5000 });
+
+    // Press Delete — should remove all three selected blocks
+    await page.keyboard.press('Delete');
+
+    // block-1, block-2 (image), block-3 should all be gone from iframe
+    await expect(iframe.locator('[data-block-uid="block-1-uuid"]')).not.toBeVisible({ timeout: 5000 });
+    await expect(iframe.locator('[data-block-uid="block-2-uuid"]')).not.toBeVisible({ timeout: 5000 });
+    await expect(iframe.locator('[data-block-uid="block-3-uuid"]')).not.toBeVisible({ timeout: 5000 });
+
+    // Multi-selection outline should be gone
+    await expect(page.locator('.volto-hydra-block-outline')).not.toBeVisible({ timeout: 3000 });
   });
 });
