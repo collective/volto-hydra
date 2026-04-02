@@ -603,6 +603,36 @@ test.describe('Block Mode (Escape state machine)', () => {
       .toBeVisible({ timeout: 3000 });
   });
 
+  test('Arrow through non-editable block stays in text mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // block-1 (slate text), block-2 (image, no fields), block-3 (slate text)
+    // Click block-1, cursor at end
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+
+    // Verify text mode (subtle border)
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
+      .toBeVisible({ timeout: 3000 });
+
+    // ArrowDown at end → lands on block-2 (image, no editable fields)
+    // Should show block mode border for this block but editMode stays 'text'
+    await page.keyboard.press('End');
+    await page.keyboard.press('ArrowDown');
+    await helper.waitForBlockSelected('block-2-uuid');
+
+    // ArrowDown again → lands on block-3 (slate text)
+    // Should re-enter text mode (subtle border) because editMode is 'text'
+    await page.keyboard.press('ArrowDown');
+    await helper.waitForBlockSelected('block-3-uuid');
+
+    // Should be in text mode with cursor at start
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
+      .toBeVisible({ timeout: 3000 });
+  });
+
   test('Arrow Down navigates between nested blocks inside a container', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();

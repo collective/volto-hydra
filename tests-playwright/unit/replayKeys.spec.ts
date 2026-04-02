@@ -108,6 +108,99 @@ async function replay(
   );
 }
 
+/**
+ * Like replay() but also captures messages sent to parent window.
+ * Returns { text, textBefore, messages } where messages is an array of
+ * { type, ...data } objects sent via bridge.sendMessageToParent.
+ */
+async function replayWithMessages(
+  iframe: ReturnType<AdminUIHelper['getIframe']>,
+  html: string,
+  cursorAt: 'start' | 'end' | number,
+  keys: (string | { key: string; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean; altKey?: boolean })[],
+  setup?: (bridge: any) => void,
+) {
+  return await iframe.locator('body').evaluate(
+    (_el: Element, { html, cursorAt, keys, setupStr }: any) => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) {
+        bridge.blockTextMutationObserver.disconnect();
+      }
+      editField.innerHTML = html;
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'value';
+      bridge.isInlineEditing = true;
+
+      // Run optional setup
+      if (setupStr) {
+        new Function('bridge', setupStr)(bridge);
+      }
+
+      // Capture messages
+      const messages: any[] = [];
+      const origSend = bridge.sendMessageToParent.bind(bridge);
+      bridge.sendMessageToParent = (msg: any, ...args: any[]) => {
+        messages.push(msg);
+        origSend(msg, ...args);
+      };
+
+      // Place cursor
+      const walker = document.createTreeWalker(editField, NodeFilter.SHOW_TEXT);
+      const textNodes: Text[] = [];
+      let tn: Text | null;
+      while ((tn = walker.nextNode() as Text)) textNodes.push(tn);
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      if (cursorAt === 'start') {
+        range.setStart(textNodes[0], 0);
+      } else if (cursorAt === 'end') {
+        const last = textNodes[textNodes.length - 1];
+        range.setStart(last, last.length);
+      } else {
+        let remaining = cursorAt as number;
+        for (const t of textNodes) {
+          const vis = t.textContent!.replace(/[\uFEFF\u200B]/g, '');
+          if (remaining <= vis.length) {
+            let raw = 0, seen = 0;
+            for (let i = 0; i < t.textContent!.length && seen < remaining; i++) {
+              if (t.textContent![i] !== '\uFEFF' && t.textContent![i] !== '\u200B') seen++;
+              raw++;
+            }
+            range.setStart(t, raw);
+            break;
+          }
+          remaining -= vis.length;
+        }
+      }
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      // Replay
+      bridge.eventBuffer = keys.map((k: any) => {
+        if (typeof k === 'string') {
+          return { key: k, code: k, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false };
+        }
+        return { code: k.key, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, ...k };
+      });
+      bridge.pendingTransform = { blockId, requestId: 'test-replay' };
+      bridge.blockedBlockId = blockId;
+      bridge.replayBufferAndUnblock('unit-test');
+
+      // Restore
+      bridge.sendMessageToParent = origSend;
+
+      const text = editField.textContent!.replace(/[\uFEFF\u200B]/g, '');
+      return { text, messages };
+    },
+    { html, cursorAt, keys, setupStr: setup?.toString() },
+  );
+}
+
 test.describe('replayOneKey — cursor movement and editing', () => {
   let helper: AdminUIHelper;
 
@@ -301,5 +394,207 @@ test.describe('replayOneKey — cursor movement and editing', () => {
       '<strong data-node-id="0.1"><span>bold</span></strong>\uFEFF</p>',
       'end', ['ArrowLeft', 'ArrowLeft']);
     expect(r.textBefore).toBe('beforebo');
+  });
+});
+
+test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
+  let helper: AdminUIHelper;
+
+  test.beforeEach(async ({ page }) => {
+    helper = new AdminUIHelper(page);
+    await page.goto('http://localhost:8889/mock-parent.html');
+    await helper.waitForIframeReady();
+    await helper.waitForBlockSelected('mock-block-1');
+  });
+
+  test('slash menu ArrowDown sends SLASH_MENU down', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      bridge._slashMenuActive = true;
+      const messages: any[] = [];
+      const origSend = bridge.sendMessageToParent.bind(bridge);
+      bridge.sendMessageToParent = (msg: any) => { messages.push(msg); origSend(msg); };
+      bridge.replayOneKey('mock-block-1', { key: 'ArrowDown' }, null);
+      bridge.sendMessageToParent = origSend;
+      bridge._slashMenuActive = false;
+      return { messages };
+    });
+    expect(r.messages.find((m: any) => m.type === 'SLASH_MENU' && m.action === 'down')).toBeTruthy();
+  });
+
+  test('slash menu Enter sends SLASH_MENU select', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      bridge._slashMenuActive = true;
+      const messages: any[] = [];
+      const origSend = bridge.sendMessageToParent.bind(bridge);
+      bridge.sendMessageToParent = (msg: any) => { messages.push(msg); origSend(msg); };
+      bridge.replayOneKey('mock-block-1', { key: 'Enter' }, null);
+      bridge.sendMessageToParent = origSend;
+      bridge._slashMenuActive = false;
+      return { messages };
+    });
+    expect(r.messages.find((m: any) => m.type === 'SLASH_MENU' && m.action === 'select')).toBeTruthy();
+  });
+
+  test('slash menu Escape sends SLASH_MENU hide and deactivates', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      bridge._slashMenuActive = true;
+      const messages: any[] = [];
+      const origSend = bridge.sendMessageToParent.bind(bridge);
+      bridge.sendMessageToParent = (msg: any) => { messages.push(msg); origSend(msg); };
+      bridge.replayOneKey('mock-block-1', { key: 'Escape' }, null);
+      bridge.sendMessageToParent = origSend;
+      const wasDeactivated = !bridge._slashMenuActive;
+      return { messages, wasDeactivated };
+    });
+    expect(r.messages.find((m: any) => m.type === 'SLASH_MENU' && m.action === 'hide')).toBeTruthy();
+    expect(r.wasDeactivated).toBe(true);
+  });
+
+  test('Ctrl+Z sends SLATE_UNDO_REQUEST', async () => {
+    const r = await replayWithMessages(helper.getIframe(),
+      '<p data-node-id="0">Hello</p>', 'end',
+      [{ key: 'z', ctrlKey: true }],
+    );
+    const undoMsg = r.messages.find((m: any) => m.type === 'SLATE_UNDO_REQUEST');
+    expect(undoMsg).toBeTruthy();
+  });
+
+  test('Ctrl+Shift+Z sends SLATE_REDO_REQUEST', async () => {
+    const r = await replayWithMessages(helper.getIframe(),
+      '<p data-node-id="0">Hello</p>', 'end',
+      [{ key: 'z', ctrlKey: true, shiftKey: true }],
+    );
+    const redoMsg = r.messages.find((m: any) => m.type === 'SLATE_REDO_REQUEST');
+    expect(redoMsg).toBeTruthy();
+  });
+
+  test('Ctrl+S sends SAVE_REQUEST', async () => {
+    const r = await replayWithMessages(helper.getIframe(),
+      '<p data-node-id="0">Hello</p>', 'end',
+      [{ key: 's', ctrlKey: true }],
+    );
+    const saveMsg = r.messages.find((m: any) => m.type === 'SAVE_REQUEST');
+    expect(saveMsg).toBeTruthy();
+  });
+
+  test('Enter in pre element inserts newline', async () => {
+    // Wrap in <pre> for the pre-element Enter handler
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+
+      // Wrap the edit field in <pre> temporarily
+      const pre = document.createElement('pre');
+      pre.setAttribute('data-edit-text', 'code');
+      pre.setAttribute('contenteditable', 'true');
+      pre.innerHTML = 'line1';
+      editField.innerHTML = '';
+      editField.appendChild(pre);
+
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'code';
+      bridge.isInlineEditing = true;
+
+      // Place cursor at end
+      const textNode = pre.firstChild!;
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(textNode, textNode.textContent!.length);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      // Replay Enter
+      bridge.replayOneKey(blockId, { key: 'Enter', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false }, pre);
+
+      return { text: pre.textContent };
+    });
+    expect(r.text).toBe('line1\n');
+  });
+
+  test('Space on button element inserts space (not activate)', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+
+      // Replace edit field content with a contenteditable button
+      const btn = document.createElement('button');
+      btn.setAttribute('data-edit-text', 'buttonText');
+      btn.setAttribute('contenteditable', 'true');
+      btn.textContent = 'Click';
+      editField.innerHTML = '';
+      editField.appendChild(btn);
+
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'buttonText';
+      bridge.isInlineEditing = true;
+
+      // Place cursor at end
+      const textNode = btn.firstChild!;
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(textNode, textNode.textContent!.length);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      bridge.replayOneKey(blockId, { key: ' ', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false }, btn);
+
+      return { text: btn.textContent };
+    });
+    // Space should be inserted as text, not activate the button
+    expect(r.text).toContain('Click\u00A0');
+  });
+
+  test('Tab in pre element inserts spaces', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+
+      const pre = document.createElement('pre');
+      pre.setAttribute('data-edit-text', 'code');
+      pre.setAttribute('contenteditable', 'true');
+      pre.innerHTML = 'hello';
+      editField.innerHTML = '';
+      editField.appendChild(pre);
+
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'code';
+      bridge.isInlineEditing = true;
+
+      const textNode = pre.firstChild!;
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(textNode, 0);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      bridge.replayOneKey(blockId, { key: 'Tab', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false }, pre);
+
+      return { text: pre.textContent };
+    });
+    expect(r.text).toBe('  hello');
   });
 });

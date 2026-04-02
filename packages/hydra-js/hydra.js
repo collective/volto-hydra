@@ -157,6 +157,7 @@ export class Bridge {
     this.blockTextMutationObserver = null;
     this.attributeMutationObserver = null;
     this.selectedBlockUid = null;
+    this.editMode = null; // 'text' | 'block' | null (no block selected)
     this.multiSelectedBlockUids = []; // Array of block UIDs in multi-selection
     this.focusedFieldName = null; // Track which editable field within the block has focus
     this.focusedLinkableField = null; // Track which linkable field has focus (for link editing)
@@ -858,14 +859,132 @@ export class Bridge {
    * @param {HTMLElement} editableField - The currently focused editable field
    * @param {HTMLElement} blockElement - The block element
    */
-  handleArrowAtEdge(key, blockUid, editableField, blockElement) {
-    const pathInfo = this.blockPathMap?.[blockUid];
-    if (!pathInfo) return;
+  /**
+   * Handle keys in block mode (no contenteditable field focused).
+   * Called from the document keyboard blocker for body-focused and
+   * block-focused keys. Returns true if the key was handled (caller
+   * should not buffer it for text replay).
+   *
+   * Covers: Arrow navigation, Shift+Arrow multi-select, Delete/Backspace,
+   * Cmd+A select-all escalation, Enter to add block.
+   */
+  _handleBlockModeKey(e) {
+    // Arrow keys: navigate between sibling blocks or extend multi-selection
+    if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      const blockEl = this.queryBlockElement(this.selectedBlockUid);
+      const nav = this.getArrowNavigationTarget(e.key, this.selectedBlockUid, blockEl);
+      if (!nav) return false; // at boundary or wrong direction for layout
+      const { adjacentId, adjacentEl } = nav;
 
-    // Determine layout direction for navigation (skip addability checks — we want
-    // navigation direction even for blocks that can't have siblings added)
-    let addDirection = blockElement.getAttribute('data-block-add');
-    if (!addDirection) {
+      e.preventDefault();
+
+      if (e.shiftKey) {
+        // Shift+Arrow: extend/shrink multi-selection
+        if (this.multiSelectedBlockUids.length === 0) {
+          this.multiSelectedBlockUids = [this.selectedBlockUid, adjacentId];
+        } else if (this.multiSelectedBlockUids.includes(adjacentId)) {
+          this.multiSelectedBlockUids = this.multiSelectedBlockUids.filter(
+            uid => uid !== this.selectedBlockUid,
+          );
+        } else {
+          this.multiSelectedBlockUids.push(adjacentId);
+        }
+        this.selectedBlockUid = adjacentId;
+        if (this.multiSelectedBlockUids.length <= 1) {
+          const singleUid = this.multiSelectedBlockUids[0] || adjacentId;
+          this.multiSelectedBlockUids = [];
+          this.selectedBlockUid = singleUid;
+          this.focusedFieldName = null;
+          window.getSelection()?.removeAllRanges();
+          const el = this.queryBlockElement(singleUid);
+          if (el) this.sendBlockSelected('shiftArrowSingle', el, { focusedFieldName: null });
+        } else {
+          this._sendMultiBlockSelected();
+        }
+      } else {
+        // Plain arrow: navigate to adjacent block, stay in block mode
+        // editMode is already 'block', selectBlock reads it
+        this.multiSelectedBlockUids = [];
+        this._navigatingToBlock = true;
+        this.selectBlock(adjacentEl);
+        this._navigatingToBlock = false;
+      }
+      return true;
+    }
+
+    // Delete/Backspace: delete selected block(s)
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      if (this.multiSelectedBlockUids.length > 0) {
+        log('Block mode Delete: deleting', this.multiSelectedBlockUids.length, 'blocks');
+        this.sendMessageToParent({
+          type: 'DELETE_BLOCKS',
+          uids: [...this.multiSelectedBlockUids],
+        });
+        this.multiSelectedBlockUids = [];
+        this.selectedBlockUid = null;
+      } else {
+        log('Block mode Delete: deleting single block', this.selectedBlockUid);
+        this.sendMessageToParent({
+          type: 'DELETE_BLOCK',
+          uid: this.selectedBlockUid,
+        });
+      }
+      return true;
+    }
+
+    // Cmd+A: select all sibling blocks (block mode → multi-select)
+    if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+      if (this.multiSelectedBlockUids.length > 0) return true; // already multi-selected
+      e.preventDefault();
+      const siblings = [this.selectedBlockUid];
+      let uid = this.selectedBlockUid;
+      while (true) {
+        const prev = this._resolveNavigationTarget(uid, 'backward', false);
+        if (!prev) break;
+        siblings.unshift(prev);
+        uid = prev;
+      }
+      uid = this.selectedBlockUid;
+      while (true) {
+        const next = this._resolveNavigationTarget(uid, 'forward', false);
+        if (!next) break;
+        siblings.push(next);
+        uid = next;
+      }
+      if (siblings.length > 1) {
+        this.multiSelectedBlockUids = siblings;
+        this._sendMultiBlockSelected();
+      }
+      return true;
+    }
+
+    // Enter: add block after (only in edit mode)
+    if (e.key === 'Enter' && !e.shiftKey && this.isInlineEditing) {
+      e.preventDefault();
+      this.sendMessageToParent({
+        type: 'ADD_BLOCK_AFTER',
+        blockId: this.selectedBlockUid,
+      });
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Single source of truth for arrow-key → adjacent block navigation.
+   * Maps the arrow key to a direction based on layout mode (vertical,
+   * horizontal, table), then resolves the navigation target via blockPathMap.
+   *
+   * @returns {{ adjacentId, adjacentEl, direction, isTableVertical }} or null
+   */
+  getArrowNavigationTarget(key, blockUid, blockElement) {
+    const pathInfo = this.blockPathMap?.[blockUid];
+    if (!pathInfo) return null;
+
+    let addDirection = blockElement?.getAttribute('data-block-add');
+    if (!addDirection && blockElement) {
       let depth = 0;
       let parent = blockElement.parentElement;
       while (parent) {
@@ -876,34 +995,37 @@ export class Bridge {
     }
     const isTableMode = pathInfo.parentAddMode === 'table';
 
-    // Map arrow keys to directions
     const isForwardKey = (key === 'ArrowDown' || key === 'ArrowRight');
     const isVerticalKey = (key === 'ArrowUp' || key === 'ArrowDown');
     const isHorizontalKey = (key === 'ArrowLeft' || key === 'ArrowRight');
 
-    // Determine if this key should trigger navigation
     let shouldNavigate = false;
     let isTableVertical = false;
 
     if (isTableMode) {
-      // Table mode: both directions work
-      // Horizontal (Left/Right) → navigate between cells in same row
-      // Vertical (Up/Down) → navigate between rows (same column)
-      if (isHorizontalKey) {
-        shouldNavigate = true;
-      } else if (isVerticalKey) {
-        shouldNavigate = true;
-        isTableVertical = true;
-      }
+      if (isHorizontalKey) shouldNavigate = true;
+      else if (isVerticalKey) { shouldNavigate = true; isTableVertical = true; }
     } else if (addDirection === 'bottom' && isVerticalKey) {
       shouldNavigate = true;
     } else if (addDirection === 'right' && isHorizontalKey) {
       shouldNavigate = true;
     }
 
-    if (!shouldNavigate) return;
+    if (!shouldNavigate) return null;
 
     const direction = isForwardKey ? 'forward' : 'backward';
+    const adjacentId = this._resolveNavigationTarget(blockUid, direction, isTableVertical);
+    if (!adjacentId) return null;
+    const adjacentEl = this.queryBlockElement(adjacentId);
+    if (!adjacentEl) return null;
+
+    return { adjacentId, adjacentEl, direction, isTableVertical };
+  }
+
+  handleArrowAtEdge(key, blockUid, editableField, blockElement) {
+    const nav = this.getArrowNavigationTarget(key, blockUid, blockElement);
+    if (!nav) return;
+    const { adjacentId, adjacentEl, direction, isTableVertical } = nav;
 
     // Check multi-field: navigate between fields within the block first
     const ownFields = this.getOwnEditableFields(blockElement);
@@ -932,49 +1054,15 @@ export class Bridge {
       }
     }
 
-    // Navigate to adjacent block, resolving through template instance boundaries.
-    // Template instances are virtual containers with no DOM element — we must
-    // drill into them (when entering) or skip past them (when leaving).
-    let adjacentId = this._resolveNavigationTarget(blockUid, direction, isTableVertical);
-    if (!adjacentId) return;
-
-    const adjacentElement = this.queryBlockElement(adjacentId);
-    if (!adjacentElement) return;
-
     log('handleArrowAtEdge: navigating from', blockUid, 'to', adjacentId, 'direction:', direction);
 
-    // selectBlock() sets up toolbar, contenteditable, and sends BLOCK_SELECTED to admin.
-    // Admin echoes back SELECT_BLOCK but iframe skips it (alreadySelected).
-    // So we handle field focusing and cursor placement directly here.
-    this.selectBlock(adjacentElement);
-
-    // Focus the appropriate field and place cursor after DOM settles
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const currentElement = this.queryBlockElement(adjacentId);
-        if (!currentElement) return;
-        let targetField;
-        if (direction === 'backward') {
-          const fields = this.getOwnEditableFields(currentElement);
-          targetField = fields[fields.length - 1] || null;
-        } else {
-          targetField = this.getOwnFirstEditableField(currentElement);
-        }
-        if (targetField && targetField.getAttribute('contenteditable') === 'true') {
-          targetField.focus();
-          if (direction === 'backward') {
-            this._placeCursorAtEnd(targetField);
-          } else {
-            const sel = window.getSelection();
-            const range = document.createRange();
-            range.selectNodeContents(targetField);
-            range.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(range);
-          }
-        }
-      });
+    // editMode stays 'text' — selectBlock will set up contenteditable
+    this._navigatingToBlock = true;
+    this.selectBlock(adjacentEl, {
+      fieldToFocus: direction === 'backward' ? 'last' : 'first',
+      cursorAt: direction === 'backward' ? 'end' : 'start',
     });
+    this._navigatingToBlock = false;
   }
 
   /**
@@ -1070,13 +1158,62 @@ export class Bridge {
    * cursor movement. Used by buffer replay and testable independently.
    * @returns {boolean} true if handled
    */
+  /**
+   * Single source of truth for all key actions in a contenteditable field.
+   * Called for both live keystrokes (from field keydown handler) and buffered
+   * replay (from replayBufferedEvents). Returns true if the key was handled.
+   */
   replayOneKey(blockId, evt, editableField) {
     const { key, shiftKey = false, ctrlKey = false, metaKey = false } = evt;
     const hasMod = ctrlKey || metaKey;
 
+    // Clear prospective inline on navigation keys
+    const navigationKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Escape', 'Tab', 'Home', 'End', 'PageUp', 'PageDown'];
+    if ((navigationKeys.includes(key) || hasMod || evt.altKey) && this.prospectiveInlineElement) {
+      log('Clearing prospective inline due to navigation key:', key);
+      this.prospectiveInlineElement = null;
+    }
+
+    // Slash menu: forward navigation keys to admin
+    if (this._slashMenuActive) {
+      if (key === 'ArrowUp' || key === 'ArrowDown') {
+        this.sendMessageToParent({ type: 'SLASH_MENU', action: key === 'ArrowUp' ? 'up' : 'down', blockId });
+        return true;
+      }
+      if (key === 'Enter' && !shiftKey) {
+        this.sendMessageToParent({ type: 'SLASH_MENU', action: 'select', blockId });
+        return true;
+      }
+      if (key === 'Escape') {
+        this._slashMenuActive = false;
+        this.sendMessageToParent({ type: 'SLASH_MENU', action: 'hide', blockId });
+        return true;
+      }
+    }
+
     // Paste (Ctrl+V with stored clipboard data)
     if (evt._type === 'paste' || (hasMod && key?.toLowerCase() === 'v')) {
       if (evt.html) this._doPaste(blockId, evt.html);
+      return true;
+    }
+
+    // Save (Ctrl+S)
+    if (hasMod && key === 's' && !shiftKey) {
+      this.sendMessageToParent({ type: 'SAVE_REQUEST' });
+      return true;
+    }
+
+    // Undo (Ctrl+Z)
+    if (hasMod && key === 'z' && !shiftKey) {
+      this.flushPendingTextUpdates();
+      this.sendMessageToParent({ type: 'SLATE_UNDO_REQUEST', blockId });
+      return true;
+    }
+
+    // Redo (Ctrl+Shift+Z or Ctrl+Y)
+    if (hasMod && ((key === 'z' && shiftKey) || key === 'y')) {
+      this.flushPendingTextUpdates();
+      this.sendMessageToParent({ type: 'SLATE_REDO_REQUEST', blockId });
       return true;
     }
 
@@ -1092,7 +1229,8 @@ export class Bridge {
             (hasShift ? shiftKey : !shiftKey) &&
             (hasAlt ? evt.altKey : !evt.altKey) &&
             key?.toLowerCase() === hotkey && config.type === 'inline') {
-          log('Replaying format hotkey:', config.format);
+          if (!this.isSlateField(blockId, this.focusedFieldName)) return true; // skip non-slate
+          log('Format hotkey:', config.format);
           this.sendTransformRequest(blockId, 'format', { format: config.format });
           return true;
         }
@@ -1101,7 +1239,6 @@ export class Bridge {
 
     // Modifier shortcuts
     if (hasMod && key?.toLowerCase() === 'a') {
-      // Select all — use text node endpoints to avoid correctInvalidWhitespaceSelection
       const sel = window.getSelection();
       if (sel && editableField) {
         const walker = document.createTreeWalker(editableField, NodeFilter.SHOW_TEXT);
@@ -1118,29 +1255,24 @@ export class Bridge {
       }
       return true;
     }
-    if (hasMod && key.toLowerCase() === 'c') {
+    if (hasMod && key?.toLowerCase() === 'c') {
       document.execCommand('copy');
       return true;
     }
-    if (hasMod && key.toLowerCase() === 'x') {
+    if (hasMod && key?.toLowerCase() === 'x') {
       this._doCut(blockId);
-      return true;
-    }
-    if (hasMod && key.toLowerCase() === 'z') {
-      // Undo/redo — not replayable, skip
       return true;
     }
 
     // Space: check markdown first, then insert as text
     if (key === ' ' && !hasMod) {
       if (this.handleSpaceKey(blockId)) {
-        return true; // markdown transform sent
+        return true;
       }
       // Fall through to text insertion
     }
 
     // Text character (including space without markdown)
-    // Run the same preprocessing as the live keydown handler, then insert.
     if (key?.length === 1 && !hasMod) {
       this.correctInvalidWhitespaceSelection();
       this.ensureValidInsertionTarget();
@@ -1181,29 +1313,125 @@ export class Bridge {
       return true;
     }
 
-    // Navigation keys
+    // Arrow keys
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
-      this.moveArrowKey(key, editableField, shiftKey);
-      return true;
-    }
-    if (key === 'Home' || key === 'End') {
-      const sel = window.getSelection();
-      if (sel) {
-        const dir = key === 'Home' ? 'backward' : 'forward';
-        sel.modify(shiftKey ? 'extend' : 'move', dir, 'lineboundary');
-        this._skipZwsNode(dir === 'backward' ? 'forward' : 'backward');
+      if (!hasMod && !evt.altKey) {
+        this.moveArrowKey(key, editableField, shiftKey);
       }
       return true;
     }
 
-    // Keys needing full field context (Enter→split, Tab→indent)
-    // Call the field keydown handler directly instead of synthetic event dispatch
-    if (key === 'Enter' || key === 'Tab') {
-      const syntheticEvt = new KeyboardEvent('keydown', {
-        key, code: evt.code, shiftKey, ctrlKey, metaKey,
-        altKey: evt.altKey, bubbles: true, cancelable: true,
-      });
-      this._handleFieldKeydown(syntheticEvt, blockId, editableField);
+    // Home/End
+    if (key === 'Home' || key === 'End') {
+      if (!hasMod && !evt.altKey) {
+        const sel = window.getSelection();
+        if (sel) {
+          const dir = key === 'Home' ? 'backward' : 'forward';
+          sel.modify(shiftKey ? 'extend' : 'move', dir, 'lineboundary');
+          this._skipZwsNode(dir === 'backward' ? 'forward' : 'backward');
+        }
+      }
+      return true;
+    }
+
+    // Tab
+    if (key === 'Tab' && !hasMod) {
+      const isPreElement = editableField?.tagName === 'PRE' || !!editableField?.closest('pre');
+      if (isPreElement) {
+        const sel = window.getSelection();
+        if (sel?.rangeCount) {
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+          const spaces = document.createTextNode('  ');
+          range.insertNode(spaces);
+          range.setStartAfter(spaces);
+          range.setEndAfter(spaces);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          editableField.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        return true;
+      }
+      if (this.isSlateField(blockId, this.focusedFieldName)) {
+        const selection = window.getSelection();
+        if (selection?.rangeCount) {
+          const tabNode = selection.getRangeAt(0).startContainer;
+          const tabEl = this._toElement(tabNode);
+          if (tabEl?.closest('li')) {
+            this.sendTransformRequest(blockId, shiftKey ? 'outdent' : 'indent', {});
+            return true;
+          }
+        }
+      }
+      return true;
+    }
+
+    // Enter
+    if (key === 'Enter' && !shiftKey) {
+      const isPreElement = editableField?.tagName === 'PRE' || !!editableField?.closest('pre');
+      if (isPreElement) {
+        const sel = window.getSelection();
+        if (sel?.rangeCount) {
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+          const textNode = document.createTextNode('\n');
+          range.insertNode(textNode);
+          range.setStartAfter(textNode);
+          range.setEndAfter(textNode);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          editableField.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        return true;
+      }
+
+      // Plain string fields: navigate to next field or add block
+      if (!this.isSlateField(blockId, this.focusedFieldName)) {
+        const blockEl = editableField?.closest('[data-block-uid]');
+        if (!blockEl) return true;
+        const ownFields = this.getOwnEditableFields(blockEl);
+        const idx = editableField ? ownFields.indexOf(editableField) : -1;
+        if (idx >= 0 && idx < ownFields.length - 1) {
+          const nextField = ownFields[idx + 1];
+          nextField.focus();
+          const sel = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(nextField);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } else {
+          this.sendMessageToParent({ type: 'ADD_BLOCK_AFTER', blockId });
+        }
+        return true;
+      }
+
+      // Slate field: multi-field check then split
+      const blockElement = editableField?.closest('[data-block-uid]');
+      if (!blockElement) return true;
+      const ownFields = this.getOwnEditableFields(blockElement);
+      const currentIndex = editableField ? ownFields.indexOf(editableField) : -1;
+      if (currentIndex >= 0 && currentIndex < ownFields.length - 1) {
+        const nextField = ownFields[currentIndex + 1];
+        nextField.focus();
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(nextField);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        return true;
+      }
+
+      // Last (or only) slate field — split via transform
+      this.correctInvalidWhitespaceSelection();
+      const selection = window.getSelection();
+      if (!selection?.rangeCount) return true;
+      const node = selection.getRangeAt(0).startContainer;
+      const parentElement = this._toElement(node);
+      if (parentElement?.closest('[data-node-id]')) {
+        this.sendTransformRequest(blockId, 'enter', {});
+      }
       return true;
     }
 
@@ -2765,6 +2993,7 @@ export class Bridge {
           this.multiSelectedBlockUids = [];
         }
 
+        this.editMode = 'text';
         this.selectBlock(blockElement);
       } else {
         // No block - check for page-level fields
@@ -2832,297 +3061,12 @@ export class Bridge {
       document.addEventListener('mousedown', this._blockSelectorMousedownHandler, true);
     }
 
-    // Add global keydown handler for space on interactive elements
-    // Certain elements (buttons, inputs, summary) have space key behavior that conflicts
-    // with text editing when contenteditable. This handler is at document level so it
-    // survives DOM re-renders.
-    if (!this._interactiveSpaceHandler) {
-      this._interactiveSpaceHandler = (e) => {
-        if (e.key !== ' ' || !e.target.isContentEditable) return;
+    // Space on interactive contenteditable elements (buttons, etc.) is handled
+    // by _handleFieldKeydown → replayOneKey which preventDefault + insertText.
 
-        const tag = e.target.tagName;
-        const type = e.target.type?.toLowerCase();
-
-        // Elements where space has special activation behavior
-        const needsSpaceOverride =
-          tag === 'BUTTON' ||
-          tag === 'SUMMARY' ||
-          (tag === 'INPUT' && (type === 'submit' || type === 'button' || type === 'reset'));
-
-        if (needsSpaceOverride) {
-          e.preventDefault();
-          document.execCommand('insertText', false, ' ');
-        }
-      };
-      document.addEventListener('keydown', this._interactiveSpaceHandler, true);
-    }
-
-    // Add global keydown handler for Escape — three-state machine:
-    //   Text editing → Block mode (unfocus, stay on block)
-    //   Block mode    → Parent block (or deselect if at page level)
-    if (!this._escapeKeyHandler) {
-      this._escapeKeyHandler = (e) => {
-        if (e.key !== 'Escape') return;
-        // If no block is selected in iframe, still send deselect to admin —
-        // the admin may have a selectedBlock (from Redux) that the iframe
-        // hasn't processed yet (e.g., during INITIAL_DATA waitForStable).
-        if (!this.selectedBlockUid) {
-          this.sendBlockSelected('escapeKey', null);
-          return;
-        }
-
-        // Don't interfere with escape in modals, dropdowns, slash menu, etc.
-        if (this._slashMenuActive) return;
-        const isInPopup = e.target.closest('.volto-hydra-dropdown-menu, .blocks-chooser, [role="dialog"]');
-        if (isInPopup) return;
-
-        e.preventDefault();
-
-        // Check if we're currently in text editing mode (an editable field has focus)
-        const activeEditField = document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]');
-        if (activeEditField) {
-          // FIRST ESCAPE: Text editing → Block mode
-          // Remove contenteditable from all fields in this block, blur the field.
-          // Block stays selected (outline visible, quanta toolbar visible).
-          log('Escape key - entering block mode from text editing:', this.selectedBlockUid);
-          const blockElement = this.queryBlockElement(this.selectedBlockUid);
-          if (blockElement) {
-            const editableFields = blockElement.querySelectorAll('[data-edit-text][contenteditable="true"]');
-            editableFields.forEach((field) => {
-              field.setAttribute('contenteditable', 'false');
-            });
-          }
-          activeEditField.blur();
-          // Clear focused field and re-send BLOCK_SELECTED so admin sees
-          // focusedFieldName=null → block mode outline (full border)
-          this.focusedFieldName = null;
-          if (blockElement) {
-            this.sendBlockSelected('escapeToBlockMode', blockElement, { focusedFieldName: null });
-          }
-          return;
-        }
-
-        // SECOND ESCAPE: Block mode → Parent (or deselect)
-        const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
-        const parentId = pathInfo?.parentId || null;
-        log('Escape key - selecting parent:', parentId, 'from:', this.selectedBlockUid);
-
-        // PAGE_BLOCK_UID is the virtual root - treat as "no parent" (deselect)
-        if (parentId && parentId !== PAGE_BLOCK_UID) {
-          // Handle template instances (virtual containers with no DOM element)
-          if (this.blockPathMap?.[parentId]?.isTemplateInstance) {
-            this.selectBlock(parentId);
-          } else {
-            // Select the parent block
-            const parentElement = this.queryBlockElement(parentId);
-            if (parentElement) {
-              this.selectBlock(parentElement, 'escapeKey');
-            }
-          }
-        } else {
-          // No parent or parent is page - deselect by sending BLOCK_SELECTED with null
-          this.selectedBlockUid = null;
-          this.sendBlockSelected('escapeKey', null);
-        }
-      };
-      document.addEventListener('keydown', this._escapeKeyHandler, true);
-    }
-
-    // Arrow key handler for block mode and no-selection state.
-    // Text mode arrows are handled by field-level _arrowNavHandler (in restoreContentEditableOnFields).
-    // This handler covers:
-    //   No block selected: select first/last page-level block
-    //   Block mode (selected, no field focused): navigate via blockPathMap
-    //   Block mode + Shift: extend/shrink multi-selection
-    if (!this._arrowBlockModeHandler) {
-      this._arrowBlockModeHandler = (e) => {
-        if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
-
-        // In text mode (editing a field), let field-level _arrowNavHandler handle it
-        if (document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]')) return;
-
-        // No block selected: select first or last page-level block
-        if (!this.selectedBlockUid) {
-          if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-          const allBlocks = document.querySelectorAll('[data-block-uid]');
-          const pageBlocks = Array.from(allBlocks).filter(el =>
-            !el.parentElement?.closest('[data-block-uid]'),
-          );
-          if (pageBlocks.length === 0) return;
-          e.preventDefault();
-          const target = e.key === 'ArrowDown' ? pageBlocks[0] : pageBlocks[pageBlocks.length - 1];
-          this.selectBlock(target);
-          return;
-        }
-
-        // Block mode: use _resolveNavigationTarget (same as handleArrowAtEdge)
-        // for proper layout-aware navigation including table mode and templates
-        const direction = (e.key === 'ArrowDown' || e.key === 'ArrowRight') ? 'forward' : 'backward';
-        const isVerticalKey = (e.key === 'ArrowUp' || e.key === 'ArrowDown');
-        const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
-        const isTableMode = pathInfo?.parentAddMode === 'table';
-        const isTableVertical = isTableMode && isVerticalKey;
-
-        const adjacentId = this._resolveNavigationTarget(this.selectedBlockUid, direction, isTableVertical);
-        if (!adjacentId) return;
-        const adjacentEl = this.queryBlockElement(adjacentId);
-        if (!adjacentEl) return;
-
-        e.preventDefault();
-
-        if (e.shiftKey) {
-          // Shift+Arrow: extend/shrink multi-selection
-          if (this.multiSelectedBlockUids.length === 0) {
-            this.multiSelectedBlockUids = [this.selectedBlockUid, adjacentId];
-          } else if (this.multiSelectedBlockUids.includes(adjacentId)) {
-            // Shrink: remove current block from selection
-            this.multiSelectedBlockUids = this.multiSelectedBlockUids.filter(
-              uid => uid !== this.selectedBlockUid,
-            );
-          } else {
-            this.multiSelectedBlockUids.push(adjacentId);
-          }
-          this.selectedBlockUid = adjacentId;
-          // If shrunk back to single block, exit multi-select → block mode
-          if (this.multiSelectedBlockUids.length <= 1) {
-            const singleUid = this.multiSelectedBlockUids[0] || adjacentId;
-            this.multiSelectedBlockUids = [];
-            this.selectedBlockUid = singleUid;
-            this.focusedFieldName = null;
-            window.getSelection()?.removeAllRanges();
-            const el = this.queryBlockElement(singleUid);
-            if (el) this.sendBlockSelected('shiftArrowSingle', el, { focusedFieldName: null });
-          } else {
-            this._sendMultiBlockSelected();
-          }
-        } else {
-          // Plain arrow: navigate to adjacent block, stay in block mode
-          this.multiSelectedBlockUids = [];
-          this.selectedBlockUid = adjacentId;
-          this.focusedFieldName = null;
-          this.sendBlockSelected('arrowBlockMode', adjacentEl, { focusedFieldName: null });
-        }
-      };
-      document.addEventListener('keydown', this._arrowBlockModeHandler);
-    }
-
-    // Delete/Backspace in block mode: delete selected block(s)
-    if (!this._blockModeDeleteHandler) {
-      this._blockModeDeleteHandler = (e) => {
-        if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-        if (!this.selectedBlockUid) return;
-        // Only in block mode (no editable field focused)
-        if (document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]')) return;
-
-        e.preventDefault();
-
-        if (this.multiSelectedBlockUids.length > 0) {
-          // Multi-selection: delete all selected blocks
-          log('Block mode Delete: deleting', this.multiSelectedBlockUids.length, 'blocks');
-          this.sendMessageToParent({
-            type: 'DELETE_BLOCKS',
-            uids: [...this.multiSelectedBlockUids],
-          });
-          this.multiSelectedBlockUids = [];
-          this.selectedBlockUid = null;
-        } else {
-          // Single block: delete current block
-          log('Block mode Delete: deleting single block', this.selectedBlockUid);
-          this.sendMessageToParent({
-            type: 'DELETE_BLOCK',
-            uid: this.selectedBlockUid,
-          });
-        }
-      };
-      document.addEventListener('keydown', this._blockModeDeleteHandler);
-    }
-
-    // Cmd+A / Ctrl+A escalation: text → block → all siblings
-    if (!this._selectAllHandler) {
-      this._selectAllHandler = (e) => {
-        if (e.key !== 'a' || !(e.ctrlKey || e.metaKey)) return;
-        if (!this.selectedBlockUid) return;
-
-        const activeEditField = document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]');
-
-        if (activeEditField) {
-          // Text mode: check if all text is already selected
-          const sel = window.getSelection();
-          if (!sel || sel.rangeCount === 0) return; // let browser handle
-
-          const range = sel.getRangeAt(0);
-          const fieldText = activeEditField.textContent || '';
-          const selText = sel.toString();
-
-          // If selection doesn't cover all text, let browser select all (first Cmd+A)
-          if (selText.length < fieldText.replace(/[\uFEFF\u200B]/g, '').length) return;
-
-          // All text selected → escalate to block mode (second Cmd+A)
-          e.preventDefault();
-          const blockElement = this.queryBlockElement(this.selectedBlockUid);
-          if (blockElement) {
-            const editableFields = blockElement.querySelectorAll('[data-edit-text][contenteditable="true"]');
-            editableFields.forEach(f => f.setAttribute('contenteditable', 'false'));
-          }
-          activeEditField.blur();
-          window.getSelection()?.removeAllRanges();
-          this.focusedFieldName = null;
-          if (blockElement) {
-            this.sendBlockSelected('selectAllBlock', blockElement, { focusedFieldName: null });
-          }
-          return;
-        }
-
-        // Block mode (single block) → select all sibling blocks
-        if (this.multiSelectedBlockUids.length > 0) return; // already multi-selected
-
-        e.preventDefault();
-        const direction = 'forward';
-        // Collect all siblings using _resolveNavigationTarget
-        const siblings = [this.selectedBlockUid];
-        // Walk backward to find first sibling
-        let uid = this.selectedBlockUid;
-        while (true) {
-          const prev = this._resolveNavigationTarget(uid, 'backward', false);
-          if (!prev) break;
-          siblings.unshift(prev);
-          uid = prev;
-        }
-        // Walk forward to find last sibling
-        uid = this.selectedBlockUid;
-        while (true) {
-          const next = this._resolveNavigationTarget(uid, 'forward', false);
-          if (!next) break;
-          siblings.push(next);
-          uid = next;
-        }
-
-        if (siblings.length > 1) {
-          this.multiSelectedBlockUids = siblings;
-          this._sendMultiBlockSelected();
-        }
-      };
-      document.addEventListener('keydown', this._selectAllHandler, true);
-    }
-
-    // Add global Enter handler for "block selected, no field focused" → add block after
-    if (!this._enterKeyHandler) {
-      this._enterKeyHandler = (e) => {
-        if (e.key !== 'Enter' || e.shiftKey) return;
-        if (!this.selectedBlockUid) return;
-        // Only fire if no editable field is currently focused
-        if (document.activeElement?.closest('[data-edit-text]')) return;
-        // Must be in edit mode
-        if (!this.isInlineEditing) return;
-
-        e.preventDefault();
-        this.sendMessageToParent({
-          type: 'ADD_BLOCK_AFTER',
-          blockId: this.selectedBlockUid,
-        });
-      };
-      document.addEventListener('keydown', this._enterKeyHandler);
-    }
+    // All keyboard handling (Escape, arrows, delete, Cmd+A, Enter) is
+    // consolidated in _documentKeyboardBlocker → _handleKeydown.
+    // No separate document-level keydown handlers needed.
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -3151,23 +3095,133 @@ export class Bridge {
         log('DEBUG blocker:', e.type, e.key || e.inputType || '?', 'target:', e.target?.nodeName,
           'block:', e.target?.closest?.('[data-block-uid]')?.getAttribute('data-block-uid'));
       }
-      // Not blocked: capture body-focused keys (field destroyed by re-render).
-      // Same buffer — replayed by restoreContentEditableOnFields when field is ready.
+      // Not blocked — handle all keydown events based on current mode.
       if (!this.blockedBlockId) {
-        if (e.type === 'keydown' && this.selectedBlockUid) {
-          const isBodyTarget = e.target === document.body || e.target === document.documentElement;
-          if (isBodyTarget && !['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key)) {
-            log('Buffering body-focused key:', e.key, 'for', this.selectedBlockUid);
-            this.eventBuffer.push({
-              key: e.key,
-              code: e.code,
-              ctrlKey: e.ctrlKey,
-              metaKey: e.metaKey,
-              shiftKey: e.shiftKey,
-              altKey: e.altKey,
-            });
-            e.preventDefault();
+        if (e.type !== 'keydown') return;
+        if (['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key)) return;
+        if (e.defaultPrevented) return; // Already handled by field-level handler
+
+        // DEBUG: trace arrow events through blocker
+        if (['ArrowDown', 'ArrowUp'].includes(e.key)) {
+          log('BLOCKER arrow:', e.key, 'ts:', Math.round(e.timeStamp), 'trusted:', e.isTrusted,
+            'target:', e.target?.nodeName, 'class:', e.target?.className?.substring?.(0, 30),
+            'activeEl:', document.activeElement?.nodeName, 'selected:', this.selectedBlockUid);
+        }
+
+        const activeEditField = document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]');
+
+        // === Escape: three-state machine (works in all modes) ===
+        if (e.key === 'Escape') {
+          // No block selected: send deselect to admin
+          if (!this.selectedBlockUid) {
+            this.sendBlockSelected('escapeKey', null);
+            return;
           }
+          // Don't interfere with slash menu, modals, dropdowns
+          if (this._slashMenuActive) return;
+          const isInPopup = e.target?.closest?.('.volto-hydra-dropdown-menu, .blocks-chooser, [role="dialog"]');
+          if (isInPopup) return;
+
+          e.preventDefault();
+          if (activeEditField) {
+            // Text mode → Block mode
+            log('Escape key - entering block mode from text editing:', this.selectedBlockUid);
+            this.editMode = 'block';
+            const blockElement = this.queryBlockElement(this.selectedBlockUid);
+            if (blockElement) {
+              blockElement.querySelectorAll('[data-edit-text][contenteditable="true"]')
+                .forEach(f => f.setAttribute('contenteditable', 'false'));
+            }
+            activeEditField.blur();
+            this.focusedFieldName = null;
+            if (blockElement) {
+              this.sendBlockSelected('escapeToBlockMode', blockElement, { focusedFieldName: null });
+            }
+          } else {
+            // Block mode → Parent (or deselect)
+            this.editMode = 'block'; // stay in block mode for parent
+            const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
+            const parentId = pathInfo?.parentId || null;
+            log('Escape key - selecting parent:', parentId, 'from:', this.selectedBlockUid);
+            if (parentId && parentId !== PAGE_BLOCK_UID) {
+              if (this.blockPathMap?.[parentId]?.isTemplateInstance) {
+                this.selectBlock(parentId);
+              } else {
+                const parentElement = this.queryBlockElement(parentId);
+                if (parentElement) this.selectBlock(parentElement);
+              }
+            } else {
+              this.selectedBlockUid = null;
+              this.editMode = null;
+              this.sendBlockSelected('escapeKey', null);
+            }
+          }
+          return;
+        }
+
+        // === Cmd+A: escalation (text → block → all siblings) ===
+        if (e.key === 'a' && (e.ctrlKey || e.metaKey) && this.selectedBlockUid) {
+          if (activeEditField) {
+            // Text mode: if all text already selected, escalate to block mode
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            const fieldText = activeEditField.textContent || '';
+            const selText = sel.toString();
+            if (selText.length < fieldText.replace(/[\uFEFF\u200B]/g, '').length) return; // let browser select all
+            // Escalate to block mode
+            e.preventDefault();
+            this.editMode = 'block';
+            const blockElement = this.queryBlockElement(this.selectedBlockUid);
+            if (blockElement) {
+              blockElement.querySelectorAll('[data-edit-text][contenteditable="true"]')
+                .forEach(f => f.setAttribute('contenteditable', 'false'));
+            }
+            activeEditField.blur();
+            window.getSelection()?.removeAllRanges();
+            this.focusedFieldName = null;
+            if (blockElement) {
+              this.sendBlockSelected('selectAllBlock', blockElement, { focusedFieldName: null });
+            }
+            return;
+          }
+          // Block mode Cmd+A handled by _handleBlockModeKey below
+        }
+
+        // === Text mode: let field-level handlers deal with everything else ===
+        if (activeEditField) return;
+
+        // === No block selected: Arrow selects first/last page-level block ===
+        if (!this.selectedBlockUid) {
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            const allBlocks = document.querySelectorAll('[data-block-uid]');
+            const pageBlocks = Array.from(allBlocks).filter(el =>
+              !el.parentElement?.closest('[data-block-uid]'),
+            );
+            if (pageBlocks.length === 0) return;
+            e.preventDefault();
+            this.editMode = 'text';
+            this.selectBlock(e.key === 'ArrowDown' ? pageBlocks[0] : pageBlocks[pageBlocks.length - 1]);
+          }
+          return;
+        }
+
+        // === Block mode: structural keys handled immediately ===
+        if (this._handleBlockModeKey(e)) return;
+
+        // === Remaining body-focused keys: buffer for text replay ===
+        // (keys that arrive on body during block transitions, before new field is ready)
+        const isBodyTarget = e.target === document.body || e.target === document.documentElement;
+        if (isBodyTarget) {
+          log('Buffering body-focused key:', e.key, 'for', this.selectedBlockUid);
+          this.eventBuffer.push({
+            key: e.key,
+            code: e.code,
+            ctrlKey: e.ctrlKey,
+            metaKey: e.metaKey,
+            shiftKey: e.shiftKey,
+            altKey: e.altKey,
+          });
+          e.preventDefault();
         }
         return;
       }
@@ -4641,86 +4695,9 @@ export class Bridge {
         this.updateEmptyState(field);
         log(`  ${fieldPath}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})${placeholder ? ` placeholder: "${placeholder}"` : ''}`);
 
-        // For <pre> elements, handle Enter (newline) and Tab (indent) properly
-        const isPreElement = field.tagName === 'PRE' || !!field.closest('pre');
-        if (isPreElement && !field._preKeyHandler) {
-          field._preKeyHandler = (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              // Insert a plain \n at cursor position instead of browser's <div>
-              const sel = window.getSelection();
-              if (!sel.rangeCount) return;
-              const range = sel.getRangeAt(0);
-              range.deleteContents();
-              const textNode = document.createTextNode('\n');
-              range.insertNode(textNode);
-              // Move cursor after the newline
-              range.setStartAfter(textNode);
-              range.setEndAfter(textNode);
-              sel.removeAllRanges();
-              sel.addRange(range);
-              field.dispatchEvent(new Event('input', { bubbles: true }));
-            } else if (e.key === 'Tab') {
-              e.preventDefault();
-              // Insert 2 spaces for indentation
-              const sel = window.getSelection();
-              if (!sel.rangeCount) return;
-              const range = sel.getRangeAt(0);
-              range.deleteContents();
-              const spaces = document.createTextNode('  ');
-              range.insertNode(spaces);
-              range.setStartAfter(spaces);
-              range.setEndAfter(spaces);
-              sel.removeAllRanges();
-              sel.addRange(range);
-              field.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-          };
-          field.addEventListener('keydown', field._preKeyHandler);
-        }
-
-        // For plain string fields (single-line), Enter navigates to next field or adds a block
-        if (this.fieldTypeIsPlainString(fieldType) && !field._enterKeyHandler) {
-          field._enterKeyHandler = (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              const blockEl = field.closest('[data-block-uid]');
-              if (!blockEl) return;
-              const ownFields = this.getOwnEditableFields(blockEl);
-              const idx = ownFields.indexOf(field);
-              if (idx < ownFields.length - 1) {
-                // Not last field → focus next field
-                const nextField = ownFields[idx + 1];
-                nextField.focus();
-                const sel = window.getSelection();
-                const range = document.createRange();
-                range.selectNodeContents(nextField);
-                range.collapse(true);
-                sel.removeAllRanges();
-                sel.addRange(range);
-              } else {
-                // Last field → add new block after
-                const blockUid = blockEl.getAttribute('data-block-uid');
-                this.sendMessageToParent({
-                  type: 'ADD_BLOCK_AFTER',
-                  blockId: blockUid,
-                });
-              }
-            }
-          };
-          field.addEventListener('keydown', field._enterKeyHandler);
-        }
-
-        // Arrow key edge navigation: move between fields/blocks when cursor is at edge
-        if (!field._arrowNavHandler) {
-          field._arrowNavHandler = (e) => {
-            if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
-            if (e.ctrlKey || e.metaKey || e.altKey) return;
-            this.moveArrowKey(e.key, field, e.shiftKey);
-            e.preventDefault();
-          };
-          field.addEventListener('keydown', field._arrowNavHandler);
-        }
+        // All key handling (arrows, enter, tab, delete, etc.) goes through the
+        // single _handleFieldKeydown handler registered in activateEditableField.
+        // No per-field key handlers — one handler per field, one code path.
       } else {
         log(`  ${fieldPath}: skipped (type: ${fieldType})`);
       }
@@ -5929,7 +5906,16 @@ export class Bridge {
    *
    * @param {HTMLElement|string} blockElementOrUid - The block element or block UID to select.
    */
-  selectBlock(blockElementOrUid) {
+  /**
+   * Select a block. The caller decides the editing intent via options.fieldToFocus:
+   *   undefined → auto (focus first editable field, set contenteditable — text mode)
+   *   null      → block mode (no contenteditable, no field focus)
+   *   'value'   → focus specific field
+   */
+  selectBlock(blockElementOrUid, options = {}) {
+    // Back-compat: old callers pass a string as second arg (caller name for logging)
+    const opts = typeof options === 'string' ? {} : options;
+    const fieldToFocus = opts.fieldToFocus; // undefined=auto, null=block mode, string=specific field
     // Accept either a DOM element (from click handlers) or a block UID string
     const blockUidFromArg = typeof blockElementOrUid === 'string' ? blockElementOrUid : null;
 
@@ -5984,16 +5970,21 @@ export class Bridge {
       this.eventBuffer = [];
     }
 
-    // Skip contenteditable setup for template instances (they're virtual containers)
-    if (!isTemplateInstance) {
+    // Set up editing based on fieldToFocus:
+    // Use editMode to decide whether to set up contenteditable.
+    // In text mode, fieldToFocus controls which field to focus:
+    //   undefined → auto (first editable field)
+    //   'first'/'last'/name → specific field
+    //   cursorAt → 'start' or 'end'
+    const isBlockMode = this.editMode === 'block';
+
+    if (!isTemplateInstance && !isBlockMode) {
       this.isInlineEditing = true;
 
       // Set contenteditable on all text-editable fields
       this.restoreContentEditableOnFields(blockElement, 'selectBlock');
 
       // For slate blocks (value field), also set up paste/keydown handlers
-      // Check blockElement itself first (Nuxt puts both attributes on same element)
-      // then fall back to querying for child elements
       let valueField = blockElement.hasAttribute('data-edit-text') &&
                        blockElement.getAttribute('data-edit-text') === 'value'
                        ? blockElement
@@ -6002,26 +5993,43 @@ export class Bridge {
         this.makeBlockContentEditable(valueField);
       }
 
-      // For blocks with no usable editable fields (e.g., image, readOnly template blocks),
-      // make the block element focusable and attach arrow key navigation so user can navigate away.
-      const isReadonly = this.isBlockReadonly(blockUid);
-      const hasEditableFields = !isReadonly && this.getOwnEditableFields(blockElement).length > 0;
-      if (!hasEditableFields) {
-        if (!blockElement.hasAttribute('tabindex')) {
-          blockElement.setAttribute('tabindex', '-1');
-        }
-        blockElement.focus({ preventScroll: true });
-        if (!blockElement._nonEditableArrowHandler) {
-          blockElement._nonEditableArrowHandler = (e) => {
-            if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
-            if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
-            e.preventDefault();
-            const uid = blockElement.getAttribute('data-block-uid');
-            this.handleArrowAtEdge(e.key, uid, null, blockElement);
-          };
-          blockElement.addEventListener('keydown', blockElement._nonEditableArrowHandler);
-        }
+      // Focus specific field + cursor placement after DOM settles
+      if (fieldToFocus === 'first' || fieldToFocus === 'last' || typeof fieldToFocus === 'string') {
+        const cursorAt = opts.cursorAt || 'start';
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const currentElement = this.queryBlockElement(blockUid);
+            if (!currentElement) return;
+            let targetField;
+            if (fieldToFocus === 'last') {
+              const fields = this.getOwnEditableFields(currentElement);
+              targetField = fields[fields.length - 1] || null;
+            } else if (fieldToFocus === 'first') {
+              targetField = this.getOwnFirstEditableField(currentElement);
+            } else {
+              // Specific field name
+              targetField = currentElement.querySelector(`[data-edit-text="${fieldToFocus}"]`);
+            }
+            if (targetField && targetField.getAttribute('contenteditable') === 'true') {
+              targetField.focus();
+              if (cursorAt === 'end') {
+                this._placeCursorAtEnd(targetField);
+              } else {
+                const sel = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(targetField);
+                range.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(range);
+              }
+            }
+          });
+        });
       }
+    }
+
+    if (isBlockMode) {
+      this.focusedFieldName = null;
     }
 
     // Remove border and button from the previously selected block
@@ -6148,19 +6156,29 @@ export class Bridge {
       this.observeBlockTextChanges(blockElement);
     }
 
-    // For template instances, send BLOCK_SELECTED immediately (no text selection to trigger it)
-    if (isTemplateInstance && this._pendingBlockSelected) {
-      const pending = this._pendingBlockSelected;
-      this._pendingBlockSelected = null;
-      log('Sending BLOCK_SELECTED for template instance:', pending.blockUid);
-      // Use sendBlockSelected with blockUid override (template instances have no DOM element)
-      this.sendBlockSelected('templateInstance', blockElement, {
-        blockUid: pending.blockUid,
-        focusedFieldName: pending.focusedFieldName,
-        focusedLinkableField: pending.focusedLinkableField,
-        focusedMediaField: pending.focusedMediaField,
-      });
-      return; // Exit early - no further processing needed for template instances
+    // Send BLOCK_SELECTED immediately when selectionchange won't fire:
+    // - Template instances (no DOM element)
+    // - Non-editable blocks (no contenteditable field)
+    // - Block mode (contenteditable not set)
+    {
+      const isReadonly = this.isBlockReadonly(blockUid);
+      const hasEditableFields = !isReadonly && this.getOwnEditableFields(blockElement).length > 0;
+      const needsImmediateSend = isTemplateInstance || isBlockMode || !hasEditableFields;
+      if (needsImmediateSend && this._pendingBlockSelected) {
+        const pending = this._pendingBlockSelected;
+        this._pendingBlockSelected = null;
+        const src = isTemplateInstance ? 'templateInstance'
+          : isBlockMode ? 'blockMode'
+          : 'nonEditableBlock';
+        log('Sending BLOCK_SELECTED immediately for:', pending.blockUid, `(${src})`);
+        this.sendBlockSelected(src, blockElement, {
+          blockUid: pending.blockUid,
+          focusedFieldName: isBlockMode ? null : (isTemplateInstance ? pending.focusedFieldName : null),
+          focusedLinkableField: isTemplateInstance ? pending.focusedLinkableField : null,
+          focusedMediaField: isTemplateInstance ? pending.focusedMediaField : null,
+        });
+        if (isTemplateInstance) return;
+      }
     }
 
     // Track selection changes to preserve selection across format operations
@@ -7693,6 +7711,7 @@ export class Bridge {
             this.deselectBlock(prevUid, null);
           }
           // Send BLOCK_SELECTED(null) so Admin knows iframe acknowledged deselection
+          this.editMode = null;
           this.sendBlockSelected('adminDeselect', null);
           return;
         }
@@ -7775,6 +7794,7 @@ export class Bridge {
 
           // Call selectBlock() to properly set up toolbar and contenteditable
           // This ensures blocks selected via Order tab work the same as clicking
+          this.editMode = 'text';
           this.selectBlock(blockElement);
 
           // Focus the contenteditable element for blocks with editable fields
@@ -8112,280 +8132,39 @@ export class Bridge {
   }
 
   /**
-   * Handle keydown events for an editable field. Shared entry point called from
-   * both per-field listeners and the document-level fallback listener.
+   * Handle keydown events for an editable field. Thin wrapper that calls
+   * replayOneKey (single source of truth) and preventDefault if handled.
    */
   _handleFieldKeydown(e, blockUid, editableField) {
-        // DEBUG: trace End/Backspace key arrival and selection state
-        if (e.key === 'End' || e.key === 'Backspace') {
-          const sel = window.getSelection();
-          log('DEBUG keydown:', e.key, 'isTrusted:', e.isTrusted,
-              'collapsed:', sel?.isCollapsed, 'anchorOffset:', sel?.anchorOffset,
-              'focusOffset:', sel?.focusOffset, 'anchorNode:', sel?.anchorNode?.nodeName,
-              'focusNode:', sel?.focusNode?.nodeName,
-              'sameNode:', sel?.anchorNode === sel?.focusNode,
-              'rangeCollapsed:', sel?.rangeCount ? sel.getRangeAt(0).collapsed : 'no-range',
-              'blockedBlockId:', this.blockedBlockId);
-        }
-        // Ensure cursor is inside a data-node-id element before processing.
-        // After transforms (e.g. delete), Vue/Nuxt may re-render and leave the
-        // cursor on template whitespace outside the content element.
-        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
-          this.correctInvalidWhitespaceSelection();
-          // Also fix whitespace-only text nodes INSIDE data-node-id elements.
-          // Nuxt renders empty paragraphs as <p> </p> (space). The browser's
-          // contenteditable refuses to insert characters into a whitespace-only
-          // text node inside a block element, creating a new node on the parent
-          // instead. Replace the whitespace with FEFF so the browser has a valid
-          // insertion target.
-          this.ensureValidInsertionTarget();
-        }
+        // Skip modifier-only keys
+        if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
 
-        // Clear prospective inline on navigation keys (user intentionally leaving the inline)
-        const navigationKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Escape', 'Tab', 'Home', 'End', 'PageUp', 'PageDown'];
-        const isNavigationKey = navigationKeys.includes(e.key) || e.ctrlKey || e.metaKey || e.altKey;
-        if (isNavigationKey && this.prospectiveInlineElement) {
-          log('Clearing prospective inline due to navigation key:', e.key);
-          this.prospectiveInlineElement = null;
-        }
-
-        // Ensure navigation keys actually move the cursor.
-        // CDP-dispatched keydown events (e.g. from Playwright or automation) don't always
-        // trigger the browser's native cursor movement in contenteditable. Apply
-        // selection.modify explicitly — this is idempotent with the native action.
-        // Arrow keys are handled by _arrowNavHandler (attached in restoreContentEditableOnFields)
-        // for ALL field types, so only handle Home/End and Shift+arrow here.
-        const navActions = {
-          Home: ['backward', 'lineboundary'],
-          End: ['forward', 'lineboundary'],
-        };
-        // Arrow keys are handled by _arrowNavHandler (from restoreContentEditableOnFields).
-        // Only handle Home/End here.
-        if (navActions[e.key] && !e.ctrlKey && !e.metaKey && !e.altKey) {
-          const sel = window.getSelection();
-          if (sel) {
-            const alter = e.shiftKey ? 'extend' : 'move';
-            sel.modify(alter, navActions[e.key][0], navActions[e.key][1]);
-            e.preventDefault();
-          }
-        }
-
-        // When slash menu is active, forward navigation keys to admin
-        if (this._slashMenuActive) {
-          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-            e.preventDefault();
-            this.sendMessageToParent({
-              type: 'SLASH_MENU',
-              action: e.key === 'ArrowUp' ? 'up' : 'down',
-              blockId: blockUid,
-            });
-            return;
-          }
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            this.sendMessageToParent({
-              type: 'SLASH_MENU',
-              action: 'select',
-              blockId: blockUid,
-            });
-            return;
-          }
-          if (e.key === 'Escape') {
-            e.preventDefault();
-            this._slashMenuActive = false;
-            this.sendMessageToParent({
-              type: 'SLASH_MENU',
-              action: 'hide',
-              blockId: blockUid,
-            });
-            return;
-          }
-        }
-
-        // Always suppress native contenteditable formatting shortcuts (Ctrl/Cmd+B/I/U/S)
-        // to prevent native formatting from conflicting with Slate-based formatting
+        // Suppress native contenteditable formatting (Ctrl+B/I/U/S)
         const nativeFormattingKeys = ['b', 'i', 'u', 's'];
         if ((e.ctrlKey || e.metaKey) && nativeFormattingKeys.includes(e.key.toLowerCase())) {
-          log('Suppressing native formatting for:', e.key);
           e.preventDefault();
         }
 
-        // Handle formatting keyboard shortcuts (Ctrl+B, Ctrl+I, etc.)
-        if (this.slateConfig && this.slateConfig.hotkeys) {
-          for (const [shortcut, config] of Object.entries(this.slateConfig.hotkeys)) {
-            // Parse shortcut like "mod+b" into components
-            const parts = shortcut.toLowerCase().split('+');
-            const hasmod = parts.includes('mod');
-            const hasShift = parts.includes('shift');
-            const hasAlt = parts.includes('alt');
-            const key = parts[parts.length - 1]; // Last part is the key
-
-            // Check if this shortcut matches the current event
-            const modifierMatch = hasmod ? (e.ctrlKey || e.metaKey) : true;
-            const shiftMatch = hasShift ? e.shiftKey : !e.shiftKey;
-            const altMatch = hasAlt ? e.altKey : !e.altKey;
-            const keyMatch = e.key.toLowerCase() === key;
-
-            if (modifierMatch && shiftMatch && altMatch && keyMatch && config.type === 'inline') {
-
-              // Only apply format hotkeys to slate fields - text/textarea fields don't support formatting
-              if (!this.isSlateField(blockUid, this.focusedFieldName)) {
-                console.warn('[HYDRA] Skipping format hotkey - field is not slate');
-                // Still prevent default to avoid native contenteditable formatting
-                e.preventDefault();
-                return;
-              }
-
-              e.preventDefault();
-
-              // Send format request with current form data included
-              // This ensures admin receives latest text along with the format action
-              this.sendTransformRequest(blockUid, 'format', {
-                format: config.format,
-              });
-              return;
-            }
-          }
-        }
-
-        // Handle Undo (Ctrl+Z / Cmd+Z)
-        if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-          log('Undo detected');
-          e.preventDefault();
-
-          // Flush pending text so undo manager has the latest state
-          this.flushPendingTextUpdates();
-          this.sendMessageToParent({
-            type: 'SLATE_UNDO_REQUEST',
-            blockId: blockUid,
-          });
-          return;
-        }
-
-        // Handle Redo (Ctrl+Shift+Z / Cmd+Shift+Z or Ctrl+Y / Cmd+Y)
-        if ((e.ctrlKey || e.metaKey) && ((e.key === 'z' && e.shiftKey) || e.key === 'y')) {
-          log('Redo detected');
-          e.preventDefault();
-
-          // Flush pending text so redo manager has the latest state
-          this.flushPendingTextUpdates();
-          this.sendMessageToParent({
-            type: 'SLATE_REDO_REQUEST',
-            blockId: blockUid,
-          });
-          return;
-        }
-
-        // Handle Save (Ctrl+S / Cmd+S) - forward to parent for CMS save
-        // Note: strikethrough was moved to Ctrl+Shift+S to free this shortcut
-        if ((e.ctrlKey || e.metaKey) && e.key === 's' && !e.shiftKey) {
-          log('Save shortcut detected');
-          e.preventDefault();
-          this.sendMessageToParent({
-            type: 'SAVE_REQUEST',
-          });
-          return;
-        }
-
-        // Copy (Ctrl+C / Cmd+C): let native keydown propagate → copy event
-        // fires → _doCopy cleans clipboard with both HTML and plain text.
-
-        // Cut (Ctrl+X / Cmd+X): copy via execCommand (triggers _doCopy),
-        // then delete via transform. Synchronous — no async clipboard API.
-        if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
-          e.preventDefault();
-          this._doCut(blockUid);
-          return;
-        }
-
-        // Paste (Ctrl+V / Cmd+V): let native keydown propagate → paste
-        // event fires → field-level handler calls _doPaste with HTML.
-
-        // Handle markdown shortcuts (Space triggers autoformat)
-        // Shared handler checks text before cursor for block/inline patterns
-        if (e.key === ' ' && this.handleSpaceKey(blockUid)) {
+        // Delegate to replayOneKey — single source of truth for key actions
+        if (this.replayOneKey(blockUid, {
+          key: e.key,
+          code: e.code,
+          shiftKey: e.shiftKey,
+          ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey,
+          altKey: e.altKey,
+        }, editableField)) {
           e.preventDefault();
           return;
         }
 
-        // Handle Tab/Shift+Tab for list indentation in slate fields
-        if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) {
-          if (this.isSlateField(blockUid, this.focusedFieldName)) {
-            const selection = window.getSelection();
-            if (selection.rangeCount) {
-              const tabNode = selection.getRangeAt(0).startContainer;
-              const tabEl = this._toElement(tabNode);
-              if (tabEl?.closest('li')) {
-                e.preventDefault();
-                this.sendTransformRequest(blockUid, e.shiftKey ? 'outdent' : 'indent', {});
-                return;
-              }
-            }
-          }
-        }
+        // Paste (Ctrl+V) and Copy (Ctrl+C): let native propagate for clipboard events
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'c')) return;
 
-        // Handle Enter key to create new block (slate fields only)
-        // Non-slate fields handle Enter via _enterKeyHandler in restoreContentEditableOnFields
-        if (e.key === 'Enter' && !e.shiftKey) {
-          if (!this.isSlateField(blockUid, this.focusedFieldName)) {
-            // Non-slate field — _enterKeyHandler handles navigation/add-block
-            return;
-          }
-
-          log('Enter key detected in slate field (no Shift)');
-
-          const blockElement = editableField.closest('[data-block-uid]');
-          if (!blockElement) return;
-
-          // Check if this is the last editable field — if not, navigate to next field
-          const ownFields = this.getOwnEditableFields(blockElement);
-          const currentIndex = ownFields.indexOf(editableField);
-          const isLastField = currentIndex === ownFields.length - 1;
-
-          if (!isLastField && ownFields.length > 1) {
-            e.preventDefault();
-            const nextField = ownFields[currentIndex + 1];
-            nextField.focus();
-            const sel = window.getSelection();
-            const range = document.createRange();
-            range.selectNodeContents(nextField);
-            range.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(range);
-            return;
-          }
-
-          // Last (or only) slate field — split/create via transform
-          // Correct cursor if it's on invalid whitespace before checking data-node-id
-          this.correctInvalidWhitespaceSelection();
-
-          const selection = window.getSelection();
-          log('Selection rangeCount:', selection.rangeCount);
-          if (!selection.rangeCount) return;
-
-          const range = selection.getRangeAt(0);
-          const node = range.startContainer;
-
-          const parentElement = this._toElement(node);
-          const hasNodeId = parentElement?.closest('[data-node-id]');
-          log('Has data-node-id?', !!hasNodeId);
-
-          if (hasNodeId) {
-            log('Preventing default Enter and sending transform request for block:', blockUid);
-            e.preventDefault();
-            this.sendTransformRequest(blockUid, 'enter', {});
-            return;
-          }
-        }
-
-        // Handle Delete/Backspace special cases (unwrap, delete block, boundary)
-        // via shared handler. If not handled, let browser perform native action.
-        if (e.key === 'Delete' || e.key === 'Backspace') {
-          if (this.handleDeleteKey(blockUid, e.key)) {
-            e.preventDefault();
-          }
-        }
+        // Text input: let browser handle natively (MutationObserver picks up changes)
+        return;
   }
+
 
   /**
    * Observes changes in the text content of a block.
