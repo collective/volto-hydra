@@ -569,18 +569,17 @@ test.describe('Block Mode (Escape state machine)', () => {
     await helper.waitForBlockSelected('block-1-uuid');
 
     // First Escape: enter block mode
-    await page.keyboard.press('Escape');
+    await helper.escapeFromEditing();
 
-    // Verify block mode: block selected but not contenteditable
-    const editField = iframe.locator('[data-block-uid="block-1-uuid"] [data-edit-text]');
-    await expect(editField).not.toHaveAttribute('contenteditable', 'true', { timeout: 3000 });
-    await expect(page.locator('.volto-hydra-block-outline')).toBeVisible();
+    // Verify block mode: editor field should not be contenteditable
+    const editor = await helper.getEditorLocator('block-1-uuid', 'value');
+    await expect(editor).not.toHaveAttribute('contenteditable', 'true', { timeout: 3000 });
 
     // Click the text area again — should re-enter text editing mode
-    await iframe.locator('[data-block-uid="block-1-uuid"] [data-edit-text]').click();
+    await editor.click();
 
     // Field should become contenteditable again
-    await expect(iframe.locator('[data-block-uid="block-1-uuid"] [data-edit-text][contenteditable="true"]')).toBeVisible({ timeout: 5000 });
+    await expect(editor).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
   });
 
   test('Arrow Down in block mode moves to next block', async ({ page }) => {

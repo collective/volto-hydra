@@ -3129,8 +3129,11 @@ export class Bridge {
             this.editMode = 'block';
             const blockElement = this.queryBlockElement(this.selectedBlockUid);
             if (blockElement) {
-              blockElement.querySelectorAll('[data-edit-text][contenteditable="true"]')
-                .forEach(f => f.setAttribute('contenteditable', 'false'));
+              this.collectBlockFields(blockElement, 'data-edit-text', (el) => {
+                if (el.getAttribute('contenteditable') === 'true') {
+                  el.setAttribute('contenteditable', 'false');
+                }
+              });
             }
             activeEditField.blur();
             this.focusedFieldName = null;
@@ -3173,8 +3176,11 @@ export class Bridge {
             this.editMode = 'block';
             const blockElement = this.queryBlockElement(this.selectedBlockUid);
             if (blockElement) {
-              blockElement.querySelectorAll('[data-edit-text][contenteditable="true"]')
-                .forEach(f => f.setAttribute('contenteditable', 'false'));
+              this.collectBlockFields(blockElement, 'data-edit-text', (el) => {
+                if (el.getAttribute('contenteditable') === 'true') {
+                  el.setAttribute('contenteditable', 'false');
+                }
+              });
             }
             activeEditField.blur();
             window.getSelection()?.removeAllRanges();
@@ -4647,6 +4653,12 @@ export class Bridge {
    * @param {string} caller - The caller for debugging (e.g., 'selectBlock', 'FORM_DATA')
    */
   restoreContentEditableOnFields(blockElement, caller = 'unknown') {
+    // In block mode, don't set contenteditable on any fields
+    if (this.editMode === 'block') {
+      log(`restoreContentEditableOnFields: skipped (editMode=block) caller=${caller}`);
+      return;
+    }
+
     // Get blockUid from the element - don't rely on this.selectedBlockUid as it may not be set yet
     const blockUid = blockElement.getAttribute('data-block-uid');
 
