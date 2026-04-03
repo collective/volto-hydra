@@ -9,9 +9,17 @@ export default defineConfig({
     headers: {
       'Content-Security-Policy': 'frame-ancestors *',
     },
+    // Warm up hydra.js on startup so first test doesn't hit cold compile
+    warmup: {
+      clientFiles: [
+        path.resolve(__dirname, '../../../packages/hydra-js/hydra.src.js'),
+      ],
+    },
   },
-  // SPA mode (default) — serves index.html for all unmatched routes
-  // mock-parent.html is served directly as a static file
+  // Pre-bundle tabbable dependency to avoid on-demand resolution delay
+  optimizeDeps: {
+    include: ['tabbable'],
+  },
   resolve: {
     alias: {
       '/hydra.js': path.resolve(__dirname, '../../../packages/hydra-js/hydra.src.js'),

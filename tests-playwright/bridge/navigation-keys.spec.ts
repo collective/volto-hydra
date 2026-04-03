@@ -179,8 +179,7 @@ test.describe('Navigation key behavior in contenteditable', () => {
     // Wait for bold transform to complete
     await helper.waitForFormattedText(editable, 'Text to format', 'bold', { timeout: 5000 });
 
-    // Now select all the bold text
-    await page.keyboard.press('ControlOrMeta+a');
+    // Wait for selection to be restored after bold transform
     await expect.poll(() =>
       helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
@@ -228,11 +227,12 @@ test.describe('Navigation key behavior in contenteditable', () => {
     await page.keyboard.press('ControlOrMeta+b');
     await helper.waitForFormattedText(editable, 'Text to format', 'bold', { timeout: 5000 });
 
-    // Select all bold text and delete — triggers delete transform
-    await page.keyboard.press('ControlOrMeta+a');
+    // Selection should be restored after bold transform — wait for it
     await expect.poll(() =>
       helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
+
+    // Backspace deletes the formatted selection → triggers delete transform
     await page.keyboard.press('Backspace');
 
     // Type immediately — characters arrive while transform is in flight.
@@ -270,11 +270,12 @@ test.describe('Navigation key behavior in contenteditable', () => {
     await page.keyboard.press('ControlOrMeta+b');
     await helper.waitForFormattedText(editable, 'Text to format', 'bold', { timeout: 5000 });
 
-    // Select all bold text and delete — triggers delete transform
-    await page.keyboard.press('ControlOrMeta+a');
+    // Selection should be restored after bold transform — wait for it
     await expect.poll(() =>
       helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
+
+    // Backspace deletes the formatted selection — triggers delete transform
     await page.keyboard.press('Backspace');
 
     // Wait for the clear to complete
