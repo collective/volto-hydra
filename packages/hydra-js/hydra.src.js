@@ -3049,6 +3049,7 @@ export class Bridge {
             // Check if field was already editable (user may be re-clicking an edited field)
             const wasAlreadyEditable = pageField.getAttribute('contenteditable') === 'true';
 
+            this.editMode = 'text';
             this.isInlineEditing = true;
             this.activateEditableField(pageField, this.focusedFieldName, null, 'pageFieldClick', {
               wasAlreadyEditable,

@@ -509,7 +509,7 @@ test.describe('Block Mode (Escape state machine)', () => {
     await helper.waitForBlockSelected('block-1-uuid');
 
     // Verify we're in text editing mode: field should be contenteditable
-    const editFieldEditable = iframe.locator('[data-block-uid="block-1-uuid"] [data-edit-text][contenteditable="true"]');
+    const editFieldEditable = await helper.getEditorLocator('block-1-uuid', 'value');
     await expect(editFieldEditable).toBeVisible({ timeout: 5000 });
 
     // Text mode: subtle outline on block + field underline
@@ -526,7 +526,7 @@ test.describe('Block Mode (Escape state machine)', () => {
     await expect(page.locator('.volto-hydra-field-underline')).not.toBeVisible({ timeout: 3000 });
 
     // The field should no longer be contenteditable="true"
-    const editField = iframe.locator('[data-block-uid="block-1-uuid"] [data-edit-text]');
+    const editField = await helper.getEditorLocator('block-1-uuid', 'value');
     await expect(editField).not.toHaveAttribute('contenteditable', 'true', { timeout: 3000 });
 
     // Second Escape: should deselect (top-level block, no parent)
@@ -836,7 +836,8 @@ test.describe('Multi-Block Selection', () => {
       .toBeVisible({ timeout: 3000 });
 
     // Shift+Click on the SAME block (text-1a)
-    await iframe.locator('[data-block-uid="text-1a"] [data-edit-text]').click({ modifiers: ['Shift'] });
+    const textField1a = await helper.getEditorLocator('text-1a', 'value');
+    await textField1a.click({ modifiers: ['Shift'] });
 
     // Should enter text mode: subtle border + field underline + toolbar
     await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
@@ -863,7 +864,8 @@ test.describe('Multi-Block Selection', () => {
 
     // Shift+Click directly on the TEXT inside block-3 (another Slate block)
     // This must trigger multi-select, NOT enter text editing on block-3
-    await iframe.locator('[data-block-uid="block-3-uuid"] [data-edit-text]').click({ modifiers: ['Shift'] });
+    const textField3 = await helper.getEditorLocator('block-3-uuid', 'value');
+    await textField3.click({ modifiers: ['Shift'] });
 
     // Should have multi-selection outline (combined bounding box, taller than single)
     await expect(async () => {
@@ -873,9 +875,8 @@ test.describe('Multi-Block Selection', () => {
       expect(box!.height).toBeGreaterThan(100);
     }).toPass({ timeout: 5000 });
 
-    // Should NOT be in text mode — no field should be contenteditable
-    const editableField = iframe.locator('[data-block-uid="block-3-uuid"] [data-edit-text][contenteditable="true"]');
-    await expect(editableField).toHaveCount(0, { timeout: 2000 });
+    // Should NOT be in text mode — field should not be contenteditable
+    await expect(textField3).not.toHaveAttribute('contenteditable', 'true', { timeout: 2000 });
   });
 
   test('Shift+Click selects range of blocks', async ({ page }) => {

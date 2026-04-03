@@ -2605,6 +2605,7 @@ var Bridge = class {
           this.focusedFieldName = pageField.getAttribute("data-edit-text");
           if (this.focusedFieldName) {
             const wasAlreadyEditable = pageField.getAttribute("contenteditable") === "true";
+            this.editMode = "text";
             this.isInlineEditing = true;
             this.activateEditableField(pageField, this.focusedFieldName, null, "pageFieldClick", {
               wasAlreadyEditable,
