@@ -16,101 +16,21 @@ const express = require('express');
 const { app: apiApp, contentDirMap } = require('./mock-plone-api');
 
 const API_PORT = process.env.PORT || 8888;
-const FRONTEND_PORT = process.env.FRONTEND_PORT || 8889;
-const FRONTEND_DIR = path.join(__dirname, 'test-frontend');
-
-// ── Test frontend server ──────────────────────────────────────────────────
-
-const frontend = express();
-
-// Serve hydra.js — bundle hydra.src.js on-the-fly with esbuild so dev
-// changes are reflected instantly without a separate watch/build process.
-const fs = require('fs');
-let esbuild;
-try { esbuild = require('esbuild'); } catch { esbuild = null; }
-let hydraCache = null;
-let hydraCacheMtime = 0;
-
-frontend.get('/hydra.js', async (req, res) => {
-  res.setHeader('Content-Type', 'text/javascript; charset=UTF-8');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-
-  const srcPath = path.join(__dirname, '../../packages/hydra-js/hydra.src.js');
-  if (esbuild) {
-    try {
-      const stat = fs.statSync(srcPath);
-      if (!hydraCache || stat.mtimeMs > hydraCacheMtime) {
-        hydraCache = await esbuild.build({
-          entryPoints: [srcPath],
-          bundle: true,
-          format: 'esm',
-          write: false,
-          sourcemap: 'inline',
-        });
-        hydraCacheMtime = stat.mtimeMs;
-      }
-      res.send(hydraCache.outputFiles[0].text);
-    } catch (err) {
-      console.error('esbuild bundle error:', err.message);
-      res.sendFile(path.join(__dirname, '../../packages/hydra-js/hydra.js'));
-    }
-  } else {
-    // esbuild not available — serve pre-built hydra.js
-    res.sendFile(path.join(__dirname, '../../packages/hydra-js/hydra.js'));
-  }
-});
-
-// Serve buildBlockPathMap utility (Volto-free, used by mock-parent.html)
-frontend.get('/build-block-path-map.js', (req, res) => {
-  const filePath = path.join(__dirname, '../../packages/hydra-js/buildBlockPathMap.js');
-  res.setHeader('Content-Type', 'text/javascript; charset=UTF-8');
-  res.sendFile(filePath);
-});
-
-// Serve shared block schemas (used by test frontend via import)
-frontend.get('/shared-block-schemas.js', (req, res) => {
-  const filePath = path.join(__dirname, 'shared-block-schemas.js');
-  res.setHeader('Content-Type', 'text/javascript; charset=UTF-8');
-  res.sendFile(filePath);
-});
-
-// Serve frontend static files
-frontend.use(express.static(FRONTEND_DIR, {
-  setHeaders: (res) => {
-    res.removeHeader('X-Frame-Options');
-    res.setHeader('Content-Security-Policy', 'frame-ancestors *');
-  }
-}));
-
-// SPA fallback
-frontend.get('*', (req, res) => {
-  if (req.isApiRequest) {
-    return res.status(404).json({ error: { type: 'NotFound' } });
-  }
-  res.removeHeader('X-Frame-Options');
-  res.setHeader('Content-Security-Policy', 'frame-ancestors *');
-  res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
-});
 
 // ── Server startup ────────────────────────────────────────────────────────
+// Test frontend is now a separate Vite dev server (tests-playwright/fixtures/test-frontend/)
 
-let apiServer, frontendServer;
+let apiServer;
 if (require.main === module) {
   apiServer = apiApp.listen(API_PORT, () => {
     console.log(`Mock Plone API running on http://localhost:${API_PORT}`);
     console.log(`Health: http://localhost:${API_PORT}/health`);
   });
 
-  frontendServer = frontend.listen(FRONTEND_PORT, () => {
-    console.log(`Test frontend running on http://localhost:${FRONTEND_PORT}`);
-  });
-
   process.on('SIGTERM', () => {
     console.log('SIGTERM received, shutting down');
-    apiServer.close();
-    frontendServer.close(() => process.exit(0));
+    apiServer.close(() => process.exit(0));
   });
 }
 
-module.exports = { app: apiApp, frontend, apiServer, frontendServer };
+module.exports = { app: apiApp, apiServer };
