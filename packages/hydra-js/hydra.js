@@ -1339,7 +1339,11 @@ var Bridge = class {
         }
         return true;
       }
-      if (!this.isSlateField(blockId, this.focusedFieldName)) {
+      const fieldType = this.getFieldType(blockId, this.focusedFieldName);
+      if (!this.isSlateField(blockId, this.focusedFieldName) && !this.fieldTypeIsPlainString(fieldType)) {
+        return false;
+      }
+      if (this.fieldTypeIsPlainString(fieldType)) {
         const blockEl = editableField?.closest("[data-block-uid]");
         if (!blockEl) return true;
         const ownFields2 = this.getOwnEditableFields(blockEl);

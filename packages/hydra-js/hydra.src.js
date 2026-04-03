@@ -1362,7 +1362,16 @@ export class Bridge {
         }
         return true;
       }
-      if (!this.isSlateField(blockId, this.focusedFieldName)) {
+      // Plain string fields: navigate to next field or add block.
+      // Textarea and unknown types: let native handle (inserts newline).
+      // Slate fields: multi-field check then split via transform.
+      const fieldType = this.getFieldType(blockId, this.focusedFieldName);
+      if (!this.isSlateField(blockId, this.focusedFieldName) &&
+          !this.fieldTypeIsPlainString(fieldType)) {
+        // Textarea or unknown — let native insert newline
+        return false;
+      }
+      if (this.fieldTypeIsPlainString(fieldType)) {
         const blockEl = editableField?.closest('[data-block-uid]');
         if (!blockEl) return true;
         const ownFields = this.getOwnEditableFields(blockEl);
