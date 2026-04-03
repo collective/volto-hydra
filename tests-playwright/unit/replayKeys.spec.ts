@@ -563,6 +563,91 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
     expect(r.fullText).toBe('Hellox');
   });
 
+  test('_handleFieldKeydown skips isComposing events (IME)', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+      editField.innerHTML = '<p data-node-id="0">Hello</p>';
+      editField.setAttribute('contenteditable', 'true');
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'value';
+      bridge.isInlineEditing = true;
+      bridge.editMode = 'text';
+
+      // Place cursor at end
+      const textNode = editField.querySelector('p')!.firstChild!;
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(textNode, textNode.textContent!.length);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      // Dispatch a keydown with isComposing=true (simulates IME input)
+      const composingEvent = new KeyboardEvent('keydown', {
+        key: 'Process', code: 'KeyN', bubbles: true, cancelable: true,
+        composed: true,
+      });
+      // Override isComposing (readonly in constructor, use defineProperty)
+      Object.defineProperty(composingEvent, 'isComposing', { value: true });
+
+      // Track if preventDefault was called
+      let prevented = false;
+      const origPreventDefault = composingEvent.preventDefault.bind(composingEvent);
+      composingEvent.preventDefault = () => { prevented = true; origPreventDefault(); };
+
+      editField.dispatchEvent(composingEvent);
+
+      // Text should be unchanged (bridge didn't handle it)
+      const text = editField.textContent!.replace(/[\uFEFF\u200B]/g, '');
+      return { text, prevented };
+    });
+    // isComposing event should NOT be prevented — let native/IME handle
+    expect(r.prevented).toBe(false);
+    expect(r.text).toBe('Hello');
+  });
+
+  test('IME composition result is preserved via native input', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+      editField.innerHTML = '<p data-node-id="0">Hello</p>';
+      editField.setAttribute('contenteditable', 'true');
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'value';
+      bridge.isInlineEditing = true;
+      bridge.editMode = 'text';
+
+      // Place cursor at end
+      const textNode = editField.querySelector('p')!.firstChild!;
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(textNode, textNode.textContent!.length);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      // Simulate native IME inserting a character (compositionend)
+      // In real IME, browser inserts the character natively
+      textNode.textContent = 'Hello\u4e16'; // 世 (Chinese character)
+
+      const text = editField.textContent!.replace(/[\uFEFF\u200B]/g, '');
+      return { text };
+    });
+    // IME character should be in the text (inserted natively, not by replayOneKey)
+    expect(r.text).toBe('Hello\u4e16');
+  });
+
   test('Space on button element inserts space (not activate)', async () => {
     const iframe = helper.getIframe();
     const r = await iframe.locator('body').evaluate(() => {
