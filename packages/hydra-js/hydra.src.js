@@ -3207,7 +3207,7 @@ export class Bridge {
             if (!sel || sel.rangeCount === 0) return;
             const fieldText = activeEditField.textContent || '';
             const selText = sel.toString();
-            if (selText.length < fieldText.replace(/[\uFEFF\u200B]/g, '').length) return; // let browser select all
+            if (selText.length < fieldText.replace(/[\uFEFF\u200B]/g, '').length) return; // let field handler select all
             // Escalate to block mode
             e.preventDefault();
             this.editMode = 'block';

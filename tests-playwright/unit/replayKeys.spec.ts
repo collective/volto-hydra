@@ -679,6 +679,44 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
     expect(r.focusMoved).toBe(true);
   });
 
+  test('Ctrl+A selects all text and selection survives selectionchange', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+      editField.innerHTML = '<p data-node-id="0">Hello World</p>';
+      editField.setAttribute('contenteditable', 'true');
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'value';
+      bridge.isInlineEditing = true;
+      bridge.editMode = 'text';
+
+      // Place cursor at start
+      const textNode = editField.querySelector('p')!.firstChild!;
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(textNode, 0);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      // Replay Ctrl+A
+      bridge.handleSpecialKey(blockId, {
+        key: 'a', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false,
+      }, editField);
+
+      // Check selection immediately
+      const selText = window.getSelection()?.toString() || '';
+
+      return { selText };
+    });
+    expect(r.selText).toBe('Hello World');
+  });
+
   test('Space on button element inserts space (not activate)', async () => {
     const iframe = helper.getIframe();
     const r = await iframe.locator('body').evaluate(() => {
