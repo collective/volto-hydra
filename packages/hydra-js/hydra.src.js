@@ -1195,9 +1195,30 @@ export class Bridge {
       }
     }
 
-    // Paste (Ctrl+V with stored clipboard data)
-    if (evt._type === 'paste' || (hasMod && key?.toLowerCase() === 'v')) {
+    // Paste: replay has clipboard data stored at buffer time (evt.html).
+    // Live Ctrl+V reads clipboard now (user gesture is active).
+    if (evt._type === 'paste') {
       if (evt.html) this._doPaste(blockId, evt.html);
+      return true;
+    }
+    if (hasMod && key?.toLowerCase() === 'v') {
+      // Read clipboard async (user gesture active for live keys)
+      navigator.clipboard.read().then(async (items) => {
+        for (const item of items) {
+          if (item.types.includes('text/html')) {
+            this._doPaste(blockId, await (await item.getType('text/html')).text());
+            return;
+          }
+          if (item.types.includes('text/plain')) {
+            this._doPaste(blockId, await (await item.getType('text/plain')).text());
+            return;
+          }
+        }
+      }).catch(() => {
+        navigator.clipboard.readText().then(text => {
+          if (text) this._doPaste(blockId, text);
+        }).catch(() => {});
+      });
       return true;
     }
 

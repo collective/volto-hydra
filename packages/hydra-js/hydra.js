@@ -1197,8 +1197,28 @@ var Bridge = class {
         return true;
       }
     }
-    if (evt._type === "paste" || hasMod && key?.toLowerCase() === "v") {
+    if (evt._type === "paste") {
       if (evt.html) this._doPaste(blockId, evt.html);
+      return true;
+    }
+    if (hasMod && key?.toLowerCase() === "v") {
+      navigator.clipboard.read().then(async (items) => {
+        for (const item of items) {
+          if (item.types.includes("text/html")) {
+            this._doPaste(blockId, await (await item.getType("text/html")).text());
+            return;
+          }
+          if (item.types.includes("text/plain")) {
+            this._doPaste(blockId, await (await item.getType("text/plain")).text());
+            return;
+          }
+        }
+      }).catch(() => {
+        navigator.clipboard.readText().then((text) => {
+          if (text) this._doPaste(blockId, text);
+        }).catch(() => {
+        });
+      });
       return true;
     }
     if (hasMod && key === "s" && !shiftKey) {

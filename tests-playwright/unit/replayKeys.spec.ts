@@ -717,6 +717,82 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
     expect(r.selText).toBe('Hello World');
   });
 
+  test('Ctrl+C triggers execCommand copy', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+      editField.innerHTML = '<p data-node-id="0">Copy this text</p>';
+      editField.setAttribute('contenteditable', 'true');
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'value';
+
+      // Select all text
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.selectNodeContents(editField.querySelector('p')!);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      // Track if copy event fires
+      let copyFired = false;
+      editField.addEventListener('copy', () => { copyFired = true; }, { once: true });
+
+      bridge.handleSpecialKey(blockId, {
+        key: 'c', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false,
+      }, editField);
+
+      return { copyFired };
+    });
+    expect(r.copyFired).toBe(true);
+  });
+
+  test('Ctrl+X triggers copy and sends delete transform', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+      editField.innerHTML = '<p data-node-id="0">Cut this text</p>';
+      editField.setAttribute('contenteditable', 'true');
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'value';
+
+      // Select all text
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.selectNodeContents(editField.querySelector('p')!);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      // Capture messages
+      const messages: any[] = [];
+      const origSend = bridge.sendMessageToParent.bind(bridge);
+      bridge.sendMessageToParent = (msg: any) => { messages.push(msg); origSend(msg); };
+
+      let copyFired = false;
+      editField.addEventListener('copy', () => { copyFired = true; }, { once: true });
+
+      bridge.handleSpecialKey(blockId, {
+        key: 'x', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false,
+      }, editField);
+
+      bridge.sendMessageToParent = origSend;
+
+      const deleteMsg = messages.find((m: any) => m.type === 'SLATE_TRANSFORM_REQUEST' && m.action === 'delete');
+      return { copyFired, hasDeleteTransform: !!deleteMsg };
+    });
+    expect(r.copyFired).toBe(true);
+    expect(r.hasDeleteTransform).toBe(true);
+  });
+
   test('Space on button element inserts space (not activate)', async () => {
     const iframe = helper.getIframe();
     const r = await iframe.locator('body').evaluate(() => {
