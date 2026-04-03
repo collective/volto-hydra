@@ -1161,22 +1161,24 @@ export class Bridge {
    * @returns {boolean} true if handled
    */
   /**
-   * Single source of truth for all key actions in a contenteditable field.
-   * Called for both live keystrokes (from field keydown handler) and buffered
-   * replay (from replayBufferedEvents). Returns true if the key was handled.
+   * Handle structural/special key actions that need preventDefault.
+   * Shared by both live (_handleFieldKeydown) and replay (replayOneKey).
+   * Returns true if the key was fully handled (caller should preventDefault).
+   * Returns false if the key is a content key (text char, normal delete, space
+   * without markdown) — caller decides: live lets native handle, replay uses
+   * _insertTextAtCursor / execCommand.
    */
-  replayOneKey(blockId, evt, editableField) {
+  handleSpecialKey(blockId, evt, editableField) {
     const { key, shiftKey = false, ctrlKey = false, metaKey = false } = evt;
     const hasMod = ctrlKey || metaKey;
 
     // Clear prospective inline on navigation keys
     const navigationKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Escape', 'Tab', 'Home', 'End', 'PageUp', 'PageDown'];
     if ((navigationKeys.includes(key) || hasMod || evt.altKey) && this.prospectiveInlineElement) {
-      log('Clearing prospective inline due to navigation key:', key);
       this.prospectiveInlineElement = null;
     }
 
-    // Slash menu: forward navigation keys to admin
+    // Slash menu navigation
     if (this._slashMenuActive) {
       if (key === 'ArrowUp' || key === 'ArrowDown') {
         this.sendMessageToParent({ type: 'SLASH_MENU', action: key === 'ArrowUp' ? 'up' : 'down', blockId });
@@ -1199,20 +1201,16 @@ export class Bridge {
       return true;
     }
 
-    // Save (Ctrl+S)
+    // Save, Undo, Redo
     if (hasMod && key === 's' && !shiftKey) {
       this.sendMessageToParent({ type: 'SAVE_REQUEST' });
       return true;
     }
-
-    // Undo (Ctrl+Z)
     if (hasMod && key === 'z' && !shiftKey) {
       this.flushPendingTextUpdates();
       this.sendMessageToParent({ type: 'SLATE_UNDO_REQUEST', blockId });
       return true;
     }
-
-    // Redo (Ctrl+Shift+Z or Ctrl+Y)
     if (hasMod && ((key === 'z' && shiftKey) || key === 'y')) {
       this.flushPendingTextUpdates();
       this.sendMessageToParent({ type: 'SLATE_REDO_REQUEST', blockId });
@@ -1231,15 +1229,14 @@ export class Bridge {
             (hasShift ? shiftKey : !shiftKey) &&
             (hasAlt ? evt.altKey : !evt.altKey) &&
             key?.toLowerCase() === hotkey && config.type === 'inline') {
-          if (!this.isSlateField(blockId, this.focusedFieldName)) return true; // skip non-slate
-          log('Format hotkey:', config.format);
+          if (!this.isSlateField(blockId, this.focusedFieldName)) return true;
           this.sendTransformRequest(blockId, 'format', { format: config.format });
           return true;
         }
       }
     }
 
-    // Modifier shortcuts
+    // Cmd+A, Cmd+C, Cmd+X
     if (hasMod && key?.toLowerCase() === 'a') {
       const sel = window.getSelection();
       if (sel && editableField) {
@@ -1266,53 +1263,21 @@ export class Bridge {
       return true;
     }
 
-    // Space: check markdown first, then insert as text
+    // Space: markdown shortcut only (text insertion is NOT special)
     if (key === ' ' && !hasMod) {
-      if (this.handleSpaceKey(blockId)) {
-        return true;
-      }
-      // Fall through to text insertion
+      if (this.handleSpaceKey(blockId)) return true;
+      return false; // let caller handle as text
     }
 
-    // Text character (including space without markdown)
-    if (key?.length === 1 && !hasMod) {
-      this.correctInvalidWhitespaceSelection();
-      this.ensureValidInsertionTarget();
-      this._insertTextAtCursor(key, editableField);
-      return true;
-    }
-
-    // Delete keys
+    // Delete/Backspace: boundary cases only (normal delete is NOT special)
     if (key === 'Backspace') {
-      if (!this.handleDeleteKey(blockId, 'Backspace')) {
-        if (!this.preserveLastCharDelete()) {
-          document.execCommand('delete', false);
-        }
-      }
-      return true;
+      if (this.handleDeleteKey(blockId, 'Backspace')) return true;
+      return false; // let caller handle as native delete
     }
     if (key === 'Delete') {
       this._skipZwsNode('forward');
-      if (!this.handleDeleteKey(blockId, 'Delete')) {
-        if (!this.preserveLastCharDelete()) {
-          const sel = window.getSelection();
-          if (sel?.isCollapsed && sel.focusNode?.nodeType === Node.TEXT_NODE) {
-            const text = sel.focusNode.textContent || '';
-            let offset = sel.focusOffset;
-            while (offset < text.length &&
-              (text[offset] === '\uFEFF' || text[offset] === '\u200B')) {
-              offset++;
-            }
-            if (offset < text.length) {
-              const range = document.createRange();
-              range.setStart(sel.focusNode, offset);
-              range.setEnd(sel.focusNode, offset + 1);
-              range.deleteContents();
-            }
-          }
-        }
-      }
-      return true;
+      if (this.handleDeleteKey(blockId, 'Delete')) return true;
+      return false; // let caller handle as native delete
     }
 
     // Arrow keys
@@ -1365,8 +1330,7 @@ export class Bridge {
           }
         }
       }
-      // Not in pre or list — focus navigation following tab order.
-      // Uses tabbable library to find next/previous focusable element.
+      // Focus navigation via tabbable
       {
         const ordered = tabbable(document.documentElement);
         const currentIdx = ordered.indexOf(editableField || document.activeElement);
@@ -1398,8 +1362,6 @@ export class Bridge {
         }
         return true;
       }
-
-      // Plain string fields: navigate to next field or add block
       if (!this.isSlateField(blockId, this.focusedFieldName)) {
         const blockEl = editableField?.closest('[data-block-uid]');
         if (!blockEl) return true;
@@ -1419,8 +1381,7 @@ export class Bridge {
         }
         return true;
       }
-
-      // Slate field: multi-field check then split
+      // Slate: multi-field then split
       const blockElement = editableField?.closest('[data-block-uid]');
       if (!blockElement) return true;
       const ownFields = this.getOwnEditableFields(blockElement);
@@ -1436,8 +1397,6 @@ export class Bridge {
         sel.addRange(range);
         return true;
       }
-
-      // Last (or only) slate field — split via transform
       this.correctInvalidWhitespaceSelection();
       const selection = window.getSelection();
       if (!selection?.rangeCount) return true;
@@ -1445,6 +1404,61 @@ export class Bridge {
       const parentElement = this._toElement(node);
       if (parentElement?.closest('[data-node-id]')) {
         this.sendTransformRequest(blockId, 'enter', {});
+      }
+      return true;
+    }
+
+    return false; // Not a special key
+  }
+
+  /**
+   * Replay a buffered key. Calls handleSpecialKey first, then handles
+   * content keys (text insertion, normal delete) that can't go native.
+   */
+  replayOneKey(blockId, evt, editableField) {
+    // Try special/structural handling first (shared with live _handleFieldKeydown)
+    if (this.handleSpecialKey(blockId, evt, editableField)) return true;
+
+    const { key, ctrlKey = false, metaKey = false } = evt;
+    const hasMod = ctrlKey || metaKey;
+
+    // Content keys: in replay, no native events — handle explicitly.
+    // (For live keys, _handleFieldKeydown lets these go native instead.)
+
+    // Text character (including space that wasn't a markdown shortcut)
+    if (key?.length === 1 && !hasMod) {
+      this.correctInvalidWhitespaceSelection();
+      this.ensureValidInsertionTarget();
+      this._insertTextAtCursor(key, editableField);
+      return true;
+    }
+
+    // Backspace (not handled by handleSpecialKey = normal char delete)
+    if (key === 'Backspace') {
+      if (!this.preserveLastCharDelete()) {
+        document.execCommand('delete', false);
+      }
+      return true;
+    }
+
+    // Delete (not handled by handleSpecialKey = normal char delete)
+    if (key === 'Delete') {
+      if (!this.preserveLastCharDelete()) {
+        const sel = window.getSelection();
+        if (sel?.isCollapsed && sel.focusNode?.nodeType === Node.TEXT_NODE) {
+          const text = sel.focusNode.textContent || '';
+          let offset = sel.focusOffset;
+          while (offset < text.length &&
+            (text[offset] === '\uFEFF' || text[offset] === '\u200B')) {
+            offset++;
+          }
+          if (offset < text.length) {
+            const range = document.createRange();
+            range.setStart(sel.focusNode, offset);
+            range.setEnd(sel.focusNode, offset + 1);
+            range.deleteContents();
+          }
+        }
       }
       return true;
     }
@@ -8172,25 +8186,27 @@ export class Bridge {
         // IME composition: let native handle entirely
         if (e.isComposing) return;
 
-        // Text characters: native (browser inserts, MutationObserver detects).
-        // Keeps IME, spell check, auto-capitalize working. Also avoids
-        // performance cost of DOM manipulation per keystroke.
-        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-          this.correctInvalidWhitespaceSelection();
-          this.ensureValidInsertionTarget();
-          return;
-        }
-
-        // Paste (Ctrl+V) and Copy (Ctrl+C): native clipboard events
-        if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'c')) return;
-
-        // Everything else: replayOneKey (single source of truth)
-        if (this.replayOneKey(blockUid, {
+        // Try special/structural handling (shared with replayOneKey).
+        // If handled, preventDefault to suppress native action.
+        if (this.handleSpecialKey(blockUid, {
           key: e.key, code: e.code,
           shiftKey: e.shiftKey, ctrlKey: e.ctrlKey,
           metaKey: e.metaKey, altKey: e.altKey,
         }, editableField)) {
           e.preventDefault();
+          return;
+        }
+
+        // Content keys: let native handle.
+        // Text chars: browser inserts, MutationObserver detects.
+        // Space (non-markdown): browser inserts space.
+        // Delete/Backspace (non-boundary): browser deletes, beforeinput
+        //   handles preserveLastCharDelete.
+        // Paste/Copy: native clipboard events.
+        // Pre-processing for text input:
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          this.correctInvalidWhitespaceSelection();
+          this.ensureValidInsertionTarget();
         }
   }
 

@@ -1168,16 +1168,18 @@ var Bridge = class {
    * @returns {boolean} true if handled
    */
   /**
-   * Single source of truth for all key actions in a contenteditable field.
-   * Called for both live keystrokes (from field keydown handler) and buffered
-   * replay (from replayBufferedEvents). Returns true if the key was handled.
+   * Handle structural/special key actions that need preventDefault.
+   * Shared by both live (_handleFieldKeydown) and replay (replayOneKey).
+   * Returns true if the key was fully handled (caller should preventDefault).
+   * Returns false if the key is a content key (text char, normal delete, space
+   * without markdown) — caller decides: live lets native handle, replay uses
+   * _insertTextAtCursor / execCommand.
    */
-  replayOneKey(blockId, evt, editableField) {
+  handleSpecialKey(blockId, evt, editableField) {
     const { key, shiftKey = false, ctrlKey = false, metaKey = false } = evt;
     const hasMod = ctrlKey || metaKey;
     const navigationKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Escape", "Tab", "Home", "End", "PageUp", "PageDown"];
     if ((navigationKeys.includes(key) || hasMod || evt.altKey) && this.prospectiveInlineElement) {
-      log("Clearing prospective inline due to navigation key:", key);
       this.prospectiveInlineElement = null;
     }
     if (this._slashMenuActive) {
@@ -1222,7 +1224,6 @@ var Bridge = class {
         const hotkey = parts[parts.length - 1];
         if ((hasmod ? hasMod : true) && (hasShift ? shiftKey : !shiftKey) && (hasAlt ? evt.altKey : !evt.altKey) && key?.toLowerCase() === hotkey && config.type === "inline") {
           if (!this.isSlateField(blockId, this.focusedFieldName)) return true;
-          log("Format hotkey:", config.format);
           this.sendTransformRequest(blockId, "format", { format: config.format });
           return true;
         }
@@ -1254,45 +1255,17 @@ var Bridge = class {
       return true;
     }
     if (key === " " && !hasMod) {
-      if (this.handleSpaceKey(blockId)) {
-        return true;
-      }
-    }
-    if (key?.length === 1 && !hasMod) {
-      this.correctInvalidWhitespaceSelection();
-      this.ensureValidInsertionTarget();
-      this._insertTextAtCursor(key, editableField);
-      return true;
+      if (this.handleSpaceKey(blockId)) return true;
+      return false;
     }
     if (key === "Backspace") {
-      if (!this.handleDeleteKey(blockId, "Backspace")) {
-        if (!this.preserveLastCharDelete()) {
-          document.execCommand("delete", false);
-        }
-      }
-      return true;
+      if (this.handleDeleteKey(blockId, "Backspace")) return true;
+      return false;
     }
     if (key === "Delete") {
       this._skipZwsNode("forward");
-      if (!this.handleDeleteKey(blockId, "Delete")) {
-        if (!this.preserveLastCharDelete()) {
-          const sel = window.getSelection();
-          if (sel?.isCollapsed && sel.focusNode?.nodeType === Node.TEXT_NODE) {
-            const text = sel.focusNode.textContent || "";
-            let offset = sel.focusOffset;
-            while (offset < text.length && (text[offset] === "\uFEFF" || text[offset] === "\u200B")) {
-              offset++;
-            }
-            if (offset < text.length) {
-              const range = document.createRange();
-              range.setStart(sel.focusNode, offset);
-              range.setEnd(sel.focusNode, offset + 1);
-              range.deleteContents();
-            }
-          }
-        }
-      }
-      return true;
+      if (this.handleDeleteKey(blockId, "Delete")) return true;
+      return false;
     }
     if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(key)) {
       if (!hasMod && !evt.altKey) {
@@ -1407,6 +1380,47 @@ var Bridge = class {
       const parentElement = this._toElement(node);
       if (parentElement?.closest("[data-node-id]")) {
         this.sendTransformRequest(blockId, "enter", {});
+      }
+      return true;
+    }
+    return false;
+  }
+  /**
+   * Replay a buffered key. Calls handleSpecialKey first, then handles
+   * content keys (text insertion, normal delete) that can't go native.
+   */
+  replayOneKey(blockId, evt, editableField) {
+    if (this.handleSpecialKey(blockId, evt, editableField)) return true;
+    const { key, ctrlKey = false, metaKey = false } = evt;
+    const hasMod = ctrlKey || metaKey;
+    if (key?.length === 1 && !hasMod) {
+      this.correctInvalidWhitespaceSelection();
+      this.ensureValidInsertionTarget();
+      this._insertTextAtCursor(key, editableField);
+      return true;
+    }
+    if (key === "Backspace") {
+      if (!this.preserveLastCharDelete()) {
+        document.execCommand("delete", false);
+      }
+      return true;
+    }
+    if (key === "Delete") {
+      if (!this.preserveLastCharDelete()) {
+        const sel = window.getSelection();
+        if (sel?.isCollapsed && sel.focusNode?.nodeType === Node.TEXT_NODE) {
+          const text = sel.focusNode.textContent || "";
+          let offset = sel.focusOffset;
+          while (offset < text.length && (text[offset] === "\uFEFF" || text[offset] === "\u200B")) {
+            offset++;
+          }
+          if (offset < text.length) {
+            const range = document.createRange();
+            range.setStart(sel.focusNode, offset);
+            range.setEnd(sel.focusNode, offset + 1);
+            range.deleteContents();
+          }
+        }
       }
       return true;
     }
@@ -6397,13 +6411,7 @@ DOM path (text node \u2192 container):
   _handleFieldKeydown(e, blockUid, editableField) {
     if (["Shift", "Control", "Alt", "Meta"].includes(e.key)) return;
     if (e.isComposing) return;
-    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      this.correctInvalidWhitespaceSelection();
-      this.ensureValidInsertionTarget();
-      return;
-    }
-    if ((e.ctrlKey || e.metaKey) && (e.key === "v" || e.key === "c")) return;
-    if (this.replayOneKey(blockUid, {
+    if (this.handleSpecialKey(blockUid, {
       key: e.key,
       code: e.code,
       shiftKey: e.shiftKey,
@@ -6412,6 +6420,11 @@ DOM path (text node \u2192 container):
       altKey: e.altKey
     }, editableField)) {
       e.preventDefault();
+      return;
+    }
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      this.correctInvalidWhitespaceSelection();
+      this.ensureValidInsertionTarget();
     }
   }
   /**
