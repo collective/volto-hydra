@@ -12,13 +12,12 @@ const nextConfig = {
   },
   webpack: (config, { dev }) => {
     if (dev) {
-      // In dev mode, resolve hydra.js directly from source for live reload
-      // without needing to re-run copy:hydra after each change.
-      // In production builds, the copy:hydra script (prebuild) copies it to
-      // ./src/utils/hydra.js which the #utils/hydra import map resolves to.
+      // In dev mode, resolve hydra.js from source so webpack bundles it
+      // (resolves tabbable import). Changes are picked up on rebuild.
+      // In production builds, copy:hydra copies the pre-built bundle.
       config.resolve.alias['#utils/hydra'] = path.resolve(
         __dirname,
-        '../../packages/hydra-js/hydra.js',
+        '../../packages/hydra-js/hydra.src.js',
       );
     }
     return config;

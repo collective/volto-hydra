@@ -4930,6 +4930,16 @@ DOM path (text node \u2192 container):
     if (isBlockMode) {
       this.focusedFieldName = null;
     }
+    if (!isTemplateInstance) {
+      const isReadonly = this.isBlockReadonly(blockUid);
+      const hasEditableFields = !isReadonly && this.getOwnEditableFields(blockElement).length > 0;
+      if (!hasEditableFields) {
+        if (!blockElement.hasAttribute("tabindex")) {
+          blockElement.setAttribute("tabindex", "-1");
+        }
+        blockElement.focus({ preventScroll: true });
+      }
+    }
     const prevBlockUid = this.prevSelectedBlock?.getAttribute("data-block-uid");
     if (this.prevSelectedBlock === null || prevBlockUid !== blockUid) {
       if (this.currentlySelectedBlock) {

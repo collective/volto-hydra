@@ -6108,6 +6108,20 @@ export class Bridge {
       this.focusedFieldName = null;
     }
 
+    // For non-editable blocks (no text fields), make the block focusable so
+    // the document-level keyboard blocker receives key events. Without focus
+    // in the iframe, keydown events go to the parent page instead.
+    if (!isTemplateInstance) {
+      const isReadonly = this.isBlockReadonly(blockUid);
+      const hasEditableFields = !isReadonly && this.getOwnEditableFields(blockElement).length > 0;
+      if (!hasEditableFields) {
+        if (!blockElement.hasAttribute('tabindex')) {
+          blockElement.setAttribute('tabindex', '-1');
+        }
+        blockElement.focus({ preventScroll: true });
+      }
+    }
+
     // Remove border and button from the previously selected block
     const prevBlockUid = this.prevSelectedBlock?.getAttribute('data-block-uid');
     if (this.prevSelectedBlock === null || prevBlockUid !== blockUid) {

@@ -436,8 +436,7 @@ jobs:
           node tests-playwright/fixtures/mock-api-server.js &
           npx vite --config tests-playwright/fixtures/test-frontend/vite.config.js &
           cd examples/hydra-nextjs && pnpm run start:test &
-          cd examples/hydra-vue-f7 && cp ../../packages/hydra-js/hydra.js ./src/js/hydra.js && \
-            VITE_API_BASE_URL=http://localhost:8888 npx vite --port 3008 --strictPort --config vite.config.test.js &
+          cd examples/hydra-vue-f7 && VITE_API_BASE_URL=http://localhost:8888 npx vite --port 3008 --strictPort --config vite.config.test.js &
           sleep 3
       - name: Wait for servers
         run: |
