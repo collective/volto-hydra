@@ -195,6 +195,9 @@ export default defineNuxtConfig({
       alias: {
         // In dev mode, use workspace source for live reload
         // In production builds, prebuild script syncs a local copy to ./packages
+        '@hydra-js/hydra.js': process.env.NODE_ENV === 'development'
+          ? resolve(hydraJsPath, 'hydra.src.js')  // Source — Vite bundles + resolves tabbable
+          : './packages/hydra.js',                  // Pre-built copy from sync-hydra
         '@hydra-js': process.env.NODE_ENV === 'development' ? hydraJsPath : './packages',
         '@test-fixtures': fixturesPath
       }

@@ -23,15 +23,42 @@ const FRONTEND_DIR = path.join(__dirname, 'test-frontend');
 
 const frontend = express();
 
-// Serve the real hydra.js from packages/hydra-js
-frontend.get('/hydra.js', (req, res) => {
-  const hydraJsPath = path.join(__dirname, '../../packages/hydra-js/hydra.js');
+// Serve hydra.js — bundle hydra.src.js on-the-fly with esbuild so dev
+// changes are reflected instantly without a separate watch/build process.
+const fs = require('fs');
+let esbuild;
+try { esbuild = require('esbuild'); } catch { esbuild = null; }
+let hydraCache = null;
+let hydraCacheMtime = 0;
+
+frontend.get('/hydra.js', async (req, res) => {
   res.setHeader('Content-Type', 'text/javascript; charset=UTF-8');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(hydraJsPath);
+
+  const srcPath = path.join(__dirname, '../../packages/hydra-js/hydra.src.js');
+  if (esbuild) {
+    try {
+      const stat = fs.statSync(srcPath);
+      if (!hydraCache || stat.mtimeMs > hydraCacheMtime) {
+        hydraCache = await esbuild.build({
+          entryPoints: [srcPath],
+          bundle: true,
+          format: 'esm',
+          write: false,
+          sourcemap: 'inline',
+        });
+        hydraCacheMtime = stat.mtimeMs;
+      }
+      res.send(hydraCache.outputFiles[0].text);
+    } catch (err) {
+      console.error('esbuild bundle error:', err.message);
+      res.sendFile(path.join(__dirname, '../../packages/hydra-js/hydra.js'));
+    }
+  } else {
+    // esbuild not available — serve pre-built hydra.js
+    res.sendFile(path.join(__dirname, '../../packages/hydra-js/hydra.js'));
+  }
 });
 
 // Serve buildBlockPathMap utility (Volto-free, used by mock-parent.html)

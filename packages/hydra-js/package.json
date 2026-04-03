@@ -7,6 +7,7 @@
     ".": "./hydra.js"
   },
   "scripts": {
+    "build": "esbuild hydra.src.js --bundle --format=esm --outfile=hydra.js --sourcemap",
     "test": "NODE_OPTIONS='--experimental-vm-modules' npx jest"
   },
   "type": "module",
@@ -14,8 +15,12 @@
   "author": "",
   "license": "UNLICENSED",
   "devDependencies": {
+    "esbuild": "^0.28.0",
     "jest": "^30.0.0",
     "jest-environment-node": "^30.0.0",
     "jsdom": "^22.0.0"
+  },
+  "dependencies": {
+    "tabbable": "^6.4.0"
   }
 }

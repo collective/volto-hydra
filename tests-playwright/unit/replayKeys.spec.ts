@@ -648,6 +648,37 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
     expect(r.text).toBe('Hello\u4e16');
   });
 
+  test('Tab in non-list non-pre field moves focus to next tabbable element', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'value';
+      bridge.isInlineEditing = true;
+      bridge.editMode = 'text';
+
+      // Focus the edit field
+      editField.focus();
+      const focusBefore = document.activeElement;
+
+      // Tab should move focus to next tabbable element
+      const handled = bridge.replayOneKey(blockId, {
+        key: 'Tab', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false,
+      }, editField);
+
+      const focusAfter = document.activeElement;
+      const focusMoved = focusBefore !== focusAfter;
+
+      return { handled, focusMoved };
+    });
+    expect(r.handled).toBe(true);
+    expect(r.focusMoved).toBe(true);
+  });
+
   test('Space on button element inserts space (not activate)', async () => {
     const iframe = helper.getIframe();
     const r = await iframe.locator('body').evaluate(() => {
