@@ -523,6 +523,46 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
     expect(r.text).toBe('line1\n');
   });
 
+  test('text after prospective inline (Ctrl+B) inserts inside the bold element', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+
+      // Set up: "Hello" with a prospective <strong> at the end (simulates Ctrl+B with collapsed cursor)
+      editField.innerHTML = '<p data-node-id="0">Hello<strong data-node-id="0.1"></strong></p>';
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'value';
+      bridge.isInlineEditing = true;
+
+      // Set the prospective inline element
+      const strong = editField.querySelector('strong')!;
+      bridge.prospectiveInlineElement = strong;
+
+      // Place cursor inside the <strong> (where Chrome would put it after Ctrl+B)
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(strong, 0);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      // Replay a text character — should end up INSIDE the <strong>
+      bridge.replayOneKey(blockId, { key: 'x', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false }, editField);
+
+      // Check if 'x' is inside the <strong>
+      const strongText = strong.textContent;
+      const fullText = editField.textContent!.replace(/[\uFEFF\u200B]/g, '');
+      return { strongText, fullText };
+    });
+    expect(r.strongText).toContain('x');
+    expect(r.fullText).toBe('Hellox');
+  });
+
   test('Space on button element inserts space (not activate)', async () => {
     const iframe = helper.getIframe();
     const r = await iframe.locator('body').evaluate(() => {

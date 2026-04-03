@@ -4707,9 +4707,14 @@ export class Bridge {
         this.updateEmptyState(field);
         log(`  ${fieldPath}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})${placeholder ? ` placeholder: "${placeholder}"` : ''}`);
 
-        // All key handling (arrows, enter, tab, delete, etc.) goes through the
-        // single _handleFieldKeydown handler registered in activateEditableField.
-        // No per-field key handlers — one handler per field, one code path.
+        // Register keydown handler on every editable field (not just the focused one).
+        // One handler per field, all keys go through _handleFieldKeydown → replayOneKey.
+        if (!field._hydraKeydownHandler) {
+          field._hydraKeydownHandler = (e) => {
+            this._handleFieldKeydown(e, blockUid, field);
+          };
+          field.addEventListener('keydown', field._hydraKeydownHandler);
+        }
       } else {
         log(`  ${fieldPath}: skipped (type: ${fieldType})`);
       }
@@ -8144,37 +8149,39 @@ export class Bridge {
   }
 
   /**
-   * Handle keydown events for an editable field. Thin wrapper that calls
-   * replayOneKey (single source of truth) and preventDefault if handled.
+   * Handle live keydown events for an editable field.
+   * Default: replayOneKey handles everything (same code path as buffered replay).
+   * Exceptions let native handle: text characters (performance, IME compat),
+   * Paste/Copy (need native clipboard events).
+   * If performance issues arise, more keys can be moved to native.
    */
   _handleFieldKeydown(e, blockUid, editableField) {
         // Skip modifier-only keys
         if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
 
-        // Suppress native contenteditable formatting (Ctrl+B/I/U/S)
-        const nativeFormattingKeys = ['b', 'i', 'u', 's'];
-        if ((e.ctrlKey || e.metaKey) && nativeFormattingKeys.includes(e.key.toLowerCase())) {
-          e.preventDefault();
-        }
+        // IME composition: let native handle entirely
+        if (e.isComposing) return;
 
-        // Delegate to replayOneKey — single source of truth for key actions
-        if (this.replayOneKey(blockUid, {
-          key: e.key,
-          code: e.code,
-          shiftKey: e.shiftKey,
-          ctrlKey: e.ctrlKey,
-          metaKey: e.metaKey,
-          altKey: e.altKey,
-        }, editableField)) {
-          e.preventDefault();
+        // Text characters: native (browser inserts, MutationObserver detects).
+        // Keeps IME, spell check, auto-capitalize working. Also avoids
+        // performance cost of DOM manipulation per keystroke.
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          this.correctInvalidWhitespaceSelection();
+          this.ensureValidInsertionTarget();
           return;
         }
 
-        // Paste (Ctrl+V) and Copy (Ctrl+C): let native propagate for clipboard events
+        // Paste (Ctrl+V) and Copy (Ctrl+C): native clipboard events
         if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'c')) return;
 
-        // Text input: let browser handle natively (MutationObserver picks up changes)
-        return;
+        // Everything else: replayOneKey (single source of truth)
+        if (this.replayOneKey(blockUid, {
+          key: e.key, code: e.code,
+          shiftKey: e.shiftKey, ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey, altKey: e.altKey,
+        }, editableField)) {
+          e.preventDefault();
+        }
   }
 
 
