@@ -119,7 +119,7 @@ test.describe('Inline Editing with Mock Parent', () => {
 
     // Apply bold using keyboard shortcut to trigger transform
     await page.keyboard.press('ControlOrMeta+b');
-    await page.waitForTimeout(50); // Small delay for blocking to kick in
+    // Ctrl+B starts blocking synchronously — typed keys are buffered
 
     // Type during the slow transform - should be buffered (not inserted yet)
     await page.keyboard.type('BUFFERED');

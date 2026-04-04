@@ -491,9 +491,9 @@ test.describe('Navigation key behavior in contenteditable', () => {
       helper.getCleanSelectionText(iframe.locator('[contenteditable="true"]'))
     ).toBe('Text to format');
     await page.keyboard.press('ControlOrMeta+b');
-    await page.waitForTimeout(50);
 
     // Press Home (collapse to start), then Delete to remove first char
+    // Ctrl+B starts blocking synchronously, so these are buffered and replayed
     // "Text to format" → Home → at pos 0 → Delete → "ext to format"
     await page.keyboard.press('Home');
     await page.keyboard.press('Delete');
