@@ -6272,9 +6272,9 @@ export class Bridge {
         log('Sending BLOCK_SELECTED immediately for:', pending.blockUid, `(${src})`);
         this.sendBlockSelected(src, blockElement, {
           blockUid: pending.blockUid,
-          focusedFieldName: isBlockMode ? null : (isTemplateInstance ? pending.focusedFieldName : null),
-          focusedLinkableField: isTemplateInstance ? pending.focusedLinkableField : null,
-          focusedMediaField: isTemplateInstance ? pending.focusedMediaField : null,
+          focusedFieldName: isBlockMode ? null : pending.focusedFieldName,
+          focusedLinkableField: pending.focusedLinkableField,
+          focusedMediaField: pending.focusedMediaField,
         });
         if (isTemplateInstance) return;
       }

@@ -1293,8 +1293,8 @@ export class AdminUIHelper {
    * Handles both plain text and formatted text (where text is inside SPAN, STRONG, etc.)
    */
   async selectAllTextInEditor(editor: Locator): Promise<void> {
-    // Get the expected text content (visible text, trimmed)
-    const expectedText = await editor.evaluate((el) => el.textContent?.trim() || '');
+    // Get the expected text content (visible text, trimmed, strip ZWS/BOM)
+    const expectedText = await editor.evaluate((el) => (el.textContent || '').replace(/[\uFEFF\u200B]/g, '').trim());
 
     // Use platform-appropriate keyboard shortcut (Cmd+A on Mac, Ctrl+A elsewhere)
     await editor.press('ControlOrMeta+a');
