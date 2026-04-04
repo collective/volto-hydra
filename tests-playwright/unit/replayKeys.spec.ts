@@ -866,4 +866,49 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
     });
     expect(r.text).toBe('  hello');
   });
+
+  test('_insertTextAtCursor on non-collapsed selection inside bold preserves formatting', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+      // Set up bold text — frontends use <strong>, <b>, or <span style="font-weight:bold">
+      editField.innerHTML = '<p data-node-id="0"><strong data-node-id="0.1">Bold text</strong></p>';
+      editField.setAttribute('contenteditable', 'true');
+      bridge.selectedBlockUid = blockId;
+      bridge.editMode = 'text';
+      bridge.focusedFieldName = 'value';
+
+      // Select all text — use restoreSlateSelection like the real code does
+      // This sets selection at the node-id level, not the text node level
+      const selection = { anchor: { path: [0, 0], offset: 0 }, focus: { path: [0, 0], offset: 9 } };
+      bridge.restoreSlateSelection(selection, {
+        blocks: { 'mock-block-1': { '@type': 'slate', value: [{ type: 'p', children: [{ text: '' }, { type: 'strong', children: [{ text: 'Bold text' }] }, { text: '' }] }] } },
+        blocks_layout: { items: ['mock-block-1'] },
+      });
+      const sel = window.getSelection()!;
+
+      // Capture state before
+      const selBefore = { collapsed: sel.isCollapsed, text: sel.toString(), anchorNode: sel.anchorNode?.nodeName, anchorParent: sel.anchorNode?.parentElement?.nodeName };
+
+      // Insert replacement text
+      bridge._insertTextAtCursor('Replaced', editField);
+
+      // Check result
+      const html = editField.innerHTML;
+      const hasStrongWrapper = !!editField.querySelector('strong');
+      const textContent = editField.textContent;
+
+      return { selBefore, html, hasStrongWrapper, textContent };
+    });
+    console.log('Before:', JSON.stringify(r.selBefore), 'After HTML:', r.html);
+    expect(r.selBefore.collapsed).toBe(false);
+    expect(r.selBefore.text).toBe('Bold text');
+    expect(r.textContent).toContain('Replaced');
+    expect(r.hasStrongWrapper).toBe(true);
+  });
 });

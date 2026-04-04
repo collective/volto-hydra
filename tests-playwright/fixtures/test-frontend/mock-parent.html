@@ -631,6 +631,8 @@
             };
 
             // Compute transformedSelection based on the transform result.
+            // After a transform, the Slate tree structure changes, so the original
+            // selection paths are invalid. We need to compute new paths.
             let transformedSelection = selection;
             if (transformType === 'delete') {
               // After delete, content is empty — cursor at start of first node
@@ -638,20 +640,30 @@
                 anchor: { path: [0, 0], offset: 0 },
                 focus: { path: [0, 0], offset: 0 },
               };
-            } else if (selection && selection.anchor.offset === selection.focus.offset
-                && JSON.stringify(selection.anchor.path) === JSON.stringify(selection.focus.path)) {
-              // Collapsed selection — for prospective formatting, the cursor
-              // moves into the new inline element.
+            } else if (transformType === 'format') {
+              // After format, text may have moved into an inline element.
+              // Find the inline element in the updated value and adjust paths.
               const block = mockFormData.blocks[blockId];
               const val = block[fieldName] || block.value;
               if (val && val[0] && val[0].children) {
                 const inlineIdx = val[0].children.findIndex(c => c.type === format);
                 if (inlineIdx >= 0) {
-                  const newPath = [0, inlineIdx, 0];
-                  transformedSelection = {
-                    anchor: { path: newPath, offset: 0 },
-                    focus: { path: newPath, offset: 0 },
-                  };
+                  const inlineChild = val[0].children[inlineIdx];
+                  const textLen = inlineChild.children?.[0]?.text?.length || 0;
+                  if (selection && selection.anchor.offset === selection.focus.offset
+                      && JSON.stringify(selection.anchor.path) === JSON.stringify(selection.focus.path)) {
+                    // Collapsed selection (prospective formatting) — cursor inside inline
+                    transformedSelection = {
+                      anchor: { path: [0, inlineIdx, 0], offset: 0 },
+                      focus: { path: [0, inlineIdx, 0], offset: 0 },
+                    };
+                  } else {
+                    // Non-collapsed selection — select all text inside the inline
+                    transformedSelection = {
+                      anchor: { path: [0, inlineIdx, 0], offset: 0 },
+                      focus: { path: [0, inlineIdx, 0], offset: textLen },
+                    };
+                  }
                 }
               }
             }

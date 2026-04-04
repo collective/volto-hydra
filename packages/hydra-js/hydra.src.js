@@ -1595,11 +1595,13 @@ export class Bridge {
     const sel = window.getSelection();
     if (!sel?.rangeCount) return;
     const range = sel.getRangeAt(0);
-    if (!range.collapsed) range.deleteContents();
 
     // NBSP for spaces to prevent CSS whitespace collapse in inline elements.
     // handleTextChange converts NBSP back to regular space in the model.
     const insertionText = text.replace(/^ /, '\u00A0').replace(/ $/, '\u00A0');
+
+    if (!range.collapsed) range.deleteContents();
+
     const textNode = document.createTextNode(insertionText);
     range.insertNode(textNode);
 
