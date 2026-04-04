@@ -751,16 +751,9 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
     expect(r.copyFired).toBe(true);
   });
 
-  test('Ctrl+X triggers copy and sends delete transform', async ({ page }) => {
+  test('Ctrl+X triggers copy and sends delete transform', async () => {
     const iframe = helper.getIframe();
-
-    // Listen for the mock parent's console log of the transform
-    const transformPromise = page.waitForEvent('console', {
-      predicate: msg => msg.text().includes('Processing SLATE_TRANSFORM_REQUEST') && msg.text().includes('delete'),
-      timeout: 5000,
-    });
-
-    const copyFired = await iframe.locator('body').evaluate(() => {
+    const r = await iframe.locator('body').evaluate(() => {
       const bridge = (window as any).bridge;
       const blockId = 'mock-block-1';
       const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
@@ -780,18 +773,23 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
       sel.removeAllRanges();
       sel.addRange(range);
 
-      let fired = false;
-      editField.addEventListener('copy', () => { fired = true; }, { once: true });
+      let copyFired = false;
+      editField.addEventListener('copy', () => { copyFired = true; }, { once: true });
+
+      // sendTransformRequest sets pendingTransform with the requestId
+      bridge.pendingTransform = null;
 
       bridge.handleSpecialKey(blockId, {
         key: 'x', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false,
       }, editField);
 
-      return fired;
+      return {
+        copyFired,
+        hasDeleteTransform: !!bridge.pendingTransform?.requestId?.includes('delete'),
+      };
     });
-    expect(copyFired).toBe(true);
-    // The mock parent logs the transform — wait for it to confirm delivery
-    await transformPromise;
+    expect(r.copyFired).toBe(true);
+    expect(r.hasDeleteTransform).toBe(true);
   });
 
   test('Space on button element inserts space (not activate)', async () => {
