@@ -1305,7 +1305,7 @@ export class AdminUIHelper {
         async () => {
           return editor.evaluate(() => {
             const sel = window.getSelection();
-            return sel?.toString().trim() || '';
+            return (sel?.toString() || '').replace(/[\uFEFF\u200B]/g, '').trim();
           });
         },
         { timeout: 5000 }
