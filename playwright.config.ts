@@ -304,9 +304,10 @@ export default defineConfig({
     },
     {
       // Test frontend — Vite dev server, auto-bundles hydra.src.js with tabbable
+      // Health check on hydra.js (not HTML) to ensure Vite has compiled it
       name: 'Test Frontend',
       command: 'npx vite --config tests-playwright/fixtures/test-frontend/vite.config.js',
-      url: 'http://localhost:8889/mock-parent.html',
+      url: 'http://localhost:8889/hydra.js',
       timeout: 30 * 1000,
       reuseExistingServer: true,
       cwd: process.cwd(),

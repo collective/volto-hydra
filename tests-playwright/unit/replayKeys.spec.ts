@@ -751,9 +751,16 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
     expect(r.copyFired).toBe(true);
   });
 
-  test('Ctrl+X triggers copy and sends delete transform', async () => {
+  test('Ctrl+X triggers copy and sends delete transform', async ({ page }) => {
     const iframe = helper.getIframe();
-    const r = await iframe.locator('body').evaluate(() => {
+
+    // Listen for the mock parent's console log of the transform
+    const transformPromise = page.waitForEvent('console', {
+      predicate: msg => msg.text().includes('Processing SLATE_TRANSFORM_REQUEST') && msg.text().includes('delete'),
+      timeout: 5000,
+    });
+
+    const copyFired = await iframe.locator('body').evaluate(() => {
       const bridge = (window as any).bridge;
       const blockId = 'mock-block-1';
       const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
@@ -763,6 +770,7 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
       editField.innerHTML = '<p data-node-id="0">Cut this text</p>';
       editField.setAttribute('contenteditable', 'true');
       bridge.selectedBlockUid = blockId;
+      bridge.editMode = 'text';
       bridge.focusedFieldName = 'value';
 
       // Select all text
@@ -772,25 +780,18 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
       sel.removeAllRanges();
       sel.addRange(range);
 
-      // Capture messages
-      const messages: any[] = [];
-      const origSend = bridge.sendMessageToParent.bind(bridge);
-      bridge.sendMessageToParent = (msg: any) => { messages.push(msg); origSend(msg); };
-
-      let copyFired = false;
-      editField.addEventListener('copy', () => { copyFired = true; }, { once: true });
+      let fired = false;
+      editField.addEventListener('copy', () => { fired = true; }, { once: true });
 
       bridge.handleSpecialKey(blockId, {
         key: 'x', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false,
       }, editField);
 
-      bridge.sendMessageToParent = origSend;
-
-      const deleteMsg = messages.find((m: any) => m.type === 'SLATE_TRANSFORM_REQUEST' && m.action === 'delete');
-      return { copyFired, hasDeleteTransform: !!deleteMsg };
+      return fired;
     });
-    expect(r.copyFired).toBe(true);
-    expect(r.hasDeleteTransform).toBe(true);
+    expect(copyFired).toBe(true);
+    // The mock parent logs the transform — wait for it to confirm delivery
+    await transformPromise;
   });
 
   test('Space on button element inserts space (not activate)', async () => {

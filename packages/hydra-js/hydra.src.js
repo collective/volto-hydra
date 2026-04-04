@@ -159,7 +159,7 @@ export class Bridge {
     this.blockTextMutationObserver = null;
     this.attributeMutationObserver = null;
     this.selectedBlockUid = null;
-    this.editMode = null; // 'text' | 'block' | null (no block selected)
+    this.editMode = 'text'; // 'text' | 'block' — user switches via Escape/Enter/click
     this.multiSelectedBlockUids = []; // Array of block UIDs in multi-selection
     this.focusedFieldName = null; // Track which editable field within the block has focus
     this.focusedLinkableField = null; // Track which linkable field has focus (for link editing)
@@ -3214,7 +3214,7 @@ export class Bridge {
               }
             } else {
               this.selectedBlockUid = null;
-              this.editMode = null;
+              this.editMode = 'text';
               this.sendBlockSelected('escapeKey', null);
             }
           }
@@ -3268,6 +3268,18 @@ export class Bridge {
             this.selectBlock(e.key === 'ArrowDown' ? pageBlocks[0] : pageBlocks[pageBlocks.length - 1]);
           }
           return;
+        }
+
+        // === Text mode on non-editable block (no field to focus): use same
+        // edge navigation as text mode at field boundary ===
+        if (this.editMode === 'text' &&
+            ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+          const blockEl = this.queryBlockElement(this.selectedBlockUid);
+          if (blockEl) {
+            e.preventDefault();
+            this.handleArrowAtEdge(e.key, this.selectedBlockUid, null, blockEl);
+            return;
+          }
         }
 
         // === Block mode: structural keys handled immediately ===
@@ -6046,12 +6058,8 @@ export class Bridge {
       this.eventBuffer = [];
     }
 
-    // Set up editing based on fieldToFocus:
-    // Use editMode to decide whether to set up contenteditable.
-    // In text mode, fieldToFocus controls which field to focus:
-    //   undefined → auto (first editable field)
-    //   'first'/'last'/name → specific field
-    //   cursorAt → 'start' or 'end'
+    // editMode is controlled by user actions only (Escape → block, click/Enter → text).
+    // selectBlock never changes editMode — it just respects the current mode.
     const isBlockMode = this.editMode === 'block';
 
     if (!isTemplateInstance && !isBlockMode) {
@@ -6177,8 +6185,9 @@ export class Bridge {
       }
     }
 
-    // If no clicked field, use the first editable field that belongs to THIS block (skip for template instances)
-    if (!isTemplateInstance && !this.focusedFieldName && blockElement) {
+    // If no clicked field, use the first editable field that belongs to THIS block
+    // Skip for template instances and block mode (no field should be focused)
+    if (!isTemplateInstance && !isBlockMode && !this.focusedFieldName && blockElement) {
       const firstEditableField = this.getOwnFirstEditableField(blockElement);
       if (firstEditableField) {
         this.focusedFieldName = firstEditableField.getAttribute('data-edit-text');
@@ -6337,6 +6346,11 @@ export class Bridge {
             this.needsFieldDetection = false;
           }
 
+          // In block mode, don't set up contenteditable or focus fields
+          if (this.editMode === 'block') {
+            this.sendBlockSelected('blockMode', currentBlockElement, { focusedFieldName: null });
+          } else if (this.editMode === 'text') {
+
           // Check if field was already editable before we do anything
           const editableField = this.getOwnFirstEditableField(currentBlockElement);
           const wasAlreadyEditable = editableField?.getAttribute('contenteditable') === 'true';
@@ -6376,6 +6390,8 @@ export class Bridge {
             log('selectBlock: no editable field found, clearing lastClickPosition');
             this.lastClickPosition = null;
           }
+
+          } // end editMode === 'text'
 
           // Now send BLOCK_SELECTED with selection - both arrive atomically
           // This prevents race conditions where toolbar gets new block but old selection
@@ -7801,7 +7817,7 @@ export class Bridge {
             this.deselectBlock(prevUid, null);
           }
           // Send BLOCK_SELECTED(null) so Admin knows iframe acknowledged deselection
-          this.editMode = null;
+          this.editMode = 'text';
           this.sendBlockSelected('adminDeselect', null);
           return;
         }
