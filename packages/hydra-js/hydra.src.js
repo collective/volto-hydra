@@ -6280,9 +6280,12 @@ export class Bridge {
           : isBlockMode ? 'blockMode'
           : 'nonEditableBlock';
         log('Sending BLOCK_SELECTED immediately for:', pending.blockUid, `(${src})`);
+        // focusedFieldName: null for non-editable and block mode (no text field
+        // focused). Media/linkable fields always pass through — they're set from
+        // the click and the toolbar needs them regardless of block type.
         this.sendBlockSelected(src, blockElement, {
           blockUid: pending.blockUid,
-          focusedFieldName: isBlockMode ? null : pending.focusedFieldName,
+          focusedFieldName: (isBlockMode || !hasEditableFields) ? null : pending.focusedFieldName,
           focusedLinkableField: pending.focusedLinkableField,
           focusedMediaField: pending.focusedMediaField,
         });
