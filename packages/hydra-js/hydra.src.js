@@ -3491,6 +3491,14 @@ export class Bridge {
 
     this.pendingBufferReplay = null;
 
+    // Ensure field is focused before replay — sel.modify (Home/End) and
+    // execCommand (Delete/Backspace) require focus to work correctly.
+    if (currentEditable &&
+        document.activeElement !== currentEditable &&
+        !currentEditable.contains(document.activeElement)) {
+      currentEditable.focus({ preventScroll: true });
+    }
+
     // Clear blockedBlockId so the capture-phase blocker doesn't interfere;
     // if a replayed event starts a new transform, blockedBlockId gets re-set.
     const savedBlockedId = this.blockedBlockId;
