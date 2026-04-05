@@ -10,16 +10,12 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  webpack: (config, { dev }) => {
-    if (dev) {
-      // In dev mode, resolve hydra.js from source so webpack bundles it
-      // (resolves tabbable import). Changes are picked up on rebuild.
-      // In production builds, copy:hydra copies the pre-built bundle.
-      config.resolve.alias['#utils/hydra'] = path.resolve(
-        __dirname,
-        '../../packages/hydra-js/hydra.src.js',
-      );
-    }
+  webpack: (config) => {
+    // Always resolve hydra.js from workspace source — webpack bundles tabbable
+    config.resolve.alias['#utils/hydra'] = path.resolve(
+      __dirname,
+      '../../packages/hydra-js/hydra.src.js',
+    );
     return config;
   },
 };

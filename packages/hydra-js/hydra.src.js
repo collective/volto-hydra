@@ -103,12 +103,12 @@ try {
     (window.location?.search && new URLSearchParams(window.location.search).has('_hydra_debug'))
   );
 } catch { /* SSR or restricted environment */ }
-const log = (...args) => {
-  if (!debugEnabled) return;
+function log(...args) {
+  if (!debugEnabled && !window['HYDRA_DEBUG']) return;
   const runId = typeof window !== 'undefined' && window.__testRunId;
   const prefix = runId != null ? `[HYDRA][RUN-${runId}]` : '[HYDRA]';
   console.log(prefix, ...args);
-};
+}
 
 /**
  * Validates a data-node-id value is a real Slate path (dot-separated integers like "0", "0.1").
@@ -6279,7 +6279,8 @@ export class Bridge {
         const src = isTemplateInstance ? 'templateInstance'
           : isBlockMode ? 'blockMode'
           : 'nonEditableBlock';
-        log('Sending BLOCK_SELECTED immediately for:', pending.blockUid, `(${src})`);
+        log('Sending BLOCK_SELECTED immediately for:', pending.blockUid, `(${src})`,
+            'mediaField:', pending.focusedMediaField, 'hasEditable:', hasEditableFields, 'isBlockMode:', isBlockMode);
         // focusedFieldName: null for non-editable and block mode (no text field
         // focused). Media/linkable fields always pass through — they're set from
         // the click and the toolbar needs them regardless of block type.
