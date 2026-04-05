@@ -12,6 +12,7 @@ import { getIframeUrlCookieName } from '../../utils/cookieNames';
 import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, getBlockAddability } from '@volto-hydra/hydra-js';
 import Api from '@plone/volto/helpers/Api/Api';
 
+import { setBlocksClipboard } from '@plone/volto/actions/blocksClipboard/blocksClipboard';
 import { createLog } from '../../utils/log';
 
 const log = createLog('VIEW');
@@ -1562,6 +1563,20 @@ const Iframe = (props) => {
           onSelectBlock(null);
           setBlockUI(null);
           setMultiSelectState({ blockUids: [], rects: {} });
+          break;
+        }
+
+        case 'COPY_BLOCKS': {
+          const uids = event.data.uids || [];
+          const action = event.data.action || 'copy'; // 'copy' or 'cut'
+          const blocksData = uids
+            .map(uid => {
+              const block = getBlockById(properties, iframeSyncState.blockPathMap, uid);
+              return block ? [uid, block] : null;
+            })
+            .filter(Boolean);
+          log('COPY_BLOCKS:', action, blocksData.length, 'blocks');
+          dispatch(setBlocksClipboard({ [action]: blocksData }));
           break;
         }
 

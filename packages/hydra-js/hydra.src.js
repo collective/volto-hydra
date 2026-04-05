@@ -961,6 +961,27 @@ export class Bridge {
       return true;
     }
 
+    // Cmd+C / Cmd+X: copy/cut blocks (uses Volto's blocksClipboard)
+    if ((e.key === 'c' || e.key === 'x') && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      const uids = this.multiSelectedBlockUids.length > 0
+        ? [...this.multiSelectedBlockUids]
+        : [this.selectedBlockUid];
+      const action = e.key === 'c' ? 'copy' : 'cut';
+      log('Block mode', action, uids.length, 'blocks');
+      this.sendMessageToParent({ type: 'COPY_BLOCKS', uids, action });
+      if (action === 'cut') {
+        if (this.multiSelectedBlockUids.length > 0) {
+          this.sendMessageToParent({ type: 'DELETE_BLOCKS', uids });
+          this.multiSelectedBlockUids = [];
+          this.selectedBlockUid = null;
+        } else {
+          this.sendMessageToParent({ type: 'DELETE_BLOCK', uid: this.selectedBlockUid });
+        }
+      }
+      return true;
+    }
+
     // Enter: add block after (only in edit mode)
     if (e.key === 'Enter' && !e.shiftKey && this.isInlineEditing) {
       e.preventDefault();
@@ -3033,12 +3054,7 @@ export class Bridge {
         // Only in block mode — in text mode, Shift+Click extends text selection (browser native)
         // Ctrl/Meta+Click always toggles block selection regardless of mode
         if (event.shiftKey || event.ctrlKey || event.metaKey) {
-          // Text mode = the selected block has contenteditable="true" fields
-          // (set by restoreContentEditableOnFields, removed by Escape → block mode)
-          const selectedEl = this.selectedBlockUid ? this.queryBlockElement(this.selectedBlockUid) : null;
-          const isTextMode = selectedEl
-            ? selectedEl.querySelector('[data-edit-text][contenteditable="true"]') !== null
-            : false;
+          const isTextMode = this.editMode === 'text';
           // Shift+Click on the same block in block mode → enter text mode (not multi-select)
           const isSameBlock = blockUid === this.selectedBlockUid;
           if ((!isTextMode && !isSameBlock) || event.ctrlKey || event.metaKey) {

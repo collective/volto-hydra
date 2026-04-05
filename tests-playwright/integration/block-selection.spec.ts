@@ -1003,4 +1003,24 @@ test.describe('Multi-Block Selection', () => {
     // Multi-selection outline should be gone
     await expect(page.locator('.volto-hydra-block-outline')).not.toBeVisible({ timeout: 3000 });
   });
+
+  test('Cmd+C in block mode copies block to clipboard', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click block-1, enter block mode
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+
+    // Cmd+C in block mode should send COPY_BLOCKS to admin
+    await page.keyboard.press('ControlOrMeta+c');
+
+    // Verify the blocksClipboard Redux state was set
+    // BlocksToolbar renders a paste button when clipboard has content
+    // We can check by looking for the paste button in the toolbar
+    const pasteButton = page.locator('#toolbar-paste-blocks');
+    await expect(pasteButton).toBeVisible({ timeout: 3000 });
+  });
 });
