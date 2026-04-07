@@ -1153,11 +1153,10 @@ test.describe('Multi-Block Selection', () => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
-    const iframe = helper.getIframe();
 
-    // Copy the columns block (top-level, type=columns)
-    await helper.clickBlockInIframe('columns-1');
-    await helper.waitForBlockSelected('columns-1');
+    // Copy a text block (type=slate) from inside a column
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
     await helper.escapeFromEditing();
     await page.keyboard.press('ControlOrMeta+c');
 
@@ -1165,14 +1164,153 @@ test.describe('Multi-Block Selection', () => {
     const pasteButton = page.locator('#toolbar-paste-blocks');
     await expect(pasteButton).toBeVisible({ timeout: 3000 });
 
-    // Now select a block inside a column (restricted container)
-    // Columns inside columns are not allowed — paste should be disabled
+    // Navigate to col-1 via Escape from text-1a (text mode → block mode → parent)
+    // col-1's parent (columns-1) only allows 'column' children,
+    // so pasting 'slate' after col-1 is not allowed
     await helper.clickBlockInIframe('text-1a');
     await helper.waitForBlockSelected('text-1a');
+    await helper.escapeFromEditing();  // text mode → block mode
+    await page.keyboard.press('Escape');  // block mode → select parent (col-1)
+    await helper.waitForQuantaToolbar('col-1');
 
-    // Paste button should be visually disabled (not clickable)
+    // Left toolbar paste button should be disabled
+    await expect(pasteButton).toBeVisible({ timeout: 5000 });
+    await expect(pasteButton).toBeDisabled({ timeout: 5000 });
+
+    // Dropdown paste item should be hidden when not allowed
+    const menuButton = page.locator('.quanta-toolbar .volto-hydra-menu-trigger');
+    await menuButton.click();
+    const dropdown = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdown).toBeVisible({ timeout: 3000 });
+    await expect(dropdown.locator('[data-action="paste-block"]')).not.toBeVisible();
+    await menuButton.click(); // close
+
+    // Cmd+V should be a no-op — block count shouldn't change
+    const iframe = helper.getIframe();
+    const blocksBefore = await iframe.locator('[data-block-uid]').count();
+    await page.keyboard.press('ControlOrMeta+v');
+    // Small wait then verify count unchanged
+    await page.waitForTimeout(500);
+    const blocksAfter = await iframe.locator('[data-block-uid]').count();
+    expect(blocksAfter).toBe(blocksBefore);
+  });
+
+  test('Quanta toolbar dropdown has copy/cut/paste actions for single block', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Select block-1
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+
+    // Open the ⋯ dropdown
+    const menuButton = page.locator('.quanta-toolbar .volto-hydra-menu-trigger');
+    await expect(menuButton).toBeVisible({ timeout: 3000 });
+    await menuButton.click();
+
+    // Should have copy and cut items
+    const dropdown = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdown).toBeVisible({ timeout: 3000 });
+    await expect(dropdown.locator('[data-action="copy-block"]')).toBeVisible();
+    await expect(dropdown.locator('[data-action="cut-block"]')).toBeVisible();
+
+    // Click copy
+    await dropdown.locator('[data-action="copy-block"]').click();
+
+    // Paste should now be available in dropdown (re-open menu)
+    await menuButton.click();
+    await expect(dropdown.locator('[data-action="paste-block"]')).toBeVisible();
+  });
+
+  test('Quanta toolbar dropdown has copy/cut for multi-selected blocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Multi-select: block-1 + block-2
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+    await page.keyboard.press('Shift+ArrowDown');
+
+    // Multi-select toolbar should have ⋯ button
+    const toolbar = page.locator('.quanta-toolbar[data-multi-select="true"]');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    const menuButton = toolbar.locator('.volto-hydra-menu-trigger');
+    await expect(menuButton).toBeVisible({ timeout: 3000 });
+    await menuButton.click();
+
+    // Should have copy, cut, delete items
+    const dropdown = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdown).toBeVisible({ timeout: 3000 });
+    await expect(dropdown.locator('[data-action="copy-block"]')).toBeVisible();
+    await expect(dropdown.locator('[data-action="cut-block"]')).toBeVisible();
+  });
+
+  test('Paste from quanta toolbar dropdown inserts block', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    const iframe = helper.getIframe();
+
+    const initialOrder = await helper.getBlockOrder();
+    const initialCount = initialOrder.length;
+
+    // Copy block-1 via keyboard
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+    await page.keyboard.press('ControlOrMeta+c');
+
+    // Select block-3
+    await helper.clickBlockInIframe('block-3-uuid');
+    await helper.waitForBlockSelected('block-3-uuid');
+
+    // Open ⋯ dropdown and click paste
+    const menuButton = page.locator('.quanta-toolbar .volto-hydra-menu-trigger');
+    await menuButton.click();
+    const dropdown = page.locator('.volto-hydra-dropdown-menu');
+    await expect(dropdown.locator('[data-action="paste-block"]')).toBeVisible({ timeout: 3000 });
+    await dropdown.locator('[data-action="paste-block"]').click();
+
+    // Should have one more block
+    await expect(async () => {
+      const newOrder = await helper.getBlockOrder();
+      expect(newOrder.length).toBe(initialCount + 1);
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('Cmd+V in block mode pastes blocks from clipboard', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    const iframe = helper.getIframe();
+
+    const initialOrder = await helper.getBlockOrder();
+    const initialCount = initialOrder.length;
+
+    // Select block-1, enter block mode, copy
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+    await page.keyboard.press('ControlOrMeta+c');
+
+    // Paste button should appear (clipboard has content)
+    const pasteButton = page.locator('#toolbar-paste-blocks');
     await expect(pasteButton).toBeVisible({ timeout: 3000 });
-    await expect(pasteButton).toBeDisabled({ timeout: 3000 });
+
+    // ArrowDown to move to block-2 (stay in block mode)
+    await page.keyboard.press('ArrowDown');
+
+    // Cmd+V in block mode should paste after currently selected block
+    await page.keyboard.press('ControlOrMeta+v');
+
+    // Should have one more block
+    await expect(async () => {
+      const newOrder = await helper.getBlockOrder();
+      expect(newOrder.length).toBe(initialCount + 1);
+    }).toPass({ timeout: 5000 });
   });
 
   test('Cut blocks removes originals after paste', async ({ page }) => {

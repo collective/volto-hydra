@@ -982,6 +982,17 @@ export class Bridge {
       return true;
     }
 
+    // Cmd+V: paste blocks from clipboard (admin handles actual insertion)
+    if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      const afterUid = this.multiSelectedBlockUids.length > 0
+        ? this.multiSelectedBlockUids[this.multiSelectedBlockUids.length - 1]
+        : this.selectedBlockUid;
+      log('Block mode paste after:', afterUid);
+      this.sendMessageToParent({ type: 'PASTE_BLOCKS', afterBlockId: afterUid });
+      return true;
+    }
+
     // Enter: add block after (only in edit mode)
     if (e.key === 'Enter' && !e.shiftKey && this.isInlineEditing) {
       e.preventDefault();

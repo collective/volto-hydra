@@ -633,6 +633,31 @@ const Iframe = (props) => {
     return () => document.removeEventListener('hydra-select-page', handler);
   }, [onSelectBlock]);
 
+  // Notify toolbar whether paste is allowed for the current selection + clipboard.
+  // The toolbar uses this to disable the paste button when block types aren't allowed.
+  useEffect(() => {
+    const bpm = iframeSyncState?.blockPathMap;
+    if (!bpm || !selectedBlock) return;
+    const clipData = blocksClipboard?.cut || blocksClipboard?.copy || [];
+    if (clipData.length === 0) return;
+
+    const blocksConfig = config.blocks.blocksConfig;
+    const containerConfig = getContainerFieldConfig(selectedBlock, bpm, properties, blocksConfig, intl);
+    const allowedTypes = containerConfig?.allowedBlocks;
+
+    // If container has no allowedBlocks restriction, all types are allowed
+    let allowed = true;
+    if (allowedTypes?.length > 0) {
+      allowed = clipData.every(([, blockData]) =>
+        allowedTypes.includes(blockData?.['@type']),
+      );
+    }
+
+    document.dispatchEvent(new CustomEvent('hydra-paste-state', {
+      detail: { allowed },
+    }));
+  }, [selectedBlock, blocksClipboard, iframeSyncState?.blockPathMap, properties, intl]);
+
   // Handle copy/cut/delete/paste from BlocksToolbar via document events.
   // View.jsx owns blockPathMap and container-aware utilities, so the toolbar
   // fires events and View handles the actual data operations.
@@ -683,10 +708,21 @@ const Iframe = (props) => {
 
       if (cloneWithIds.length === 0) return;
 
+      const containerConfig = getContainerFieldConfig(afterBlockId, bpm, properties, blocksConfig, intl);
+      const allowedTypes = containerConfig?.allowedBlocks;
+      if (allowedTypes?.length > 0) {
+        const allAllowed = cloneWithIds.every(([, blockData]) =>
+          allowedTypes.includes(blockData?.['@type']),
+        );
+        if (!allAllowed) {
+          log('hydra-paste-blocks: blocked — types not allowed in container');
+          return;
+        }
+      }
+
       log('hydra-paste-blocks:', cloneWithIds.length, 'blocks after', afterBlockId);
       let newFormData = { ...properties };
       let currentBpm = bpm;
-      const containerConfig = getContainerFieldConfig(afterBlockId, currentBpm, newFormData, blocksConfig, intl);
       let lastId = afterBlockId;
       for (const [newId, blockData] of cloneWithIds) {
         newFormData = insertBlockInContainer(newFormData, currentBpm, lastId, newId, blockData, containerConfig, 'after');
@@ -1655,6 +1691,16 @@ const Iframe = (props) => {
             .filter(Boolean);
           log('COPY_BLOCKS:', action, blocksData.length, 'blocks');
           dispatch(setBlocksClipboard({ [action]: blocksData }));
+          break;
+        }
+
+        case 'PASTE_BLOCKS': {
+          // Paste from blocks clipboard after the specified block (Cmd+V in block mode)
+          const afterBlockId = event.data.afterBlockId;
+          if (!afterBlockId) break;
+          document.dispatchEvent(new CustomEvent('hydra-paste-blocks', {
+            detail: { afterBlockId, keepClipboard: false },
+          }));
           break;
         }
 

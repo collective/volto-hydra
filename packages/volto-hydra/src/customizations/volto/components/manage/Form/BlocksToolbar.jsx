@@ -36,12 +36,21 @@ import trashSVG from '@plone/volto/icons/delete.svg';
 export class BlocksToolbarComponent extends React.Component {
   constructor(props) {
     super(props);
+    this.state = { pasteAllowed: true };
     this.copyBlocksToClipboard = this.copyBlocksToClipboard.bind(this);
     this.cutBlocksToClipboard = this.cutBlocksToClipboard.bind(this);
     this.deleteBlocks = this.deleteBlocks.bind(this);
     this.loadFromStorage = this.loadFromStorage.bind(this);
     this.pasteBlocks = this.pasteBlocks.bind(this);
     this.setBlocksClipboard = this.setBlocksClipboard.bind(this);
+    this.handlePasteState = this.handlePasteState.bind(this);
+  }
+
+  handlePasteState(e) {
+    const { allowed } = e.detail;
+    if (allowed !== this.state.pasteAllowed) {
+      this.setState({ pasteAllowed: allowed });
+    }
   }
 
   loadFromStorage() {
@@ -52,10 +61,12 @@ export class BlocksToolbarComponent extends React.Component {
 
   componentDidMount() {
     window.addEventListener('storage', this.loadFromStorage, true);
+    document.addEventListener('hydra-paste-state', this.handlePasteState);
   }
 
   componentWillUnmount() {
     window.removeEventListener('storage', this.loadFromStorage);
+    document.removeEventListener('hydra-paste-state', this.handlePasteState);
   }
 
   /**
@@ -112,6 +123,7 @@ export class BlocksToolbarComponent extends React.Component {
       selectedBlocks,
       intl,
     } = this.props;
+    const { pasteAllowed } = this.state;
     return (
       <>
         {selectedBlocks.length > 0 ? (
@@ -157,14 +169,15 @@ export class BlocksToolbarComponent extends React.Component {
           <Plug
             pluggable="main.toolbar.bottom"
             id="block-paste-btn"
-            dependencies={[selectedBlock]}
+            dependencies={[selectedBlock, pasteAllowed]}
           >
             <button
               aria-label={intl.formatMessage(messages.pasteBlocks)}
-              onClick={this.pasteBlocks}
+              onClick={pasteAllowed ? this.pasteBlocks : undefined}
               tabIndex={0}
               className="pasteBlocks"
               id="toolbar-paste-blocks"
+              disabled={!pasteAllowed}
             >
               <span className="blockCount">
                 {(blocksClipboard.cut || blocksClipboard.copy).length}
