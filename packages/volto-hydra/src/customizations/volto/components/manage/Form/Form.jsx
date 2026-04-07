@@ -781,7 +781,6 @@ class Form extends Component {
               formData={formData}
               selectedBlock={this.props.uiState.selected}
               selectedBlocks={this.props.uiState.multiSelected}
-              onChangeBlocks={this.onIframeChangeFormData}
               onSetSelectedBlocks={(blockIds) =>
                 this.props.setUIState({ multiSelected: blockIds })
               }

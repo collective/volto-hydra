@@ -1068,46 +1068,151 @@ test.describe('Multi-Block Selection', () => {
     await expect(summary).toContainText('2 blocks selected');
   });
 
-  test('Copy blocks and paste after another block', async ({ page }) => {
+  test('Copy block and paste after another block', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/test-page');
     const iframe = helper.getIframe();
 
-    // Get initial block order
-    const initialBlocks = await iframe.locator('[data-block-uid]').evaluateAll(
-      els => els.map(el => el.getAttribute('data-block-uid'))
-    );
-    const initialCount = initialBlocks.length;
+    const initialOrder = await helper.getBlockOrder();
+    const initialCount = initialOrder.length;
+
+    // Select block-1, enter block mode, copy
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+    await page.keyboard.press('ControlOrMeta+c');
+
+    // Paste button should appear in left toolbar
+    const pasteButton = page.locator('#toolbar-paste-blocks');
+    await expect(pasteButton).toBeVisible({ timeout: 3000 });
+
+    // Click block-3 to select as paste target
+    await helper.clickBlockInIframe('block-3-uuid');
+    await helper.waitForBlockSelected('block-3-uuid');
+    await expect(pasteButton).toBeVisible({ timeout: 3000 });
+
+    // Click paste — block should be inserted after block-3
+    await pasteButton.click();
+
+    // Verify: one more block, and it appears after block-3
+    await expect(async () => {
+      const newOrder = await helper.getBlockOrder();
+      expect(newOrder.length).toBe(initialCount + 1);
+      const block3Idx = newOrder.indexOf('block-3-uuid');
+      // New block is right after block-3
+      expect(block3Idx).toBeGreaterThanOrEqual(0);
+      expect(block3Idx + 1).toBeLessThan(newOrder.length);
+      // The new block should NOT be any of the original blocks
+      expect(initialOrder).not.toContain(newOrder[block3Idx + 1]);
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('Multi-select copy and paste inserts all blocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    const iframe = helper.getIframe();
+
+    const initialOrder = await helper.getBlockOrder();
+    const initialCount = initialOrder.length;
+
+    // Select block-1 in block mode, Shift+Arrow to also select block-2
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+    await page.keyboard.press('Shift+ArrowDown');
+
+    // Left toolbar should show copy button for multi-selection
+    const copyButton = page.locator('#toolbar-copy-blocks');
+    await expect(copyButton).toBeVisible({ timeout: 5000 });
+
+    // Copy via left toolbar button
+    await copyButton.click();
+
+    // Click block-3 to set paste target
+    await helper.clickBlockInIframe('block-3-uuid');
+    await helper.waitForBlockSelected('block-3-uuid');
+
+    // Paste button should show with count of 2
+    const pasteButton = page.locator('#toolbar-paste-blocks');
+    await expect(pasteButton).toBeVisible({ timeout: 3000 });
+    await expect(pasteButton.locator('.blockCount')).toHaveText('2');
+
+    // Click paste
+    await pasteButton.click();
+
+    // Verify: two more blocks inserted after block-3
+    await expect(async () => {
+      const newOrder = await helper.getBlockOrder();
+      expect(newOrder.length).toBe(initialCount + 2);
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('Paste button is disabled when block type not allowed in target container', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+    const iframe = helper.getIframe();
+
+    // Copy the columns block (top-level, type=columns)
+    await helper.clickBlockInIframe('columns-1');
+    await helper.waitForBlockSelected('columns-1');
+    await helper.escapeFromEditing();
+    await page.keyboard.press('ControlOrMeta+c');
+
+    // Paste button should appear
+    const pasteButton = page.locator('#toolbar-paste-blocks');
+    await expect(pasteButton).toBeVisible({ timeout: 3000 });
+
+    // Now select a block inside a column (restricted container)
+    // Columns inside columns are not allowed — paste should be disabled
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+
+    // Paste button should be visually disabled (not clickable)
+    await expect(pasteButton).toBeVisible({ timeout: 3000 });
+    await expect(pasteButton).toBeDisabled({ timeout: 3000 });
+  });
+
+  test('Cut blocks removes originals after paste', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    const iframe = helper.getIframe();
+
+    const initialOrder = await helper.getBlockOrder();
+    const initialCount = initialOrder.length;
 
     // Select block-1, enter block mode
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.waitForBlockSelected('block-1-uuid');
     await helper.escapeFromEditing();
 
-    // Copy block-1 via Cmd+C
-    await page.keyboard.press('ControlOrMeta+c');
+    // Cut via Cmd+X (block mode sends COPY_BLOCKS with action='cut')
+    await page.keyboard.press('ControlOrMeta+x');
 
-    // Verify paste button appeared
-    const pasteButton = page.locator('#toolbar-paste-blocks');
-    await expect(pasteButton).toBeVisible({ timeout: 3000 });
+    // block-1 should be removed (cut deletes immediately)
+    await expect(async () => {
+      const order = await helper.getBlockOrder();
+      expect(order).not.toContain('block-1-uuid');
+    }).toPass({ timeout: 5000 });
 
-    // Click block-3 to select it (paste target — blocks paste after selected block)
+    // Click block-3 to set paste target
     await helper.clickBlockInIframe('block-3-uuid');
     await helper.waitForBlockSelected('block-3-uuid');
 
-    // Paste button should still be visible (clipboard persists)
+    // Paste button should be visible
+    const pasteButton = page.locator('#toolbar-paste-blocks');
     await expect(pasteButton).toBeVisible({ timeout: 3000 });
 
-    // Click paste
+    // Click paste — block-1 data pasted after block-3 (same count as before cut)
     await pasteButton.click();
 
-    // Should now have one more block than before
     await expect(async () => {
-      const blocks = await iframe.locator('[data-block-uid]').evaluateAll(
-        els => els.map(el => el.getAttribute('data-block-uid'))
-      );
-      expect(blocks.length).toBe(initialCount + 1);
+      const newOrder = await helper.getBlockOrder();
+      // Cut removes 1, paste adds 1 — same total count
+      expect(newOrder.length).toBe(initialCount);
     }).toPass({ timeout: 5000 });
   });
 });

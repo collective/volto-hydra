@@ -12,7 +12,8 @@ import { getIframeUrlCookieName } from '../../utils/cookieNames';
 import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, getBlockAddability } from '@volto-hydra/hydra-js';
 import Api from '@plone/volto/helpers/Api/Api';
 
-import { setBlocksClipboard } from '@plone/volto/actions/blocksClipboard/blocksClipboard';
+import { setBlocksClipboard, resetBlocksClipboard } from '@plone/volto/actions/blocksClipboard/blocksClipboard';
+import { cloneBlocks } from '@plone/volto/helpers/Blocks/cloneBlocks';
 import { createLog } from '../../utils/log';
 
 const log = createLog('VIEW');
@@ -517,6 +518,7 @@ const Iframe = (props) => {
   } = props;
 
   const dispatch = useDispatch();
+  const blocksClipboard = useSelector((state) => state?.blocksClipboard || {});
 
   // Viewport preset for responsive preview
   const viewportPreset = useSelector(
@@ -630,6 +632,81 @@ const Iframe = (props) => {
     document.addEventListener('hydra-select-page', handler);
     return () => document.removeEventListener('hydra-select-page', handler);
   }, [onSelectBlock]);
+
+  // Handle copy/cut/delete/paste from BlocksToolbar via document events.
+  // View.jsx owns blockPathMap and container-aware utilities, so the toolbar
+  // fires events and View handles the actual data operations.
+  useEffect(() => {
+    const bpm = iframeSyncState?.blockPathMap;
+    if (!bpm) return;
+    const blocksConfig = config.blocks.blocksConfig;
+
+    const handleCopy = (e) => {
+      const { blockIds, action } = e.detail;
+      const blocksData = blockIds
+        .map((uid) => {
+          const block = getBlockById(properties, bpm, uid);
+          return block ? [uid, block] : null;
+        })
+        .filter(Boolean);
+      log('hydra-copy-blocks:', action, blocksData.length, 'blocks');
+      dispatch(setBlocksClipboard({ [action]: blocksData }));
+    };
+
+    const handleDelete = (e) => {
+      const { blockIds } = e.detail;
+      log('hydra-delete-blocks:', blockIds.length, 'blocks');
+      let newFormData = { ...properties };
+      for (const uid of blockIds) {
+        const containerConfig = getContainerFieldConfig(uid, bpm, newFormData, blocksConfig, intl);
+        newFormData = deleteBlockFromContainer(newFormData, bpm, uid, containerConfig);
+      }
+      onChangeFormData(newFormData);
+    };
+
+    const handlePaste = (e) => {
+      const { afterBlockId, keepClipboard } = e.detail;
+      const mode = Object.keys(blocksClipboard).includes('cut') ? 'cut' : 'copy';
+      const blocksData = blocksClipboard[mode] || [];
+
+      const cloneWithIds = blocksData
+        .filter(([blockId, blockData]) => blockId && blockData?.['@type'])
+        .map(([blockId, blockData]) => {
+          const blockConfig = blocksConfig[blockData['@type']];
+          return mode === 'copy'
+            ? blockConfig?.cloneData
+              ? blockConfig.cloneData(blockData)
+              : [uuid(), cloneBlocks(blockData)]
+            : [blockId, blockData];
+        })
+        .filter(Boolean);
+
+      if (cloneWithIds.length === 0) return;
+
+      log('hydra-paste-blocks:', cloneWithIds.length, 'blocks after', afterBlockId);
+      let newFormData = { ...properties };
+      let currentBpm = bpm;
+      const containerConfig = getContainerFieldConfig(afterBlockId, currentBpm, newFormData, blocksConfig, intl);
+      let lastId = afterBlockId;
+      for (const [newId, blockData] of cloneWithIds) {
+        newFormData = insertBlockInContainer(newFormData, currentBpm, lastId, newId, blockData, containerConfig, 'after');
+        currentBpm = buildBlockPathMap(newFormData, blocksConfig, intl);
+        lastId = newId;
+      }
+
+      if (!keepClipboard) dispatch(resetBlocksClipboard());
+      onChangeFormData(newFormData);
+    };
+
+    document.addEventListener('hydra-copy-blocks', handleCopy);
+    document.addEventListener('hydra-delete-blocks', handleDelete);
+    document.addEventListener('hydra-paste-blocks', handlePaste);
+    return () => {
+      document.removeEventListener('hydra-copy-blocks', handleCopy);
+      document.removeEventListener('hydra-delete-blocks', handleDelete);
+      document.removeEventListener('hydra-paste-blocks', handlePaste);
+    };
+  }, [blocksClipboard, properties, iframeSyncState?.blockPathMap, onChangeFormData, dispatch, intl]);
 
   useEffect(() => {
     // Only send SELECT_BLOCK if iframe is ready (has sent INIT)
