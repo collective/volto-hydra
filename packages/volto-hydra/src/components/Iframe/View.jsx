@@ -2307,42 +2307,53 @@ const Iframe = (props) => {
           onChangeFormData(event.data.data);
           break;
 
-        case 'MOVE_BLOCK': {
-          // Handle drag-and-drop block moves (supports container and page-level)
-          const { blockId, targetBlockId, insertAfter, sourceParentId, targetParentId } = event.data;
-          log('MOVE_BLOCK: received:', { blockId, targetBlockId, insertAfter, sourceParentId, targetParentId });
+        case 'MOVE_BLOCKS': {
+          // Handle drag-and-drop block moves (single or multi, supports containers)
+          const { blockIds: moveBlockIds, targetBlockId, insertAfter, targetParentId } = event.data;
+          log('MOVE_BLOCKS: received:', moveBlockIds?.length, 'blocks to', targetBlockId, 'insertAfter:', insertAfter);
 
           // Use properties (Redux) as source of truth for moves
-          // Rebuild blockPathMap from properties to ensure consistency
           const currentFormData = properties;
           const currentBlockPathMap = buildBlockPathMap(currentFormData, config.blocks.blocksConfig, intl);
 
-          // Check if this is a template instance (virtual container with child blocks)
-          const isTemplateInstance = currentBlockPathMap[blockId]?.isTemplateInstance;
-
-          // Get all blocks to move - for template instances, get all child blocks in order
-          let blocksToMove;
-          if (isTemplateInstance) {
-            // Get child blocks of the template instance, maintaining their relative order
-            // by filtering the parent's blocks_layout
-            const parentId = currentBlockPathMap[blockId]?.parentId || 'page';
-            const parentBlock = parentId === 'page' ? currentFormData : getBlockById(currentFormData, currentBlockPathMap, parentId);
-            const containerField = currentBlockPathMap[blockId]?.containerField || 'blocks_layout';
-            const layoutItems = parentBlock?.[containerField]?.items || [];
-
-            // Find all child blocks of this template instance in layout order
-            blocksToMove = layoutItems.filter(id => currentBlockPathMap[id]?.parentId === blockId);
-            log('MOVE_BLOCK: template instance - moving blocks:', blocksToMove);
-          } else {
-            blocksToMove = [blockId];
+          // Expand template instances: each template instance drags all its child blocks
+          const blocksToMove = [];
+          for (const bid of (moveBlockIds || [])) {
+            if (currentBlockPathMap[bid]?.isTemplateInstance) {
+              const parentId = currentBlockPathMap[bid]?.parentId || 'page';
+              const parentBlock = parentId === 'page' ? currentFormData : getBlockById(currentFormData, currentBlockPathMap, parentId);
+              const containerField = currentBlockPathMap[bid]?.containerField || 'blocks_layout';
+              const layoutItems = parentBlock?.[containerField]?.items || [];
+              const childBlocks = layoutItems.filter(id => currentBlockPathMap[id]?.parentId === bid);
+              log('MOVE_BLOCKS: template instance', bid, '- expanding to:', childBlocks);
+              blocksToMove.push(...childBlocks);
+            } else {
+              blocksToMove.push(bid);
+            }
           }
 
-          // Get source container config BEFORE the move (needed for ensureEmptyBlockIfEmpty)
-          // Only needed when moving to a different container
+          // Derive sourceParentId from first block's pathMap entry
           const firstBlockId = blocksToMove[0];
+          const sourceParentId = currentBlockPathMap[firstBlockId]?.parentId || null;
+
+          // Get source container config BEFORE the move (needed for ensureEmptyBlockIfEmpty)
           const sourceContainerConfig = sourceParentId !== targetParentId && sourceParentId
             ? getContainerFieldConfig(firstBlockId, currentBlockPathMap, currentFormData, blocksConfig, intl)
             : null;
+
+          // Check all block types are allowed in the target container
+          const targetContainerCfg = getContainerFieldConfig(targetBlockId, currentBlockPathMap, currentFormData, blocksConfig, intl);
+          const targetAllowedTypes = targetContainerCfg?.allowedBlocks;
+          if (targetAllowedTypes?.length > 0) {
+            const allAllowed = blocksToMove.every(bid => {
+              const blockData = getBlockById(currentFormData, currentBlockPathMap, bid);
+              return targetAllowedTypes.includes(blockData?.['@type']);
+            });
+            if (!allAllowed) {
+              log('MOVE_BLOCKS: blocked — block types not allowed in target container');
+              break;
+            }
+          }
 
           // Move all blocks in sequence, each one after the previous
           // Track insertAfter for each block (needed for template inheritance)
@@ -2369,7 +2380,7 @@ const Iframe = (props) => {
             );
 
             if (!newFormData) {
-              log('MOVE_BLOCK: moveBlockBetweenContainers failed for:', moveBlockId);
+              log('MOVE_BLOCKS: moveBlockBetweenContainers failed for:', moveBlockId);
               break;
             }
 
@@ -2377,7 +2388,7 @@ const Iframe = (props) => {
             currentTarget = moveBlockId;
             currentInsertAfter = true;
           }
-          log('MOVE_BLOCK: moveBlockBetweenContainers returned:', newFormData ? 'formData' : 'null');
+          log('MOVE_BLOCKS: moveBlockBetweenContainers returned:', newFormData ? 'formData' : 'null');
 
           if (newFormData) {
             // Apply defaults to moved blocks based on their new position
@@ -2416,7 +2427,7 @@ const Iframe = (props) => {
               if (updatedBlockData !== blockData) {
                 newFormData = updateBlockById(newFormData, updatedPathMap, moveBlockId, updatedBlockData);
                 updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
-                log('MOVE_BLOCK: Applied defaults to moved block:', moveBlockId, 'templateId:', updatedBlockData.templateId, 'slotId:', updatedBlockData.slotId);
+                log('MOVE_BLOCKS: Applied defaults to moved block:', moveBlockId, 'templateId:', updatedBlockData.templateId, 'slotId:', updatedBlockData.slotId);
               }
             }
 
@@ -2440,15 +2451,15 @@ const Iframe = (props) => {
               setIframeSyncState(prev => ({
                 ...prev,
                 blockPathMap: newBlockPathMap,
-                pendingSelectBlockUid: blockId,
+                pendingSelectBlockUid: blocksToMove[0],
               }));
             });
             // Debug: Log column contents after move
             const col1AfterMove = newFormData?.blocks?.['columns-1']?.columns?.['col-1'];
             const col2AfterMove = newFormData?.blocks?.['columns-1']?.columns?.['col-2'];
-            log('MOVE_BLOCK: col-1 blocks_layout after move:', col1AfterMove?.blocks_layout?.items);
-            log('MOVE_BLOCK: col-2 blocks_layout after move:', col2AfterMove?.blocks_layout?.items);
-            log('MOVE_BLOCK: calling onChangeFormData');
+            log('MOVE_BLOCKS: col-1 blocks_layout after move:', col1AfterMove?.blocks_layout?.items);
+            log('MOVE_BLOCKS: col-2 blocks_layout after move:', col2AfterMove?.blocks_layout?.items);
+            log('MOVE_BLOCKS: calling onChangeFormData');
             onChangeFormData(newFormData);
           }
           break;

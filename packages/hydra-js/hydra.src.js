@@ -7833,36 +7833,17 @@ export class Bridge {
 
           const targetPathInfo = this.blockPathMap?.[closestBlockUid];
 
-          if (draggedUids.length > 1) {
-            // Multi-block drag: send all UIDs in order
-            log('DnD: Moving', draggedUids.length, 'blocks relative to', closestBlockUid, 'insertAfter:', insertAt === 1);
-            window.parent.postMessage(
-              {
-                type: 'MOVE_BLOCKS',
-                blockIds: draggedUids,
-                targetBlockId: closestBlockUid,
-                insertAfter: insertAt === 1,
-                targetParentId: targetPathInfo?.parentId || null,
-              },
-              this.adminOrigin,
-            );
-          } else {
-            // Single block drag (may be template instance)
-            const draggedBlockId = draggedUids[0];
-            const draggedPathInfo = this.blockPathMap?.[draggedBlockId];
-            log('DnD: Moving block', draggedBlockId, 'relative to', closestBlockUid, 'insertAfter:', insertAt === 1);
-            window.parent.postMessage(
-              {
-                type: 'MOVE_BLOCK',
-                blockId: draggedBlockId,
-                targetBlockId: closestBlockUid,
-                insertAfter: insertAt === 1,
-                sourceParentId: draggedPathInfo?.parentId || null,
-                targetParentId: targetPathInfo?.parentId || null,
-              },
-              this.adminOrigin,
-            );
-          }
+          log('DnD: Moving', draggedUids.length, 'blocks relative to', closestBlockUid, 'insertAfter:', insertAt === 1);
+          window.parent.postMessage(
+            {
+              type: 'MOVE_BLOCKS',
+              blockIds: draggedUids,
+              targetBlockId: closestBlockUid,
+              insertAfter: insertAt === 1,
+              targetParentId: targetPathInfo?.parentId || null,
+            },
+            this.adminOrigin,
+          );
         } else if (closestBlockUid && !dropIndicatorVisible) {
           log('DnD: Drop rejected - indicator was not visible (block type not allowed in target)');
         }
