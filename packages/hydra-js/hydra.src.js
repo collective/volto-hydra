@@ -3217,6 +3217,17 @@ export class Bridge {
 
         // === Escape: three-state machine (works in all modes) ===
         if (e.key === 'Escape') {
+          // Multi-select → single block (anchor)
+          if (this.multiSelectedBlockUids.length > 0) {
+            const anchorUid = this.multiSelectedBlockUids[0];
+            this.multiSelectedBlockUids = [];
+            this.selectedBlockUid = anchorUid;
+            const anchorEl = this.queryBlockElement(anchorUid);
+            if (anchorEl) {
+              this.sendBlockSelected('escapeMultiSelect', anchorEl, { focusedFieldName: null });
+            }
+            return;
+          }
           // No block selected: send deselect to admin
           if (!this.selectedBlockUid) {
             this.sendBlockSelected('escapeKey', null);

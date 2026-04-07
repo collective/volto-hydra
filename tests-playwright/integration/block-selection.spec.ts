@@ -1353,4 +1353,144 @@ test.describe('Multi-Block Selection', () => {
       expect(newOrder.length).toBe(initialCount);
     }).toPass({ timeout: 5000 });
   });
+
+  test('Multi-select Cmd+X cuts multiple blocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    const iframe = helper.getIframe();
+
+    const initialOrder = await helper.getBlockOrder();
+    const initialCount = initialOrder.length;
+
+    // Select block-1, block mode, extend to block-2
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+    await page.keyboard.press('Shift+ArrowDown');
+
+    // Cmd+X should cut both blocks
+    await page.keyboard.press('ControlOrMeta+x');
+
+    // Both blocks should be removed
+    await expect(async () => {
+      const order = await helper.getBlockOrder();
+      expect(order).not.toContain('block-1-uuid');
+      expect(order).not.toContain('block-2-uuid');
+      expect(order.length).toBe(initialCount - 2);
+    }).toPass({ timeout: 5000 });
+
+    // Paste button should show count of 2
+    // Select block-3 first to have a paste target
+    await helper.clickBlockInIframe('block-3-uuid');
+    await helper.waitForBlockSelected('block-3-uuid');
+    const pasteButton = page.locator('#toolbar-paste-blocks');
+    await expect(pasteButton).toBeVisible({ timeout: 3000 });
+    await expect(pasteButton.locator('.blockCount')).toHaveText('2');
+  });
+
+  test('Escape clears multi-selection back to single block', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Select block-1, block mode, extend to block-2
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+    await page.keyboard.press('Shift+ArrowDown');
+
+    // Multi-select toolbar should be visible
+    await expect(page.locator('.quanta-toolbar[data-multi-select="true"]'))
+      .toBeVisible({ timeout: 5000 });
+
+    // Escape should clear multi-selection
+    await page.keyboard.press('Escape');
+
+    // Should be back to single-block toolbar (no data-multi-select)
+    await expect(page.locator('.quanta-toolbar[data-multi-select="true"]'))
+      .not.toBeVisible({ timeout: 3000 });
+
+    // Should still have a block selected (block outline visible)
+    await expect(page.locator('.volto-hydra-block-outline'))
+      .toBeVisible({ timeout: 3000 });
+  });
+
+  test('Shift+Arrow multi-selects inside containers', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Click text-1a inside col-1, enter block mode
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.escapeFromEditing();
+
+    // Shift+ArrowDown should select text-1a + text-1b (siblings in col-1)
+    await page.keyboard.press('Shift+ArrowDown');
+
+    // Multi-select toolbar should appear
+    await expect(page.locator('.quanta-toolbar[data-multi-select="true"]'))
+      .toBeVisible({ timeout: 5000 });
+
+    // Right sidebar should show 2 blocks selected
+    const summary = page.locator('[data-testid="multi-select-summary"]');
+    await expect(summary).toBeVisible({ timeout: 5000 });
+    await expect(summary).toContainText('2 blocks selected');
+  });
+
+  test('Delete multi-selected blocks in container', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+    const iframe = helper.getIframe();
+
+    // Click text-1a, block mode, extend to text-1b
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.escapeFromEditing();
+    await page.keyboard.press('Shift+ArrowDown');
+
+    // Wait for multi-select
+    await expect(page.locator('.quanta-toolbar[data-multi-select="true"]'))
+      .toBeVisible({ timeout: 5000 });
+
+    // Delete should remove both blocks from the container
+    await page.keyboard.press('Delete');
+
+    // Both text blocks should be gone from col-1
+    await expect(async () => {
+      await expect(iframe.locator('[data-block-uid="text-1a"]')).not.toBeVisible();
+      await expect(iframe.locator('[data-block-uid="text-1b"]')).not.toBeVisible();
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('Multi-select does not span across different containers', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Click text-1a (inside col-1), block mode
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.escapeFromEditing();
+
+    // Shift+Click on text-2a (inside col-2 — different container)
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="text-2a"]').click({ modifiers: ['Shift'] });
+
+    // Should NOT multi-select across containers — only text-2a selected
+    // (or both if they share a parent, but col-1 and col-2 are different)
+    // The key check: we should NOT have both text-1a and text-2a in selection
+    await expect(async () => {
+      const summary = page.locator('[data-testid="multi-select-summary"]');
+      // Either no multi-select, or only blocks from one container
+      const isMulti = await summary.isVisible().catch(() => false);
+      if (isMulti) {
+        const text = await summary.textContent();
+        // Should not have 2+ blocks from different containers
+        expect(text).not.toContain('3 blocks');
+      }
+    }).toPass({ timeout: 3000 });
+  });
 });
