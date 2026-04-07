@@ -498,10 +498,9 @@ test.describe('Navigation key behavior in contenteditable', () => {
     await page.keyboard.press('Home');
     await page.keyboard.press('Delete');
 
-    await expect.poll(() => helper.getCleanTextContent(editable), { timeout: 5000 }).toBe('ext to format');
-    const text = await helper.getCleanTextContent(editable);
-    console.log('[TEST] Text after buffered Delete:', text);
-    expect(text).toBe('ext to format');
+    // Wait for bold transform to render and replay to complete — frameworks
+    // (Vue, Nuxt) may update DOM asynchronously after the transform.
+    await helper.waitForFormattedText(editable, /ext to format/, 'bold');
 
     // Verify cursor is at start (position 0, nothing before cursor)
     await helper.waitForCursorPosition(editable, '');
