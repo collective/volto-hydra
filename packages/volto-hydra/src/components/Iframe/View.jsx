@@ -633,8 +633,73 @@ const Iframe = (props) => {
     return () => document.removeEventListener('hydra-select-page', handler);
   }, [onSelectBlock]);
 
+  useEffect(() => {
+    // Only send SELECT_BLOCK if iframe is ready (has sent INIT)
+    // Skip if there's a pending selection - it will be sent via FORM_DATA instead
+    // This prevents race condition where old selection overwrites pending new selection
+    // Also skip if we just sent this same block (prevents duplicate sends)
+    if (iframeOriginRef.current && selectedBlock && !iframeSyncState?.pendingSelectBlockUid) {
+      if (lastSentSelectBlockRef.current !== selectedBlock) {
+        log('useEffect sending SELECT_BLOCK:', selectedBlock);
+        lastSentSelectBlockRef.current = selectedBlock;
+        document.getElementById('previewIframe')?.contentWindow?.postMessage(
+          {
+            type: 'SELECT_BLOCK',
+            uid: selectedBlock,
+            method: 'select',
+          },
+          iframeOriginRef.current,
+        );
+      }
+    }
+  }, [selectedBlock]);
+
+  // Clear blockUI when no block is selected
+  // BUT keep it for page-level fields (blockUI exists with rect and blockUid is PAGE_BLOCK_UID)
+  useEffect(() => {
+    if (!selectedBlock) {
+      setBlockUI((prev) => {
+        // Keep blockUI if it's a page-level selection (blockUid is PAGE_BLOCK_UID with rect)
+        if (prev?.blockUid === PAGE_BLOCK_UID && prev?.rect) {
+          return prev;
+        }
+        return null;
+      });
+    }
+  }, [selectedBlock]);
+
+  const iframeOriginRef = useRef(null); // Store actual iframe origin from received messages
+  // Note: iframePath is stored in module-level persistedIframePath to survive component remounts
+  const inlineEditCounterRef = useRef(0); // Count INLINE_EDIT_DATA messages from iframe
+  const processedInlineEditCounterRef = useRef(0); // Count how many we've seen come back through Redux
+  const editSequenceRef = useRef(-1); // Sequence counter for detecting stale iframe echoes (starts at -1 so first increment gives 0)
+  // Combined state for iframe data - formData, selection, requestId, and transformAction updated atomically
+  // This ensures toolbar sees all together in the same render
+  const intl = useIntl();
+
+  // Initialize with properties so we have data from first render
+  //
+  // UNIFIED STATE MODEL (see DATA FLOW ARCHITECTURE in SyncedSlateToolbar.jsx):
+  // - formData: current form data to sync with iframe
+  // - selection: current Slate selection
+  // - completedFlushRequestId: iframe completed a FLUSH_BUFFER request (toolbar button flow)
+  // - transformAction: hotkey transform pending (format, paste, delete) - includes its own requestId
+  // - toolbarRequestDone: toolbar completed a format operation, needs to send FORM_DATA to unblock iframe
+  //   This is separate from completedFlushRequestId - that's for iframe→toolbar flow (flush),
+  //   this is for toolbar→iframe flow (format completion, including selection-only changes)
+  const [iframeSyncState, setIframeSyncState] = useState(() => ({
+    formData: properties,
+    blockPathMap: {}, // Built on INIT — no point computing here since INIT replaces it immediately
+    selection: null,
+    completedFlushRequestId: null, // For toolbar button click flow (FLUSH_BUFFER)
+    transformAction: null, // For hotkey transform flow (format, paste, delete) - includes its own requestId
+    toolbarRequestDone: null, // requestId - toolbar completed format, need to respond to iframe
+    pendingSelectBlockUid: null, // Block to select after next FORM_DATA (for new block add)
+    pendingFormatRequestId: null, // requestId to include in next FORM_DATA (for Enter key, etc.)
+    templateEditMode: null, // templateInstanceId of template being edited, or null if not in edit mode
+  }));
+
   // Notify toolbar whether paste is allowed for the current selection + clipboard.
-  // The toolbar uses this to disable the paste button when block types aren't allowed.
   useEffect(() => {
     const bpm = iframeSyncState?.blockPathMap;
     if (!bpm || !selectedBlock) return;
@@ -645,7 +710,6 @@ const Iframe = (props) => {
     const containerConfig = getContainerFieldConfig(selectedBlock, bpm, properties, blocksConfig, intl);
     const allowedTypes = containerConfig?.allowedBlocks;
 
-    // If container has no allowedBlocks restriction, all types are allowed
     let allowed = true;
     if (allowedTypes?.length > 0) {
       allowed = clipData.every(([, blockData]) =>
@@ -659,8 +723,6 @@ const Iframe = (props) => {
   }, [selectedBlock, blocksClipboard, iframeSyncState?.blockPathMap, properties, intl]);
 
   // Handle copy/cut/delete/paste from BlocksToolbar via document events.
-  // View.jsx owns blockPathMap and container-aware utilities, so the toolbar
-  // fires events and View handles the actual data operations.
   useEffect(() => {
     const bpm = iframeSyncState?.blockPathMap;
     if (!bpm) return;
@@ -743,72 +805,6 @@ const Iframe = (props) => {
       document.removeEventListener('hydra-paste-blocks', handlePaste);
     };
   }, [blocksClipboard, properties, iframeSyncState?.blockPathMap, onChangeFormData, dispatch, intl]);
-
-  useEffect(() => {
-    // Only send SELECT_BLOCK if iframe is ready (has sent INIT)
-    // Skip if there's a pending selection - it will be sent via FORM_DATA instead
-    // This prevents race condition where old selection overwrites pending new selection
-    // Also skip if we just sent this same block (prevents duplicate sends)
-    if (iframeOriginRef.current && selectedBlock && !iframeSyncState?.pendingSelectBlockUid) {
-      if (lastSentSelectBlockRef.current !== selectedBlock) {
-        log('useEffect sending SELECT_BLOCK:', selectedBlock);
-        lastSentSelectBlockRef.current = selectedBlock;
-        document.getElementById('previewIframe')?.contentWindow?.postMessage(
-          {
-            type: 'SELECT_BLOCK',
-            uid: selectedBlock,
-            method: 'select',
-          },
-          iframeOriginRef.current,
-        );
-      }
-    }
-  }, [selectedBlock]);
-
-  // Clear blockUI when no block is selected
-  // BUT keep it for page-level fields (blockUI exists with rect and blockUid is PAGE_BLOCK_UID)
-  useEffect(() => {
-    if (!selectedBlock) {
-      setBlockUI((prev) => {
-        // Keep blockUI if it's a page-level selection (blockUid is PAGE_BLOCK_UID with rect)
-        if (prev?.blockUid === PAGE_BLOCK_UID && prev?.rect) {
-          return prev;
-        }
-        return null;
-      });
-    }
-  }, [selectedBlock]);
-
-  const iframeOriginRef = useRef(null); // Store actual iframe origin from received messages
-  // Note: iframePath is stored in module-level persistedIframePath to survive component remounts
-  const inlineEditCounterRef = useRef(0); // Count INLINE_EDIT_DATA messages from iframe
-  const processedInlineEditCounterRef = useRef(0); // Count how many we've seen come back through Redux
-  const editSequenceRef = useRef(-1); // Sequence counter for detecting stale iframe echoes (starts at -1 so first increment gives 0)
-  // Combined state for iframe data - formData, selection, requestId, and transformAction updated atomically
-  // This ensures toolbar sees all together in the same render
-  const intl = useIntl();
-
-  // Initialize with properties so we have data from first render
-  //
-  // UNIFIED STATE MODEL (see DATA FLOW ARCHITECTURE in SyncedSlateToolbar.jsx):
-  // - formData: current form data to sync with iframe
-  // - selection: current Slate selection
-  // - completedFlushRequestId: iframe completed a FLUSH_BUFFER request (toolbar button flow)
-  // - transformAction: hotkey transform pending (format, paste, delete) - includes its own requestId
-  // - toolbarRequestDone: toolbar completed a format operation, needs to send FORM_DATA to unblock iframe
-  //   This is separate from completedFlushRequestId - that's for iframe→toolbar flow (flush),
-  //   this is for toolbar→iframe flow (format completion, including selection-only changes)
-  const [iframeSyncState, setIframeSyncState] = useState(() => ({
-    formData: properties,
-    blockPathMap: {}, // Built on INIT — no point computing here since INIT replaces it immediately
-    selection: null,
-    completedFlushRequestId: null, // For toolbar button click flow (FLUSH_BUFFER)
-    transformAction: null, // For hotkey transform flow (format, paste, delete) - includes its own requestId
-    toolbarRequestDone: null, // requestId - toolbar completed format, need to respond to iframe
-    pendingSelectBlockUid: null, // Block to select after next FORM_DATA (for new block add)
-    pendingFormatRequestId: null, // requestId to include in next FORM_DATA (for Enter key, etc.)
-    templateEditMode: null, // templateInstanceId of template being edited, or null if not in edit mode
-  }));
 
   // Template cache: stores loaded template documents keyed by templateId
   // Used for comparison on save to detect template changes
