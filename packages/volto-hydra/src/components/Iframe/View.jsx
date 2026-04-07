@@ -160,7 +160,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema } from '../../utils/blockPath';
+import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor } from '../../utils/blockPath';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
@@ -513,6 +513,7 @@ const Iframe = (props) => {
     schema, // Content type schema for page-level field types
     saveTemplatesRef, // Ref that Form.jsx uses to trigger template save
     multiSelected = [], // Array of block UIDs in multi-selection
+    onSetMultiSelected, // Callback to set multi-selection in Redux
   } = props;
 
   const dispatch = useDispatch();
@@ -565,7 +566,7 @@ const Iframe = (props) => {
   const iframeName = `hydra-${isEditMode ? 'edit' : 'view'}:${adminOrigin}`;
 
   const [pendingFieldMedia, setPendingFieldMedia] = useState(null); // { fieldName, blockUid } for field-level image selection
-  const [multiSelectState, setMultiSelectState] = useState({ blockUids: [], rects: {} }); // Multi-block selection
+  // Multi-select state is merged into blockUI (multiSelectedUids, multiSelectRects fields)
   const blockChooserRef = useRef();
   const [slashMenu, setSlashMenu] = useState(null); // { blockId, filter } or null
   const [slashMenuIndex, setSlashMenuIndex] = useState(0);
@@ -1562,7 +1563,7 @@ const Iframe = (props) => {
           onChangeFormData(newFormData);
           onSelectBlock(null);
           setBlockUI(null);
-          setMultiSelectState({ blockUids: [], rects: {} });
+          if (onSetMultiSelected) onSetMultiSelected([]);
           break;
         }
 
@@ -2390,25 +2391,28 @@ const Iframe = (props) => {
           // may have moved to a different selection in the meantime
           lastSentSelectBlockRef.current = event.data.blockUid;
 
-          // Call onSelectBlock OUTSIDE setBlockUI callback to avoid React warning
+          // --- Multi-block selection: set state and break (nothing else applies) ---
           if (event.data.isMultipleSelection) {
-            log('BLOCK_SELECTED multi-select:', event.data.blockUids?.length, 'blocks');
-            // hydra.js owns multi-selection state — it sends the full list
-            // of selected block UIDs and their rects. Store for outline rendering.
-            setMultiSelectState({
-              blockUids: event.data.blockUids || [],
-              rects: event.data.rects || {},
+            const blockUids = event.data.blockUids || [];
+            log('BLOCK_SELECTED multi-select:', blockUids.length, 'blocks');
+            if (onSetMultiSelected) onSetMultiSelected(blockUids);
+            setBlockUI({
+              blockUid: blockUids[0],
+              rect: event.data.rect,
+              focusedFieldName: null,
+              addDirection: 'bottom',
+              editableFields: {},
+              multiSelectedUids: blockUids,
+              multiSelectRects: event.data.rects || {},
             });
-            // Deselect single block — sidebar shows common parent
-            onSelectBlock(null);
-          } else {
-            // Single-block selection — always clear multi-selection state
-            // (can't use multiSelectState in condition — stale closure)
-            setMultiSelectState({ blockUids: [], rects: {} });
-            if (isNewBlock) {
-              log('BLOCK_SELECTED calling onSelectBlock:', event.data.blockUid);
-              onSelectBlock(event.data.blockUid);
-            }
+            break;
+          }
+
+          // --- Single-block selection from here on ---
+          if (onSetMultiSelected) onSetMultiSelected([]);
+          if (isNewBlock) {
+            log('BLOCK_SELECTED calling onSelectBlock:', event.data.blockUid);
+            onSelectBlock(event.data.blockUid);
           }
 
           // Deselection: just call onSelectBlock(null) — skip blockUI/addability updates.
@@ -3708,8 +3712,8 @@ const Iframe = (props) => {
       )}
 
       {/* Multi-block selection outline — combined bounding box */}
-      {multiSelectState.blockUids.length > 1 && referenceElement && (() => {
-        const allRects = Object.values(multiSelectState.rects);
+      {blockUI?.multiSelectedUids?.length > 1 && referenceElement && (() => {
+        const allRects = Object.values(blockUI.multiSelectRects || {});
         if (allRects.length === 0) return null;
         const iframeRect = referenceElement.getBoundingClientRect();
         const minTop = Math.min(...allRects.map(r => r.top));
@@ -3735,17 +3739,13 @@ const Iframe = (props) => {
         );
       })()}
 
-      {/* Block UI Overlays - rendered in parent window, positioned over iframe */}
-      {blockUI && blockUI.rect && referenceElement && (() => {
-        // Two outline modes based on editing state:
-        //   Text mode (focusedFieldName set): subtle border on block + underline on field
-        //   Block mode (no focusedFieldName): full solid border on block
+      {/* Single-block outline + underline (hidden during multi-select) */}
+      {blockUI && blockUI.rect && referenceElement && !(blockUI.multiSelectedUids?.length > 1) && (() => {
         const isTextMode = !!blockUI.focusedFieldName;
         const iframeLeft = referenceElement.getBoundingClientRect().left;
         const iframeTop = referenceElement.getBoundingClientRect().top;
         return (
         <>
-          {/* Block outline — full border in block mode, subtle in text mode */}
           <div
             className="volto-hydra-block-outline"
             data-outline-style={isTextMode ? 'subtle' : 'border'}
@@ -3761,8 +3761,6 @@ const Iframe = (props) => {
               zIndex: 1,
             }}
           />
-
-          {/* Field underline — only in text mode when we have the field rect */}
           {isTextMode && blockUI.focusedFieldRect && (
             <div
               className="volto-hydra-field-underline"
@@ -3778,9 +3776,12 @@ const Iframe = (props) => {
               }}
             />
           )}
+        </>
+        );
+      })()}
 
-          {/* Quanta Toolbar with real Slate buttons */}
-          <SyncedSlateToolbar
+      {/* Quanta Toolbar — renders for both single and multi-select */}
+      <SyncedSlateToolbar
             selectedBlock={selectedBlock}
             form={iframeSyncState.formData}
             blockPathMap={iframeSyncState.blockPathMap}
@@ -4105,71 +4106,45 @@ const Iframe = (props) => {
             }}
           />
 
-          {/* Add Button - positioned based on data-block-add direction */}
-          {/* addDirection is 'hidden' when getBlockAddability returns canInsertBefore/After both false */}
-          {/* This handles: readonly blocks, template edit mode, maxLength, fixed blocks */}
-          {blockUI.addDirection !== 'hidden' && (() => {
+      {/* Add Button — single-block only, hidden during multi-select */}
+      {blockUI && blockUI.rect && referenceElement && !(blockUI.multiSelectedUids?.length > 1) &&
+        blockUI.addDirection !== 'hidden' && (() => {
             const iframeRect = referenceElement.getBoundingClientRect();
             log('Add button render, blockUI.addDirection:', blockUI.addDirection, 'blockUid:', blockUI.blockUid);
             const isRightDirection = blockUI.addDirection === 'right';
 
-            // Calculate ideal position
             const buttonWidth = 30;
             const buttonHeight = 30;
             let addLeft = isRightDirection
-              ? iframeRect.left + blockUI.rect.left + blockUI.rect.width + 8  // Right of block
-              : iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth; // Bottom-right of block
+              ? iframeRect.left + blockUI.rect.left + blockUI.rect.width + 8
+              : iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth;
 
-            // Track if we're constrained inside the block
             let isConstrained = false;
-
-            // Constrain to stay within iframe bounds
             const iframeRight = iframeRect.left + iframeRect.width;
-            const blockRightInIframe = blockUI.rect.left + blockUI.rect.width;
-            const availableMargin = iframeRect.width - blockRightInIframe;
-            const buttonSpace = buttonWidth + 8; // button + gap
-            log('Add button constraint check:', {
-              blockRect: { left: blockUI.rect.left, width: blockUI.rect.width, right: blockRightInIframe },
-              iframeWidth: iframeRect.width,
-              availableMargin,
-              buttonSpace,
-              wouldConstrain: availableMargin < buttonSpace,
-            });
             if (addLeft + buttonWidth > iframeRight) {
-              // Move button inward to stay on screen, but keep it at top-right of block
               addLeft = iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth - 8;
               isConstrained = true;
             }
 
-            // For 'right': top-right of block (or bottom-right if constrained to avoid image overlay)
-            // For 'bottom' (default): below block
             let addTop;
             if (isRightDirection) {
-              if (isConstrained) {
-                // When constrained inside block, position at bottom-right to avoid image overlay buttons
-                addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height - buttonHeight - 8;
-              } else {
-                addTop = iframeRect.top + blockUI.rect.top;  // Top-right
-              }
+              addTop = isConstrained
+                ? iframeRect.top + blockUI.rect.top + blockUI.rect.height - buttonHeight - 8
+                : iframeRect.top + blockUI.rect.top;
             } else {
-              addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;  // Below block
+              addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;
             }
 
-            // Check if this is a table mode block (row or cell)
             const pathInfo = iframeSyncState.blockPathMap?.[selectedBlock];
             const isTableMode = pathInfo?.addMode === 'table' || pathInfo?.parentAddMode === 'table';
-
-            // Icon and title depend on table mode and direction
             let addIcon;
             let addTitle;
             if (isTableMode) {
-              // Table mode: use row/column icons
               addIcon = isRightDirection
                 ? <Icon name={columnAfterSVG} size="20px" />
                 : <Icon name={rowAfterSVG} size="20px" />;
               addTitle = isRightDirection ? "Add column" : "Add row";
             } else {
-              // Regular blocks: use simple + icon
               addIcon = <span style={{ fontSize: '22px', lineHeight: 1 }}>+</span>;
               addTitle = "Add block";
             }
@@ -4201,15 +4176,13 @@ const Iframe = (props) => {
             </button>
             );
           })()}
-        </>
-        );
-      })()}
 
       {/* Hierarchical sidebar widgets */}
       {/* Use properties (Redux) for formData - it's always up-to-date after onChangeFormData */}
       {/* blockPathMap is updated synchronously before onChangeFormData, so they stay in sync */}
       <ParentBlocksWidget
         selectedBlock={selectedBlock}
+        multiSelected={multiSelected}
         formData={properties}
         blockPathMap={iframeSyncState.blockPathMap}
         onSelectBlock={onSelectBlock}

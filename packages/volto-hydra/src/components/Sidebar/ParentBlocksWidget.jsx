@@ -561,6 +561,7 @@ const ParentBlockSection = ({
  */
 const ParentBlocksWidget = ({
   selectedBlock,
+  multiSelected = [],
   formData,
   blockPathMap,
   onSelectBlock,
@@ -571,6 +572,7 @@ const ParentBlocksWidget = ({
   onChangeTemplateSettings,
   onToggleTemplateEditMode,
 }) => {
+  const isMultiSelected = multiSelected.length > 1;
   const [isClient, setIsClient] = React.useState(false);
   const prevSelectedBlockRef = React.useRef(null);
   const intl = useIntl();
@@ -738,7 +740,39 @@ const ParentBlocksWidget = ({
             );
           })}
 
-          {/* Current block - rendered the same way as parents */}
+          {/* Current block or multi-selection summary */}
+          {isMultiSelected ? (
+            <div className="sidebar-section" data-testid="multi-select-summary">
+              <div className="sidebar-section-header sticky-header" style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '8px 12px', background: '#f5f5f5', borderBottom: '1px solid #ddd',
+              }}>
+                <span style={{ fontWeight: 'bold' }}>{multiSelected.length} blocks selected</span>
+              </div>
+              <div style={{ padding: '8px 12px' }}>
+                {multiSelected.map((uid) => {
+                  const pi = blockPathMap[uid];
+                  const type = pi?.blockType || 'Unknown';
+                  return (
+                    <div
+                      key={uid}
+                      style={{
+                        padding: '6px 8px',
+                        margin: '2px 0',
+                        background: '#e8f4fd',
+                        borderRadius: '3px',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => onSelectBlock(uid)}
+                    >
+                      {type}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
           <ParentBlockSection
             key={selectedBlock}
             blockId={selectedBlock}
@@ -760,6 +794,7 @@ const ParentBlocksWidget = ({
             onChangeTemplateSettings={onChangeTemplateSettings}
             onToggleTemplateEditMode={onToggleTemplateEditMode}
           />
+          )}
         </>,
         parentsTarget,
       )}

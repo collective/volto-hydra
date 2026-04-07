@@ -896,6 +896,9 @@ test.describe('Multi-Block Selection', () => {
     await expect(singleOutline).toBeVisible({ timeout: 5000 });
     const singleBox = await singleOutline.boundingBox();
 
+    // Enable debug to trace click handler
+    await iframe.locator('body').evaluate(() => { (window as any).HYDRA_DEBUG = true; });
+
     // Shift+Click third block — should select range block-1 through block-3
     await iframe.locator('[data-block-uid="block-3-uuid"]').click({ modifiers: ['Shift'] });
 
@@ -907,9 +910,16 @@ test.describe('Multi-Block Selection', () => {
       expect(box!.height).toBeGreaterThan(singleBox!.height * 2);
     }).toPass({ timeout: 5000 });
 
-    // Quanta toolbar should NOT be visible (no inline editing in multi-select)
-    const toolbar = page.locator('.quanta-toolbar');
-    await expect(toolbar).not.toBeVisible({ timeout: 3000 });
+    // Debug: check toolbar DOM state
+    const toolbarInfo = await page.evaluate(() => {
+      const t = document.querySelector('.quanta-toolbar');
+      return t ? { html: t.outerHTML.substring(0, 300), multiSelect: t.getAttribute('data-multi-select') } : 'NO TOOLBAR';
+    });
+    console.log('Toolbar state:', JSON.stringify(toolbarInfo));
+
+    // Multi-select toolbar should show block count (not format buttons)
+    const toolbar = page.locator('.quanta-toolbar[data-multi-select="true"]');
+    await expect(toolbar).toBeVisible({ timeout: 3000 });
   });
 
   test('Ctrl+Click toggles block in/out of selection', async ({ page }) => {
@@ -1022,5 +1032,82 @@ test.describe('Multi-Block Selection', () => {
     // We can check by looking for the paste button in the toolbar
     const pasteButton = page.locator('#toolbar-paste-blocks');
     await expect(pasteButton).toBeVisible({ timeout: 3000 });
+  });
+
+  test('Multi-select shows left toolbar buttons (copy/cut/delete)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click block-1, enter block mode, Shift+ArrowDown to multi-select
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+    await page.keyboard.press('Shift+ArrowDown');
+
+    // Left toolbar should show copy, cut, and delete buttons
+    await expect(page.locator('#toolbar-copy-blocks')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('#toolbar-cut-blocks')).toBeVisible({ timeout: 3000 });
+    await expect(page.locator('#toolbar-delete-blocks')).toBeVisible({ timeout: 3000 });
+  });
+
+  test('Multi-select shows right sidebar summary', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click block-1, enter block mode, Shift+ArrowDown to multi-select 2 blocks
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+    await page.keyboard.press('Shift+ArrowDown');
+
+    // Right sidebar should show multi-select summary
+    const summary = page.locator('[data-testid="multi-select-summary"]');
+    await expect(summary).toBeVisible({ timeout: 5000 });
+    await expect(summary).toContainText('2 blocks selected');
+  });
+
+  test('Copy blocks and paste after another block', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    const iframe = helper.getIframe();
+
+    // Get initial block order
+    const initialBlocks = await iframe.locator('[data-block-uid]').evaluateAll(
+      els => els.map(el => el.getAttribute('data-block-uid'))
+    );
+    const initialCount = initialBlocks.length;
+
+    // Select block-1, enter block mode
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+
+    // Copy block-1 via Cmd+C
+    await page.keyboard.press('ControlOrMeta+c');
+
+    // Verify paste button appeared
+    const pasteButton = page.locator('#toolbar-paste-blocks');
+    await expect(pasteButton).toBeVisible({ timeout: 3000 });
+
+    // Click block-3 to select it (paste target — blocks paste after selected block)
+    await helper.clickBlockInIframe('block-3-uuid');
+    await helper.waitForBlockSelected('block-3-uuid');
+
+    // Paste button should still be visible (clipboard persists)
+    await expect(pasteButton).toBeVisible({ timeout: 3000 });
+
+    // Click paste
+    await pasteButton.click();
+
+    // Should now have one more block than before
+    await expect(async () => {
+      const blocks = await iframe.locator('[data-block-uid]').evaluateAll(
+        els => els.map(el => el.getAttribute('data-block-uid'))
+      );
+      expect(blocks.length).toBe(initialCount + 1);
+    }).toPass({ timeout: 5000 });
   });
 });

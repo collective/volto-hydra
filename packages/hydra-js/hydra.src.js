@@ -2049,7 +2049,11 @@ export class Bridge {
     }
 
     // Get all elements for this block (multi-element blocks, template instances)
-    const allElements = blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid) : [];
+    // For multi-selection, gather elements from ALL selected blocks for combined rect
+    const multiBlockUids = options.isMultipleSelection ? (options.blockUids || []) : [];
+    const allElements = multiBlockUids.length > 1
+      ? multiBlockUids.flatMap(uid => [...this.getAllBlockElements(uid)])
+      : (blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid) : []);
 
     // Use first element for field detection if no element was passed
     const elementForFields = blockElement || allElements[0] || null;
@@ -2137,6 +2141,14 @@ export class Bridge {
       message.selection = options.selection;
     }
 
+    // Multi-selection: include block UIDs and per-block rects
+    if (options.isMultipleSelection) {
+      message.isMultipleSelection = true;
+      message.blockUids = options.blockUids;
+      message.rects = options.rects;
+    }
+
+    log('sendBlockSelected:', src, 'blockUid:', blockUid, 'isMulti:', !!message.isMultipleSelection, 'rect:', !!rect);
     window.parent.postMessage(message, this.adminOrigin);
   }
 
@@ -2210,13 +2222,18 @@ export class Bridge {
       }
     }
 
-    this.sendMessageToParent({
-      type: 'BLOCK_SELECTED',
-      src: 'multiSelect',
-      blockUid: null,
+    // Use sendBlockSelected with the anchor block — it handles drag handle
+    // positioning, combined rect computation, and the BLOCK_SELECTED message.
+    const anchorUid = this.multiSelectedBlockUids[0];
+    const anchorEl = this.queryBlockElement(anchorUid);
+    if (!anchorEl) return;
+
+    this.sendBlockSelected('multiSelect', anchorEl, {
+      blockUid: anchorUid,
       blockUids: this.multiSelectedBlockUids,
       rects,
       isMultipleSelection: true,
+      focusedFieldName: null,
     });
   }
 
@@ -7419,9 +7436,12 @@ export class Bridge {
       // Set flag to suppress scrollHandler during drag
       this._isDragging = true;
 
-      // Get all elements for this block (multi-element blocks like listings, template instances)
-      // Convert NodeList to array for .map() and .includes() support
-      const allElements = [...this.getAllBlockElements(this.selectedBlockUid)];
+      // Get all elements for dragged blocks — supports multi-selection
+      // For multi-selected blocks, include all their elements
+      const draggedUids = this.multiSelectedBlockUids.length > 0
+        ? [...this.multiSelectedBlockUids]
+        : [this.selectedBlockUid];
+      const allElements = draggedUids.flatMap(uid => [...this.getAllBlockElements(uid)]);
       if (allElements.length === 0) return;
 
       // Compute bounding box for all elements
@@ -7432,8 +7452,8 @@ export class Bridge {
 
       // Create a visual ghost for dragging
       let draggedBlock;
-      if (allElements.length > 1) {
-        // Multi-element block: create a placeholder box representing the bounding area
+      if (draggedUids.length > 1 || allElements.length > 1) {
+        // Multi-block or multi-element: create a placeholder box
         draggedBlock = document.createElement('div');
         draggedBlock.classList.add('dragging', 'multi-element-ghost');
         draggedBlock.style.cssText = `
@@ -7789,27 +7809,38 @@ export class Bridge {
           // Only set on successful drop, not on cancelled drags.
           this._justFinishedDragBlockId = this.selectedBlockUid;
 
-          // Use selectedBlockUid (not blockElement's UID) to support template instances
-          // For template instances, selectedBlockUid is the instance ID, blockElement is first child
-          const draggedBlockId = this.selectedBlockUid;
-          const draggedPathInfo = this.blockPathMap?.[draggedBlockId];
           const targetPathInfo = this.blockPathMap?.[closestBlockUid];
 
-          // Send MOVE_BLOCK message with all info needed for the move
-          // Admin will handle the complex mutation (works for page-level and container blocks)
-          log('DnD: Moving block', draggedBlockId, 'relative to', closestBlockUid, 'insertAfter:', insertAt === 1);
-          window.parent.postMessage(
-            {
-              type: 'MOVE_BLOCK',
-              blockId: draggedBlockId,
-              targetBlockId: closestBlockUid,
-              insertAfter: insertAt === 1,
-              // Include path info for Admin to determine source/target containers
-              sourceParentId: draggedPathInfo?.parentId || null,
-              targetParentId: targetPathInfo?.parentId || null,
-            },
-            this.adminOrigin,
-          );
+          if (draggedUids.length > 1) {
+            // Multi-block drag: send all UIDs in order
+            log('DnD: Moving', draggedUids.length, 'blocks relative to', closestBlockUid, 'insertAfter:', insertAt === 1);
+            window.parent.postMessage(
+              {
+                type: 'MOVE_BLOCKS',
+                blockIds: draggedUids,
+                targetBlockId: closestBlockUid,
+                insertAfter: insertAt === 1,
+                targetParentId: targetPathInfo?.parentId || null,
+              },
+              this.adminOrigin,
+            );
+          } else {
+            // Single block drag (may be template instance)
+            const draggedBlockId = draggedUids[0];
+            const draggedPathInfo = this.blockPathMap?.[draggedBlockId];
+            log('DnD: Moving block', draggedBlockId, 'relative to', closestBlockUid, 'insertAfter:', insertAt === 1);
+            window.parent.postMessage(
+              {
+                type: 'MOVE_BLOCK',
+                blockId: draggedBlockId,
+                targetBlockId: closestBlockUid,
+                insertAfter: insertAt === 1,
+                sourceParentId: draggedPathInfo?.parentId || null,
+                targetParentId: targetPathInfo?.parentId || null,
+              },
+              this.adminOrigin,
+            );
+          }
         } else if (closestBlockUid && !dropIndicatorVisible) {
           log('DnD: Drop rejected - indicator was not visible (block type not allowed in target)');
         }

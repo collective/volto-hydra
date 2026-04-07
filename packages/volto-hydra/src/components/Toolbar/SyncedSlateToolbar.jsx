@@ -1075,10 +1075,76 @@ const SyncedSlateToolbar = ({
     }
   });
 
+  // Multi-selection: simplified toolbar with drag handle + count
+  const isMultiSelected = blockUI?.multiSelectedUids?.length > 1;
+
   // Render toolbar when we have a rect (either block or page-level field)
   // selectedBlock is PAGE_BLOCK_UID for page-level fields
-  if (!blockUI?.rect) {
+  if (!blockUI?.rect && !isMultiSelected) {
     return null;
+  }
+  if (isMultiSelected) {
+    const allRects = Object.values(blockUI.multiSelectRects || {});
+    if (allRects.length === 0) return null;
+    const toolbarIframeRect = iframeElement?.getBoundingClientRect() || { top: 0, left: 0 };
+    const minTop = Math.min(...allRects.map(r => r.top));
+    const minLeft = Math.min(...allRects.map(r => r.left));
+    const multiToolbarTop = toolbarIframeRect.top + minTop - 40;
+    const multiToolbarLeft = toolbarIframeRect.left + minLeft;
+    return (
+      <div
+        className="quanta-toolbar"
+        data-multi-select="true"
+        style={{
+          position: 'fixed',
+          top: `${multiToolbarTop}px`,
+          left: `${multiToolbarLeft}px`,
+          zIndex: 2,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '2px',
+          background: '#fff',
+          border: '1px solid #ddd',
+          borderRadius: '4px',
+          padding: '2px 4px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          fontSize: '13px',
+        }}
+      >
+        <div
+          className="drag-handle"
+          style={{
+            cursor: 'move',
+            padding: '4px 6px',
+            display: 'flex',
+            alignItems: 'center',
+            color: '#666',
+            fontSize: '14px',
+            background: '#e8e8e8',
+            borderRadius: '2px',
+            pointerEvents: 'none',
+          }}
+        >
+          ⠿
+        </div>
+        <span style={{ padding: '0 6px', color: '#666' }}>
+          {blockUI.multiSelectedUids.length} blocks
+        </span>
+        <button
+          title="More options"
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '4px',
+            cursor: 'pointer',
+            fontSize: '16px',
+            color: '#666',
+          }}
+        >
+          ⋯
+        </button>
+      </div>
+    );
   }
 
   // DEFENSIVE: Verify we have form data with blocks

@@ -814,6 +814,9 @@ class Form extends Component {
             pathname={this.props.pathname}
             selectedBlock={this.props.uiState.selected}
             multiSelected={this.props.uiState.multiSelected}
+            onSetMultiSelected={(blockIds) => this.props.setUIState({
+              multiSelected: blockIds,
+            })}
             manage={this.props.isAdminForm}
             allowedBlocks={this.props.allowedBlocks}
             showRestricted={this.props.showRestricted}
