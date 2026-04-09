@@ -3893,32 +3893,30 @@ const Iframe = (props) => {
         />
       )}
 
-      {/* Multi-block selection outline — combined bounding box */}
+      {/* Multi-block selection outlines — individual outline per selected block */}
       {blockUI?.multiSelectedUids?.length > 1 && referenceElement && (() => {
-        const allRects = Object.values(blockUI.multiSelectRects || {});
-        if (allRects.length === 0) return null;
+        const rects = blockUI.multiSelectRects || {};
+        if (Object.keys(rects).length === 0) return null;
         const iframeRect = referenceElement.getBoundingClientRect();
-        const minTop = Math.min(...allRects.map(r => r.top));
-        const minLeft = Math.min(...allRects.map(r => r.left));
-        const maxBottom = Math.max(...allRects.map(r => r.top + r.height));
-        const maxRight = Math.max(...allRects.map(r => r.left + r.width));
-        return (
+        return Object.entries(rects).map(([uid, rect]) => (
           <div
+            key={`multi-outline-${uid}`}
             className="volto-hydra-block-outline"
             data-outline-style="border"
+            data-block-uid={uid}
             style={{
               position: 'fixed',
-              left: `${iframeRect.left + minLeft - 2}px`,
-              top: `${iframeRect.top + minTop - 2}px`,
-              width: `${maxRight - minLeft + 4}px`,
-              height: `${maxBottom - minTop + 4}px`,
+              left: `${iframeRect.left + rect.left - 2}px`,
+              top: `${iframeRect.top + rect.top - 2}px`,
+              width: `${rect.width + 4}px`,
+              height: `${rect.height + 4}px`,
               background: 'transparent',
               border: '2px solid #007eb1',
               pointerEvents: 'none',
               zIndex: 1,
             }}
           />
-        );
+        ));
       })()}
 
       {/* Single-block outline + underline (hidden during multi-select) */}

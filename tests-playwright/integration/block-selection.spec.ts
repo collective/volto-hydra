@@ -686,13 +686,7 @@ test.describe('Block Mode (Escape state machine)', () => {
     // Third Cmd+A: selects all sibling blocks (multi-selection)
     await page.keyboard.press('ControlOrMeta+a');
 
-    // Should have multi-selection outline covering both text-1a and text-1b
-    await expect(async () => {
-      const outline = page.locator('.volto-hydra-block-outline');
-      const box = await outline.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box!.height).toBeGreaterThan(50);
-    }).toPass({ timeout: 5000 });
+    await helper.waitForMultiSelectOutlines(2);
 
     // Sidebar should show "2 blocks selected"
     await expect(page.locator('[data-testid="multi-select-summary"]'))
@@ -716,12 +710,7 @@ test.describe('Block Mode (Escape state machine)', () => {
     // Cmd+A should select all siblings (text-1a + text-1b)
     await page.keyboard.press('ControlOrMeta+a');
 
-    await expect(async () => {
-      const outline = page.locator('.volto-hydra-block-outline');
-      const box = await outline.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box!.height).toBeGreaterThan(50);
-    }).toPass({ timeout: 5000 });
+    await helper.waitForMultiSelectOutlines(2);
   });
 
   test('Cmd+A on non-editable block selects all sibling blocks', async ({ page }) => {
@@ -740,13 +729,7 @@ test.describe('Block Mode (Escape state machine)', () => {
     // Cmd+A should select all page-level siblings
     await page.keyboard.press('ControlOrMeta+a');
 
-    await expect(async () => {
-      const outline = page.locator('.volto-hydra-block-outline');
-      const box = await outline.boundingBox();
-      expect(box).not.toBeNull();
-      // Should cover many blocks — much taller than single image
-      expect(box!.height).toBeGreaterThan(200);
-    }).toPass({ timeout: 5000 });
+    await helper.waitForMultiSelectOutlines(3);
   });
 
   test('Shift+Arrow extend and shrink shows correct outline at each step', async ({ page }) => {
@@ -769,12 +752,7 @@ test.describe('Block Mode (Escape state machine)', () => {
 
     // Step 2: Shift+ArrowDown — multi-select text-1a + text-1b
     await page.keyboard.press('Shift+ArrowDown');
-    await expect(async () => {
-      const box = await outline.boundingBox();
-      expect(box).not.toBeNull();
-      // Combined box must be taller than single block
-      expect(box!.height).toBeGreaterThan(singleBox!.height + 10);
-    }).toPass({ timeout: 5000 });
+    await helper.waitForMultiSelectOutlines(2);
 
     // Step 3: Shift+ArrowUp — shrink back to single block (text-1a)
     await page.keyboard.press('Shift+ArrowUp');
@@ -812,13 +790,7 @@ test.describe('Block Mode (Escape state machine)', () => {
     // Shift+ArrowDown should extend selection to include block-2
     await page.keyboard.press('Shift+ArrowDown');
 
-    // Multi-selection outline should cover both blocks (larger than single block)
-    await expect(async () => {
-      const outline = page.locator('.volto-hydra-block-outline');
-      const box = await outline.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box!.height).toBeGreaterThan(100);
-    }).toPass({ timeout: 5000 });
+    await helper.waitForMultiSelectOutlines(2);
   });
 });
 
@@ -871,13 +843,7 @@ test.describe('Multi-Block Selection', () => {
     const textField3 = await helper.getEditorLocator('block-3-uuid', 'value');
     await textField3.click({ modifiers: ['Shift'] });
 
-    // Should have multi-selection outline (combined bounding box, taller than single)
-    await expect(async () => {
-      const outline = page.locator('.volto-hydra-block-outline');
-      const box = await outline.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box!.height).toBeGreaterThan(100);
-    }).toPass({ timeout: 5000 });
+    await helper.waitForMultiSelectOutlines(2);
 
     // Should NOT be in text mode — field should not be contenteditable
     await expect(textField3).not.toHaveAttribute('contenteditable', 'true', { timeout: 2000 });
@@ -906,13 +872,8 @@ test.describe('Multi-Block Selection', () => {
     // Shift+Click third block — should select range block-1 through block-3
     await iframe.locator('[data-block-uid="block-3-uuid"]').click({ modifiers: ['Shift'] });
 
-    // Outline should grow to cover all three blocks (combined bounding box)
-    await expect(async () => {
-      const outline = page.locator('.volto-hydra-block-outline');
-      const box = await outline.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box!.height).toBeGreaterThan(singleBox!.height * 2);
-    }).toPass({ timeout: 5000 });
+    // Should have individual outlines on all blocks in the range
+    await helper.waitForMultiSelectOutlines(3);
 
     // Debug: check toolbar DOM state
     const toolbarInfo = await page.evaluate(() => {
@@ -941,13 +902,7 @@ test.describe('Multi-Block Selection', () => {
     const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
     await iframe.locator('[data-block-uid="block-3-uuid"]').click({ modifiers: [modifier] });
 
-    await expect(async () => {
-      const outline = page.locator('.volto-hydra-block-outline');
-      const box = await outline.boundingBox();
-      expect(box).not.toBeNull();
-      // Combined box should span from block-1 top to block-3 bottom
-      expect(box!.height).toBeGreaterThan(100);
-    }).toPass({ timeout: 5000 });
+    await helper.waitForMultiSelectOutlines(2);
   });
 
   test('Click clears multi-selection back to single', async ({ page }) => {
@@ -963,11 +918,7 @@ test.describe('Multi-Block Selection', () => {
     await helper.escapeFromEditing();
     await iframe.locator('[data-block-uid="block-3-uuid"]').click({ modifiers: ['Shift'] });
 
-    // Verify outline is multi-block sized
-    await expect(async () => {
-      const box = await page.locator('.volto-hydra-block-outline').boundingBox();
-      expect(box!.height).toBeGreaterThan(100);
-    }).toPass({ timeout: 5000 });
+    await helper.waitForMultiSelectOutlines(2);
 
     // Plain click on block-2 — should clear multi-selection
     await helper.clickBlockInIframe('block-2-uuid');
@@ -998,13 +949,7 @@ test.describe('Multi-Block Selection', () => {
     await page.keyboard.press('Shift+ArrowDown');
     await page.keyboard.press('Shift+ArrowDown');
 
-    // Verify multi-selection outline is visible
-    await expect(async () => {
-      const outline = page.locator('.volto-hydra-block-outline');
-      const box = await outline.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box!.height).toBeGreaterThan(100);
-    }).toPass({ timeout: 5000 });
+    await helper.waitForMultiSelectOutlines(2);
 
     // Press Delete — should remove all three selected blocks
     await page.keyboard.press('Delete');
@@ -1790,12 +1735,6 @@ test.describe('Multi-Block Selection', () => {
     // Ctrl+Click on block-3 — should toggle it into multi-selection regardless of mode
     await iframe.locator('[data-block-uid="block-3-uuid"]').click({ modifiers: ['ControlOrMeta'] });
 
-    // Should have multi-selection
-    await expect(async () => {
-      const outline = page.locator('.volto-hydra-block-outline');
-      const box = await outline.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box!.height).toBeGreaterThan(100);
-    }).toPass({ timeout: 5000 });
+    await helper.waitForMultiSelectOutlines(2);
   });
 });

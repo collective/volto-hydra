@@ -813,6 +813,18 @@ export class AdminUIHelper {
   }
 
   /**
+   * Wait for multi-block selection outlines to appear.
+   * Each selected block gets its own outline element.
+   * @param minCount - minimum number of outlines expected (default 2)
+   */
+  async waitForMultiSelectOutlines(minCount = 2): Promise<void> {
+    await expect(async () => {
+      const count = await this.page.locator('.volto-hydra-block-outline').count();
+      expect(count).toBeGreaterThanOrEqual(minCount);
+    }).toPass({ timeout: 5000 });
+  }
+
+  /**
    * Press Escape twice to navigate from text editing to parent block (or deselect).
    * First Escape: text mode → block mode. Second Escape: block mode → parent.
    * If already in block mode (not editing), only one Escape is needed.
