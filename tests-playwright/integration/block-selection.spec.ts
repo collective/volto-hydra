@@ -1668,6 +1668,86 @@ test.describe('Multi-Block Selection', () => {
     await expect(checkbox1).toHaveAttribute('data-checked', 'true', { timeout: 3000 });
   });
 
+  test('Clicking block in iframe toggles it during selection mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Enter selection mode with block-1 checked
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.longPressBlock('block-1-uuid');
+
+    // Click block-2 in the iframe (away from the checkbox overlay on the left edge)
+    // In selection mode, this should toggle block-2, not select it
+    await iframe.locator('[data-block-uid="block-2-uuid"]').click({ position: { x: 200, y: 50 } });
+
+    // Block-2 should now be checked
+    await expect(page.locator('.volto-hydra-selection-checkbox[data-block-uid="block-2-uuid"]'))
+      .toHaveAttribute('data-checked', 'true', { timeout: 5000 });
+
+    // Block-1 should still be checked
+    await expect(page.locator('.volto-hydra-selection-checkbox[data-block-uid="block-1-uuid"]'))
+      .toHaveAttribute('data-checked', 'true', { timeout: 3000 });
+
+    // Click block-2 again in iframe — should uncheck it
+    await iframe.locator('[data-block-uid="block-2-uuid"]').click({ position: { x: 200, y: 50 } });
+
+    await expect(page.locator('.volto-hydra-selection-checkbox[data-block-uid="block-2-uuid"]'))
+      .toHaveAttribute('data-checked', 'false', { timeout: 5000 });
+  });
+
+  test('Long press on checked block unchecks it', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Enter selection mode with block-1 checked
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.longPressBlock('block-1-uuid');
+
+    // Block-1 is checked
+    const checkbox1 = page.locator('.volto-hydra-selection-checkbox[data-block-uid="block-1-uuid"]');
+    await expect(checkbox1).toHaveAttribute('data-checked', 'true', { timeout: 3000 });
+
+    // Check block-2 first so we don't auto-exit on empty
+    const checkbox2 = page.locator('.volto-hydra-selection-checkbox[data-block-uid="block-2-uuid"]');
+    await expect(checkbox2).toBeVisible({ timeout: 5000 });
+    await checkbox2.click();
+    await expect(checkbox2).toHaveAttribute('data-checked', 'true', { timeout: 3000 });
+
+    // Long press on block-1 (already checked) — should uncheck it
+    await helper.longPressBlock('block-1-uuid');
+    await expect(checkbox1).toHaveAttribute('data-checked', 'false', { timeout: 5000 });
+
+    // Block-2 should still be checked
+    await expect(checkbox2).toHaveAttribute('data-checked', 'true', { timeout: 3000 });
+  });
+
+  test('Long press during text editing enters selection mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Click block-1 — enters text mode (cursor in text)
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+
+    // Verify text mode
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
+      .toBeVisible({ timeout: 3000 });
+
+    // Long press on block-1 while in text mode — should enter selection mode
+    await helper.longPressBlock('block-1-uuid');
+
+    // Checkboxes should appear
+    await expect(page.locator('.volto-hydra-selection-checkbox[data-block-uid="block-1-uuid"]'))
+      .toHaveAttribute('data-checked', 'true', { timeout: 3000 });
+  });
+
   test('Shift+Click in text mode extends text selection, not multi-select', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
