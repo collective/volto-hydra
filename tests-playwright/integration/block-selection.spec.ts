@@ -1742,52 +1742,40 @@ test.describe('Multi-Block Selection', () => {
   });
 
   test('Multi-select outlines reappear at correct positions after scroll', async ({ page }) => {
-    // Use small viewport so content overflows
-    await page.setViewportSize({ width: 1280, height: 400 });
-
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
     const iframe = helper.getIframe();
 
-    // Multi-select block-1 and block-2 via Shift+Arrow
+    // Multi-select block-1 and block-3 via Ctrl+Click (selectedBlockUid becomes null)
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.waitForBlockSelected('block-1-uuid');
     await helper.escapeFromEditing();
-    await page.keyboard.press('Shift+ArrowDown');
+    await iframe.locator('[data-block-uid="block-3-uuid"]').click({ modifiers: ['ControlOrMeta'] });
     await helper.waitForMultiSelectOutlines(2);
 
-    // Record outline positions by block UID before scroll
-    const getOutlinePositions = async () => {
-      const outlines = await page.locator('.volto-hydra-block-outline').all();
-      const positions: Record<string, { top: number; left: number }> = {};
-      for (const o of outlines) {
-        const uid = await o.getAttribute('data-block-uid');
-        const box = await o.boundingBox();
-        if (uid && box) positions[uid] = { top: box.top, left: box.left };
-      }
-      return positions;
-    };
-    const posBefore = await getOutlinePositions();
-    expect(Object.keys(posBefore).length).toBe(2);
+    // Scroll iframe down — outlines should disappear during scroll
+    await iframe.locator('body').evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect(page.locator('.volto-hydra-block-outline')).toHaveCount(0, { timeout: 1000 });
 
-    // Scroll iframe down — outlines should disappear (HIDE_BLOCK_UI)
-    await iframe.locator('body').evaluate(() => window.scrollTo(0, 500));
-    await page.waitForTimeout(300);
-
-    // Scroll back to top — outlines should reappear
+    // Scroll back to top
     await iframe.locator('body').evaluate(() => window.scrollTo(0, 0));
-    await helper.waitForMultiSelectOutlines(2);
+    await page.waitForTimeout(500);
 
-    // Verify outlines are back at approximately the same positions
-    const posAfter = await getOutlinePositions();
-    expect(Object.keys(posAfter).length).toBe(2);
-    for (const uid of Object.keys(posBefore)) {
-      // Skip blocks that are partially off-screen (null bounding box)
-      if (!posAfter[uid] || !posBefore[uid]) continue;
-      expect(Math.abs(posAfter[uid].top - posBefore[uid].top)).toBeLessThan(5);
-      expect(Math.abs(posAfter[uid].left - posBefore[uid].left)).toBeLessThan(5);
-    }
+    // Outlines should reappear correctly positioned on each block
+    await expect(async () => {
+      for (const uid of ['block-1-uuid', 'block-3-uuid']) {
+        const outline = page.locator(`.volto-hydra-block-outline[data-block-uid="${uid}"]`);
+        const outlineBox = await outline.boundingBox();
+        const blockBox = await helper.getCombinedBlockBoundingBox([uid]);
+        expect(outlineBox).not.toBeNull();
+        expect(blockBox).not.toBeNull();
+        expect(Math.abs(blockBox!.x - outlineBox!.x)).toBeLessThan(10);
+        expect(Math.abs(blockBox!.y - outlineBox!.y)).toBeLessThan(10);
+        expect(Math.abs(blockBox!.width - outlineBox!.width)).toBeLessThan(10);
+        expect(Math.abs(blockBox!.height - outlineBox!.height)).toBeLessThan(10);
+      }
+    }).toPass({ timeout: 5000 });
   });
 });

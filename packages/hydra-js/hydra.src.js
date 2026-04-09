@@ -8149,7 +8149,7 @@ export class Bridge {
       // UI state, and scrollBlockIntoViewWithToolbarRoom can trigger scroll events
       // that would hide the toolbar with no BLOCK_SELECTED to restore it (the
       // debounced handler below also skips when _blockSelectorNavigating is true).
-      if (this.selectedBlockUid && !this._blockSelectorNavigating) {
+      if ((this.selectedBlockUid || this.multiSelectedBlockUids.length > 0) && !this._blockSelectorNavigating) {
         window.parent.postMessage(
           { type: 'HIDE_BLOCK_UI' },
           this.adminOrigin,
@@ -8168,6 +8168,14 @@ export class Bridge {
         if (this._isDragging || this._blockSelectorNavigating) {
           return; // Don't send BLOCK_SELECTED during drag or carousel navigation
         }
+
+        // Re-send multi-select with updated rects after scroll
+        // (checked before selectedBlockUid — Ctrl+Click sets selectedBlockUid to null)
+        if (this.multiSelectedBlockUids.length > 1) {
+          this._sendMultiBlockSelected();
+          return;
+        }
+
         if (this.selectedBlockUid) {
           let element;
           if (this.selectedBlockUid === PAGE_BLOCK_UID) {
@@ -8186,10 +8194,7 @@ export class Bridge {
             element = elements[0] || null;
           }
 
-          // Re-send multi-select with updated rects after scroll
-          if (this.multiSelectedBlockUids.length > 1) {
-            this._sendMultiBlockSelected();
-          } else if (element) {
+          if (element) {
             // Single block: include selection mode rects if active
             const extra = {};
             if (this._selectionModeBlockUids) {
