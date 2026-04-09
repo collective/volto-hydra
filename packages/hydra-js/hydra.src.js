@@ -8186,8 +8186,11 @@ export class Bridge {
             element = elements[0] || null;
           }
 
-          if (element) {
-            // Include selection mode rects if active, so checkboxes reposition
+          // Re-send multi-select with updated rects after scroll
+          if (this.multiSelectedBlockUids.length > 1) {
+            this._sendMultiBlockSelected();
+          } else if (element) {
+            // Single block: include selection mode rects if active
             const extra = {};
             if (this._selectionModeBlockUids) {
               const selectionModeRects = {};
@@ -8200,8 +8203,6 @@ export class Bridge {
               }
               extra.selectionModeRects = selectionModeRects;
             }
-            // Pass blockUid explicitly to preserve template instance selection
-            // (element may be a child block with different UID)
             this.sendBlockSelected('scrollHandler', element, { blockUid: this.selectedBlockUid, ...extra });
           }
         }
