@@ -748,13 +748,18 @@ const Iframe = (props) => {
 
     const handleDelete = (e) => {
       const { blockIds } = e.detail;
-      log('hydra-delete-blocks:', blockIds.length, 'blocks');
+      log('hydra-delete-blocks:', blockIds.length, 'blocks:', blockIds);
       let newFormData = { ...properties };
+      let currentBpm = bpm;
       for (const uid of blockIds) {
-        const containerConfig = getContainerFieldConfig(uid, bpm, newFormData, blocksConfig, intl);
-        newFormData = deleteBlockFromContainer(newFormData, bpm, uid, containerConfig);
+        const containerConfig = getContainerFieldConfig(uid, currentBpm, newFormData, blocksConfig, intl);
+        newFormData = deleteBlockFromContainer(newFormData, currentBpm, uid, containerConfig);
+        currentBpm = buildBlockPathMap(newFormData, blocksConfig, intl);
       }
       onChangeFormData(newFormData);
+      onSelectBlock(null);
+      setBlockUI(null);
+      if (onSetMultiSelected) onSetMultiSelected([]);
     };
 
     const handlePaste = (e) => {
@@ -1669,29 +1674,11 @@ const Iframe = (props) => {
           break;
 
         case 'DELETE_BLOCKS': {
-          // Multi-block delete: batch-delete all selected blocks in one formData update
           const uidsToDelete = event.data.uids || [];
-          log('DELETE_BLOCKS: deleting', uidsToDelete.length, 'blocks:', uidsToDelete);
-          const mergedBlocksConfig = config.blocks.blocksConfig;
-          let newFormData = { ...properties };
-
-          // Delete each block from the accumulated formData
-          for (const uid of uidsToDelete) {
-            const containerConfig = getContainerFieldConfig(
-              uid, iframeSyncState.blockPathMap, newFormData, mergedBlocksConfig, intl,
-            );
-            newFormData = deleteBlockFromContainer(
-              newFormData, iframeSyncState.blockPathMap, uid, containerConfig,
-            );
-          }
-
-          // Rebuild blockPathMap and update
-          const newBlockPathMap = buildBlockPathMap(newFormData, mergedBlocksConfig, intl);
-          setIframeSyncState(prev => ({ ...prev, blockPathMap: newBlockPathMap }));
-          onChangeFormData(newFormData);
-          onSelectBlock(null);
-          setBlockUI(null);
-          if (onSetMultiSelected) onSetMultiSelected([]);
+          log('DELETE_BLOCKS: dispatching hydra-delete-blocks for', uidsToDelete.length, 'blocks');
+          document.dispatchEvent(new CustomEvent('hydra-delete-blocks', {
+            detail: { blockIds: uidsToDelete },
+          }));
           break;
         }
 

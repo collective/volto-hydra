@@ -931,6 +931,62 @@ test.describe('Multi-Block Selection', () => {
     await helper.waitForQuantaToolbar('block-2-uuid');
   });
 
+  test('Delete via left toolbar removes all multi-selected blocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Select block-1, enter block mode, Shift+ArrowDown twice to select block-1 + block-2 + block-3
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+    await page.keyboard.press('Shift+ArrowDown');
+    await page.keyboard.press('Shift+ArrowDown');
+
+    await helper.waitForMultiSelectOutlines(2);
+
+    // Click delete on left toolbar
+    const deleteButton = page.locator('button[aria-label="Delete blocks"]');
+    await expect(deleteButton).toBeVisible({ timeout: 3000 });
+    await deleteButton.click();
+
+    // All three blocks should be gone
+    await expect(iframe.locator('[data-block-uid="block-1-uuid"]')).not.toBeVisible({ timeout: 5000 });
+    await expect(iframe.locator('[data-block-uid="block-2-uuid"]')).not.toBeVisible({ timeout: 5000 });
+    await expect(iframe.locator('[data-block-uid="block-3-uuid"]')).not.toBeVisible({ timeout: 5000 });
+
+    // Outlines should be gone
+    await expect(page.locator('.volto-hydra-block-outline')).not.toBeVisible({ timeout: 3000 });
+  });
+
+  test('Delete via left toolbar removes blocks from different containers', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Select text-1a (inside col-1), enter block mode
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.escapeFromEditing();
+
+    // Ctrl+Click text-2a (inside col-2) to add to multi-selection
+    await iframe.locator('[data-block-uid="text-2a"]').click({ modifiers: ['ControlOrMeta'] });
+    await helper.waitForMultiSelectOutlines(2);
+
+    // Click delete on left toolbar
+    const deleteButton = page.locator('button[aria-label="Delete blocks"]');
+    await expect(deleteButton).toBeVisible({ timeout: 3000 });
+    await deleteButton.click();
+
+    // Both blocks should be gone
+    await expect(iframe.locator('[data-block-uid="text-1a"]')).not.toBeVisible({ timeout: 5000 });
+    await expect(iframe.locator('[data-block-uid="text-2a"]')).not.toBeVisible({ timeout: 5000 });
+  });
+
   test('Delete key removes all multi-selected blocks', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
