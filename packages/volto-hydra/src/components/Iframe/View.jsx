@@ -553,6 +553,9 @@ const Iframe = (props) => {
   const [referenceElement, setReferenceElement] = useState(null);
   const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, focusedFieldName }
   const [mouseActivityCounter, setMouseActivityCounter] = useState(0); // incremented on MOUSE_ACTIVITY from iframe
+  const [selectionMode, setSelectionMode] = useState(false); // true when in touch selection mode
+  const multiSelectedRef = useRef(multiSelected);
+  multiSelectedRef.current = multiSelected;
 
   // History for routing - needed early for edit mode detection
   const history = useHistory();
@@ -738,6 +741,7 @@ const Iframe = (props) => {
         .filter(Boolean);
       log('hydra-copy-blocks:', action, blocksData.length, 'blocks');
       dispatch(setBlocksClipboard({ [action]: blocksData }));
+      handleExitSelectionMode();
     };
 
     const handleDelete = (e) => {
@@ -796,13 +800,26 @@ const Iframe = (props) => {
       onChangeFormData(newFormData);
     };
 
+    const handleExitSelectionMode = () => {
+      log('hydra-exit-selection-mode');
+      if (onSetMultiSelected) onSetMultiSelected([]);
+      // Tell iframe — it clears state and acks with EXIT_SELECTION_MODE
+      // which sets selectionMode(false) so checkboxes disappear after iframe confirms
+      const iframe = document.getElementById('previewIframe');
+      if (iframe?.contentWindow && iframeOriginRef.current) {
+        iframe.contentWindow.postMessage({ type: 'EXIT_SELECTION_MODE' }, iframeOriginRef.current);
+      }
+    };
+
     document.addEventListener('hydra-copy-blocks', handleCopy);
     document.addEventListener('hydra-delete-blocks', handleDelete);
     document.addEventListener('hydra-paste-blocks', handlePaste);
+    document.addEventListener('hydra-exit-selection-mode', handleExitSelectionMode);
     return () => {
       document.removeEventListener('hydra-copy-blocks', handleCopy);
       document.removeEventListener('hydra-delete-blocks', handleDelete);
       document.removeEventListener('hydra-paste-blocks', handlePaste);
+      document.removeEventListener('hydra-exit-selection-mode', handleExitSelectionMode);
     };
   }, [blocksClipboard, properties, iframeSyncState?.blockPathMap, onChangeFormData, dispatch, intl]);
 
@@ -1697,6 +1714,40 @@ const Iframe = (props) => {
           document.dispatchEvent(new CustomEvent('hydra-paste-blocks', {
             detail: { afterBlockId, keepClipboard: false },
           }));
+          break;
+        }
+
+        case 'ENTER_SELECTION_MODE': {
+          const { blockUid: toggledUid, allBlockRects } = event.data;
+          log('ENTER_SELECTION_MODE:', toggledUid, allBlockRects ? Object.keys(allBlockRects).length + ' rects' : 'toggle');
+          setSelectionMode(true);
+          if (allBlockRects) {
+            setBlockUI(prev => ({ ...prev, selectionModeRects: allBlockRects }));
+          }
+          // Toggle blockUid in multiSelected (use ref to avoid stale closure)
+          if (onSetMultiSelected) {
+            const current = multiSelectedRef.current || [];
+            const idx = current.indexOf(toggledUid);
+            const updated = idx >= 0
+              ? current.filter(id => id !== toggledUid)
+              : [...current, toggledUid];
+            if (updated.length === 0) {
+              // All unchecked — exit selection mode
+              onSetMultiSelected([]);
+              const iframe = document.getElementById('previewIframe');
+              if (iframe?.contentWindow && iframeOriginRef.current) {
+                iframe.contentWindow.postMessage({ type: 'EXIT_SELECTION_MODE' }, iframeOriginRef.current);
+              }
+            } else {
+              onSetMultiSelected(updated);
+            }
+          }
+          break;
+        }
+
+        case 'EXIT_SELECTION_MODE': {
+          log('EXIT_SELECTION_MODE ack from iframe');
+          setSelectionMode(false);
           break;
         }
 
@@ -2617,6 +2668,7 @@ const Iframe = (props) => {
               mediaFields: event.data.mediaFields, // Map of fieldName -> true for image/media fields
               addDirection: event.data.addDirection, // Direction for add button positioning
               isMultiElement: event.data.isMultiElement, // True if block renders as multiple DOM elements
+              selectionModeRects: event.data.selectionModeRects,
             };
           });
           // Set selection from BLOCK_SELECTED - this ensures block and selection are atomic
@@ -3908,6 +3960,53 @@ const Iframe = (props) => {
           )}
         </>
         );
+      })()}
+
+      {/* Touch selection mode — checkbox overlays on each sibling block */}
+      {selectionMode && blockUI?.selectionModeRects && referenceElement && (() => {
+        const iframeRect = referenceElement.getBoundingClientRect();
+        return Object.entries(blockUI.selectionModeRects).map(([uid, rect]) => {
+          const isChecked = multiSelected.includes(uid);
+          return (
+            <div
+              key={`sel-${uid}`}
+              className="volto-hydra-selection-checkbox"
+              data-block-uid={uid}
+              data-checked={isChecked ? 'true' : 'false'}
+              onClick={() => {
+                const checked = multiSelected.includes(uid)
+                  ? multiSelected.filter(id => id !== uid)
+                  : [...multiSelected, uid];
+                if (checked.length === 0) {
+                  document.dispatchEvent(new CustomEvent('hydra-exit-selection-mode'));
+                } else {
+                  if (onSetMultiSelected) onSetMultiSelected(checked);
+                }
+              }}
+              style={{
+                position: 'fixed',
+                left: `${iframeRect.left + rect.left - 4}px`,
+                top: `${iframeRect.top + rect.top + rect.height / 2 - 12}px`,
+                width: '24px',
+                height: '24px',
+                borderRadius: '4px',
+                border: `2px solid ${isChecked ? '#007eb1' : '#999'}`,
+                background: isChecked ? '#007eb1' : 'white',
+                cursor: 'pointer',
+                zIndex: 10,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              }}
+            >
+              {isChecked ? '\u2713' : ''}
+            </div>
+          );
+        });
       })()}
 
       {/* Quanta Toolbar — renders for both single and multi-select */}

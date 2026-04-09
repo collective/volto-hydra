@@ -693,6 +693,10 @@ test.describe('Block Mode (Escape state machine)', () => {
       expect(box).not.toBeNull();
       expect(box!.height).toBeGreaterThan(50);
     }).toPass({ timeout: 5000 });
+
+    // Sidebar should show "2 blocks selected"
+    await expect(page.locator('[data-testid="multi-select-summary"]'))
+      .toContainText('2 blocks', { timeout: 3000 });
   });
 
   test('Cmd+A in block mode selects all sibling blocks', async ({ page }) => {
@@ -1465,7 +1469,7 @@ test.describe('Multi-Block Selection', () => {
     }).toPass({ timeout: 5000 });
   });
 
-  test('Multi-select does not span across different containers', async ({ page }) => {
+  test('Shift+Click range select does not span across different containers', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
@@ -1476,21 +1480,242 @@ test.describe('Multi-Block Selection', () => {
     await helper.escapeFromEditing();
 
     // Shift+Click on text-2a (inside col-2 — different container)
+    // Range select only works between siblings, so this should NOT create a range
     const iframe = helper.getIframe();
     await iframe.locator('[data-block-uid="text-2a"]').click({ modifiers: ['Shift'] });
 
-    // Should NOT multi-select across containers — only text-2a selected
-    // (or both if they share a parent, but col-1 and col-2 are different)
-    // The key check: we should NOT have both text-1a and text-2a in selection
+    // Should NOT have multi-select — text-2a is in a different container
+    await expect(page.locator('[data-testid="multi-select-summary"]'))
+      .not.toBeVisible({ timeout: 3000 });
+  });
+
+  test('Ctrl+Click selects blocks from different containers and paste works', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click text-1a (inside col-1), enter block mode
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.escapeFromEditing();
+
+    // Ctrl+Click text-2a (inside col-2 — different container)
+    await iframe.locator('[data-block-uid="text-2a"]').click({ modifiers: ['ControlOrMeta'] });
+
+    // Should have multi-selection with blocks from both containers
+    await expect(page.locator('[data-testid="multi-select-summary"]'))
+      .toContainText('2 blocks', { timeout: 5000 });
+
+    // Copy the multi-selected blocks
+    await page.keyboard.press('ControlOrMeta+c');
+
+    // Click on text-after (page-level block outside containers), enter block mode
+    await helper.clickBlockInIframe('text-after');
+    await helper.waitForBlockSelected('text-after');
+    await helper.escapeFromEditing();
+
+    // Count blocks before paste
+    const blocksBefore = await iframe.locator('[data-block-uid]').count();
+
+    // Paste — should insert both blocks after text-after
+    await page.keyboard.press('ControlOrMeta+v');
+
+    // Verify two new blocks were inserted
     await expect(async () => {
-      const summary = page.locator('[data-testid="multi-select-summary"]');
-      // Either no multi-select, or only blocks from one container
-      const isMulti = await summary.isVisible().catch(() => false);
-      if (isMulti) {
-        const text = await summary.textContent();
-        // Should not have 2+ blocks from different containers
-        expect(text).not.toContain('3 blocks');
-      }
-    }).toPass({ timeout: 3000 });
+      const blocksAfter = await iframe.locator('[data-block-uid]').count();
+      expect(blocksAfter).toBe(blocksBefore + 2);
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('Long press enters selection mode, copy and paste via left toolbar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click block-1 to select it first
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+
+    // Long press on block-1 — enters selection mode with checkbox overlays
+    await helper.longPressBlock('block-1-uuid');
+
+    // Block-1 should already be checked (long-pressed block)
+    const checkbox1 = page.locator('.volto-hydra-selection-checkbox[data-block-uid="block-1-uuid"]');
+    await expect(checkbox1).toHaveAttribute('data-checked', 'true', { timeout: 3000 });
+
+    // Check block-2 as well
+    const checkbox2 = page.locator('.volto-hydra-selection-checkbox[data-block-uid="block-2-uuid"]');
+    await expect(checkbox2).toBeVisible({ timeout: 5000 });
+    await checkbox2.click();
+
+    // Sidebar should show 2 blocks selected
+    await expect(page.locator('[data-testid="multi-select-summary"]'))
+      .toContainText('2 blocks', { timeout: 5000 });
+
+    // Copy via left toolbar — auto-exits selection mode
+    const copyButton = page.locator('button[aria-label="Copy blocks"]');
+    await expect(copyButton).toBeVisible({ timeout: 3000 });
+    await copyButton.click();
+
+    // Checkboxes should be gone after copy
+    await expect(page.locator('.volto-hydra-selection-checkbox').first())
+      .not.toBeVisible({ timeout: 3000 });
+
+    // Click block-3, enter block mode to paste after it
+    await helper.clickBlockInIframe('block-3-uuid');
+    await helper.waitForBlockSelected('block-3-uuid');
+    await helper.escapeFromEditing();
+
+    // Count blocks before paste
+    const blocksBefore = await iframe.locator('[data-block-uid]').count();
+
+    // Paste via left toolbar
+    const pasteButton = page.locator('button[aria-label="Paste blocks"]');
+    await expect(pasteButton).toBeVisible({ timeout: 3000 });
+    await pasteButton.click();
+
+    // Should have 2 more blocks
+    await expect(async () => {
+      const blocksAfter = await iframe.locator('[data-block-uid]').count();
+      expect(blocksAfter).toBe(blocksBefore + 2);
+    }).toPass({ timeout: 5000 });
+  });
+
+  test('Exit selection mode button clears checkboxes and shows count badge', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Enter selection mode
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.longPressBlock('block-1-uuid');
+
+    // Check block-2
+    const checkbox2 = page.locator('.volto-hydra-selection-checkbox[data-block-uid="block-2-uuid"]');
+    await expect(checkbox2).toBeVisible({ timeout: 5000 });
+    await checkbox2.click();
+
+    // Wait for multi-select state to update
+    await expect(page.locator('[data-testid="multi-select-summary"]'))
+      .toContainText('2 blocks', { timeout: 5000 });
+
+    // Exit button should show count badge "2"
+    const exitButton = page.locator('[data-testid="exit-selection-mode"]');
+    await expect(exitButton).toBeVisible({ timeout: 3000 });
+    await expect(exitButton.locator('.blockCount')).toContainText('2', { timeout: 2000 });
+
+    // Click exit
+    await exitButton.click();
+
+    // Checkboxes should be gone
+    await expect(page.locator('.volto-hydra-selection-checkbox').first())
+      .not.toBeVisible({ timeout: 3000 });
+
+    // Multi-select should be cleared
+    await expect(page.locator('[data-testid="multi-select-summary"]'))
+      .not.toBeVisible({ timeout: 3000 });
+  });
+
+  test('Unticking all checkboxes exits selection mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Enter selection mode with block-1 checked
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.longPressBlock('block-1-uuid');
+
+    // Block-1 is checked
+    const checkbox1 = page.locator('.volto-hydra-selection-checkbox[data-block-uid="block-1-uuid"]');
+    await expect(checkbox1).toHaveAttribute('data-checked', 'true', { timeout: 3000 });
+
+    // Uncheck block-1 — now nothing is checked
+    await checkbox1.click();
+
+    // Selection mode should auto-exit — checkboxes gone
+    await expect(page.locator('.volto-hydra-selection-checkbox').first())
+      .not.toBeVisible({ timeout: 5000 });
+  });
+
+  test('Long press on unchecked block in selection mode checks it', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Enter selection mode with block-1 checked
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.longPressBlock('block-1-uuid');
+
+    // Block-2 should be unchecked
+    const checkbox2 = page.locator('.volto-hydra-selection-checkbox[data-block-uid="block-2-uuid"]');
+    await expect(checkbox2).toHaveAttribute('data-checked', 'false', { timeout: 3000 });
+
+    // Long press on block-2 — should check it (not start a new selection mode)
+    await helper.longPressBlock('block-2-uuid');
+
+    // Block-2 should now be checked
+    await expect(checkbox2).toHaveAttribute('data-checked', 'true', { timeout: 3000 });
+
+    // Block-1 should still be checked
+    const checkbox1 = page.locator('.volto-hydra-selection-checkbox[data-block-uid="block-1-uuid"]');
+    await expect(checkbox1).toHaveAttribute('data-checked', 'true', { timeout: 3000 });
+  });
+
+  test('Shift+Click in text mode extends text selection, not multi-select', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click block-1 — enters text mode
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+
+    // Verify text mode (subtle border)
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
+      .toBeVisible({ timeout: 3000 });
+
+    // Shift+Click on block-3's text — should extend text selection, NOT multi-select
+    const textField3 = await helper.getEditorLocator('block-3-uuid', 'value');
+    await textField3.click({ modifiers: ['Shift'] });
+
+    // Should NOT have multi-select outline or sidebar summary
+    await expect(page.locator('[data-testid="multi-select-summary"]'))
+      .not.toBeVisible({ timeout: 2000 });
+
+    // Should still be in text mode (subtle border, not block mode border)
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
+      .toBeVisible({ timeout: 2000 });
+  });
+
+  test('Ctrl+Click from text mode toggles block selection', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click block-1 — enters text mode
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+
+    // Ctrl+Click on block-3 — should toggle it into multi-selection regardless of mode
+    await iframe.locator('[data-block-uid="block-3-uuid"]').click({ modifiers: ['ControlOrMeta'] });
+
+    // Should have multi-selection
+    await expect(async () => {
+      const outline = page.locator('.volto-hydra-block-outline');
+      const box = await outline.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.height).toBeGreaterThan(100);
+    }).toPass({ timeout: 5000 });
   });
 });

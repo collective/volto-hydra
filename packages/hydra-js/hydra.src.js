@@ -935,25 +935,13 @@ export class Bridge {
       return true;
     }
 
-    // Cmd+A: select all sibling blocks (block mode → multi-select)
+    // Cmd+A: select all sibling blocks within the same container
     if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
       if (this.multiSelectedBlockUids.length > 0) return true; // already multi-selected
       e.preventDefault();
-      const siblings = [this.selectedBlockUid];
-      let uid = this.selectedBlockUid;
-      while (true) {
-        const prev = this._resolveNavigationTarget(uid, 'backward', false);
-        if (!prev) break;
-        siblings.unshift(prev);
-        uid = prev;
-      }
-      uid = this.selectedBlockUid;
-      while (true) {
-        const next = this._resolveNavigationTarget(uid, 'forward', false);
-        if (!next) break;
-        siblings.push(next);
-        uid = next;
-      }
+      const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
+      const parentId = pathInfo?.parentId || null;
+      const siblings = this._getSiblingsByDomOrder(this.selectedBlockUid, parentId);
       if (siblings.length > 1) {
         this.multiSelectedBlockUids = siblings;
         this._sendMultiBlockSelected();
@@ -2159,6 +2147,11 @@ export class Bridge {
       message.rects = options.rects;
     }
 
+    // Selection mode: include updated rects for all checkbox blocks
+    if (options.selectionModeRects) {
+      message.selectionModeRects = options.selectionModeRects;
+    }
+
     log('sendBlockSelected:', src, 'blockUid:', blockUid, 'isMulti:', !!message.isMultipleSelection, 'rect:', !!rect);
     window.parent.postMessage(message, this.adminOrigin);
   }
@@ -2217,6 +2210,36 @@ export class Bridge {
     this.isInlineEditing = false;
 
     this._sendMultiBlockSelected();
+  }
+
+  /**
+   * Enter touch selection mode. Sends all sibling block rects to admin
+   * so it can render checkbox overlays for toggling selection.
+   * @param {string} blockUid - The long-pressed block (initially checked)
+   */
+  _enterSelectionMode(blockUid) {
+    // Get all sibling blocks (same parent) with their rects
+    const pathInfo = this.blockPathMap?.[blockUid];
+    const parentId = pathInfo?.parentId || null;
+    const siblings = this._getSiblingsByDomOrder(blockUid, parentId);
+
+    const allBlockRects = {};
+    for (const uid of siblings) {
+      const el = this.queryBlockElement(uid);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        allBlockRects[uid] = { top: r.top, left: r.left, width: r.width, height: r.height };
+      }
+    }
+
+    // Store UIDs so scroll handler can re-send updated rects
+    this._selectionModeBlockUids = siblings;
+
+    this.sendMessageToParent({
+      type: 'ENTER_SELECTION_MODE',
+      blockUid,
+      allBlockRects,
+    });
   }
 
   /**
@@ -2865,6 +2888,12 @@ export class Bridge {
           // Admin closed the slash menu (user selected a block type or dismissed)
           log('Received SLASH_MENU_CLOSED');
           this._slashMenuActive = false;
+        } else if (event.data.type === 'EXIT_SELECTION_MODE') {
+          log('Received EXIT_SELECTION_MODE');
+          this._selectionModeBlockUids = null;
+          this.multiSelectedBlockUids = [];
+          // Ack back to admin so it can clear selectionMode
+          this.sendMessageToParent({ type: 'EXIT_SELECTION_MODE' });
         } else if (event.data.type === 'TEMPLATE_EDIT_MODE') {
           // Toggle template edit mode - affects which blocks are editable via isBlockReadonly
           // instanceId: the template instance being edited, or null to exit edit mode
@@ -2952,6 +2981,21 @@ export class Bridge {
    */
   enableBlockClickListener() {
     this.blockClickHandler = (event) => {
+      // Selection mode: clicks toggle blocks instead of selecting
+      if (this._selectionModeBlockUids) {
+        const blockElement = event.target.closest('[data-block-uid]');
+        if (blockElement) {
+          event.preventDefault();
+          event.stopPropagation();
+          const blockUid = blockElement.getAttribute('data-block-uid');
+          log('blockClickHandler: selection mode toggle:', blockUid);
+          this.sendMessageToParent({
+            type: 'ENTER_SELECTION_MODE',
+            blockUid,
+          });
+        }
+        return;
+      }
       log('blockClickHandler: event target:', event.target.tagName, event.target.className);
       log('blockClickHandler: _isDragging:', this._isDragging, '_navigatingToBlock:', this._navigatingToBlock);
 
@@ -3166,6 +3210,59 @@ export class Bridge {
       document.addEventListener('mousedown', this._blockSelectorMousedownHandler, true);
     }
 
+    // Long press detection for touch devices (mobile selection mode)
+    if (!this._longPressHandlersAttached) {
+      this._longPressHandlersAttached = true;
+      this._longPressTimer = null;
+      const LONG_PRESS_MS = 600;
+      const MOVE_THRESHOLD = 10;
+      let startX = 0, startY = 0;
+
+      document.addEventListener('touchstart', (e) => {
+        if (this._longPressTimer) clearTimeout(this._longPressTimer);
+        const touch = e.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        const blockEl = target?.closest('[data-block-uid]');
+        if (!blockEl) return;
+        const blockUid = blockEl.getAttribute('data-block-uid');
+
+        this._longPressTimer = setTimeout(() => {
+          this._longPressTimer = null;
+          if (this._selectionModeBlockUids) {
+            // Already in selection mode — send toggle to admin
+            log('Long press in selection mode, toggling:', blockUid);
+            this.sendMessageToParent({
+              type: 'ENTER_SELECTION_MODE',
+              blockUid,
+            });
+          } else {
+            log('Long press detected on block:', blockUid);
+            this._enterSelectionMode(blockUid);
+          }
+        }, LONG_PRESS_MS);
+      }, { passive: true });
+
+      document.addEventListener('touchmove', (e) => {
+        if (!this._longPressTimer) return;
+        const touch = e.touches[0];
+        const dx = touch.clientX - startX;
+        const dy = touch.clientY - startY;
+        if (Math.abs(dx) > MOVE_THRESHOLD || Math.abs(dy) > MOVE_THRESHOLD) {
+          clearTimeout(this._longPressTimer);
+          this._longPressTimer = null;
+        }
+      }, { passive: true });
+
+      document.addEventListener('touchend', () => {
+        if (this._longPressTimer) {
+          clearTimeout(this._longPressTimer);
+          this._longPressTimer = null;
+        }
+      }, { passive: true });
+    }
+
     // Space on interactive contenteditable elements (buttons, etc.) is handled
     // by _handleFieldKeydown → replayOneKey which preventDefault + insertText.
 
@@ -3311,6 +3408,14 @@ export class Bridge {
 
         // === Text mode: let field-level handlers deal with everything else ===
         if (activeEditField) return;
+
+        // === Multi-select: handle keys before the no-block guard ===
+        // After Ctrl+Click multi-select, selectedBlockUid may be null but
+        // multiSelectedBlockUids is populated. _handleBlockModeKey handles
+        // Cmd+C, Cmd+X, Cmd+V, Delete, Escape for multi-selection.
+        if (this.multiSelectedBlockUids.length > 0) {
+          if (this._handleBlockModeKey(e)) return;
+        }
 
         // === No block selected: Arrow selects first/last page-level block ===
         if (!this.selectedBlockUid) {
@@ -8082,9 +8187,22 @@ export class Bridge {
           }
 
           if (element) {
+            // Include selection mode rects if active, so checkboxes reposition
+            const extra = {};
+            if (this._selectionModeBlockUids) {
+              const selectionModeRects = {};
+              for (const uid of this._selectionModeBlockUids) {
+                const el = this.queryBlockElement(uid);
+                if (el) {
+                  const r = el.getBoundingClientRect();
+                  selectionModeRects[uid] = { top: r.top, left: r.left, width: r.width, height: r.height };
+                }
+              }
+              extra.selectionModeRects = selectionModeRects;
+            }
             // Pass blockUid explicitly to preserve template instance selection
             // (element may be a child block with different UID)
-            this.sendBlockSelected('scrollHandler', element, { blockUid: this.selectedBlockUid });
+            this.sendBlockSelected('scrollHandler', element, { blockUid: this.selectedBlockUid, ...extra });
           }
         }
       }, 150);

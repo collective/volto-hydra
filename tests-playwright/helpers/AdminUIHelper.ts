@@ -770,6 +770,49 @@ export class AdminUIHelper {
   }
 
   /**
+   * Simulate a long press (touch) on a block in the iframe.
+   * Dispatches touchstart/touchend events inside the iframe with a 700ms hold.
+   * Triggers ENTER_SELECTION_MODE in hydra.js for mobile selection mode.
+   */
+  async longPressBlock(blockUid: string): Promise<void> {
+    const iframe = this.getIframe();
+    const block = iframe.locator(`[data-block-uid="${blockUid}"]`);
+
+    // Get block center in iframe-relative coordinates
+    const center = await block.evaluate(el => {
+      const r = el.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    });
+
+    // Dispatch touchstart
+    await iframe.locator('body').evaluate((body, pos) => {
+      const el = document.elementFromPoint(pos.x, pos.y) || body;
+      el.dispatchEvent(new TouchEvent('touchstart', {
+        bubbles: true,
+        cancelable: true,
+        touches: [new Touch({ identifier: 1, target: el, clientX: pos.x, clientY: pos.y })],
+      }));
+    }, center);
+
+    // Hold for long press threshold
+    await this.page.waitForTimeout(700);
+
+    // Dispatch touchend
+    await iframe.locator('body').evaluate((body, pos) => {
+      const el = document.elementFromPoint(pos.x, pos.y) || body;
+      el.dispatchEvent(new TouchEvent('touchend', {
+        bubbles: true,
+        cancelable: true,
+        changedTouches: [new Touch({ identifier: 1, target: el, clientX: pos.x, clientY: pos.y })],
+      }));
+    }, center);
+
+    // Wait for selection checkboxes to appear
+    await expect(this.page.locator('.volto-hydra-selection-checkbox').first())
+      .toBeVisible({ timeout: 5000 });
+  }
+
+  /**
    * Press Escape twice to navigate from text editing to parent block (or deselect).
    * First Escape: text mode → block mode. Second Escape: block mode → parent.
    * If already in block mode (not editing), only one Escape is needed.

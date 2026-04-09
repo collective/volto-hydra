@@ -32,6 +32,7 @@ import copySVG from '@plone/volto/icons/copy.svg';
 import cutSVG from '@plone/volto/icons/cut.svg';
 import pasteSVG from '@plone/volto/icons/paste.svg';
 import trashSVG from '@plone/volto/icons/delete.svg';
+import clearSVG from '@plone/volto/icons/clear.svg';
 
 export class BlocksToolbarComponent extends React.Component {
   constructor(props) {
@@ -159,6 +160,21 @@ export class BlocksToolbarComponent extends React.Component {
                 id="toolbar-copy-blocks"
               >
                 <Icon name={copySVG} size="30px" />
+              </button>
+            </Plug>
+            <Plug pluggable="main.toolbar.bottom" id="blocks-exit-selection-btn" dependencies={[selectedBlocks]}>
+              <button
+                aria-label="Exit selection mode"
+                data-testid="exit-selection-mode"
+                onClick={() => {
+                  document.dispatchEvent(new CustomEvent('hydra-exit-selection-mode'));
+                }}
+                tabIndex={0}
+                className="exitSelectionMode"
+                id="toolbar-exit-selection-mode"
+              >
+                <span className="blockCount">{selectedBlocks.length}</span>
+                <Icon name={clearSVG} size="30px" />
               </button>
             </Plug>
           </>
