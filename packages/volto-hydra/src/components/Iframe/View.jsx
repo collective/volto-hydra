@@ -741,6 +741,8 @@ const Iframe = (props) => {
         .filter(Boolean);
       log('hydra-copy-blocks:', action, blocksData.length, 'blocks');
       dispatch(setBlocksClipboard({ [action]: blocksData }));
+      // Clear multi-select outlines and selection mode
+      setBlockUI(prev => prev ? { ...prev, multiSelectedUids: undefined, multiSelectRects: undefined } : prev);
       handleExitSelectionMode();
     };
 

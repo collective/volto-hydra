@@ -1079,6 +1079,9 @@ test.describe('Multi-Block Selection', () => {
     // Copy via left toolbar button
     await copyButton.click();
 
+    // Multi-select outlines should clear after copy
+    await expect(page.locator('.volto-hydra-block-outline')).toHaveCount(1, { timeout: 5000 });
+
     // Click block-3 to set paste target
     await helper.clickBlockInIframe('block-3-uuid');
     await helper.waitForBlockSelected('block-3-uuid');
