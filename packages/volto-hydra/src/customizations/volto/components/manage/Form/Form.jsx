@@ -26,7 +26,6 @@ import {
   map,
   mapValues,
   pickBy,
-  without,
   cloneDeep,
   xor,
 } from 'lodash';
@@ -474,57 +473,14 @@ class Form extends Component {
    * @param {string} isMultipleSelection true if multiple blocks are selected
    * @returns {undefined}
    */
-  onSelectBlock(id, isMultipleSelection, event) {
-    let multiSelected = [];
-    let selected = id;
-    const formData = this.state.formData;
-
-    if (isMultipleSelection) {
-      selected = null;
-      const blocksLayoutFieldname = getBlocksLayoutFieldname(formData);
-
-      const blocks_layout = formData[blocksLayoutFieldname].items;
-
-      if (event.shiftKey) {
-        const anchor =
-          this.props.uiState.multiSelected.length > 0
-            ? blocks_layout.indexOf(this.props.uiState.multiSelected[0])
-            : blocks_layout.indexOf(this.props.uiState.selected);
-        const focus = blocks_layout.indexOf(id);
-
-        if (anchor === focus) {
-          multiSelected = [id];
-        } else if (focus > anchor) {
-          multiSelected = [...blocks_layout.slice(anchor, focus + 1)];
-        } else {
-          multiSelected = [...blocks_layout.slice(focus, anchor + 1)];
-        }
-        window.getSelection().empty();
-      }
-
-      if ((event.ctrlKey || event.metaKey) && !event.shiftKey) {
-        multiSelected = this.props.uiState.multiSelected || [];
-        if (!this.props.uiState.multiSelected.includes(this.state.selected)) {
-          multiSelected = [...multiSelected, this.props.uiState.selected];
-          selected = null;
-        }
-        if (this.props.uiState.multiSelected.includes(id)) {
-          selected = null;
-          multiSelected = without(multiSelected, id);
-        } else {
-          multiSelected = [...multiSelected, id];
-        }
-      }
-    }
-
+  onSelectBlock(id) {
     this.props.setUIState({
-      selected,
-      multiSelected,
+      selected: id,
+      multiSelected: [],
       gridSelected: null,
     });
 
     if (this.props.onSelectForm) {
-      if (event) event.nativeEvent.stopImmediatePropagation();
       this.props.onSelectForm();
     }
   }
