@@ -961,6 +961,77 @@ test.describe('Multi-Block Selection', () => {
     await expect(page.locator('.volto-hydra-block-outline')).not.toBeVisible({ timeout: 3000 });
   });
 
+  test('Ctrl+Click in sidebar block list multi-selects and highlights blocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Navigate into col-1 to see its children
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.escapeToParent();
+    await helper.waitForBlockSelected('col-1');
+
+    const blockList = page.locator('.child-blocks-widget');
+    await expect(blockList).toBeVisible({ timeout: 5000 });
+
+    // Ctrl+Click first item (text-1a)
+    await blockList.locator('.child-block-item').first().click({ modifiers: ['ControlOrMeta'] });
+    // Ctrl+Click second item (text-1b)
+    await blockList.locator('.child-block-item').last().click({ modifiers: ['ControlOrMeta'] });
+
+    // Both items should be highlighted in the block list
+    await expect(blockList.locator('.child-block-item.selected'))
+      .toHaveCount(2, { timeout: 5000 });
+
+    // Summary bar should show count
+    await expect(blockList.locator('.multi-select-bar'))
+      .toContainText('2 selected', { timeout: 3000 });
+
+    // Block list should remain visible (not replaced by summary)
+    await expect(blockList).toBeVisible();
+  });
+
+  test('Shift+Click in sidebar block list selects range and highlights', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Select block-1 to open sidebar, click back to page level
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    const backArrow = page.locator('.sidebar-section-header .nav-back');
+    await expect(backArrow).toBeVisible({ timeout: 5000 });
+    await backArrow.click();
+
+    const blockList = page.locator('.child-blocks-widget');
+    await expect(blockList).toBeVisible({ timeout: 5000 });
+
+    // Click first Text block to select as anchor
+    const textItem = blockList.locator('.child-block-item', { hasText: 'Text' }).first();
+    await textItem.click();
+    await helper.waitForBlockSelected('block-1-uuid');
+
+    // Navigate back to page level again
+    const backArrow2 = page.locator('.sidebar-section-header .nav-back');
+    await expect(backArrow2).toBeVisible({ timeout: 5000 });
+    await backArrow2.click();
+    await expect(blockList).toBeVisible({ timeout: 5000 });
+
+    // Shift+Click on the third item to select range (items 0, 1, 2)
+    const thirdItem = blockList.locator('.child-block-item').nth(2);
+    await expect(thirdItem).toBeVisible({ timeout: 3000 });
+    await thirdItem.click({ modifiers: ['Shift'] });
+
+    // 3 items should be highlighted
+    await expect(blockList.locator('.child-block-item.selected'))
+      .toHaveCount(3, { timeout: 5000 });
+
+    // Summary bar at bottom
+    await expect(blockList.locator('.multi-select-bar'))
+      .toContainText('3 selected', { timeout: 3000 });
+  });
+
   test('Delete via left toolbar removes blocks from different containers', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -1833,5 +1904,170 @@ test.describe('Multi-Block Selection', () => {
         expect(Math.abs(blockBox!.height - outlineBox!.height)).toBeLessThan(10);
       }
     }).toPass({ timeout: 5000 });
+  });
+
+  // --- Unified Selection Mode tests (plan tasks 1-5) ---
+
+  // Task 1: Iframe checkboxes on ALL visible blocks
+  test('Selection mode shows checkboxes on blocks outside current container', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Click text-1a (inside col-1), enter selection mode via long press
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.longPressBlock('text-1a');
+
+    // Checkbox should appear on text-after (page-level, different container)
+    const textAfterCheckbox = page.locator('.volto-hydra-selection-checkbox[data-block-uid="text-after"]');
+    await expect(textAfterCheckbox).toBeVisible({ timeout: 5000 });
+
+    // Checkbox should also appear on text-2a (inside col-2, different container)
+    const text2aCheckbox = page.locator('.volto-hydra-selection-checkbox[data-block-uid="text-2a"]');
+    await expect(text2aCheckbox).toBeVisible({ timeout: 5000 });
+  });
+
+  // Task 2: ChildBlocksWidget highlighting and summary bar
+  test('Multi-selected blocks are highlighted in sidebar ChildBlocksWidget', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Select text-1a, escape to col-1 level
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.escapeToParent();
+    await helper.waitForBlockSelected('col-1');
+
+    // ChildBlocksWidget visible with col-1's children
+    const blockList = page.locator('.child-blocks-widget');
+    await expect(blockList).toBeVisible({ timeout: 5000 });
+
+    // Ctrl+Click first item
+    await blockList.locator('.child-block-item').first().click({ modifiers: ['ControlOrMeta'] });
+    // Ctrl+Click second item
+    await blockList.locator('.child-block-item').last().click({ modifiers: ['ControlOrMeta'] });
+
+    // Items should be highlighted with selected class
+    await expect(blockList.locator('.child-block-item.selected'))
+      .toHaveCount(2, { timeout: 5000 });
+
+    // Summary bar at bottom should show count
+    await expect(blockList.locator('.multi-select-bar'))
+      .toContainText('2 selected', { timeout: 3000 });
+  });
+
+  // Task 3: Sidebar enters selection mode (syncs with iframe)
+  test('Ctrl+Click in sidebar also shows checkboxes in iframe', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Navigate to col-1 children in sidebar
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.escapeToParent();
+    await helper.waitForBlockSelected('col-1');
+
+    // Ctrl+Click items in sidebar
+    const blockList = page.locator('.child-blocks-widget');
+    await blockList.locator('.child-block-item').first().click({ modifiers: ['ControlOrMeta'] });
+    await blockList.locator('.child-block-item').last().click({ modifiers: ['ControlOrMeta'] });
+
+    // Iframe should show checkboxes too
+    await expect(page.locator('.volto-hydra-selection-checkbox').first())
+      .toBeVisible({ timeout: 5000 });
+
+    // Exit button should be on left toolbar
+    await expect(page.locator('[data-testid="exit-selection-mode"]'))
+      .toBeVisible({ timeout: 3000 });
+  });
+
+  // Task 4: Sibling multi-select keeps block list, cross-container shows filtered view
+  test('Sibling multi-select keeps ChildBlocksWidget visible', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Shift+Arrow to multi-select text-1a + text-1b (siblings in col-1)
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.escapeFromEditing();
+    await page.keyboard.press('Shift+ArrowDown');
+
+    // ChildBlocksWidget should be visible (not replaced by summary)
+    await expect(page.locator('.child-blocks-widget')).toBeVisible({ timeout: 5000 });
+
+    // multi-select-summary should NOT appear for siblings
+    await expect(page.locator('[data-testid="multi-select-summary"]'))
+      .not.toBeVisible({ timeout: 2000 });
+  });
+
+  test('Cross-container multi-select shows filtered path view', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Select text-1a (col-1), Ctrl+Click text-2a (col-2)
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.escapeFromEditing();
+    await iframe.locator('[data-block-uid="text-2a"]').click({ modifiers: ['ControlOrMeta'] });
+
+    // ChildBlocksWidget should show filtered view with paths
+    const blockList = page.locator('.child-blocks-widget');
+    await expect(blockList).toBeVisible({ timeout: 5000 });
+
+    // Should show selected blocks with path context
+    await expect(blockList.locator('.selected-block-path')).toHaveCount(2, { timeout: 5000 });
+    await expect(blockList.locator('.multi-select-bar')).toContainText('2 selected');
+  });
+
+  test('Page-level cross-container multi-select shows full paths', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Select text-1a (in col-1), Ctrl+Click text-after (page-level)
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.escapeFromEditing();
+    await iframe.locator('[data-block-uid="text-after"]').click({ modifiers: ['ControlOrMeta'] });
+
+    // Common ancestor is PAGE — filtered view with full paths
+    const blockList = page.locator('.child-blocks-widget');
+    await expect(blockList).toBeVisible({ timeout: 5000 });
+    await expect(blockList.locator('.selected-block-path')).toHaveCount(2, { timeout: 5000 });
+    await expect(blockList.locator('.multi-select-bar')).toContainText('2 selected');
+  });
+
+  // Task 5: Selection mode navigation in sidebar
+  test('Sidebar navigation works during selection mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Enter selection mode via iframe long press
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.longPressBlock('text-1a');
+
+    // Navigate back to col-1 via sidebar back arrow
+    const backArrow = page.locator('.sidebar-section-header .nav-back');
+    await expect(backArrow).toBeVisible({ timeout: 5000 });
+    await backArrow.click();
+
+    // Should see col-1's children in sidebar, still in selection mode
+    const blockList = page.locator('.child-blocks-widget');
+    await expect(blockList).toBeVisible({ timeout: 5000 });
+
+    // Checkboxes should still be in iframe
+    await expect(page.locator('.volto-hydra-selection-checkbox').first())
+      .toBeVisible({ timeout: 3000 });
   });
 });
