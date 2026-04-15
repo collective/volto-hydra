@@ -219,6 +219,116 @@ export async function checkEditAnnotations(
   }
 }
 
+/**
+ * Detect slate-shaped field values in block data: non-empty arrays of
+ * objects where the first item has a `children` array (slate node shape).
+ */
+function findSlateFields(
+  blockData: Record<string, unknown>,
+): string[] {
+  const fields: string[] = [];
+  for (const [key, value] of Object.entries(blockData)) {
+    if (key.startsWith('@') || key === 'blocks' || key === 'blocks_layout') continue;
+    if (!Array.isArray(value) || value.length === 0) continue;
+    const first = value[0] as Record<string, unknown> | undefined;
+    if (first && typeof first === 'object' && Array.isArray(first.children)) {
+      fields.push(key);
+    }
+  }
+  return fields;
+}
+
+/**
+ * Compare two slate trees for structural equality (types + text), ignoring
+ * nodeId metadata and inline mark ordering. Used to verify that the DOM
+ * round-trips back to the same Slate value via readSlateValueFromDOM.
+ */
+function slateEqualIgnoringIds(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((item, i) => slateEqualIgnoringIds(item, b[i]));
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    const ao = a as Record<string, unknown>;
+    const bo = b as Record<string, unknown>;
+    const SKIP = new Set(['nodeId', 'data-node-id']);
+    const keys = new Set([...Object.keys(ao), ...Object.keys(bo)].filter(k => !SKIP.has(k)));
+    for (const k of keys) {
+      if (!slateEqualIgnoringIds(ao[k], bo[k])) return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Schema-driven (with shape-based fallback) slate annotation check.
+ *
+ * For every slate field — either declared as `widget: 'slate'` in the block
+ * schema or detected by value shape (array of `{children: [...]}`) — round-trip
+ * the rendered DOM back to a Slate value using Bridge.readSlateValueFromDOM
+ * and compare against blockData[field]. A mismatch means the renderer
+ * isn't emitting the data-node-id attributes the bridge needs to anchor
+ * text nodes, so cursor sync will fail during editing.
+ *
+ * This is strictly stronger than counting [data-node-id] descendants —
+ * it fails when any slate node is missing an id, not just when all are.
+ */
+export async function checkSlateAnnotations(
+  block: Locator,
+  blockData: Record<string, unknown> | undefined,
+  blockSchema?: { properties?: Record<string, any> },
+): Promise<void> {
+  if (!blockData) return;
+
+  let slateFields: string[];
+  if (blockSchema?.properties) {
+    slateFields = Object.entries(blockSchema.properties)
+      .filter(([, prop]) => (prop as Record<string, unknown>)?.widget === 'slate')
+      .map(([field]) => field)
+      .filter((field) => {
+        const v = blockData[field];
+        return Array.isArray(v) && v.length > 0;
+      });
+  } else {
+    slateFields = findSlateFields(blockData);
+  }
+
+  for (const field of slateFields) {
+    const container = block.locator(`[data-edit-text="${field}"]`).first();
+    await expect(
+      container,
+      `Slate field "${field}" should have a [data-edit-text="${field}"] container`,
+    ).toBeAttached();
+
+    // Round-trip via the bridge's own DOM→Slate reader. Returns [] (or partial)
+    // if the renderer didn't emit data-node-id on slate elements.
+    // The bridge is set up asynchronously by initBridge() in the frontend's
+    // onMounted, so wait for __hydraBridge to appear before calling it.
+    const existing = blockData[field];
+    const domValue = await container.evaluate(async (el, existingValue) => {
+      for (let i = 0; i < 50; i++) {
+        if ((window as any).__hydraBridge?.readSlateValueFromDOM) break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      const bridge = (window as any).__hydraBridge;
+      if (!bridge?.readSlateValueFromDOM) return { error: 'bridge not available on window.__hydraBridge after 5s' };
+      try {
+        return { value: bridge.readSlateValueFromDOM(el, existingValue) };
+      } catch (e: any) {
+        return { error: `readSlateValueFromDOM threw: ${e?.message || String(e)}` };
+      }
+    }, existing);
+
+    expect(domValue, `Slate field "${field}" DOM round-trip`).not.toHaveProperty('error');
+    expect(
+      slateEqualIgnoringIds((domValue as any).value, existing),
+      `Slate field "${field}" DOM does not round-trip to the same Slate value — renderer is likely missing data-node-id on some nodes. Got: ${JSON.stringify((domValue as any).value)} Expected (ignoring ids): ${JSON.stringify(existing)}`,
+    ).toBe(true);
+  }
+}
+
 export interface VerifyBlockRenderingOptions {
   expectedText?: string | null;
   isListing?: boolean;
@@ -271,6 +381,11 @@ export async function verifyBlockRendering(
   // Verify edit annotations
   await checkEditAnnotations(block, blockData);
 
+  // Schema-driven slate check (no-op if schema or data not supplied)
+  const blockType = blockData?.['@type'] as string | undefined;
+  const blockSchema = blockType ? blocksConfig?.[blockType]?.blockSchema : undefined;
+  await checkSlateAnnotations(block, blockData, blockSchema);
+
   // Verify sub-blocks (before clicking, which may toggle interactive
   // containers like accordions closed).
   if (checkSubBlocks && blockData) {
@@ -282,6 +397,9 @@ export async function verifyBlockRendering(
       if (await loc.isVisible()) {
         anyVisible = true;
         await checkEditAnnotations(loc, data);
+        const subType = data?.['@type'] as string | undefined;
+        const subSchema = subType ? blocksConfig?.[subType]?.blockSchema : undefined;
+        await checkSlateAnnotations(loc, data, subSchema);
       }
     }
     if (subBlocks.length > 0) {

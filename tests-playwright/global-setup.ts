@@ -34,10 +34,13 @@ async function globalSetup() {
 
   // In production mode (USE_PREBUILT), check SSR server directly
   // In dev mode, check webpack-dev-server health endpoint
+  // Consumers running Volto on non-default ports (e.g. parallel test stacks)
+  // can override with VOLTO_HEALTH_URL.
   const usePrebuilt = process.env.USE_PREBUILT === 'true';
-  const healthUrl = usePrebuilt
+  const defaultHealthUrl = usePrebuilt
     ? 'http://localhost:3001'
     : 'http://localhost:3002/health';
+  const healthUrl = process.env.VOLTO_HEALTH_URL || defaultHealthUrl;
   const serverType = usePrebuilt ? 'production server' : 'webpack compilation';
 
   console.log(`[SETUP] Checking Volto ${serverType} status...`);
