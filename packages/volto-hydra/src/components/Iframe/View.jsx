@@ -3949,7 +3949,7 @@ const Iframe = (props) => {
         );
       })()}
 
-      {/* Touch selection mode — checkbox overlays on each sibling block */}
+      {/* Touch selection mode — checkbox overlays on all visible blocks */}
       {selectionMode && blockUI?.selectionModeRects && referenceElement && (() => {
         const iframeRect = referenceElement.getBoundingClientRect();
         return Object.entries(blockUI.selectionModeRects).map(([uid, rect]) => {

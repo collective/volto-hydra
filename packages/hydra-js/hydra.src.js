@@ -2218,13 +2218,21 @@ export class Bridge {
    * @param {string} blockUid - The long-pressed block (initially checked)
    */
   _enterSelectionMode(blockUid) {
-    // Get all sibling blocks (same parent) with their rects
-    const pathInfo = this.blockPathMap?.[blockUid];
-    const parentId = pathInfo?.parentId || null;
-    const siblings = this._getSiblingsByDomOrder(blockUid, parentId);
+    // Get ALL blocks in the document, not just siblings, so checkboxes
+    // appear on every visible block regardless of container hierarchy.
+    const blockElements = document.querySelectorAll('[data-block-uid]');
+    const seen = new Set();
+    const allVisibleUids = [];
+    for (const el of blockElements) {
+      const uid = el.getAttribute('data-block-uid');
+      if (uid && !seen.has(uid)) {
+        seen.add(uid);
+        allVisibleUids.push(uid);
+      }
+    }
 
     const allBlockRects = {};
-    for (const uid of siblings) {
+    for (const uid of allVisibleUids) {
       const el = this.queryBlockElement(uid);
       if (el) {
         const r = el.getBoundingClientRect();
@@ -2233,7 +2241,7 @@ export class Bridge {
     }
 
     // Store UIDs so scroll handler can re-send updated rects
-    this._selectionModeBlockUids = siblings;
+    this._selectionModeBlockUids = allVisibleUids;
 
     this.sendMessageToParent({
       type: 'ENTER_SELECTION_MODE',
