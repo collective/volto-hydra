@@ -5,7 +5,7 @@
  * Port 8888: Mock Plone API (REST endpoints, content from disk)
  * Port 8889: Test frontend (mock-parent.html, renderer.js, hydra.js)
  *
- * Run directly: node mock-api-server.js
+ * Run directly: node mock-api-server.cjs
  * Or started automatically by Playwright config webServer
  */
 
