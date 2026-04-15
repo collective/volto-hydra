@@ -15,8 +15,11 @@ async function globalSetup() {
   // causes early return but discovery still needs to run for bridge tests)
   const discoverApi = process.env.DISCOVER_BLOCKS_API;
   if (discoverApi) {
-    const maxPages = parseInt(process.env.DISCOVER_MAX_PAGES || '50', 10);
-    console.log(`[SETUP] Discovering blocks from ${discoverApi} (max ${maxPages} pages)...`);
+    const maxPages = process.env.DISCOVER_MAX_PAGES
+      ? parseInt(process.env.DISCOVER_MAX_PAGES, 10)
+      : Infinity;
+    const maxLabel = Number.isFinite(maxPages) ? `max ${maxPages} pages` : 'all pages';
+    console.log(`[SETUP] Discovering blocks from ${discoverApi} (${maxLabel})...`);
     const blocks = await discoverBlocks(discoverApi, maxPages);
     const outPath = path.resolve(__dirname, '../.discovered-blocks.json');
     fs.writeFileSync(outPath, JSON.stringify(blocks, null, 2));

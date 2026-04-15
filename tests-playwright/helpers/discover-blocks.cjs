@@ -160,8 +160,83 @@ function richnessScore(blockData) {
  * @param {Object} [blocksConfig={}] - Block schemas for object_list discovery
  * @returns {Promise<DiscoveredBlock[]>} One entry per unique (blockType, variation)
  */
-async function discoverBlocks(apiUrl, maxPages = 50, blocksConfig = {}) {
+/**
+ * Walk a slate subtree and collect structural issues:
+ *  - Element nodes (have `children`) must have a string `type`.
+ *  - Text leaves (have `text`) must not also have `children` or `type`.
+ *  - Leaf-only nodes at root level (text without element wrapper) are invalid.
+ */
+function validateSlateNode(node, pathStr, issues) {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) {
+    issues.push(`${pathStr}: non-object slate node (${typeof node})`);
+    return;
+  }
+  const hasChildren = Array.isArray(node.children);
+  const hasText = Object.prototype.hasOwnProperty.call(node, 'text');
+  const hasType = typeof node.type === 'string' && node.type.length > 0;
+
+  if (hasChildren) {
+    if (!hasType) issues.push(`${pathStr}: element has children but no \`type\``);
+    for (let i = 0; i < node.children.length; i++) {
+      validateSlateNode(node.children[i], `${pathStr}.children[${i}]`, issues);
+    }
+  } else if (hasText) {
+    if (hasType) issues.push(`${pathStr}: text leaf must not have \`type\``);
+    // Newlines inside a text leaf mean under-structured content — multi-
+    // paragraph or bulleted content stuffed into one text node instead of
+    // proper slate elements. Breaks inline editing boundaries.
+    if (typeof node.text === 'string' && node.text.includes('\n')) {
+      const preview = node.text.replace(/\n/g, '\\n').slice(0, 80);
+      issues.push(`${pathStr}: text leaf contains newline(s) — split into separate slate elements ("${preview}${node.text.length > 80 ? '…' : ''}")`);
+    }
+  } else {
+    issues.push(`${pathStr}: node has neither \`children\` nor \`text\``);
+  }
+}
+
+/**
+ * Walk a block's data for slate-shaped fields (arrays whose first item looks
+ * like a slate node) and record all structural issues:
+ *  - Multi-root values force renderers to add a nodeId-less wrapper.
+ *  - Missing `type` on root element.
+ *  - Invalid node shapes anywhere in the tree.
+ *
+ * Schema-independent; runs against raw API data.
+ */
+function collectSlateIssues(blockData, pagePath, blockId, out) {
+  if (!blockData || typeof blockData !== 'object') return;
+  for (const [key, value] of Object.entries(blockData)) {
+    if (key.startsWith('@') || key === 'blocks' || key === 'blocks_layout') continue;
+    if (!Array.isArray(value) || value.length === 0) continue;
+    const first = value[0];
+    const looksSlate =
+      first && typeof first === 'object' &&
+      (Array.isArray(first.children) || Object.prototype.hasOwnProperty.call(first, 'text'));
+    if (!looksSlate) continue;
+
+    const issues = [];
+    if (value.length > 1) {
+      issues.push(`multiple top-level nodes (${value.length}); split into separate blocks`);
+    }
+    for (let i = 0; i < value.length; i++) {
+      validateSlateNode(value[i], `value[${i}]`, issues);
+    }
+    // A slate field's roots must be elements, not text leaves.
+    for (let i = 0; i < value.length; i++) {
+      const n = value[i];
+      if (n && typeof n === 'object' && Object.prototype.hasOwnProperty.call(n, 'text') && !Array.isArray(n.children)) {
+        issues.push(`value[${i}]: text leaf at root (must be wrapped in an element)`);
+      }
+    }
+    if (issues.length) {
+      out.push({ pagePath, blockId, field: key, issues });
+    }
+  }
+}
+
+async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}) {
   const seen = new Map();
+  const slateIssues = [];
   const objectListFields = buildObjectListFieldsMap(blocksConfig);
 
   if (objectListFields.size > 0) {
@@ -213,6 +288,8 @@ async function discoverBlocks(apiUrl, maxPages = 50, blocksConfig = {}) {
       const blocks = extractBlocks(content.blocks, content.blocks_layout.items, objectListFields);
 
       for (const { blockId, blockType, blockData } of blocks) {
+        collectSlateIssues(blockData, pagePath, blockId, slateIssues);
+
         // Skip metadata block types that don't render visually
         if (blockType === 'title' || blockType === 'description') continue;
 
@@ -247,6 +324,20 @@ async function discoverBlocks(apiUrl, maxPages = 50, blocksConfig = {}) {
 
   const result = Array.from(seen.values()).map(({ _score, ...rest }) => rest);
   console.log(`[DISCOVER] Discovered ${result.length} unique (blockType, variation) pairs from ${fetched} pages`);
+
+  if (slateIssues.length) {
+    const lines = slateIssues.flatMap((e) => [
+      `  ${e.pagePath} [${e.blockId}] field "${e.field}":`,
+      ...e.issues.map((msg) => `    - ${msg}`),
+    ]);
+    throw new Error(
+      `Discovery found ${slateIssues.length} slate field(s) with structural issues. ` +
+        `Each slate field must be a single element root with a string \`type\`; ` +
+        `text leaves must live inside an element.\n` +
+        lines.join('\n'),
+    );
+  }
+
   return result;
 }
 
