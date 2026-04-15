@@ -5,7 +5,7 @@ import { Page, Locator, FrameLocator, expect, ElementHandle } from '@playwright/
 import { TEST_DATA_PREFIX } from './test-paths';
 
 // Hardcoded test JWT — mock API only checks for "Bearer " prefix, never validates.
-// sub=admin, exp=4102444800 (2100-01-01). Shared with mock-api-server.js.
+// sub=admin, exp=4102444800 (2100-01-01). Shared with mock-api-server.cjs.
 export const TEST_AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6NDEwMjQ0NDgwMH0.fake-signature';
 
 export class AdminUIHelper {

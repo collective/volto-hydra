@@ -1,6 +1,6 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { app } = require('./mock-api-server');
+const { app } = require('./mock-api-server.cjs');
 
 let server;
 let baseUrl;

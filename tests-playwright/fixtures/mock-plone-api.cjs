@@ -3,7 +3,7 @@
  * Implements minimal Plone REST API endpoints for content editing.
  * Serves content from disk (JSON files in content directories).
  *
- * Run standalone: node mock-plone-api.js
+ * Run standalone: node mock-plone-api.cjs
  * Or import the express app: const { app } = require('./mock-plone-api');
  */
 

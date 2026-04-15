@@ -5,7 +5,7 @@
  * Port 8888: Mock Plone API (REST endpoints, content from disk)
  * Port 8889: Test frontend (mock-parent.html, renderer.js, hydra.js)
  *
- * Run directly: node mock-api-server.js
+ * Run directly: node mock-api-server.cjs
  * Or started automatically by Playwright config webServer
  */
 
@@ -13,7 +13,7 @@ const path = require('path');
 const express = require('express');
 
 // Start the mock Plone API (imports and initializes on require)
-const { app: apiApp, contentDirMap } = require('./mock-plone-api');
+const { app: apiApp, contentDirMap } = require('./mock-plone-api.cjs');
 
 const API_PORT = process.env.PORT || 8888;
 const FRONTEND_PORT = process.env.FRONTEND_PORT || 8889;

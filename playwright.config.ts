@@ -292,7 +292,7 @@ export default defineConfig({
       // API on port 8888, test frontend on port 8889
       // Uses --watch for auto-reload on code changes during development
       name: 'Mock API + Frontend',
-      command: `node --watch --watch-path=tests-playwright/fixtures --watch-path=packages/hydra-js ${path.join(__dirname, 'tests-playwright/fixtures/mock-api-server.js')}`,
+      command: `node --watch --watch-path=tests-playwright/fixtures --watch-path=packages/hydra-js ${path.join(__dirname, 'tests-playwright/fixtures/mock-api-server.cjs')}`,
       url: 'http://localhost:8889/mock-parent.html',
       timeout: 50 * 1000,
       reuseExistingServer: true,
