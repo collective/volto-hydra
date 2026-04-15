@@ -4,7 +4,11 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-const { discoverBlocks } = require('./helpers/discover-blocks');
+import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+const { discoverBlocks } = require('./helpers/discover-blocks.cjs');
 
 async function globalSetup() {
   // Run block discovery if configured (before health checks — SKIP_VOLTO_CHECK

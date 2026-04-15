@@ -13,7 +13,7 @@ const path = require('path');
 const express = require('express');
 
 // Start the mock Plone API (imports and initializes on require)
-const { app: apiApp, contentDirMap } = require('./mock-plone-api');
+const { app: apiApp, contentDirMap } = require('./mock-plone-api.cjs');
 
 const API_PORT = process.env.PORT || 8888;
 const FRONTEND_PORT = process.env.FRONTEND_PORT || 8889;
