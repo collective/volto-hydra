@@ -94,7 +94,7 @@ jobs:
         run: pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
-          node tests-playwright/fixtures/mock-api-server.js &
+          node tests-playwright/fixtures/mock-api-server.cjs &
           cd docs/blocks/test-react && npx vite --port 3004 --strictPort &
           cd docs/blocks/test-svelte && npx vite --port 3005 --strictPort &
           cd docs/blocks/test-vue && npx vite --port 3006 --strictPort &
@@ -185,7 +185,7 @@ jobs:
         run: pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
-          node tests-playwright/fixtures/mock-api-server.js &
+          node tests-playwright/fixtures/mock-api-server.cjs &
           PORT=3001 RAZZLE_API_PATH=http://localhost:8888 \
             RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8889,http://localhost:3003 \
             VOLTOCONFIG=${{ github.workspace }}/volto.config.js \
@@ -269,7 +269,7 @@ jobs:
         run: pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
-          node tests-playwright/fixtures/mock-api-server.js &
+          node tests-playwright/fixtures/mock-api-server.cjs &
           cd examples/nuxt-blog-starter && pnpm run preview:test &
           sleep 3
       - name: Wait for servers
@@ -349,7 +349,7 @@ jobs:
         run: pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
-          node tests-playwright/fixtures/mock-api-server.js &
+          node tests-playwright/fixtures/mock-api-server.cjs &
           PORT=3001 RAZZLE_API_PATH=http://localhost:8888 \
             RAZZLE_DEFAULT_IFRAME_URL=http://localhost:8889,http://localhost:3003 \
             VOLTOCONFIG=${{ github.workspace }}/volto.config.js \
@@ -429,7 +429,7 @@ jobs:
         run: pnpm exec playwright install-deps chromium firefox
       - name: Start servers
         run: |
-          node tests-playwright/fixtures/mock-api-server.js &
+          node tests-playwright/fixtures/mock-api-server.cjs &
           cd examples/hydra-nextjs && pnpm run start:test &
           cd examples/hydra-vue-f7 && cp ../../packages/hydra-js/hydra.js ./src/js/hydra.js && \
             VITE_API_BASE_URL=http://localhost:8888 npx vite --port 3008 --strictPort --config vite.config.test.js &

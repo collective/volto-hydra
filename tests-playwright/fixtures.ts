@@ -14,6 +14,8 @@
  */
 
 import { test as playwrightTest, expect } from '@playwright/test';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 
 // Only use coverage test fixture when COVERAGE is enabled (CI)
 // This prevents ~90MB of V8 coverage data per test locally
