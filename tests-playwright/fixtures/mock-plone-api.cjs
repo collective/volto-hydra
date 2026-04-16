@@ -440,6 +440,7 @@ function getNavigationItems(basePath = '/', depth = 1) {
     })
     .map((itemPath) => {
       const rawContent = loadRawContentFromDisk(itemPath);
+      if (!rawContent) return null;
       if (rawContent.exclude_from_nav) return null;
       if (rawContent['@type'] === 'Image' || rawContent['@type'] === 'File') return null;
       return formatNavItem(rawContent, itemPath, baseUrl);
@@ -1742,7 +1743,10 @@ app.get('*/@search', (req, res) => {
       }
     }
   } else {
-    // No depth filter - return all content items from disk
+    // No depth filter - return all content items from disk.
+    // Rescan so newly-added fixture directories surface without a server
+    // restart — same "rescan on miss" pattern as resolveUidUrls() above.
+    initContentDirMap();
     items = Object.keys(contentDirMap)
       .filter((itemPath) => itemPath !== '/')
       .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl));

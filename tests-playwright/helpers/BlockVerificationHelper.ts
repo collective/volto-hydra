@@ -195,11 +195,13 @@ export async function checkEditAnnotations(
   );
   expect(brokenImages, 'All images should have valid src and load successfully').toEqual([]);
 
-  // Simple string fields in block data must appear with data-edit-text
+  // Any string field in block data whose value the renderer displays must
+  // sit inside [data-edit-text] so the editor can target it. Data-driven
+  // (no hardcoded field names): iterate every string-valued field, skip
+  // @-prefixed metadata, skip values not present in the rendered DOM.
   if (blockData) {
-    const TEXT_FIELDS = ['title', 'heading', 'description', 'head_title', 'label'];
-    for (const field of TEXT_FIELDS) {
-      const value = blockData[field];
+    for (const [field, value] of Object.entries(blockData)) {
+      if (field.startsWith('@')) continue;
       if (typeof value !== 'string' || !value) continue;
       const hasEditText = await block.evaluate(
         (el, v) => {
@@ -282,17 +284,38 @@ export async function checkSlateAnnotations(
 ): Promise<void> {
   if (!blockData) return;
 
+  // Prefer the live schema from the bridge (built from the blockPathMap's
+  // _schemas, already resolved via schemaEnhancers) when a caller didn't
+  // pass one explicitly. This avoids persisting blocksConfig to disk just
+  // to drive annotation checks in the spec.
+  if (!blockSchema?.properties) {
+    const blockUid = await block.getAttribute('data-block-uid');
+    if (blockUid) {
+      const bridgeSchema = await block.evaluate(
+        (_el, uid) => (window as any).__hydraBridge?.getBlockSchema?.(uid) || null,
+        blockUid,
+      );
+      if (bridgeSchema?.properties) blockSchema = bridgeSchema;
+    }
+  }
+
+  // Every schema-declared slate field needs a [data-edit-text="<field>"]
+  // container in the rendered DOM — even when the field's value is null or
+  // empty (the placeholder is where the editor will insert new content).
+  // Without a schema, fall back to detecting slate shapes in populated data.
   let slateFields: string[];
+  let slateHasValue: (field: string) => boolean;
   if (blockSchema?.properties) {
     slateFields = Object.entries(blockSchema.properties)
       .filter(([, prop]) => (prop as Record<string, unknown>)?.widget === 'slate')
-      .map(([field]) => field)
-      .filter((field) => {
-        const v = blockData[field];
-        return Array.isArray(v) && v.length > 0;
-      });
+      .map(([field]) => field);
+    slateHasValue = (field) => {
+      const v = blockData[field];
+      return Array.isArray(v) && v.length > 0;
+    };
   } else {
     slateFields = findSlateFields(blockData);
+    slateHasValue = () => true;
   }
 
   for (const field of slateFields) {
@@ -318,6 +341,11 @@ export async function checkSlateAnnotations(
           `  block outerHTML (truncated): ${context.outer}`,
       );
     }
+
+    // Empty/null slate fields still need the edit-text container (checked
+    // above) but nothing to round-trip — the renderer has no source value
+    // to mirror into the DOM.
+    if (!slateHasValue(field)) continue;
 
     // Round-trip via the bridge's own DOM→Slate reader. The bridge already
     // walked its formData with addNodeIds — use bridge.getBlockData(uid)[field]

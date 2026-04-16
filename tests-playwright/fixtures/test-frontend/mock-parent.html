@@ -124,6 +124,12 @@
     // when it receives FORM_DATA, so the mock parent (acting as admin) should
     // send plain Slate JSON without nodeIds, just like the real admin does.
 
+    // Track which block keys arrived via frontend INIT vs. live in this
+    // baseline. Sanity discovery uses this to ignore mock-parent's test
+    // fixtures (hero, slate, mock-*) when checking that every frontend-
+    // registered block type has a content example.
+    const frontendBlockKeys = new Set();
+
     // blocksConfig for schema-driven buildBlockPathMap (no Volto deps)
     const mockBlocksConfig = {
       _page: {
@@ -475,9 +481,15 @@
       switch (message.type) {
         case 'INIT': {
           // New INIT message format from hydra.js
-          // Merge frontend's blocksConfig (sent via bridge, just like View.jsx does)
+          // Merge frontend's blocksConfig (sent via bridge, just like View.jsx does).
+          // Track which keys came from the frontend so consumers (e.g. sanity
+          // discovery) can distinguish frontend-registered types from
+          // mock-parent's own test baseline (slate, hero, columns…).
           console.log('[MOCK_PARENT] Received INIT message:', message);
           if (message.blocks) {
+            for (const blockType of Object.keys(message.blocks)) {
+              frontendBlockKeys.add(blockType);
+            }
             for (const [blockType, blockDef] of Object.entries(message.blocks)) {
               if (!mockBlocksConfig[blockType]) {
                 mockBlocksConfig[blockType] = blockDef;
@@ -776,6 +788,7 @@
     window.mockParent = {
       getFormData: () => mockFormData,
       getBlocksConfig: () => mockBlocksConfig,
+      getFrontendBlockKeys: () => Array.from(frontendBlockKeys),
       getBlock: (blockId) => mockFormData.blocks[blockId],
       buildBlockPathMap: () => buildBlockPathMap(mockFormData, mockBlocksConfig),
       setTransformDelay: (delay) => { window.mockTransformDelay = delay; },
