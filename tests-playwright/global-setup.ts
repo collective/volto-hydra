@@ -15,8 +15,11 @@ async function globalSetup() {
   // causes early return but discovery still needs to run for bridge tests)
   const discoverApi = process.env.DISCOVER_BLOCKS_API;
   if (discoverApi) {
-    const maxPages = parseInt(process.env.DISCOVER_MAX_PAGES || '50', 10);
-    console.log(`[SETUP] Discovering blocks from ${discoverApi} (max ${maxPages} pages)...`);
+    const maxPages = process.env.DISCOVER_MAX_PAGES
+      ? parseInt(process.env.DISCOVER_MAX_PAGES, 10)
+      : Infinity;
+    const maxLabel = Number.isFinite(maxPages) ? `max ${maxPages} pages` : 'all pages';
+    console.log(`[SETUP] Discovering blocks from ${discoverApi} (${maxLabel})...`);
     const blocks = await discoverBlocks(discoverApi, maxPages);
     const outPath = path.resolve(__dirname, '../.discovered-blocks.json');
     fs.writeFileSync(outPath, JSON.stringify(blocks, null, 2));
@@ -34,10 +37,13 @@ async function globalSetup() {
 
   // In production mode (USE_PREBUILT), check SSR server directly
   // In dev mode, check webpack-dev-server health endpoint
+  // Consumers running Volto on non-default ports (e.g. parallel test stacks)
+  // can override with VOLTO_HEALTH_URL.
   const usePrebuilt = process.env.USE_PREBUILT === 'true';
-  const healthUrl = usePrebuilt
+  const defaultHealthUrl = usePrebuilt
     ? 'http://localhost:3001'
     : 'http://localhost:3002/health';
+  const healthUrl = process.env.VOLTO_HEALTH_URL || defaultHealthUrl;
   const serverType = usePrebuilt ? 'production server' : 'webpack compilation';
 
   console.log(`[SETUP] Checking Volto ${serverType} status...`);

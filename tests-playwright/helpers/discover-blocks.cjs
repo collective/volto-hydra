@@ -1,5 +1,5 @@
 /**
- * Crawls a Plone REST API to discover one example of each block @type.
+ * Crawls a Plone REST API to discover one example of each (block @type, variation) pair.
  *
  * Used by globalSetup to write .discovered-blocks.json, which the
  * block-sanity spec reads at module load time to parametrize tests.
@@ -7,7 +7,7 @@
  * Works against any Plone API (mock or real) — no filesystem access needed.
  * When blocksConfig (schemas) is provided, also discovers object_list sub-blocks.
  *
- * @typedef {{ blockType: string, blockId: string, pagePath: string, blockData: Object, isListing: boolean }} DiscoveredBlock
+ * @typedef {{ blockType: string, variation: string, blockId: string, pagePath: string, blockData: Object, isListing: boolean }} DiscoveredBlock
  */
 
 /**
@@ -96,15 +96,147 @@ function extractBlocks(blocks, layout, objectListFields) {
 }
 
 /**
- * Discover one example of each block type from a Plone API.
+ * Pick a variation key from block data. Covers the common select-widget
+ * field names hydra blocks use: `variation`, `template`, `variant`. Falls
+ * back to `'default'` so blocks without variations still get one entry.
+ */
+function variationOf(blockData) {
+  return (
+    blockData?.variation ||
+    blockData?.template ||
+    blockData?.variant ||
+    'default'
+  );
+}
+
+/**
+ * Score an example block by content richness, so when multiple pages
+ * contain the same (blockType, variation) we keep the most interesting
+ * example for testing. Heuristic:
+ *  - +1 per non-empty field
+ *  - +number of unique slate node types across slate values (heading, list,
+ *    link, bold, etc. — exercises more renderer paths)
+ *
+ * Handles circular-ish data defensively: a shallow walk is enough for slate.
+ */
+function collectSlateNodeTypes(node, types) {
+  if (!node || typeof node !== 'object') return;
+  if (Array.isArray(node)) {
+    for (const item of node) collectSlateNodeTypes(item, types);
+    return;
+  }
+  if (typeof node.type === 'string') types.add(node.type);
+  // Slate leaves carry inline marks as boolean keys
+  for (const key of ['bold', 'italic', 'underline', 'strikethrough', 'code']) {
+    if (node[key]) types.add(`leaf:${key}`);
+  }
+  if (Array.isArray(node.children)) {
+    for (const child of node.children) collectSlateNodeTypes(child, types);
+  }
+}
+
+function richnessScore(blockData) {
+  let score = 0;
+  const slateTypes = new Set();
+  for (const [key, value] of Object.entries(blockData || {})) {
+    if (key.startsWith('@') || key === 'blocks' || key === 'blocks_layout') continue;
+    if (value == null) continue;
+    if (typeof value === 'string' && value === '') continue;
+    if (Array.isArray(value) && value.length === 0) continue;
+    score += 1;
+    // Arrays of slate nodes or single slate-like trees
+    if (Array.isArray(value) && value.length && typeof value[0] === 'object' && value[0] && 'children' in value[0]) {
+      collectSlateNodeTypes(value, slateTypes);
+    }
+  }
+  return score + slateTypes.size;
+}
+
+/**
+ * Discover one example of each (block type, variation) pair from a Plone API.
  *
  * @param {string} apiUrl - Base URL of the Plone API (e.g. "http://localhost:8888")
  * @param {number} [maxPages=50] - Maximum number of pages to fetch
  * @param {Object} [blocksConfig={}] - Block schemas for object_list discovery
- * @returns {Promise<DiscoveredBlock[]>} One entry per unique block @type
+ * @returns {Promise<DiscoveredBlock[]>} One entry per unique (blockType, variation)
  */
-async function discoverBlocks(apiUrl, maxPages = 50, blocksConfig = {}) {
+/**
+ * Walk a slate subtree and collect structural issues:
+ *  - Element nodes (have `children`) must have a string `type`.
+ *  - Text leaves (have `text`) must not also have `children` or `type`.
+ *  - Leaf-only nodes at root level (text without element wrapper) are invalid.
+ */
+function validateSlateNode(node, pathStr, issues) {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) {
+    issues.push(`${pathStr}: non-object slate node (${typeof node})`);
+    return;
+  }
+  const hasChildren = Array.isArray(node.children);
+  const hasText = Object.prototype.hasOwnProperty.call(node, 'text');
+  const hasType = typeof node.type === 'string' && node.type.length > 0;
+
+  if (hasChildren) {
+    if (!hasType) issues.push(`${pathStr}: element has children but no \`type\``);
+    for (let i = 0; i < node.children.length; i++) {
+      validateSlateNode(node.children[i], `${pathStr}.children[${i}]`, issues);
+    }
+  } else if (hasText) {
+    if (hasType) issues.push(`${pathStr}: text leaf must not have \`type\``);
+    // Newlines inside a text leaf mean under-structured content — multi-
+    // paragraph or bulleted content stuffed into one text node instead of
+    // proper slate elements. Breaks inline editing boundaries.
+    if (typeof node.text === 'string' && node.text.includes('\n')) {
+      const preview = node.text.replace(/\n/g, '\\n').slice(0, 80);
+      issues.push(`${pathStr}: text leaf contains newline(s) — split into separate slate elements ("${preview}${node.text.length > 80 ? '…' : ''}")`);
+    }
+  } else {
+    issues.push(`${pathStr}: node has neither \`children\` nor \`text\``);
+  }
+}
+
+/**
+ * Walk a block's data for slate-shaped fields (arrays whose first item looks
+ * like a slate node) and record all structural issues:
+ *  - Multi-root values force renderers to add a nodeId-less wrapper.
+ *  - Missing `type` on root element.
+ *  - Invalid node shapes anywhere in the tree.
+ *
+ * Schema-independent; runs against raw API data.
+ */
+function collectSlateIssues(blockData, pagePath, blockId, out) {
+  if (!blockData || typeof blockData !== 'object') return;
+  for (const [key, value] of Object.entries(blockData)) {
+    if (key.startsWith('@') || key === 'blocks' || key === 'blocks_layout') continue;
+    if (!Array.isArray(value) || value.length === 0) continue;
+    const first = value[0];
+    const looksSlate =
+      first && typeof first === 'object' &&
+      (Array.isArray(first.children) || Object.prototype.hasOwnProperty.call(first, 'text'));
+    if (!looksSlate) continue;
+
+    const issues = [];
+    if (value.length > 1) {
+      issues.push(`multiple top-level nodes (${value.length}); split into separate blocks`);
+    }
+    for (let i = 0; i < value.length; i++) {
+      validateSlateNode(value[i], `value[${i}]`, issues);
+    }
+    // A slate field's roots must be elements, not text leaves.
+    for (let i = 0; i < value.length; i++) {
+      const n = value[i];
+      if (n && typeof n === 'object' && Object.prototype.hasOwnProperty.call(n, 'text') && !Array.isArray(n.children)) {
+        issues.push(`value[${i}]: text leaf at root (must be wrapped in an element)`);
+      }
+    }
+    if (issues.length) {
+      out.push({ pagePath, blockId, field: key, issues });
+    }
+  }
+}
+
+async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}) {
   const seen = new Map();
+  const slateIssues = [];
   const objectListFields = buildObjectListFieldsMap(blocksConfig);
 
   if (objectListFields.size > 0) {
@@ -156,20 +288,33 @@ async function discoverBlocks(apiUrl, maxPages = 50, blocksConfig = {}) {
       const blocks = extractBlocks(content.blocks, content.blocks_layout.items, objectListFields);
 
       for (const { blockId, blockType, blockData } of blocks) {
-        if (seen.has(blockType)) continue;
+        collectSlateIssues(blockData, pagePath, blockId, slateIssues);
 
         // Skip metadata block types that don't render visually
         if (blockType === 'title' || blockType === 'description') continue;
 
-        seen.set(blockType, {
+        const variation = variationOf(blockData);
+        const key = `${blockType}:${variation}`;
+        const score = richnessScore(blockData);
+        const existing = seen.get(key);
+        if (existing && existing._score >= score) continue;
+
+        const label = variation === 'default' ? blockType : `${blockType} (${variation})`;
+        if (existing) {
+          console.log(`[DISCOVER] Replaced ${label} with richer example from ${pagePath} (score ${existing._score} → ${score})`);
+        } else {
+          console.log(`[DISCOVER] Found ${label} block "${blockId}" on ${pagePath} (score ${score})`);
+        }
+
+        seen.set(key, {
           blockType,
+          variation,
           blockId,
           pagePath,
           blockData,
           isListing: blockType === 'listing',
+          _score: score,
         });
-
-        console.log(`[DISCOVER] Found ${blockType} block "${blockId}" on ${pagePath}`);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -177,8 +322,22 @@ async function discoverBlocks(apiUrl, maxPages = 50, blocksConfig = {}) {
     }
   }
 
-  const result = Array.from(seen.values());
-  console.log(`[DISCOVER] Discovered ${result.length} unique block types from ${fetched} pages`);
+  const result = Array.from(seen.values()).map(({ _score, ...rest }) => rest);
+  console.log(`[DISCOVER] Discovered ${result.length} unique (blockType, variation) pairs from ${fetched} pages`);
+
+  if (slateIssues.length) {
+    const lines = slateIssues.flatMap((e) => [
+      `  ${e.pagePath} [${e.blockId}] field "${e.field}":`,
+      ...e.issues.map((msg) => `    - ${msg}`),
+    ]);
+    throw new Error(
+      `Discovery found ${slateIssues.length} slate field(s) with structural issues. ` +
+        `Each slate field must be a single element root with a string \`type\`; ` +
+        `text leaves must live inside an element.\n` +
+        lines.join('\n'),
+    );
+  }
+
   return result;
 }
 

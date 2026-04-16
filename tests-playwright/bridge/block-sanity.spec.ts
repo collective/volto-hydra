@@ -24,6 +24,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 interface DiscoveredBlock {
   blockType: string;
+  variation?: string;
   blockId: string;
   pagePath: string;
   blockData: Record<string, unknown>;
@@ -53,7 +54,10 @@ const test = base.extend<{ helper: AdminUIHelper }>({
 
 test.describe('Block sanity (auto-discovered)', () => {
   for (const block of discoveredBlocks) {
-    test(`${block.blockType} block renders and has edit annotations`, async ({ page, helper }, testInfo) => {
+    const label = block.variation && block.variation !== 'default'
+      ? `${block.blockType} (${block.variation})`
+      : block.blockType;
+    test(`${label} block renders and has edit annotations`, async ({ page, helper }, testInfo) => {
       const frontendUrl = process.env.FRONTEND_URL || getFrontendUrl(testInfo.project.name);
       const frontend = frontendUrl ? `&frontend=${encodeURIComponent(frontendUrl)}` : '';
 
