@@ -78,9 +78,9 @@ test.describe('Block sanity (auto-discovered)', () => {
 
       await verifyBlockRendering(page, iframe, block.blockId, block.blockData, {
         isListing: block.isListing,
-        // Skip sub-block checks — without blocksConfig the heuristic produces false
-        // positives (e.g. teaser href arrays have @id+@type but aren't sub-blocks)
-        checkSubBlocks: false,
+        // Sub-block iteration uses the bridge's blockPathMap (canonical,
+        // schema-resolved) rather than a shape heuristic on blockData.
+        checkSubBlocks: true,
         // Skip data-edit-text clicks for discovered content — we just want rendering + annotation checks
         checkEditTextClicks: false,
       });

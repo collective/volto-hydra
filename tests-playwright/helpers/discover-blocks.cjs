@@ -33,6 +33,60 @@ function buildObjectListFieldsMap(blocksConfig) {
 }
 
 /**
+ * Build a map of (parentType, field) → allowedBlocks[] for every container
+ * field that declares allowedBlocks (object_list subblocks + blocks_layout
+ * child containers). Sanity coverage needs one content example per
+ * (parentType, field, subType) tuple.
+ * @param {Object} blocksConfig - Block schemas from initBridge INIT message
+ * @returns {Array<{parentType: string, field: string, allowedBlocks: string[]}>}
+ */
+function buildAllowedBlocksList(blocksConfig) {
+  const out = [];
+  for (const [blockType, blockDef] of Object.entries(blocksConfig || {})) {
+    const props = blockDef?.blockSchema?.properties;
+    if (!props) continue;
+    for (const [fieldName, fieldDef] of Object.entries(props)) {
+      const widget = fieldDef?.widget;
+      if (widget !== 'object_list' && widget !== 'blocks_layout') continue;
+      const allowedBlocks = fieldDef?.allowedBlocks;
+      if (!Array.isArray(allowedBlocks) || allowedBlocks.length === 0) continue;
+      out.push({ parentType: blockType, field: fieldName, allowedBlocks });
+    }
+  }
+  return out;
+}
+
+/**
+ * For a parent block's data, return the set of sub-block types present in
+ * the given container field. Handles both object_list shape (array of items
+ * with field_type/@type) and blocks_layout shape (ids in {items:[]} that
+ * resolve to blocks dict entries with @type).
+ */
+function subTypesInField(blockData, field) {
+  const types = new Set();
+  const value = blockData?.[field];
+  if (!value) return types;
+  // blocks_layout: { items: [...] } pointing into blockData.blocks
+  if (typeof value === 'object' && !Array.isArray(value) && Array.isArray(value.items)) {
+    const dict = blockData?.blocks || {};
+    for (const id of value.items) {
+      const t = dict[id]?.['@type'];
+      if (typeof t === 'string') types.add(t);
+    }
+    return types;
+  }
+  // object_list: array of items with type info
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      const t = item['@type'] || item.field_type || item.type;
+      if (typeof t === 'string') types.add(t);
+    }
+  }
+  return types;
+}
+
+/**
  * Recursively extract all blocks from a content object.
  * Handles nested containers: section, gridBlock, columns, accordion, etc.
  * When objectListFields is provided, also extracts object_list sub-blocks.
@@ -138,18 +192,30 @@ function collectSlateNodeTypes(node, types) {
 function richnessScore(blockData) {
   let score = 0;
   const slateTypes = new Set();
+  const itemTypes = new Set();
   for (const [key, value] of Object.entries(blockData || {})) {
     if (key.startsWith('@') || key === 'blocks' || key === 'blocks_layout') continue;
     if (value == null) continue;
     if (typeof value === 'string' && value === '') continue;
     if (Array.isArray(value) && value.length === 0) continue;
     score += 1;
-    // Arrays of slate nodes or single slate-like trees
-    if (Array.isArray(value) && value.length && typeof value[0] === 'object' && value[0] && 'children' in value[0]) {
-      collectSlateNodeTypes(value, slateTypes);
+    if (Array.isArray(value) && value.length && typeof value[0] === 'object' && value[0]) {
+      // Slate values: array of {children: [...]} — collect every node type
+      if ('children' in value[0]) {
+        collectSlateNodeTypes(value, slateTypes);
+      }
+      // Object_list items (form subblocks, hero_slider slides, etc.):
+      // collect every distinct @type / field_type / type so a fixture that
+      // exercises many variants scores higher than one with repeats.
+      for (const item of value) {
+        if (item && typeof item === 'object' && !Array.isArray(item)) {
+          const t = item['@type'] || item.field_type || item.type;
+          if (typeof t === 'string') itemTypes.add(`${key}:${t}`);
+        }
+      }
     }
   }
-  return score + slateTypes.size;
+  return score + slateTypes.size + itemTypes.size;
 }
 
 /**
@@ -346,10 +412,17 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   // — skip these, they're not blocks.
   const PAGE_TYPES = new Set(['Document', 'Folder', 'Plone Site', 'News Item', 'Event']);
   const objectListFields = buildObjectListFieldsMap(blocksConfig);
+  const allowedBlocksList = buildAllowedBlocksList(blocksConfig);
 
   if (objectListFields.size > 0) {
     console.log(`[DISCOVER] Using schemas for ${objectListFields.size} block types with object_list fields`);
   }
+
+  // subTypeExamples: key "parentType|field|subType" → first parent instance
+  // (uid + pagePath + blockData) that contains a sub-block of that subType.
+  // After the rich/simple pass, we use this to ensure every allowedBlocks
+  // sub-type has at least one parent covering it in the final test set.
+  const subTypeExamples = new Map();
 
   // Step 1: Get all content paths via @search (b_size=9999 to avoid pagination)
   const searchUrl = `${apiUrl}/@search?b_size=9999`;
@@ -473,6 +546,19 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
             _score: score,
           });
         }
+
+        // Record first-seen example of every (parentType, field, subType)
+        // tuple so the sub-type coverage pass can fill gaps the rich/simple
+        // picks don't happen to cover.
+        for (const { parentType, field } of allowedBlocksList) {
+          if (parentType !== blockType) continue;
+          for (const subType of subTypesInField(blockData, field)) {
+            const stKey = `${parentType}|${field}|${subType}`;
+            if (!subTypeExamples.has(stKey)) {
+              subTypeExamples.set(stKey, { blockId, pagePath, blockData, variation });
+            }
+          }
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -480,8 +566,71 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
     }
   }
 
-  const result = Array.from(seen.values()).map(({ _score, ...rest }) => rest);
-  console.log(`[DISCOVER] Discovered ${result.length} unique (blockType, variation) pairs from ${fetched} pages`);
+  // Sub-type coverage pass: ensure every declared allowedBlocks sub-type has
+  // at least one test case via a parent instance containing it. If a rich or
+  // simple pick already covers it (same blockId appears in seen), no extra
+  // test is added. Uncovered sub-types with no content example anywhere are
+  // reported via missingSubTypes for a warning below.
+  const missingSubTypes = [];
+  const coveredByBlockId = new Map(); // blockId → Set<"parentType|field|subType">
+  for (const entry of seen.values()) {
+    const covered = coveredByBlockId.get(entry.blockId) || new Set();
+    for (const { parentType, field } of allowedBlocksList) {
+      if (parentType !== entry.blockType) continue;
+      for (const subType of subTypesInField(entry.blockData, field)) {
+        covered.add(`${parentType}|${field}|${subType}`);
+      }
+    }
+    coveredByBlockId.set(entry.blockId, covered);
+  }
+  const allCovered = new Set();
+  for (const covered of coveredByBlockId.values()) {
+    for (const k of covered) allCovered.add(k);
+  }
+
+  for (const { parentType, field, allowedBlocks } of allowedBlocksList) {
+    for (const subType of allowedBlocks) {
+      const stKey = `${parentType}|${field}|${subType}`;
+      if (allCovered.has(stKey)) continue;
+      const example = subTypeExamples.get(stKey);
+      if (!example) {
+        missingSubTypes.push({ parentType, field, subType });
+        continue;
+      }
+      const key = `sub:${parentType}:${field}:${subType}`;
+      console.log(`[DISCOVER] Found ${parentType} [sub:${subType}] block "${example.blockId}" on ${example.pagePath} (adds ${subType} coverage)`);
+      seen.set(key, {
+        blockType: parentType,
+        variation: example.variation,
+        kind: `sub:${subType}`,
+        blockId: example.blockId,
+        pagePath: example.pagePath,
+        blockData: example.blockData,
+        isListing: parentType === 'listing',
+        _score: 0,
+      });
+    }
+  }
+
+  // Dedupe by blockId — when the same parent uid shows up as rich AND as a
+  // sub-type filler (or simple + sub-type), one render test exercises the
+  // full pathMap walk and covers everything inside.
+  const byUid = new Map();
+  for (const entry of seen.values()) {
+    if (!byUid.has(entry.blockId)) byUid.set(entry.blockId, entry);
+  }
+  const result = Array.from(byUid.values()).map(({ _score, ...rest }) => rest);
+  console.log(`[DISCOVER] Discovered ${result.length} unique (blockType, variation, kind) pairs from ${fetched} pages`);
+
+  if (missingSubTypes.length) {
+    const lines = missingSubTypes.map(
+      ({ parentType, field, subType }) => `  - ${parentType}.${field}: allowed sub-type "${subType}" has no content example`,
+    );
+    console.warn(
+      `[DISCOVER] ${missingSubTypes.length} allowed sub-type(s) have no content example — ` +
+        `renderer paths for these are untested:\n${lines.join('\n')}`,
+    );
+  }
 
   if (unregisteredTypes.size) {
     const lines = [];

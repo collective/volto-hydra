@@ -183,7 +183,6 @@ test.describe('Doc example blocks', () => {
       await verifyBlockRendering(page, iframe, example.blockId, blockData, {
         expectedText: example.expectedText,
         isListing: example.isListing,
-        blocksConfig: flatBlocksConfig,
       });
     });
   }

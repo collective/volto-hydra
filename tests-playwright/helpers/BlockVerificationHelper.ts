@@ -16,84 +16,6 @@ export interface SubBlock {
 }
 
 /**
- * Build a map of blockType → (fieldName → idField) for every object_list
- * field in the blocksConfig. Used by getSubBlocks to identify which array
- * fields contain sub-blocks and what property to use as the block UID.
- */
-export function buildObjectListFieldsMap(
-  blocksConfig: Record<string, { blockSchema?: { properties?: Record<string, any> } }>,
-): Map<string, Map<string, string>> {
-  const map = new Map<string, Map<string, string>>();
-  for (const [blockType, blockDef] of Object.entries(blocksConfig)) {
-    const props = blockDef?.blockSchema?.properties;
-    if (!props) continue;
-    for (const [fieldName, fieldDef] of Object.entries(props)) {
-      if ((fieldDef as Record<string, unknown>)?.widget === 'object_list') {
-        if (!map.has(blockType)) map.set(blockType, new Map());
-        const idField = ((fieldDef as Record<string, unknown>).idField as string | undefined) || '@id';
-        map.get(blockType)!.set(fieldName, idField);
-      }
-    }
-  }
-  return map;
-}
-
-/**
- * Recursively collect all sub-blocks (id + data) from block data.
- *
- * Uses the objectListFields map to identify object_list fields and their
- * idField (the item property used as data-block-uid). Falls back to a
- * heuristic (@id + @type/blocks/blocks_layout) for blocks not in the map.
- */
-export function getSubBlocks(
-  obj: Record<string, unknown>,
-  blockType?: string,
-  objectListFields?: Map<string, Map<string, string>>,
-): SubBlock[] {
-  const result: SubBlock[] = [];
-  const knownListFields = (blockType && objectListFields?.get(blockType)) || new Map<string, string>();
-
-  for (const [key, value] of Object.entries(obj)) {
-    if (key === 'blocks' && value && typeof value === 'object' && !Array.isArray(value)) {
-      // Shared blocks dict: keys are block IDs
-      for (const [subId, subBlock] of Object.entries(value as Record<string, unknown>)) {
-        if (subBlock && typeof subBlock === 'object' && !Array.isArray(subBlock)) {
-          const subData = subBlock as Record<string, unknown>;
-          result.push({ id: subId, data: subData });
-          result.push(...getSubBlocks(subData, subData['@type'] as string | undefined, objectListFields));
-        }
-      }
-    } else if (Array.isArray(value)) {
-      const idField = knownListFields.get(key);
-      for (const item of value) {
-        if (item && typeof item === 'object' && !Array.isArray(item)) {
-          const rec = item as Record<string, unknown>;
-          if (idField) {
-            // Schema-defined object_list: use the declared idField
-            const id = rec[idField] as string | undefined;
-            if (id) {
-              result.push({ id, data: rec });
-              result.push(...getSubBlocks(rec, rec['@type'] as string | undefined, objectListFields));
-            }
-          } else {
-            // Fallback heuristic: @id + (@type or blocks or blocks_layout)
-            const id = rec['@id'] as string | undefined;
-            const isSubBlock = id && (rec['@type'] || rec['blocks'] || rec['blocks_layout']);
-            if (isSubBlock) {
-              result.push({ id, data: rec });
-            }
-            result.push(...getSubBlocks(rec, rec['@type'] as string | undefined, objectListFields));
-          }
-        }
-      }
-    } else if (value && typeof value === 'object') {
-      result.push(...getSubBlocks(value as Record<string, unknown>, undefined, objectListFields));
-    }
-  }
-  return result;
-}
-
-/**
  * Click each [data-edit-text] element in the block and verify no
  * "Missing data-node-id attributes" warning appears in the iframe.
  *
@@ -401,12 +323,15 @@ export interface VerifyBlockRenderingOptions {
   isListing?: boolean;
   checkSubBlocks?: boolean;
   checkEditTextClicks?: boolean;
-  blocksConfig?: Record<string, any>;
 }
 
 /**
  * Full block rendering verification: locate block, check text, check edit
  * annotations, verify sub-blocks, and click data-edit-text elements.
+ *
+ * Schema + sub-block discovery come from the bridge's blockPathMap inside
+ * the iframe — no blocksConfig plumbing needed. Callers must render the
+ * block through an iframe with `initBridge()` already run.
  */
 export async function verifyBlockRendering(
   page: Page,
@@ -420,10 +345,7 @@ export async function verifyBlockRendering(
     isListing = false,
     checkSubBlocks = true,
     checkEditTextClicks: doEditTextClicks = true,
-    blocksConfig,
   } = options;
-
-  const objectListFields = blocksConfig ? buildObjectListFieldsMap(blocksConfig) : undefined;
 
   // Listing blocks: expandListingBlocks sets @uid=parentId on all items,
   // so multiple elements share the same data-block-uid.
@@ -448,15 +370,38 @@ export async function verifyBlockRendering(
   // Verify edit annotations
   await checkEditAnnotations(block, blockData);
 
-  // Schema-driven slate check (no-op if schema or data not supplied)
-  const blockType = blockData?.['@type'] as string | undefined;
-  const blockSchema = blockType ? blocksConfig?.[blockType]?.blockSchema : undefined;
-  await checkSlateAnnotations(block, blockData, blockSchema);
+  // Schema-driven slate check — checkSlateAnnotations pulls the schema
+  // from the bridge itself (authoritative, schemaEnhancer-resolved).
+  await checkSlateAnnotations(block, blockData);
 
   // Verify sub-blocks (before clicking, which may toggle interactive
-  // containers like accordions closed).
+  // containers like accordions closed). Sub-blocks come from the bridge's
+  // blockPathMap — canonical nested-block tree with schema-driven
+  // container traversal (blocks_layout and object_list handled uniformly).
   if (checkSubBlocks && blockData) {
-    const subBlocks = getSubBlocks(blockData, blockData['@type'] as string, objectListFields);
+    const subBlocks = await block.evaluate((_el, parentUid) => {
+      const b = (window as any).__hydraBridge;
+      if (!b?.blockPathMap) {
+        throw new Error(
+          'verifyBlockRendering: __hydraBridge.blockPathMap not available — ' +
+            'the block must be rendered inside an iframe with initBridge() run.',
+        );
+      }
+      const pathMap = b.blockPathMap;
+      const isDescendant = (uid: string): boolean => {
+        let cur = pathMap[uid]?.parentId;
+        while (cur) {
+          if (cur === parentUid) return true;
+          cur = pathMap[cur]?.parentId;
+        }
+        return false;
+      };
+      return Object.keys(pathMap)
+        .filter((k) => !k.startsWith('_') && isDescendant(k))
+        .map((uid) => ({ id: uid, data: b.getBlockData?.(uid) || null }))
+        .filter((s: { id: string; data: unknown }) => !!s.data && typeof s.data === 'object');
+    }, blockId) as SubBlock[];
+
     let anyVisible = false;
     for (const { id, data } of subBlocks) {
       const loc = iframe.locator(`[data-block-uid="${id}"]`).first();
@@ -464,9 +409,7 @@ export async function verifyBlockRendering(
       if (await loc.isVisible()) {
         anyVisible = true;
         await checkEditAnnotations(loc, data);
-        const subType = data?.['@type'] as string | undefined;
-        const subSchema = subType ? blocksConfig?.[subType]?.blockSchema : undefined;
-        await checkSlateAnnotations(loc, data, subSchema);
+        await checkSlateAnnotations(loc, data);
       }
     }
     if (subBlocks.length > 0) {
