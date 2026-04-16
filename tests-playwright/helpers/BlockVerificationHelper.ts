@@ -296,36 +296,75 @@ export async function checkSlateAnnotations(
   }
 
   for (const field of slateFields) {
-    const container = block.locator(`[data-edit-text="${field}"]`).first();
-    await expect(
-      container,
-      `Slate field "${field}" should have a [data-edit-text="${field}"] container`,
-    ).toBeAttached();
+    // Accept either a descendant [data-edit-text="<field>"] OR the block
+    // element itself carrying the attribute (renderers are free to collapse
+    // the block wrapper and the edit-text container onto one element).
+    const blockHasAttr = (await block.getAttribute('data-edit-text')) === field;
+    const container = blockHasAttr ? block : block.locator(`[data-edit-text="${field}"]`).first();
+    if (!(await container.count())) {
+      // Build a diagnostic showing what data-edit-text values ARE present in
+      // the block — usually it's a typo or a misplaced attribute.
+      const context = await block.evaluate((el) => {
+        const outer = (el.outerHTML || '').slice(0, 200);
+        const self = el.getAttribute('data-edit-text');
+        const descendants = Array.from(el.querySelectorAll('[data-edit-text]'))
+          .map((d) => `${d.tagName.toLowerCase()}[data-edit-text="${d.getAttribute('data-edit-text')}"]`);
+        return { outer, self, descendants };
+      });
+      throw new Error(
+        `Slate field "${field}": no [data-edit-text="${field}"] container found.\n` +
+          `  block element's own data-edit-text: ${context.self ?? '(none)'}\n` +
+          `  descendants with data-edit-text: ${context.descendants.length ? context.descendants.join(', ') : '(none)'}\n` +
+          `  block outerHTML (truncated): ${context.outer}`,
+      );
+    }
 
-    // Round-trip via the bridge's own DOM→Slate reader. Returns [] (or partial)
-    // if the renderer didn't emit data-node-id on slate elements.
-    // The bridge is set up asynchronously by initBridge() in the frontend's
-    // onMounted, so wait for __hydraBridge to appear before calling it.
-    const existing = blockData[field];
-    const domValue = await container.evaluate(async (el, existingValue) => {
+    // Round-trip via the bridge's own DOM→Slate reader. The bridge already
+    // walked its formData with addNodeIds — use bridge.getBlockData(uid)[field]
+    // as the existingValue so domNodeToSlate's metadata lookup finds the ids
+    // that match the DOM (otherwise `type` drops out of the round-tripped
+    // result). Wait for bridge + data-node-id on the DOM before reading.
+    const blockUid = await block.getAttribute('data-block-uid');
+    const domValue = await container.evaluate(async (el, args) => {
+      const { uid, fieldName } = args as { uid: string | null; fieldName: string };
+      const hasId = (root: Element) =>
+        root.hasAttribute('data-node-id') || !!root.querySelector('[data-node-id]');
       for (let i = 0; i < 50; i++) {
-        if ((window as any).__hydraBridge?.readSlateValueFromDOM) break;
+        const b = (window as any).__hydraBridge;
+        if (b?.readSlateValueFromDOM && b?.getBlockData && hasId(el)) break;
         await new Promise((r) => setTimeout(r, 100));
       }
       const bridge = (window as any).__hydraBridge;
       if (!bridge?.readSlateValueFromDOM) return { error: 'bridge not available on window.__hydraBridge after 5s' };
+      if (!hasId(el)) return { error: 'no data-node-id rendered after 5s — renderer is not forwarding node ids' };
+      const existingValue = uid ? bridge.getBlockData(uid)?.[fieldName] : undefined;
+      if (!existingValue) return { error: `bridge.getBlockData(${uid})?.${fieldName} is missing — bridge hasn't delivered data or block is nested outside the bridge's map` };
       try {
         return { value: bridge.readSlateValueFromDOM(el, existingValue) };
       } catch (e: any) {
         return { error: `readSlateValueFromDOM threw: ${e?.message || String(e)}` };
       }
-    }, existing);
+    }, { uid: blockUid, fieldName: field });
+    const existing = blockData[field];
 
-    expect(domValue, `Slate field "${field}" DOM round-trip`).not.toHaveProperty('error');
-    expect(
-      slateEqualIgnoringIds((domValue as any).value, existing),
-      `Slate field "${field}" DOM does not round-trip to the same Slate value — renderer is likely missing data-node-id on some nodes. Got: ${JSON.stringify((domValue as any).value)} Expected (ignoring ids): ${JSON.stringify(existing)}`,
-    ).toBe(true);
+    if ((domValue as any).error) {
+      const dom = await container.evaluate((el) => (el.outerHTML || '').slice(0, 200));
+      throw new Error(
+        `Slate field "${field}" round-trip failed: ${(domValue as any).error}\n` +
+          `  container outerHTML (truncated): ${dom}`,
+      );
+    }
+    if (!slateEqualIgnoringIds((domValue as any).value, existing)) {
+      const dom = await container.evaluate((el) => (el.outerHTML || '').slice(0, 300));
+      throw new Error(
+        `Slate field "${field}" DOM does not round-trip to the same Slate value.\n` +
+          `  Diff (first 400 chars each):\n` +
+          `    Got:      ${JSON.stringify((domValue as any).value).slice(0, 400)}\n` +
+          `    Expected: ${JSON.stringify(existing).slice(0, 400)}\n` +
+          `  container outerHTML (truncated): ${dom}\n` +
+          `  Likely causes: renderer missing data-node-id on some nodes; stray whitespace in template between sibling slate nodes; renderer emitting wrong element tag.`,
+      );
+    }
   }
 }
 
