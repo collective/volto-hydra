@@ -124,8 +124,10 @@ app.use((req, res, next) => {
     cleanPath = vhmMatch[1] || '/';
   }
 
-  // Handle simple ++api++ prefix: /++api++/@site -> /@site
-  cleanPath = cleanPath.replace(/^\/\+\+api\+\+/, '');
+  // Strip ++api++ anywhere in path (start or mid-path):
+  //   /++api++/@site           -> /@site
+  //   /blocks/search/++api++/@ -> /blocks/search/@
+  cleanPath = cleanPath.replace(/\/?\+\+api\+\+\/?/g, '/');
 
   // Normalize multiple slashes to single slash (e.g., //@search -> /@search)
   cleanPath = cleanPath.replace(/\/+/g, '/');
@@ -1018,7 +1020,7 @@ app.get('/health', (req, res) => {
  * Get querystring schema (available indexes, operators, sortable indexes)
  * Used by QuerystringWidget to populate criteria and sort dropdowns
  */
-app.get('/@querystring', (req, res) => {
+app.get('*/@querystring', (req, res) => {
   res.json({
     '@id': 'http://localhost:8888/@querystring',
     'indexes': {
