@@ -1273,22 +1273,15 @@ const handleSortChange = (event) => {
   navigateTo({ path: route.path, query: { ...route.query, sort_on: event.target.value } });
 };
 
-// Facet field options - maps field name to available options
-const FACET_FIELD_OPTIONS = {
-  'review_state': [
-    { value: 'private', title: 'Private' },
-    { value: 'pending', title: 'Pending' },
-    { value: 'published', title: 'Published' },
-  ],
-  'portal_type': [
-    { value: 'Document', title: 'Page' },
-    { value: 'News Item', title: 'News Item' },
-    { value: 'Event', title: 'Event' },
-    { value: 'Image', title: 'Image' },
-    { value: 'File', title: 'File' },
-    { value: 'Link', title: 'Link' },
-  ],
-};
+// Querystring metadata — fetched once globally, cached in Nuxt payload.
+// Same pattern as Volto's withQueryString HOC. lazy:true keeps this
+// component synchronous so event handlers work correctly.
+const runtimeConfig = useRuntimeConfig();
+const { data: querystringData } = useFetch(
+  `${runtimeConfig.public.backendBaseUrl}/++api++/@querystring`,
+  { key: 'querystring', headers: { Accept: 'application/json' }, lazy: true },
+);
+const querystringIndexes = computed(() => querystringData.value?.indexes || {});
 
 // Get facet field value (handles object { label, value } or plain string)
 const getFacetField = (facet) => {
@@ -1298,10 +1291,15 @@ const getFacetField = (facet) => {
   return facet.field || '';
 };
 
-// Get facet options based on field
+// Get facet options from @querystring index values (dynamic, not hardcoded)
 const getFacetOptions = (facet) => {
   const field = getFacetField(facet);
-  return FACET_FIELD_OPTIONS[field] || [];
+  const index = querystringIndexes.value[field];
+  if (!index?.values) return [];
+  return Object.entries(index.values).map(([value, info]) => ({
+    value,
+    title: (info as any).title || value,
+  }));
 };
 
 // Check if a facet value is currently selected (from URL params)
