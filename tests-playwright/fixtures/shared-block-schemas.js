@@ -800,6 +800,11 @@ export const sharedBlocksConfig = {
                     type: 'string',
                     description: 'Only visible when page has a description',
                 },
+                switchField: {
+                    title: 'Switch Field',
+                    type: 'string',
+                    description: 'Array rule with bare false as catch-all hide',
+                },
             },
         },
         schemaEnhancer: {
@@ -808,6 +813,12 @@ export const sharedBlocksConfig = {
                 simpleWarning: { when: { mode: { isNot: 'advanced' } }, else: false },
                 columnLayout: { when: { columns: { gte: 2 } }, else: false },
                 pageNotice: { when: { '../description': { isSet: true } }, else: false },
+                // Array rule: show when simple OR advanced, bare false hides otherwise
+                switchField: [
+                    { when: { mode: 'simple' } },
+                    { when: { mode: 'advanced' } },
+                    false,
+                ],
             },
         },
     },

@@ -1457,6 +1457,15 @@ function createFieldRulesEnhancer(rulesConfig) {
 
 /**
  * Evaluate a field rule and return the resulting field definition.
+ *
+ * Rule shapes:
+ *   false                                  → always hide
+ *   { when, set?, else? }                  → single conditional: when-matches ? set : else
+ *   { ...fieldDef }                        → plain definition, always applied
+ *   [ { when, set? }, …, { set? }, false ] → switch: first matching entry wins.
+ *                                             Bare `false` acts as a catch-all hide
+ *                                             (equivalent to `{ set: false }`).
+ *
  * Returns: false (hide), object (field definition), or undefined (no change).
  * @private
  */
@@ -1467,6 +1476,8 @@ function evaluateFieldRule(rule, formData, args) {
   // Array → switch: first matching rule wins
   if (Array.isArray(rule)) {
     for (const r of rule) {
+      // Bare false acts as a catch-all "hide" (matches with no condition)
+      if (r === false) return false;
       if (!r.when || evaluateWhenCondition(r.when, formData, args)) {
         if ('set' in r) return r.set;
         return undefined; // matched but no set → keep current

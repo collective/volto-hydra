@@ -362,10 +362,7 @@ const getUrlWithAdminParams = (url, token, isEdit) => {
   // _edit param ensures mode change triggers URL change and iframe reload
   if (typeof window === 'undefined') return null;
   const contentPath = window.location.pathname.replace(/\/edit$/, '');
-  const params = { access_token: token };
-  if (isEdit) {
-    params._edit = 'true';
-  }
+  const params = { access_token: token, _edit: isEdit ? 'true' : 'false' };
   // Forward debug param to iframe so hydra.js enables logging
   const adminUrl = new URL(window.location.href);
   if (adminUrl.searchParams.has('_hydra_debug')) {

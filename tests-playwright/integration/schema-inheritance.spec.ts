@@ -1237,6 +1237,37 @@ test.describe('fieldRules - Conditional Field Visibility', () => {
     await expect(columnLayoutField).toBeVisible({ timeout: 5000 });
   });
 
+  test('fieldRules array with bare false as catch-all hide', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    const testBlock = iframe.locator('[data-block-uid="skiplogic-test"]');
+    await expect(testBlock).toBeVisible({ timeout: 10000 });
+    await testBlock.click();
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // switchField rule: [{when: mode=simple}, {when: mode=advanced}, false]
+    // mode is unset initially → all array entries miss, bare false hides
+    const switchField = page.locator('text=Switch Field');
+    await expect(switchField).not.toBeVisible();
+
+    // Select 'simple' → first array entry matches → visible
+    const modeSelect = page.locator('.react-select__control').first();
+    await modeSelect.click();
+    const menu = page.locator('.react-select__menu');
+    await menu.waitFor({ state: 'visible', timeout: 3000 });
+    await menu.locator('.react-select__option', { hasText: 'Simple' }).click();
+    await menu.waitFor({ state: 'hidden', timeout: 3000 });
+
+    await expect(switchField).toBeVisible({ timeout: 5000 });
+  });
+
   test('fieldRules with parent path reference', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
