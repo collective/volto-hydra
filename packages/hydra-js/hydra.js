@@ -1978,7 +1978,14 @@ var Bridge = class {
         const end = Math.max(anchorIdx, focusIdx);
         this.multiSelectedBlockUids = siblingUids.slice(start, end + 1);
       } else {
-        this.multiSelectedBlockUids = [blockUid];
+        const current = this.multiSelectedBlockUids.length > 0 ? [...this.multiSelectedBlockUids] : this.selectedBlockUid ? [this.selectedBlockUid] : [];
+        const idx = current.indexOf(blockUid);
+        if (idx >= 0) {
+          current.splice(idx, 1);
+        } else {
+          current.push(blockUid);
+        }
+        this.multiSelectedBlockUids = current;
       }
     } else {
       const current = this.multiSelectedBlockUids.length > 0 ? [...this.multiSelectedBlockUids] : this.selectedBlockUid ? [this.selectedBlockUid] : [];

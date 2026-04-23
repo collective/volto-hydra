@@ -285,6 +285,13 @@ const ContainerFieldSection = ({
                     }
                     // Enter selection mode — iframe shows checkboxes
                     document.dispatchEvent(new CustomEvent('hydra-enter-selection-mode'));
+                  } else if (multiSelected.length > 0) {
+                    // Selection mode: plain click toggles (don't navigate)
+                    if (multiSelected.includes(child.id)) {
+                      dispatch(setUIState({ multiSelected: multiSelected.filter(uid => uid !== child.id) }));
+                    } else {
+                      dispatch(setUIState({ multiSelected: [...multiSelected, child.id] }));
+                    }
                   } else {
                     onSelectBlock(child.id);
                   }
@@ -304,7 +311,18 @@ const ContainerFieldSection = ({
                   ⋮⋮
                 </span>
                 <span className="block-type">{child.title}</span>
-                <Icon className="nav-arrow" name={rightArrowSVG} size="24px" />
+                <span
+                  className="nav-arrow-wrapper"
+                  role="button"
+                  aria-label="Navigate into block"
+                  onClick={(e) => {
+                    // Arrow always navigates — even in selection mode
+                    e.stopPropagation();
+                    onSelectBlock(child.id);
+                  }}
+                >
+                  <Icon className="nav-arrow" name={rightArrowSVG} size="24px" />
+                </span>
               </div>
             )}
           </DragDropList>

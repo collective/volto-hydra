@@ -984,12 +984,16 @@ test.describe('Multi-Block Selection', () => {
     await expect(blockList.locator('.child-block-item.selected'))
       .toHaveCount(2, { timeout: 5000 });
 
-    // Summary bar should show count
-    await expect(blockList.locator('.multi-select-bar'))
+    // Summary bar should show count (in sidebar, not inside blockList)
+    await expect(page.locator('.multi-select-bar'))
       .toContainText('2 selected', { timeout: 3000 });
 
     // Block list should remain visible (not replaced by summary)
     await expect(blockList).toBeVisible();
+
+    // Sidebar view should NOT have changed — still showing col-1's children
+    // (Ctrl+Click toggles selection, doesn't navigate to the clicked block)
+    await expect(blockList.locator('.child-block-item')).toHaveCount(2);
   });
 
   test('Shift+Click in sidebar block list selects range and highlights', async ({ page }) => {
@@ -997,28 +1001,20 @@ test.describe('Multi-Block Selection', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Select block-1 to open sidebar, click back to page level
+    // Navigate to page-level block list
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.waitForBlockSelected('block-1-uuid');
-    const backArrow = page.locator('.sidebar-section-header .nav-back');
+    const backArrow = page.locator('.sidebar-section-header .nav-back').last();
     await expect(backArrow).toBeVisible({ timeout: 5000 });
     await backArrow.click();
 
     const blockList = page.locator('.child-blocks-widget');
     await expect(blockList).toBeVisible({ timeout: 5000 });
 
-    // Click first Text block to select as anchor
-    const textItem = blockList.locator('.child-block-item', { hasText: 'Text' }).first();
-    await textItem.click();
-    await helper.waitForBlockSelected('block-1-uuid');
+    // Ctrl+Click first item to set anchor and enter selection mode
+    await blockList.locator('.child-block-item').first().click({ modifiers: ['ControlOrMeta'] });
 
-    // Navigate back to page level again
-    const backArrow2 = page.locator('.sidebar-section-header .nav-back');
-    await expect(backArrow2).toBeVisible({ timeout: 5000 });
-    await backArrow2.click();
-    await expect(blockList).toBeVisible({ timeout: 5000 });
-
-    // Shift+Click on the third item to select range (items 0, 1, 2)
+    // Shift+Click third item to extend range to items 0, 1, 2
     const thirdItem = blockList.locator('.child-block-item').nth(2);
     await expect(thirdItem).toBeVisible({ timeout: 3000 });
     await thirdItem.click({ modifiers: ['Shift'] });
@@ -1027,8 +1023,8 @@ test.describe('Multi-Block Selection', () => {
     await expect(blockList.locator('.child-block-item.selected'))
       .toHaveCount(3, { timeout: 5000 });
 
-    // Summary bar at bottom
-    await expect(blockList.locator('.multi-select-bar'))
+    // Summary bar at bottom of sidebar
+    await expect(page.locator('.multi-select-bar'))
       .toContainText('3 selected', { timeout: 3000 });
   });
 
@@ -1297,7 +1293,10 @@ test.describe('Multi-Block Selection', () => {
     // Click copy
     await dropdown.locator('[data-action="copy-block"]').click();
 
-    // Paste should now be available in dropdown (re-open menu)
+    // Re-select block and reopen menu — paste should now be available
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await expect(menuButton).toBeVisible({ timeout: 3000 });
     await menuButton.click();
     await expect(dropdown.locator('[data-action="paste-block"]')).toBeVisible();
   });
@@ -1544,7 +1543,7 @@ test.describe('Multi-Block Selection', () => {
     }).toPass({ timeout: 5000 });
   });
 
-  test('Shift+Click range select does not span across different containers', async ({ page }) => {
+  test('Shift+Click across containers toggles block into selection (no range)', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
@@ -1555,13 +1554,14 @@ test.describe('Multi-Block Selection', () => {
     await helper.escapeFromEditing();
 
     // Shift+Click on text-2a (inside col-2 — different container)
-    // Range select only works between siblings, so this should NOT create a range
+    // Range can't span containers, so Shift+Click falls through to toggle behavior
+    // (Option D): multiSelected becomes [text-1a, text-2a] — both selected, no range between
     const iframe = helper.getIframe();
     await iframe.locator('[data-block-uid="text-2a"]').click({ modifiers: ['Shift'] });
 
-    // Should NOT have multi-select — text-2a is in a different container
+    // Both blocks should be selected (summary bar shows 2)
     await expect(page.locator('.multi-select-bar'))
-      .not.toBeVisible({ timeout: 3000 });
+      .toContainText('2 selected', { timeout: 5000 });
   });
 
   test('Ctrl+Click selects blocks from different containers and paste works', async ({ page }) => {
@@ -2074,8 +2074,8 @@ test.describe('Multi-Block Selection', () => {
     await expect(page.locator('.selected-block-path')).toHaveCount(1, { timeout: 3000 });
   });
 
-  // Selection mode suppresses normal single-block UI
-  test('Selection mode hides single-block outline and toolbar in iframe', async ({ page }) => {
+  // Selection mode suppresses single-block outline (toolbar stays visible for DnD)
+  test('Selection mode hides single-block outline in iframe', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/test-page');
@@ -2095,8 +2095,75 @@ test.describe('Multi-Block Selection', () => {
     await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
       .not.toBeVisible({ timeout: 2000 });
 
-    // Quanta toolbar should NOT be visible
-    await expect(page.locator('.quanta-toolbar')).not.toBeVisible({ timeout: 2000 });
+    // Toolbar stays visible (needed for drag handle during DnD of selected blocks)
+    await expect(page.locator('.quanta-toolbar')).toBeVisible({ timeout: 2000 });
+  });
+
+  // Multi-select toolbar positions around combined rect of selected blocks
+  test('Multi-select toolbar spans combined rect of selected blocks', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+    const toolbar = page.locator('.quanta-toolbar');
+
+    // Start with block-3 selected (slate, so we get text mode first)
+    await helper.clickBlockInIframe('block-3-uuid');
+    await helper.waitForBlockSelected('block-3-uuid');
+    await helper.escapeFromEditing();
+
+    // Baseline: single-block toolbar offset above block-3 top
+    const box3Before = await iframe.locator('[data-block-uid="block-3-uuid"]').boundingBox();
+    expect(box3Before).not.toBeNull();
+    const singleToolbarBox = await toolbar.boundingBox();
+    expect(singleToolbarBox).not.toBeNull();
+    const singleOffsetAboveTop = box3Before!.y - singleToolbarBox!.y;
+
+    // Extend UPWARD: anchor=block-3, add block-2 via Shift+ArrowUp.
+    // Critical: anchor's top (block-3.top) is BELOW combined top (block-2.top),
+    // so if toolbar used anchor.top it would be below combined top — wrong.
+    await page.keyboard.press('Shift+ArrowUp');
+    await helper.waitForMultiSelectOutlines(2);
+
+    const box2 = await iframe.locator('[data-block-uid="block-2-uuid"]').boundingBox();
+    const box3 = await iframe.locator('[data-block-uid="block-3-uuid"]').boundingBox();
+    expect(box2).not.toBeNull();
+    expect(box3).not.toBeNull();
+
+    const combinedTop = Math.min(box2!.y, box3!.y);
+    const combinedBottom = Math.max(box2!.y + box2!.height, box3!.y + box3!.height);
+
+    await expect(toolbar).toBeVisible({ timeout: 3000 });
+
+    // Verify via the admin's voltoHydraData.blockUIRect that toolbar positioning
+    // uses the COMBINED rect (spans both blocks in iframe coords), not just the anchor.
+    // blockUIRect is in iframe-relative coords.
+    const hydraData = await page.evaluate(() => (window as any).voltoHydraData);
+    expect(hydraData).not.toBeNull();
+    expect(hydraData.blockUIRect).toBeDefined();
+
+    // Get iframe-relative block positions (hydra's local coord space)
+    const iframeRects = await iframe.locator('[data-block-uid="block-2-uuid"], [data-block-uid="block-3-uuid"]').evaluateAll(
+      (els: HTMLElement[]) => els.map(el => {
+        const r = el.getBoundingClientRect();
+        return { uid: el.getAttribute('data-block-uid'), top: r.top, left: r.left, width: r.width, height: r.height };
+      })
+    );
+    const b2 = iframeRects.find(r => r.uid === 'block-2-uuid')!;
+    const b3 = iframeRects.find(r => r.uid === 'block-3-uuid')!;
+    const expectedCombinedTop = Math.min(b2.top, b3.top);
+    const expectedCombinedBottom = Math.max(b2.top + b2.height, b3.top + b3.height);
+    const expectedCombinedHeight = expectedCombinedBottom - expectedCombinedTop;
+    const expectedCombinedLeft = Math.min(b2.left, b3.left);
+    const expectedCombinedRight = Math.max(b2.left + b2.width, b3.left + b3.width);
+    const expectedCombinedWidth = expectedCombinedRight - expectedCombinedLeft;
+
+    // blockUIRect drives toolbar + outline positioning. Must be the combined rect.
+    expect(Math.abs(hydraData.blockUIRect.top - expectedCombinedTop)).toBeLessThan(2);
+    expect(Math.abs(hydraData.blockUIRect.left - expectedCombinedLeft)).toBeLessThan(2);
+    expect(Math.abs(hydraData.blockUIRect.height - expectedCombinedHeight)).toBeLessThan(2);
+    expect(Math.abs(hydraData.blockUIRect.width - expectedCombinedWidth)).toBeLessThan(2);
   });
 
   // Clicking item body in sidebar during selection mode toggles, not navigates
@@ -2110,10 +2177,10 @@ test.describe('Multi-Block Selection', () => {
     await helper.waitForBlockSelected('text-1a');
     await helper.longPressBlock('text-1a');
 
-    // Sidebar navigation: escape to col-1 level to see the block list
-    const backArrow = page.locator('.sidebar-section-header .nav-back');
-    await expect(backArrow).toBeVisible({ timeout: 5000 });
-    await backArrow.click();
+    // Sidebar navigation: click text-1a's "Go to parent" (last one — its section's nav-back → col-1)
+    const goToParent = page.locator('.sidebar-section-header .nav-back[title="Go to parent"]').last();
+    await expect(goToParent).toBeVisible({ timeout: 5000 });
+    await goToParent.click();
 
     const blockList = page.locator('.child-blocks-widget');
     await expect(blockList).toBeVisible({ timeout: 5000 });
@@ -2142,20 +2209,20 @@ test.describe('Multi-Block Selection', () => {
     await helper.waitForBlockSelected('text-1a');
     await helper.longPressBlock('text-1a');
 
-    // Navigate up to columns-1 level to see col-1, col-2
-    const backArrow = page.locator('.sidebar-section-header .nav-back');
-    await expect(backArrow).toBeVisible({ timeout: 5000 });
-    await backArrow.click();
-    await backArrow.click(); // up to columns-1
+    // Navigate up to columns-1 level to see col-1, col-2 (two Go to parent clicks)
+    // Always use .last() — it's the current block's nav-back
+    const goToParent = page.locator('.sidebar-section-header .nav-back[title="Go to parent"]').last();
+    await expect(goToParent).toBeVisible({ timeout: 5000 });
+    await goToParent.click();
+    await page.locator('.sidebar-section-header .nav-back[title="Go to parent"]').last().click();
 
     const blockList = page.locator('.child-blocks-widget');
     await expect(blockList).toBeVisible({ timeout: 5000 });
 
     // Click the > arrow on col-2 to navigate into it (not toggle)
     const col2Item = blockList.locator('.child-block-item').filter({ hasText: 'column' }).last();
-    const col2Arrow = col2Item.locator('[data-testid="navigate-into"], .navigate-arrow, [role="button"]').last();
-    // Click the arrow specifically — behavior: drill into col-2, still in selection mode
-    await col2Arrow.click();
+    // Click the arrow wrapper specifically — behavior: drill into col-2, still in selection mode
+    await col2Item.locator('.nav-arrow-wrapper').click();
 
     // ChildBlocksWidget should now show col-2's children (text-2a)
     await expect(blockList.locator('.child-block-item', { hasText: /Text/ })).toBeVisible({ timeout: 5000 });

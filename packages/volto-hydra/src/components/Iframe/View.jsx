@@ -3922,8 +3922,8 @@ const Iframe = (props) => {
         ));
       })()}
 
-      {/* Single-block outline + underline (hidden during multi-select) */}
-      {blockUI && blockUI.rect && referenceElement && !(blockUI.multiSelectedUids?.length > 1) && (() => {
+      {/* Single-block outline + underline (hidden during multi-select or selection mode) */}
+      {blockUI && blockUI.rect && referenceElement && !selectionMode && !(blockUI.multiSelectedUids?.length > 1) && (() => {
         const isTextMode = !!blockUI.focusedFieldName;
         const iframeLeft = referenceElement.getBoundingClientRect().left;
         const iframeTop = referenceElement.getBoundingClientRect().top;

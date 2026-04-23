@@ -2198,7 +2198,17 @@ export class Bridge {
         const end = Math.max(anchorIdx, focusIdx);
         this.multiSelectedBlockUids = siblingUids.slice(start, end + 1);
       } else {
-        this.multiSelectedBlockUids = [blockUid];
+        // Cross-container Shift+Click: fall through to toggle (Ctrl-like)
+        const current = this.multiSelectedBlockUids.length > 0
+          ? [...this.multiSelectedBlockUids]
+          : this.selectedBlockUid ? [this.selectedBlockUid] : [];
+        const idx = current.indexOf(blockUid);
+        if (idx >= 0) {
+          current.splice(idx, 1);
+        } else {
+          current.push(blockUid);
+        }
+        this.multiSelectedBlockUids = current;
       }
     } else {
       // Ctrl/Meta+Click: toggle block in/out of selection

@@ -676,14 +676,47 @@ const ParentBlocksWidget = ({
   if (!isClient) {
     return null;
   }
-  // Don't render block hierarchy for page-level selection
-  // PAGE_BLOCK_UID is the virtual root, not a block to show in the hierarchy
-  if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) {
+  const parentsTarget = document.getElementById('sidebar-parents');
+  if (!parentsTarget) {
     return null;
   }
 
-  const parentsTarget = document.getElementById('sidebar-parents');
-  if (!parentsTarget) {
+  // Page-level or no selection: still render the multi-select bar if any
+  if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) {
+    if (multiSelected.length > 0) {
+      return createPortal(
+        <div className="multi-select-bar" style={{
+          padding: '8px 12px',
+          background: '#e8f4fd',
+          borderTop: '1px solid #007eb1',
+          fontSize: '13px',
+          color: '#007eb1',
+        }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>
+            {multiSelected.length} selected
+          </div>
+          {multiSelected.map((uid) => {
+            const pi = blockPathMap[uid];
+            const type = pi?.blockType || 'Unknown';
+            return (
+              <div
+                key={uid}
+                className="selected-block-path"
+                style={{
+                  padding: '4px 8px', margin: '2px 0',
+                  background: 'white', borderRadius: '3px',
+                  fontSize: '12px', cursor: 'pointer',
+                }}
+                onClick={() => onSelectBlock(uid)}
+              >
+                {type}
+              </div>
+            );
+          })}
+        </div>,
+        parentsTarget,
+      );
+    }
     return null;
   }
 

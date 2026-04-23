@@ -21,7 +21,7 @@
 
 - **Entering selection mode**: Long press on iframe OR Ctrl+Click on sidebar ChildBlocksWidget item → enters selection mode. Iframe shows checkbox overlays on ALL visible blocks. Sidebar shows checkboxes on ChildBlocksWidget items.
 - **In selection mode**:
-  - **Iframe**: clicks on blocks toggle them (no single-block outline/toolbar). Navigation via sidebar still works.
+  - **Iframe**: clicks on blocks toggle them. Single-block outline hidden; toolbar stays visible so users can drag the drag-handle to move selected blocks.
   - **Sidebar**: clicking an item's body toggles its checkbox. Clicking the `>` arrow navigates into that block's children (view only — iframe does NOT highlight the block as selected). Back arrow navigates up. Selected items visually highlighted.
   - Normal single-block selection visualization (outline, toolbar) is suppressed — only multi-select checkboxes show.
 - **Sidebar display during selection mode**:
