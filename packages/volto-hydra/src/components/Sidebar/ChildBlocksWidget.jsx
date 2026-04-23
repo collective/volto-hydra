@@ -260,7 +260,8 @@ const ContainerFieldSection = ({
               <div
                 ref={draginfo.innerRef}
                 {...draginfo.draggableProps}
-                className="child-block-item"
+                className={`child-block-item${multiSelected.includes(child.id) ? ' selected' : ''}`}
+                style={multiSelected.includes(child.id) ? { background: '#e8f4fd' } : undefined}
                 onClick={(e) => {
                   if (e.shiftKey) {
                     // Shift+Click: select range from anchor to clicked
@@ -280,9 +281,10 @@ const ContainerFieldSection = ({
                     if (multiSelected.includes(child.id)) {
                       dispatch(setUIState({ multiSelected: multiSelected.filter(uid => uid !== child.id) }));
                     } else {
-                      const base = multiSelected.length === 0 && selected ? [selected] : [...multiSelected];
-                      dispatch(setUIState({ selected: null, multiSelected: [...base, child.id] }));
+                      dispatch(setUIState({ multiSelected: [...multiSelected, child.id] }));
                     }
+                    // Enter selection mode — iframe shows checkboxes
+                    document.dispatchEvent(new CustomEvent('hydra-enter-selection-mode'));
                   } else {
                     onSelectBlock(child.id);
                   }
@@ -309,6 +311,18 @@ const ContainerFieldSection = ({
         ) : (
           <div className="empty-container-message">No blocks yet</div>
         )}
+        {(() => {
+          const count = multiSelected.filter(uid => childBlocks.some(c => c.id === uid)).length;
+          return count > 0 ? (
+            <div className="multi-select-bar" style={{
+              padding: '6px 12px', background: '#e8f4fd',
+              borderTop: '1px solid #007eb1', fontSize: '13px',
+              fontWeight: 'bold', color: '#007eb1',
+            }}>
+              {count} selected
+            </div>
+          ) : null;
+        })()}
       </div>
     </div>
   );

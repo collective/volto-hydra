@@ -2251,6 +2251,38 @@ export class Bridge {
   }
 
   /**
+   * Enter selection mode without toggling any block.
+   * Used when admin (sidebar) initiates — admin already set multiSelected.
+   * Iframe just needs to start showing checkboxes on all visible blocks.
+   */
+  _enterSelectionModeActivateOnly() {
+    const blockElements = document.querySelectorAll('[data-block-uid]');
+    const seen = new Set();
+    const allVisibleUids = [];
+    for (const el of blockElements) {
+      const uid = el.getAttribute('data-block-uid');
+      if (uid && !seen.has(uid)) {
+        seen.add(uid);
+        allVisibleUids.push(uid);
+      }
+    }
+    const allBlockRects = {};
+    for (const uid of allVisibleUids) {
+      const el = this.queryBlockElement(uid);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        allBlockRects[uid] = { top: r.top, left: r.left, width: r.width, height: r.height };
+      }
+    }
+    this._selectionModeBlockUids = allVisibleUids;
+    // Send without blockUid so admin does not toggle
+    this.sendMessageToParent({
+      type: 'ENTER_SELECTION_MODE',
+      allBlockRects,
+    });
+  }
+
+  /**
    * Send BLOCK_SELECTED with all multi-selected block UIDs and their rects.
    * The admin uses these to render combined outline and determine common parent.
    */
@@ -2896,6 +2928,11 @@ export class Bridge {
           // Admin closed the slash menu (user selected a block type or dismissed)
           log('Received SLASH_MENU_CLOSED');
           this._slashMenuActive = false;
+        } else if (event.data.type === 'ENTER_SELECTION_MODE') {
+          log('Received ENTER_SELECTION_MODE from admin');
+          // Admin (sidebar Ctrl+Click) asked us to enter selection mode.
+          // Enter without toggling any block — admin already set multiSelected.
+          this._enterSelectionModeActivateOnly();
         } else if (event.data.type === 'EXIT_SELECTION_MODE') {
           log('Received EXIT_SELECTION_MODE');
           this._selectionModeBlockUids = null;

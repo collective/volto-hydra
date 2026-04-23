@@ -818,15 +818,27 @@ const Iframe = (props) => {
       }
     };
 
+    const handleEnterSelectionMode = () => {
+      log('hydra-enter-selection-mode');
+      // Tell iframe to enter selection mode. Iframe responds with ENTER_SELECTION_MODE
+      // message containing allBlockRects, which sets selectionMode=true in View.jsx
+      const iframe = document.getElementById('previewIframe');
+      if (iframe?.contentWindow && iframeOriginRef.current) {
+        iframe.contentWindow.postMessage({ type: 'ENTER_SELECTION_MODE' }, iframeOriginRef.current);
+      }
+    };
+
     document.addEventListener('hydra-copy-blocks', handleCopy);
     document.addEventListener('hydra-delete-blocks', handleDelete);
     document.addEventListener('hydra-paste-blocks', handlePaste);
     document.addEventListener('hydra-exit-selection-mode', handleExitSelectionMode);
+    document.addEventListener('hydra-enter-selection-mode', handleEnterSelectionMode);
     return () => {
       document.removeEventListener('hydra-copy-blocks', handleCopy);
       document.removeEventListener('hydra-delete-blocks', handleDelete);
       document.removeEventListener('hydra-paste-blocks', handlePaste);
       document.removeEventListener('hydra-exit-selection-mode', handleExitSelectionMode);
+      document.removeEventListener('hydra-enter-selection-mode', handleEnterSelectionMode);
     };
   }, [blocksClipboard, properties, iframeSyncState?.blockPathMap, onChangeFormData, dispatch, intl]);
 
@@ -1708,13 +1720,14 @@ const Iframe = (props) => {
 
         case 'ENTER_SELECTION_MODE': {
           const { blockUid: toggledUid, allBlockRects } = event.data;
-          log('ENTER_SELECTION_MODE:', toggledUid, allBlockRects ? Object.keys(allBlockRects).length + ' rects' : 'toggle');
+          log('ENTER_SELECTION_MODE:', toggledUid || '(activate only)', allBlockRects ? Object.keys(allBlockRects).length + ' rects' : 'toggle');
           setSelectionMode(true);
           if (allBlockRects) {
             setBlockUI(prev => ({ ...prev, selectionModeRects: allBlockRects }));
           }
-          // Toggle blockUid in multiSelected (use ref to avoid stale closure)
-          if (onSetMultiSelected) {
+          // Toggle blockUid in multiSelected only if provided. When admin triggered
+          // selection mode via sidebar (no blockUid), multiSelected is already set.
+          if (toggledUid && onSetMultiSelected) {
             const current = multiSelectedRef.current || [];
             const idx = current.indexOf(toggledUid);
             const updated = idx >= 0

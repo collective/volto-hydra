@@ -319,12 +319,12 @@ try {
   debugEnabled = typeof window !== "undefined" && !!(window.HYDRA_DEBUG || window.location?.search && new URLSearchParams(window.location.search).has("_hydra_debug"));
 } catch {
 }
-var log = (...args) => {
-  if (!debugEnabled) return;
+function log(...args) {
+  if (!debugEnabled && !window["HYDRA_DEBUG"]) return;
   const runId = typeof window !== "undefined" && window.__testRunId;
   const prefix = runId != null ? `[HYDRA][RUN-${runId}]` : "[HYDRA]";
   console.log(prefix, ...args);
-};
+}
 var isValidNodeId = (id) => id && /^\d+(\.\d+)*$/.test(id);
 var PAGE_BLOCK_UID = "_page";
 var Bridge = class {
@@ -358,7 +358,7 @@ var Bridge = class {
     this.blockTextMutationObserver = null;
     this.attributeMutationObserver = null;
     this.selectedBlockUid = null;
-    this.editMode = null;
+    this.editMode = "text";
     this.multiSelectedBlockUids = [];
     this.focusedFieldName = null;
     this.focusedLinkableField = null;
@@ -977,25 +977,37 @@ var Bridge = class {
     if (e.key === "a" && (e.ctrlKey || e.metaKey)) {
       if (this.multiSelectedBlockUids.length > 0) return true;
       e.preventDefault();
-      const siblings = [this.selectedBlockUid];
-      let uid = this.selectedBlockUid;
-      while (true) {
-        const prev = this._resolveNavigationTarget(uid, "backward", false);
-        if (!prev) break;
-        siblings.unshift(prev);
-        uid = prev;
-      }
-      uid = this.selectedBlockUid;
-      while (true) {
-        const next = this._resolveNavigationTarget(uid, "forward", false);
-        if (!next) break;
-        siblings.push(next);
-        uid = next;
-      }
+      const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
+      const parentId = pathInfo?.parentId || null;
+      const siblings = this._getSiblingsByDomOrder(this.selectedBlockUid, parentId);
       if (siblings.length > 1) {
         this.multiSelectedBlockUids = siblings;
         this._sendMultiBlockSelected();
       }
+      return true;
+    }
+    if ((e.key === "c" || e.key === "x") && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      const uids = this.multiSelectedBlockUids.length > 0 ? [...this.multiSelectedBlockUids] : [this.selectedBlockUid];
+      const action = e.key === "c" ? "copy" : "cut";
+      log("Block mode", action, uids.length, "blocks");
+      this.sendMessageToParent({ type: "COPY_BLOCKS", uids, action });
+      if (action === "cut") {
+        if (this.multiSelectedBlockUids.length > 0) {
+          this.sendMessageToParent({ type: "DELETE_BLOCKS", uids });
+          this.multiSelectedBlockUids = [];
+          this.selectedBlockUid = null;
+        } else {
+          this.sendMessageToParent({ type: "DELETE_BLOCK", uid: this.selectedBlockUid });
+        }
+      }
+      return true;
+    }
+    if (e.key === "v" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      const afterUid = this.multiSelectedBlockUids.length > 0 ? this.multiSelectedBlockUids[this.multiSelectedBlockUids.length - 1] : this.selectedBlockUid;
+      log("Block mode paste after:", afterUid);
+      this.sendMessageToParent({ type: "PASTE_BLOCKS", afterBlockId: afterUid });
       return true;
     }
     if (e.key === "Enter" && !e.shiftKey && this.isInlineEditing) {
@@ -1529,8 +1541,8 @@ var Bridge = class {
     const sel = window.getSelection();
     if (!sel?.rangeCount) return;
     const range = sel.getRangeAt(0);
-    if (!range.collapsed) range.deleteContents();
     const insertionText = text.replace(/^ /, "\xA0").replace(/ $/, "\xA0");
+    if (!range.collapsed) range.deleteContents();
     const textNode = document.createTextNode(insertionText);
     range.insertNode(textNode);
     const parent = textNode.parentNode;
@@ -1858,7 +1870,8 @@ var Bridge = class {
       }, this.adminOrigin);
       return;
     }
-    const allElements = blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid) : [];
+    const multiBlockUids = options.isMultipleSelection ? options.blockUids || [] : [];
+    const allElements = multiBlockUids.length > 1 ? multiBlockUids.flatMap((uid) => [...this.getAllBlockElements(uid)]) : blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid) : [];
     const elementForFields = blockElement || allElements[0] || null;
     let rect;
     if (allElements.length > 0) {
@@ -1921,6 +1934,15 @@ var Bridge = class {
     if (options.selection !== void 0) {
       message.selection = options.selection;
     }
+    if (options.isMultipleSelection) {
+      message.isMultipleSelection = true;
+      message.blockUids = options.blockUids;
+      message.rects = options.rects;
+    }
+    if (options.selectionModeRects) {
+      message.selectionModeRects = options.selectionModeRects;
+    }
+    log("sendBlockSelected:", src, "blockUid:", blockUid, "isMulti:", !!message.isMultipleSelection, "rect:", !!rect);
     window.parent.postMessage(message, this.adminOrigin);
   }
   /**
@@ -1964,6 +1986,67 @@ var Bridge = class {
     this._sendMultiBlockSelected();
   }
   /**
+   * Enter touch selection mode. Sends all sibling block rects to admin
+   * so it can render checkbox overlays for toggling selection.
+   * @param {string} blockUid - The long-pressed block (initially checked)
+   */
+  _enterSelectionMode(blockUid) {
+    const blockElements = document.querySelectorAll("[data-block-uid]");
+    const seen = /* @__PURE__ */ new Set();
+    const allVisibleUids = [];
+    for (const el of blockElements) {
+      const uid = el.getAttribute("data-block-uid");
+      if (uid && !seen.has(uid)) {
+        seen.add(uid);
+        allVisibleUids.push(uid);
+      }
+    }
+    const allBlockRects = {};
+    for (const uid of allVisibleUids) {
+      const el = this.queryBlockElement(uid);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        allBlockRects[uid] = { top: r.top, left: r.left, width: r.width, height: r.height };
+      }
+    }
+    this._selectionModeBlockUids = allVisibleUids;
+    this.sendMessageToParent({
+      type: "ENTER_SELECTION_MODE",
+      blockUid,
+      allBlockRects
+    });
+  }
+  /**
+   * Enter selection mode without toggling any block.
+   * Used when admin (sidebar) initiates — admin already set multiSelected.
+   * Iframe just needs to start showing checkboxes on all visible blocks.
+   */
+  _enterSelectionModeActivateOnly() {
+    const blockElements = document.querySelectorAll("[data-block-uid]");
+    const seen = /* @__PURE__ */ new Set();
+    const allVisibleUids = [];
+    for (const el of blockElements) {
+      const uid = el.getAttribute("data-block-uid");
+      if (uid && !seen.has(uid)) {
+        seen.add(uid);
+        allVisibleUids.push(uid);
+      }
+    }
+    const allBlockRects = {};
+    for (const uid of allVisibleUids) {
+      const el = this.queryBlockElement(uid);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        allBlockRects[uid] = { top: r.top, left: r.left, width: r.width, height: r.height };
+      }
+    }
+    this._selectionModeBlockUids = allVisibleUids;
+    this.sendMessageToParent({
+      type: "ENTER_SELECTION_MODE",
+      allBlockRects
+    });
+  }
+  /**
    * Send BLOCK_SELECTED with all multi-selected block UIDs and their rects.
    * The admin uses these to render combined outline and determine common parent.
    */
@@ -1976,13 +2059,15 @@ var Bridge = class {
         rects[uid] = { top: r.top, left: r.left, width: r.width, height: r.height };
       }
     }
-    this.sendMessageToParent({
-      type: "BLOCK_SELECTED",
-      src: "multiSelect",
-      blockUid: null,
+    const anchorUid = this.multiSelectedBlockUids[0];
+    const anchorEl = this.queryBlockElement(anchorUid);
+    if (!anchorEl) return;
+    this.sendBlockSelected("multiSelect", anchorEl, {
+      blockUid: anchorUid,
       blockUids: this.multiSelectedBlockUids,
       rects,
-      isMultipleSelection: true
+      isMultipleSelection: true,
+      focusedFieldName: null
     });
   }
   /**
@@ -2445,6 +2530,14 @@ var Bridge = class {
         } else if (event.data.type === "SLASH_MENU_CLOSED") {
           log("Received SLASH_MENU_CLOSED");
           this._slashMenuActive = false;
+        } else if (event.data.type === "ENTER_SELECTION_MODE") {
+          log("Received ENTER_SELECTION_MODE from admin");
+          this._enterSelectionModeActivateOnly();
+        } else if (event.data.type === "EXIT_SELECTION_MODE") {
+          log("Received EXIT_SELECTION_MODE");
+          this._selectionModeBlockUids = null;
+          this.multiSelectedBlockUids = [];
+          this.sendMessageToParent({ type: "EXIT_SELECTION_MODE" });
         } else if (event.data.type === "TEMPLATE_EDIT_MODE") {
           this.templateEditMode = event.data.instanceId;
           log("Template edit mode:", this.templateEditMode ? `editing instance ${this.templateEditMode}` : "disabled");
@@ -2511,6 +2604,20 @@ var Bridge = class {
    */
   enableBlockClickListener() {
     this.blockClickHandler = (event) => {
+      if (this._selectionModeBlockUids) {
+        const blockElement2 = event.target.closest("[data-block-uid]");
+        if (blockElement2) {
+          event.preventDefault();
+          event.stopPropagation();
+          const blockUid = blockElement2.getAttribute("data-block-uid");
+          log("blockClickHandler: selection mode toggle:", blockUid);
+          this.sendMessageToParent({
+            type: "ENTER_SELECTION_MODE",
+            blockUid
+          });
+        }
+        return;
+      }
       log("blockClickHandler: event target:", event.target.tagName, event.target.className);
       log("blockClickHandler: _isDragging:", this._isDragging, "_navigatingToBlock:", this._navigatingToBlock);
       const selectorElement = event.target.closest("[data-block-selector]");
@@ -2602,8 +2709,7 @@ var Bridge = class {
           this._pendingInitialSelectTimer = null;
         }
         if (event.shiftKey || event.ctrlKey || event.metaKey) {
-          const selectedEl = this.selectedBlockUid ? this.queryBlockElement(this.selectedBlockUid) : null;
-          const isTextMode = selectedEl ? selectedEl.querySelector('[data-edit-text][contenteditable="true"]') !== null : false;
+          const isTextMode = this.editMode === "text";
           const isSameBlock = blockUid === this.selectedBlockUid;
           if (!isTextMode && !isSameBlock || event.ctrlKey || event.metaKey) {
             this._handleMultiSelectClick(blockUid, event);
@@ -2659,6 +2765,52 @@ var Bridge = class {
         }
       };
       document.addEventListener("mousedown", this._blockSelectorMousedownHandler, true);
+    }
+    if (!this._longPressHandlersAttached) {
+      this._longPressHandlersAttached = true;
+      this._longPressTimer = null;
+      const LONG_PRESS_MS = 600;
+      const MOVE_THRESHOLD = 10;
+      let startX = 0, startY = 0;
+      document.addEventListener("touchstart", (e) => {
+        if (this._longPressTimer) clearTimeout(this._longPressTimer);
+        const touch = e.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        const blockEl = target?.closest("[data-block-uid]");
+        if (!blockEl) return;
+        const blockUid = blockEl.getAttribute("data-block-uid");
+        this._longPressTimer = setTimeout(() => {
+          this._longPressTimer = null;
+          if (this._selectionModeBlockUids) {
+            log("Long press in selection mode, toggling:", blockUid);
+            this.sendMessageToParent({
+              type: "ENTER_SELECTION_MODE",
+              blockUid
+            });
+          } else {
+            log("Long press detected on block:", blockUid);
+            this._enterSelectionMode(blockUid);
+          }
+        }, LONG_PRESS_MS);
+      }, { passive: true });
+      document.addEventListener("touchmove", (e) => {
+        if (!this._longPressTimer) return;
+        const touch = e.touches[0];
+        const dx = touch.clientX - startX;
+        const dy = touch.clientY - startY;
+        if (Math.abs(dx) > MOVE_THRESHOLD || Math.abs(dy) > MOVE_THRESHOLD) {
+          clearTimeout(this._longPressTimer);
+          this._longPressTimer = null;
+        }
+      }, { passive: true });
+      document.addEventListener("touchend", () => {
+        if (this._longPressTimer) {
+          clearTimeout(this._longPressTimer);
+          this._longPressTimer = null;
+        }
+      }, { passive: true });
     }
   }
   ////////////////////////////////////////////////////////////////////////////////
@@ -2716,6 +2868,16 @@ var Bridge = class {
         }
         const activeEditField = document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]');
         if (e.key === "Escape") {
+          if (this.multiSelectedBlockUids.length > 0) {
+            const anchorUid = this.multiSelectedBlockUids[0];
+            this.multiSelectedBlockUids = [];
+            this.selectedBlockUid = anchorUid;
+            const anchorEl = this.queryBlockElement(anchorUid);
+            if (anchorEl) {
+              this.sendBlockSelected("escapeMultiSelect", anchorEl, { focusedFieldName: null });
+            }
+            return;
+          }
           if (!this.selectedBlockUid) {
             this.sendBlockSelected("escapeKey", null);
             return;
@@ -2754,7 +2916,7 @@ var Bridge = class {
               }
             } else {
               this.selectedBlockUid = null;
-              this.editMode = null;
+              this.editMode = "text";
               this.sendBlockSelected("escapeKey", null);
             }
           }
@@ -2787,6 +2949,9 @@ var Bridge = class {
           }
         }
         if (activeEditField) return;
+        if (this.multiSelectedBlockUids.length > 0) {
+          if (this._handleBlockModeKey(e)) return;
+        }
         if (!this.selectedBlockUid) {
           if (e.key === "ArrowDown" || e.key === "ArrowUp") {
             const allBlocks = document.querySelectorAll("[data-block-uid]");
@@ -2799,6 +2964,14 @@ var Bridge = class {
             this.selectBlock(e.key === "ArrowDown" ? pageBlocks[0] : pageBlocks[pageBlocks.length - 1]);
           }
           return;
+        }
+        if (this.editMode === "text" && ["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+          const blockEl = this.queryBlockElement(this.selectedBlockUid);
+          if (blockEl) {
+            e.preventDefault();
+            this.handleArrowAtEdge(e.key, this.selectedBlockUid, null, blockEl);
+            return;
+          }
         }
         if (this._handleBlockModeKey(e)) return;
         const isBodyTarget2 = e.target === document.body || e.target === document.documentElement;
@@ -2969,6 +3142,9 @@ var Bridge = class {
       return;
     }
     this.pendingBufferReplay = null;
+    if (currentEditable && document.activeElement !== currentEditable && !currentEditable.contains(document.activeElement)) {
+      currentEditable.focus({ preventScroll: true });
+    }
     const savedBlockedId = this.blockedBlockId;
     this.blockedBlockId = null;
     for (let i = 0; i < buffer.length; i++) {
@@ -4981,7 +5157,7 @@ DOM path (text node \u2192 container):
         log("Detected focused media field from click:", this.focusedMediaField);
       }
     }
-    if (!isTemplateInstance && !this.focusedFieldName && blockElement) {
+    if (!isTemplateInstance && !isBlockMode && !this.focusedFieldName && blockElement) {
       const firstEditableField = this.getOwnFirstEditableField(blockElement);
       if (firstEditableField) {
         this.focusedFieldName = firstEditableField.getAttribute("data-edit-text");
@@ -5041,12 +5217,22 @@ DOM path (text node \u2192 container):
         const pending = this._pendingBlockSelected;
         this._pendingBlockSelected = null;
         const src = isTemplateInstance ? "templateInstance" : isBlockMode ? "blockMode" : "nonEditableBlock";
-        log("Sending BLOCK_SELECTED immediately for:", pending.blockUid, `(${src})`);
+        log(
+          "Sending BLOCK_SELECTED immediately for:",
+          pending.blockUid,
+          `(${src})`,
+          "mediaField:",
+          pending.focusedMediaField,
+          "hasEditable:",
+          hasEditableFields,
+          "isBlockMode:",
+          isBlockMode
+        );
         this.sendBlockSelected(src, blockElement, {
           blockUid: pending.blockUid,
-          focusedFieldName: isBlockMode ? null : isTemplateInstance ? pending.focusedFieldName : null,
-          focusedLinkableField: isTemplateInstance ? pending.focusedLinkableField : null,
-          focusedMediaField: isTemplateInstance ? pending.focusedMediaField : null
+          focusedFieldName: isBlockMode || !hasEditableFields ? null : pending.focusedFieldName,
+          focusedLinkableField: pending.focusedLinkableField,
+          focusedMediaField: pending.focusedMediaField
         });
         if (isTemplateInstance) return;
       }
@@ -5093,32 +5279,36 @@ DOM path (text node \u2192 container):
             this.detectFocusedFieldAndUpdateToolbar(this.selectedBlockUid);
             this.needsFieldDetection = false;
           }
-          const editableField = this.getOwnFirstEditableField(currentBlockElement);
-          const wasAlreadyEditable = editableField?.getAttribute("contenteditable") === "true";
-          this.restoreContentEditableOnFields(currentBlockElement, "selectBlock");
-          let contentEditableField = this.focusedFieldName ? this.getEditableFieldByName(currentBlockElement, this.focusedFieldName) : currentBlockElement.querySelector('[contenteditable="true"]');
-          if (contentEditableField) {
-            const fieldBlockElement = contentEditableField.closest("[data-block-uid]");
-            if (fieldBlockElement !== currentBlockElement) {
-              log("selectBlock: editable field belongs to nested block, skipping focus");
-              contentEditableField = null;
+          if (this.editMode === "block") {
+            this.sendBlockSelected("blockMode", currentBlockElement, { focusedFieldName: null });
+          } else if (this.editMode === "text") {
+            const editableField = this.getOwnFirstEditableField(currentBlockElement);
+            const wasAlreadyEditable = editableField?.getAttribute("contenteditable") === "true";
+            this.restoreContentEditableOnFields(currentBlockElement, "selectBlock");
+            let contentEditableField = this.focusedFieldName ? this.getEditableFieldByName(currentBlockElement, this.focusedFieldName) : currentBlockElement.querySelector('[contenteditable="true"]');
+            if (contentEditableField) {
+              const fieldBlockElement = contentEditableField.closest("[data-block-uid]");
+              if (fieldBlockElement !== currentBlockElement) {
+                log("selectBlock: editable field belongs to nested block, skipping focus");
+                contentEditableField = null;
+              }
             }
-          }
-          if (contentEditableField) {
-            const fieldPath = contentEditableField.getAttribute("data-edit-text");
-            this.activateEditableField(contentEditableField, fieldPath, this.selectedBlockUid, "selectBlock", {
-              skipContentEditable: true,
-              // Already done above
-              skipObservers: true,
-              // Text observers set up elsewhere for blocks
-              preventScroll: this._isReselectingSameBlock,
-              wasAlreadyEditable,
-              saveClickPosition: true
-              // Save for FORM_DATA handler after re-render
-            });
-          } else if (this.lastClickPosition) {
-            log("selectBlock: no editable field found, clearing lastClickPosition");
-            this.lastClickPosition = null;
+            if (contentEditableField) {
+              const fieldPath = contentEditableField.getAttribute("data-edit-text");
+              this.activateEditableField(contentEditableField, fieldPath, this.selectedBlockUid, "selectBlock", {
+                skipContentEditable: true,
+                // Already done above
+                skipObservers: true,
+                // Text observers set up elsewhere for blocks
+                preventScroll: this._isReselectingSameBlock,
+                wasAlreadyEditable,
+                saveClickPosition: true
+                // Save for FORM_DATA handler after re-render
+              });
+            } else if (this.lastClickPosition) {
+              log("selectBlock: no editable field found, clearing lastClickPosition");
+              this.lastClickPosition = null;
+            }
           }
           if (this._pendingBlockSelected) {
             const serializedSelection = this.serializeSelection();
@@ -5860,13 +6050,14 @@ DOM path (text node \u2192 container):
     const dragHandler = (e) => {
       e.preventDefault();
       this._isDragging = true;
-      const allElements = [...this.getAllBlockElements(this.selectedBlockUid)];
+      const draggedUids = this.multiSelectedBlockUids.length > 0 ? [...this.multiSelectedBlockUids] : [this.selectedBlockUid];
+      const allElements = draggedUids.flatMap((uid) => [...this.getAllBlockElements(uid)]);
       if (allElements.length === 0) return;
       const rect = this.getBoundingBoxForElements(allElements);
       if (!rect) return;
       document.querySelector("body").classList.add("grabbing");
       let draggedBlock;
-      if (allElements.length > 1) {
+      if (draggedUids.length > 1 || allElements.length > 1) {
         draggedBlock = document.createElement("div");
         draggedBlock.classList.add("dragging", "multi-element-ghost");
         draggedBlock.style.cssText = `
@@ -6119,18 +6310,14 @@ DOM path (text node \u2192 container):
         }
         if (closestBlockUid && dropIndicatorVisible) {
           this._justFinishedDragBlockId = this.selectedBlockUid;
-          const draggedBlockId = this.selectedBlockUid;
-          const draggedPathInfo = this.blockPathMap?.[draggedBlockId];
           const targetPathInfo = this.blockPathMap?.[closestBlockUid];
-          log("DnD: Moving block", draggedBlockId, "relative to", closestBlockUid, "insertAfter:", insertAt === 1);
+          log("DnD: Moving", draggedUids.length, "blocks relative to", closestBlockUid, "insertAfter:", insertAt === 1);
           window.parent.postMessage(
             {
-              type: "MOVE_BLOCK",
-              blockId: draggedBlockId,
+              type: "MOVE_BLOCKS",
+              blockIds: draggedUids,
               targetBlockId: closestBlockUid,
               insertAfter: insertAt === 1,
-              // Include path info for Admin to determine source/target containers
-              sourceParentId: draggedPathInfo?.parentId || null,
               targetParentId: targetPathInfo?.parentId || null
             },
             this.adminOrigin
@@ -6161,7 +6348,7 @@ DOM path (text node \u2192 container):
           if (prevUid) {
             this.deselectBlock(prevUid, null);
           }
-          this.editMode = null;
+          this.editMode = "text";
           this.sendBlockSelected("adminDeselect", null);
           return;
         }
@@ -6266,7 +6453,7 @@ DOM path (text node \u2192 container):
    */
   setupScrollHandler() {
     const handleScroll = () => {
-      if (this.selectedBlockUid && !this._blockSelectorNavigating) {
+      if ((this.selectedBlockUid || this.multiSelectedBlockUids.length > 0) && !this._blockSelectorNavigating) {
         window.parent.postMessage(
           { type: "HIDE_BLOCK_UI" },
           this.adminOrigin
@@ -6277,6 +6464,10 @@ DOM path (text node \u2192 container):
       }
       this.scrollTimeout = setTimeout(() => {
         if (this._isDragging || this._blockSelectorNavigating) {
+          return;
+        }
+        if (this.multiSelectedBlockUids.length > 1) {
+          this._sendMultiBlockSelected();
           return;
         }
         if (this.selectedBlockUid) {
@@ -6294,7 +6485,19 @@ DOM path (text node \u2192 container):
             element = elements[0] || null;
           }
           if (element) {
-            this.sendBlockSelected("scrollHandler", element, { blockUid: this.selectedBlockUid });
+            const extra = {};
+            if (this._selectionModeBlockUids) {
+              const selectionModeRects = {};
+              for (const uid of this._selectionModeBlockUids) {
+                const el = this.queryBlockElement(uid);
+                if (el) {
+                  const r = el.getBoundingClientRect();
+                  selectionModeRects[uid] = { top: r.top, left: r.left, width: r.width, height: r.height };
+                }
+              }
+              extra.selectionModeRects = selectionModeRects;
+            }
+            this.sendBlockSelected("scrollHandler", element, { blockUid: this.selectedBlockUid, ...extra });
           }
         }
       }, 150);
