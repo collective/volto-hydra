@@ -732,6 +732,49 @@ test.describe('Block Mode (Escape state machine)', () => {
     await helper.waitForMultiSelectOutlines(3);
   });
 
+  // Subsequent Cmd+A presses walk up the parent chain
+  test('Cmd+A escalates up through parent containers', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Enter text mode on text-1a (deepest leaf)
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+
+    // Press 1: text in field. Press 2: block mode. Press 3: siblings in col-1.
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('ControlOrMeta+a');
+    await helper.waitForMultiSelectOutlines(2);
+    const level3Count = await page.locator('.selected-block-path').count();
+    expect(level3Count).toBe(2);
+
+    // Press 4: escalate to siblings of col-1 (inside columns-1). Should include col-2 at minimum.
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect.poll(async () => page.locator('.selected-block-path').count(), {
+      timeout: 3000,
+    }).toBeGreaterThan(level3Count);
+    const level4Count = await page.locator('.selected-block-path').count();
+
+    // Press 5: escalate to columns-1's siblings (page level). Page has title + columns-1 + text-after + grid-1.
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect.poll(async () => {
+      const rows = page.locator('.selected-block-path');
+      const count = await rows.count();
+      if (count === 0) return null;
+      const texts = await rows.allTextContents();
+      // Page-level siblings include 'Title' (title-block type) which wasn't in previous levels
+      return texts.some((t) => t.includes('Title')) ? count : null;
+    }, { timeout: 3000 }).not.toBeNull();
+    const level5Count = await page.locator('.selected-block-path').count();
+
+    // Further presses: no-op (already at page root — escalation has nowhere to go)
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.waitForTimeout(500);
+    expect(await page.locator('.selected-block-path').count()).toBe(level5Count);
+  });
+
   test('Shift+Arrow extend and shrink shows correct outline at each step', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -2289,5 +2332,50 @@ test.describe('Multi-Block Selection', () => {
     // Single-block outline should reappear on one of the previously selected blocks
     await expect(page.locator('.volto-hydra-block-outline').first())
       .toBeVisible({ timeout: 3000 });
+  });
+
+  // Cross-block text drag: selecting text across block boundaries enters multi-block selection
+  test('Text selection spanning two blocks enters multi-block selection', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Click into block-1 first to establish text mode
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+
+    // Use Range API to set a selection spanning block-1 and block-3 (both slate blocks)
+    await iframe.locator('body').evaluate(() => {
+      const block1 = document.querySelector('[data-block-uid="block-1-uuid"]');
+      const block3 = document.querySelector('[data-block-uid="block-3-uuid"]');
+      if (!block1 || !block3) throw new Error('blocks not found');
+
+      // Find first text node in block-1 and first text node in block-3
+      const findText = (root: Element) => {
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        return walker.nextNode() as Text | null;
+      };
+      const t1 = findText(block1);
+      const t3 = findText(block3);
+      if (!t1 || !t3) throw new Error('text nodes not found');
+
+      const range = document.createRange();
+      range.setStart(t1, 0);
+      range.setEnd(t3, Math.min(3, t3.length));
+      const sel = window.getSelection()!;
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.dispatchEvent(new Event('selectionchange'));
+    });
+
+    // Expected: multi-block selection. Outlines on both slate blocks (block-1 + block-3)
+    // Note: block-2 (image, between them) may or may not be included
+    await helper.waitForMultiSelectOutlines(2);
+
+    // Summary bar reflects it
+    await expect(page.locator('.multi-select-bar'))
+      .toContainText('selected', { timeout: 3000 });
   });
 });

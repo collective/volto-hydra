@@ -900,6 +900,57 @@ var Bridge = class {
     });
     return siblings;
   }
+  _sameUids(a, b) {
+    if (a.length !== b.length) return false;
+    const setB = new Set(b);
+    return a.every((uid) => setB.has(uid));
+  }
+  /**
+   * Detects text selections that span multiple blocks and converts them into
+   * a multi-block selection. Fires on each selectionchange.
+   */
+  _checkCrossBlockSelection(range) {
+    const anchorBlock = this._closestBlockElement(range.startContainer);
+    const focusBlock = this._closestBlockElement(range.endContainer);
+    if (!anchorBlock || !focusBlock) return;
+    const anchorUid = anchorBlock.getAttribute("data-block-uid");
+    const focusUid = focusBlock.getAttribute("data-block-uid");
+    if (!anchorUid || !focusUid || anchorUid === focusUid) return;
+    const uids = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const el of document.querySelectorAll("[data-block-uid]")) {
+      if (!range.intersectsNode(el)) continue;
+      const uid = el.getAttribute("data-block-uid");
+      if (!uid || seen.has(uid)) continue;
+      seen.add(uid);
+      uids.push(uid);
+    }
+    if (uids.length < 2) return;
+    const pruned = uids.filter((uid) => {
+      const el = this.queryBlockElement(uid);
+      if (!el) return false;
+      return !uids.some((other) => {
+        if (other === uid) return false;
+        const otherEl = this.queryBlockElement(other);
+        return otherEl && el !== otherEl && el.contains(otherEl);
+      });
+    });
+    if (pruned.length < 2) return;
+    if (this._sameUids(pruned, this.multiSelectedBlockUids)) return;
+    this.multiSelectedBlockUids = pruned;
+    this.selectedBlockUid = pruned[pruned.length - 1];
+    this._sendMultiBlockSelected();
+  }
+  _closestBlockElement(node) {
+    let current = node;
+    while (current) {
+      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.("data-block-uid")) {
+        return current;
+      }
+      current = current.parentNode;
+    }
+    return null;
+  }
   /**
    * Handle arrow key press when cursor is at the edge of an editable field.
    * Navigates between fields within a block, or to adjacent blocks.
@@ -975,12 +1026,24 @@ var Bridge = class {
       return true;
     }
     if (e.key === "a" && (e.ctrlKey || e.metaKey)) {
-      if (this.multiSelectedBlockUids.length > 0) return true;
       e.preventDefault();
-      const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
-      const parentId = pathInfo?.parentId || null;
-      const siblings = this._getSiblingsByDomOrder(this.selectedBlockUid, parentId);
-      if (siblings.length > 1) {
+      let anchorUid;
+      if (this.multiSelectedBlockUids.length > 0) {
+        anchorUid = this.multiSelectedBlockUids[0];
+      } else {
+        anchorUid = this.selectedBlockUid;
+      }
+      const anchorInfo = this.blockPathMap?.[anchorUid];
+      if (!anchorInfo) return true;
+      let containerId = anchorInfo.parentId || null;
+      if (this.multiSelectedBlockUids.length > 0) {
+        const containerInfo = this.blockPathMap?.[containerId];
+        if (!containerInfo) return true;
+        containerId = containerInfo.parentId || null;
+        anchorUid = anchorInfo.parentId;
+      }
+      const siblings = this._getSiblingsByDomOrder(anchorUid, containerId);
+      if (siblings.length > 0 && !this._sameUids(siblings, this.multiSelectedBlockUids)) {
         this.multiSelectedBlockUids = siblings;
         this._sendMultiBlockSelected();
       }
@@ -5266,6 +5329,9 @@ DOM path (text node \u2192 container):
           rangeEnd: range?.endOffset,
           collapsed: selection?.isCollapsed
         });
+        if (selection && !selection.isCollapsed && range) {
+          this._checkCrossBlockSelection(range);
+        }
         if (selection && selection.rangeCount > 0) {
           this._isCorrectingWhitespaceSelection = true;
           const corrected = this.correctInvalidWhitespaceSelection();

@@ -852,6 +852,67 @@ export class Bridge {
     return siblings;
   }
 
+  _sameUids(a, b) {
+    if (a.length !== b.length) return false;
+    const setB = new Set(b);
+    return a.every((uid) => setB.has(uid));
+  }
+
+  /**
+   * Detects text selections that span multiple blocks and converts them into
+   * a multi-block selection. Fires on each selectionchange.
+   */
+  _checkCrossBlockSelection(range) {
+    const anchorBlock = this._closestBlockElement(range.startContainer);
+    const focusBlock = this._closestBlockElement(range.endContainer);
+    if (!anchorBlock || !focusBlock) return;
+    const anchorUid = anchorBlock.getAttribute('data-block-uid');
+    const focusUid = focusBlock.getAttribute('data-block-uid');
+    if (!anchorUid || !focusUid || anchorUid === focusUid) return;
+
+    // Collect all blocks intersecting the range, preserve DOM order
+    const uids = [];
+    const seen = new Set();
+    for (const el of document.querySelectorAll('[data-block-uid]')) {
+      if (!range.intersectsNode(el)) continue;
+      const uid = el.getAttribute('data-block-uid');
+      if (!uid || seen.has(uid)) continue;
+      // Skip containers: only include blocks whose entire UID doesn't contain another selected block
+      // (keeps the selection at the leaf level the user dragged across)
+      seen.add(uid);
+      uids.push(uid);
+    }
+    if (uids.length < 2) return;
+
+    // Prune containers: remove any block that is an ancestor of another selected block
+    const pruned = uids.filter((uid) => {
+      const el = this.queryBlockElement(uid);
+      if (!el) return false;
+      return !uids.some((other) => {
+        if (other === uid) return false;
+        const otherEl = this.queryBlockElement(other);
+        return otherEl && el !== otherEl && el.contains(otherEl);
+      });
+    });
+    if (pruned.length < 2) return;
+
+    if (this._sameUids(pruned, this.multiSelectedBlockUids)) return;
+    this.multiSelectedBlockUids = pruned;
+    this.selectedBlockUid = pruned[pruned.length - 1];
+    this._sendMultiBlockSelected();
+  }
+
+  _closestBlockElement(node) {
+    let current = node;
+    while (current) {
+      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-block-uid')) {
+        return current;
+      }
+      current = current.parentNode;
+    }
+    return null;
+  }
+
   /**
    * Handle arrow key press when cursor is at the edge of an editable field.
    * Navigates between fields within a block, or to adjacent blocks.
@@ -935,14 +996,32 @@ export class Bridge {
       return true;
     }
 
-    // Cmd+A: select all sibling blocks within the same container
+    // Cmd+A: escalate selection up the parent chain
+    // Press 1 (in block mode, no multi): select siblings of current block
+    // Press 2+: replace with siblings of the current selection's parent (walk up)
     if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
-      if (this.multiSelectedBlockUids.length > 0) return true; // already multi-selected
       e.preventDefault();
-      const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
-      const parentId = pathInfo?.parentId || null;
-      const siblings = this._getSiblingsByDomOrder(this.selectedBlockUid, parentId);
-      if (siblings.length > 1) {
+      let anchorUid;
+      if (this.multiSelectedBlockUids.length > 0) {
+        // Already multi-selected: escalate by walking up from any selected block's parent
+        anchorUid = this.multiSelectedBlockUids[0];
+      } else {
+        anchorUid = this.selectedBlockUid;
+      }
+      const anchorInfo = this.blockPathMap?.[anchorUid];
+      if (!anchorInfo) return true;
+      // Current "container" of the selection is anchor's parentId.
+      // For escalation, select siblings at that level; next press walks up.
+      let containerId = anchorInfo.parentId || null;
+      if (this.multiSelectedBlockUids.length > 0) {
+        // Escalate: move up one level — select siblings of the container itself
+        const containerInfo = this.blockPathMap?.[containerId];
+        if (!containerInfo) return true; // already at root (page-level)
+        containerId = containerInfo.parentId || null;
+        anchorUid = anchorInfo.parentId;
+      }
+      const siblings = this._getSiblingsByDomOrder(anchorUid, containerId);
+      if (siblings.length > 0 && !this._sameUids(siblings, this.multiSelectedBlockUids)) {
         this.multiSelectedBlockUids = siblings;
         this._sendMultiBlockSelected();
       }
@@ -6536,6 +6615,12 @@ export class Bridge {
           rangeEnd: range?.endOffset,
           collapsed: selection?.isCollapsed,
         });
+
+        // Cross-block text drag: if selection spans multiple blocks, enter multi-block mode
+        if (selection && !selection.isCollapsed && range) {
+          this._checkCrossBlockSelection(range);
+        }
+
         // Save both cursor positions (collapsed) and text selections (non-collapsed)
         if (selection && selection.rangeCount > 0) {
           // Correct cursor if it's on invalid whitespace (template artifacts)
