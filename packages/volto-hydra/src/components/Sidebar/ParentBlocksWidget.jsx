@@ -764,7 +764,7 @@ const ParentBlocksWidget = ({
           />
 
           {/* Multi-select summary bar at bottom of sidebar, below ChildBlocksWidget */}
-          {isMultiSelected && (
+          {multiSelected.length > 0 && (
             <div className="multi-select-bar" style={{
               padding: '8px 12px',
               background: '#e8f4fd',

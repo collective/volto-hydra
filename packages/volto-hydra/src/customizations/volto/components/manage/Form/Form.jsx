@@ -474,10 +474,12 @@ class Form extends Component {
    * @returns {undefined}
    */
   onSelectBlock(id) {
+    // In selection mode (multiSelected has blocks), preserve the selection
+    // so users can navigate the sidebar without losing what they've selected
+    const inSelectionMode = (this.props.uiState?.multiSelected?.length || 0) > 0;
     this.props.setUIState({
       selected: id,
-      multiSelected: [],
-      gridSelected: null,
+      ...(inSelectionMode ? {} : { multiSelected: [], gridSelected: null }),
     });
 
     if (this.props.onSelectForm) {

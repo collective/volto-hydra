@@ -2592,7 +2592,8 @@ const Iframe = (props) => {
           }
 
           // --- Single-block selection from here on ---
-          if (onSetMultiSelected) onSetMultiSelected([]);
+          // Clear multiSelected unless we're in selection mode (preserve during navigation)
+          if (onSetMultiSelected && !selectionMode) onSetMultiSelected([]);
           if (isNewBlock) {
             log('BLOCK_SELECTED calling onSelectBlock:', event.data.blockUid);
             onSelectBlock(event.data.blockUid);

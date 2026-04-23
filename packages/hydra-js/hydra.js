@@ -1941,6 +1941,16 @@ var Bridge = class {
     }
     if (options.selectionModeRects) {
       message.selectionModeRects = options.selectionModeRects;
+    } else if (this._selectionModeBlockUids) {
+      const rects = {};
+      for (const uid of this._selectionModeBlockUids) {
+        const el = this.queryBlockElement(uid);
+        if (el) {
+          const r = el.getBoundingClientRect();
+          rects[uid] = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+      }
+      message.selectionModeRects = rects;
     }
     log("sendBlockSelected:", src, "blockUid:", blockUid, "isMulti:", !!message.isMultipleSelection, "rect:", !!rect);
     window.parent.postMessage(message, this.adminOrigin);

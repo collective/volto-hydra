@@ -2147,9 +2147,21 @@ export class Bridge {
       message.rects = options.rects;
     }
 
-    // Selection mode: include updated rects for all checkbox blocks
+    // Selection mode: include updated rects for all checkbox blocks.
+    // If caller provided explicit rects, use those; otherwise auto-include
+    // current selection mode rects when active so admin keeps checkboxes.
     if (options.selectionModeRects) {
       message.selectionModeRects = options.selectionModeRects;
+    } else if (this._selectionModeBlockUids) {
+      const rects = {};
+      for (const uid of this._selectionModeBlockUids) {
+        const el = this.queryBlockElement(uid);
+        if (el) {
+          const r = el.getBoundingClientRect();
+          rects[uid] = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+      }
+      message.selectionModeRects = rects;
     }
 
     log('sendBlockSelected:', src, 'blockUid:', blockUid, 'isMulti:', !!message.isMultipleSelection, 'rect:', !!rect);

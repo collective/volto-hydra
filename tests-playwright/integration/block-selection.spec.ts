@@ -2052,18 +2052,26 @@ test.describe('Multi-Block Selection', () => {
     await helper.waitForBlockSelected('text-1a');
     await helper.longPressBlock('text-1a');
 
-    // Navigate back to col-1 via sidebar back arrow
-    const backArrow = page.locator('.sidebar-section-header .nav-back');
+    // Verify selection mode is active before navigation
+    await expect(page.locator('.volto-hydra-selection-checkbox').first())
+      .toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.multi-select-bar')).toBeAttached({ timeout: 3000 });
+
+    // Navigate back to col-1 via sidebar back arrow (use last = innermost)
+    const backArrow = page.locator('.sidebar-section-header .nav-back').last();
     await expect(backArrow).toBeVisible({ timeout: 5000 });
     await backArrow.click();
 
-    // Should see col-1's children in sidebar, still in selection mode
-    const blockList = page.locator('.child-blocks-widget');
-    await expect(blockList).toBeVisible({ timeout: 5000 });
-
-    // Checkboxes should still be in iframe
+    // After navigation: selection mode should STILL be active
+    // Checkboxes should still be visible in iframe
     await expect(page.locator('.volto-hydra-selection-checkbox').first())
       .toBeVisible({ timeout: 3000 });
+
+    // Summary bar should still exist in DOM
+    await expect(page.locator('.multi-select-bar')).toBeAttached({ timeout: 3000 });
+
+    // Summary bar should contain the selected block
+    await expect(page.locator('.selected-block-path')).toHaveCount(1, { timeout: 3000 });
   });
 
   // Selection mode suppresses normal single-block UI
