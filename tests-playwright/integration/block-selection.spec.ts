@@ -2041,6 +2041,30 @@ test.describe('Multi-Block Selection', () => {
     await expect(page.locator('.selected-block-path')).toHaveCount(2);
   });
 
+  // Cross-container selection shows path (not just type) in summary bar
+  test('Multi-select summary bar renders path from common ancestor', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Select text-1a (inside columns-1 > col-1), Ctrl+Click text-2a (inside columns-1 > col-2)
+    // Common ancestor = columns-1. Path should be "Columns > ... > Slate" style.
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.escapeFromEditing();
+    await iframe.locator('[data-block-uid="text-2a"]').click({ modifiers: ['ControlOrMeta'] });
+
+    await expect(page.locator('.multi-select-bar'))
+      .toContainText('2 selected', { timeout: 5000 });
+    // Each row should contain ' > ' since path crosses the column level
+    const rows = page.locator('.selected-block-path');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.first()).toContainText(' > ');
+    await expect(rows.last()).toContainText(' > ');
+  });
+
   // Task 5: Selection mode navigation in sidebar
   test('Sidebar navigation works during selection mode', async ({ page }) => {
     const helper = new AdminUIHelper(page);
