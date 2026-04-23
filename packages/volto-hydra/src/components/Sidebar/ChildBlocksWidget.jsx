@@ -311,18 +311,6 @@ const ContainerFieldSection = ({
         ) : (
           <div className="empty-container-message">No blocks yet</div>
         )}
-        {(() => {
-          const count = multiSelected.filter(uid => childBlocks.some(c => c.id === uid)).length;
-          return count > 0 ? (
-            <div className="multi-select-bar" style={{
-              padding: '6px 12px', background: '#e8f4fd',
-              borderTop: '1px solid #007eb1', fontSize: '13px',
-              fontWeight: 'bold', color: '#007eb1',
-            }}>
-              {count} selected
-            </div>
-          ) : null;
-        })()}
       </div>
     </div>
   );

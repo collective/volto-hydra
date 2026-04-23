@@ -688,9 +688,9 @@ test.describe('Block Mode (Escape state machine)', () => {
 
     await helper.waitForMultiSelectOutlines(2);
 
-    // Sidebar should show "2 blocks selected"
-    await expect(page.locator('[data-testid="multi-select-summary"]'))
-      .toContainText('2 blocks', { timeout: 3000 });
+    // Sidebar should show "2 selected" summary bar
+    await expect(page.locator('.multi-select-bar'))
+      .toContainText('2 selected', { timeout: 3000 });
   });
 
   test('Cmd+A in block mode selects all sibling blocks', async ({ page }) => {
@@ -1138,10 +1138,10 @@ test.describe('Multi-Block Selection', () => {
     await helper.escapeFromEditing();
     await page.keyboard.press('Shift+ArrowDown');
 
-    // Right sidebar should show multi-select summary
-    const summary = page.locator('[data-testid="multi-select-summary"]');
+    // Right sidebar should show multi-select summary bar
+    const summary = page.locator('.multi-select-bar');
     await expect(summary).toBeVisible({ timeout: 5000 });
-    await expect(summary).toContainText('2 blocks selected');
+    await expect(summary).toContainText('2 selected');
   });
 
   test('Copy block and paste after another block', async ({ page }) => {
@@ -1512,10 +1512,10 @@ test.describe('Multi-Block Selection', () => {
     await expect(page.locator('.quanta-toolbar[data-multi-select="true"]'))
       .toBeVisible({ timeout: 5000 });
 
-    // Right sidebar should show 2 blocks selected
-    const summary = page.locator('[data-testid="multi-select-summary"]');
+    // Right sidebar should show 2 selected summary bar
+    const summary = page.locator('.multi-select-bar');
     await expect(summary).toBeVisible({ timeout: 5000 });
-    await expect(summary).toContainText('2 blocks selected');
+    await expect(summary).toContainText('2 selected');
   });
 
   test('Delete multi-selected blocks in container', async ({ page }) => {
@@ -1560,7 +1560,7 @@ test.describe('Multi-Block Selection', () => {
     await iframe.locator('[data-block-uid="text-2a"]').click({ modifiers: ['Shift'] });
 
     // Should NOT have multi-select — text-2a is in a different container
-    await expect(page.locator('[data-testid="multi-select-summary"]'))
+    await expect(page.locator('.multi-select-bar'))
       .not.toBeVisible({ timeout: 3000 });
   });
 
@@ -1580,8 +1580,8 @@ test.describe('Multi-Block Selection', () => {
     await iframe.locator('[data-block-uid="text-2a"]').click({ modifiers: ['ControlOrMeta'] });
 
     // Should have multi-selection with blocks from both containers
-    await expect(page.locator('[data-testid="multi-select-summary"]'))
-      .toContainText('2 blocks', { timeout: 5000 });
+    await expect(page.locator('.multi-select-bar'))
+      .toContainText('2 selected', { timeout: 5000 });
 
     // Copy the multi-selected blocks
     await page.keyboard.press('ControlOrMeta+c');
@@ -1627,9 +1627,9 @@ test.describe('Multi-Block Selection', () => {
     await expect(checkbox2).toBeVisible({ timeout: 5000 });
     await checkbox2.click();
 
-    // Sidebar should show 2 blocks selected
-    await expect(page.locator('[data-testid="multi-select-summary"]'))
-      .toContainText('2 blocks', { timeout: 5000 });
+    // Sidebar should show 2 selected summary bar
+    await expect(page.locator('.multi-select-bar'))
+      .toContainText('2 selected', { timeout: 5000 });
 
     // Copy via left toolbar — auto-exits selection mode
     const copyButton = page.locator('button[aria-label="Copy blocks"]');
@@ -1676,8 +1676,8 @@ test.describe('Multi-Block Selection', () => {
     await checkbox2.click();
 
     // Wait for multi-select state to update
-    await expect(page.locator('[data-testid="multi-select-summary"]'))
-      .toContainText('2 blocks', { timeout: 5000 });
+    await expect(page.locator('.multi-select-bar'))
+      .toContainText('2 selected', { timeout: 5000 });
 
     // Exit button should show count badge "2"
     const exitButton = page.locator('[data-testid="exit-selection-mode"]');
@@ -1692,7 +1692,7 @@ test.describe('Multi-Block Selection', () => {
       .not.toBeVisible({ timeout: 3000 });
 
     // Multi-select should be cleared
-    await expect(page.locator('[data-testid="multi-select-summary"]'))
+    await expect(page.locator('.multi-select-bar'))
       .not.toBeVisible({ timeout: 3000 });
   });
 
@@ -1842,8 +1842,8 @@ test.describe('Multi-Block Selection', () => {
     const textField3 = await helper.getEditorLocator('block-3-uuid', 'value');
     await textField3.click({ modifiers: ['Shift'] });
 
-    // Should NOT have multi-select outline or sidebar summary
-    await expect(page.locator('[data-testid="multi-select-summary"]'))
+    // Should NOT have multi-select summary bar
+    await expect(page.locator('.multi-select-bar'))
       .not.toBeVisible({ timeout: 2000 });
 
     // Should still be in text mode (subtle border, not block mode border)
@@ -1953,8 +1953,8 @@ test.describe('Multi-Block Selection', () => {
     await expect(blockList.locator('.child-block-item.selected'))
       .toHaveCount(2, { timeout: 5000 });
 
-    // Summary bar at bottom should show count
-    await expect(blockList.locator('.multi-select-bar'))
+    // Summary bar in sidebar (below child widget) shows count
+    await expect(page.locator('.multi-select-bar'))
       .toContainText('2 selected', { timeout: 3000 });
   });
 
@@ -1985,7 +1985,7 @@ test.describe('Multi-Block Selection', () => {
   });
 
   // Task 4: Sibling multi-select keeps block list, cross-container shows filtered view
-  test('Sibling multi-select keeps ChildBlocksWidget visible', async ({ page }) => {
+  test('Sibling multi-select shows summary bar with selected blocks', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
@@ -1996,15 +1996,13 @@ test.describe('Multi-Block Selection', () => {
     await helper.escapeFromEditing();
     await page.keyboard.press('Shift+ArrowDown');
 
-    // ChildBlocksWidget should be visible (not replaced by summary)
-    await expect(page.locator('.child-blocks-widget')).toBeVisible({ timeout: 5000 });
-
-    // multi-select-summary should NOT appear for siblings
-    await expect(page.locator('[data-testid="multi-select-summary"]'))
-      .not.toBeVisible({ timeout: 2000 });
+    // Summary bar should show 2 selected with paths listed
+    await expect(page.locator('.multi-select-bar'))
+      .toContainText('2 selected', { timeout: 5000 });
+    await expect(page.locator('.selected-block-path')).toHaveCount(2);
   });
 
-  test('Cross-container multi-select shows filtered path view', async ({ page }) => {
+  test('Multi-select summary lists selected blocks across containers', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
@@ -2017,33 +2015,30 @@ test.describe('Multi-Block Selection', () => {
     await helper.escapeFromEditing();
     await iframe.locator('[data-block-uid="text-2a"]').click({ modifiers: ['ControlOrMeta'] });
 
-    // ChildBlocksWidget should show filtered view with paths
-    const blockList = page.locator('.child-blocks-widget');
-    await expect(blockList).toBeVisible({ timeout: 5000 });
-
-    // Should show selected blocks with path context
-    await expect(blockList.locator('.selected-block-path')).toHaveCount(2, { timeout: 5000 });
-    await expect(blockList.locator('.multi-select-bar')).toContainText('2 selected');
+    // Summary bar is in the sidebar (below any ChildBlocksWidget)
+    // Shows total count and lists selected blocks across containers
+    await expect(page.locator('.multi-select-bar'))
+      .toContainText('2 selected', { timeout: 5000 });
+    await expect(page.locator('.selected-block-path')).toHaveCount(2, { timeout: 5000 });
   });
 
-  test('Page-level cross-container multi-select shows full paths', async ({ page }) => {
+  test('Multi-select summary persists for leaf block (no ChildBlocksWidget)', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
     const iframe = helper.getIframe();
 
-    // Select text-1a (in col-1), Ctrl+Click text-after (page-level)
+    // Select text-1a (leaf block - no ChildBlocksWidget), Ctrl+Click text-after
     await helper.clickBlockInIframe('text-1a');
     await helper.waitForBlockSelected('text-1a');
     await helper.escapeFromEditing();
     await iframe.locator('[data-block-uid="text-after"]').click({ modifiers: ['ControlOrMeta'] });
 
-    // Common ancestor is PAGE — filtered view with full paths
-    const blockList = page.locator('.child-blocks-widget');
-    await expect(blockList).toBeVisible({ timeout: 5000 });
-    await expect(blockList.locator('.selected-block-path')).toHaveCount(2, { timeout: 5000 });
-    await expect(blockList.locator('.multi-select-bar')).toContainText('2 selected');
+    // Summary bar appears in sidebar even when selected block is a leaf
+    await expect(page.locator('.multi-select-bar'))
+      .toContainText('2 selected', { timeout: 5000 });
+    await expect(page.locator('.selected-block-path')).toHaveCount(2);
   });
 
   // Task 5: Selection mode navigation in sidebar
@@ -2068,6 +2063,132 @@ test.describe('Multi-Block Selection', () => {
 
     // Checkboxes should still be in iframe
     await expect(page.locator('.volto-hydra-selection-checkbox').first())
+      .toBeVisible({ timeout: 3000 });
+  });
+
+  // Selection mode suppresses normal single-block UI
+  test('Selection mode hides single-block outline and toolbar in iframe', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Enter selection mode
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.longPressBlock('block-1-uuid');
+
+    // Checkboxes should be visible
+    await expect(page.locator('.volto-hydra-selection-checkbox').first())
+      .toBeVisible({ timeout: 5000 });
+
+    // Single-block outline should NOT be visible
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="border"]'))
+      .not.toBeVisible({ timeout: 2000 });
+    await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
+      .not.toBeVisible({ timeout: 2000 });
+
+    // Quanta toolbar should NOT be visible
+    await expect(page.locator('.quanta-toolbar')).not.toBeVisible({ timeout: 2000 });
+  });
+
+  // Clicking item body in sidebar during selection mode toggles, not navigates
+  test('Sidebar item click in selection mode toggles selection (no navigation)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Enter selection mode via iframe long press on text-1a
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.longPressBlock('text-1a');
+
+    // Sidebar navigation: escape to col-1 level to see the block list
+    const backArrow = page.locator('.sidebar-section-header .nav-back');
+    await expect(backArrow).toBeVisible({ timeout: 5000 });
+    await backArrow.click();
+
+    const blockList = page.locator('.child-blocks-widget');
+    await expect(blockList).toBeVisible({ timeout: 5000 });
+
+    // Click on second item body (normally this would navigate/select it)
+    // In selection mode it should toggle the checkbox
+    const item2 = blockList.locator('.child-block-item').nth(1);
+    await item2.click();
+
+    // Both items should be selected now (text-1a was already selected, now + text-1b)
+    await expect(blockList.locator('.child-block-item.selected'))
+      .toHaveCount(2, { timeout: 5000 });
+
+    // Sidebar should still show col-1's children (not navigate away)
+    await expect(blockList).toBeVisible();
+  });
+
+  // Sidebar > arrow still navigates into block during selection mode
+  test('Sidebar > arrow navigates into block during selection mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Enter selection mode
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelected('text-1a');
+    await helper.longPressBlock('text-1a');
+
+    // Navigate up to columns-1 level to see col-1, col-2
+    const backArrow = page.locator('.sidebar-section-header .nav-back');
+    await expect(backArrow).toBeVisible({ timeout: 5000 });
+    await backArrow.click();
+    await backArrow.click(); // up to columns-1
+
+    const blockList = page.locator('.child-blocks-widget');
+    await expect(blockList).toBeVisible({ timeout: 5000 });
+
+    // Click the > arrow on col-2 to navigate into it (not toggle)
+    const col2Item = blockList.locator('.child-block-item').filter({ hasText: 'column' }).last();
+    const col2Arrow = col2Item.locator('[data-testid="navigate-into"], .navigate-arrow, [role="button"]').last();
+    // Click the arrow specifically — behavior: drill into col-2, still in selection mode
+    await col2Arrow.click();
+
+    // ChildBlocksWidget should now show col-2's children (text-2a)
+    await expect(blockList.locator('.child-block-item', { hasText: /Text/ })).toBeVisible({ timeout: 5000 });
+
+    // Still in selection mode — checkboxes visible in iframe
+    await expect(page.locator('.volto-hydra-selection-checkbox').first())
+      .toBeVisible({ timeout: 3000 });
+
+    // col-2 itself should NOT be in multiSelected (only text-1a from initial long press)
+    // Check by counting highlighted items in current view
+    await expect(blockList.locator('.child-block-item.selected')).toHaveCount(0);
+  });
+
+  // Exit selection mode collapses to single-block selection
+  test('Exit selection mode returns to single-block selected state', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Enter selection mode with 2 blocks
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.longPressBlock('block-1-uuid');
+
+    const checkbox2 = page.locator('.volto-hydra-selection-checkbox[data-block-uid="block-2-uuid"]');
+    await expect(checkbox2).toBeVisible({ timeout: 5000 });
+    await checkbox2.click();
+
+    // Should have 2 blocks selected
+    await expect(page.locator('[data-testid="exit-selection-mode"] .blockCount'))
+      .toContainText('2', { timeout: 3000 });
+
+    // Exit via X button
+    await page.locator('[data-testid="exit-selection-mode"]').click();
+
+    // Checkboxes gone
+    await expect(page.locator('.volto-hydra-selection-checkbox').first())
+      .not.toBeVisible({ timeout: 3000 });
+
+    // Single-block outline should reappear on one of the previously selected blocks
+    await expect(page.locator('.volto-hydra-block-outline').first())
       .toBeVisible({ timeout: 3000 });
   });
 });

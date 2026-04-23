@@ -740,39 +740,7 @@ const ParentBlocksWidget = ({
             );
           })}
 
-          {/* Current block or multi-selection summary */}
-          {isMultiSelected ? (
-            <div className="sidebar-section" data-testid="multi-select-summary">
-              <div className="sidebar-section-header sticky-header" style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '8px 12px', background: '#f5f5f5', borderBottom: '1px solid #ddd',
-              }}>
-                <span style={{ fontWeight: 'bold' }}>{multiSelected.length} blocks selected</span>
-              </div>
-              <div style={{ padding: '8px 12px' }}>
-                {multiSelected.map((uid) => {
-                  const pi = blockPathMap[uid];
-                  const type = pi?.blockType || 'Unknown';
-                  return (
-                    <div
-                      key={uid}
-                      style={{
-                        padding: '6px 8px',
-                        margin: '2px 0',
-                        background: '#e8f4fd',
-                        borderRadius: '3px',
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                      }}
-                      onClick={() => onSelectBlock(uid)}
-                    >
-                      {type}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
+          {/* Current block form (ChildBlocksWidget renders inside its schema fields) */}
           <ParentBlockSection
             key={selectedBlock}
             blockId={selectedBlock}
@@ -794,6 +762,41 @@ const ParentBlocksWidget = ({
             onChangeTemplateSettings={onChangeTemplateSettings}
             onToggleTemplateEditMode={onToggleTemplateEditMode}
           />
+
+          {/* Multi-select summary bar at bottom of sidebar, below ChildBlocksWidget */}
+          {isMultiSelected && (
+            <div className="multi-select-bar" style={{
+              padding: '8px 12px',
+              background: '#e8f4fd',
+              borderTop: '1px solid #007eb1',
+              fontSize: '13px',
+              color: '#007eb1',
+            }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>
+                {multiSelected.length} selected
+              </div>
+              {multiSelected.map((uid) => {
+                const pi = blockPathMap[uid];
+                const type = pi?.blockType || 'Unknown';
+                return (
+                  <div
+                    key={uid}
+                    className="selected-block-path"
+                    style={{
+                      padding: '4px 8px',
+                      margin: '2px 0',
+                      background: 'white',
+                      borderRadius: '3px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => onSelectBlock(uid)}
+                  >
+                    {type}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </>,
         parentsTarget,
