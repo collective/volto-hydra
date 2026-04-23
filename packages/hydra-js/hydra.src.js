@@ -861,8 +861,11 @@ export class Bridge {
   /**
    * Detects text selections that span multiple blocks and converts them into
    * a multi-block selection. Fires on each selectionchange.
+   * Only active in text mode — block-mode Shift+Click extends text selection
+   * as a side effect; block-level click handlers own that state transition.
    */
   _checkCrossBlockSelection(range) {
+    if (!this.focusedFieldName) return;
     const anchorBlock = this._closestBlockElement(range.startContainer);
     const focusBlock = this._closestBlockElement(range.endContainer);
     if (!anchorBlock || !focusBlock) return;
