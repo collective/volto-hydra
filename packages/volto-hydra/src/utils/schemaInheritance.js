@@ -603,12 +603,15 @@ export function hideParentOwnedFields({ editableFields, parentControlledFields }
   return (args) => {
     const { schema, blockPathMap: passedBlockPathMap, blockId: passedBlockId } = args;
 
-    // Only use context values when called for a specific block instance.
-    // When called for TYPE inspection (getBlockSchema without blockId), passedBlockId is undefined
-    // and we should NOT filter - that would incorrectly hide fields from the type schema.
+    // Resolve blockPathMap/blockId. Volto's applySchemaEnhancer invokes
+    // block enhancers without passing these args, so we fall back on the
+    // HydraSchemaProvider context that wraps the sidebar render — the
+    // presence of currentBlockId there is the signal that we're in a
+    // specific-instance render path (not type inspection, which runs
+    // outside the provider).
     const hydraContext = getHydraSchemaContext();
-    const blockPathMap = passedBlockPathMap || (passedBlockId !== undefined ? hydraContext?.blockPathMap : null);
-    const blockId = passedBlockId ?? (passedBlockPathMap ? hydraContext?.currentBlockId : null);
+    const blockPathMap = passedBlockPathMap || hydraContext?.blockPathMap;
+    const blockId = passedBlockId ?? hydraContext?.currentBlockId;
     const blocksConfig = hydraContext?.blocksConfig;
 
     if (!blockPathMap || !blockId) return schema;
