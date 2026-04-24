@@ -313,6 +313,72 @@ var tabbable = function tabbable2(container, options) {
   return _sortByOrder(candidates);
 };
 
+// containerOps.js
+function canContain(config, blockType, currentCount) {
+  if (config?.readOnly) return false;
+  if (config?.fixed) return false;
+  const { allowedBlocks, maxLength } = config || {};
+  if (allowedBlocks != null && !allowedBlocks.includes(blockType)) return false;
+  if (maxLength != null && currentCount >= maxLength) return false;
+  return true;
+}
+function canContainAll(config, blockTypes, currentCount) {
+  if (blockTypes.length === 0) return true;
+  if (config?.readOnly || config?.fixed) return false;
+  const { allowedBlocks, maxLength } = config || {};
+  if (allowedBlocks != null) {
+    for (const type of blockTypes) {
+      if (!allowedBlocks.includes(type)) return false;
+    }
+  }
+  if (maxLength != null && currentCount + blockTypes.length > maxLength) {
+    return false;
+  }
+  return true;
+}
+function mapLayoutItems(sourceConfig, targetConfig, sourceBlock) {
+  const sourceField = sourceConfig.fieldName;
+  const targetField = targetConfig.fieldName;
+  const items = sourceBlock[sourceField]?.items ?? [];
+  const blocks = sourceBlock.blocks ?? {};
+  return {
+    blocks,
+    [targetField]: { items }
+  };
+}
+function findConversionPath(srcType, allowedTargets, blocksConfig, depth = 3) {
+  if (!srcType || !blocksConfig?.[srcType]) return null;
+  const targetSet = new Set(allowedTargets);
+  if (targetSet.has(srcType)) return [srcType];
+  const parents = /* @__PURE__ */ new Map();
+  parents.set(srcType, null);
+  let frontier = [srcType];
+  for (let hop = 1; hop <= depth; hop++) {
+    const next = [];
+    for (const current of frontier) {
+      for (const [candidate, candidateCfg] of Object.entries(blocksConfig)) {
+        if (parents.has(candidate)) continue;
+        if (!candidateCfg?.fieldMappings) continue;
+        if (!candidateCfg.fieldMappings[current]) continue;
+        parents.set(candidate, current);
+        if (targetSet.has(candidate)) {
+          const path = [candidate];
+          let node = current;
+          while (node !== null) {
+            path.unshift(node);
+            node = parents.get(node);
+          }
+          return path;
+        }
+        next.push(candidate);
+      }
+    }
+    if (next.length === 0) break;
+    frontier = next;
+  }
+  return null;
+}
+
 // hydra.src.js
 var debugEnabled = false;
 try {
@@ -10365,6 +10431,8 @@ export {
   buildQuerystringSearchBody,
   calculateDragHandlePosition,
   calculatePaging,
+  canContain,
+  canContainAll,
   cloneBlocksWithNewIds,
   contentPath,
   convertFieldValue,
@@ -10372,6 +10440,7 @@ export {
   expandListingBlocks,
   expandTemplates,
   expandTemplatesSync,
+  findConversionPath,
   findSlotRegions,
   formDataContentEqual,
   getAccessToken,
@@ -10398,6 +10467,7 @@ export {
   isTextEditableFieldType,
   isTextareaFieldType,
   loadTemplates,
+  mapLayoutItems,
   ploneFetchItems,
   staticBlocks,
   templateIdToPath

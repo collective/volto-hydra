@@ -354,6 +354,24 @@ const applyConfig = (config) => {
     },
   };
 
+  // Generic section container — accepts any block type (no allowedBlocks
+  // restriction). Used by container UX tests (wrap, unwrap, edge-drag, convert)
+  // and as a reference shape for consumers who want a first-class "section"
+  // block. Safe to ship in production: just a blocks_layout wrapper.
+  config.blocks.blocksConfig.section = {
+    ...config.blocks.blocksConfig.section,
+    id: 'section',
+    title: 'Section',
+    blockSchema: () => ({
+      title: 'Section',
+      fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+      properties: {
+        blocks_layout: { widget: 'blocks_layout' },
+      },
+      required: [],
+    }),
+  };
+
   // Default result item for listings (simple title + description)
   // Matches Volto's DefaultResultItem variation
   config.blocks.blocksConfig.default = {

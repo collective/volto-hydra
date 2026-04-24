@@ -637,6 +637,131 @@ export function insertBlockInContainer(formData, blockPathMap, refBlockId, newBl
 }
 
 /**
+ * Wrap a set of selected blocks in a new container of `newContainerType`.
+ *
+ * All selected blocks must share the same parent container. The new container
+ * is inserted where the first selected block was, and becomes the parent of
+ * all selected blocks in their original order. Selected blocks are removed
+ * from the original parent.
+ *
+ * Requires newContainerType's schema to declare a blocks_layout child field
+ * (the standard container pattern).
+ *
+ * @param {Object} formData
+ * @param {Object} blockPathMap
+ * @param {string[]} selectedIds     Block IDs to wrap (must share parent)
+ * @param {string} newContainerType  @type of the container to create
+ * @param {Object} blocksConfig
+ * @param {Object} intl
+ * @param {Object} [options]
+ * @param {Function} [options.uuidGenerator]  Override for deterministic tests
+ * @returns {{formData: Object, newContainerId: string}}
+ */
+export function wrapBlocksInContainer(
+  formData, blockPathMap, selectedIds, newContainerType, blocksConfig, intl, options = {},
+) {
+  if (!selectedIds || selectedIds.length === 0) {
+    throw new Error('[HYDRA] wrapBlocksInContainer: selectedIds is required and non-empty');
+  }
+  const uuidGen = options.uuidGenerator || (() =>
+    (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)));
+
+  // All selected blocks must share the same parent container.
+  const firstCC = getContainerFieldConfig(selectedIds[0], blockPathMap, formData, blocksConfig, intl);
+  if (!firstCC) {
+    throw new Error(`[HYDRA] wrapBlocksInContainer: no container config for ${selectedIds[0]}`);
+  }
+  for (const id of selectedIds.slice(1)) {
+    const cc = getContainerFieldConfig(id, blockPathMap, formData, blocksConfig, intl);
+    if (!cc || cc.parentId !== firstCC.parentId || cc.fieldName !== firstCC.fieldName) {
+      throw new Error(
+        `[HYDRA] wrapBlocksInContainer: all selected blocks must share a parent field (offender: ${id})`,
+      );
+    }
+  }
+
+  if (firstCC.isObjectList) {
+    throw new Error('[HYDRA] wrapBlocksInContainer: object_list parents not yet supported');
+  }
+
+  // Determine the new container's child field name from its schema.
+  const targetFieldName = _getContainerChildFieldName(newContainerType, blocksConfig, intl);
+
+  // Sort selectedIds in DOM order by reading the parent's current layout.
+  const parentPath = firstCC.parentId === PAGE_BLOCK_UID
+    ? [] : blockPathMap[firstCC.parentId]?.path;
+  const parentBlock = getBlockByPath(formData, parentPath);
+  if (!parentBlock) {
+    throw new Error(`[HYDRA] wrapBlocksInContainer: missing parent ${firstCC.parentId}`);
+  }
+  const layoutItems = getContainerItems(parentBlock, firstCC);
+  const sortedIds = layoutItems.filter((id) => selectedIds.includes(id));
+  if (sortedIds.length !== selectedIds.length) {
+    throw new Error('[HYDRA] wrapBlocksInContainer: some selected ids not found in parent layout');
+  }
+
+  // Collect block data for the children (shared blocks dict on parent).
+  const nestedBlocks = {};
+  for (const id of sortedIds) {
+    const data = parentBlock.blocks?.[id];
+    if (data === undefined) {
+      throw new Error(`[HYDRA] wrapBlocksInContainer: parent.blocks missing ${id}`);
+    }
+    nestedBlocks[id] = data;
+  }
+
+  // Build the new container block.
+  const newContainerId = uuidGen();
+  const newContainer = {
+    '@type': newContainerType,
+    blocks: nestedBlocks,
+    [targetFieldName]: { items: [...sortedIds] },
+  };
+
+  // Remove selectedIds from parent's blocks dict and splice in the new container
+  // at the first selected id's position.
+  const remainingBlocks = { ...parentBlock.blocks };
+  for (const id of sortedIds) delete remainingBlocks[id];
+  remainingBlocks[newContainerId] = newContainer;
+
+  const newItems = [];
+  let inserted = false;
+  for (const id of layoutItems) {
+    if (selectedIds.includes(id)) {
+      if (!inserted) {
+        newItems.push(newContainerId);
+        inserted = true;
+      }
+      // Skip the selected id itself — now lives inside the new container.
+    } else {
+      newItems.push(id);
+    }
+  }
+
+  const updatedParent = setContainerItems(parentBlock, firstCC, newItems, remainingBlocks);
+  const newFormData = setBlockByPath(formData, parentPath, updatedParent);
+  return { formData: newFormData, newContainerId };
+}
+
+/**
+ * Resolve the child field name a container uses for its blocks_layout children.
+ * Scans the block schema for the first field with widget='blocks_layout'.
+ * Falls back to 'blocks_layout' if none is explicitly declared.
+ */
+function _getContainerChildFieldName(blockType, blocksConfig, intl) {
+  const cfg = blocksConfig?.[blockType];
+  if (!cfg?.blockSchema) return 'blocks_layout';
+  const schema = typeof cfg.blockSchema === 'function'
+    ? cfg.blockSchema({ blocksConfig, intl })
+    : cfg.blockSchema;
+  const props = schema?.properties || {};
+  for (const [fieldName, field] of Object.entries(props)) {
+    if (field?.widget === 'blocks_layout') return fieldName;
+  }
+  return 'blocks_layout';
+}
+
+/**
  * Delete a block from a container.
  * Treats the page itself as a container when containerConfig is null.
  *

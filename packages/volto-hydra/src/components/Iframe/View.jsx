@@ -161,7 +161,8 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor } from '../../utils/blockPath';
+import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer } from '../../utils/blockPath';
+import { canContainAll } from '@volto-hydra/hydra-js';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
@@ -554,6 +555,7 @@ const Iframe = (props) => {
   const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, focusedFieldName }
   const [mouseActivityCounter, setMouseActivityCounter] = useState(0); // incremented on MOUSE_ACTIVITY from iframe
   const [selectionMode, setSelectionMode] = useState(false); // true when in touch selection mode
+  const [wrapChooser, setWrapChooser] = useState(null); // { blockIds, eligibleTypes } or null
   const multiSelectedRef = useRef(multiSelected);
   multiSelectedRef.current = multiSelected;
 
@@ -817,6 +819,66 @@ const Iframe = (props) => {
       onChangeFormData(newFormData);
     };
 
+    const handleWrapRequest = (e) => {
+      const { blockIds } = e.detail;
+      if (!blockIds || blockIds.length === 0) return;
+      log('hydra-wrap-request:', blockIds);
+
+      // Resolve parent config — all selected must share a parent.
+      const firstCC = getContainerFieldConfig(blockIds[0], bpm, properties, blocksConfig, intl);
+      if (!firstCC || firstCC.isObjectList) return;
+      for (const id of blockIds.slice(1)) {
+        const cc = getContainerFieldConfig(id, bpm, properties, blocksConfig, intl);
+        if (!cc || cc.parentId !== firstCC.parentId || cc.fieldName !== firstCC.fieldName) return;
+      }
+
+      // Collect @types of selected blocks.
+      const selectedTypes = blockIds.map((id) => {
+        const data = getBlockById(properties, bpm, id);
+        return data?.['@type'];
+      }).filter(Boolean);
+
+      // Current parent child-count (for maxLength check on eligible containers).
+      const parentPath = firstCC.parentId === PAGE_BLOCK_UID
+        ? [] : bpm[firstCC.parentId]?.path;
+      const parentBlock = getBlockByPath(properties, parentPath);
+      const parentItems = parentBlock ? getContainerItems(parentBlock, firstCC) : [];
+      const parentItemsAfterWrap = parentItems.length - blockIds.length + 1;
+      const parentAllowsNewContainer = (containerType) =>
+        !firstCC.allowedBlocks || firstCC.allowedBlocks.includes(containerType);
+
+      // Enumerate candidate container types from blocksConfig — anything with a
+      // blocks_layout child field that can accept every selected block type, and
+      // that the current parent accepts too.
+      const eligibleTypes = [];
+      for (const [type, cfg] of Object.entries(blocksConfig || {})) {
+        if (!cfg?.blockSchema) continue;
+        let schema;
+        try {
+          schema = typeof cfg.blockSchema === 'function'
+            ? cfg.blockSchema({ blocksConfig, intl })
+            : cfg.blockSchema;
+        } catch {
+          continue;
+        }
+        const props = schema?.properties || {};
+        let childField = null;
+        for (const [fieldName, field] of Object.entries(props)) {
+          if (field?.widget === 'blocks_layout') {
+            childField = { fieldName, ...field };
+            break;
+          }
+        }
+        if (!childField) continue;
+        if (!canContainAll(childField, selectedTypes, 0)) continue;
+        if (!parentAllowsNewContainer(type)) continue;
+        if (firstCC.maxLength != null && parentItemsAfterWrap > firstCC.maxLength) continue;
+        eligibleTypes.push({ type, title: cfg.title || type });
+      }
+
+      setWrapChooser({ blockIds, eligibleTypes });
+    };
+
     const handleExitSelectionMode = () => {
       log('hydra-exit-selection-mode');
       if (onSetMultiSelected) onSetMultiSelected([]);
@@ -841,12 +903,14 @@ const Iframe = (props) => {
     document.addEventListener('hydra-copy-blocks', handleCopy);
     document.addEventListener('hydra-delete-blocks', handleDelete);
     document.addEventListener('hydra-paste-blocks', handlePaste);
+    document.addEventListener('hydra-wrap-request', handleWrapRequest);
     document.addEventListener('hydra-exit-selection-mode', handleExitSelectionMode);
     document.addEventListener('hydra-enter-selection-mode', handleEnterSelectionMode);
     return () => {
       document.removeEventListener('hydra-copy-blocks', handleCopy);
       document.removeEventListener('hydra-delete-blocks', handleDelete);
       document.removeEventListener('hydra-paste-blocks', handlePaste);
+      document.removeEventListener('hydra-wrap-request', handleWrapRequest);
       document.removeEventListener('hydra-exit-selection-mode', handleExitSelectionMode);
       document.removeEventListener('hydra-enter-selection-mode', handleEnterSelectionMode);
     };
@@ -3754,8 +3818,86 @@ const Iframe = (props) => {
     }
   }, [iframeAllowedBlocks, selectedBlock, insertAndSelectBlock]);
 
+  const handleWrapCommit = (newContainerType) => {
+    if (!wrapChooser) return;
+    const { blockIds } = wrapChooser;
+    const bpm = iframeSyncState.blockPathMap;
+    try {
+      const { formData: newFormData, newContainerId } = wrapBlocksInContainer(
+        properties, bpm, blockIds, newContainerType, config.blocks.blocksConfig, intl,
+      );
+      onChangeFormData(newFormData);
+      if (onSetMultiSelected) onSetMultiSelected([]);
+      if (onSelectBlock) onSelectBlock(newContainerId);
+    } catch (err) {
+      log('wrapBlocksInContainer failed:', err);
+    }
+    setWrapChooser(null);
+  };
+
   return (
     <div id="iframeContainer">
+      {wrapChooser && (
+        <div
+          className="container-wrap-chooser"
+          style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 10000,
+            background: 'white',
+            border: '1px solid #999',
+            borderRadius: '6px',
+            padding: '16px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+            minWidth: '260px',
+          }}
+        >
+          <div style={{ fontWeight: 'bold', marginBottom: '10px' }}>
+            Wrap in container
+          </div>
+          {wrapChooser.eligibleTypes.length === 0 ? (
+            <div style={{ color: '#888', fontSize: '13px' }}>
+              No compatible container type available for this selection.
+            </div>
+          ) : (
+            wrapChooser.eligibleTypes.map(({ type, title }) => (
+              <button
+                key={type}
+                data-block-type={type}
+                onClick={() => handleWrapCommit(type)}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '8px 10px',
+                  marginBottom: '4px',
+                  background: '#f5f5f5',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                {title}
+              </button>
+            ))
+          )}
+          <button
+            onClick={() => setWrapChooser(null)}
+            style={{
+              marginTop: '8px',
+              padding: '6px 10px',
+              background: 'transparent',
+              border: 'none',
+              color: '#666',
+              cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
       <OpenObjectBrowser
         origin={iframeSrc && new URL(iframeSrc).origin}
         pendingFieldMedia={pendingFieldMedia}
