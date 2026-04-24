@@ -21,12 +21,12 @@
       "blocks": {
         "top-img-1": {
           "@type": "image",
-          "url": "/_test_data/images/test-image-1",
+          "url": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2760%27 height=%2740%27%3E%3Crect width=%2760%27 height=%2740%27 fill=%27%23aabbcc%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 dy=%270.3em%27%3ETop 1%3C/text%3E%3C/svg%3E",
           "alt": "Top Image 1"
         },
         "top-img-2": {
           "@type": "image",
-          "url": "/_test_data/images/test-image-2",
+          "url": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2760%27 height=%2740%27%3E%3Crect width=%2760%27 height=%2740%27 fill=%27%23ccbbaa%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 dy=%270.3em%27%3ETop 2%3C/text%3E%3C/svg%3E",
           "alt": "Top Image 2"
         },
         "col-1": {
