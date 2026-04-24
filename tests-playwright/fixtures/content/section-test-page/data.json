@@ -1,0 +1,88 @@
+{
+  "@id": "http://localhost:8888/section-test-page",
+  "@type": "Document",
+  "UID": "section-test-page-uid",
+  "id": "section-test-page",
+  "title": "Section Test Page",
+  "description": "A test page with a generic section container that accepts any block type (for container UX tests)",
+  "review_state": "published",
+  "parent": {
+    "@id": "http://localhost:8888",
+    "@type": "Plone Site",
+    "title": "Site"
+  },
+  "blocks": {
+    "title-block": {
+      "@type": "title"
+    },
+    "slate-before": {
+      "@type": "slate",
+      "value": [{"type": "p", "children": [{"text": "Loose slate before section"}]}],
+      "plaintext": "Loose slate before section"
+    },
+    "section-1": {
+      "@type": "section",
+      "blocks": {
+        "section-child-1": {
+          "@type": "slate",
+          "value": [{"type": "p", "children": [{"text": "Inside the section"}]}],
+          "plaintext": "Inside the section"
+        }
+      },
+      "blocks_layout": {"items": ["section-child-1"]}
+    },
+    "slate-after": {
+      "@type": "slate",
+      "value": [{"type": "p", "children": [{"text": "Loose slate after section"}]}],
+      "plaintext": "Loose slate after section"
+    },
+    "slate-after-2": {
+      "@type": "slate",
+      "value": [{"type": "p", "children": [{"text": "Second loose slate after section"}]}],
+      "plaintext": "Second loose slate after section"
+    }
+  },
+  "blocks_layout": {
+    "items": ["title-block", "slate-before", "section-1", "slate-after", "slate-after-2"]
+  },
+  "allow_discussion": false,
+  "is_folderish": false,
+  "exclude_from_nav": false,
+  "created": "2025-01-01T12:00:00+00:00",
+  "modified": "2025-01-01T12:00:00+00:00",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "@components": {
+    "actions": {
+      "@id": "http://localhost:8888/section-test-page/@actions",
+      "document_actions": [],
+      "object": [{"id": "view", "title": "View"}, {"id": "edit", "title": "Edit"}, {"id": "folderContents", "title": "Contents"}],
+      "object_buttons": [],
+      "portal_tabs": [],
+      "site_actions": [],
+      "user": []
+    },
+    "breadcrumbs": {
+      "@id": "http://localhost:8888/section-test-page/@breadcrumbs",
+      "items": [
+        {"@id": "http://localhost:8888", "title": "Home"},
+        {"@id": "http://localhost:8888/section-test-page", "title": "Section Test Page"}
+      ],
+      "root": "http://localhost:8888"
+    },
+    "navigation": {
+      "@id": "http://localhost:8888/section-test-page/@navigation",
+      "items": []
+    },
+    "workflow": {
+      "@id": "http://localhost:8888/section-test-page/@workflow"
+    }
+  },
+  "can_manage_portlets": true,
+  "can_view": true,
+  "can_edit": true,
+  "can_delete": true,
+  "can_add": true
+}

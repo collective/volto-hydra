@@ -160,6 +160,16 @@
           },
         },
       },
+      // Test-only generic section — accepts any block type (no allowedBlocks restriction).
+      // Used by container UX tests: wrap, unwrap, edge-drag, convert.
+      section: {
+        id: 'section',
+        blockSchema: {
+          properties: {
+            blocks_layout: { widget: 'blocks_layout' },
+          },
+        },
+      },
       slateTable: {
         id: 'slateTable',
         addMode: 'table',
