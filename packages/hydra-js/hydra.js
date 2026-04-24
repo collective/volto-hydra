@@ -12657,16 +12657,14 @@ export function expandTemplatesSync(inputItems, options = {}) {
     firstInsert,  // When true, copy slot block defaults as fieldPlaceholders
   } = options;
 
-  if (!templates) {
-    throw new Error('expandTemplatesSync requires options.templates with pre-loaded templates');
-  }
-
   const items = [];
   const addItem = (block, blockId) => {
     items.push({ ...block, '@uid': blockId });
   };
 
-  // In edit mode, admin handles template merging - pass blocks through as-is
+  // In edit mode, admin handles template merging - pass blocks through as-is.
+  // Templates option is only needed for view-mode expansion, so the check
+  // for it runs after this early return.
   const editMode = isEditMode();
   if (editMode) {
     return (inputItems || []).map(item => {
@@ -12681,6 +12679,10 @@ export function expandTemplatesSync(inputItems, options = {}) {
       }
       return item;
     }).filter(Boolean);
+  }
+
+  if (!templates) {
+    throw new Error('expandTemplatesSync requires options.templates with pre-loaded templates');
   }
 
   // Normalize items
