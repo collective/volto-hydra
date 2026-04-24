@@ -436,7 +436,17 @@
       ]
     },
     "ex-introduction": {
-      "@type": "introduction"
+      "@type": "introduction",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A short introductory paragraph that sets the context for the page."
+            }
+          ]
+        }
+      ]
     },
     "ex-heading": {
       "@type": "heading",

@@ -99,7 +99,7 @@ function HeroBlock({ block }) {
       )}
       <h1 data-edit-text="heading">{heading}</h1>
       <p data-edit-text="subheading" dangerouslySetInnerHTML={{ __html: subheading }} />
-      <div className="hero-description">
+      <div className="hero-description" data-edit-text="description">
         {(block.description || []).map((node, i) => (
           <SlateNode key={i} node={node} />
         ))}
@@ -121,7 +121,7 @@ function HeroBlock({ block }) {
     <img v-if="block.image" data-edit-media="image" :src="heroImageSrc" alt="Hero image" />
     <h1 data-edit-text="heading">{{ block.heading }}</h1>
     <p data-edit-text="subheading" v-html="subheadingHtml" />
-    <div class="hero-description">
+    <div class="hero-description" data-edit-text="description">
       <SlateNode v-for="(node, i) in block.description || []" :key="i" :node="node" />
     </div>
     <a data-edit-text="buttonText" data-edit-link="buttonLink" :href="buttonLink">
@@ -160,7 +160,7 @@ const heroImageSrc = computed(() => getImageUrl(props.block.image));
   {/if}
   <h1 data-edit-text="heading">{block.heading}</h1>
   <p data-edit-text="subheading">{@html subheadingHtml}</p>
-  <div class="hero-description">
+  <div class="hero-description" data-edit-text="description">
     {#each block.description || [] as node, i (i)}
       <SlateNode {node} />
     {/each}

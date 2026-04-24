@@ -98,7 +98,7 @@ function HighlightBlock({ block }) {
     >
       <div className="highlight-overlay" style={{ background: 'rgba(0,0,0,0.4)', padding: '30px', borderRadius: '8px' }}>
         <h2 data-edit-text="title">{title}</h2>
-        <div className="highlight-body">
+        <div className="highlight-body" data-edit-text="description">
           {description.map((node, i) => (
             <SlateNode key={i} node={node} />
           ))}
@@ -127,7 +127,7 @@ function HighlightBlock({ block }) {
   >
     <div class="highlight-overlay" style="background:rgba(0,0,0,0.4);padding:30px;border-radius:8px">
       <h2 data-edit-text="title">{{ block.title }}</h2>
-      <div class="highlight-body">
+      <div class="highlight-body" data-edit-text="description">
         <SlateNode v-for="(node, i) in block.description || []" :key="i" :node="node" />
       </div>
       <a
@@ -195,7 +195,7 @@ const bgStyle = computed(() => {
 >
   <div class="highlight-overlay" style="background:rgba(0,0,0,0.4);padding:30px;border-radius:8px">
     <h2 data-edit-text="title">{block.title}</h2>
-    <div class="highlight-body">
+    <div class="highlight-body" data-edit-text="description">
       {#each block.description || [] as node, i (i)}
         <SlateNode {node} />
       {/each}

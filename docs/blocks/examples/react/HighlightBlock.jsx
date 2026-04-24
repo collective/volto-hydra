@@ -27,7 +27,7 @@ function HighlightBlock({ block }) {
     >
       <div className="highlight-overlay" style={{ background: 'rgba(0,0,0,0.4)', padding: '30px', borderRadius: '8px' }}>
         <h2 data-edit-text="title">{title}</h2>
-        <div className="highlight-body">
+        <div className="highlight-body" data-edit-text="description">
           {description.map((node, i) => (
             <SlateNode key={i} node={node} />
           ))}

@@ -1433,13 +1433,28 @@
     "blocks": {
       "introduction": {
         "blockSchema": {
-          "properties": {}
+          "properties": {
+            "value": {
+              "title": "Text",
+              "widget": "slate"
+            }
+          }
         }
       }
     },
     "examples": {
       "ex-introduction": {
-        "@type": "introduction"
+        "@type": "introduction",
+        "value": [
+          {
+            "type": "p",
+            "children": [
+              {
+                "text": "A short introductory paragraph that sets the context for the page."
+              }
+            ]
+          }
+        ]
       }
     }
   },

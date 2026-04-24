@@ -3,7 +3,7 @@
     <img v-if="block.image" data-edit-media="image" :src="heroImageSrc" alt="Hero image" />
     <h1 data-edit-text="heading">{{ block.heading }}</h1>
     <p data-edit-text="subheading" v-html="subheadingHtml" />
-    <div class="hero-description">
+    <div class="hero-description" data-edit-text="description">
       <SlateNode v-for="(node, i) in block.description || []" :key="i" :node="node" />
     </div>
     <a data-edit-text="buttonText" data-edit-link="buttonLink" :href="buttonLink">

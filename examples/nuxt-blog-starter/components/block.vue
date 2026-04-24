@@ -4,8 +4,8 @@
   </div>
 
   <div v-else-if="block['@type'] == 'introduction'" :data-block-uid="block_uid"
-       data-edit-text="/description" class="text-xl text-gray-600 leading-relaxed my-6 border-t border-b border-gray-200 py-4">
-    {{ data.description }}
+       data-edit-text="value" class="text-xl text-gray-600 leading-relaxed my-6 border-t border-b border-gray-200 py-4">
+    <RichText v-for="node in block.value || []" :key="node" :node="node" />
   </div>
 
   <h1 v-else-if="block['@type'] == 'title'" :data-block-uid="block_uid" data-edit-text="/title">{{ data.title }}
@@ -519,7 +519,7 @@
     <div class="relative z-20 py-16 px-4 mx-auto max-w-screen-xl text-center lg:py-24">
       <h2 data-edit-text="title" class="mb-4 text-4xl font-extrabold text-white md:text-5xl lg:text-6xl">
         {{ block.title }}</h2>
-      <div class="mb-8 text-lg text-gray-200 lg:text-xl sm:px-16 lg:px-48">
+      <div data-edit-text="description" class="mb-8 text-lg text-gray-200 lg:text-xl sm:px-16 lg:px-48">
         <RichText v-for="node in (block.description || block['value'] || [])" :key="node" :node="node" />
       </div>
       <NuxtLink v-if="block.cta_title" :to="getUrl(block.cta_link)"

@@ -14,7 +14,7 @@
   {/if}
   <h1 data-edit-text="heading">{block.heading}</h1>
   <p data-edit-text="subheading">{@html subheadingHtml}</p>
-  <div class="hero-description">
+  <div class="hero-description" data-edit-text="description">
     {#each block.description || [] as node, i (i)}
       <SlateNode {node} />
     {/each}

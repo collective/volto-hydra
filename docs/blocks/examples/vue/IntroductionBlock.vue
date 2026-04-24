@@ -1,10 +1,12 @@
 <template>
   <div :data-block-uid="block['@uid']" class="introduction-block">
-    <h1 data-edit-text="/title">{{ content.title }}</h1>
-    <p v-if="content.description" data-edit-text="/description" class="description">{{ content.description }}</p>
+    <div class="introduction-body" data-edit-text="value">
+      <SlateNode v-for="(node, i) in block.value || []" :key="i" :node="node" />
+    </div>
   </div>
 </template>
 
 <script setup>
-defineProps({ block: Object, content: Object });
+import SlateNode from './SlateNode.vue';
+defineProps({ block: Object });
 </script>

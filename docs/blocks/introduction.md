@@ -10,7 +10,12 @@ This is a **built-in** block.
 {
   "introduction": {
     "blockSchema": {
-      "properties": {}
+      "properties": {
+        "value": {
+          "title": "Text",
+          "widget": "slate"
+        }
+      }
     }
   }
 }
@@ -21,7 +26,17 @@ This is a **built-in** block.
 
 ```json
 {
-  "@type": "introduction"
+  "@type": "introduction",
+  "value": [
+    {
+      "type": "p",
+      "children": [
+        {
+          "text": "A short introductory paragraph that sets the context for the page."
+        }
+      ]
+    }
+  ]
 }
 ```
 
@@ -33,11 +48,14 @@ The block itself has no content fields. The renderer should display the page's `
 
 <!-- file: examples/react/IntroductionBlock.jsx -->
 ```jsx
-function IntroductionBlock({ block, content }) {
+function IntroductionBlock({ block }) {
   return (
     <div data-block-uid={block['@uid']} className="introduction-block">
-      <h1 data-edit-text="/title">{content.title}</h1>
-      {content.description && <p data-edit-text="/description" className="description">{content.description}</p>}
+      <div className="introduction-body" data-edit-text="value">
+        {(block.value || []).map((node, i) => (
+          <SlateNode key={i} node={node} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -49,13 +67,15 @@ function IntroductionBlock({ block, content }) {
 ```vue
 <template>
   <div :data-block-uid="block['@uid']" class="introduction-block">
-    <h1 data-edit-text="/title">{{ content.title }}</h1>
-    <p v-if="content.description" data-edit-text="/description" class="description">{{ content.description }}</p>
+    <div class="introduction-body" data-edit-text="value">
+      <SlateNode v-for="(node, i) in block.value || []" :key="i" :node="node" />
+    </div>
   </div>
 </template>
 
 <script setup>
-defineProps({ block: Object, content: Object });
+import SlateNode from './SlateNode.vue';
+defineProps({ block: Object });
 </script>
 ```
 
@@ -64,12 +84,15 @@ defineProps({ block: Object, content: Object });
 <!-- file: examples/svelte/IntroductionBlock.svelte -->
 ```svelte
 <script>
+  import SlateNode from './SlateNode.svelte';
   export let block;
-  export let content;
 </script>
 
 <div data-block-uid={block['@uid']} class="introduction-block">
-  <h1 data-edit-text="/title">{content.title}</h1>
-  {#if content.description}<p data-edit-text="/description" class="description">{content.description}</p>{/if}
+  <div class="introduction-body" data-edit-text="value">
+    {#each block.value || [] as node, i (i)}
+      <SlateNode {node} />
+    {/each}
+  </div>
 </div>
 ```

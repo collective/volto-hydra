@@ -807,20 +807,13 @@ function renderVideoBlock(block) {
 }
 
 /**
- * Render an introduction block (page title + description).
- * The introduction block has no content of its own — it displays the page's
- * title and description from metadata, making them inline-editable.
- * @param {Object} block - Introduction block data (typically just @type)
+ * Render an introduction block — a standalone slate value used as page intro.
+ * Data shape: { @type: 'introduction', value: [slate nodes…] }.
+ * @param {Object} block - Introduction block data
  * @returns {string} HTML string
  */
 function renderIntroductionBlock(block) {
-    const title = document.getElementById('page-title')?.textContent || '';
-    const description = block._pageDescription || '';
-    let html = `<h1 data-edit-text="/title">${title}</h1>`;
-    if (description) {
-        html += `<p data-edit-text="/description" class="description" style="font-size:1.2em;color:#555;">${description}</p>`;
-    }
-    return html;
+    return renderSlateBlock(block);
 }
 
 /**
