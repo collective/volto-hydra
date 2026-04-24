@@ -380,6 +380,7 @@ const DropdownMenu = ({
                 {convertibleTypes.map(({ type, title }) => (
                   <div
                     key={type}
+                    data-convert-type={type}
                     className="volto-hydra-dropdown-item"
                     style={{
                       display: 'flex',

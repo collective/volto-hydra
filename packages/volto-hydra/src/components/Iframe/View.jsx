@@ -161,7 +161,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, _getContainerChildFieldName } from '../../utils/blockPath';
+import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, _getContainerChildFieldName } from '../../utils/blockPath';
 import { canContainAll } from '@volto-hydra/hydra-js';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
@@ -4405,20 +4405,71 @@ const Iframe = (props) => {
               setPendingFieldMedia({ fieldName, blockUid });
             }}
             convertibleTypes={(() => {
-              const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
-              const typeFieldName = iframeSyncState.blockPathMap?.[selectedBlock]?.typeField || '@type';
+              const bpm = iframeSyncState.blockPathMap;
+              const blockData = getBlockById(properties, bpm, selectedBlock);
+              const typeFieldName = bpm?.[selectedBlock]?.typeField || '@type';
               const blockType = blockData?.[typeFieldName];
-              const allowedTypes = iframeSyncState.blockPathMap?.[selectedBlock]?.allowedSiblingTypes;
-              return getConvertibleTypes(blockType, blocksConfig, allowedTypes);
+              const allowedTypes = bpm?.[selectedBlock]?.allowedSiblingTypes;
+              const contentTargets = getConvertibleTypes(blockType, blocksConfig, allowedTypes);
+
+              // Container-to-container conversions: source is a container with children.
+              // For each OTHER container whose child field accepts all of source's
+              // children, offer it as a target. The existing getConvertibleTypes
+              // doesn't cover this because it relies on fieldMappings, which are
+              // content-level.
+              const childField = blockType ? _getContainerChildFieldName(blockType, blocksConfig, intl) : null;
+              const childIds = childField ? (blockData?.[childField]?.items || []) : [];
+              if (childIds.length === 0) return contentTargets;
+
+              const childTypes = childIds
+                .map((id) => blockData.blocks?.[id]?.['@type'])
+                .filter(Boolean);
+              const containerTargets = [];
+              const existingTypes = new Set(contentTargets.map(t => t.type));
+              for (const [type, cfg] of Object.entries(blocksConfig || {})) {
+                if (!cfg?.blockSchema) continue;
+                if (type === blockType) continue;
+                if (existingTypes.has(type)) continue;
+                let schema;
+                try {
+                  schema = typeof cfg.blockSchema === 'function'
+                    ? cfg.blockSchema({ blocksConfig, intl }) : cfg.blockSchema;
+                } catch { continue; }
+                const props = schema?.properties || {};
+                let tgtChildField = null;
+                for (const [fn, field] of Object.entries(props)) {
+                  if (field?.widget === 'blocks_layout') { tgtChildField = { fieldName: fn, ...field }; break; }
+                }
+                if (!tgtChildField) continue;
+                if (!canContainAll(tgtChildField, childTypes, 0)) continue;
+                // Also respect parent's allowedBlocks — new container type must be allowed in its place.
+                if (allowedTypes && !allowedTypes.includes(type)) continue;
+                containerTargets.push({ type, title: cfg.title || type });
+              }
+              return [...contentTargets, ...containerTargets];
             })()}
             onConvertBlock={(newType) => {
-              const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
+              const bpm = iframeSyncState.blockPathMap;
+              const blockData = getBlockById(properties, bpm, selectedBlock);
               if (!blockData) return;
-              const typeFieldName = iframeSyncState.blockPathMap?.[selectedBlock]?.typeField || '@type';
-              const newBlockData = convertBlockType(blockData, newType, blocksConfig, typeFieldName, intl);
-              const updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, selectedBlock, newBlockData);
+              const typeFieldName = bpm?.[selectedBlock]?.typeField || '@type';
+              const blockType = blockData[typeFieldName];
+
+              // Decide if this is a container-to-container conversion by checking
+              // whether the source has blocks_layout children. If yes, preserve them.
+              const childField = blockType ? _getContainerChildFieldName(blockType, blocksConfig, intl) : null;
+              const hasChildren = childField && (blockData?.[childField]?.items?.length > 0);
+
+              let updatedProperties;
+              if (hasChildren) {
+                updatedProperties = convertContainerBlock(
+                  properties, bpm, selectedBlock, newType, blocksConfig, intl,
+                );
+              } else {
+                const newBlockData = convertBlockType(blockData, newType, blocksConfig, typeFieldName, intl);
+                updatedProperties = updateBlockById(properties, bpm, selectedBlock, newBlockData);
+              }
               onChangeFormData(updatedProperties);
-              // Rebuild blockPathMap and update state
               const newBlockPathMap = buildBlockPathMap(updatedProperties, blocksConfig, intl);
               setIframeSyncState(prev => ({
                 ...prev,

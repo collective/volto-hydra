@@ -823,6 +823,65 @@ export function unwrapContainer(
 }
 
 /**
+ * Convert a container block's @type while preserving its children. The
+ * source's layout field items are remapped to the target's layout field,
+ * and the shared blocks dict is carried over verbatim.
+ *
+ * Does NOT validate target.allowedBlocks; caller should have already
+ * confirmed compatibility (the UI surfaces only valid targets).
+ *
+ * @param {Object} formData
+ * @param {Object} blockPathMap
+ * @param {string} blockId
+ * @param {string} targetType
+ * @param {Object} blocksConfig
+ * @param {Object} intl
+ * @returns {Object} new formData
+ */
+export function convertContainerBlock(
+  formData, blockPathMap, blockId, targetType, blocksConfig, intl,
+) {
+  const sourceBlock = getBlockById(formData, blockPathMap, blockId);
+  if (!sourceBlock) {
+    throw new Error(`[HYDRA] convertContainerBlock: block ${blockId} not found`);
+  }
+  const sourceType = sourceBlock['@type'];
+  const sourceField = _getContainerChildFieldName(sourceType, blocksConfig, intl);
+  const targetField = _getContainerChildFieldName(targetType, blocksConfig, intl);
+  const items = sourceBlock[sourceField]?.items || [];
+
+  // Strip ALL known blocks_layout fields from the source so leftover layout
+  // fields (e.g. columns has both `columns` and `top_images`) don't linger on
+  // the converted block. Keep `blocks` and non-layout fields.
+  const sourceSchema = (() => {
+    const cfg = blocksConfig?.[sourceType];
+    if (!cfg?.blockSchema) return null;
+    try {
+      return typeof cfg.blockSchema === 'function'
+        ? cfg.blockSchema({ blocksConfig, intl })
+        : cfg.blockSchema;
+    } catch { return null; }
+  })();
+  const layoutFields = new Set();
+  if (sourceSchema?.properties) {
+    for (const [fn, field] of Object.entries(sourceSchema.properties)) {
+      if (field?.widget === 'blocks_layout') layoutFields.add(fn);
+    }
+  }
+  layoutFields.add(sourceField); // belt-and-braces
+
+  const cleanedRest = { ...sourceBlock };
+  for (const fn of layoutFields) delete cleanedRest[fn];
+
+  const newBlock = {
+    ...cleanedRest,
+    '@type': targetType,
+    [targetField]: { items: [...items] },
+  };
+  return updateBlockById(formData, blockPathMap, blockId, newBlock);
+}
+
+/**
  * Resolve the child field name a container uses for its blocks_layout children.
  * Scans the block schema for the first field with widget='blocks_layout'.
  * Falls back to 'blocks_layout' if none is explicitly declared.
