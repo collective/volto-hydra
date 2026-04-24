@@ -867,6 +867,47 @@ test.describe('Frontend-Driven Schema Enhancers', () => {
     expect(await helper.hasSidebarField('headline')).toBe(true);
   });
 
+  test('child block sidebar hides non-editable fields inside synced container', async ({ page }) => {
+    // Regression: when a block with `childBlockConfig.editableFields` lives
+    // inside a synced parent container (itemTypeField + variation set), its
+    // non-editable fields must be hidden from the CHILD sidebar and surface
+    // only on the PARENT's defaults area.
+    //
+    // Bug: Volto's applySchemaEnhancer invokes block enhancers without
+    // passing blockId/blockPathMap. `hideParentOwnedFields` guarded
+    // hydraContext fallback on those args being passed, so from Volto's
+    // sidebar path the filter never ran. Fields stayed on the child.
+    //
+    // This test uses block-preset-grid/preset-teaser where variation is
+    // pre-set in content (so we avoid flaky dropdown UI) and the teaser has
+    // overwrite:true (so Volto's schema puts head_title in the default
+    // fieldset). `head_title` is NOT in the fixture teaser's editableFields,
+    // so if filtering works it should be hidden; if broken, it shows.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    const teaser = iframe.locator('[data-block-uid="preset-teaser"]').first();
+    await expect(teaser).toBeVisible();
+    await teaser.click();
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // head_title is in schema.properties + in default fieldset (overwrite:true)
+    // but NOT in editableFields → should be hidden from child sidebar.
+    expect(
+      await helper.hasSidebarField('head_title'),
+      'non-editable field leaked onto child sidebar — hideParentOwnedFields filter did not run',
+    ).toBe(false);
+
+    // Sanity: editable fields stay on the child.
+    expect(await helper.hasSidebarField('title')).toBe(true);
+    expect(await helper.hasSidebarField('description')).toBe(true);
+  });
+
   test('nested listing fieldMapping updates when parent type changes', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
@@ -1235,6 +1276,37 @@ test.describe('fieldRules - Conditional Field Visibility', () => {
 
     // Now 'Column Layout' should be visible (columns >= 2)
     await expect(columnLayoutField).toBeVisible({ timeout: 5000 });
+  });
+
+  test('fieldRules array with bare false as catch-all hide', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    const testBlock = iframe.locator('[data-block-uid="skiplogic-test"]');
+    await expect(testBlock).toBeVisible({ timeout: 10000 });
+    await testBlock.click();
+
+    await helper.waitForSidebarOpen();
+    await helper.openSidebarTab('Block');
+
+    // switchField rule: [{when: mode=simple}, {when: mode=advanced}, false]
+    // mode is unset initially → all array entries miss, bare false hides
+    const switchField = page.locator('text=Switch Field');
+    await expect(switchField).not.toBeVisible();
+
+    // Select 'simple' → first array entry matches → visible
+    const modeSelect = page.locator('.react-select__control').first();
+    await modeSelect.click();
+    const menu = page.locator('.react-select__menu');
+    await menu.waitFor({ state: 'visible', timeout: 3000 });
+    await menu.locator('.react-select__option', { hasText: 'Simple' }).click();
+    await menu.waitFor({ state: 'hidden', timeout: 3000 });
+
+    await expect(switchField).toBeVisible({ timeout: 5000 });
   });
 
   test('fieldRules with parent path reference', async ({ page }) => {

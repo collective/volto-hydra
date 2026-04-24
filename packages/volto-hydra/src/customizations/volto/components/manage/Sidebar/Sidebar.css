@@ -37,7 +37,10 @@
 .hydra-sidebar .sidebar-section-header.sticky-header {
   position: sticky;
   top: 0;
-  z-index: 10;
+  /* Minimum z-index that beats un-positioned scroll content. Keep low so
+     dropdowns/tooltips/popovers inside the sidebar layer above the header
+     rather than being occluded by it. */
+  z-index: 1;
 }
 
 .hydra-sidebar .sidebar-section-header .section-title {

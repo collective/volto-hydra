@@ -147,6 +147,30 @@
         ]
       }
     },
+    "block-preset-grid": {
+      "@type": "gridBlock",
+      "variation": "teaser",
+      "blocks": {
+        "preset-teaser": {
+          "@type": "teaser",
+          "overwrite": true,
+          "title": "Preset Teaser",
+          "head_title": "Preset Kicker",
+          "description": "Teaser in a grid that has variation pre-set to teaser",
+          "href": [
+            {
+              "@id": "/target-page",
+              "title": "Target"
+            }
+          ]
+        }
+      },
+      "blocks_layout": {
+        "items": [
+          "preset-teaser"
+        ]
+      }
+    },
     "block-9-listing": {
       "@type": "listing",
       "headline": "Featured Items",
@@ -237,6 +261,7 @@
       "block-6-empty-teaser",
       "block-7-filled-teaser",
       "block-8-grid",
+      "block-preset-grid",
       "block-9-listing",
       "block-10-listing-no-mapping",
       "skiplogic-test"

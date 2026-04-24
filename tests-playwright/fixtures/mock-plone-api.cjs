@@ -142,8 +142,10 @@ app.use((req, res, next) => {
     cleanPath = vhmMatch[1] || '/';
   }
 
-  // Handle simple ++api++ prefix: /++api++/@site -> /@site
-  cleanPath = cleanPath.replace(/^\/\+\+api\+\+/, '');
+  // Strip ++api++ anywhere in path (start or mid-path):
+  //   /++api++/@site           -> /@site
+  //   /blocks/search/++api++/@ -> /blocks/search/@
+  cleanPath = cleanPath.replace(/\/?\+\+api\+\+\/?/g, '/');
 
   // Normalize multiple slashes to single slash (e.g., //@search -> /@search)
   cleanPath = cleanPath.replace(/\/+/g, '/');
@@ -458,6 +460,7 @@ function getNavigationItems(basePath = '/', depth = 1) {
     })
     .map((itemPath) => {
       const rawContent = loadRawContentFromDisk(itemPath);
+      if (!rawContent) return null;
       if (rawContent.exclude_from_nav) return null;
       if (rawContent['@type'] === 'Image' || rawContent['@type'] === 'File') return null;
       return formatNavItem(rawContent, itemPath, baseUrl);
@@ -1035,7 +1038,7 @@ app.get('/health', (req, res) => {
  * Get querystring schema (available indexes, operators, sortable indexes)
  * Used by QuerystringWidget to populate criteria and sort dropdowns
  */
-app.get('/@querystring', (req, res) => {
+app.get('*/@querystring', (req, res) => {
   res.json({
     '@id': 'http://localhost:8888/@querystring',
     'indexes': {
@@ -1760,7 +1763,10 @@ app.get('*/@search', (req, res) => {
       }
     }
   } else {
-    // No depth filter - return all content items from disk
+    // No depth filter - return all content items from disk.
+    // Rescan so newly-added fixture directories surface without a server
+    // restart — same "rescan on miss" pattern as resolveUidUrls() above.
+    initContentDirMap();
     items = Object.keys(contentDirMap)
       .filter((itemPath) => itemPath !== '/')
       .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl));
@@ -1988,6 +1994,51 @@ app.get('*/@@download/*', (req, res) => {
   res.status(404).json({
     error: { type: 'NotFound', message: `Download not found: ${req.path}` }
   });
+});
+
+/**
+ * GET /<content-path-that-is-an-Image>
+ *
+ * Plone's Zope-traversal layer serves Image content items' blob bytes
+ * directly at their plain content path (no /@@images/image suffix, no
+ * ++api++ prefix, Accept != application/json). Frontend <img src> URLs
+ * rely on this so image refs like `/company/about-us/screenshot.png`
+ * resolve against the backend. The @@images handler above covers
+ * explicit scale paths; this covers the implicit default-view case.
+ */
+app.get('*', (req, res, next) => {
+  if (req.isApiRequest) return next();
+
+  const dirInfo = contentDirMap[req.path];
+  if (!dirInfo) return next();
+
+  const dataFile = path.join(dirInfo.dirPath, 'data.json');
+  if (!fs.existsSync(dataFile)) return next();
+
+  let item;
+  try { item = JSON.parse(fs.readFileSync(dataFile, 'utf8')); }
+  catch { return next(); }
+  if (item['@type'] !== 'Image') return next();
+
+  // Image items store the blob in an `image/` subdirectory (same shape as
+  // the @@images handler reads from). Serve whatever file is in there.
+  const imageDir = path.join(dirInfo.dirPath, 'image');
+  if (!fs.existsSync(imageDir)) return next();
+  const files = fs.readdirSync(imageDir);
+  if (files.length === 0) return next();
+
+  const imageFile = path.join(imageDir, files[0]);
+  const ext = path.extname(files[0]).toLowerCase();
+  const mimeTypes = {
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+  };
+  res.set('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+  res.sendFile(imageFile);
 });
 
 /**

@@ -16,84 +16,6 @@ export interface SubBlock {
 }
 
 /**
- * Build a map of blockType → (fieldName → idField) for every object_list
- * field in the blocksConfig. Used by getSubBlocks to identify which array
- * fields contain sub-blocks and what property to use as the block UID.
- */
-export function buildObjectListFieldsMap(
-  blocksConfig: Record<string, { blockSchema?: { properties?: Record<string, any> } }>,
-): Map<string, Map<string, string>> {
-  const map = new Map<string, Map<string, string>>();
-  for (const [blockType, blockDef] of Object.entries(blocksConfig)) {
-    const props = blockDef?.blockSchema?.properties;
-    if (!props) continue;
-    for (const [fieldName, fieldDef] of Object.entries(props)) {
-      if ((fieldDef as Record<string, unknown>)?.widget === 'object_list') {
-        if (!map.has(blockType)) map.set(blockType, new Map());
-        const idField = ((fieldDef as Record<string, unknown>).idField as string | undefined) || '@id';
-        map.get(blockType)!.set(fieldName, idField);
-      }
-    }
-  }
-  return map;
-}
-
-/**
- * Recursively collect all sub-blocks (id + data) from block data.
- *
- * Uses the objectListFields map to identify object_list fields and their
- * idField (the item property used as data-block-uid). Falls back to a
- * heuristic (@id + @type/blocks/blocks_layout) for blocks not in the map.
- */
-export function getSubBlocks(
-  obj: Record<string, unknown>,
-  blockType?: string,
-  objectListFields?: Map<string, Map<string, string>>,
-): SubBlock[] {
-  const result: SubBlock[] = [];
-  const knownListFields = (blockType && objectListFields?.get(blockType)) || new Map<string, string>();
-
-  for (const [key, value] of Object.entries(obj)) {
-    if (key === 'blocks' && value && typeof value === 'object' && !Array.isArray(value)) {
-      // Shared blocks dict: keys are block IDs
-      for (const [subId, subBlock] of Object.entries(value as Record<string, unknown>)) {
-        if (subBlock && typeof subBlock === 'object' && !Array.isArray(subBlock)) {
-          const subData = subBlock as Record<string, unknown>;
-          result.push({ id: subId, data: subData });
-          result.push(...getSubBlocks(subData, subData['@type'] as string | undefined, objectListFields));
-        }
-      }
-    } else if (Array.isArray(value)) {
-      const idField = knownListFields.get(key);
-      for (const item of value) {
-        if (item && typeof item === 'object' && !Array.isArray(item)) {
-          const rec = item as Record<string, unknown>;
-          if (idField) {
-            // Schema-defined object_list: use the declared idField
-            const id = rec[idField] as string | undefined;
-            if (id) {
-              result.push({ id, data: rec });
-              result.push(...getSubBlocks(rec, rec['@type'] as string | undefined, objectListFields));
-            }
-          } else {
-            // Fallback heuristic: @id + (@type or blocks or blocks_layout)
-            const id = rec['@id'] as string | undefined;
-            const isSubBlock = id && (rec['@type'] || rec['blocks'] || rec['blocks_layout']);
-            if (isSubBlock) {
-              result.push({ id, data: rec });
-            }
-            result.push(...getSubBlocks(rec, rec['@type'] as string | undefined, objectListFields));
-          }
-        }
-      }
-    } else if (value && typeof value === 'object') {
-      result.push(...getSubBlocks(value as Record<string, unknown>, undefined, objectListFields));
-    }
-  }
-  return result;
-}
-
-/**
  * Click each [data-edit-text] element in the block and verify no
  * "Missing data-node-id attributes" warning appears in the iframe.
  *
@@ -195,11 +117,13 @@ export async function checkEditAnnotations(
   );
   expect(brokenImages, 'All images should have valid src and load successfully').toEqual([]);
 
-  // Simple string fields in block data must appear with data-edit-text
+  // Any string field in block data whose value the renderer displays must
+  // sit inside [data-edit-text] so the editor can target it. Data-driven
+  // (no hardcoded field names): iterate every string-valued field, skip
+  // @-prefixed metadata, skip values not present in the rendered DOM.
   if (blockData) {
-    const TEXT_FIELDS = ['title', 'heading', 'description', 'head_title', 'label'];
-    for (const field of TEXT_FIELDS) {
-      const value = blockData[field];
+    for (const [field, value] of Object.entries(blockData)) {
+      if (field.startsWith('@')) continue;
       if (typeof value !== 'string' || !value) continue;
       const hasEditText = await block.evaluate(
         (el, v) => {
@@ -219,17 +143,195 @@ export async function checkEditAnnotations(
   }
 }
 
+/**
+ * Detect slate-shaped field values in block data: non-empty arrays of
+ * objects where the first item has a `children` array (slate node shape).
+ */
+function findSlateFields(
+  blockData: Record<string, unknown>,
+): string[] {
+  const fields: string[] = [];
+  for (const [key, value] of Object.entries(blockData)) {
+    if (key.startsWith('@') || key === 'blocks' || key === 'blocks_layout') continue;
+    if (!Array.isArray(value) || value.length === 0) continue;
+    const first = value[0] as Record<string, unknown> | undefined;
+    if (first && typeof first === 'object' && Array.isArray(first.children)) {
+      fields.push(key);
+    }
+  }
+  return fields;
+}
+
+/**
+ * Compare two slate trees for structural equality (types + text), ignoring
+ * nodeId metadata and inline mark ordering. Used to verify that the DOM
+ * round-trips back to the same Slate value via readSlateValueFromDOM.
+ */
+function slateEqualIgnoringIds(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((item, i) => slateEqualIgnoringIds(item, b[i]));
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    const ao = a as Record<string, unknown>;
+    const bo = b as Record<string, unknown>;
+    const SKIP = new Set(['nodeId', 'data-node-id']);
+    const keys = new Set([...Object.keys(ao), ...Object.keys(bo)].filter(k => !SKIP.has(k)));
+    for (const k of keys) {
+      if (!slateEqualIgnoringIds(ao[k], bo[k])) return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Schema-driven (with shape-based fallback) slate annotation check.
+ *
+ * For every slate field — either declared as `widget: 'slate'` in the block
+ * schema or detected by value shape (array of `{children: [...]}`) — round-trip
+ * the rendered DOM back to a Slate value using Bridge.readSlateValueFromDOM
+ * and compare against blockData[field]. A mismatch means the renderer
+ * isn't emitting the data-node-id attributes the bridge needs to anchor
+ * text nodes, so cursor sync will fail during editing.
+ *
+ * This is strictly stronger than counting [data-node-id] descendants —
+ * it fails when any slate node is missing an id, not just when all are.
+ */
+export async function checkSlateAnnotations(
+  block: Locator,
+  blockData: Record<string, unknown> | undefined,
+  blockSchema?: { properties?: Record<string, any> },
+): Promise<void> {
+  if (!blockData) return;
+
+  // Prefer the live schema from the bridge (built from the blockPathMap's
+  // _schemas, already resolved via schemaEnhancers) when a caller didn't
+  // pass one explicitly. This avoids persisting blocksConfig to disk just
+  // to drive annotation checks in the spec.
+  if (!blockSchema?.properties) {
+    const blockUid = await block.getAttribute('data-block-uid');
+    if (blockUid) {
+      const bridgeSchema = await block.evaluate(
+        (_el, uid) => (window as any).__hydraBridge?.getBlockSchema?.(uid) || null,
+        blockUid,
+      );
+      if (bridgeSchema?.properties) blockSchema = bridgeSchema;
+    }
+  }
+
+  // Every schema-declared slate field needs a [data-edit-text="<field>"]
+  // container in the rendered DOM — even when the field's value is null or
+  // empty (the placeholder is where the editor will insert new content).
+  // Without a schema, fall back to detecting slate shapes in populated data.
+  let slateFields: string[];
+  let slateHasValue: (field: string) => boolean;
+  if (blockSchema?.properties) {
+    slateFields = Object.entries(blockSchema.properties)
+      .filter(([, prop]) => (prop as Record<string, unknown>)?.widget === 'slate')
+      .map(([field]) => field);
+    slateHasValue = (field) => {
+      const v = blockData[field];
+      return Array.isArray(v) && v.length > 0;
+    };
+  } else {
+    slateFields = findSlateFields(blockData);
+    slateHasValue = () => true;
+  }
+
+  for (const field of slateFields) {
+    // Accept either a descendant [data-edit-text="<field>"] OR the block
+    // element itself carrying the attribute (renderers are free to collapse
+    // the block wrapper and the edit-text container onto one element).
+    const blockHasAttr = (await block.getAttribute('data-edit-text')) === field;
+    const container = blockHasAttr ? block : block.locator(`[data-edit-text="${field}"]`).first();
+    if (!(await container.count())) {
+      // Build a diagnostic showing what data-edit-text values ARE present in
+      // the block — usually it's a typo or a misplaced attribute.
+      const context = await block.evaluate((el) => {
+        const outer = (el.outerHTML || '').slice(0, 200);
+        const self = el.getAttribute('data-edit-text');
+        const descendants = Array.from(el.querySelectorAll('[data-edit-text]'))
+          .map((d) => `${d.tagName.toLowerCase()}[data-edit-text="${d.getAttribute('data-edit-text')}"]`);
+        return { outer, self, descendants };
+      });
+      throw new Error(
+        `Slate field "${field}": no [data-edit-text="${field}"] container found.\n` +
+          `  block element's own data-edit-text: ${context.self ?? '(none)'}\n` +
+          `  descendants with data-edit-text: ${context.descendants.length ? context.descendants.join(', ') : '(none)'}\n` +
+          `  block outerHTML (truncated): ${context.outer}`,
+      );
+    }
+
+    // Empty/null slate fields still need the edit-text container (checked
+    // above) but nothing to round-trip — the renderer has no source value
+    // to mirror into the DOM.
+    if (!slateHasValue(field)) continue;
+
+    // Round-trip via the bridge's own DOM→Slate reader. The bridge already
+    // walked its formData with addNodeIds — use bridge.getBlockData(uid)[field]
+    // as the existingValue so domNodeToSlate's metadata lookup finds the ids
+    // that match the DOM (otherwise `type` drops out of the round-tripped
+    // result). Wait for bridge + data-node-id on the DOM before reading.
+    const blockUid = await block.getAttribute('data-block-uid');
+    const domValue = await container.evaluate(async (el, args) => {
+      const { uid, fieldName } = args as { uid: string | null; fieldName: string };
+      const hasId = (root: Element) =>
+        root.hasAttribute('data-node-id') || !!root.querySelector('[data-node-id]');
+      for (let i = 0; i < 50; i++) {
+        const b = (window as any).__hydraBridge;
+        if (b?.readSlateValueFromDOM && b?.getBlockData && hasId(el)) break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      const bridge = (window as any).__hydraBridge;
+      if (!bridge?.readSlateValueFromDOM) return { error: 'bridge not available on window.__hydraBridge after 5s' };
+      if (!hasId(el)) return { error: 'no data-node-id rendered after 5s — renderer is not forwarding node ids' };
+      const existingValue = uid ? bridge.getBlockData(uid)?.[fieldName] : undefined;
+      if (!existingValue) return { error: `bridge.getBlockData(${uid})?.${fieldName} is missing — bridge hasn't delivered data or block is nested outside the bridge's map` };
+      try {
+        return { value: bridge.readSlateValueFromDOM(el, existingValue) };
+      } catch (e: any) {
+        return { error: `readSlateValueFromDOM threw: ${e?.message || String(e)}` };
+      }
+    }, { uid: blockUid, fieldName: field });
+    const existing = blockData[field];
+
+    if ((domValue as any).error) {
+      const dom = await container.evaluate((el) => (el.outerHTML || '').slice(0, 200));
+      throw new Error(
+        `Slate field "${field}" round-trip failed: ${(domValue as any).error}\n` +
+          `  container outerHTML (truncated): ${dom}`,
+      );
+    }
+    if (!slateEqualIgnoringIds((domValue as any).value, existing)) {
+      const dom = await container.evaluate((el) => (el.outerHTML || '').slice(0, 300));
+      throw new Error(
+        `Slate field "${field}" DOM does not round-trip to the same Slate value.\n` +
+          `  Diff (first 400 chars each):\n` +
+          `    Got:      ${JSON.stringify((domValue as any).value).slice(0, 400)}\n` +
+          `    Expected: ${JSON.stringify(existing).slice(0, 400)}\n` +
+          `  container outerHTML (truncated): ${dom}\n` +
+          `  Likely causes: renderer missing data-node-id on some nodes; stray whitespace in template between sibling slate nodes; renderer emitting wrong element tag.`,
+      );
+    }
+  }
+}
+
 export interface VerifyBlockRenderingOptions {
   expectedText?: string | null;
   isListing?: boolean;
   checkSubBlocks?: boolean;
   checkEditTextClicks?: boolean;
-  blocksConfig?: Record<string, any>;
 }
 
 /**
  * Full block rendering verification: locate block, check text, check edit
  * annotations, verify sub-blocks, and click data-edit-text elements.
+ *
+ * Schema + sub-block discovery come from the bridge's blockPathMap inside
+ * the iframe — no blocksConfig plumbing needed. Callers must render the
+ * block through an iframe with `initBridge()` already run.
  */
 export async function verifyBlockRendering(
   page: Page,
@@ -243,10 +345,7 @@ export async function verifyBlockRendering(
     isListing = false,
     checkSubBlocks = true,
     checkEditTextClicks: doEditTextClicks = true,
-    blocksConfig,
   } = options;
-
-  const objectListFields = blocksConfig ? buildObjectListFieldsMap(blocksConfig) : undefined;
 
   // Listing blocks: expandListingBlocks sets @uid=parentId on all items,
   // so multiple elements share the same data-block-uid.
@@ -271,10 +370,38 @@ export async function verifyBlockRendering(
   // Verify edit annotations
   await checkEditAnnotations(block, blockData);
 
+  // Schema-driven slate check — checkSlateAnnotations pulls the schema
+  // from the bridge itself (authoritative, schemaEnhancer-resolved).
+  await checkSlateAnnotations(block, blockData);
+
   // Verify sub-blocks (before clicking, which may toggle interactive
-  // containers like accordions closed).
+  // containers like accordions closed). Sub-blocks come from the bridge's
+  // blockPathMap — canonical nested-block tree with schema-driven
+  // container traversal (blocks_layout and object_list handled uniformly).
   if (checkSubBlocks && blockData) {
-    const subBlocks = getSubBlocks(blockData, blockData['@type'] as string, objectListFields);
+    const subBlocks = await block.evaluate((_el, parentUid) => {
+      const b = (window as any).__hydraBridge;
+      if (!b?.blockPathMap) {
+        throw new Error(
+          'verifyBlockRendering: __hydraBridge.blockPathMap not available — ' +
+            'the block must be rendered inside an iframe with initBridge() run.',
+        );
+      }
+      const pathMap = b.blockPathMap;
+      const isDescendant = (uid: string): boolean => {
+        let cur = pathMap[uid]?.parentId;
+        while (cur) {
+          if (cur === parentUid) return true;
+          cur = pathMap[cur]?.parentId;
+        }
+        return false;
+      };
+      return Object.keys(pathMap)
+        .filter((k) => !k.startsWith('_') && isDescendant(k))
+        .map((uid) => ({ id: uid, data: b.getBlockData?.(uid) || null }))
+        .filter((s: { id: string; data: unknown }) => !!s.data && typeof s.data === 'object');
+    }, blockId) as SubBlock[];
+
     let anyVisible = false;
     for (const { id, data } of subBlocks) {
       const loc = iframe.locator(`[data-block-uid="${id}"]`).first();
@@ -282,6 +409,7 @@ export async function verifyBlockRendering(
       if (await loc.isVisible()) {
         anyVisible = true;
         await checkEditAnnotations(loc, data);
+        await checkSlateAnnotations(loc, data);
       }
     }
     if (subBlocks.length > 0) {

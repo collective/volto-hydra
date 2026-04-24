@@ -91,6 +91,10 @@ test.describe('Block Resize Detection', () => {
               items: ['mock-block-1', 'mock-text-block', 'mock-multi-field-block', 'mock-textarea-block'],
             },
           },
+          // setFormDataFromAdmin requires blockPathMap. Reuse mock-parent's
+          // builder — the blocks here are the same uids as mock-parent's
+          // initial data, so the resulting map applies cleanly.
+          blockPathMap: (window as any).mockParent.buildBlockPathMap(),
         }, '*');
       }
     });
