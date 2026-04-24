@@ -6,7 +6,7 @@
   $: useBlockData = block.overwrite || !hrefObj?.title;
   $: title = useBlockData ? block.title : hrefObj?.title || '';
   $: description = useBlockData ? block.description : hrefObj?.description || '';
-  $: href = hrefObj?.['@id'] || '';
+  $: href = contentPath(hrefObj?.['@id'] || '');
   $: imageSrc = block.preview_image
     ? getImageUrl(block.preview_image)
     : (hrefObj?.hasPreviewImage ? getImageUrl(`${href}/@@images/preview_image`) : '');

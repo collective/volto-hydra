@@ -8,6 +8,7 @@ function SearchBlock({ block, blockId }) {
 
   return (
     <div data-block-uid={blockId} className="search-block">
+      {block.headline && <h2 data-edit-text="headline">{block.headline}</h2>}
       <input
         type="search"
         placeholder="Search..."

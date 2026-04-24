@@ -21,7 +21,7 @@ const hrefObj = computed(() => props.block.href?.[0] || null);
 const useBlockData = computed(() => props.block.overwrite || !hrefObj.value?.title);
 const title = computed(() => useBlockData.value ? props.block.title : hrefObj.value?.title || '');
 const description = computed(() => useBlockData.value ? props.block.description : hrefObj.value?.description || '');
-const href = computed(() => hrefObj.value?.['@id'] || '');
+const href = computed(() => contentPath(hrefObj.value?.['@id'] || ''));
 const imageSrc = computed(() => {
   if (props.block.preview_image) {
     return getImageUrl(props.block.preview_image);

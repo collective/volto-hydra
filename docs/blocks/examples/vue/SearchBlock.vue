@@ -1,5 +1,6 @@
 <template>
   <div :data-block-uid="blockId" class="search-block">
+    <h2 v-if="block.headline" data-edit-text="headline">{{ block.headline }}</h2>
     <input type="search" placeholder="Search..." v-model="query" />
 
     <div v-if="visibleFacets.length" class="facets">

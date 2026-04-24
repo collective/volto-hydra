@@ -181,6 +181,7 @@ function SearchBlock({ block, blockId }) {
 
   return (
     <div data-block-uid={blockId} className="search-block">
+      {block.headline && <h2 data-edit-text="headline">{block.headline}</h2>}
       <input
         type="search"
         placeholder="Search..."
@@ -226,6 +227,7 @@ function FacetRenderer({ facet }) {
 ```vue
 <template>
   <div :data-block-uid="blockId" class="search-block">
+    <h2 v-if="block.headline" data-edit-text="headline">{{ block.headline }}</h2>
     <input type="search" placeholder="Search..." v-model="query" />
 
     <div v-if="visibleFacets.length" class="facets">
@@ -282,6 +284,7 @@ const listingBlock = computed(() => listingId.value ? props.block.blocks?.[listi
 </script>
 
 <div data-block-uid={blockId} class="search-block">
+  {#if block.headline}<h2 data-edit-text="headline">{block.headline}</h2>{/if}
   <input type="search" placeholder="Search..." bind:value={query} />
 
   {#if visibleFacets.length}

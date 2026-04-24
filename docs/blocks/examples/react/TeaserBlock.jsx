@@ -6,7 +6,8 @@ function TeaserBlock({ block }) {
 
   const title = useBlockData ? block.title : hrefObj?.title || '';
   const description = useBlockData ? block.description : hrefObj?.description || '';
-  const href = hrefObj?.['@id'] || '';
+  // Strip API origin from brain @id so the link resolves same-origin.
+  const href = contentPath(hrefObj?.['@id'] || '');
   const imageSrc = block.preview_image
     ? getImageUrl(block.preview_image)
     : (hrefObj?.hasPreviewImage ? getImageUrl({ '@id': `${href}/@@images/preview_image` }) : '');

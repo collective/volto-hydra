@@ -11,6 +11,7 @@
 </script>
 
 <div data-block-uid={blockId} class="search-block">
+  {#if block.headline}<h2 data-edit-text="headline">{block.headline}</h2>{/if}
   <input type="search" placeholder="Search..." bind:value={query} />
 
   {#if visibleFacets.length}
