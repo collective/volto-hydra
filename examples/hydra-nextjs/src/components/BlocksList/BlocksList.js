@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
-import SlateBlock from "@/components/SlateBlock";
+import SlateBlock, { SlateInline } from "@/components/SlateBlock";
 import CodeExampleBlock from "@/components/CodeExampleBlock/CodeExampleBlock";
 import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, staticBlocks, contentPath } from "#utils/hydra";
 import SwiperSlider from "@/components/SwiperSlider";
@@ -31,7 +31,12 @@ function useExpand() {
  */
 function SlateNodes({ value }) {
   if (!Array.isArray(value) || value.length === 0) return null;
-  return <SlateBlock value={value} />;
+  // Render inline — no [data-edit-text="value"] wrapper. Callers like the
+  // hero description put the slate content inside their own
+  // [data-edit-text="description"] (or similar) container and must not nest
+  // another edit-text container inside it, otherwise the bridge's DOM-to-
+  // Slate round-trip reads an empty value from the outer container.
+  return <SlateInline value={value} />;
 }
 
 /**

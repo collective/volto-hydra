@@ -74,3 +74,12 @@ export default function SlateBlock({ value }) {
     </div>
   );
 }
+
+/**
+ * Render slate nodes WITHOUT the [data-edit-text="value"] wrapper. Use this
+ * when the slate value is a FIELD of another block (e.g. hero.description),
+ * since that parent already owns the edit-text container for its own field.
+ */
+export function SlateInline({ value }) {
+  return <>{serializeSlateJSON(value)}</>;
+}
