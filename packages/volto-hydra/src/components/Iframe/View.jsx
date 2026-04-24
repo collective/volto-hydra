@@ -4427,43 +4427,47 @@ const Iframe = (props) => {
                 toolbarRequestDone: `convert-block-${Date.now()}`,
               }));
             }}
-            canUnwrap={(() => {
-              // Container is unwrappable iff every child's type is accepted by
-              // the parent container. Children live in the first blocks_layout
-              // field of the selected block's schema.
+            {...(() => {
+              // Unwrap action props — only render for blocks that ARE containers.
+              // For leaf blocks (slate, image, etc.) omit onUnwrap so the menu
+              // item doesn't render.
               const bpm = iframeSyncState.blockPathMap;
-              if (!selectedBlock || !bpm?.[selectedBlock]) return false;
+              if (!selectedBlock || !bpm?.[selectedBlock]) return {};
               const block = getBlockById(properties, bpm, selectedBlock);
-              if (!block) return false;
+              if (!block) return {};
               const childField = _getContainerChildFieldName(block['@type'], blocksConfig, intl);
               const childIds = block?.[childField]?.items || [];
-              if (childIds.length === 0) return false;
+              if (childIds.length === 0) return {}; // not a container with children
+
               const childTypes = childIds
                 .map((id) => block.blocks?.[id]?.['@type'])
                 .filter(Boolean);
               const parentCC = getContainerFieldConfig(selectedBlock, bpm, properties, blocksConfig, intl);
-              if (!parentCC || parentCC.isObjectList) return false;
-              // Count siblings currently in parent; the unwrap replaces 1 container with N children.
-              const parentPath = parentCC.parentId === PAGE_BLOCK_UID ? [] : bpm[parentCC.parentId]?.path;
-              const parentBlock = getBlockByPath(properties, parentPath);
-              const currentCount = parentBlock ? (getContainerItems(parentBlock, parentCC).length - 1) : 0;
-              return canContainAll(parentCC, childTypes, currentCount);
-            })()}
-            onUnwrap={() => {
-              const bpm = iframeSyncState.blockPathMap;
-              try {
-                const { formData: newFormData, promotedIds } = unwrapContainer(
-                  properties, bpm, selectedBlock, blocksConfig, intl,
-                );
-                onChangeFormData(newFormData);
-                // Select the first promoted child after unwrap.
-                if (promotedIds.length > 0 && onSelectBlock) {
-                  onSelectBlock(promotedIds[0]);
-                }
-              } catch (err) {
-                log('unwrapContainer failed:', err);
+              let canUnwrap = false;
+              if (parentCC && !parentCC.isObjectList) {
+                const parentPath = parentCC.parentId === PAGE_BLOCK_UID ? [] : bpm[parentCC.parentId]?.path;
+                const parentBlock = getBlockByPath(properties, parentPath);
+                const currentCount = parentBlock ? (getContainerItems(parentBlock, parentCC).length - 1) : 0;
+                canUnwrap = canContainAll(parentCC, childTypes, currentCount);
               }
-            }}
+
+              return {
+                canUnwrap,
+                onUnwrap: () => {
+                  try {
+                    const { formData: newFormData, promotedIds } = unwrapContainer(
+                      properties, bpm, selectedBlock, blocksConfig, intl,
+                    );
+                    onChangeFormData(newFormData);
+                    if (promotedIds.length > 0 && onSelectBlock) {
+                      onSelectBlock(promotedIds[0]);
+                    }
+                  } catch (err) {
+                    log('unwrapContainer failed:', err);
+                  }
+                },
+              };
+            })()}
             templateEditMode={iframeSyncState.templateEditMode}
             onMakeTemplate={() => {
               // Create a new template from the selected block
