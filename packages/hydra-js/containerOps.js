@@ -63,6 +63,32 @@ export function canContainAll(config, blockTypes, currentCount) {
  * @param {number} [depth=3]     Max number of edges to traverse.
  * @returns {string[] | null}
  */
+/**
+ * Map a source container's children into the shape of a target container.
+ * Supports the blocks_layout pattern (shared `blocks` dict + `{fieldName}.items`).
+ *
+ * Returns an object with `blocks` and `[targetConfig.fieldName]`, which the
+ * caller can merge into a target block shell.
+ *
+ * object_list containers (items as inline arrays with @id/idField) are a
+ * follow-up — not handled here.
+ *
+ * @param {{fieldName: string}} sourceConfig
+ * @param {{fieldName: string}} targetConfig
+ * @param {object} sourceBlock
+ * @returns {{blocks: object, [fieldName: string]: {items: string[]}}}
+ */
+export function mapLayoutItems(sourceConfig, targetConfig, sourceBlock) {
+  const sourceField = sourceConfig.fieldName;
+  const targetField = targetConfig.fieldName;
+  const items = sourceBlock[sourceField]?.items ?? [];
+  const blocks = sourceBlock.blocks ?? {};
+  return {
+    blocks,
+    [targetField]: { items },
+  };
+}
+
 export function findConversionPath(srcType, allowedTargets, blocksConfig, depth = 3) {
   if (!srcType || !blocksConfig?.[srcType]) return null;
   const targetSet = new Set(allowedTargets);

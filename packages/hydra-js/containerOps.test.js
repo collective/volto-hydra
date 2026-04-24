@@ -5,7 +5,7 @@
  * Strict TDD: each `it` below must fail before its implementation exists.
  */
 
-import { canContain, canContainAll, findConversionPath } from './containerOps.js';
+import { canContain, canContainAll, findConversionPath, mapLayoutItems } from './containerOps.js';
 
 describe('containerOps', () => {
   describe('canContain', () => {
@@ -130,6 +130,52 @@ describe('containerOps', () => {
       };
       expect(findConversionPath('slate', ['heading', 'quote'], cfg))
         .toEqual(['slate', 'quote']);
+    });
+  });
+
+  describe('mapLayoutItems (blocks_layout ↔ blocks_layout)', () => {
+    // Two containers using the blocks_layout pattern:
+    //   { blocks: {uid: data}, [fieldName]: { items: [uid] } }
+    const sourceBlock = {
+      '@type': 'columns',
+      blocks: { 'c-1': { '@type': 'column' }, 'c-2': { '@type': 'column' } },
+      columns: { items: ['c-1', 'c-2'] },
+    };
+    const sourceConfig = { fieldName: 'columns' };
+    const targetConfig = { fieldName: 'blocks_layout' };
+
+    test('returns target field with items preserving source order', () => {
+      const result = mapLayoutItems(sourceConfig, targetConfig, sourceBlock);
+      expect(result.blocks_layout).toEqual({ items: ['c-1', 'c-2'] });
+    });
+
+    test('preserves the blocks dict verbatim', () => {
+      const result = mapLayoutItems(sourceConfig, targetConfig, sourceBlock);
+      expect(result.blocks).toEqual(sourceBlock.blocks);
+      // Same reference — caller can mutate a copy if it needs to
+      expect(result.blocks).toBe(sourceBlock.blocks);
+    });
+
+    test('handles an empty source container', () => {
+      const empty = { '@type': 'columns', blocks: {}, columns: { items: [] } };
+      const result = mapLayoutItems(sourceConfig, targetConfig, empty);
+      expect(result).toEqual({ blocks: {}, blocks_layout: { items: [] } });
+    });
+
+    test('handles a missing items array (returns empty items)', () => {
+      const noItems = { '@type': 'columns', blocks: {} };
+      const result = mapLayoutItems(sourceConfig, targetConfig, noItems);
+      expect(result).toEqual({ blocks: {}, blocks_layout: { items: [] } });
+    });
+
+    test('same source and target field name round-trips cleanly', () => {
+      const cfg = { fieldName: 'blocks_layout' };
+      const block = {
+        blocks: { a: {} },
+        blocks_layout: { items: ['a'] },
+      };
+      expect(mapLayoutItems(cfg, cfg, block))
+        .toEqual({ blocks: { a: {} }, blocks_layout: { items: ['a'] } });
     });
   });
 });
