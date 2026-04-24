@@ -123,7 +123,10 @@ test.describe('Quanta Toolbar - Dropdown Menu', () => {
     expect(options).toContain('Settings');
     expect(options).toContain('Remove');
     expect(options.some(o => o.toLowerCase().includes('make') && o.toLowerCase().includes('template'))).toBe(true);
-    expect(options.length).toBe(3);
+    // Also includes Copy and Cut actions
+    expect(options.some(o => o.includes('Copy'))).toBe(true);
+    expect(options.some(o => o.includes('Cut'))).toBe(true);
+    expect(options.length).toBe(5);
   });
 
   test('Clicking Remove option triggers delete', async ({ page }) => {

@@ -78,7 +78,7 @@ test.describe('Nuxt site footer', () => {
     await expect(page.locator('#sidebar-properties .field-wrapper-url input')).not.toBeVisible({ timeout: 3000 });
 
     // Navigate up to SocialLinks parent to check sidebar [+]
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForSidebarOpen();
     const linksSection = page.locator('.container-field-section').filter({
       has: page.locator('.widget-title', { hasText: 'Links' }),
@@ -102,7 +102,7 @@ test.describe('Nuxt site footer', () => {
     const { blockId: socialBlockId } = await helper.waitForBlockByContent('Follow us:');
     await helper.clickBlockInIframe(socialBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
 
     // Toggle "Edit Template" in the sidebar
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
@@ -130,7 +130,7 @@ test.describe('Nuxt site footer', () => {
     await expect(addButton).toBeVisible({ timeout: 5000 });
 
     // Navigate up to SocialLinks parent to check sidebar [+]
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForSidebarOpen();
     const linksSection = page.locator('.container-field-section').filter({
       has: page.locator('.widget-title', { hasText: 'Links' }),
@@ -154,7 +154,7 @@ test.describe('Nuxt site footer', () => {
     const { blockId: socialBlockId } = await helper.waitForBlockByContent('Follow us:');
     await helper.clickBlockInIframe(socialBlockId);
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
 
     const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
     await expect(editToggle).toBeVisible({ timeout: 10000 });

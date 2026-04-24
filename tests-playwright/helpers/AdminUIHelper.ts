@@ -759,6 +759,98 @@ export class AdminUIHelper {
   }
 
   /**
+   * Press Escape once to exit text editing and enter block mode.
+   * Block stays selected but fields are no longer contenteditable.
+   */
+  async escapeFromEditing(): Promise<void> {
+    await this.page.keyboard.press('Escape');
+    // Wait for outline to switch to block mode (full border)
+    await expect(this.page.locator('.volto-hydra-block-outline[data-outline-style="border"]'))
+      .toBeVisible({ timeout: 3000 });
+  }
+
+  /**
+   * Simulate a long press (touch) on a block in the iframe.
+   * Dispatches touchstart/touchend events inside the iframe with a 700ms hold.
+   * Triggers ENTER_SELECTION_MODE in hydra.js for mobile selection mode.
+   */
+  async longPressBlock(blockUid: string): Promise<void> {
+    const iframe = this.getIframe();
+    const block = iframe.locator(`[data-block-uid="${blockUid}"]`);
+
+    // Get block center in iframe-relative coordinates
+    const center = await block.evaluate(el => {
+      const r = el.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    });
+
+    // Dispatch touchstart
+    await iframe.locator('body').evaluate((body, pos) => {
+      const el = document.elementFromPoint(pos.x, pos.y) || body;
+      el.dispatchEvent(new TouchEvent('touchstart', {
+        bubbles: true,
+        cancelable: true,
+        touches: [new Touch({ identifier: 1, target: el, clientX: pos.x, clientY: pos.y })],
+      }));
+    }, center);
+
+    // Hold for long press threshold
+    await this.page.waitForTimeout(700);
+
+    // Dispatch touchend
+    await iframe.locator('body').evaluate((body, pos) => {
+      const el = document.elementFromPoint(pos.x, pos.y) || body;
+      el.dispatchEvent(new TouchEvent('touchend', {
+        bubbles: true,
+        cancelable: true,
+        changedTouches: [new Touch({ identifier: 1, target: el, clientX: pos.x, clientY: pos.y })],
+      }));
+    }, center);
+
+    // Wait for selection checkboxes to appear
+    await expect(this.page.locator('.volto-hydra-selection-checkbox').first())
+      .toBeVisible({ timeout: 5000 });
+  }
+
+  /**
+   * Wait for multi-block selection outlines to appear.
+   * Each selected block gets its own outline element.
+   * @param minCount - minimum number of outlines expected (default 2)
+   */
+  async waitForMultiSelectOutlines(minCount = 2): Promise<void> {
+    await expect(async () => {
+      const count = await this.page.locator('.volto-hydra-block-outline').count();
+      expect(count).toBeGreaterThanOrEqual(minCount);
+    }).toPass({ timeout: 5000 });
+  }
+
+  /**
+   * Press Escape twice to navigate from text editing to parent block (or deselect).
+   * First Escape: text mode → block mode. Second Escape: block mode → parent.
+   * If already in block mode (not editing), only one Escape is needed.
+   */
+  async escapeToParent(): Promise<void> {
+    // Get current sidebar header count to detect navigation
+    const headersBefore = await this.page
+      .locator('.sidebar-section-header.sticky-header')
+      .count();
+
+    await this.page.keyboard.press('Escape');
+
+    // Check if we actually navigated (header count changed) or just entered block mode
+    // If still on same level after 300ms, press Escape again
+    await this.page.waitForTimeout(300);
+    const headersAfter = await this.page
+      .locator('.sidebar-section-header.sticky-header')
+      .count();
+
+    if (headersAfter >= headersBefore) {
+      // Didn't navigate — we entered block mode. Press again.
+      await this.page.keyboard.press('Escape');
+    }
+  }
+
+  /**
    * Check if the sidebar is open.
    */
   async isSidebarOpen(): Promise<boolean> {
@@ -1256,8 +1348,8 @@ export class AdminUIHelper {
    * Handles both plain text and formatted text (where text is inside SPAN, STRONG, etc.)
    */
   async selectAllTextInEditor(editor: Locator): Promise<void> {
-    // Get the expected text content (visible text, trimmed)
-    const expectedText = await editor.evaluate((el) => el.textContent?.trim() || '');
+    // Get the expected text content (visible text, trimmed, strip ZWS/BOM)
+    const expectedText = await editor.evaluate((el) => (el.textContent || '').replace(/[\uFEFF\u200B]/g, '').trim());
 
     // Use platform-appropriate keyboard shortcut (Cmd+A on Mac, Ctrl+A elsewhere)
     await editor.press('ControlOrMeta+a');
@@ -1268,7 +1360,7 @@ export class AdminUIHelper {
         async () => {
           return editor.evaluate(() => {
             const sel = window.getSelection();
-            return sel?.toString().trim() || '';
+            return (sel?.toString() || '').replace(/[\uFEFF\u200B]/g, '').trim();
           });
         },
         { timeout: 5000 }
@@ -2490,6 +2582,60 @@ export class AdminUIHelper {
     );
 
     // Wait for selection change to propagate
+    await this.page.waitForTimeout(100);
+  }
+
+  /**
+   * Set a text selection that spans from startOffset in startBlockId to
+   * endOffset in endBlockId. Same ZWS-aware position logic as selectTextRange
+   * but across two blocks in the iframe. Used to simulate a user's cross-block
+   * text drag.
+   */
+  async selectTextAcrossBlocks(
+    startBlockId: string,
+    startOffset: number,
+    endBlockId: string,
+    endOffset: number,
+  ): Promise<void> {
+    const iframe = this.getIframe();
+    await iframe.locator('body').evaluate(
+      (_body, args) => {
+        const findPositionInTextNodes = (root: Element, targetOffset: number) => {
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+          let currentOffset = 0;
+          let node: Node | null;
+          while ((node = walker.nextNode())) {
+            const text = node.textContent || '';
+            const cleanText = text.replace(/[﻿​]/g, '');
+            const nodeLength = cleanText.length;
+            if (currentOffset + nodeLength >= targetOffset) {
+              let charsSeen = 0;
+              let rawOffset = 0;
+              for (let i = 0; i < text.length && charsSeen < targetOffset - currentOffset; i++) {
+                if (text[i] !== '﻿' && text[i] !== '​') charsSeen++;
+                rawOffset++;
+              }
+              return { node, offset: rawOffset };
+            }
+            currentOffset += nodeLength;
+          }
+          return null;
+        };
+        const startEl = document.querySelector(`[data-block-uid="${args.startId}"]`);
+        const endEl = document.querySelector(`[data-block-uid="${args.endId}"]`);
+        if (!startEl || !endEl) throw new Error('blocks not found');
+        const startPos = findPositionInTextNodes(startEl, args.startOffset);
+        const endPos = findPositionInTextNodes(endEl, args.endOffset);
+        if (!startPos || !endPos) throw new Error('text positions not found');
+        const range = document.createRange();
+        range.setStart(startPos.node, startPos.offset);
+        range.setEnd(endPos.node, endPos.offset);
+        const sel = window.getSelection()!;
+        sel.removeAllRanges();
+        sel.addRange(range);
+      },
+      { startId: startBlockId, endId: endBlockId, startOffset, endOffset },
+    );
     await this.page.waitForTimeout(100);
   }
 

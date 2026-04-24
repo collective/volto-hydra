@@ -9,9 +9,11 @@ import {
 import { validateAndLog, validateTemplatePlaceholders } from '../../utils/formDataValidation';
 import { toast } from 'react-toastify';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
-import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, getBlockAddability } from '@volto-hydra/hydra-js';
+import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, getBlockAddability, isBlockReadonly, isBlockPositionLocked } from '@volto-hydra/hydra-js';
 import Api from '@plone/volto/helpers/Api/Api';
 
+import { setBlocksClipboard, resetBlocksClipboard } from '@plone/volto/actions/blocksClipboard/blocksClipboard';
+import { cloneBlocks } from '@plone/volto/helpers/Blocks/cloneBlocks';
 import { createLog } from '../../utils/log';
 
 const log = createLog('VIEW');
@@ -159,7 +161,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema } from '../../utils/blockPath';
+import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor } from '../../utils/blockPath';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
@@ -511,9 +513,12 @@ const Iframe = (props) => {
     closeObjectBrowser,
     schema, // Content type schema for page-level field types
     saveTemplatesRef, // Ref that Form.jsx uses to trigger template save
+    multiSelected = [], // Array of block UIDs in multi-selection
+    onSetMultiSelected, // Callback to set multi-selection in Redux
   } = props;
 
   const dispatch = useDispatch();
+  const blocksClipboard = useSelector((state) => state?.blocksClipboard || {});
 
   // Viewport preset for responsive preview
   const viewportPreset = useSelector(
@@ -548,6 +553,9 @@ const Iframe = (props) => {
   const [referenceElement, setReferenceElement] = useState(null);
   const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, focusedFieldName }
   const [mouseActivityCounter, setMouseActivityCounter] = useState(0); // incremented on MOUSE_ACTIVITY from iframe
+  const [selectionMode, setSelectionMode] = useState(false); // true when in touch selection mode
+  const multiSelectedRef = useRef(multiSelected);
+  multiSelectedRef.current = multiSelected;
 
   // History for routing - needed early for edit mode detection
   const history = useHistory();
@@ -563,6 +571,7 @@ const Iframe = (props) => {
   const iframeName = `hydra-${isEditMode ? 'edit' : 'view'}:${adminOrigin}`;
 
   const [pendingFieldMedia, setPendingFieldMedia] = useState(null); // { fieldName, blockUid } for field-level image selection
+  // Multi-select state is merged into blockUI (multiSelectedUids, multiSelectRects fields)
   const blockChooserRef = useRef();
   const [slashMenu, setSlashMenu] = useState(null); // { blockId, filter } or null
   const [slashMenuIndex, setSlashMenuIndex] = useState(0);
@@ -692,6 +701,156 @@ const Iframe = (props) => {
     pendingFormatRequestId: null, // requestId to include in next FORM_DATA (for Enter key, etc.)
     templateEditMode: null, // templateInstanceId of template being edited, or null if not in edit mode
   }));
+
+  // Notify toolbar whether paste is allowed for the current selection + clipboard.
+  useEffect(() => {
+    const bpm = iframeSyncState?.blockPathMap;
+    if (!bpm || !selectedBlock) return;
+    const clipData = blocksClipboard?.cut || blocksClipboard?.copy || [];
+    if (clipData.length === 0) return;
+
+    const blocksConfig = config.blocks.blocksConfig;
+    const containerConfig = getContainerFieldConfig(selectedBlock, bpm, properties, blocksConfig, intl);
+    const allowedTypes = containerConfig?.allowedBlocks;
+
+    let allowed = true;
+    if (allowedTypes?.length > 0) {
+      allowed = clipData.every(([, blockData]) =>
+        allowedTypes.includes(blockData?.['@type']),
+      );
+    }
+
+    document.dispatchEvent(new CustomEvent('hydra-paste-state', {
+      detail: { allowed },
+    }));
+  }, [selectedBlock, blocksClipboard, iframeSyncState?.blockPathMap, properties, intl]);
+
+  // Handle copy/cut/delete/paste from BlocksToolbar via document events.
+  useEffect(() => {
+    const bpm = iframeSyncState?.blockPathMap;
+    if (!bpm) return;
+    const blocksConfig = config.blocks.blocksConfig;
+
+    const handleCopy = (e) => {
+      const { blockIds, action } = e.detail;
+      const blocksData = blockIds
+        .map((uid) => {
+          const block = getBlockById(properties, bpm, uid);
+          return block ? [uid, block] : null;
+        })
+        .filter(Boolean);
+      log('hydra-copy-blocks:', action, blocksData.length, 'blocks');
+      dispatch(setBlocksClipboard({ [action]: blocksData }));
+      // Clear all outlines — stale combined rect would render wrong as single-block outline
+      setBlockUI(null);
+      handleExitSelectionMode();
+    };
+
+    const handleDelete = (e) => {
+      const { blockIds } = e.detail;
+      // Backstop: even if a caller slipped locked UIDs past the iframe-side
+      // filter (hydra._filterMutableBlockUids), guard here before we mutate.
+      const templateMode = iframeSyncState.templateEditMode;
+      const safeIds = blockIds.filter((uid) => {
+        const block = getBlockById(properties, bpm, uid);
+        if (!block) return false;
+        return !isBlockReadonly(block, templateMode)
+            && !isBlockPositionLocked(block, templateMode);
+      });
+      log('hydra-delete-blocks:', safeIds.length, '/', blockIds.length, 'blocks (after lock filter)');
+      if (safeIds.length === 0) return;
+      let newFormData = { ...properties };
+      let currentBpm = bpm;
+      for (const uid of safeIds) {
+        const containerConfig = getContainerFieldConfig(uid, currentBpm, newFormData, blocksConfig, intl);
+        newFormData = deleteBlockFromContainer(newFormData, currentBpm, uid, containerConfig);
+        currentBpm = buildBlockPathMap(newFormData, blocksConfig, intl);
+      }
+      onChangeFormData(newFormData);
+      onSelectBlock(null);
+      setBlockUI(null);
+      if (onSetMultiSelected) onSetMultiSelected([]);
+    };
+
+    const handlePaste = (e) => {
+      const { afterBlockId, keepClipboard } = e.detail;
+      const mode = Object.keys(blocksClipboard).includes('cut') ? 'cut' : 'copy';
+      const blocksData = blocksClipboard[mode] || [];
+
+      const cloneWithIds = blocksData
+        .filter(([blockId, blockData]) => blockId && blockData?.['@type'])
+        .map(([blockId, blockData]) => {
+          const blockConfig = blocksConfig[blockData['@type']];
+          return mode === 'copy'
+            ? blockConfig?.cloneData
+              ? blockConfig.cloneData(blockData)
+              : [uuid(), cloneBlocks(blockData)]
+            : [blockId, blockData];
+        })
+        .filter(Boolean);
+
+      if (cloneWithIds.length === 0) return;
+
+      const containerConfig = getContainerFieldConfig(afterBlockId, bpm, properties, blocksConfig, intl);
+      const allowedTypes = containerConfig?.allowedBlocks;
+      if (allowedTypes?.length > 0) {
+        const allAllowed = cloneWithIds.every(([, blockData]) =>
+          allowedTypes.includes(blockData?.['@type']),
+        );
+        if (!allAllowed) {
+          log('hydra-paste-blocks: blocked — types not allowed in container');
+          return;
+        }
+      }
+
+      log('hydra-paste-blocks:', cloneWithIds.length, 'blocks after', afterBlockId);
+      let newFormData = { ...properties };
+      let currentBpm = bpm;
+      let lastId = afterBlockId;
+      for (const [newId, blockData] of cloneWithIds) {
+        newFormData = insertBlockInContainer(newFormData, currentBpm, lastId, newId, blockData, containerConfig, 'after');
+        currentBpm = buildBlockPathMap(newFormData, blocksConfig, intl);
+        lastId = newId;
+      }
+
+      if (!keepClipboard) dispatch(resetBlocksClipboard());
+      onChangeFormData(newFormData);
+    };
+
+    const handleExitSelectionMode = () => {
+      log('hydra-exit-selection-mode');
+      if (onSetMultiSelected) onSetMultiSelected([]);
+      // Tell iframe — it clears state and acks with EXIT_SELECTION_MODE
+      // which sets selectionMode(false) so checkboxes disappear after iframe confirms
+      const iframe = document.getElementById('previewIframe');
+      if (iframe?.contentWindow && iframeOriginRef.current) {
+        iframe.contentWindow.postMessage({ type: 'EXIT_SELECTION_MODE' }, iframeOriginRef.current);
+      }
+    };
+
+    const handleEnterSelectionMode = () => {
+      log('hydra-enter-selection-mode');
+      // Tell iframe to enter selection mode. Iframe responds with ENTER_SELECTION_MODE
+      // message containing allBlockRects, which sets selectionMode=true in View.jsx
+      const iframe = document.getElementById('previewIframe');
+      if (iframe?.contentWindow && iframeOriginRef.current) {
+        iframe.contentWindow.postMessage({ type: 'ENTER_SELECTION_MODE' }, iframeOriginRef.current);
+      }
+    };
+
+    document.addEventListener('hydra-copy-blocks', handleCopy);
+    document.addEventListener('hydra-delete-blocks', handleDelete);
+    document.addEventListener('hydra-paste-blocks', handlePaste);
+    document.addEventListener('hydra-exit-selection-mode', handleExitSelectionMode);
+    document.addEventListener('hydra-enter-selection-mode', handleEnterSelectionMode);
+    return () => {
+      document.removeEventListener('hydra-copy-blocks', handleCopy);
+      document.removeEventListener('hydra-delete-blocks', handleDelete);
+      document.removeEventListener('hydra-paste-blocks', handlePaste);
+      document.removeEventListener('hydra-exit-selection-mode', handleExitSelectionMode);
+      document.removeEventListener('hydra-enter-selection-mode', handleEnterSelectionMode);
+    };
+  }, [blocksClipboard, properties, iframeSyncState?.blockPathMap, onChangeFormData, dispatch, intl]);
 
   // Template cache: stores loaded template documents keyed by templateId
   // Used for comparison on save to detect template changes
@@ -858,9 +1017,9 @@ const Iframe = (props) => {
   // Sync effect will send INITIAL_DATA after templates are merged
   const pendingInitialDataRef = useRef(null);
 
-  // Handle Escape key in Admin UI to navigate to parent block
-  // This is needed because when selecting via sidebar, focus stays in Admin UI,
-  // not iframe, so the iframe's Escape handler doesn't receive the event.
+  // Handle Escape key in Admin UI — three-state machine (same as iframe):
+  //   Text mode (sidebar field focused) → Block mode (blur field, stay on block)
+  //   Block mode → Parent block (or deselect if at page level)
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key !== 'Escape') return;
@@ -875,18 +1034,37 @@ const Iframe = (props) => {
       if (linkEditorVisible) return;
 
       // Don't handle if focus is in iframe - let iframe's handler do it
-      const iframe = document.getElementById('previewIframe');
-      if (iframe && iframe.contains(document.activeElement)) return;
+      const iframeEl = document.getElementById('previewIframe');
+      if (iframeEl && iframeEl.contains(document.activeElement)) return;
 
       e.preventDefault();
 
-      // Get parent from blockPathMap
+      // Check if a sidebar form field has focus (sidebar text mode)
+      const sidebarField = document.activeElement?.closest?.('.field-wrapper input, .field-wrapper textarea, .field-wrapper [contenteditable="true"], .field-wrapper select');
+      if (sidebarField) {
+        // FIRST ESCAPE: Sidebar text mode → Block mode (blur field, stay on block)
+        log('Admin Escape key - entering block mode (blurring sidebar field)');
+        (document.activeElement as HTMLElement)?.blur?.();
+        return;
+      }
+
+      // SECOND ESCAPE: Block mode → Parent (or deselect)
       const pathInfo = iframeSyncState.blockPathMap?.[selectedBlock];
       const parentId = pathInfo?.parentId || null;
       log('Admin Escape key - selecting parent:', parentId, 'from:', selectedBlock);
 
       // Select parent (or deselect if no parent)
       onSelectBlock(parentId);
+
+      // Tell the iframe to select the parent (or deselect) — otherwise the iframe
+      // still has the old block selected and keeps sending BLOCK_SELECTED messages
+      const iframeWindow = iframeEl?.contentWindow;
+      if (iframeWindow) {
+        iframeWindow.postMessage(
+          { type: 'SELECT_BLOCK', uid: parentId, method: 'select' },
+          '*',
+        );
+      }
     };
 
     document.addEventListener('keydown', handleEscape, true);
@@ -1517,6 +1695,74 @@ const Iframe = (props) => {
           setPendingDelete({ uid: event.data.uid, selectPrev: true });
           break;
 
+        case 'DELETE_BLOCKS': {
+          const uidsToDelete = event.data.uids || [];
+          log('DELETE_BLOCKS: dispatching hydra-delete-blocks for', uidsToDelete.length, 'blocks');
+          document.dispatchEvent(new CustomEvent('hydra-delete-blocks', {
+            detail: { blockIds: uidsToDelete },
+          }));
+          break;
+        }
+
+        case 'COPY_BLOCKS': {
+          const uids = event.data.uids || [];
+          const action = event.data.action || 'copy'; // 'copy' or 'cut'
+          const blocksData = uids
+            .map(uid => {
+              const block = getBlockById(properties, iframeSyncState.blockPathMap, uid);
+              return block ? [uid, block] : null;
+            })
+            .filter(Boolean);
+          log('COPY_BLOCKS:', action, blocksData.length, 'blocks');
+          dispatch(setBlocksClipboard({ [action]: blocksData }));
+          break;
+        }
+
+        case 'PASTE_BLOCKS': {
+          // Paste from blocks clipboard after the specified block (Cmd+V in block mode)
+          const afterBlockId = event.data.afterBlockId;
+          if (!afterBlockId) break;
+          document.dispatchEvent(new CustomEvent('hydra-paste-blocks', {
+            detail: { afterBlockId, keepClipboard: false },
+          }));
+          break;
+        }
+
+        case 'ENTER_SELECTION_MODE': {
+          const { blockUid: toggledUid, allBlockRects } = event.data;
+          log('ENTER_SELECTION_MODE:', toggledUid || '(activate only)', allBlockRects ? Object.keys(allBlockRects).length + ' rects' : 'toggle');
+          setSelectionMode(true);
+          if (allBlockRects) {
+            setBlockUI(prev => ({ ...prev, selectionModeRects: allBlockRects }));
+          }
+          // Toggle blockUid in multiSelected only if provided. When admin triggered
+          // selection mode via sidebar (no blockUid), multiSelected is already set.
+          if (toggledUid && onSetMultiSelected) {
+            const current = multiSelectedRef.current || [];
+            const idx = current.indexOf(toggledUid);
+            const updated = idx >= 0
+              ? current.filter(id => id !== toggledUid)
+              : [...current, toggledUid];
+            if (updated.length === 0) {
+              // All unchecked — exit selection mode
+              onSetMultiSelected([]);
+              const iframe = document.getElementById('previewIframe');
+              if (iframe?.contentWindow && iframeOriginRef.current) {
+                iframe.contentWindow.postMessage({ type: 'EXIT_SELECTION_MODE' }, iframeOriginRef.current);
+              }
+            } else {
+              onSetMultiSelected(updated);
+            }
+          }
+          break;
+        }
+
+        case 'EXIT_SELECTION_MODE': {
+          log('EXIT_SELECTION_MODE ack from iframe');
+          setSelectionMode(false);
+          break;
+        }
+
         case 'ADD_BLOCK_AFTER': {
           // Determine the default block type from the container's schema
           const containerFieldConfig = getContainerFieldConfig(
@@ -2120,42 +2366,53 @@ const Iframe = (props) => {
           onChangeFormData(event.data.data);
           break;
 
-        case 'MOVE_BLOCK': {
-          // Handle drag-and-drop block moves (supports container and page-level)
-          const { blockId, targetBlockId, insertAfter, sourceParentId, targetParentId } = event.data;
-          log('MOVE_BLOCK: received:', { blockId, targetBlockId, insertAfter, sourceParentId, targetParentId });
+        case 'MOVE_BLOCKS': {
+          // Handle drag-and-drop block moves (single or multi, supports containers)
+          const { blockIds: moveBlockIds, targetBlockId, insertAfter, targetParentId } = event.data;
+          log('MOVE_BLOCKS: received:', moveBlockIds?.length, 'blocks to', targetBlockId, 'insertAfter:', insertAfter);
 
           // Use properties (Redux) as source of truth for moves
-          // Rebuild blockPathMap from properties to ensure consistency
           const currentFormData = properties;
           const currentBlockPathMap = buildBlockPathMap(currentFormData, config.blocks.blocksConfig, intl);
 
-          // Check if this is a template instance (virtual container with child blocks)
-          const isTemplateInstance = currentBlockPathMap[blockId]?.isTemplateInstance;
-
-          // Get all blocks to move - for template instances, get all child blocks in order
-          let blocksToMove;
-          if (isTemplateInstance) {
-            // Get child blocks of the template instance, maintaining their relative order
-            // by filtering the parent's blocks_layout
-            const parentId = currentBlockPathMap[blockId]?.parentId || 'page';
-            const parentBlock = parentId === 'page' ? currentFormData : getBlockById(currentFormData, currentBlockPathMap, parentId);
-            const containerField = currentBlockPathMap[blockId]?.containerField || 'blocks_layout';
-            const layoutItems = parentBlock?.[containerField]?.items || [];
-
-            // Find all child blocks of this template instance in layout order
-            blocksToMove = layoutItems.filter(id => currentBlockPathMap[id]?.parentId === blockId);
-            log('MOVE_BLOCK: template instance - moving blocks:', blocksToMove);
-          } else {
-            blocksToMove = [blockId];
+          // Expand template instances: each template instance drags all its child blocks
+          const blocksToMove = [];
+          for (const bid of (moveBlockIds || [])) {
+            if (currentBlockPathMap[bid]?.isTemplateInstance) {
+              const parentId = currentBlockPathMap[bid]?.parentId || 'page';
+              const parentBlock = parentId === 'page' ? currentFormData : getBlockById(currentFormData, currentBlockPathMap, parentId);
+              const containerField = currentBlockPathMap[bid]?.containerField || 'blocks_layout';
+              const layoutItems = parentBlock?.[containerField]?.items || [];
+              const childBlocks = layoutItems.filter(id => currentBlockPathMap[id]?.parentId === bid);
+              log('MOVE_BLOCKS: template instance', bid, '- expanding to:', childBlocks);
+              blocksToMove.push(...childBlocks);
+            } else {
+              blocksToMove.push(bid);
+            }
           }
 
-          // Get source container config BEFORE the move (needed for ensureEmptyBlockIfEmpty)
-          // Only needed when moving to a different container
+          // Derive sourceParentId from first block's pathMap entry
           const firstBlockId = blocksToMove[0];
+          const sourceParentId = currentBlockPathMap[firstBlockId]?.parentId || null;
+
+          // Get source container config BEFORE the move (needed for ensureEmptyBlockIfEmpty)
           const sourceContainerConfig = sourceParentId !== targetParentId && sourceParentId
             ? getContainerFieldConfig(firstBlockId, currentBlockPathMap, currentFormData, blocksConfig, intl)
             : null;
+
+          // Check all block types are allowed in the target container
+          const targetContainerCfg = getContainerFieldConfig(targetBlockId, currentBlockPathMap, currentFormData, blocksConfig, intl);
+          const targetAllowedTypes = targetContainerCfg?.allowedBlocks;
+          if (targetAllowedTypes?.length > 0) {
+            const allAllowed = blocksToMove.every(bid => {
+              const blockData = getBlockById(currentFormData, currentBlockPathMap, bid);
+              return targetAllowedTypes.includes(blockData?.['@type']);
+            });
+            if (!allAllowed) {
+              log('MOVE_BLOCKS: blocked — block types not allowed in target container');
+              break;
+            }
+          }
 
           // Move all blocks in sequence, each one after the previous
           // Track insertAfter for each block (needed for template inheritance)
@@ -2182,7 +2439,7 @@ const Iframe = (props) => {
             );
 
             if (!newFormData) {
-              log('MOVE_BLOCK: moveBlockBetweenContainers failed for:', moveBlockId);
+              log('MOVE_BLOCKS: moveBlockBetweenContainers failed for:', moveBlockId);
               break;
             }
 
@@ -2190,7 +2447,7 @@ const Iframe = (props) => {
             currentTarget = moveBlockId;
             currentInsertAfter = true;
           }
-          log('MOVE_BLOCK: moveBlockBetweenContainers returned:', newFormData ? 'formData' : 'null');
+          log('MOVE_BLOCKS: moveBlockBetweenContainers returned:', newFormData ? 'formData' : 'null');
 
           if (newFormData) {
             // Apply defaults to moved blocks based on their new position
@@ -2229,7 +2486,7 @@ const Iframe = (props) => {
               if (updatedBlockData !== blockData) {
                 newFormData = updateBlockById(newFormData, updatedPathMap, moveBlockId, updatedBlockData);
                 updatedPathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
-                log('MOVE_BLOCK: Applied defaults to moved block:', moveBlockId, 'templateId:', updatedBlockData.templateId, 'slotId:', updatedBlockData.slotId);
+                log('MOVE_BLOCKS: Applied defaults to moved block:', moveBlockId, 'templateId:', updatedBlockData.templateId, 'slotId:', updatedBlockData.slotId);
               }
             }
 
@@ -2253,15 +2510,15 @@ const Iframe = (props) => {
               setIframeSyncState(prev => ({
                 ...prev,
                 blockPathMap: newBlockPathMap,
-                pendingSelectBlockUid: blockId,
+                pendingSelectBlockUid: blocksToMove[0],
               }));
             });
             // Debug: Log column contents after move
             const col1AfterMove = newFormData?.blocks?.['columns-1']?.columns?.['col-1'];
             const col2AfterMove = newFormData?.blocks?.['columns-1']?.columns?.['col-2'];
-            log('MOVE_BLOCK: col-1 blocks_layout after move:', col1AfterMove?.blocks_layout?.items);
-            log('MOVE_BLOCK: col-2 blocks_layout after move:', col2AfterMove?.blocks_layout?.items);
-            log('MOVE_BLOCK: calling onChangeFormData');
+            log('MOVE_BLOCKS: col-1 blocks_layout after move:', col1AfterMove?.blocks_layout?.items);
+            log('MOVE_BLOCKS: col-2 blocks_layout after move:', col2AfterMove?.blocks_layout?.items);
+            log('MOVE_BLOCKS: calling onChangeFormData');
             onChangeFormData(newFormData);
           }
           break;
@@ -2327,7 +2584,26 @@ const Iframe = (props) => {
           // may have moved to a different selection in the meantime
           lastSentSelectBlockRef.current = event.data.blockUid;
 
-          // Call onSelectBlock OUTSIDE setBlockUI callback to avoid React warning
+          // --- Multi-block selection: set state and break (nothing else applies) ---
+          if (event.data.isMultipleSelection) {
+            const blockUids = event.data.blockUids || [];
+            log('BLOCK_SELECTED multi-select:', blockUids.length, 'blocks');
+            if (onSetMultiSelected) onSetMultiSelected(blockUids);
+            setBlockUI({
+              blockUid: blockUids[0],
+              rect: event.data.rect,
+              focusedFieldName: null,
+              addDirection: 'bottom',
+              editableFields: {},
+              multiSelectedUids: blockUids,
+              multiSelectRects: event.data.rects || {},
+            });
+            break;
+          }
+
+          // --- Single-block selection from here on ---
+          // Clear multiSelected unless we're in selection mode (preserve during navigation)
+          if (onSetMultiSelected && !selectionMode) onSetMultiSelected([]);
           if (isNewBlock) {
             log('BLOCK_SELECTED calling onSelectBlock:', event.data.blockUid);
             onSelectBlock(event.data.blockUid);
@@ -2374,6 +2650,9 @@ const Iframe = (props) => {
                 prevBlockUI.rect?.width === event.data.rect?.width &&
                 prevBlockUI.rect?.height === event.data.rect?.height &&
                 !mediaFieldsChanged) {
+              // focusedFieldRect intentionally excluded — it changes during typing
+              // (field height shifts) and re-renders from that cause perf issues.
+              // The underline updates when other fields trigger a state change.
               return prevBlockUI; // Return same reference to skip re-render
             }
             // Note: Zero rect check happens earlier (before onSelectBlock) so we return before reaching here
@@ -2394,6 +2673,7 @@ const Iframe = (props) => {
               blockUid: event.data.blockUid,
               rect: event.data.rect,
               focusedFieldName: event.data.focusedFieldName, // Track which editable field is focused
+              focusedFieldRect: event.data.focusedFieldRect, // Rect of focused field for underline positioning
               focusedLinkableField: event.data.focusedLinkableField, // Track which linkable field is focused
               focusedMediaField: event.data.focusedMediaField, // Track which media field is focused
               editableFields: event.data.editableFields, // Map of fieldName -> fieldType from iframe
@@ -2401,6 +2681,7 @@ const Iframe = (props) => {
               mediaFields: event.data.mediaFields, // Map of fieldName -> true for image/media fields
               addDirection: event.data.addDirection, // Direction for add button positioning
               isMultiElement: event.data.isMultiElement, // True if block renders as multiple DOM elements
+              selectionModeRects: event.data.selectionModeRects,
             };
           });
           // Set selection from BLOCK_SELECTED - this ensures block and selection are atomic
@@ -3625,46 +3906,122 @@ const Iframe = (props) => {
         />
       )}
 
-      {/* Block UI Overlays - rendered in parent window, positioned over iframe */}
-      {blockUI && blockUI.rect && referenceElement && (() => {
-        // Determine outline style based on block type and number of editable fields
-        // Container blocks always get full border (they contain child blocks)
-        // Single field non-container blocks get bottom line
-        // Multi-field non-container blocks get full border
-        const editableFieldCount = Object.keys(blockUI.editableFields || {}).length;
-        const isContainer = getAllContainerFields(
-          selectedBlock,
-          iframeSyncState.blockPathMap,
-          properties,
-          config.blocks.blocksConfig,
-          intl,
-          iframeSyncState.templateEditMode,
-        ).length > 0;
-        // Multi-element blocks (e.g., listings) always get full border to show combined bounding box
-        const showBottomLine = editableFieldCount === 1 && !isContainer && !blockUI.isMultiElement;
-        return (
-        <>
-          {/* Selection Outline - blue border or bottom line depending on field count */}
+      {/* Multi-block selection outlines — individual outline per selected block */}
+      {blockUI?.multiSelectedUids?.length > 1 && referenceElement && (() => {
+        const rects = blockUI.multiSelectRects || {};
+        if (Object.keys(rects).length === 0) return null;
+        const iframeRect = referenceElement.getBoundingClientRect();
+        return Object.entries(rects).map(([uid, rect]) => (
           <div
+            key={`multi-outline-${uid}`}
             className="volto-hydra-block-outline"
-            data-outline-style={showBottomLine ? 'bottom-line' : 'border'}
+            data-outline-style="border"
+            data-block-uid={uid}
             style={{
               position: 'fixed',
-              left: `${referenceElement.getBoundingClientRect().left + blockUI.rect.left}px`,
-              top: showBottomLine
-                ? `${referenceElement.getBoundingClientRect().top + blockUI.rect.top + blockUI.rect.height - 1}px`
-                : `${referenceElement.getBoundingClientRect().top + blockUI.rect.top - 2}px`,
-              width: `${blockUI.rect.width}px`,
-              height: showBottomLine ? '3px' : `${blockUI.rect.height + 4}px`,
-              background: showBottomLine ? '#007eb1' : 'transparent',
-              border: showBottomLine ? 'none' : '2px solid #007eb1',
+              left: `${iframeRect.left + rect.left - 2}px`,
+              top: `${iframeRect.top + rect.top - 2}px`,
+              width: `${rect.width + 4}px`,
+              height: `${rect.height + 4}px`,
+              background: 'transparent',
+              border: '2px solid #007eb1',
               pointerEvents: 'none',
               zIndex: 1,
             }}
           />
+        ));
+      })()}
 
-          {/* Quanta Toolbar with real Slate buttons */}
-          <SyncedSlateToolbar
+      {/* Single-block outline + underline (hidden during multi-select or selection mode) */}
+      {blockUI && blockUI.rect && referenceElement && !selectionMode && !(blockUI.multiSelectedUids?.length > 1) && (() => {
+        const isTextMode = !!blockUI.focusedFieldName;
+        const iframeLeft = referenceElement.getBoundingClientRect().left;
+        const iframeTop = referenceElement.getBoundingClientRect().top;
+        return (
+        <>
+          <div
+            className="volto-hydra-block-outline"
+            data-outline-style={isTextMode ? 'subtle' : 'border'}
+            style={{
+              position: 'fixed',
+              left: `${iframeLeft + blockUI.rect.left - 2}px`,
+              top: `${iframeTop + blockUI.rect.top - 2}px`,
+              width: `${blockUI.rect.width + 4}px`,
+              height: `${blockUI.rect.height + 4}px`,
+              background: 'transparent',
+              border: isTextMode ? '1px solid rgba(0, 126, 177, 0.3)' : '2px solid #007eb1',
+              pointerEvents: 'none',
+              zIndex: 1,
+            }}
+          />
+          {isTextMode && blockUI.focusedFieldRect && (
+            <div
+              className="volto-hydra-field-underline"
+              style={{
+                position: 'fixed',
+                left: `${iframeLeft + blockUI.focusedFieldRect.left}px`,
+                top: `${iframeTop + blockUI.focusedFieldRect.top + blockUI.focusedFieldRect.height - 1}px`,
+                width: `${blockUI.focusedFieldRect.width}px`,
+                height: '3px',
+                background: '#007eb1',
+                pointerEvents: 'none',
+                zIndex: 2,
+              }}
+            />
+          )}
+        </>
+        );
+      })()}
+
+      {/* Touch selection mode — checkbox overlays on all visible blocks */}
+      {selectionMode && blockUI?.selectionModeRects && referenceElement && (() => {
+        const iframeRect = referenceElement.getBoundingClientRect();
+        return Object.entries(blockUI.selectionModeRects).map(([uid, rect]) => {
+          const isChecked = multiSelected.includes(uid);
+          return (
+            <div
+              key={`sel-${uid}`}
+              className="volto-hydra-selection-checkbox"
+              data-block-uid={uid}
+              data-checked={isChecked ? 'true' : 'false'}
+              onClick={() => {
+                const checked = multiSelected.includes(uid)
+                  ? multiSelected.filter(id => id !== uid)
+                  : [...multiSelected, uid];
+                if (checked.length === 0) {
+                  document.dispatchEvent(new CustomEvent('hydra-exit-selection-mode'));
+                } else {
+                  if (onSetMultiSelected) onSetMultiSelected(checked);
+                }
+              }}
+              style={{
+                position: 'fixed',
+                left: `${iframeRect.left + rect.left - 4}px`,
+                top: `${iframeRect.top + rect.top + rect.height / 2 - 12}px`,
+                width: '24px',
+                height: '24px',
+                borderRadius: '4px',
+                border: `2px solid ${isChecked ? '#007eb1' : '#999'}`,
+                background: isChecked ? '#007eb1' : 'white',
+                cursor: 'pointer',
+                zIndex: 10,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              }}
+            >
+              {isChecked ? '\u2713' : ''}
+            </div>
+          );
+        });
+      })()}
+
+      {/* Quanta Toolbar — renders for both single and multi-select */}
+      <SyncedSlateToolbar
             selectedBlock={selectedBlock}
             form={iframeSyncState.formData}
             blockPathMap={iframeSyncState.blockPathMap}
@@ -3989,71 +4346,45 @@ const Iframe = (props) => {
             }}
           />
 
-          {/* Add Button - positioned based on data-block-add direction */}
-          {/* addDirection is 'hidden' when getBlockAddability returns canInsertBefore/After both false */}
-          {/* This handles: readonly blocks, template edit mode, maxLength, fixed blocks */}
-          {blockUI.addDirection !== 'hidden' && (() => {
+      {/* Add Button — single-block only, hidden during multi-select */}
+      {blockUI && blockUI.rect && referenceElement && !(blockUI.multiSelectedUids?.length > 1) &&
+        blockUI.addDirection !== 'hidden' && (() => {
             const iframeRect = referenceElement.getBoundingClientRect();
             log('Add button render, blockUI.addDirection:', blockUI.addDirection, 'blockUid:', blockUI.blockUid);
             const isRightDirection = blockUI.addDirection === 'right';
 
-            // Calculate ideal position
             const buttonWidth = 30;
             const buttonHeight = 30;
             let addLeft = isRightDirection
-              ? iframeRect.left + blockUI.rect.left + blockUI.rect.width + 8  // Right of block
-              : iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth; // Bottom-right of block
+              ? iframeRect.left + blockUI.rect.left + blockUI.rect.width + 8
+              : iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth;
 
-            // Track if we're constrained inside the block
             let isConstrained = false;
-
-            // Constrain to stay within iframe bounds
             const iframeRight = iframeRect.left + iframeRect.width;
-            const blockRightInIframe = blockUI.rect.left + blockUI.rect.width;
-            const availableMargin = iframeRect.width - blockRightInIframe;
-            const buttonSpace = buttonWidth + 8; // button + gap
-            log('Add button constraint check:', {
-              blockRect: { left: blockUI.rect.left, width: blockUI.rect.width, right: blockRightInIframe },
-              iframeWidth: iframeRect.width,
-              availableMargin,
-              buttonSpace,
-              wouldConstrain: availableMargin < buttonSpace,
-            });
             if (addLeft + buttonWidth > iframeRight) {
-              // Move button inward to stay on screen, but keep it at top-right of block
               addLeft = iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth - 8;
               isConstrained = true;
             }
 
-            // For 'right': top-right of block (or bottom-right if constrained to avoid image overlay)
-            // For 'bottom' (default): below block
             let addTop;
             if (isRightDirection) {
-              if (isConstrained) {
-                // When constrained inside block, position at bottom-right to avoid image overlay buttons
-                addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height - buttonHeight - 8;
-              } else {
-                addTop = iframeRect.top + blockUI.rect.top;  // Top-right
-              }
+              addTop = isConstrained
+                ? iframeRect.top + blockUI.rect.top + blockUI.rect.height - buttonHeight - 8
+                : iframeRect.top + blockUI.rect.top;
             } else {
-              addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;  // Below block
+              addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;
             }
 
-            // Check if this is a table mode block (row or cell)
             const pathInfo = iframeSyncState.blockPathMap?.[selectedBlock];
             const isTableMode = pathInfo?.addMode === 'table' || pathInfo?.parentAddMode === 'table';
-
-            // Icon and title depend on table mode and direction
             let addIcon;
             let addTitle;
             if (isTableMode) {
-              // Table mode: use row/column icons
               addIcon = isRightDirection
                 ? <Icon name={columnAfterSVG} size="20px" />
                 : <Icon name={rowAfterSVG} size="20px" />;
               addTitle = isRightDirection ? "Add column" : "Add row";
             } else {
-              // Regular blocks: use simple + icon
               addIcon = <span style={{ fontSize: '22px', lineHeight: 1 }}>+</span>;
               addTitle = "Add block";
             }
@@ -4085,15 +4416,13 @@ const Iframe = (props) => {
             </button>
             );
           })()}
-        </>
-        );
-      })()}
 
       {/* Hierarchical sidebar widgets */}
       {/* Use properties (Redux) for formData - it's always up-to-date after onChangeFormData */}
       {/* blockPathMap is updated synchronously before onChangeFormData, so they stay in sync */}
       <ParentBlocksWidget
         selectedBlock={selectedBlock}
+        multiSelected={multiSelected}
         formData={properties}
         blockPathMap={iframeSyncState.blockPathMap}
         onSelectBlock={onSelectBlock}

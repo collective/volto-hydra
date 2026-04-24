@@ -45,6 +45,9 @@ const DropdownMenu = ({
   isReadonly = false, // Template blocks that can't be edited
   isInTemplate = false, // Whether block is already part of a template
   onMakeTemplate, // Handler for "Make Template" action
+  multiSelectedUids, // Array of multi-selected block UIDs (for copy/cut/delete)
+  hasClipboard = false, // Whether blocksClipboard has content to paste
+  pasteAllowed = true, // Whether clipboard types are allowed in target container
 }) => {
   const menuRef = useRef(null);
   const [convertSubmenuOpen, setConvertSubmenuOpen] = React.useState(false);
@@ -373,6 +376,64 @@ const DropdownMenu = ({
           />
         </>
       )}
+      {/* Copy / Cut / Paste actions */}
+      {selectedBlock && selectedBlock !== PAGE_BLOCK_UID && (
+        <>
+          <div
+            className="volto-hydra-dropdown-item"
+            data-action="copy-block"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            onClick={() => {
+              onClose();
+              const uids = multiSelectedUids?.length > 1 ? multiSelectedUids : [selectedBlock];
+              document.dispatchEvent(new CustomEvent('hydra-copy-blocks', {
+                detail: { blockIds: uids, action: 'copy' },
+              }));
+            }}
+          >
+            📋 Copy
+          </div>
+          <div
+            className="volto-hydra-dropdown-item"
+            data-action="cut-block"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            onClick={() => {
+              onClose();
+              const uids = multiSelectedUids?.length > 1 ? multiSelectedUids : [selectedBlock];
+              document.dispatchEvent(new CustomEvent('hydra-copy-blocks', {
+                detail: { blockIds: uids, action: 'cut' },
+              }));
+              document.dispatchEvent(new CustomEvent('hydra-delete-blocks', {
+                detail: { blockIds: uids },
+              }));
+            }}
+          >
+            ✂️ Cut
+          </div>
+          {hasClipboard && pasteAllowed && (
+            <div
+              className="volto-hydra-dropdown-item"
+              data-action="paste-block"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', cursor: 'pointer', fontSize: '15px', fontWeight: '500' }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              onClick={() => {
+                onClose();
+                document.dispatchEvent(new CustomEvent('hydra-paste-blocks', {
+                  detail: { afterBlockId: selectedBlock, keepClipboard: false },
+                }));
+              }}
+            >
+              📌 Paste
+            </div>
+          )}
+          <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.1)', margin: '0 10px' }} />
+        </>
+      )}
       {/* Select Container option - only shown for nested blocks with a real parent (not page) */}
       {parentId && parentId !== PAGE_BLOCK_UID && onSelectBlock && (
         <>
@@ -388,6 +449,7 @@ const DropdownMenu = ({
             }}
             onMouseEnter={(e) => (e.target.style.background = '#f0f0f0')}
             onMouseLeave={(e) => (e.target.style.background = 'transparent')}
+            data-action="select-container"
             onClick={handleSelectContainer}
           >
             ⬆️ Select Container
@@ -426,6 +488,7 @@ const DropdownMenu = ({
         return (
           <div
             className="volto-hydra-dropdown-item"
+            data-action="delete-block"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -435,8 +498,8 @@ const DropdownMenu = ({
               fontSize: '15px',
               fontWeight: '500',
             }}
-            onMouseEnter={(e) => (e.target.style.background = '#f0f0f0')}
-            onMouseLeave={(e) => (e.target.style.background = 'transparent')}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             onClick={() => {
               onClose();
               if (removeAction && onTableAction) {

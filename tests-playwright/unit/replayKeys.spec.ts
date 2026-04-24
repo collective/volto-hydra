@@ -108,6 +108,99 @@ async function replay(
   );
 }
 
+/**
+ * Like replay() but also captures messages sent to parent window.
+ * Returns { text, textBefore, messages } where messages is an array of
+ * { type, ...data } objects sent via bridge.sendMessageToParent.
+ */
+async function replayWithMessages(
+  iframe: ReturnType<AdminUIHelper['getIframe']>,
+  html: string,
+  cursorAt: 'start' | 'end' | number,
+  keys: (string | { key: string; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean; altKey?: boolean })[],
+  setup?: (bridge: any) => void,
+) {
+  return await iframe.locator('body').evaluate(
+    (_el: Element, { html, cursorAt, keys, setupStr }: any) => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) {
+        bridge.blockTextMutationObserver.disconnect();
+      }
+      editField.innerHTML = html;
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'value';
+      bridge.isInlineEditing = true;
+
+      // Run optional setup
+      if (setupStr) {
+        new Function('bridge', setupStr)(bridge);
+      }
+
+      // Capture messages
+      const messages: any[] = [];
+      const origSend = bridge.sendMessageToParent.bind(bridge);
+      bridge.sendMessageToParent = (msg: any, ...args: any[]) => {
+        messages.push(msg);
+        origSend(msg, ...args);
+      };
+
+      // Place cursor
+      const walker = document.createTreeWalker(editField, NodeFilter.SHOW_TEXT);
+      const textNodes: Text[] = [];
+      let tn: Text | null;
+      while ((tn = walker.nextNode() as Text)) textNodes.push(tn);
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      if (cursorAt === 'start') {
+        range.setStart(textNodes[0], 0);
+      } else if (cursorAt === 'end') {
+        const last = textNodes[textNodes.length - 1];
+        range.setStart(last, last.length);
+      } else {
+        let remaining = cursorAt as number;
+        for (const t of textNodes) {
+          const vis = t.textContent!.replace(/[\uFEFF\u200B]/g, '');
+          if (remaining <= vis.length) {
+            let raw = 0, seen = 0;
+            for (let i = 0; i < t.textContent!.length && seen < remaining; i++) {
+              if (t.textContent![i] !== '\uFEFF' && t.textContent![i] !== '\u200B') seen++;
+              raw++;
+            }
+            range.setStart(t, raw);
+            break;
+          }
+          remaining -= vis.length;
+        }
+      }
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      // Replay
+      bridge.eventBuffer = keys.map((k: any) => {
+        if (typeof k === 'string') {
+          return { key: k, code: k, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false };
+        }
+        return { code: k.key, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, ...k };
+      });
+      bridge.pendingTransform = { blockId, requestId: 'test-replay' };
+      bridge.blockedBlockId = blockId;
+      bridge.replayBufferAndUnblock('unit-test');
+
+      // Restore
+      bridge.sendMessageToParent = origSend;
+
+      const text = editField.textContent!.replace(/[\uFEFF\u200B]/g, '');
+      return { text, messages };
+    },
+    { html, cursorAt, keys, setupStr: setup?.toString() },
+  );
+}
+
 test.describe('replayOneKey — cursor movement and editing', () => {
   let helper: AdminUIHelper;
 
@@ -301,5 +394,521 @@ test.describe('replayOneKey — cursor movement and editing', () => {
       '<strong data-node-id="0.1"><span>bold</span></strong>\uFEFF</p>',
       'end', ['ArrowLeft', 'ArrowLeft']);
     expect(r.textBefore).toBe('beforebo');
+  });
+});
+
+test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
+  let helper: AdminUIHelper;
+
+  test.beforeEach(async ({ page }) => {
+    helper = new AdminUIHelper(page);
+    await page.goto('http://localhost:8889/mock-parent.html');
+    await helper.waitForIframeReady();
+    await helper.waitForBlockSelected('mock-block-1');
+  });
+
+  test('slash menu ArrowDown sends SLASH_MENU down', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      bridge._slashMenuActive = true;
+      const messages: any[] = [];
+      const origSend = bridge.sendMessageToParent.bind(bridge);
+      bridge.sendMessageToParent = (msg: any) => { messages.push(msg); origSend(msg); };
+      bridge.replayOneKey('mock-block-1', { key: 'ArrowDown' }, null);
+      bridge.sendMessageToParent = origSend;
+      bridge._slashMenuActive = false;
+      return { messages };
+    });
+    expect(r.messages.find((m: any) => m.type === 'SLASH_MENU' && m.action === 'down')).toBeTruthy();
+  });
+
+  test('slash menu Enter sends SLASH_MENU select', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      bridge._slashMenuActive = true;
+      const messages: any[] = [];
+      const origSend = bridge.sendMessageToParent.bind(bridge);
+      bridge.sendMessageToParent = (msg: any) => { messages.push(msg); origSend(msg); };
+      bridge.replayOneKey('mock-block-1', { key: 'Enter' }, null);
+      bridge.sendMessageToParent = origSend;
+      bridge._slashMenuActive = false;
+      return { messages };
+    });
+    expect(r.messages.find((m: any) => m.type === 'SLASH_MENU' && m.action === 'select')).toBeTruthy();
+  });
+
+  test('slash menu Escape sends SLASH_MENU hide and deactivates', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      bridge._slashMenuActive = true;
+      const messages: any[] = [];
+      const origSend = bridge.sendMessageToParent.bind(bridge);
+      bridge.sendMessageToParent = (msg: any) => { messages.push(msg); origSend(msg); };
+      bridge.replayOneKey('mock-block-1', { key: 'Escape' }, null);
+      bridge.sendMessageToParent = origSend;
+      const wasDeactivated = !bridge._slashMenuActive;
+      return { messages, wasDeactivated };
+    });
+    expect(r.messages.find((m: any) => m.type === 'SLASH_MENU' && m.action === 'hide')).toBeTruthy();
+    expect(r.wasDeactivated).toBe(true);
+  });
+
+  test('Ctrl+Z sends SLATE_UNDO_REQUEST', async () => {
+    const r = await replayWithMessages(helper.getIframe(),
+      '<p data-node-id="0">Hello</p>', 'end',
+      [{ key: 'z', ctrlKey: true }],
+    );
+    const undoMsg = r.messages.find((m: any) => m.type === 'SLATE_UNDO_REQUEST');
+    expect(undoMsg).toBeTruthy();
+  });
+
+  test('Ctrl+Shift+Z sends SLATE_REDO_REQUEST', async () => {
+    const r = await replayWithMessages(helper.getIframe(),
+      '<p data-node-id="0">Hello</p>', 'end',
+      [{ key: 'z', ctrlKey: true, shiftKey: true }],
+    );
+    const redoMsg = r.messages.find((m: any) => m.type === 'SLATE_REDO_REQUEST');
+    expect(redoMsg).toBeTruthy();
+  });
+
+  test('Ctrl+S sends SAVE_REQUEST', async () => {
+    const r = await replayWithMessages(helper.getIframe(),
+      '<p data-node-id="0">Hello</p>', 'end',
+      [{ key: 's', ctrlKey: true }],
+    );
+    const saveMsg = r.messages.find((m: any) => m.type === 'SAVE_REQUEST');
+    expect(saveMsg).toBeTruthy();
+  });
+
+  test('Enter in pre element inserts newline', async () => {
+    // Wrap in <pre> for the pre-element Enter handler
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+
+      // Wrap the edit field in <pre> temporarily
+      const pre = document.createElement('pre');
+      pre.setAttribute('data-edit-text', 'code');
+      pre.setAttribute('contenteditable', 'true');
+      pre.innerHTML = 'line1';
+      editField.innerHTML = '';
+      editField.appendChild(pre);
+
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'code';
+      bridge.isInlineEditing = true;
+
+      // Place cursor at end
+      const textNode = pre.firstChild!;
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(textNode, textNode.textContent!.length);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      // Replay Enter
+      bridge.replayOneKey(blockId, { key: 'Enter', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false }, pre);
+
+      return { text: pre.textContent };
+    });
+    expect(r.text).toBe('line1\n');
+  });
+
+  test('text after prospective inline (Ctrl+B) inserts inside the bold element', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+
+      // Set up: "Hello" with a prospective <strong> at the end (simulates Ctrl+B with collapsed cursor)
+      editField.innerHTML = '<p data-node-id="0">Hello<strong data-node-id="0.1"></strong></p>';
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'value';
+      bridge.isInlineEditing = true;
+
+      // Set the prospective inline element
+      const strong = editField.querySelector('strong')!;
+      bridge.prospectiveInlineElement = strong;
+
+      // Place cursor inside the <strong> (where Chrome would put it after Ctrl+B)
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(strong, 0);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      // Replay a text character — should end up INSIDE the <strong>
+      bridge.replayOneKey(blockId, { key: 'x', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false }, editField);
+
+      // Check if 'x' is inside the <strong>
+      const strongText = strong.textContent;
+      const fullText = editField.textContent!.replace(/[\uFEFF\u200B]/g, '');
+      return { strongText, fullText };
+    });
+    expect(r.strongText).toContain('x');
+    expect(r.fullText).toBe('Hellox');
+  });
+
+  test('_handleFieldKeydown skips isComposing events (IME)', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+      editField.innerHTML = '<p data-node-id="0">Hello</p>';
+      editField.setAttribute('contenteditable', 'true');
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'value';
+      bridge.isInlineEditing = true;
+      bridge.editMode = 'text';
+
+      // Place cursor at end
+      const textNode = editField.querySelector('p')!.firstChild!;
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(textNode, textNode.textContent!.length);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      // Dispatch a keydown with isComposing=true (simulates IME input)
+      const composingEvent = new KeyboardEvent('keydown', {
+        key: 'Process', code: 'KeyN', bubbles: true, cancelable: true,
+        composed: true,
+      });
+      // Override isComposing (readonly in constructor, use defineProperty)
+      Object.defineProperty(composingEvent, 'isComposing', { value: true });
+
+      // Track if preventDefault was called
+      let prevented = false;
+      const origPreventDefault = composingEvent.preventDefault.bind(composingEvent);
+      composingEvent.preventDefault = () => { prevented = true; origPreventDefault(); };
+
+      editField.dispatchEvent(composingEvent);
+
+      // Text should be unchanged (bridge didn't handle it)
+      const text = editField.textContent!.replace(/[\uFEFF\u200B]/g, '');
+      return { text, prevented };
+    });
+    // isComposing event should NOT be prevented — let native/IME handle
+    expect(r.prevented).toBe(false);
+    expect(r.text).toBe('Hello');
+  });
+
+  test('IME composition result is preserved via native input', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+      editField.innerHTML = '<p data-node-id="0">Hello</p>';
+      editField.setAttribute('contenteditable', 'true');
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'value';
+      bridge.isInlineEditing = true;
+      bridge.editMode = 'text';
+
+      // Place cursor at end
+      const textNode = editField.querySelector('p')!.firstChild!;
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(textNode, textNode.textContent!.length);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      // Simulate native IME inserting a character (compositionend)
+      // In real IME, browser inserts the character natively
+      textNode.textContent = 'Hello\u4e16'; // 世 (Chinese character)
+
+      const text = editField.textContent!.replace(/[\uFEFF\u200B]/g, '');
+      return { text };
+    });
+    // IME character should be in the text (inserted natively, not by replayOneKey)
+    expect(r.text).toBe('Hello\u4e16');
+  });
+
+  test('Tab in non-list non-pre field moves focus to next tabbable element', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'value';
+      bridge.isInlineEditing = true;
+      bridge.editMode = 'text';
+
+      // Focus the edit field
+      editField.focus();
+      const focusBefore = document.activeElement;
+
+      // Tab should move focus to next tabbable element
+      const handled = bridge.replayOneKey(blockId, {
+        key: 'Tab', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false,
+      }, editField);
+
+      const focusAfter = document.activeElement;
+      const focusMoved = focusBefore !== focusAfter;
+
+      return { handled, focusMoved };
+    });
+    expect(r.handled).toBe(true);
+    expect(r.focusMoved).toBe(true);
+  });
+
+  test('Ctrl+A selects all text and selection survives selectionchange', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+      editField.innerHTML = '<p data-node-id="0">Hello World</p>';
+      editField.setAttribute('contenteditable', 'true');
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'value';
+      bridge.isInlineEditing = true;
+      bridge.editMode = 'text';
+
+      // Place cursor at start
+      const textNode = editField.querySelector('p')!.firstChild!;
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(textNode, 0);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      // Replay Ctrl+A
+      bridge.handleSpecialKey(blockId, {
+        key: 'a', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false,
+      }, editField);
+
+      // Check selection immediately
+      const selText = window.getSelection()?.toString() || '';
+
+      return { selText };
+    });
+    expect(r.selText).toBe('Hello World');
+  });
+
+  test('Ctrl+C triggers execCommand copy', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+      editField.innerHTML = '<p data-node-id="0">Copy this text</p>';
+      editField.setAttribute('contenteditable', 'true');
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'value';
+
+      // Select all text
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.selectNodeContents(editField.querySelector('p')!);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      // Track if copy event fires
+      let copyFired = false;
+      editField.addEventListener('copy', () => { copyFired = true; }, { once: true });
+
+      bridge.handleSpecialKey(blockId, {
+        key: 'c', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false,
+      }, editField);
+
+      return { copyFired };
+    });
+    expect(r.copyFired).toBe(true);
+  });
+
+  test('Ctrl+X triggers copy and sends delete transform', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+      editField.innerHTML = '<p data-node-id="0">Cut this text</p>';
+      editField.setAttribute('contenteditable', 'true');
+      bridge.selectedBlockUid = blockId;
+      bridge.editMode = 'text';
+      bridge.focusedFieldName = 'value';
+
+      // Select all text
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.selectNodeContents(editField.querySelector('p')!);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      let copyFired = false;
+      editField.addEventListener('copy', () => { copyFired = true; }, { once: true });
+
+      // sendTransformRequest sets pendingTransform with the requestId
+      bridge.pendingTransform = null;
+
+      bridge.handleSpecialKey(blockId, {
+        key: 'x', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false,
+      }, editField);
+
+      return {
+        copyFired,
+        hasDeleteTransform: !!bridge.pendingTransform?.requestId?.includes('delete'),
+      };
+    });
+    expect(r.copyFired).toBe(true);
+    expect(r.hasDeleteTransform).toBe(true);
+  });
+
+  test('Space on button element inserts space (not activate)', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+
+      // Replace edit field content with a contenteditable button
+      const btn = document.createElement('button');
+      btn.setAttribute('data-edit-text', 'buttonText');
+      btn.setAttribute('contenteditable', 'true');
+      btn.textContent = 'Click';
+      editField.innerHTML = '';
+      editField.appendChild(btn);
+
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'buttonText';
+      bridge.isInlineEditing = true;
+
+      // Place cursor at end
+      const textNode = btn.firstChild!;
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(textNode, textNode.textContent!.length);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      bridge.replayOneKey(blockId, { key: ' ', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false }, btn);
+
+      return { text: btn.textContent };
+    });
+    // Space should be inserted as text, not activate the button
+    expect(r.text).toContain('Click\u00A0');
+  });
+
+  test('Tab in pre element inserts spaces', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+
+      const pre = document.createElement('pre');
+      pre.setAttribute('data-edit-text', 'code');
+      pre.setAttribute('contenteditable', 'true');
+      pre.innerHTML = 'hello';
+      editField.innerHTML = '';
+      editField.appendChild(pre);
+
+      bridge.selectedBlockUid = blockId;
+      bridge.focusedFieldName = 'code';
+      bridge.isInlineEditing = true;
+
+      const textNode = pre.firstChild!;
+      const sel = window.getSelection()!;
+      const range = document.createRange();
+      range.setStart(textNode, 0);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      bridge.replayOneKey(blockId, { key: 'Tab', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false }, pre);
+
+      return { text: pre.textContent };
+    });
+    expect(r.text).toBe('  hello');
+  });
+
+  test('_insertTextAtCursor on non-collapsed selection inside bold preserves formatting', async () => {
+    const iframe = helper.getIframe();
+    const r = await iframe.locator('body').evaluate(() => {
+      const bridge = (window as any).bridge;
+      const blockId = 'mock-block-1';
+      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
+      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+
+      if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
+      // Set up bold text — frontends use <strong>, <b>, or <span style="font-weight:bold">
+      editField.innerHTML = '<p data-node-id="0"><strong data-node-id="0.1">Bold text</strong></p>';
+      editField.setAttribute('contenteditable', 'true');
+      bridge.selectedBlockUid = blockId;
+      bridge.editMode = 'text';
+      bridge.focusedFieldName = 'value';
+
+      // Select all text — use restoreSlateSelection like the real code does
+      // This sets selection at the node-id level, not the text node level
+      const selection = { anchor: { path: [0, 0], offset: 0 }, focus: { path: [0, 0], offset: 9 } };
+      bridge.restoreSlateSelection(selection, {
+        blocks: { 'mock-block-1': { '@type': 'slate', value: [{ type: 'p', children: [{ text: '' }, { type: 'strong', children: [{ text: 'Bold text' }] }, { text: '' }] }] } },
+        blocks_layout: { items: ['mock-block-1'] },
+      });
+      const sel = window.getSelection()!;
+
+      // Capture state before
+      const selBefore = { collapsed: sel.isCollapsed, text: sel.toString(), anchorNode: sel.anchorNode?.nodeName, anchorParent: sel.anchorNode?.parentElement?.nodeName };
+
+      // Insert replacement text
+      bridge._insertTextAtCursor('Replaced', editField);
+
+      // Check result
+      const html = editField.innerHTML;
+      const hasStrongWrapper = !!editField.querySelector('strong');
+      const textContent = editField.textContent;
+
+      return { selBefore, html, hasStrongWrapper, textContent };
+    });
+    console.log('Before:', JSON.stringify(r.selBefore), 'After HTML:', r.html);
+    expect(r.selBefore.collapsed).toBe(false);
+    expect(r.selBefore.text).toBe('Bold text');
+    expect(r.textContent).toContain('Replaced');
+    expect(r.hasStrongWrapper).toBe(true);
   });
 });

@@ -11,7 +11,6 @@
     "predev_edit": "pnpm run sync-hydra",
     "dev_edit": "nuxt dev --envName edit",
     "dev:test": "NUXT_PUBLIC_BACKEND_BASE_URL=http://localhost:8888 NUXT_PUBLIC_ADMIN_URL=http://localhost:3001 nuxt dev --envName edit --port 3003",
-    "prebuild:test": "pnpm run sync-hydra",
     "build:test": "NUXT_TEST_BACKEND=http://localhost:8888 nuxt build --envName edit",
     "preview:test": "npx serve .output/public -s -l tcp://0.0.0.0:3003",
     "pregenerate": "pnpm run sync-hydra",

@@ -1587,3 +1587,43 @@ function getInsertionIndex(formData, blockPathMap, targetBlockId, insertAfter, c
   return insertAfter ? targetIndex + 1 : targetIndex;
 }
 
+/**
+ * Find the lowest common ancestor of multiple blocks.
+ * Walks up the parent chain for each block and finds the deepest
+ * ancestor shared by all.
+ *
+ * @param {Object} blockPathMap - The block path map
+ * @param {string[]} blockUids - Array of block UIDs
+ * @returns {string} The common ancestor block UID, or PAGE_BLOCK_UID
+ */
+export function getCommonAncestor(blockPathMap, blockUids) {
+  if (!blockUids || blockUids.length === 0) return PAGE_BLOCK_UID;
+  if (blockUids.length === 1) return blockPathMap[blockUids[0]]?.parentId || PAGE_BLOCK_UID;
+
+  // Build ancestor chain for each block (including self)
+  const getAncestors = (uid) => {
+    const chain = [];
+    let current = uid;
+    while (current && current !== PAGE_BLOCK_UID) {
+      chain.unshift(current); // prepend so chain goes root → leaf
+      current = blockPathMap[current]?.parentId;
+    }
+    chain.unshift(PAGE_BLOCK_UID);
+    return chain;
+  };
+
+  const chains = blockUids.map(getAncestors);
+
+  // Walk chains in parallel, find last common element
+  let common = PAGE_BLOCK_UID;
+  for (let i = 0; i < chains[0].length; i++) {
+    const ancestor = chains[0][i];
+    if (chains.every(chain => chain[i] === ancestor)) {
+      common = ancestor;
+    } else {
+      break;
+    }
+  }
+  return common;
+}
+

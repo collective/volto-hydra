@@ -16,7 +16,9 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
 import { defineMessages, useIntl } from 'react-intl';
+import { useDispatch, useSelector } from 'react-redux';
 import { Icon } from '@plone/volto/components';
+import { setUIState } from '@plone/volto/actions';
 import rightArrowSVG from '@plone/volto/icons/right-key.svg';
 import config from '@plone/volto/registry';
 import { DragDropList } from '@plone/volto/components';
@@ -204,6 +206,9 @@ const ContainerFieldSection = ({
   blockPathMap,
 }) => {
   const intl = useIntl();
+  const dispatch = useDispatch();
+  const selected = useSelector((state) => state.form.ui.selected);
+  const multiSelected = useSelector((state) => state.form.ui.multiSelected) || [];
 
   // Convert childBlocks to format expected by DragDropList: [[id, data], ...]
   const childList = childBlocks.map((child) => [child.id, child]);
@@ -255,8 +260,42 @@ const ContainerFieldSection = ({
               <div
                 ref={draginfo.innerRef}
                 {...draginfo.draggableProps}
-                className="child-block-item"
-                onClick={() => onSelectBlock(child.id)}
+                className={`child-block-item${multiSelected.includes(child.id) ? ' selected' : ''}`}
+                style={multiSelected.includes(child.id) ? { background: '#e8f4fd' } : undefined}
+                onClick={(e) => {
+                  if (e.shiftKey) {
+                    // Shift+Click: select range from anchor to clicked
+                    const siblingIds = childBlocks.map(c => c.id);
+                    const anchor = multiSelected.length > 0
+                      ? multiSelected[0]
+                      : selected;
+                    const anchorIdx = siblingIds.indexOf(anchor);
+                    const focusIdx = siblingIds.indexOf(child.id);
+                    if (anchorIdx >= 0 && focusIdx >= 0) {
+                      const start = Math.min(anchorIdx, focusIdx);
+                      const end = Math.max(anchorIdx, focusIdx);
+                      dispatch(setUIState({ selected: null, multiSelected: siblingIds.slice(start, end + 1) }));
+                    }
+                  } else if (e.ctrlKey || e.metaKey) {
+                    // Ctrl/Cmd+Click: toggle in/out of multi-selection
+                    if (multiSelected.includes(child.id)) {
+                      dispatch(setUIState({ multiSelected: multiSelected.filter(uid => uid !== child.id) }));
+                    } else {
+                      dispatch(setUIState({ multiSelected: [...multiSelected, child.id] }));
+                    }
+                    // Enter selection mode — iframe shows checkboxes
+                    document.dispatchEvent(new CustomEvent('hydra-enter-selection-mode'));
+                  } else if (multiSelected.length > 0) {
+                    // Selection mode: plain click toggles (don't navigate)
+                    if (multiSelected.includes(child.id)) {
+                      dispatch(setUIState({ multiSelected: multiSelected.filter(uid => uid !== child.id) }));
+                    } else {
+                      dispatch(setUIState({ multiSelected: [...multiSelected, child.id] }));
+                    }
+                  } else {
+                    onSelectBlock(child.id);
+                  }
+                }}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
@@ -272,7 +311,18 @@ const ContainerFieldSection = ({
                   ⋮⋮
                 </span>
                 <span className="block-type">{child.title}</span>
-                <Icon className="nav-arrow" name={rightArrowSVG} size="24px" />
+                <span
+                  className="nav-arrow-wrapper"
+                  role="button"
+                  aria-label="Navigate into block"
+                  onClick={(e) => {
+                    // Arrow always navigates — even in selection mode
+                    e.stopPropagation();
+                    onSelectBlock(child.id);
+                  }}
+                >
+                  <Icon className="nav-arrow" name={rightArrowSVG} size="24px" />
+                </span>
               </div>
             )}
           </DragDropList>

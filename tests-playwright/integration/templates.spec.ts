@@ -330,7 +330,7 @@ test.describe('Templates', () => {
     await expect(stickyHeaders).toHaveCount(3);
 
     // Press Escape to navigate up to template instance
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await page.waitForTimeout(200);
 
     // Now should have 2 headers: Page > Template Instance
@@ -374,7 +374,7 @@ test.describe('Templates', () => {
     // Select template header, then navigate up to template instance
     await headerBlock.click();
     await helper.waitForQuantaToolbar(headerBlockId!);
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
 
     // Wait for the template instance toolbar to appear with a drag handle
     // Template instances are virtual (no DOM element), so just check toolbar visibility
@@ -634,7 +634,7 @@ test.describe('Templates', () => {
 
     // Select template header, then Escape to navigate up to template instance
     const headerBlockId = await helper.clickBlockByContent('Template Header');
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
 
     // Find the footer block to get its ID for toolbar positioning
     const { blockId: footerBlockId } = await helper.waitForBlockByContent('Template Footer');

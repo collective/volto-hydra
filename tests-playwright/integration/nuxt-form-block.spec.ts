@@ -136,7 +136,7 @@ test.describe('Form Block', () => {
 
     // Select the form block via sidebar — press Escape to get to page level
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
 
     // Drill down to the form block in the sidebar
     const pageChildBlocks = page.locator('#sidebar-order .child-blocks-widget');

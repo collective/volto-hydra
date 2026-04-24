@@ -144,11 +144,10 @@ test.describe('Container Block Detection', () => {
     // Click on columns-1 (a container block with a title field)
     await helper.clickContainerBlockInIframe('columns-1');
 
-    // Check the selection outline style - should be 'border', not 'bottom-line'
-    // The expect().toBeVisible() will poll until the outline appears
+    // Clicking container title enters text mode — subtle outline on block
     const outline = page.locator('.volto-hydra-block-outline');
     await expect(outline).toBeVisible();
-    await expect(outline).toHaveAttribute('data-outline-style', 'border');
+    await expect(outline).toHaveAttribute('data-outline-style', 'subtle');
   });
 });
 
@@ -1590,7 +1589,7 @@ test.describe('Parent Block Navigation', () => {
     expect(headerCount).toBe(4);
 
     // Press Escape to go up to parent (col-1)
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await page.waitForTimeout(300);
 
     // Should now have 3 headers (Page, Columns, Column)
@@ -1606,7 +1605,7 @@ test.describe('Parent Block Navigation', () => {
     await expect(currentHeader).toContainText(/column/i);
 
     // Press Escape again to go to columns-1
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await page.waitForTimeout(300);
 
     headerCount = await page
@@ -1616,7 +1615,7 @@ test.describe('Parent Block Navigation', () => {
     await expect(currentHeader).toContainText(/columns/i);
 
     // Press Escape again to deselect (no block selected)
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await page.waitForTimeout(300);
 
     headerCount = await page
@@ -2652,7 +2651,7 @@ test.describe('Sidebar Child Blocks Reordering', () => {
     await helper.waitForSidebarOpen();
 
     // Press Escape to deselect any auto-selected block and show page-level child blocks
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
 
     // Find grid-1 in the page's child blocks widget and click it
     const pageChildBlocks = page.locator('#sidebar-order .child-blocks-widget');
@@ -2885,7 +2884,7 @@ test.describe('data-block-selector Navigation', () => {
     await helper.waitForQuantaToolbar('slide-1');
 
     // Press Escape to navigate up to the parent container
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForBlockSelected('slider-1');
     await helper.waitForQuantaToolbar('slider-1');
 
@@ -2923,7 +2922,7 @@ test.describe('data-block-selector Navigation', () => {
     // For carousels, navigate to container via child -> Escape
     await helper.clickBlockInIframe('slide-1');
     await helper.waitForQuantaToolbar('slide-1');
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     // Wait for sidebar to show Slider as current block (more reliable than toolbar positioning)
     await helper.waitForSidebarCurrentBlock('Slider');
 
@@ -2943,7 +2942,7 @@ test.describe('data-block-selector Navigation', () => {
     await helper.waitForQuantaToolbar('slide-3');
 
     // Now go back to carousel container and select slide-1
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     // Wait for sidebar to show Slider as current block (more reliable than toolbar positioning)
     await helper.waitForSidebarCurrentBlock('Slider');
 
@@ -2968,7 +2967,7 @@ test.describe('data-block-selector Navigation', () => {
     // Navigate to carousel container: click slide-1, then press Escape
     await helper.clickBlockInIframe('slide-1');
     await helper.waitForQuantaToolbar('slide-1');
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar('slider-1');
 
     // Wait for sidebar to show Slides section
@@ -3020,7 +3019,7 @@ test.describe('data-block-selector Navigation', () => {
     await expect(editor).toHaveText('');
 
     // 4. Navigate back to slider to verify 4 slides now exist
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar('slider-1');
     await expect(sidebar.locator('text=Slides').first()).toBeVisible();
     await expect(slideItems).toHaveCount(4);
@@ -3085,7 +3084,7 @@ test.describe('data-block-selector Navigation', () => {
     await expect(editor).toHaveText('');
 
     // Navigate back to slider to verify 4 slides now exist
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar('slider-1');
     await expect(sidebar.locator('text=Slides').first()).toBeVisible();
     const slideItems = sidebar.locator('.child-block-item');
@@ -3327,18 +3326,16 @@ test.describe('slateTable Container', () => {
     await expect(sidebarProperties.locator('text=Content')).toBeVisible();
 
     // Navigate up via Escape: cell -> row -> table
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(200);
+    await helper.escapeToParent();
 
     // Now should have 3 headers: Page, Table, Row
-    await expect(stickyHeaders).toHaveCount(3);
+    await expect(stickyHeaders).toHaveCount(3, { timeout: 5000 });
     await expect(stickyHeaders.nth(2)).toContainText('Row');
 
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(200);
+    await helper.escapeToParent();
 
     // Now should have 2 headers: Page, Table
-    await expect(stickyHeaders).toHaveCount(2);
+    await expect(stickyHeaders).toHaveCount(2, { timeout: 5000 });
     await expect(stickyHeaders.nth(1)).toContainText('Table');
 
     // Verify table-1 is now selected (outline visible on table)
@@ -3460,7 +3457,7 @@ test.describe('slateTable Container', () => {
     await page.waitForTimeout(200);
 
     // Navigate to row using Escape, then add a new row
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     // Wait for add button to change from "Add column" to "Add row" - more reliable than sidebar check
     const addButton = page.locator('.volto-hydra-add-button');
     await expect(addButton).toHaveAttribute('title', 'Add row', { timeout: 5000 });
@@ -3510,7 +3507,7 @@ test.describe('slateTable Container', () => {
     // Select a cell first, then navigate to row using Escape
     await helper.clickBlockInIframe('cell-1-1');
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForBlockSelected('row-1');
 
     // Should show "Add row" title with SVG icon
@@ -3533,7 +3530,7 @@ test.describe('slateTable Container', () => {
     // Select a cell, then press Escape to navigate to parent row
     await helper.clickBlockInIframe('cell-1-1');
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForBlockSelected('row-1');
 
     // Open dropdown menu (three dots button)
@@ -3697,7 +3694,7 @@ test.describe('slateTable Container', () => {
     // Select a cell, then press Escape to navigate to parent row
     await helper.clickBlockInIframe('cell-1-1');
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForBlockSelected('row-1');
 
     // Toolbar should have insert row action buttons
@@ -3722,7 +3719,7 @@ test.describe('slateTable Container', () => {
     // Select second row via Escape from its cell
     await helper.clickBlockInIframe('cell-2-1');
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForBlockSelected('row-2');
 
     // Click Add Row Before button
@@ -3859,7 +3856,7 @@ test.describe('Multi-Container Field Operations', () => {
     await expect(sidebar.locator('text=Image').first()).toBeVisible();
 
     // Press Escape to navigate to parent (columns)
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
 
     // Verify the columns block is now selected - Title field should be editable
     await expect(sidebar.getByLabel('Title')).toBeVisible();
@@ -3880,7 +3877,7 @@ test.describe('Multi-Container Field Operations', () => {
     await helper.waitForSidebarCurrentBlock('Column');
 
     // Press Escape to navigate to parent (columns)
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
 
     // Verify the columns block is now selected - Title field should be editable
     const sidebar = page.locator('.sidebar-container');
@@ -4101,7 +4098,7 @@ test.describe('Single-Schema Object_List (table rows)', () => {
     // Click a cell, Escape to row level (table addMode needs a selected row to copy cell structure)
     await helper.clickBlockInIframe('cell-1-1');
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForBlockSelected('row-1');
 
     const sidebar = page.locator('.sidebar-container');
@@ -4137,9 +4134,9 @@ test.describe('Single-Schema Object_List (table rows)', () => {
     // Click a cell, Escape twice to reach table level
     await helper.clickBlockInIframe('cell-1-1');
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForBlockSelected('row-1');
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForBlockSelected('table-1');
 
     const sidebar = page.locator('.sidebar-container');
@@ -4166,7 +4163,7 @@ test.describe('Single-Schema Object_List (table rows)', () => {
     await helper.waitForQuantaToolbar('row-1');
 
     // Navigate back to table level to verify child count
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForQuantaToolbar('table-1');
     const rowItemsAfter = sidebar.locator('.child-block-item');
     await expect(rowItemsAfter).toHaveCount(2, { timeout: 5000 });
@@ -4186,9 +4183,9 @@ test.describe('Single-Schema Object_List (table rows)', () => {
     // Click a cell, Escape twice to reach table level
     await helper.clickBlockInIframe('cell-1-1');
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForBlockSelected('row-1');
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await helper.waitForBlockSelected('table-1');
 
     const sidebar = page.locator('.sidebar-container');

@@ -10,7 +10,7 @@ import slateTransforms, { withEmptyInlineRemoval } from '../../utils/slateTransf
 import { syncCreateSlateBlock } from '@plone/volto-slate/utils/volto-blocks';
 import { getBlockById, updateBlockById } from '../../utils/blockPath';
 import { isSlateFieldType, calculateDragHandlePosition, PAGE_BLOCK_UID, isBlockPositionLocked, isBlockReadonly } from '@volto-hydra/hydra-js';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import FormatDropdown from './FormatDropdown';
 import DropdownMenu from './DropdownMenu';
 import linkSVG from '@plone/volto/icons/link.svg';
@@ -221,6 +221,7 @@ const SyncedSlateToolbar = ({
 
   // Redux dispatch for closing persistent helpers
   const dispatch = useDispatch();
+  const blocksClipboard = useSelector((state) => state?.blocksClipboard || {});
 
   // Wrap ReactEditor.focus to handle toolbar editor gracefully
   // The toolbar editor isn't in a resolvable DOM tree, so focus calls will fail
@@ -290,6 +291,14 @@ const SyncedSlateToolbar = ({
   // State for dropdown menu
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuButtonRect, setMenuButtonRect] = useState(null);
+  const [pasteAllowed, setPasteAllowed] = useState(true);
+
+  // Listen for paste-allowed state from View.jsx
+  useEffect(() => {
+    const handler = (e) => setPasteAllowed(e.detail.allowed);
+    document.addEventListener('hydra-paste-state', handler);
+    return () => document.removeEventListener('hydra-paste-state', handler);
+  }, []);
 
   // State for field link editor popup
   const [fieldLinkEditorOpen, setFieldLinkEditorOpen] = useState(false);
@@ -1075,8 +1084,10 @@ const SyncedSlateToolbar = ({
     }
   });
 
+  // Multi-selection: simplified toolbar with drag handle + count
+  const isMultiSelected = blockUI?.multiSelectedUids?.length > 1;
+
   // Render toolbar when we have a rect (either block or page-level field)
-  // selectedBlock is PAGE_BLOCK_UID for page-level fields
   if (!blockUI?.rect) {
     return null;
   }
@@ -1105,7 +1116,7 @@ const SyncedSlateToolbar = ({
   const blockTypeFields = blockFieldTypes?.[blockType] || {};
   const fieldType = blockTypeFields[fieldName];
   const blockIsReadonly = isBlockReadonly(block, templateEditMode);
-  const showFormatButtons = isSlateFieldType(fieldType) && !blockIsReadonly;
+  const showFormatButtons = isSlateFieldType(fieldType) && !blockIsReadonly && !isMultiSelected;
 
   // CRITICAL: Only show Slate if we actually have a valid field value array
   const hasValidSlateValue = fieldValue && Array.isArray(fieldValue) && fieldValue.length > 0;
@@ -1206,6 +1217,7 @@ const SyncedSlateToolbar = ({
     <>
       <div
         className="quanta-toolbar"
+        data-multi-select={isMultiSelected ? 'true' : undefined}
         style={{
           position: 'fixed',
           top: `${toolbarTop}px`,
@@ -1411,6 +1423,7 @@ const SyncedSlateToolbar = ({
 
       {/* Three-dots menu button */}
       <button
+        className="volto-hydra-menu-trigger"
         style={{
           background: menuOpen ? '#e8e8e8' : '#fff',
           border: 'none',
@@ -1471,6 +1484,9 @@ const SyncedSlateToolbar = ({
         isFixed={blockPathMap?.[selectedBlock]?.isFixed}
         isInTemplate={!!block?.templateId}
         onMakeTemplate={onMakeTemplate}
+        multiSelectedUids={isMultiSelected ? blockUI.multiSelectedUids : null}
+        hasClipboard={!!(blocksClipboard?.cut || blocksClipboard?.copy)}
+        pasteAllowed={pasteAllowed}
       />
     )}
 

@@ -27,7 +27,7 @@ import { Icon } from '@plone/volto/components';
 import leftArrowSVG from '@plone/volto/icons/left-key.svg';
 import { SidebarPortalTargetContext } from './SidebarPortalTargetContext';
 import DropdownMenu from '../Toolbar/DropdownMenu';
-import { getBlockById, updateBlockById, getResolvedSchema } from '../../utils/blockPath';
+import { getBlockById, updateBlockById, getResolvedSchema, getCommonAncestor } from '../../utils/blockPath';
 import { HydraSchemaProvider } from '../../context';
 import { getConvertibleTypes, convertBlockType } from '../../utils/schemaInheritance';
 import { PAGE_BLOCK_UID, isBlockReadonly } from '@volto-hydra/hydra-js';
@@ -561,6 +561,7 @@ const ParentBlockSection = ({
  */
 const ParentBlocksWidget = ({
   selectedBlock,
+  multiSelected = [],
   formData,
   blockPathMap,
   onSelectBlock,
@@ -571,6 +572,7 @@ const ParentBlocksWidget = ({
   onChangeTemplateSettings,
   onToggleTemplateEditMode,
 }) => {
+  const isMultiSelected = multiSelected.length > 1;
   const [isClient, setIsClient] = React.useState(false);
   const prevSelectedBlockRef = React.useRef(null);
   const intl = useIntl();
@@ -674,14 +676,52 @@ const ParentBlocksWidget = ({
   if (!isClient) {
     return null;
   }
-  // Don't render block hierarchy for page-level selection
-  // PAGE_BLOCK_UID is the virtual root, not a block to show in the hierarchy
-  if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) {
+  const parentsTarget = document.getElementById('sidebar-parents');
+  if (!parentsTarget) {
     return null;
   }
 
-  const parentsTarget = document.getElementById('sidebar-parents');
-  if (!parentsTarget) {
+  // Page-level or no selection: still render the multi-select bar if any
+  if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) {
+    if (multiSelected.length > 0) {
+      const commonAncestor = getCommonAncestor(blockPathMap, multiSelected);
+      return createPortal(
+        <div className="multi-select-bar" style={{
+          padding: '8px 12px',
+          background: '#e8f4fd',
+          borderTop: '1px solid #007eb1',
+          fontSize: '13px',
+          color: '#007eb1',
+        }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>
+            {multiSelected.length} selected
+          </div>
+          {multiSelected.map((uid) => {
+            const pathSegments = [];
+            let current = uid;
+            while (current && current !== commonAncestor && current !== PAGE_BLOCK_UID) {
+              pathSegments.unshift(getBlockTypeTitle(blockPathMap[current]?.blockType, blockPathMap, current));
+              current = blockPathMap[current]?.parentId;
+            }
+            return (
+              <div
+                key={uid}
+                className="selected-block-path"
+                style={{
+                  padding: '4px 8px', margin: '2px 0',
+                  background: 'white', borderRadius: '3px',
+                  fontSize: '12px', cursor: 'pointer',
+                }}
+                onClick={() => onSelectBlock(uid)}
+              >
+                {pathSegments.join(' > ')}
+              </div>
+            );
+          })}
+        </div>,
+        parentsTarget,
+      );
+    }
     return null;
   }
 
@@ -738,7 +778,7 @@ const ParentBlocksWidget = ({
             );
           })}
 
-          {/* Current block - rendered the same way as parents */}
+          {/* Current block form (ChildBlocksWidget renders inside its schema fields) */}
           <ParentBlockSection
             key={selectedBlock}
             blockId={selectedBlock}
@@ -760,6 +800,49 @@ const ParentBlocksWidget = ({
             onChangeTemplateSettings={onChangeTemplateSettings}
             onToggleTemplateEditMode={onToggleTemplateEditMode}
           />
+
+          {/* Multi-select summary bar at bottom of sidebar, below ChildBlocksWidget */}
+          {multiSelected.length > 0 && (() => {
+            const commonAncestor = getCommonAncestor(blockPathMap, multiSelected);
+            return (
+              <div className="multi-select-bar" style={{
+                padding: '8px 12px',
+                background: '#e8f4fd',
+                borderTop: '1px solid #007eb1',
+                fontSize: '13px',
+                color: '#007eb1',
+              }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>
+                  {multiSelected.length} selected
+                </div>
+                {multiSelected.map((uid) => {
+                  const pathSegments = [];
+                  let current = uid;
+                  while (current && current !== commonAncestor && current !== PAGE_BLOCK_UID) {
+                    pathSegments.unshift(getBlockTypeTitle(blockPathMap[current]?.blockType, blockPathMap, current));
+                    current = blockPathMap[current]?.parentId;
+                  }
+                  return (
+                    <div
+                      key={uid}
+                      className="selected-block-path"
+                      style={{
+                        padding: '4px 8px',
+                        margin: '2px 0',
+                        background: 'white',
+                        borderRadius: '3px',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => onSelectBlock(uid)}
+                    >
+                      {pathSegments.join(' > ')}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </>,
         parentsTarget,
       )}

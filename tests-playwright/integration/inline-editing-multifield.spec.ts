@@ -298,35 +298,36 @@ test.describe('Inline Editing - Hero Block with Comment Syntax', () => {
     await expect(boldButton).not.toBeVisible();
   });
 
-  test('hero block has border outline (multiple fields)', async ({ page }) => {
+  test('hero block has subtle outline in text mode (field focused)', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Click the hero block to select it
+    // Click the hero block to select it (enters text mode — focuses a field)
     await helper.clickBlockInIframe(HERO_BLOCK_ID);
 
-    // The outline should use border style (not bottom line)
+    // Text mode: subtle outline on block
     const outline = page.locator('.volto-hydra-block-outline');
     await expect(outline).toBeVisible();
-    await expect(outline).toHaveAttribute('data-outline-style', 'border');
+    await expect(outline).toHaveAttribute('data-outline-style', 'subtle');
   });
 });
 
 test.describe('Inline Editing - Selection Outline Styles', () => {
   const SLATE_BLOCK_ID = 'block-1-uuid';
 
-  test('slate block has bottom-line outline (single field)', async ({ page }) => {
+  test('slate block has subtle outline in text mode with field underline', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Click the slate block to select it
+    // Click the slate block to select it (enters text mode)
     await helper.clickBlockInIframe(SLATE_BLOCK_ID);
 
-    // The outline should use bottom-line style (single field)
+    // Text mode: subtle outline on block + underline on focused field
     const outline = page.locator('.volto-hydra-block-outline');
     await expect(outline).toBeVisible();
-    await expect(outline).toHaveAttribute('data-outline-style', 'bottom-line');
+    await expect(outline).toHaveAttribute('data-outline-style', 'subtle');
+    await expect(page.locator('.volto-hydra-field-underline')).toBeVisible();
   });
 });

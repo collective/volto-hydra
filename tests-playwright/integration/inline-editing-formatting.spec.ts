@@ -189,7 +189,8 @@ test.describe('Inline Editing - Formatting', () => {
     await expect(editor.locator(boldSelector)).toBeVisible();
 
     // Click bold button again to remove formatting
-    await helper.selectAllTextInEditor(editor); // Re-select text
+    // Selection should be restored after the bold transform — wait for it
+    await helper.verifySelectionMatches(editor, 'Toggle bold text');
     await helper.clickFormatButton('bold');
     await expect(editor.locator(boldSelector)).not.toBeVisible();
 

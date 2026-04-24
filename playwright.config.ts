@@ -288,22 +288,32 @@ export default defineConfig({
   /* Set NO_WEBSERVER=true in CI to disable all auto-start (each CI job manages its own servers) */
   webServer: process.env.NO_WEBSERVER ? [] : [
     {
-      // Mock Plone API + test frontend — starts both servers
-      // API on port 8888, test frontend on port 8889
-      // Uses --watch for auto-reload on code changes during development
-      name: 'Mock API + Frontend',
+      // Mock Plone API — REST endpoints, content from disk
+      // Test frontend is served by the separate Vite webServer entry below
+      name: 'Mock API',
       command: `node --watch --watch-path=tests-playwright/fixtures --watch-path=packages/hydra-js ${path.join(__dirname, 'tests-playwright/fixtures/mock-api-server.cjs')}`,
-      url: 'http://localhost:8889/mock-parent.html',
-      timeout: 50 * 1000,
+      url: 'http://localhost:8888/health',
+      timeout: 30 * 1000,
       reuseExistingServer: true,
       cwd: process.cwd(),
       stdout: 'pipe' as const,
       stderr: 'pipe' as const,
       env: {
         PORT: '8888',
-        FRONTEND_PORT: '8889',
         CONTENT_MOUNTS: '/:docs/content/content/content,/_test_data:tests-playwright/fixtures/content',
       },
+    },
+    {
+      // Test frontend — Vite dev server, auto-bundles hydra.src.js with tabbable
+      // Health check on hydra.js (not HTML) to ensure Vite has compiled it
+      name: 'Test Frontend',
+      command: 'npx vite --config tests-playwright/fixtures/test-frontend/vite.config.js',
+      url: 'http://localhost:8889/hydra.js',
+      timeout: 30 * 1000,
+      reuseExistingServer: true,
+      cwd: process.cwd(),
+      stdout: 'pipe' as const,
+      stderr: 'pipe' as const,
     },
     // Use prebuilt production server in CI, dev server locally
     process.env.USE_PREBUILT

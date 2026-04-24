@@ -510,4 +510,49 @@ test.describe('Block Drag and Drop', () => {
       initialContentBlocks.length + initialFooterBlocks.length
     );
   });
+
+  test('multi-selected blocks can be dragged together', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+    const initialOrder = await helper.getBlockOrder();
+    console.log('[TEST] Initial order:', initialOrder);
+
+    // Need at least 3 blocks
+    expect(initialOrder.length).toBeGreaterThanOrEqual(3);
+
+    const firstUid = initialOrder[0];
+    const secondUid = initialOrder[1];
+    const thirdUid = initialOrder[2];
+
+    // Select first block and enter block mode
+    await helper.clickBlockInIframe(firstUid);
+    await helper.waitForBlockSelected(firstUid);
+    await helper.escapeFromEditing();
+
+    // Shift+Arrow to extend selection to second block
+    await page.keyboard.press('Shift+ArrowDown');
+
+    // Wait for multi-selection toolbar to appear
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    const dragHandle = toolbar.locator('.drag-handle');
+    await expect(dragHandle).toBeVisible({ timeout: 3000 });
+    const thirdBlock = iframe.locator(`[data-block-uid="${thirdUid}"]`);
+    await helper.dragBlockWithMouse(dragHandle, thirdBlock, true);
+
+    // Verify both blocks moved after block-3
+    const newOrder = await helper.getBlockOrder();
+    console.log('[TEST] New order after multi-drag:', newOrder);
+
+    // block-3 should now be first, then block-1 and block-2 (preserved relative order)
+    const thirdIdx = newOrder.indexOf(thirdUid);
+    const firstIdx = newOrder.indexOf(firstUid);
+    const secondIdx = newOrder.indexOf(secondUid);
+    expect(firstIdx).toBe(thirdIdx + 1);
+    expect(secondIdx).toBe(thirdIdx + 2);
+  });
 });
