@@ -172,6 +172,8 @@ const SyncedSlateToolbar = ({
   onFileUpload, // Handler for file uploads: (fieldName, file) => void
   convertibleTypes = [], // Array of { type, title } for block type conversion
   onConvertBlock, // Handler for block conversion: (newType) => void
+  canUnwrap = false, // True when selected container can be unwrapped into its parent
+  onUnwrap, // Handler for unwrap: () => void
   onMakeTemplate, // Handler for "Make Template" action
   templateEditMode, // instanceId of template being edited, or null
 }) => {
@@ -1481,6 +1483,8 @@ const SyncedSlateToolbar = ({
         addDirection={blockUI?.addDirection}
         convertibleTypes={convertibleTypes}
         onConvertBlock={onConvertBlock}
+        canUnwrap={canUnwrap}
+        onUnwrap={onUnwrap}
         isFixed={blockPathMap?.[selectedBlock]?.isFixed}
         isInTemplate={!!block?.templateId}
         onMakeTemplate={onMakeTemplate}

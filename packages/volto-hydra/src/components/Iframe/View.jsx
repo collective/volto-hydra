@@ -161,7 +161,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer } from '../../utils/blockPath';
+import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, _getContainerChildFieldName } from '../../utils/blockPath';
 import { canContainAll } from '@volto-hydra/hydra-js';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
@@ -4426,6 +4426,43 @@ const Iframe = (props) => {
                 blockPathMap: newBlockPathMap,
                 toolbarRequestDone: `convert-block-${Date.now()}`,
               }));
+            }}
+            canUnwrap={(() => {
+              // Container is unwrappable iff every child's type is accepted by
+              // the parent container. Children live in the first blocks_layout
+              // field of the selected block's schema.
+              const bpm = iframeSyncState.blockPathMap;
+              if (!selectedBlock || !bpm?.[selectedBlock]) return false;
+              const block = getBlockById(properties, bpm, selectedBlock);
+              if (!block) return false;
+              const childField = _getContainerChildFieldName(block['@type'], blocksConfig, intl);
+              const childIds = block?.[childField]?.items || [];
+              if (childIds.length === 0) return false;
+              const childTypes = childIds
+                .map((id) => block.blocks?.[id]?.['@type'])
+                .filter(Boolean);
+              const parentCC = getContainerFieldConfig(selectedBlock, bpm, properties, blocksConfig, intl);
+              if (!parentCC || parentCC.isObjectList) return false;
+              // Count siblings currently in parent; the unwrap replaces 1 container with N children.
+              const parentPath = parentCC.parentId === PAGE_BLOCK_UID ? [] : bpm[parentCC.parentId]?.path;
+              const parentBlock = getBlockByPath(properties, parentPath);
+              const currentCount = parentBlock ? (getContainerItems(parentBlock, parentCC).length - 1) : 0;
+              return canContainAll(parentCC, childTypes, currentCount);
+            })()}
+            onUnwrap={() => {
+              const bpm = iframeSyncState.blockPathMap;
+              try {
+                const { formData: newFormData, promotedIds } = unwrapContainer(
+                  properties, bpm, selectedBlock, blocksConfig, intl,
+                );
+                onChangeFormData(newFormData);
+                // Select the first promoted child after unwrap.
+                if (promotedIds.length > 0 && onSelectBlock) {
+                  onSelectBlock(promotedIds[0]);
+                }
+              } catch (err) {
+                log('unwrapContainer failed:', err);
+              }
             }}
             templateEditMode={iframeSyncState.templateEditMode}
             onMakeTemplate={() => {

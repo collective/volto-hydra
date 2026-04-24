@@ -41,6 +41,8 @@ const DropdownMenu = ({
   addDirection, // 'right' or 'bottom' - determines Column vs Row terminology
   convertibleTypes = [], // Array of { type, title } for block type conversion
   onConvertBlock, // Handler for block conversion: (newType) => void
+  canUnwrap = false, // True when selected block is a container whose children can live in the parent
+  onUnwrap, // Handler for unwrap: () => void
   isFixed = false, // Template blocks that can't be moved/deleted
   isReadonly = false, // Template blocks that can't be edited
   isInTemplate = false, // Whether block is already part of a template
@@ -298,6 +300,39 @@ const DropdownMenu = ({
               margin: '0 10px',
             }}
           />
+        </>
+      )}
+      {/* Unwrap — promotes children to the parent. Renders for containers when
+          the parent accepts the children; disabled state shown when it doesn't
+          accept (still rendered so users can see the action exists). */}
+      {onUnwrap && (
+        <>
+          <button
+            data-testid="unwrap-container"
+            disabled={!canUnwrap}
+            className="volto-hydra-dropdown-item unwrap-container"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!canUnwrap) return;
+              onClose();
+              onUnwrap();
+            }}
+            style={{
+              display: 'block',
+              width: '100%',
+              textAlign: 'left',
+              padding: '10px',
+              background: 'transparent',
+              border: 'none',
+              cursor: canUnwrap ? 'pointer' : 'not-allowed',
+              fontSize: '15px',
+              fontWeight: '500',
+              color: canUnwrap ? 'inherit' : '#888',
+            }}
+          >
+            ⤴ Unwrap container
+          </button>
+          <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.1)', margin: '0 10px' }} />
         </>
       )}
       {/* Convert to submenu - only shown when there are convertible types */}

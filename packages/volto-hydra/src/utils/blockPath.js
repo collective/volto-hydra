@@ -744,11 +744,90 @@ export function wrapBlocksInContainer(
 }
 
 /**
+ * Unwrap a container block: promote its children to the parent at the
+ * container's position, then remove the container.
+ *
+ * Caller is responsible for confirming the parent's allowedBlocks accepts
+ * each child type before calling (UI button should be disabled otherwise).
+ * Throws if the container isn't a blocks_layout-style parent or if the
+ * parent can't be located.
+ *
+ * @param {Object} formData
+ * @param {Object} blockPathMap
+ * @param {string} containerId      The container block to unwrap
+ * @param {Object} blocksConfig
+ * @param {Object} intl
+ * @returns {{formData: Object, promotedIds: string[]}}
+ */
+export function unwrapContainer(
+  formData, blockPathMap, containerId, blocksConfig, intl,
+) {
+  const containerInfo = blockPathMap?.[containerId];
+  if (!containerInfo) {
+    throw new Error(`[HYDRA] unwrapContainer: no pathInfo for ${containerId}`);
+  }
+
+  // Load the container and find its child field (first blocks_layout field).
+  const containerBlock = getBlockById(formData, blockPathMap, containerId);
+  if (!containerBlock) {
+    throw new Error(`[HYDRA] unwrapContainer: cannot read block ${containerId}`);
+  }
+  const childFieldName = _getContainerChildFieldName(
+    containerBlock['@type'], blocksConfig, intl,
+  );
+  const childIds = containerBlock[childFieldName]?.items || [];
+  const childData = containerBlock.blocks || {};
+
+  // Get the parent container config where `containerId` lives.
+  const containerCC = getContainerFieldConfig(containerId, blockPathMap, formData, blocksConfig, intl);
+  if (!containerCC) {
+    throw new Error(`[HYDRA] unwrapContainer: no parent config for ${containerId}`);
+  }
+  if (containerCC.isObjectList) {
+    throw new Error('[HYDRA] unwrapContainer: object_list parents not yet supported');
+  }
+
+  const parentPath = containerCC.parentId === PAGE_BLOCK_UID
+    ? [] : blockPathMap[containerCC.parentId]?.path;
+  const parentBlock = getBlockByPath(formData, parentPath);
+  if (!parentBlock) {
+    throw new Error(`[HYDRA] unwrapContainer: cannot find parent ${containerCC.parentId}`);
+  }
+
+  const parentItems = getContainerItems(parentBlock, containerCC);
+  const containerIdx = parentItems.indexOf(containerId);
+  if (containerIdx < 0) {
+    throw new Error(`[HYDRA] unwrapContainer: ${containerId} not in parent layout`);
+  }
+
+  // Build the new parent layout: replace containerId with its child ids.
+  const newParentItems = [
+    ...parentItems.slice(0, containerIdx),
+    ...childIds,
+    ...parentItems.slice(containerIdx + 1),
+  ];
+
+  // Merge the container's children into the parent's blocks dict.
+  const newParentBlocks = { ...parentBlock.blocks };
+  delete newParentBlocks[containerId];
+  for (const id of childIds) {
+    if (id in newParentBlocks) {
+      throw new Error(`[HYDRA] unwrapContainer: child id ${id} collides with parent blocks`);
+    }
+    newParentBlocks[id] = childData[id];
+  }
+
+  const updatedParent = setContainerItems(parentBlock, containerCC, newParentItems, newParentBlocks);
+  const newFormData = setBlockByPath(formData, parentPath, updatedParent);
+  return { formData: newFormData, promotedIds: [...childIds] };
+}
+
+/**
  * Resolve the child field name a container uses for its blocks_layout children.
  * Scans the block schema for the first field with widget='blocks_layout'.
  * Falls back to 'blocks_layout' if none is explicitly declared.
  */
-function _getContainerChildFieldName(blockType, blocksConfig, intl) {
+export function _getContainerChildFieldName(blockType, blocksConfig, intl) {
   const cfg = blocksConfig?.[blockType];
   if (!cfg?.blockSchema) return 'blocks_layout';
   const schema = typeof cfg.blockSchema === 'function'
