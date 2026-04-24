@@ -859,6 +859,142 @@ export class Bridge {
   }
 
   /**
+   * Position the container bottom edge handle on the selected block's rect if
+   * the block is a container with children AND has a loose sibling below whose
+   * type is accepted by the container's child field. Otherwise hides it.
+   */
+  _positionBottomEdgeHandle() {
+    const handle = this._bottomEdgeHandle;
+    if (!handle) return;
+    const uid = this.selectedBlockUid;
+    if (!uid || uid === PAGE_BLOCK_UID) { handle.style.display = 'none'; return; }
+    const info = this.blockPathMap?.[uid];
+    if (!info) { handle.style.display = 'none'; return; }
+
+    // Does this block have children in a blocks_layout field?
+    const el = this.queryBlockElement(uid);
+    if (!el) { handle.style.display = 'none'; return; }
+    const block = this.getBlockData(uid);
+    if (!block) { handle.style.display = 'none'; return; }
+    const schema = this.blockPathMap?._schemas?.[info._schemaRef];
+    let childField = null;
+    let childAllowed = null;
+    for (const [fn, fd] of Object.entries(schema?.properties || {})) {
+      if (fd?.widget === 'blocks_layout') {
+        childField = fn;
+        childAllowed = fd.allowedBlocks || null;
+        break;
+      }
+    }
+    if (!childField) { handle.style.display = 'none'; return; }
+    const childIds = block[childField]?.items || [];
+    if (childIds.length === 0) { handle.style.display = 'none'; return; }
+
+    // Find the next sibling at the same container level via the parent's layout.
+    const parentId = info.parentId;
+    const parentInfo = parentId ? this.blockPathMap?.[parentId] : null;
+    const parentPath = parentId === PAGE_BLOCK_UID ? [] : parentInfo?.path;
+    if (!parentPath && parentId !== PAGE_BLOCK_UID) { handle.style.display = 'none'; return; }
+    const parentBlock = parentId === PAGE_BLOCK_UID ? this.formData : this.getBlockData(parentId);
+    if (!parentBlock) { handle.style.display = 'none'; return; }
+    const parentField = info.containerField;
+    const parentItems = parentBlock[parentField]?.items || [];
+    const myIdx = parentItems.indexOf(uid);
+    const nextSiblingUid = myIdx >= 0 ? parentItems[myIdx + 1] : null;
+    if (!nextSiblingUid) { handle.style.display = 'none'; return; }
+
+    // Check container accepts the sibling's type.
+    const siblingData = parentBlock.blocks?.[nextSiblingUid];
+    const siblingType = siblingData?.['@type'];
+    if (!siblingType) { handle.style.display = 'none'; return; }
+    if (childAllowed && !childAllowed.includes(siblingType)) {
+      handle.style.display = 'none'; return;
+    }
+
+    // Position the handle on the container's bottom edge.
+    const r = el.getBoundingClientRect();
+    handle.style.left = `${r.left}px`;
+    handle.style.top = `${r.bottom - 3}px`;
+    handle.style.width = `${r.width}px`;
+    handle.style.display = 'block';
+    handle.dataset.nextSibling = nextSiblingUid;
+    handle.dataset.container = uid;
+    // Store the last child uid so admin can target-after it when committing.
+    handle.dataset.lastChild = childIds[childIds.length - 1];
+  }
+
+  _setupEdgeHandleDrag(handle) {
+    let dragging = false;
+    let startY = 0;
+    let lastY = 0;
+    let ghost = null;
+    const ensureGhost = () => {
+      if (ghost) return ghost;
+      ghost = document.createElement('div');
+      ghost.className = 'volto-hydra-edge-ghost';
+      Object.assign(ghost.style, {
+        position: 'fixed',
+        height: '2px',
+        background: '#007eb1',
+        boxShadow: '0 0 6px rgba(0, 126, 177, 0.6)',
+        zIndex: '10000',
+        pointerEvents: 'none',
+        display: 'none',
+      });
+      document.body.appendChild(ghost);
+      return ghost;
+    };
+
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragging = true;
+      startY = e.clientY;
+      lastY = e.clientY;
+      ensureGhost();
+      ghost.style.left = handle.style.left;
+      ghost.style.width = handle.style.width;
+      ghost.style.top = handle.style.top;
+      ghost.style.display = 'block';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      e.preventDefault();
+      lastY = e.clientY;
+      if (ghost) ghost.style.top = `${e.clientY}px`;
+    });
+
+    document.addEventListener('mouseup', (e) => {
+      if (!dragging) return;
+      dragging = false;
+      if (ghost) ghost.style.display = 'none';
+
+      const nextSibling = handle.dataset.nextSibling;
+      const container = handle.dataset.container;
+      const lastChild = handle.dataset.lastChild;
+      if (!nextSibling || !container || !lastChild) return;
+
+      // Did the mouse cross the sibling's midpoint?
+      const siblingEl = this.queryBlockElement(nextSibling);
+      if (!siblingEl) return;
+      const sRect = siblingEl.getBoundingClientRect();
+      const midpoint = sRect.top + sRect.height / 2;
+      if (lastY < midpoint) return; // didn't drag far enough
+
+      // Commit: move `nextSibling` to be the last child of `container`.
+      // Targets existing last child with insertAfter=true to land at container's end.
+      window.parent.postMessage({
+        type: 'MOVE_BLOCKS',
+        blockIds: [nextSibling],
+        targetBlockId: lastChild,
+        insertAfter: true,
+        targetParentId: container,
+      }, this.adminOrigin);
+    });
+  }
+
+  /**
    * Filter a list of block UIDs to those that can be mutated by `op`.
    * Single source of truth for locked-block protection on the iframe side.
    * op: 'delete' | 'move' | 'edit'.
@@ -2224,6 +2360,8 @@ export class Bridge {
       dragHandle.style.top = `${handlePos.top}px`;
       dragHandle.style.display = 'block';
     }
+    // Position edge handle on the selected container's bottom, if applicable.
+    this._positionBottomEdgeHandle();
 
     // Get focused field rect for text-mode underline positioning
     // Round to integers to avoid sub-pixel jitter causing unnecessary state updates
@@ -7712,6 +7850,26 @@ export class Bridge {
     });
 
     document.body.appendChild(dragButton);
+
+    // Container edge handle — appears on a selected container's bottom edge
+    // when the container has at least one child and a compatible loose sibling
+    // below. Dragging it past the sibling's midpoint absorbs that sibling.
+    document.querySelectorAll('.volto-hydra-edge-handle').forEach((el) => el.remove());
+    const bottomEdgeHandle = document.createElement('div');
+    bottomEdgeHandle.className = 'volto-hydra-edge-handle';
+    bottomEdgeHandle.setAttribute('data-edge', 'bottom');
+    Object.assign(bottomEdgeHandle.style, {
+      position: 'fixed',
+      height: '6px',
+      background: 'rgba(0, 126, 177, 0.35)',
+      cursor: 'ns-resize',
+      zIndex: '9998',
+      display: 'none',
+      pointerEvents: 'auto',
+    });
+    document.body.appendChild(bottomEdgeHandle);
+    this._bottomEdgeHandle = bottomEdgeHandle;
+    this._setupEdgeHandleDrag(bottomEdgeHandle);
 
     // Position the drag handle immediately (not on mousemove)
     const positionDragHandle = () => {
