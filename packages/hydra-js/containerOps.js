@@ -47,3 +47,52 @@ export function canContainAll(config, blockTypes, currentCount) {
   }
   return true;
 }
+
+/**
+ * Find the shortest conversion path from srcType to any allowedTarget, using
+ * Volto's fieldMappings convention: blocksConfig[target].fieldMappings[source]
+ * defines an edge source → target.
+ *
+ * Returns an array of types from srcType to the chosen target, or null if no
+ * path exists within `depth` edges (default 3 — caller memoization is
+ * recommended for hot paths like DropdownMenu rendering).
+ *
+ * @param {string} srcType
+ * @param {string[]} allowedTargets
+ * @param {object} blocksConfig
+ * @param {number} [depth=3]     Max number of edges to traverse.
+ * @returns {string[] | null}
+ */
+export function findConversionPath(srcType, allowedTargets, blocksConfig, depth = 3) {
+  if (!srcType || !blocksConfig?.[srcType]) return null;
+  const targetSet = new Set(allowedTargets);
+  if (targetSet.has(srcType)) return [srcType];
+
+  const parents = new Map();
+  parents.set(srcType, null);
+  let frontier = [srcType];
+  for (let hop = 1; hop <= depth; hop++) {
+    const next = [];
+    for (const current of frontier) {
+      for (const [candidate, candidateCfg] of Object.entries(blocksConfig)) {
+        if (parents.has(candidate)) continue;
+        if (!candidateCfg?.fieldMappings) continue;
+        if (!candidateCfg.fieldMappings[current]) continue;
+        parents.set(candidate, current);
+        if (targetSet.has(candidate)) {
+          const path = [candidate];
+          let node = current;
+          while (node !== null) {
+            path.unshift(node);
+            node = parents.get(node);
+          }
+          return path;
+        }
+        next.push(candidate);
+      }
+    }
+    if (next.length === 0) break;
+    frontier = next;
+  }
+  return null;
+}

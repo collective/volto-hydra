@@ -5,7 +5,7 @@
  * Strict TDD: each `it` below must fail before its implementation exists.
  */
 
-import { canContain, canContainAll } from './containerOps.js';
+import { canContain, canContainAll, findConversionPath } from './containerOps.js';
 
 describe('containerOps', () => {
   describe('canContain', () => {
@@ -63,6 +63,73 @@ describe('containerOps', () => {
     test('returns true for an empty input list (nothing to add)', () => {
       const cfg = { allowedBlocks: ['slate'], maxLength: 0 };
       expect(canContainAll(cfg, [], 0)).toBe(true);
+    });
+  });
+
+  describe('findConversionPath', () => {
+    // Minimal blocksConfig using Volto's fieldMappings convention:
+    // blocksConfig[target].fieldMappings[sourceType] = mapping → target is reachable
+    // from sourceType. '@default' works when both types have canonical fields.
+
+    test('returns null if source not in blocksConfig', () => {
+      const cfg = {};
+      expect(findConversionPath('slate', ['text'], cfg)).toBeNull();
+    });
+
+    test('returns single-step path for a direct conversion', () => {
+      const cfg = {
+        slate: {},
+        text: { fieldMappings: { slate: {} } },
+      };
+      expect(findConversionPath('slate', ['text'], cfg)).toEqual(['slate', 'text']);
+    });
+
+    test('returns the source itself if already in allowedTargets', () => {
+      const cfg = { slate: {} };
+      expect(findConversionPath('slate', ['slate', 'text'], cfg)).toEqual(['slate']);
+    });
+
+    test('returns multi-step path via intermediates', () => {
+      const cfg = {
+        slate: {},
+        text: { fieldMappings: { slate: {} } },
+        heading: { fieldMappings: { text: {} } },
+      };
+      expect(findConversionPath('slate', ['heading'], cfg)).toEqual(['slate', 'text', 'heading']);
+    });
+
+    test('returns null when no path exists', () => {
+      const cfg = {
+        slate: {},
+        image: {}, // no fieldMappings from slate
+      };
+      expect(findConversionPath('slate', ['image'], cfg)).toBeNull();
+    });
+
+    test('returns null when path exceeds depth cap', () => {
+      // Chain: a -> b -> c -> d -> e. depth=2 should only allow up to 2 edges.
+      const cfg = {
+        a: {},
+        b: { fieldMappings: { a: {} } },
+        c: { fieldMappings: { b: {} } },
+        d: { fieldMappings: { c: {} } },
+        e: { fieldMappings: { d: {} } },
+      };
+      // With default depth=3, a->b->c->d is reachable (3 edges) but a->b->c->d->e (4 edges) is not
+      expect(findConversionPath('a', ['d'], cfg, 3)).toEqual(['a', 'b', 'c', 'd']);
+      expect(findConversionPath('a', ['e'], cfg, 3)).toBeNull();
+      expect(findConversionPath('a', ['c'], cfg, 2)).toEqual(['a', 'b', 'c']);
+      expect(findConversionPath('a', ['d'], cfg, 2)).toBeNull();
+    });
+
+    test('picks the shortest path when multiple targets match', () => {
+      const cfg = {
+        slate: {},
+        quote: { fieldMappings: { slate: {} } },        // 1 hop
+        heading: { fieldMappings: { quote: {} } },       // 2 hops from slate
+      };
+      expect(findConversionPath('slate', ['heading', 'quote'], cfg))
+        .toEqual(['slate', 'quote']);
     });
   });
 });
