@@ -128,6 +128,19 @@
     </div>
   </div>
 
+  <!-- Generic section container — accepts any block type. Used by the
+       container UX feature tests (wrap, unwrap, edge-drag, convert). -->
+  <div v-else-if="block['@type'] == 'section'" :data-block-uid="block_uid"
+       class="section-body p-3 border border-dashed border-gray-500 rounded">
+    <Block v-for="childId in (block.blocks_layout?.items || [])"
+           :key="childId"
+           :block_uid="childId"
+           :block="block.blocks?.[childId]"
+           :data="data"
+           :contained="true"
+           class="my-2" />
+  </div>
+
   <div v-else-if="block['@type'] == 'teaser'"
     class="teaser-block max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
     :data-block-uid="block._blockUid || block_uid"
