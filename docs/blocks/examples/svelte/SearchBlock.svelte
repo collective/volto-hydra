@@ -15,7 +15,7 @@
 
   {#if visibleFacets.length}
     <div class="facets">
-      <h4>{block.facetsTitle || 'Filter'}</h4>
+      <h4 data-edit-text="facetsTitle">{block.facetsTitle || 'Filter'}</h4>
       {#each visibleFacets as facet (facet['@id'])}
         {#if facet.type === 'checkboxFacet'}
           <fieldset data-block-uid={facet['@id']}><legend data-edit-text="title">{facet.title}</legend><!-- checkbox options --></fieldset>

@@ -41,6 +41,6 @@ function BlockRenderer({ block, content }) {
           {block.description && <p data-edit-text="description">{block.description}</p>}
         </div>
       );
-    default:              return <div data-block-uid={block['@uid']}>Unknown block: {type}</div>;
+    default:              return <div data-block-uid={block['@uid']} data-unknown-block-type={type}>[not implemented]</div>;
   }
 }

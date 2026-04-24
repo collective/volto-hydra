@@ -3,7 +3,7 @@
     <input type="search" placeholder="Search..." v-model="query" />
 
     <div v-if="visibleFacets.length" class="facets">
-      <h4>{{ block.facetsTitle || 'Filter' }}</h4>
+      <h4 data-edit-text="facetsTitle">{{ block.facetsTitle || 'Filter' }}</h4>
       <template v-for="facet in visibleFacets" :key="facet['@id']">
         <fieldset v-if="facet.type === 'checkboxFacet'" :data-block-uid="facet['@id']">
           <legend data-edit-text="title">{{ facet.title }}</legend>

@@ -73,7 +73,7 @@ function componentFor(type) {
   return typeMap[type] || {
     props: ['block'],
     render() {
-      return h('div', { 'data-block-uid': this.block['@uid'] }, `Unknown block: ${type}`);
+      return h('div', { 'data-block-uid': this.block['@uid'], 'data-unknown-block-type': type }, '[not implemented]');
     },
   };
 }

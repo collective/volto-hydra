@@ -17,7 +17,7 @@ function SearchBlock({ block, blockId }) {
 
       {facets.length > 0 && (
         <div className="facets">
-          <h4>{block.facetsTitle || 'Filter'}</h4>
+          <h4 data-edit-text="facetsTitle">{block.facetsTitle || 'Filter'}</h4>
           {facets.map(facet => (
             <FacetRenderer key={facet['@id']} facet={facet} />
           ))}
