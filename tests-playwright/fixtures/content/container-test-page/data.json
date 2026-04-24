@@ -21,12 +21,12 @@
       "blocks": {
         "top-img-1": {
           "@type": "image",
-          "url": "http://localhost:8888/test-image-1.jpg",
+          "url": "/_test_data/test-image-1",
           "alt": "Top Image 1"
         },
         "top-img-2": {
           "@type": "image",
-          "url": "http://localhost:8888/test-image-2.jpg",
+          "url": "/_test_data/test-image-2",
           "alt": "Top Image 2"
         },
         "col-1": {

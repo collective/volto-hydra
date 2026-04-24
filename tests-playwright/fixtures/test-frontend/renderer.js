@@ -83,7 +83,9 @@ function getImageUrl(value) {
         const field = value.image_field;
         const scales = value.image_scales[field];
         if (scales?.[0]?.download) {
-            const baseUrl = value['@id'] || '';
+            // Brain @id is often an absolute URL (matches apiOrigin); strip to
+            // relative so we don't double-prepend. External absolutes are kept.
+            const baseUrl = stripApiOrigin(value['@id'] || '');
             return `${apiOrigin}${baseUrl}/${scales[0].download}`;
         }
     }
@@ -298,7 +300,9 @@ async function renderBlock(blockId, block) {
             wrapper.innerHTML = '';
             break;
         default:
-            wrapper.innerHTML = `<p>Unknown block type: ${block['@type']}</p>`;
+            // Diagnostic only — keep type in a data attribute so it doesn't
+            // leak as visible text that fails checkEditAnnotations.
+            wrapper.innerHTML = `<p data-unknown-block-type="${block['@type']}">[not implemented]</p>`;
     }
 
     return wrapper;
@@ -637,8 +641,9 @@ function renderTeaserBlock(block, blockUid) {
     const hrefObjHasContentData = hrefObj?.title !== undefined;
     const useBlockData = block.overwrite || !hrefObjHasContentData;
 
-    // Get href: always from hrefObj @id (link destination)
-    const href = hrefObj?.['@id'] || '';
+    // Get href: always from hrefObj @id (link destination). Strip apiOrigin
+    // so brain-absolute URLs render as same-origin relative paths.
+    const href = stripApiOrigin(hrefObj?.['@id'] || '');
 
     // Get title/description/image based on useBlockData (all or nothing, no mixing)
     const title = useBlockData ? (block.title || '') : (hrefObj?.title || '');
@@ -967,7 +972,7 @@ function renderFormBlock(block) {
         }
         html += '</div>';
     }
-    html += `<button type="button" class="form-submit" style="padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 4px;">${submitLabel}</button>`;
+    html += `<button type="button" class="form-submit" data-edit-text="submit_label" style="padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 4px;">${submitLabel}</button>`;
     html += '</form>';
     return html;
 }
@@ -1143,7 +1148,7 @@ async function renderColumnContent(column, columnId) {
                 html += renderTeaserBlock(block, null);
                 break;
             default:
-                html += `<p>Unknown block type: ${block['@type']}</p>`;
+                html += `<p data-unknown-block-type="${block['@type']}">[not implemented]</p>`;
         }
 
         html += '</div>';
@@ -1289,7 +1294,7 @@ async function renderGridBlock(block, blockId) {
                 html += renderEmptyBlock(childBlock);
                 break;
             default:
-                html += `<p>Unknown block type: ${childBlock['@type']}</p>`;
+                html += `<p data-unknown-block-type="${childBlock['@type']}">[not implemented]</p>`;
         }
 
         html += '</div>';
@@ -1809,8 +1814,7 @@ async function renderSearchBlock(block, blockId) {
  * @returns {string} HTML string
  */
 function renderNestedSlateBlock(block) {
-    const plaintext = block.plaintext || '';
-    return `<p data-edit-text="value" style="margin: 0;">${plaintext}</p>`;
+    return renderSlateBlock(block);
 }
 
 /**
@@ -1865,9 +1869,9 @@ function renderSkiplogicTestBlock(block) {
     return `
         <div class="skiplogic-test-block" style="padding: 16px; border: 1px solid #ccc; background: #f9f9f9;">
             <h4>Skiplogic Test Block</h4>
-            <p>Mode: ${mode}</p>
-            <p>Columns: ${columns}</p>
-            <p>Title: ${title}</p>
+            <p data-skiplogic-mode="${mode}">Mode</p>
+            <p data-skiplogic-columns="${columns}">Columns</p>
+            <p data-edit-text="basicTitle">${title}</p>
         </div>
     `;
 }

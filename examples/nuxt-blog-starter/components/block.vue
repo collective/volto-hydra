@@ -1298,7 +1298,7 @@ const getFacetOptions = (facet) => {
   if (!index?.values) return [];
   return Object.entries(index.values).map(([value, info]) => ({
     value,
-    title: (info as any).title || value,
+    title: info?.title || value,
   }));
 };
 
