@@ -1997,6 +1997,51 @@ app.get('*/@@download/*', (req, res) => {
 });
 
 /**
+ * GET /<content-path-that-is-an-Image>
+ *
+ * Plone's Zope-traversal layer serves Image content items' blob bytes
+ * directly at their plain content path (no /@@images/image suffix, no
+ * ++api++ prefix, Accept != application/json). Frontend <img src> URLs
+ * rely on this so image refs like `/company/about-us/screenshot.png`
+ * resolve against the backend. The @@images handler above covers
+ * explicit scale paths; this covers the implicit default-view case.
+ */
+app.get('*', (req, res, next) => {
+  if (req.isApiRequest) return next();
+
+  const dirInfo = contentDirMap[req.path];
+  if (!dirInfo) return next();
+
+  const dataFile = path.join(dirInfo.dirPath, 'data.json');
+  if (!fs.existsSync(dataFile)) return next();
+
+  let item;
+  try { item = JSON.parse(fs.readFileSync(dataFile, 'utf8')); }
+  catch { return next(); }
+  if (item['@type'] !== 'Image') return next();
+
+  // Image items store the blob in an `image/` subdirectory (same shape as
+  // the @@images handler reads from). Serve whatever file is in there.
+  const imageDir = path.join(dirInfo.dirPath, 'image');
+  if (!fs.existsSync(imageDir)) return next();
+  const files = fs.readdirSync(imageDir);
+  if (files.length === 0) return next();
+
+  const imageFile = path.join(imageDir, files[0]);
+  const ext = path.extname(files[0]).toLowerCase();
+  const mimeTypes = {
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+  };
+  res.set('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+  res.sendFile(imageFile);
+});
+
+/**
  * GET /:path
  * Get content by path (API requests only)
  * Frontend requests fall through to static file serving
