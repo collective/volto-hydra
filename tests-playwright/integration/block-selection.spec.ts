@@ -2340,35 +2340,11 @@ test.describe('Multi-Block Selection', () => {
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    const iframe = helper.getIframe();
-
-    // Click into block-1 first to establish text mode
+    // Click into block-1 first to establish text mode, then select across to block-3
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.waitForBlockSelected('block-1-uuid');
 
-    // Use Range API to set a selection spanning block-1 and block-3 (both slate blocks)
-    await iframe.locator('body').evaluate(() => {
-      const block1 = document.querySelector('[data-block-uid="block-1-uuid"]');
-      const block3 = document.querySelector('[data-block-uid="block-3-uuid"]');
-      if (!block1 || !block3) throw new Error('blocks not found');
-
-      // Find first text node in block-1 and first text node in block-3
-      const findText = (root: Element) => {
-        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-        return walker.nextNode() as Text | null;
-      };
-      const t1 = findText(block1);
-      const t3 = findText(block3);
-      if (!t1 || !t3) throw new Error('text nodes not found');
-
-      const range = document.createRange();
-      range.setStart(t1, 0);
-      range.setEnd(t3, Math.min(3, t3.length));
-      const sel = window.getSelection()!;
-      sel.removeAllRanges();
-      sel.addRange(range);
-      document.dispatchEvent(new Event('selectionchange'));
-    });
+    await helper.selectTextAcrossBlocks('block-1-uuid', 0, 'block-3-uuid', 3);
 
     // Expected: multi-block selection. Outlines on both slate blocks (block-1 + block-3)
     // Note: block-2 (image, between them) may or may not be included
@@ -2402,21 +2378,7 @@ test.describe('Multi-Block Selection', () => {
     await helper.clickBlockInIframe('block-1-uuid');
     await helper.waitForBlockSelected('block-1-uuid');
 
-    await iframe.locator('body').evaluate(() => {
-      const find = (uid: string) => {
-        const el = document.querySelector(`[data-block-uid="${uid}"]`);
-        const walker = document.createTreeWalker(el!, NodeFilter.SHOW_TEXT);
-        return walker.nextNode() as Text;
-      };
-      const t1 = find('block-1-uuid');
-      const t3 = find('block-3-uuid');
-      const range = document.createRange();
-      range.setStart(t1, 5);
-      range.setEnd(t3, 7);
-      const sel = window.getSelection()!;
-      sel.removeAllRanges();
-      sel.addRange(range);
-    });
+    await helper.selectTextAcrossBlocks('block-1-uuid', 5, 'block-3-uuid', 7);
 
     // Cross-block detector promotes partial-text → full multi-block selection
     await helper.waitForMultiSelectOutlines(2);

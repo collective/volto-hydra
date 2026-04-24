@@ -2586,6 +2586,60 @@ export class AdminUIHelper {
   }
 
   /**
+   * Set a text selection that spans from startOffset in startBlockId to
+   * endOffset in endBlockId. Same ZWS-aware position logic as selectTextRange
+   * but across two blocks in the iframe. Used to simulate a user's cross-block
+   * text drag.
+   */
+  async selectTextAcrossBlocks(
+    startBlockId: string,
+    startOffset: number,
+    endBlockId: string,
+    endOffset: number,
+  ): Promise<void> {
+    const iframe = this.getIframe();
+    await iframe.locator('body').evaluate(
+      (_body, args) => {
+        const findPositionInTextNodes = (root: Element, targetOffset: number) => {
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+          let currentOffset = 0;
+          let node: Node | null;
+          while ((node = walker.nextNode())) {
+            const text = node.textContent || '';
+            const cleanText = text.replace(/[﻿​]/g, '');
+            const nodeLength = cleanText.length;
+            if (currentOffset + nodeLength >= targetOffset) {
+              let charsSeen = 0;
+              let rawOffset = 0;
+              for (let i = 0; i < text.length && charsSeen < targetOffset - currentOffset; i++) {
+                if (text[i] !== '﻿' && text[i] !== '​') charsSeen++;
+                rawOffset++;
+              }
+              return { node, offset: rawOffset };
+            }
+            currentOffset += nodeLength;
+          }
+          return null;
+        };
+        const startEl = document.querySelector(`[data-block-uid="${args.startId}"]`);
+        const endEl = document.querySelector(`[data-block-uid="${args.endId}"]`);
+        if (!startEl || !endEl) throw new Error('blocks not found');
+        const startPos = findPositionInTextNodes(startEl, args.startOffset);
+        const endPos = findPositionInTextNodes(endEl, args.endOffset);
+        if (!startPos || !endPos) throw new Error('text positions not found');
+        const range = document.createRange();
+        range.setStart(startPos.node, startPos.offset);
+        range.setEnd(endPos.node, endPos.offset);
+        const sel = window.getSelection()!;
+        sel.removeAllRanges();
+        sel.addRange(range);
+      },
+      { startId: startBlockId, endId: endBlockId, startOffset, endOffset },
+    );
+    await this.page.waitForTimeout(100);
+  }
+
+  /**
    * Edit text in a contenteditable block within the iframe.
    * Handles both cases: block already editable, or needs to be clicked to become editable.
    */
