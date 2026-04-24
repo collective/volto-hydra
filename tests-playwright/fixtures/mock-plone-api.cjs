@@ -3,7 +3,7 @@
  * Implements minimal Plone REST API endpoints for content editing.
  * Serves content from disk (JSON files in content directories).
  *
- * Run standalone: node mock-plone-api.js
+ * Run standalone: node mock-plone-api.cjs
  * Or import the express app: const { app } = require('./mock-plone-api');
  */
 
@@ -38,6 +38,24 @@ function parseContentMounts() {
 }
 
 const CONTENT_MOUNTS = parseContentMounts();
+
+// Validate each mounted content tree at startup. Errors are loud (listed)
+// but non-fatal — tests using the mock API still start. Set
+// SKIP_CONTENT_VALIDATION=true to suppress entirely.
+if (process.env.SKIP_CONTENT_VALIDATION !== 'true') {
+  const { validate, checkIntegrity, formatReport } = require('./plone-content-validator.cjs');
+  for (const { mountPath, dirPath } of CONTENT_MOUNTS) {
+    if (!fs.existsSync(path.join(dirPath, '__metadata__.json'))) continue;
+    const v = validate(dirPath);
+    const c = checkIntegrity(dirPath);
+    const problems = v.errors.length + v.warnings.length + c.errors.length + c.warnings.length;
+    if (problems > 0) {
+      console.log(`[content-check] ${mountPath} -> ${dirPath}`);
+      if (v.errors.length || v.warnings.length) console.log(formatReport('validate', v));
+      if (c.errors.length || c.warnings.length) console.log(formatReport('check', c));
+    }
+  }
+}
 
 // Session-based transient content storage for uploads
 // Uploads are stored per-session so they don't appear for other users

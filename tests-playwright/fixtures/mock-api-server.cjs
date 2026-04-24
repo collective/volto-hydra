@@ -1,19 +1,16 @@
 /**
- * Test frontend server — serves the vanilla JS test frontend + hydra.js.
- * Also starts the mock Plone API on a separate port.
+ * Mock Plone API server — REST endpoints, content from disk.
+ * Test frontend lives in tests-playwright/fixtures/test-frontend/ and is
+ * served separately by its own Vite dev server on port 8889.
  *
- * Port 8888: Mock Plone API (REST endpoints, content from disk)
- * Port 8889: Test frontend (mock-parent.html, renderer.js, hydra.js)
+ * Port 8888: Mock Plone API (this server)
  *
- * Run directly: node mock-api-server.js
+ * Run directly: node mock-api-server.cjs
  * Or started automatically by Playwright config webServer
  */
 
-const path = require('path');
-const express = require('express');
-
 // Start the mock Plone API (imports and initializes on require)
-const { app: apiApp, contentDirMap } = require('./mock-plone-api');
+const { app: apiApp } = require('./mock-plone-api.cjs');
 
 const API_PORT = process.env.PORT || 8888;
 
