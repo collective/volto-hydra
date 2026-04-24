@@ -62,6 +62,9 @@ export async function verifyNoBackendLinks(
     const pageOrigin = window.location.origin;
     const isBackend = ${matchJs};
     return Array.from(document.querySelectorAll('a[href]'))
+      // Intentional cross-origin admin links (e.g. Login to Volto) opt out
+      // via data-linkable-allow, same as block-level edit annotation checks.
+      .filter((el) => !el.hasAttribute('data-linkable-allow'))
       .map((el) => el.getAttribute('href'))
       .filter((h) => {
         if (!h || h.startsWith('#') || h.startsWith('/')) return false;
