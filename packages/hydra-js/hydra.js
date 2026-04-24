@@ -906,6 +906,24 @@ var Bridge = class {
     return a.every((uid) => setB.has(uid));
   }
   /**
+   * Filter a list of block UIDs to those that can be mutated by `op`.
+   * Single source of truth for locked-block protection on the iframe side.
+   * op: 'delete' | 'move' | 'edit'.
+   */
+  _filterMutableBlockUids(uids, op = "delete") {
+    return uids.filter((uid) => {
+      if (!uid) return false;
+      const blockData = this.getBlockData(uid);
+      if ((op === "delete" || op === "move") && isBlockPositionLocked(blockData, this.templateEditMode)) {
+        return false;
+      }
+      if ((op === "delete" || op === "edit") && isBlockReadonly(blockData, this.templateEditMode)) {
+        return false;
+      }
+      return true;
+    });
+  }
+  /**
    * Detects text selections that span multiple blocks and converts them into
    * a multi-block selection. Fires on each selectionchange.
    * Only active in text mode — block-mode Shift+Click extends text selection
@@ -1012,19 +1030,19 @@ var Bridge = class {
     if (e.key === "Delete" || e.key === "Backspace") {
       e.preventDefault();
       if (this.multiSelectedBlockUids.length > 0) {
-        log("Block mode Delete: deleting", this.multiSelectedBlockUids.length, "blocks");
-        this.sendMessageToParent({
-          type: "DELETE_BLOCKS",
-          uids: [...this.multiSelectedBlockUids]
-        });
+        const deletable = this._filterMutableBlockUids(
+          this.multiSelectedBlockUids,
+          "delete"
+        );
+        log("Block mode Delete: deleting", deletable.length, "/", this.multiSelectedBlockUids.length, "blocks");
+        if (deletable.length > 0) {
+          this.sendMessageToParent({ type: "DELETE_BLOCKS", uids: deletable });
+        }
         this.multiSelectedBlockUids = [];
         this.selectedBlockUid = null;
-      } else {
+      } else if (this.selectedBlockUid && this._filterMutableBlockUids([this.selectedBlockUid], "delete").length > 0) {
         log("Block mode Delete: deleting single block", this.selectedBlockUid);
-        this.sendMessageToParent({
-          type: "DELETE_BLOCK",
-          uid: this.selectedBlockUid
-        });
+        this.sendMessageToParent({ type: "DELETE_BLOCK", uid: this.selectedBlockUid });
       }
       return true;
     }
@@ -1057,15 +1075,14 @@ var Bridge = class {
       const uids = this.multiSelectedBlockUids.length > 0 ? [...this.multiSelectedBlockUids] : [this.selectedBlockUid];
       const action = e.key === "c" ? "copy" : "cut";
       log("Block mode", action, uids.length, "blocks");
-      this.sendMessageToParent({ type: "COPY_BLOCKS", uids, action });
-      if (action === "cut") {
-        if (this.multiSelectedBlockUids.length > 0) {
-          this.sendMessageToParent({ type: "DELETE_BLOCKS", uids });
-          this.multiSelectedBlockUids = [];
-          this.selectedBlockUid = null;
-        } else {
-          this.sendMessageToParent({ type: "DELETE_BLOCK", uid: this.selectedBlockUid });
-        }
+      const transferUids = action === "cut" ? this._filterMutableBlockUids(uids, "delete") : uids;
+      if (transferUids.length > 0) {
+        this.sendMessageToParent({ type: "COPY_BLOCKS", uids: transferUids, action });
+      }
+      if (action === "cut" && transferUids.length > 0) {
+        this.sendMessageToParent({ type: "DELETE_BLOCKS", uids: transferUids });
+        this.multiSelectedBlockUids = [];
+        this.selectedBlockUid = null;
       }
       return true;
     }
@@ -1345,10 +1362,30 @@ var Bridge = class {
       return true;
     }
     if (hasMod && key?.toLowerCase() === "c") {
+      if (this.multiSelectedBlockUids.length > 1) {
+        this.sendMessageToParent({
+          type: "COPY_BLOCKS",
+          uids: [...this.multiSelectedBlockUids],
+          action: "copy"
+        });
+        return true;
+      }
       document.execCommand("copy");
       return true;
     }
     if (hasMod && key?.toLowerCase() === "x") {
+      if (this.multiSelectedBlockUids.length > 1) {
+        const transferUids = this._filterMutableBlockUids(
+          [...this.multiSelectedBlockUids],
+          "delete"
+        );
+        if (transferUids.length > 0) {
+          this.sendMessageToParent({ type: "COPY_BLOCKS", uids: transferUids, action: "cut" });
+          this.sendMessageToParent({ type: "DELETE_BLOCKS", uids: transferUids });
+        }
+        this.multiSelectedBlockUids = [];
+        return true;
+      }
       this._doCut(blockId);
       return true;
     }
@@ -6136,7 +6173,12 @@ DOM path (text node \u2192 container):
     const dragHandler = (e) => {
       e.preventDefault();
       this._isDragging = true;
-      const draggedUids = this.multiSelectedBlockUids.length > 0 ? [...this.multiSelectedBlockUids] : [this.selectedBlockUid];
+      const rawDraggedUids = this.multiSelectedBlockUids.length > 0 ? [...this.multiSelectedBlockUids] : [this.selectedBlockUid];
+      const draggedUids = this._filterMutableBlockUids(rawDraggedUids, "move");
+      if (draggedUids.length === 0) {
+        this._isDragging = false;
+        return;
+      }
       const allElements = draggedUids.flatMap((uid) => [...this.getAllBlockElements(uid)]);
       if (allElements.length === 0) return;
       const rect = this.getBoundingBoxForElements(allElements);

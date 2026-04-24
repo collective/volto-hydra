@@ -2378,4 +2378,183 @@ test.describe('Multi-Block Selection', () => {
     await expect(page.locator('.multi-select-bar'))
       .toContainText('selected', { timeout: 3000 });
   });
+
+  // Option A semantics: once a text drag crosses a block boundary we promote to
+  // full block selection. Copy operates on whole blocks, not the partial-text
+  // sub-range that spawned the promotion.
+  //
+  // Rationale: block-level clipboard is the composable unit (pastable anywhere
+  // blocks are allowed). Serializing a partial paragraph across blocks produces
+  // an awkward half-block on paste with no good block-type mapping. Matches the
+  // Notion/Plate.js convention. Downside: user who carefully trimmed their
+  // selection loses that intent — they see the whole block outlines appear
+  // once the drag crosses a boundary, which signals the mode switch.
+  test('Cross-block partial text selection copies full blocks, not trimmed text (Option A)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Focus block-1, then programmatically select from block-1 midpoint to block-3 midpoint.
+    // block-1 text is "This is a test paragraph" — start at offset 5 ("is a test paragraph")
+    // block-3 text is "Another paragraph for testing" — end at offset 7 ("Another")
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+
+    await iframe.locator('body').evaluate(() => {
+      const find = (uid: string) => {
+        const el = document.querySelector(`[data-block-uid="${uid}"]`);
+        const walker = document.createTreeWalker(el!, NodeFilter.SHOW_TEXT);
+        return walker.nextNode() as Text;
+      };
+      const t1 = find('block-1-uuid');
+      const t3 = find('block-3-uuid');
+      const range = document.createRange();
+      range.setStart(t1, 5);
+      range.setEnd(t3, 7);
+      const sel = window.getSelection()!;
+      sel.removeAllRanges();
+      sel.addRange(range);
+    });
+
+    // Cross-block detector promotes partial-text → full multi-block selection
+    await helper.waitForMultiSelectOutlines(2);
+    await expect(page.locator('.multi-select-bar')).toContainText('selected');
+
+    // Capture COPY_BLOCKS message from the admin (parent) window — iframe
+    // postMessage lands here via the existing onmessage listener. We listen
+    // on 'message' events to see what hydra sent.
+    const copyMsg = page.evaluate(() => {
+      return new Promise<{ uids: string[]; action: string } | null>((resolve) => {
+        const handler = (e: MessageEvent) => {
+          if (e.data?.type === 'COPY_BLOCKS') {
+            window.removeEventListener('message', handler);
+            resolve({ uids: e.data.uids, action: e.data.action });
+          }
+        };
+        window.addEventListener('message', handler);
+        setTimeout(() => {
+          window.removeEventListener('message', handler);
+          resolve(null);
+        }, 4000);
+      });
+    });
+
+    await page.keyboard.press('ControlOrMeta+c');
+    const result = await copyMsg;
+    expect(result).not.toBeNull();
+    expect(result!.action).toBe('copy');
+    // Full blocks copied (Option A) — not a trimmed text snippet
+    expect(result!.uids).toContain('block-1-uuid');
+    expect(result!.uids).toContain('block-3-uuid');
+  });
+
+  // Drag-and-drop moves all selected blocks together
+  test('Drag of multi-selected blocks moves them together', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+    const initialOrder = await helper.getBlockOrder();
+    // Expect at least block-1, block-2, block-3 at top
+    expect(initialOrder.slice(0, 3)).toEqual(['block-1-uuid', 'block-2-uuid', 'block-3-uuid']);
+
+    // Multi-select block-1 + block-2 via Shift+ArrowDown from block mode
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.escapeFromEditing();
+    await page.keyboard.press('Shift+ArrowDown');
+    await helper.waitForMultiSelectOutlines(2);
+
+    // Drag via the toolbar drag handle onto block-3
+    const dragHandle = await helper.getDragHandle();
+    const block3 = iframe.locator('[data-block-uid="block-3-uuid"]');
+    await helper.dragBlockWithMouse(dragHandle, block3, true);
+
+    // After drop: block-3 precedes block-1, block-2 in the layout
+    const newOrder = await helper.getBlockOrder();
+    const idx3 = newOrder.indexOf('block-3-uuid');
+    const idx1 = newOrder.indexOf('block-1-uuid');
+    const idx2 = newOrder.indexOf('block-2-uuid');
+    expect(idx3).toBeLessThan(idx1);
+    expect(idx1).toBeLessThan(idx2);
+  });
+
+  // Multi-select containing a locked/fixed block: delete spares the locked one
+  test('Delete on multi-selection with locked block spares the locked block', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // standalone-block-1 is a regular slate block (not fixed)
+    // template-header is fixed + readOnly (part of the template)
+    const initialOrder = await helper.getBlockOrder();
+    expect(initialOrder).toContain('standalone-block-1');
+    expect(initialOrder).toContain('template-header');
+
+    // Select standalone-block-1 then Ctrl+Click the locked template-header
+    const iframe = helper.getIframe();
+    await helper.clickBlockInIframe('standalone-block-1');
+    await helper.waitForBlockSelected('standalone-block-1');
+    await helper.escapeFromEditing();
+
+    const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+    await iframe.locator('[data-block-uid="template-header"]').click({ modifiers: [modifier] });
+    await helper.waitForMultiSelectOutlines(2);
+
+    // Press Delete — expect the locked block to survive; standalone should go
+    await page.keyboard.press('Delete');
+
+    await expect.poll(async () => helper.getBlockOrder(), { timeout: 5000 })
+      .not.toContain('standalone-block-1');
+
+    const finalOrder = await helper.getBlockOrder();
+    expect(finalOrder).toContain('template-header');
+  });
+
+  // DnD on multi-selection with a locked block: only the movable blocks move;
+  // the locked block stays in its original position.
+  test('Drag of multi-selection containing locked block moves only unlocked', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const initialOrder = await helper.getBlockOrder();
+    const initialHeaderIdx = initialOrder.indexOf('template-header');
+    const initialStandaloneIdx = initialOrder.indexOf('standalone-block-1');
+    // Drop after standalone-block-2 (the last page-level leaf) — known-safe
+    // target with deterministic drop position (no descendants to absorb drop).
+    const targetUid = 'standalone-block-2';
+    const targetIdx = initialOrder.indexOf(targetUid);
+    expect(initialHeaderIdx).toBeGreaterThanOrEqual(0);
+    expect(initialStandaloneIdx).toBeGreaterThanOrEqual(0);
+    expect(targetIdx).toBeGreaterThan(initialHeaderIdx);
+    // standalone-block-1 comes before template-header in this fixture
+    expect(initialStandaloneIdx).toBeLessThan(initialHeaderIdx);
+
+    // Multi-select standalone-block-1 + template-header (one locked)
+    const iframe = helper.getIframe();
+    await helper.clickBlockInIframe('standalone-block-1');
+    await helper.waitForBlockSelected('standalone-block-1');
+    await helper.escapeFromEditing();
+    const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+    await iframe.locator('[data-block-uid="template-header"]').click({ modifiers: [modifier] });
+    await helper.waitForMultiSelectOutlines(2);
+
+    // Drag onto the target after the template-header
+    const dragHandle = await helper.getDragHandle();
+    const targetBlock = iframe.locator(`[data-block-uid="${targetUid}"]`);
+    await helper.dragBlockWithMouse(dragHandle, targetBlock, true);
+
+    // Expected order: remove standalone-block-1 from initial, insert it right
+    // after targetUid. template-header stays exactly where it was.
+    const expected = initialOrder.filter((uid) => uid !== 'standalone-block-1');
+    const insertAt = expected.indexOf(targetUid) + 1;
+    expected.splice(insertAt, 0, 'standalone-block-1');
+
+    const newOrder = await helper.getBlockOrder();
+    expect(newOrder).toEqual(expected);
+  });
 });

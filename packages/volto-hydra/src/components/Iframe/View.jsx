@@ -9,7 +9,7 @@ import {
 import { validateAndLog, validateTemplatePlaceholders } from '../../utils/formDataValidation';
 import { toast } from 'react-toastify';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
-import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, getBlockAddability } from '@volto-hydra/hydra-js';
+import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, getBlockAddability, isBlockReadonly, isBlockPositionLocked } from '@volto-hydra/hydra-js';
 import Api from '@plone/volto/helpers/Api/Api';
 
 import { setBlocksClipboard, resetBlocksClipboard } from '@plone/volto/actions/blocksClipboard/blocksClipboard';
@@ -748,10 +748,20 @@ const Iframe = (props) => {
 
     const handleDelete = (e) => {
       const { blockIds } = e.detail;
-      log('hydra-delete-blocks:', blockIds.length, 'blocks:', blockIds);
+      // Backstop: even if a caller slipped locked UIDs past the iframe-side
+      // filter (hydra._filterMutableBlockUids), guard here before we mutate.
+      const templateMode = iframeSyncState.templateEditMode;
+      const safeIds = blockIds.filter((uid) => {
+        const block = getBlockById(properties, bpm, uid);
+        if (!block) return false;
+        return !isBlockReadonly(block, templateMode)
+            && !isBlockPositionLocked(block, templateMode);
+      });
+      log('hydra-delete-blocks:', safeIds.length, '/', blockIds.length, 'blocks (after lock filter)');
+      if (safeIds.length === 0) return;
       let newFormData = { ...properties };
       let currentBpm = bpm;
-      for (const uid of blockIds) {
+      for (const uid of safeIds) {
         const containerConfig = getContainerFieldConfig(uid, currentBpm, newFormData, blocksConfig, intl);
         newFormData = deleteBlockFromContainer(newFormData, currentBpm, uid, containerConfig);
         currentBpm = buildBlockPathMap(newFormData, blocksConfig, intl);
