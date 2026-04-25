@@ -301,6 +301,9 @@ onMounted(() => {
                     }
                 },
             });
+            // Expose bridge so Playwright tests can drive selection programmatically
+            // (matches the test-frontend's window.bridge convention).
+            window.bridge = bridge;
         }
     }
 });
