@@ -798,7 +798,9 @@
     <p v-else class="text-gray-400 italic">No map URL configured</p>
   </div>
 
-  <div v-else :data-block-uid="block_uid" :data-unknown-block-type="block['@type']">
+  <div v-else :data-block-uid="block_uid" :data-unknown-block-type="block['@type']"
+       class="my-2 px-3 py-2 border border-dashed border-gray-300 rounded text-gray-500 italic text-sm"
+       style="min-height: 2.5rem;">
     [not implemented]
   </div>
 
