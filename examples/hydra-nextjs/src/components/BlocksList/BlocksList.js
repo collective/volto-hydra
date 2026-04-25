@@ -861,7 +861,7 @@ function SearchBlock({ id, block, data, apiUrl, contextPath }) {
           {facets.length > 0 && (
             <aside className="search-facets" style={{ width: "16rem", flexShrink: 0 }}>
               <div style={{ padding: "1rem", backgroundColor: "#f9fafb", borderRadius: "0.5rem" }}>
-                {block.facetsTitle && <h3 style={{ fontWeight: 600, marginBottom: "0.75rem", color: "#374151" }}>{block.facetsTitle}</h3>}
+                {block.facetsTitle && <h3 data-edit-text="facetsTitle" style={{ fontWeight: 600, marginBottom: "0.75rem", color: "#374151" }}>{block.facetsTitle}</h3>}
                 {facets.map((facet, i) => (
                   <div key={facet["@uid"] || i} style={{ marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid #e5e7eb" }}>
                     {renderFacet(facet, i)}
@@ -910,7 +910,7 @@ function SearchBlock({ id, block, data, apiUrl, contextPath }) {
       )}
       {facets.length > 0 && (
         <>
-          {block.facetsTitle && <h3 style={{ fontWeight: 600, marginBottom: "0.75rem", color: "#374151" }}>{block.facetsTitle}</h3>}
+          {block.facetsTitle && <h3 data-edit-text="facetsTitle" style={{ fontWeight: 600, marginBottom: "0.75rem", color: "#374151" }}>{block.facetsTitle}</h3>}
           <div className="search-facets" style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "1rem", padding: "1rem", backgroundColor: "#f9fafb", borderRadius: "0.5rem" }}>
             {facets.map((facet, i) => renderFacet(facet, i))}
           </div>
@@ -977,16 +977,13 @@ function Block({ block, id, data, apiUrl, contextPath }) {
         </p>
       );
 
-    // ── Introduction ──
+    // ── Introduction — standalone slate value at block.value, not page fields
     case "introduction":
       return (
         <div data-block-uid={id} className="introduction-block">
-          <h1 data-edit-text="/title">{data.title}</h1>
-          {data.description && (
-            <p data-edit-text="/description" className="description">
-              {data.description}
-            </p>
-          )}
+          <div data-edit-text="value">
+            <SlateNodes value={block.value || []} />
+          </div>
         </div>
       );
 
@@ -1287,7 +1284,7 @@ function Block({ block, id, data, apiUrl, contextPath }) {
           <div style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)" }} />
           <div style={{ position: "relative", padding: "4rem 1rem", textAlign: "center", color: "#fff" }}>
             <h2 data-edit-text="title" style={{ marginBottom: "1rem" }}>{block.title}</h2>
-            <div style={{ marginBottom: "2rem" }}>
+            <div data-edit-text="description" style={{ marginBottom: "2rem" }}>
               <SlateNodes value={block.description || block.value || []} />
             </div>
             {block.cta_title && (
