@@ -145,7 +145,7 @@
       <!-- data-block-readonly on the wrapper controls editability — hydra.js respects it -->
       <!-- Key forces Vue to recreate element when overwrite changes (clears stale contenteditable text) -->
       <NuxtLink :to="getUrl(block.href)" v-if="getTeaserTitle(block)" data-edit-link="href">
-        <div>{{ block.head_title }}</div>
+        <div data-edit-text="head_title">{{ block.head_title }}</div>
         <h5 class="mb-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white"
           :key="`title-${block.overwrite}`"
           data-edit-text="title">{{ getTeaserTitle(block) }}</h5>
@@ -318,7 +318,7 @@
     <!-- Facets on top (default or facetsTopSide) -->
     <template v-if="!block.variation || block.variation === 'facetsTopSide'">
       <!-- Facets horizontal -->
-      <h3 v-if="block.facetsTitle" class="font-semibold mb-3 text-gray-700">{{ block.facetsTitle }}</h3>
+      <h3 v-if="block.facetsTitle" data-edit-text="facetsTitle" class="font-semibold mb-3 text-gray-700">{{ block.facetsTitle }}</h3>
       <div v-if="block.facets?.length" class="search-facets mb-4 p-4 bg-gray-50 rounded-lg flex flex-wrap gap-4">
         <template v-for="(facet, idx) in expand(block.facets, null, '@id')" :key="facet['@uid'] || idx">
           <!-- Non-facet types (slate, image) rendered as generic blocks -->
@@ -393,7 +393,7 @@
         <!-- Sidebar: facets -->
         <aside v-if="block.facets?.length" class="search-facets w-full md:w-64 shrink-0">
           <div class="p-4 bg-gray-50 rounded-lg sticky top-4">
-            <h3 v-if="block.facetsTitle" class="font-semibold mb-3 text-gray-700">{{ block.facetsTitle }}</h3>
+            <h3 v-if="block.facetsTitle" data-edit-text="facetsTitle" class="font-semibold mb-3 text-gray-700">{{ block.facetsTitle }}</h3>
             <template v-for="(facet, idx) in expand(block.facets, null, '@id')" :key="facet['@uid'] || idx">
               <!-- Non-facet types (slate, image) rendered as generic blocks -->
               <template v-if="facet.type === 'slate' || facet.type === 'image'">
@@ -798,9 +798,8 @@
     <p v-else class="text-gray-400 italic">No map URL configured</p>
   </div>
 
-  <div v-else :data-block-uid="block_uid">
-    {{ 'Not implemented Block: @type=' + block['@type'] }}
-    <pre>{{ block }}</pre>
+  <div v-else :data-block-uid="block_uid" :data-unknown-block-type="block['@type']">
+    [not implemented]
   </div>
 
 </template>
