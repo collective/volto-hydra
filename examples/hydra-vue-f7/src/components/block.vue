@@ -13,10 +13,11 @@
     {{ data.description }}
   </p>
 
-  <!-- Introduction -->
+  <!-- Introduction — standalone slate value at block.value, not page fields -->
   <div v-else-if="block['@type'] == 'introduction'" :data-block-uid="block_uid" class="introduction-block">
-    <h1 data-edit-text="/title">{{ data.title }}</h1>
-    <p v-if="data.description" data-edit-text="/description" class="description">{{ data.description }}</p>
+    <div data-edit-text="value">
+      <RichText v-for="node in block.value || []" :key="node" :node="node" />
+    </div>
   </div>
 
   <!-- Image -->
@@ -371,7 +372,7 @@
     <div :style="{ position: 'absolute', inset: '0', background: 'rgba(0,0,0,0.5)' }" />
     <div :style="{ position: 'relative', zIndex: '1', padding: '4rem 2rem', textAlign: 'center', color: 'white' }">
       <h2 data-edit-text="title" style="margin-bottom:1rem; font-size:2rem; font-weight:800;">{{ block.title }}</h2>
-      <div style="margin-bottom:2rem; font-size:1.1rem;">
+      <div data-edit-text="description" style="margin-bottom:2rem; font-size:1.1rem;">
         <RichText v-for="node in (block.description || block['value'] || [])" :key="node" :node="node" />
       </div>
       <f7-button v-if="block.cta_title" fill :href="getUrl(block.cta_link)"
