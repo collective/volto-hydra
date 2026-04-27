@@ -18,22 +18,18 @@ test.describe('Container UX: Wrap', () => {
     await iframe.locator('[data-block-uid="slate-after"]').click({ modifiers: [modifier] });
     await helper.waitForMultiSelectOutlines(2);
 
-    // Open the multi-select toolbar "Wrap in..." action. Exact wiring lives in
-    // BlocksToolbar (sidebar left column) today — button should appear with the
-    // multi-select count badge.
+    // Open the quanta toolbar 3-dot menu and click "Wrap in container…"
+    const menuButton = page.locator('.quanta-toolbar .volto-hydra-menu-trigger');
+    await expect(menuButton).toBeVisible({ timeout: 3000 });
+    await menuButton.click();
     const wrapButton = page.locator('[data-testid="wrap-selected"]');
     await expect(wrapButton).toBeVisible({ timeout: 3000 });
     await wrapButton.click();
 
-    // A BlockChooser-style popup opens with compatible container types.
-    // `section` is compatible (accepts any). `columns` is not (only accepts `column`).
-    const chooser = page.locator('.container-wrap-chooser');
-    await expect(chooser).toBeVisible({ timeout: 3000 });
-    await expect(chooser.locator('[data-block-type="section"]')).toBeVisible();
-    await expect(chooser.locator('[data-block-type="columns"]')).not.toBeVisible();
-
-    // Pick section
-    await chooser.locator('[data-block-type="section"]').click();
+    // BlockChooser opens filtered to compatible container types — section is
+    // compatible (accepts any); columns is not (only accepts `column`).
+    await expect(page.locator('.blocks-chooser button.columns')).toHaveCount(0);
+    await helper.selectBlockType('section');
 
     // slate-before and slate-after are now children of a new section block
     // (not page-level siblings). Verify via DOM hierarchy: the closest

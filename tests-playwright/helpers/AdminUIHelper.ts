@@ -2983,70 +2983,28 @@ export class AdminUIHelper {
   }
 
   /**
-   * Select a block type from the block chooser.
-   * Block types: 'slate', 'image', 'video', 'listing', etc.
+   * Select a block type from the BlockChooser by its @type id.
+   *
+   * BlockChooser renders each block as `<button class={block.id}>`. Use the
+   * search input to filter so accordion-collapse state is irrelevant — no
+   * per-type display-name mapping needed.
    */
   async selectBlockType(blockType: string): Promise<void> {
-    // Wait for block chooser to be fully visible
-    await this.page.waitForSelector('.blocks-chooser', { state: 'visible', timeout: 5000 });
+    const chooser = this.page.locator('.blocks-chooser');
+    await chooser.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Different block types have different display names
-    const blockNames: Record<string, string[]> = {
-      slate: ['Text', 'Slate', 'text'],
-      image: ['Image', 'image'],
-      video: ['Video', 'video'],
-      listing: ['Listing', 'listing'],
-      columns: ['Columns', 'columns'],
-      accordion: ['Accordion', 'accordion'],
-      slider: ['Slider', 'slider'],
-      gridblock: ['Grid'],
-    };
-
-    const possibleNames = blockNames[blockType.toLowerCase()] || [blockType];
-
-    // Block chooser is rendered as a portal directly on document.body
-    // with class "blocks-chooser". Look specifically within this container
-    // to avoid matching sidebar buttons with similar text.
-    const blockChooser = this.page.locator('.blocks-chooser');
-
-    // Wait for block chooser buttons to be rendered (at least one button should exist)
-    await blockChooser.locator('button').first().waitFor({ state: 'visible', timeout: 5000 });
-
-    // Try to find and click the block type button within the block chooser
-    for (const name of possibleNames) {
-      // Look for button within block chooser, excluding sidebar items (which have ⋮⋮ prefix)
-      const blockButton = blockChooser.locator(`button:has-text("${name}")`).first();
-
-      if (await blockButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await blockButton.click();
-        // Wait for block chooser to close (indicates block was added)
-        await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });
-        return;
-      }
+    // Filter via search input — works regardless of which accordion group
+    // the block is in. BlockChooser filters case-insensitively against title;
+    // typing the @type id is a reliable match for default-title blocks.
+    const search = chooser.locator('input[placeholder="Search"]');
+    if (await search.isVisible().catch(() => false)) {
+      await search.fill(blockType);
     }
 
-    // Block not visible in MOST USED section, try using search
-    const searchInput = blockChooser.locator('input[placeholder="Search"]');
-    if (await searchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      // Use the first possible name for search
-      await searchInput.fill(possibleNames[0]);
-      // Wait for search results to update (buttons should change)
-      await this.page.waitForTimeout(300);
-
-      // Now try to find the block button again
-      for (const name of possibleNames) {
-        const blockButton = blockChooser.locator(`button:has-text("${name}")`).first();
-
-        if (await blockButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await blockButton.click();
-          // Wait for block chooser to close (indicates block was added)
-          await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });
-          return;
-        }
-      }
-    }
-
-    throw new Error(`Block type "${blockType}" not found in chooser`);
+    const button = chooser.locator(`button.${blockType}`).first();
+    await button.waitFor({ state: 'visible', timeout: 5000 });
+    await button.click();
+    await chooser.waitFor({ state: 'hidden', timeout: 5000 });
   }
 
   /**

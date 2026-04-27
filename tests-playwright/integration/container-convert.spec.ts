@@ -20,18 +20,16 @@ test.describe('Container UX: Convert (container-to-container)', () => {
     await expect(iframe.locator('[data-block-uid="grid-cell-1"]')).toBeVisible();
     await expect(iframe.locator('[data-block-uid="grid-cell-2"]')).toBeVisible();
 
-    // Open 3-dot menu, hover Convert to, pick section
+    // Open 3-dot menu, click "Convert to…", pick section in BlockChooser
     const menuButton = page.locator('.quanta-toolbar .volto-hydra-menu-trigger');
     await expect(menuButton).toBeVisible({ timeout: 3000 });
     await menuButton.click();
 
-    const convertMenu = page.locator('.convert-to-menu');
-    await expect(convertMenu).toBeVisible({ timeout: 3000 });
-    await convertMenu.hover();
+    const convertButton = page.locator('[data-testid="convert-block"]');
+    await expect(convertButton).toBeVisible({ timeout: 3000 });
+    await convertButton.click();
 
-    const sectionOption = page.locator('.volto-hydra-submenu [data-convert-type="section"]');
-    await expect(sectionOption).toBeVisible({ timeout: 3000 });
-    await sectionOption.click();
+    await helper.selectBlockType('section');
 
     // After conversion: grid-1 block still exists (same UID, converted to section).
     // Its teaser children are preserved — same UIDs, same parent.
