@@ -2985,23 +2985,25 @@ export class AdminUIHelper {
   /**
    * Select a block type from the BlockChooser by its @type id.
    *
-   * BlockChooser renders each block as `<button class={block.id}>`. Use the
-   * search input to filter so accordion-collapse state is irrelevant — no
-   * per-type display-name mapping needed.
+   * BlockChooser renders each block as `<button class={block.id}>`. The button
+   * exists in the DOM regardless of accordion state, but is hidden inside
+   * collapsed groups. We open every collapsed accordion title before clicking
+   * so the call works without a per-type display-name mapping.
    */
   async selectBlockType(blockType: string): Promise<void> {
     const chooser = this.page.locator('.blocks-chooser');
     await chooser.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Filter via search input — works regardless of which accordion group
-    // the block is in. BlockChooser filters case-insensitively against title;
-    // typing the @type id is a reliable match for default-title blocks.
-    const search = chooser.locator('input[placeholder="Search"]');
-    if (await search.isVisible().catch(() => false)) {
-      await search.fill(blockType);
-    }
-
     const button = chooser.locator(`button.${blockType}`).first();
+    if (!(await button.isVisible().catch(() => false))) {
+      // Expand every accordion title that isn't already active so all
+      // ButtonGroups render their content.
+      const inactiveTitles = chooser.locator('.accordion .title:not(.active)');
+      const count = await inactiveTitles.count();
+      for (let i = 0; i < count; i++) {
+        await inactiveTitles.nth(i).click().catch(() => {});
+      }
+    }
     await button.waitFor({ state: 'visible', timeout: 5000 });
     await button.click();
     await chooser.waitFor({ state: 'hidden', timeout: 5000 });
