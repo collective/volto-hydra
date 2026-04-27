@@ -243,12 +243,20 @@ test.describe('Container UX: Edge-drag', () => {
     }
     await page.mouse.up();
 
-    await expect.poll(async () =>
-      iframe.locator('[data-block-uid="text-2a"]').evaluate(
-        (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid') || null,
-      ),
-      { timeout: 5000 },
-    ).toBe('col-1');
+    // text-2a's only sibling chain (col-2 → text-2a) gets fully covered, so
+    // bottom-up promotion moves col-2 itself into col-1 (col-1 accepts column).
+    // Result: text-2a is now a descendant of col-1 (via col-2).
+    await expect.poll(async () => {
+      return iframe.locator('[data-block-uid="text-2a"]').evaluate((el) => {
+        let current = el.parentElement?.closest('[data-block-uid]');
+        const chain = [];
+        while (current) {
+          chain.push(current.getAttribute('data-block-uid'));
+          current = current.parentElement?.closest('[data-block-uid]');
+        }
+        return chain;
+      });
+    }, { timeout: 5000 }).toContain('col-1');
 
     await helper.waitForBlockSelected('col-1');
   });
@@ -330,13 +338,69 @@ test.describe('Container UX: Edge-drag', () => {
     }
     await page.mouse.up();
 
+    // col-1 has [text-1a, text-1b] — text-1b's midpoint is crossed; full sibling
+    // coverage requires text-1a too. With only text-1b covered, no promotion;
+    // text-1b moves directly into col-2.
+    await expect.poll(async () => {
+      return iframe.locator('[data-block-uid="text-1b"]').evaluate((el) => {
+        let current = el.parentElement?.closest('[data-block-uid]');
+        const chain = [];
+        while (current) {
+          chain.push(current.getAttribute('data-block-uid'));
+          current = current.parentElement?.closest('[data-block-uid]');
+        }
+        return chain;
+      });
+    }, { timeout: 5000 }).toContain('col-2');
+
+    await helper.waitForBlockSelected('col-2');
+  });
+
+  // Cross-axis expel: dragging the left/right edge inward on a vertical-stack
+  // container is the degenerate "all-or-nothing" case — every child shares
+  // roughly the same X-midpoint, so passing it expels the lot. Validates that
+  // axis-free geometry handles this case correctly without a special path.
+  test('Right edge: cross-axis expel — drag LEFT past child midpoint expels all children', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/section-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="section-1"]').first().evaluate((el) => {
+      (window as any).bridge?.selectBlock(el);
+    });
+    await helper.waitForBlockSelected('section-1');
+
+    const initialParent = await iframe.locator('[data-block-uid="section-child-1"]').evaluate(
+      (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid') || null,
+    );
+    expect(initialParent).toBe('section-1');
+
+    const rightHandle = iframe.locator('.volto-hydra-edge-handle[data-edge="right"]');
+    await expect(rightHandle).toBeVisible({ timeout: 3000 });
+    const childRect = await iframe.locator('[data-block-uid="section-child-1"]').boundingBox();
+    const handleBox = await rightHandle.boundingBox();
+    expect(childRect).not.toBeNull();
+    expect(handleBox).not.toBeNull();
+    const startX = handleBox!.x + handleBox!.width / 2;
+    const startY = handleBox!.y + handleBox!.height / 2;
+    const endX = childRect!.x + childRect!.width / 2 - 5; // leftward past child X-midpoint
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    for (let s = 1; s <= 8; s++) {
+      await page.mouse.move(startX + (endX - startX) * (s / 8), startY);
+      await page.waitForTimeout(20);
+    }
+    await page.mouse.up();
+
     await expect.poll(async () =>
-      iframe.locator('[data-block-uid="text-1b"]').evaluate(
+      iframe.locator('[data-block-uid="section-child-1"]').evaluate(
         (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid') || null,
       ),
       { timeout: 5000 },
-    ).toBe('col-2');
+    ).toBe(null);
 
-    await helper.waitForBlockSelected('col-2');
+    await helper.waitForBlockSelected('section-1');
   });
 });

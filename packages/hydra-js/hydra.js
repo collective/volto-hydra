@@ -1050,31 +1050,35 @@ var Bridge = class {
     return { onMouseMove, stop };
   }
   /**
-   * Position the container bottom edge handle on the selected block's rect if
-   * the block is a container with children AND has a loose sibling below whose
-   * type is accepted by the container's child field. Otherwise hides it.
+   * Position all 4 edge handles for the selected container.
+   * For each edge:
+   *   - Show if absorb is possible: there's a sibling on the outward side
+   *     (parent layout matches edge axis) whose @type the container accepts.
+   *   - Show if expel is possible: the container has a child whose @type
+   *     the parent accepts (children layout matches edge axis).
+   * The drag handler reads dataset attributes to know what to do.
    */
-  _positionBottomEdgeHandle() {
-    const handle = this._bottomEdgeHandle;
-    if (!handle) return;
+  _positionEdgeHandles() {
+    const hide = () => {
+      if (this._edgeHandles) {
+        for (const h of Object.values(this._edgeHandles)) h.style.display = "none";
+      }
+    };
+    if (!this._edgeHandles) return;
     const uid = this.selectedBlockUid;
     if (!uid || uid === PAGE_BLOCK_UID) {
-      handle.style.display = "none";
+      hide();
       return;
     }
     const info = this.blockPathMap?.[uid];
-    if (!info) {
-      handle.style.display = "none";
-      return;
-    }
-    const el = this.queryBlockElement(uid);
-    if (!el) {
-      handle.style.display = "none";
+    const el = uid ? this.queryBlockElement(uid) : null;
+    if (!info || !el) {
+      hide();
       return;
     }
     const ownChildren = this._getSiblingsByDomOrder(null, uid);
     if (ownChildren.length === 0) {
-      handle.style.display = "none";
+      hide();
       return;
     }
     const schema = this.blockPathMap?._schemas?.[info._schemaRef];
@@ -1085,37 +1089,55 @@ var Bridge = class {
         break;
       }
     }
-    const siblings = this._getSiblingsByDomOrder(uid, info.parentId);
-    const myIdx = siblings.indexOf(uid);
-    const nextSiblingUid = myIdx >= 0 ? siblings[myIdx + 1] : null;
-    if (!nextSiblingUid) {
-      handle.style.display = "none";
-      return;
+    const parentInfo = this.blockPathMap?.[info.parentId];
+    const parentSchema = parentInfo?._schemaRef ? this.blockPathMap?._schemas?.[parentInfo._schemaRef] : null;
+    let parentAllowed = null;
+    if (parentSchema?.properties && info.containerField) {
+      const fd = parentSchema.properties[info.containerField];
+      if (fd?.widget === "blocks_layout" || fd?.widget === "object_list") {
+        parentAllowed = fd.allowedBlocks || null;
+      }
+    } else if (info.parentId === PAGE_BLOCK_UID) {
+      parentAllowed = info.allowedSiblingTypes || null;
     }
-    const siblingType = this.getBlockData(nextSiblingUid)?.["@type"];
-    if (!siblingType) {
-      handle.style.display = "none";
-      return;
-    }
-    if (childAllowed && !childAllowed.includes(siblingType)) {
-      handle.style.display = "none";
-      return;
-    }
+    const accepts = (allowedList, type) => !allowedList || type && allowedList.includes(type);
+    const siblings = this._getSiblingsByDomOrder(uid, info.parentId).filter((s) => s !== uid);
     const r = el.getBoundingClientRect();
-    handle.style.left = `${r.left}px`;
-    handle.style.top = `${r.bottom - 3}px`;
-    handle.style.width = `${r.width}px`;
-    handle.style.display = "block";
-    handle.dataset.nextSibling = nextSiblingUid;
-    handle.dataset.container = uid;
-    handle.dataset.lastChild = ownChildren[ownChildren.length - 1];
-    handle.dataset.childAllowed = childAllowed ? childAllowed.join(",") : "";
+    const canAbsorbAny = siblings.some((s) => accepts(childAllowed, this.getBlockData(s)?.["@type"]));
+    const canExpelAny = ownChildren.some((c) => accepts(parentAllowed, this.getBlockData(c)?.["@type"]));
+    if (!canAbsorbAny && !canExpelAny) {
+      hide();
+      return;
+    }
+    const config = {
+      top: { axis: "vertical", position: { left: r.left, top: r.top - 3, width: r.width, height: 6 } },
+      bottom: { axis: "vertical", position: { left: r.left, top: r.bottom - 3, width: r.width, height: 6 } },
+      left: { axis: "horizontal", position: { left: r.left - 3, top: r.top, width: 6, height: r.height } },
+      right: { axis: "horizontal", position: { left: r.right - 3, top: r.top, width: 6, height: r.height } }
+    };
+    for (const [edge, cfg] of Object.entries(config)) {
+      const handle = this._edgeHandles[edge];
+      if (!handle) continue;
+      handle.style.left = `${cfg.position.left}px`;
+      handle.style.top = `${cfg.position.top}px`;
+      handle.style.width = `${cfg.position.width}px`;
+      handle.style.height = `${cfg.position.height}px`;
+      handle.style.display = "block";
+      handle.dataset.edge = edge;
+      handle.dataset.axis = cfg.axis;
+      handle.dataset.container = uid;
+      handle.dataset.canAbsorb = canAbsorbAny ? "1" : "";
+      handle.dataset.canExpel = canExpelAny ? "1" : "";
+      handle.dataset.childAllowed = childAllowed ? childAllowed.join(",") : "";
+      handle.dataset.parentAllowed = parentAllowed ? parentAllowed.join(",") : "";
+    }
   }
   _setupEdgeHandleDrag(handle) {
     let dragging = false;
+    let lastX = 0;
     let lastY = 0;
     let growthBox = null;
-    const absorbOverlays = /* @__PURE__ */ new Map();
+    const overlays = /* @__PURE__ */ new Map();
     let autoScroller = null;
     const ensureGrowthBox = () => {
       if (growthBox) return growthBox;
@@ -1124,10 +1146,6 @@ var Bridge = class {
       Object.assign(growthBox.style, {
         position: "fixed",
         background: "rgba(0, 126, 177, 0.08)",
-        // Bottom edge thickness encodes validity:
-        // 1px = no absorb yet (resting / invalid drag)
-        // 6px = at least one block in the absorb plan
-        borderBottom: "1px solid #007eb1",
         zIndex: "10000",
         pointerEvents: "none",
         display: "none"
@@ -1136,7 +1154,7 @@ var Bridge = class {
       return growthBox;
     };
     const tintBlock = (uid) => {
-      if (absorbOverlays.has(uid)) return;
+      if (overlays.has(uid)) return;
       const el = this.queryBlockElement(uid);
       if (!el) return;
       const r = el.getBoundingClientRect();
@@ -1155,50 +1173,93 @@ var Bridge = class {
         pointerEvents: "none"
       });
       document.body.appendChild(overlay);
-      absorbOverlays.set(uid, overlay);
+      overlays.set(uid, overlay);
     };
     const cleanup = () => {
       if (growthBox) growthBox.style.display = "none";
-      for (const overlay of absorbOverlays.values()) overlay.remove();
-      absorbOverlays.clear();
+      for (const o of overlays.values()) o.remove();
+      overlays.clear();
     };
-    const computeAbsorbPlan = (mouseY) => {
+    const edgeGeometry = (edge, rect, mouseX, mouseY) => {
+      switch (edge) {
+        case "bottom":
+          return { axis: "vertical", edgePos: rect.bottom, mouseCoord: mouseY, outward: mouseY - rect.bottom };
+        case "top":
+          return { axis: "vertical", edgePos: rect.top, mouseCoord: mouseY, outward: rect.top - mouseY };
+        case "right":
+          return { axis: "horizontal", edgePos: rect.right, mouseCoord: mouseX, outward: mouseX - rect.right };
+        case "left":
+          return { axis: "horizontal", edgePos: rect.left, mouseCoord: mouseX, outward: rect.left - mouseX };
+        default:
+          return null;
+      }
+    };
+    const blockMid = (el, axis) => {
+      const r = el.getBoundingClientRect();
+      return axis === "vertical" ? (r.top + r.bottom) / 2 : (r.left + r.right) / 2;
+    };
+    const computePlan = (e) => {
+      const edge = handle.dataset.edge;
       const containerUid = handle.dataset.container;
       const containerEl = this.queryBlockElement(containerUid);
-      if (!containerEl) return { absorb: [], boundaryBottom: null };
+      if (!containerEl || !edge) return { kind: "none", blocks: [], boundary: 0 };
+      const cRect = containerEl.getBoundingClientRect();
+      const geo = edgeGeometry(edge, cRect, e.clientX, e.clientY);
+      if (!geo) return { kind: "none", blocks: [], boundary: 0 };
       const containerInfo = this.blockPathMap?.[containerUid];
       const containerParentId = containerInfo?.parentId;
-      const cRect = containerEl.getBoundingClientRect();
       const childAllowed = handle.dataset.childAllowed ? handle.dataset.childAllowed.split(",") : null;
-      const candidates = /* @__PURE__ */ new Set();
-      for (const [uid, info] of Object.entries(this.blockPathMap)) {
-        if (!uid || uid === containerUid) continue;
-        if (info?.isFixed) continue;
-        if (this._isAncestor(uid, containerUid)) continue;
-        if (this._isAncestor(containerUid, uid)) continue;
-        if (!this._isAncestor(containerParentId, uid) && uid !== containerParentId) continue;
-        const el = this.queryBlockElement(uid);
-        if (!el) continue;
-        const r = el.getBoundingClientRect();
-        const midY = (r.top + r.bottom) / 2;
-        if (midY > cRect.bottom && midY < mouseY) {
-          candidates.add(uid);
+      const parentAllowed = handle.dataset.parentAllowed ? handle.dataset.parentAllowed.split(",") : null;
+      const slop = 3;
+      let kind, candidates, accepts;
+      if (geo.outward > slop && handle.dataset.canAbsorb) {
+        kind = "absorb";
+        accepts = (t) => !childAllowed || t && childAllowed.includes(t);
+        candidates = /* @__PURE__ */ new Set();
+        for (const [uid, info] of Object.entries(this.blockPathMap)) {
+          if (!uid || uid === containerUid) continue;
+          if (info?.isFixed) continue;
+          if (this._isAncestor(uid, containerUid)) continue;
+          if (this._isAncestor(containerUid, uid)) continue;
+          if (!this._isAncestor(containerParentId, uid) && uid !== containerParentId) continue;
+          const el = this.queryBlockElement(uid);
+          if (!el) continue;
+          const mid = blockMid(el, geo.axis);
+          const outwardOfEdge = (mid - geo.edgePos) * (edge === "top" || edge === "left" ? -1 : 1) > 0;
+          const inwardOfCursor = (mid - geo.mouseCoord) * (edge === "top" || edge === "left" ? -1 : 1) < 0;
+          if (outwardOfEdge && inwardOfCursor) candidates.add(uid);
         }
+      } else if (geo.outward < -slop && handle.dataset.canExpel) {
+        kind = "expel";
+        accepts = (t) => !parentAllowed || t && parentAllowed.includes(t);
+        candidates = /* @__PURE__ */ new Set();
+        for (const [uid, info] of Object.entries(this.blockPathMap)) {
+          if (!uid || uid === containerUid) continue;
+          if (info?.isFixed) continue;
+          if (!this._isAncestor(containerUid, uid)) continue;
+          const el = this.queryBlockElement(uid);
+          if (!el) continue;
+          const mid = blockMid(el, geo.axis);
+          const outwardOfCursor = (mid - geo.mouseCoord) * (edge === "top" || edge === "left" ? -1 : 1) > 0;
+          if (outwardOfCursor) candidates.add(uid);
+        }
+      } else {
+        return { kind: "none", blocks: [], boundary: geo.edgePos };
       }
-      const accepts = (type) => !childAllowed || type && childAllowed.includes(type);
       let changed = true;
       while (changed) {
         changed = false;
         for (const uid of [...candidates]) {
           const info = this.blockPathMap[uid];
           const pid = info?.parentId;
-          if (!pid || pid === containerParentId) continue;
-          const siblings = Object.entries(this.blockPathMap).filter(([, i]) => i?.parentId === pid).map(([id]) => id);
-          if (siblings.length === 0) continue;
-          if (!siblings.every((c) => candidates.has(c))) continue;
-          const parentType = this.getBlockData(pid)?.["@type"];
-          if (!accepts(parentType)) continue;
-          for (const c of siblings) candidates.delete(c);
+          if (!pid) continue;
+          if (kind === "absorb" && pid === containerParentId) continue;
+          if (kind === "expel" && pid === containerUid) continue;
+          const sibs = Object.entries(this.blockPathMap).filter(([, i]) => i?.parentId === pid).map(([id]) => id);
+          if (sibs.length === 0 || !sibs.every((c) => candidates.has(c))) continue;
+          const pType = this.getBlockData(pid)?.["@type"];
+          if (!accepts(pType)) continue;
+          for (const c of sibs) candidates.delete(c);
           candidates.add(pid);
           changed = true;
         }
@@ -1213,73 +1274,136 @@ var Bridge = class {
         if (!ea || !eb) return 0;
         return ea.compareDocumentPosition(eb) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
       });
-      let boundaryBottom = cRect.bottom;
+      let boundary = geo.edgePos;
       for (const uid of plan) {
         const el = this.queryBlockElement(uid);
-        if (el) boundaryBottom = Math.max(boundaryBottom, el.getBoundingClientRect().bottom);
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        if (edge === "bottom") boundary = Math.max(boundary, r.bottom);
+        else if (edge === "top") boundary = Math.min(boundary, r.top);
+        else if (edge === "right") boundary = Math.max(boundary, r.right);
+        else if (edge === "left") boundary = Math.min(boundary, r.left);
       }
-      return { absorb: plan, boundaryBottom };
+      return { kind, blocks: plan, boundary };
+    };
+    const updateGrowthBox = (e, plan) => {
+      if (!growthBox) return;
+      const containerEl = this.queryBlockElement(handle.dataset.container);
+      if (!containerEl) return;
+      const cRect = containerEl.getBoundingClientRect();
+      const edge = handle.dataset.edge;
+      const valid = plan.kind !== "none" && plan.blocks.length > 0;
+      const reset = (k, v) => growthBox.style.setProperty(k, v);
+      ["borderTopWidth", "borderBottomWidth", "borderLeftWidth", "borderRightWidth"].forEach((p) => reset(p, "0"));
+      const cursor = edge === "top" || edge === "bottom" ? e.clientY : e.clientX;
+      const dragKindIsExpel = plan.kind === "expel";
+      let endCoord;
+      if (valid) endCoord = plan.boundary;
+      else endCoord = handle.dataset.canAbsorb || handle.dataset.canExpel ? cursor : null;
+      if (endCoord === null) {
+        growthBox.style.display = "none";
+        return;
+      }
+      if (edge === "bottom" || edge === "top") {
+        const top = Math.min(
+          edge === "top" ? endCoord : cRect.bottom,
+          edge === "top" ? cRect.top : endCoord
+        );
+        const bottom = Math.max(
+          edge === "top" ? endCoord : cRect.bottom,
+          edge === "top" ? cRect.top : endCoord
+        );
+        growthBox.style.left = `${cRect.left}px`;
+        growthBox.style.width = `${cRect.width}px`;
+        growthBox.style.top = `${top}px`;
+        growthBox.style.height = `${Math.max(0, bottom - top)}px`;
+        const moving = edge === "top" ? "borderTopWidth" : "borderBottomWidth";
+        growthBox.style[moving] = valid ? "6px" : "1px";
+        growthBox.style.borderColor = "#007eb1";
+        growthBox.style.borderStyle = "solid";
+      } else {
+        const left = Math.min(
+          edge === "left" ? endCoord : cRect.right,
+          edge === "left" ? cRect.left : endCoord
+        );
+        const right = Math.max(
+          edge === "left" ? endCoord : cRect.right,
+          edge === "left" ? cRect.left : endCoord
+        );
+        growthBox.style.top = `${cRect.top}px`;
+        growthBox.style.height = `${cRect.height}px`;
+        growthBox.style.left = `${left}px`;
+        growthBox.style.width = `${Math.max(0, right - left)}px`;
+        const moving = edge === "left" ? "borderLeftWidth" : "borderRightWidth";
+        growthBox.style[moving] = valid ? "6px" : "1px";
+        growthBox.style.borderColor = "#007eb1";
+        growthBox.style.borderStyle = "solid";
+      }
+      growthBox.style.background = dragKindIsExpel ? "rgba(220, 53, 69, 0.06)" : "rgba(0, 126, 177, 0.08)";
+      growthBox.style.display = "block";
     };
     handle.addEventListener("mousedown", (e) => {
       e.preventDefault();
       e.stopPropagation();
       dragging = true;
+      lastX = e.clientX;
       lastY = e.clientY;
       autoScroller = this._createAutoScroller();
       ensureGrowthBox();
-      const containerUid = handle.dataset.container;
-      const containerEl = this.queryBlockElement(containerUid);
-      if (!containerEl) return;
-      const r = containerEl.getBoundingClientRect();
-      growthBox.style.left = `${r.left}px`;
-      growthBox.style.width = `${r.width}px`;
-      growthBox.style.top = `${r.bottom}px`;
-      growthBox.style.height = "0px";
-      growthBox.style.borderBottomWidth = "1px";
-      growthBox.style.display = "block";
+      updateGrowthBox(e, { kind: "none", blocks: [], boundary: 0 });
     });
     document.addEventListener("mousemove", (e) => {
       if (!dragging) return;
       e.preventDefault();
+      lastX = e.clientX;
       lastY = e.clientY;
       autoScroller?.onMouseMove(e);
-      const containerUid = handle.dataset.container;
-      const containerEl = containerUid ? this.queryBlockElement(containerUid) : null;
-      if (!containerEl || !growthBox) return;
-      const cRect = containerEl.getBoundingClientRect();
-      const { absorb, boundaryBottom } = computeAbsorbPlan(e.clientY);
-      const top = cRect.bottom;
-      const bottom = absorb.length > 0 ? boundaryBottom : Math.max(e.clientY, top);
-      growthBox.style.top = `${top}px`;
-      growthBox.style.height = `${Math.max(0, bottom - top)}px`;
-      growthBox.style.borderBottomWidth = absorb.length > 0 ? "6px" : "1px";
-      const wantedSet = new Set(absorb);
-      for (const [uid, overlay] of absorbOverlays) {
-        if (!wantedSet.has(uid)) {
+      const plan = computePlan(e);
+      updateGrowthBox(e, plan);
+      const wanted = new Set(plan.blocks);
+      for (const [uid, overlay] of overlays) {
+        if (!wanted.has(uid)) {
           overlay.remove();
-          absorbOverlays.delete(uid);
+          overlays.delete(uid);
         }
       }
-      for (const uid of absorb) tintBlock(uid);
+      for (const uid of plan.blocks) tintBlock(uid);
     });
     document.addEventListener("mouseup", () => {
       if (!dragging) return;
       dragging = false;
       autoScroller?.stop();
       autoScroller = null;
-      const { absorb } = computeAbsorbPlan(lastY);
-      const container = handle.dataset.container;
-      const lastChild = handle.dataset.lastChild;
+      const plan = computePlan({ clientX: lastX, clientY: lastY });
+      const containerUid = handle.dataset.container;
+      const containerInfo = containerUid ? this.blockPathMap?.[containerUid] : null;
+      const edge = handle.dataset.edge;
       cleanup();
-      if (absorb.length === 0 || !container || !lastChild) return;
-      window.parent.postMessage({
+      if (plan.kind === "none" || plan.blocks.length === 0 || !containerUid) return;
+      const baseMessage = {
         type: "MOVE_BLOCKS",
-        blockIds: absorb,
-        targetBlockId: lastChild,
-        insertAfter: true,
-        targetParentId: container,
-        selectAfterMove: container
-      }, this.adminOrigin);
+        blockIds: plan.blocks,
+        selectAfterMove: containerUid
+      };
+      if (plan.kind === "absorb") {
+        const ownChildren = this._getSiblingsByDomOrder(null, containerUid);
+        const insertAfter = edge === "bottom" || edge === "right";
+        const target = ownChildren.length > 0 ? insertAfter ? ownChildren[ownChildren.length - 1] : ownChildren[0] : containerUid;
+        window.parent.postMessage({
+          ...baseMessage,
+          targetBlockId: target,
+          insertAfter,
+          targetParentId: containerUid
+        }, this.adminOrigin);
+      } else if (plan.kind === "expel") {
+        const insertAfter = edge === "bottom" || edge === "right";
+        window.parent.postMessage({
+          ...baseMessage,
+          targetBlockId: containerUid,
+          insertAfter,
+          targetParentId: containerInfo?.parentId
+        }, this.adminOrigin);
+      }
     });
   }
   /**
@@ -2378,7 +2502,7 @@ var Bridge = class {
       dragHandle.style.top = `${handlePos.top}px`;
       dragHandle.style.display = "block";
     }
-    this._positionBottomEdgeHandle();
+    this._positionEdgeHandles();
     let focusedFieldRect = null;
     if (focusedFieldName && elementForFields) {
       const focusedEl = elementForFields.querySelector(`[data-edit-text="${focusedFieldName}"]`) || (elementForFields.getAttribute("data-edit-text") === focusedFieldName ? elementForFields : null);
@@ -6520,21 +6644,26 @@ DOM path (text node \u2192 container):
     });
     document.body.appendChild(dragButton);
     document.querySelectorAll(".volto-hydra-edge-handle").forEach((el) => el.remove());
-    const bottomEdgeHandle = document.createElement("div");
-    bottomEdgeHandle.className = "volto-hydra-edge-handle";
-    bottomEdgeHandle.setAttribute("data-edge", "bottom");
-    Object.assign(bottomEdgeHandle.style, {
-      position: "fixed",
-      height: "6px",
-      background: "rgba(0, 126, 177, 0.35)",
-      cursor: "ns-resize",
-      zIndex: "9998",
-      display: "none",
-      pointerEvents: "auto"
-    });
-    document.body.appendChild(bottomEdgeHandle);
-    this._bottomEdgeHandle = bottomEdgeHandle;
-    this._setupEdgeHandleDrag(bottomEdgeHandle);
+    this._edgeHandles = {};
+    for (const edge of ["top", "bottom", "left", "right"]) {
+      const h = document.createElement("div");
+      h.className = "volto-hydra-edge-handle";
+      h.setAttribute("data-edge", edge);
+      const isVertical = edge === "top" || edge === "bottom";
+      Object.assign(h.style, {
+        position: "fixed",
+        background: "rgba(0, 126, 177, 0.35)",
+        cursor: isVertical ? "ns-resize" : "ew-resize",
+        zIndex: "9998",
+        display: "none",
+        pointerEvents: "auto"
+      });
+      if (isVertical) h.style.height = "6px";
+      else h.style.width = "6px";
+      document.body.appendChild(h);
+      this._edgeHandles[edge] = h;
+      this._setupEdgeHandleDrag(h);
+    }
     const positionDragHandle = () => {
       if (!this.selectedBlockUid) {
         dragButton.style.display = "none";
