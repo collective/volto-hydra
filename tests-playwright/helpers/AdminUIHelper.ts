@@ -2993,20 +2993,140 @@ export class AdminUIHelper {
   async selectBlockType(blockType: string): Promise<void> {
     const chooser = this.page.locator('.blocks-chooser');
     await chooser.waitFor({ state: 'visible', timeout: 5000 });
-
     const button = chooser.locator(`button.${blockType}`).first();
-    if (!(await button.isVisible().catch(() => false))) {
-      // Expand every accordion title that isn't already active so all
-      // ButtonGroups render their content.
-      const inactiveTitles = chooser.locator('.accordion .title:not(.active)');
-      const count = await inactiveTitles.count();
-      for (let i = 0; i < count; i++) {
-        await inactiveTitles.nth(i).click().catch(() => {});
-      }
-    }
-    await button.waitFor({ state: 'visible', timeout: 5000 });
+    await this.revealChooserBlockButton(chooser, button);
+    // AnimateHeight (500ms) keeps the row moving for ~half a second after
+    // expansion; wait for it to settle so click is stable.
+    await this.page.waitForTimeout(600);
     await button.click();
     await chooser.waitFor({ state: 'hidden', timeout: 5000 });
+  }
+
+  /**
+   * BlockChooser groups blocks under accordions, but only ONE accordion is
+   * open at a time (singular activeIndex). Iterate titles, opening each in
+   * turn until the target button becomes visible.
+   */
+  async revealChooserBlockButton(chooser: Locator, button: Locator): Promise<void> {
+    if (await button.isVisible().catch(() => false)) return;
+    const titles = chooser.locator('.accordion .title');
+    const count = await titles.count();
+    for (let i = 0; i < count; i++) {
+      const t = titles.nth(i);
+      const cls = (await t.getAttribute('class')) || '';
+      if (!cls.split(/\s+/).includes('active')) {
+        await t.click().catch(() => {});
+        // Wait briefly for the accordion to render its content before checking.
+        await this.page.waitForTimeout(100);
+      }
+      if (await button.isVisible().catch(() => false)) return;
+    }
+    // Last resort: wait for whatever's open to settle and let visibility check fail.
+    await button.waitFor({ state: 'visible', timeout: 5000 });
+  }
+
+  /**
+   * Expand all chooser accordions in turn, collecting block ids visible in
+   * each. Returns the union as one array (deduped). Useful for tests that
+   * verify which Convert / Wrap targets the chooser offers.
+   */
+  async expandAllChooserAccordions(chooser: Locator): Promise<void> {
+    const titles = chooser.locator('.accordion .title');
+    const count = await titles.count();
+    for (let i = 0; i < count; i++) {
+      const t = titles.nth(i);
+      const cls = (await t.getAttribute('class')) || '';
+      if (!cls.split(/\s+/).includes('active')) {
+        await t.click().catch(() => {});
+        await this.page.waitForTimeout(100);
+      }
+    }
+  }
+
+  /**
+   * Open the toolbar ⋯ menu and click "Convert to…", which opens the
+   * BlockChooser overlay (chooser is rendered in a portal above the page).
+   */
+  async openConvertChooser(): Promise<void> {
+    const toolbar = this.page.locator('.quanta-toolbar');
+    await toolbar.waitFor({ state: 'visible', timeout: 5000 });
+    await toolbar.locator('button:has-text("⋯")').click();
+    const dropdownMenu = this.page.locator('.volto-hydra-dropdown-menu');
+    await dropdownMenu.waitFor({ state: 'visible', timeout: 3000 });
+    await dropdownMenu.locator('.convert-to-menu').click();
+    const chooser = this.page.locator('.blocks-chooser');
+    await chooser.waitFor({ state: 'visible', timeout: 5000 });
+  }
+
+  /**
+   * Returns block-type ids currently offered by the open BlockChooser.
+   * Each block button has `class={block.id}`; we collect those ids after
+   * expanding every accordion. Helper for tests that verify which targets
+   * are present/absent in a Convert-to or Wrap-in chooser.
+   */
+  async getBlockChooserTypes(): Promise<string[]> {
+    const chooser = this.page.locator('.blocks-chooser');
+    await chooser.waitFor({ state: 'visible', timeout: 5000 });
+
+    const collectVisibleIds = async (): Promise<string[]> => {
+      const buttons = chooser.locator('.accordion .content.active .button.basic, .accordion-noaccordion .button.basic');
+      const count = await buttons.count();
+      const out: string[] = [];
+      for (let i = 0; i < count; i++) {
+        if (!(await buttons.nth(i).isVisible().catch(() => false))) continue;
+        const cls = (await buttons.nth(i).getAttribute('class')) || '';
+        const tokens = cls.split(/\s+/).filter((t) =>
+          t && t !== 'ui' && t !== 'button' && t !== 'basic' && t !== 'icon');
+        if (tokens.length > 0) out.push(tokens[0]);
+      }
+      return out;
+    };
+
+    const ids = new Set<string>();
+
+    // BlockChooser only renders accordions when filterValue is empty. If the
+    // chooser is in flat mode, collect once.
+    const titles = chooser.locator('.accordion .title');
+    const titleCount = await titles.count();
+    if (titleCount === 0) {
+      const flatButtons = chooser.locator('.button.basic');
+      const fbCount = await flatButtons.count();
+      for (let i = 0; i < fbCount; i++) {
+        const cls = (await flatButtons.nth(i).getAttribute('class')) || '';
+        const tokens = cls.split(/\s+/).filter((t) =>
+          t && t !== 'ui' && t !== 'button' && t !== 'basic' && t !== 'icon');
+        if (tokens.length > 0) ids.add(tokens[0]);
+      }
+      return [...ids];
+    }
+
+    // Open each accordion in turn, collecting visible block buttons.
+    for (let i = 0; i < titleCount; i++) {
+      const t = titles.nth(i);
+      const cls = (await t.getAttribute('class')) || '';
+      if (!cls.split(/\s+/).includes('active')) {
+        await t.click().catch(() => {});
+        await this.page.waitForTimeout(100);
+      }
+      // Wait for the now-active content area to render.
+      const content = chooser.locator('.accordion .content.active');
+      await content.waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
+      for (const id of await collectVisibleIds()) ids.add(id);
+    }
+
+    return [...ids];
+  }
+
+  /**
+   * Cancels the open BlockChooser overlay (used after assertion-only checks
+   * that don't actually pick a target).
+   */
+  async cancelBlockChooser(): Promise<void> {
+    const chooserOverlay = this.page.locator('.container-block-chooser');
+    if (await chooserOverlay.isVisible().catch(() => false)) {
+      await chooserOverlay.locator('button:has-text("Cancel")').click();
+      await chooserOverlay.waitFor({ state: 'hidden', timeout: 5000 });
+    }
   }
 
   /**
