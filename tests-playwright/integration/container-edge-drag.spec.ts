@@ -125,4 +125,218 @@ test.describe('Container UX: Edge-drag', () => {
     // Selection still pinned to section-1.
     await helper.waitForBlockSelected('section-1');
   });
+
+  test('Top edge: drag UP past previous sibling absorbs it as first child', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/section-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="section-1"]').first().evaluate((el) => {
+      (window as any).bridge?.selectBlock(el);
+    });
+    await helper.waitForBlockSelected('section-1');
+
+    const topHandle = iframe.locator('.volto-hydra-edge-handle[data-edge="top"]');
+    await expect(topHandle).toBeVisible({ timeout: 3000 });
+
+    const slateBeforeRect = await iframe.locator('[data-block-uid="slate-before"]').boundingBox();
+    expect(slateBeforeRect).not.toBeNull();
+    const handleBox = await topHandle.boundingBox();
+    expect(handleBox).not.toBeNull();
+    const startX = handleBox!.x + handleBox!.width / 2;
+    const startY = handleBox!.y + handleBox!.height / 2;
+    const endY = slateBeforeRect!.y + slateBeforeRect!.height / 2 - 5; // past midpoint going UP
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    for (let s = 1; s <= 8; s++) {
+      await page.mouse.move(startX, startY + (endY - startY) * (s / 8));
+      await page.waitForTimeout(20);
+    }
+    await page.mouse.up();
+
+    await expect.poll(async () =>
+      iframe.locator('[data-block-uid="slate-before"]').evaluate(
+        (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid') || null,
+      ),
+      { timeout: 5000 },
+    ).toBe('section-1');
+
+    await helper.waitForBlockSelected('section-1');
+  });
+
+  test('Bottom edge: drag UP past last child expels it to the parent', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/section-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="section-1"]').first().evaluate((el) => {
+      (window as any).bridge?.selectBlock(el);
+    });
+    await helper.waitForBlockSelected('section-1');
+
+    // section-child-1 starts inside section-1.
+    const initialParent = await iframe.locator('[data-block-uid="section-child-1"]').evaluate(
+      (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid') || null,
+    );
+    expect(initialParent).toBe('section-1');
+
+    // Drag the bottom handle UPWARD into the container, past the child's midpoint.
+    const bottomHandle = iframe.locator('.volto-hydra-edge-handle[data-edge="bottom"]');
+    await expect(bottomHandle).toBeVisible({ timeout: 3000 });
+    const childRect = await iframe.locator('[data-block-uid="section-child-1"]').boundingBox();
+    const handleBox = await bottomHandle.boundingBox();
+    expect(childRect).not.toBeNull();
+    expect(handleBox).not.toBeNull();
+    const startX = handleBox!.x + handleBox!.width / 2;
+    const startY = handleBox!.y + handleBox!.height / 2;
+    const endY = childRect!.y + childRect!.height / 2 - 5; // upward past child midpoint
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    for (let s = 1; s <= 8; s++) {
+      await page.mouse.move(startX, startY + (endY - startY) * (s / 8));
+      await page.waitForTimeout(20);
+    }
+    await page.mouse.up();
+
+    // section-child-1 is now at page level (no [data-block-uid] ancestor).
+    await expect.poll(async () =>
+      iframe.locator('[data-block-uid="section-child-1"]').evaluate(
+        (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid') || null,
+      ),
+      { timeout: 5000 },
+    ).toBe(null);
+
+    await helper.waitForBlockSelected('section-1');
+  });
+
+  test('Right edge: drag RIGHT past adjacent column child absorbs it', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="col-1"]').first().evaluate((el) => {
+      (window as any).bridge?.selectBlock(el);
+    });
+    await helper.waitForBlockSelected('col-1');
+
+    const rightHandle = iframe.locator('.volto-hydra-edge-handle[data-edge="right"]');
+    await expect(rightHandle).toBeVisible({ timeout: 3000 });
+
+    const text2aRect = await iframe.locator('[data-block-uid="text-2a"]').boundingBox();
+    const handleBox = await rightHandle.boundingBox();
+    expect(text2aRect).not.toBeNull();
+    expect(handleBox).not.toBeNull();
+    const startX = handleBox!.x + handleBox!.width / 2;
+    const startY = handleBox!.y + handleBox!.height / 2;
+    const endX = text2aRect!.x + text2aRect!.width / 2 + 5;
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    for (let s = 1; s <= 8; s++) {
+      await page.mouse.move(startX + (endX - startX) * (s / 8), startY);
+      await page.waitForTimeout(20);
+    }
+    await page.mouse.up();
+
+    await expect.poll(async () =>
+      iframe.locator('[data-block-uid="text-2a"]').evaluate(
+        (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid') || null,
+      ),
+      { timeout: 5000 },
+    ).toBe('col-1');
+
+    await helper.waitForBlockSelected('col-1');
+  });
+
+  test('Top edge: drag DOWN into container expels first child to parent', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/section-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="section-1"]').first().evaluate((el) => {
+      (window as any).bridge?.selectBlock(el);
+    });
+    await helper.waitForBlockSelected('section-1');
+
+    const initialParent = await iframe.locator('[data-block-uid="section-child-1"]').evaluate(
+      (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid') || null,
+    );
+    expect(initialParent).toBe('section-1');
+
+    // Drag the top handle DOWNWARD into the container, past the first child's midpoint.
+    const topHandle = iframe.locator('.volto-hydra-edge-handle[data-edge="top"]');
+    await expect(topHandle).toBeVisible({ timeout: 3000 });
+    const childRect = await iframe.locator('[data-block-uid="section-child-1"]').boundingBox();
+    const handleBox = await topHandle.boundingBox();
+    expect(childRect).not.toBeNull();
+    expect(handleBox).not.toBeNull();
+    const startX = handleBox!.x + handleBox!.width / 2;
+    const startY = handleBox!.y + handleBox!.height / 2;
+    const endY = childRect!.y + childRect!.height / 2 + 5; // downward past child midpoint
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    for (let s = 1; s <= 8; s++) {
+      await page.mouse.move(startX, startY + (endY - startY) * (s / 8));
+      await page.waitForTimeout(20);
+    }
+    await page.mouse.up();
+
+    // section-child-1 is now at page level (expelled out the top means it
+    // sits BEFORE section-1 in the parent's layout).
+    await expect.poll(async () =>
+      iframe.locator('[data-block-uid="section-child-1"]').evaluate(
+        (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid') || null,
+      ),
+      { timeout: 5000 },
+    ).toBe(null);
+
+    await helper.waitForBlockSelected('section-1');
+  });
+
+  test('Left edge: drag LEFT past adjacent column child absorbs it', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="col-2"]').first().evaluate((el) => {
+      (window as any).bridge?.selectBlock(el);
+    });
+    await helper.waitForBlockSelected('col-2');
+
+    const leftHandle = iframe.locator('.volto-hydra-edge-handle[data-edge="left"]');
+    await expect(leftHandle).toBeVisible({ timeout: 3000 });
+
+    const text1bRect = await iframe.locator('[data-block-uid="text-1b"]').boundingBox();
+    const handleBox = await leftHandle.boundingBox();
+    expect(text1bRect).not.toBeNull();
+    expect(handleBox).not.toBeNull();
+    const startX = handleBox!.x + handleBox!.width / 2;
+    const startY = handleBox!.y + handleBox!.height / 2;
+    const endX = text1bRect!.x + text1bRect!.width / 2 - 5;
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    for (let s = 1; s <= 8; s++) {
+      await page.mouse.move(startX + (endX - startX) * (s / 8), startY);
+      await page.waitForTimeout(20);
+    }
+    await page.mouse.up();
+
+    await expect.poll(async () =>
+      iframe.locator('[data-block-uid="text-1b"]').evaluate(
+        (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid') || null,
+      ),
+      { timeout: 5000 },
+    ).toBe('col-2');
+
+    await helper.waitForBlockSelected('col-2');
+  });
 });
