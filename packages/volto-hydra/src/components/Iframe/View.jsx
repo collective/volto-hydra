@@ -2373,7 +2373,7 @@ const Iframe = (props) => {
 
         case 'MOVE_BLOCKS': {
           // Handle drag-and-drop block moves (single or multi, supports containers)
-          const { blockIds: moveBlockIds, targetBlockId, insertAfter, targetParentId } = event.data;
+          const { blockIds: moveBlockIds, targetBlockId, insertAfter, targetParentId, selectAfterMove } = event.data;
           log('MOVE_BLOCKS: received:', moveBlockIds?.length, 'blocks to', targetBlockId, 'insertAfter:', insertAfter);
 
           // Use properties (Redux) as source of truth for moves
@@ -2515,7 +2515,11 @@ const Iframe = (props) => {
               setIframeSyncState(prev => ({
                 ...prev,
                 blockPathMap: newBlockPathMap,
-                pendingSelectBlockUid: blocksToMove[0],
+                // selectAfterMove lets the sender pin selection on a specific
+                // block (e.g. edge-drag wants to stay on the container, not
+                // jump to the absorbed sibling). Defaults to the first moved
+                // block to match the legacy DnD behaviour.
+                pendingSelectBlockUid: selectAfterMove || blocksToMove[0],
               }));
             });
             // Debug: Log column contents after move

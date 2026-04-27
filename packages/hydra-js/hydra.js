@@ -971,6 +971,84 @@ var Bridge = class {
     const setB = new Set(b);
     return a.every((uid) => setB.has(uid));
   }
+  /** True if `ancestorUid` appears anywhere in `descendantUid`'s parent chain. */
+  _isAncestor(ancestorUid, descendantUid) {
+    if (!ancestorUid || !descendantUid) return false;
+    let cur = this.blockPathMap?.[descendantUid]?.parentId;
+    while (cur) {
+      if (cur === ancestorUid) return true;
+      cur = this.blockPathMap?.[cur]?.parentId;
+    }
+    return false;
+  }
+  /**
+   * Auto-scroll helper for drag operations.
+   *
+   * Returns { onMouseMove(e), stop() } that the caller wires into a drag's
+   * mousemove and mouseup. While the cursor is within `threshold` pixels of
+   * the viewport top or bottom, the page scrolls at a speed proportional to
+   * how close it is to the edge (faster nearer the edge). A synthetic
+   * mousemove is dispatched on each scroll tick so the caller's drag
+   * indicator updates while the mouse is stationary at the edge.
+   *
+   * Used by:
+   *  - block DnD (existing drag-and-drop)
+   *  - container edge-drag
+   */
+  _createAutoScroller() {
+    const threshold = 80;
+    const minSpeed = 10;
+    const maxSpeed = 50;
+    let direction = 0;
+    let speed = 0;
+    let animId = null;
+    let lastX = 0;
+    let lastY = 0;
+    const loop = () => {
+      if (direction === 0) return;
+      window.scrollTo({
+        top: window.scrollY + direction * speed,
+        behavior: "instant"
+      });
+      document.dispatchEvent(new MouseEvent("mousemove", {
+        clientX: lastX,
+        clientY: lastY,
+        bubbles: true
+      }));
+      animId = requestAnimationFrame(loop);
+    };
+    const setDirection = (d) => {
+      if (direction === d) return;
+      direction = d;
+      if (animId === null && d !== 0) {
+        animId = requestAnimationFrame(loop);
+      }
+    };
+    const stop = () => {
+      direction = 0;
+      if (animId !== null) {
+        cancelAnimationFrame(animId);
+        animId = null;
+      }
+    };
+    const onMouseMove = (e) => {
+      lastX = e.clientX;
+      lastY = e.clientY;
+      const vh = window.innerHeight;
+      if (e.clientY < threshold) {
+        const factor = 1 - e.clientY / threshold;
+        speed = minSpeed + (maxSpeed - minSpeed) * factor;
+        setDirection(-1);
+      } else if (e.clientY > vh - threshold) {
+        const factor = 1 - (vh - e.clientY) / threshold;
+        speed = minSpeed + (maxSpeed - minSpeed) * factor;
+        setDirection(1);
+      } else {
+        stop();
+      }
+    };
+    return { onMouseMove, stop };
+  }
   /**
    * Position the container bottom edge handle on the selected block's rect if
    * the block is a container with children AND has a loose sibling below whose
@@ -994,52 +1072,27 @@ var Bridge = class {
       handle.style.display = "none";
       return;
     }
-    const block = this.getBlockData(uid);
-    if (!block) {
+    const ownChildren = this._getSiblingsByDomOrder(null, uid);
+    if (ownChildren.length === 0) {
       handle.style.display = "none";
       return;
     }
     const schema = this.blockPathMap?._schemas?.[info._schemaRef];
-    let childField = null;
     let childAllowed = null;
-    for (const [fn, fd] of Object.entries(schema?.properties || {})) {
-      if (fd?.widget === "blocks_layout") {
-        childField = fn;
+    for (const [, fd] of Object.entries(schema?.properties || {})) {
+      if (fd?.widget === "blocks_layout" || fd?.widget === "object_list") {
         childAllowed = fd.allowedBlocks || null;
         break;
       }
     }
-    if (!childField) {
-      handle.style.display = "none";
-      return;
-    }
-    const childIds = block[childField]?.items || [];
-    if (childIds.length === 0) {
-      handle.style.display = "none";
-      return;
-    }
-    const parentId = info.parentId;
-    const parentInfo = parentId ? this.blockPathMap?.[parentId] : null;
-    const parentPath = parentId === PAGE_BLOCK_UID ? [] : parentInfo?.path;
-    if (!parentPath && parentId !== PAGE_BLOCK_UID) {
-      handle.style.display = "none";
-      return;
-    }
-    const parentBlock = parentId === PAGE_BLOCK_UID ? this.formData : this.getBlockData(parentId);
-    if (!parentBlock) {
-      handle.style.display = "none";
-      return;
-    }
-    const parentField = info.containerField;
-    const parentItems = parentBlock[parentField]?.items || [];
-    const myIdx = parentItems.indexOf(uid);
-    const nextSiblingUid = myIdx >= 0 ? parentItems[myIdx + 1] : null;
+    const siblings = this._getSiblingsByDomOrder(uid, info.parentId);
+    const myIdx = siblings.indexOf(uid);
+    const nextSiblingUid = myIdx >= 0 ? siblings[myIdx + 1] : null;
     if (!nextSiblingUid) {
       handle.style.display = "none";
       return;
     }
-    const siblingData = parentBlock.blocks?.[nextSiblingUid];
-    const siblingType = siblingData?.["@type"];
+    const siblingType = this.getBlockData(nextSiblingUid)?.["@type"];
     if (!siblingType) {
       handle.style.display = "none";
       return;
@@ -1055,66 +1108,177 @@ var Bridge = class {
     handle.style.display = "block";
     handle.dataset.nextSibling = nextSiblingUid;
     handle.dataset.container = uid;
-    handle.dataset.lastChild = childIds[childIds.length - 1];
+    handle.dataset.lastChild = ownChildren[ownChildren.length - 1];
+    handle.dataset.childAllowed = childAllowed ? childAllowed.join(",") : "";
   }
   _setupEdgeHandleDrag(handle) {
     let dragging = false;
-    let startY = 0;
     let lastY = 0;
-    let ghost = null;
-    const ensureGhost = () => {
-      if (ghost) return ghost;
-      ghost = document.createElement("div");
-      ghost.className = "volto-hydra-edge-ghost";
-      Object.assign(ghost.style, {
+    let growthBox = null;
+    const absorbOverlays = /* @__PURE__ */ new Map();
+    let autoScroller = null;
+    const ensureGrowthBox = () => {
+      if (growthBox) return growthBox;
+      growthBox = document.createElement("div");
+      growthBox.className = "volto-hydra-edge-growth";
+      Object.assign(growthBox.style, {
         position: "fixed",
-        height: "2px",
-        background: "#007eb1",
-        boxShadow: "0 0 6px rgba(0, 126, 177, 0.6)",
+        background: "rgba(0, 126, 177, 0.08)",
+        // Bottom edge thickness encodes validity:
+        // 1px = no absorb yet (resting / invalid drag)
+        // 6px = at least one block in the absorb plan
+        borderBottom: "1px solid #007eb1",
         zIndex: "10000",
         pointerEvents: "none",
         display: "none"
       });
-      document.body.appendChild(ghost);
-      return ghost;
+      document.body.appendChild(growthBox);
+      return growthBox;
+    };
+    const tintBlock = (uid) => {
+      if (absorbOverlays.has(uid)) return;
+      const el = this.queryBlockElement(uid);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const overlay = document.createElement("div");
+      overlay.className = "volto-hydra-edge-absorb-tint";
+      Object.assign(overlay.style, {
+        position: "fixed",
+        left: `${r.left}px`,
+        top: `${r.top}px`,
+        width: `${r.width}px`,
+        height: `${r.height}px`,
+        background: "rgba(0, 126, 177, 0.15)",
+        outline: "2px dashed rgba(0, 126, 177, 0.6)",
+        outlineOffset: "-2px",
+        zIndex: "10000",
+        pointerEvents: "none"
+      });
+      document.body.appendChild(overlay);
+      absorbOverlays.set(uid, overlay);
+    };
+    const cleanup = () => {
+      if (growthBox) growthBox.style.display = "none";
+      for (const overlay of absorbOverlays.values()) overlay.remove();
+      absorbOverlays.clear();
+    };
+    const computeAbsorbPlan = (mouseY) => {
+      const containerUid = handle.dataset.container;
+      const containerEl = this.queryBlockElement(containerUid);
+      if (!containerEl) return { absorb: [], boundaryBottom: null };
+      const containerInfo = this.blockPathMap?.[containerUid];
+      const containerParentId = containerInfo?.parentId;
+      const cRect = containerEl.getBoundingClientRect();
+      const childAllowed = handle.dataset.childAllowed ? handle.dataset.childAllowed.split(",") : null;
+      const candidates = /* @__PURE__ */ new Set();
+      for (const [uid, info] of Object.entries(this.blockPathMap)) {
+        if (!uid || uid === containerUid) continue;
+        if (info?.isFixed) continue;
+        if (this._isAncestor(uid, containerUid)) continue;
+        if (this._isAncestor(containerUid, uid)) continue;
+        if (!this._isAncestor(containerParentId, uid) && uid !== containerParentId) continue;
+        const el = this.queryBlockElement(uid);
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        const midY = (r.top + r.bottom) / 2;
+        if (midY > cRect.bottom && midY < mouseY) {
+          candidates.add(uid);
+        }
+      }
+      const accepts = (type) => !childAllowed || type && childAllowed.includes(type);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const uid of [...candidates]) {
+          const info = this.blockPathMap[uid];
+          const pid = info?.parentId;
+          if (!pid || pid === containerParentId) continue;
+          const siblings = Object.entries(this.blockPathMap).filter(([, i]) => i?.parentId === pid).map(([id]) => id);
+          if (siblings.length === 0) continue;
+          if (!siblings.every((c) => candidates.has(c))) continue;
+          const parentType = this.getBlockData(pid)?.["@type"];
+          if (!accepts(parentType)) continue;
+          for (const c of siblings) candidates.delete(c);
+          candidates.add(pid);
+          changed = true;
+        }
+      }
+      for (const uid of [...candidates]) {
+        const t = this.getBlockData(uid)?.["@type"];
+        if (!accepts(t)) candidates.delete(uid);
+      }
+      const plan = [...candidates].sort((a, b) => {
+        const ea = this.queryBlockElement(a);
+        const eb = this.queryBlockElement(b);
+        if (!ea || !eb) return 0;
+        return ea.compareDocumentPosition(eb) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+      });
+      let boundaryBottom = cRect.bottom;
+      for (const uid of plan) {
+        const el = this.queryBlockElement(uid);
+        if (el) boundaryBottom = Math.max(boundaryBottom, el.getBoundingClientRect().bottom);
+      }
+      return { absorb: plan, boundaryBottom };
     };
     handle.addEventListener("mousedown", (e) => {
       e.preventDefault();
       e.stopPropagation();
       dragging = true;
-      startY = e.clientY;
       lastY = e.clientY;
-      ensureGhost();
-      ghost.style.left = handle.style.left;
-      ghost.style.width = handle.style.width;
-      ghost.style.top = handle.style.top;
-      ghost.style.display = "block";
+      autoScroller = this._createAutoScroller();
+      ensureGrowthBox();
+      const containerUid = handle.dataset.container;
+      const containerEl = this.queryBlockElement(containerUid);
+      if (!containerEl) return;
+      const r = containerEl.getBoundingClientRect();
+      growthBox.style.left = `${r.left}px`;
+      growthBox.style.width = `${r.width}px`;
+      growthBox.style.top = `${r.bottom}px`;
+      growthBox.style.height = "0px";
+      growthBox.style.borderBottomWidth = "1px";
+      growthBox.style.display = "block";
     });
     document.addEventListener("mousemove", (e) => {
       if (!dragging) return;
       e.preventDefault();
       lastY = e.clientY;
-      if (ghost) ghost.style.top = `${e.clientY}px`;
+      autoScroller?.onMouseMove(e);
+      const containerUid = handle.dataset.container;
+      const containerEl = containerUid ? this.queryBlockElement(containerUid) : null;
+      if (!containerEl || !growthBox) return;
+      const cRect = containerEl.getBoundingClientRect();
+      const { absorb, boundaryBottom } = computeAbsorbPlan(e.clientY);
+      const top = cRect.bottom;
+      const bottom = absorb.length > 0 ? boundaryBottom : Math.max(e.clientY, top);
+      growthBox.style.top = `${top}px`;
+      growthBox.style.height = `${Math.max(0, bottom - top)}px`;
+      growthBox.style.borderBottomWidth = absorb.length > 0 ? "6px" : "1px";
+      const wantedSet = new Set(absorb);
+      for (const [uid, overlay] of absorbOverlays) {
+        if (!wantedSet.has(uid)) {
+          overlay.remove();
+          absorbOverlays.delete(uid);
+        }
+      }
+      for (const uid of absorb) tintBlock(uid);
     });
-    document.addEventListener("mouseup", (e) => {
+    document.addEventListener("mouseup", () => {
       if (!dragging) return;
       dragging = false;
-      if (ghost) ghost.style.display = "none";
-      const nextSibling = handle.dataset.nextSibling;
+      autoScroller?.stop();
+      autoScroller = null;
+      const { absorb } = computeAbsorbPlan(lastY);
       const container = handle.dataset.container;
       const lastChild = handle.dataset.lastChild;
-      if (!nextSibling || !container || !lastChild) return;
-      const siblingEl = this.queryBlockElement(nextSibling);
-      if (!siblingEl) return;
-      const sRect = siblingEl.getBoundingClientRect();
-      const midpoint = sRect.top + sRect.height / 2;
-      if (lastY < midpoint) return;
+      cleanup();
+      if (absorb.length === 0 || !container || !lastChild) return;
       window.parent.postMessage({
         type: "MOVE_BLOCKS",
-        blockIds: [nextSibling],
+        blockIds: absorb,
         targetBlockId: lastChild,
         insertAfter: true,
-        targetParentId: container
+        targetParentId: container,
+        selectAfterMove: container
       }, this.adminOrigin);
     });
   }
@@ -6442,63 +6606,11 @@ DOM path (text node \u2192 container):
       let closestBlockUid = null;
       let insertAt = null;
       let dropIndicatorVisible = false;
-      let scrollDirection = 0;
-      let scrollAnimationId = null;
-      let lastMouseX = 0;
-      let lastMouseY = 0;
-      let currentScrollSpeed = 0;
-      const scrollThreshold = 80;
-      const minScrollSpeed = 10;
-      const maxScrollSpeed = 50;
-      const scrollLoop = () => {
-        if (scrollDirection !== 0) {
-          window.scrollTo({
-            top: window.scrollY + scrollDirection * currentScrollSpeed,
-            behavior: "instant"
-          });
-          const syntheticEvent = new MouseEvent("mousemove", {
-            clientX: lastMouseX,
-            clientY: lastMouseY,
-            bubbles: true
-          });
-          document.dispatchEvent(syntheticEvent);
-          scrollAnimationId = requestAnimationFrame(scrollLoop);
-        }
-      };
-      const startScrolling = (direction) => {
-        if (scrollDirection !== direction) {
-          scrollDirection = direction;
-          if (scrollAnimationId === null && direction !== 0) {
-            scrollAnimationId = requestAnimationFrame(scrollLoop);
-          }
-        }
-      };
-      const stopScrolling = () => {
-        scrollDirection = 0;
-        if (scrollAnimationId !== null) {
-          cancelAnimationFrame(scrollAnimationId);
-          scrollAnimationId = null;
-        }
-      };
+      const scroller = this._createAutoScroller();
       const onMouseMove = (e2) => {
-        lastMouseX = e2.clientX;
-        lastMouseY = e2.clientY;
+        scroller.onMouseMove(e2);
         draggedBlock.style.left = `${e2.clientX}px`;
         draggedBlock.style.top = `${e2.clientY}px`;
-        const viewportHeight = window.innerHeight;
-        if (e2.clientY < scrollThreshold) {
-          const distanceFromEdge = e2.clientY;
-          const speedFactor = 1 - distanceFromEdge / scrollThreshold;
-          currentScrollSpeed = minScrollSpeed + (maxScrollSpeed - minScrollSpeed) * speedFactor;
-          startScrolling(-1);
-        } else if (e2.clientY > viewportHeight - scrollThreshold) {
-          const distanceFromEdge = viewportHeight - e2.clientY;
-          const speedFactor = 1 - distanceFromEdge / scrollThreshold;
-          currentScrollSpeed = minScrollSpeed + (maxScrollSpeed - minScrollSpeed) * speedFactor;
-          startScrolling(1);
-        } else {
-          stopScrolling();
-        }
         const elementBelow = document.elementFromPoint(e2.clientX, e2.clientY);
         let closestBlock = elementBelow;
         while (closestBlock && !closestBlock.hasAttribute("data-block-uid")) {
@@ -6654,7 +6766,7 @@ DOM path (text node \u2192 container):
           clearTimeout(this.scrollTimeout);
           this.scrollTimeout = null;
         }
-        stopScrolling();
+        scroller.stop();
         document.querySelector("body").classList.remove("grabbing");
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
