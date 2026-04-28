@@ -79,7 +79,7 @@
       }
     },
     "examples": {
-      "ex-slate": {
+      "ex-slate-heading": {
         "@type": "slate",
         "value": [
           {
@@ -89,7 +89,12 @@
                 "text": "Welcome"
               }
             ]
-          },
+          }
+        ]
+      },
+      "ex-slate-formatted": {
+        "@type": "slate",
+        "value": [
           {
             "type": "p",
             "children": [
@@ -119,7 +124,12 @@
                 "text": " text."
               }
             ]
-          },
+          }
+        ]
+      },
+      "ex-slate-list": {
+        "@type": "slate",
+        "value": [
           {
             "type": "ul",
             "children": [
@@ -140,7 +150,12 @@
                 ]
               }
             ]
-          },
+          }
+        ]
+      },
+      "ex-slate-link": {
+        "@type": "slate",
+        "value": [
           {
             "type": "p",
             "children": [

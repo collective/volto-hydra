@@ -27,7 +27,7 @@
         }
       ]
     },
-    "ex-slate": {
+    "ex-slate-heading": {
       "@type": "slate",
       "value": [
         {
@@ -37,7 +37,12 @@
               "text": "Welcome"
             }
           ]
-        },
+        }
+      ]
+    },
+    "ex-slate-formatted": {
+      "@type": "slate",
+      "value": [
         {
           "type": "p",
           "children": [
@@ -67,7 +72,12 @@
               "text": " text."
             }
           ]
-        },
+        }
+      ]
+    },
+    "ex-slate-list": {
+      "@type": "slate",
+      "value": [
         {
           "type": "ul",
           "children": [
@@ -88,7 +98,12 @@
               ]
             }
           ]
-        },
+        }
+      ]
+    },
+    "ex-slate-link": {
+      "@type": "slate",
+      "value": [
         {
           "type": "p",
           "children": [
@@ -600,7 +615,10 @@
   "blocks_layout": {
     "items": [
       "ex-hero",
-      "ex-slate",
+      "ex-slate-heading",
+      "ex-slate-formatted",
+      "ex-slate-list",
+      "ex-slate-link",
       "ex-image",
       "ex-teaser",
       "ex-table",
