@@ -39,10 +39,20 @@ if (fs.existsSync(discoveredPath)) {
   discoveredBlocks = JSON.parse(fs.readFileSync(discoveredPath, 'utf-8'));
 }
 
-// Skip entire file if no discovered blocks
+// Block sanity is the cross-cutting render contract. We only enforce it on
+// the three frontends that ship full block coverage and are the canonical
+// references for downstream consumers — the mock test frontend (the spec's
+// own ground truth), Nuxt, and Next.js. Other example frontends (react,
+// svelte, vue, f7) intentionally skip block-sanity so missing block types or
+// in-flight renderer changes don't gate the suite.
+const SANITY_PROJECTS = new Set(['mock', 'nuxt', 'nextjs']);
+
 base.beforeEach(async ({}, testInfo) => {
   if (discoveredBlocks.length === 0) {
     testInfo.skip(true, 'No .discovered-blocks.json found — run with DISCOVER_BLOCKS_API=<url>');
+  }
+  if (!SANITY_PROJECTS.has(testInfo.project.name)) {
+    testInfo.skip(true, `block-sanity only runs on mock/nuxt/nextjs (skipping ${testInfo.project.name})`);
   }
 });
 
