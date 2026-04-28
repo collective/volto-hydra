@@ -598,6 +598,66 @@ test.describe('Enter Key to Add/Navigate', () => {
     expect(initialBlocks).not.toContain(newBlockId);
   });
 
+
+  // Two related bugs reproduced by the same scenario:
+  //
+  //   (A) hydra.src.js:1590 gates the block-mode Enter handler on
+  //       `this.isInlineEditing`. By the time _handleBlockModeKey is reached
+  //       (line 4142), the document handler has already returned for any
+  //       active edit field (line 4104), so we're in block mode by
+  //       definition — the flag is leftover state from a prior selection.
+  //       The gate just blocks Enter in exactly the case it's most useful
+  //       (creating a new block from block-mode), so no block is created.
+  //
+  //   (B) Even when ADD_BLOCK_AFTER fires and a new block is added, the
+  //       FORM_DATA-driven select path in afterContentRender (line 6131)
+  //       calls selectBlock(el) without fieldToFocus. selectBlock respects
+  //       the current editMode and only focuses an editable field when
+  //       fieldToFocus is passed, so the user lands on a "selected but in
+  //       block mode" new block and can't type until they click into it.
+  //       The SELECT_BLOCK direct path at line 8738 handles this correctly,
+  //       so this is an oversight in the FORM_DATA branch.
+  //
+  // Repro: click into a teaser inside a grid (text mode), press Escape to
+  // get block-mode on the teaser, Escape again to get block-mode on the grid
+  // parent, then press Enter. Expectation: a new block is created and is
+  // immediately ready for typing.
+  test('Enter in block mode after Escape-to-parent creates new block and focuses it for typing', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+    const initialBlocks = await helper.getBlockOrder();
+
+    // 1. Click into the teaser's title (text mode on slate inside teaser).
+    await helper.clickBlockInIframe('grid-cell-1');
+
+    // 2. Escape → block mode on the teaser.
+    await page.keyboard.press('Escape');
+    // 3. Escape → block mode escalates to parent (grid-1).
+    await page.keyboard.press('Escape');
+    await helper.waitForBlockSelected('grid-1');
+
+    // 4. Enter — should create a new block AFTER the grid.
+    await page.keyboard.press('Enter');
+    await helper.waitForBlockCountToBe(initialBlocks.length + 1);
+
+    const newBlocks = await helper.getBlockOrder();
+    const gridIdx = newBlocks.indexOf('grid-1');
+    const newBlockId = newBlocks[gridIdx + 1];
+    expect(initialBlocks).not.toContain(newBlockId);
+
+    // 5. The smoking-gun assertion: typing should go into the new block.
+    //    If the new block is "selected but in block mode", keystrokes won't
+    //    land in any contenteditable field and the new block stays empty.
+    await page.keyboard.type('hello', { delay: 10 });
+
+    const newBlock = iframe.locator(`[data-block-uid="${newBlockId}"]`);
+    await expect(newBlock).toContainText('hello', { timeout: 3000 });
+  });
+
   test('Enter on hero heading (non-last field) moves focus to next field', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
