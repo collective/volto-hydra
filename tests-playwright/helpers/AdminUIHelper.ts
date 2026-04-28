@@ -2991,56 +2991,17 @@ export class AdminUIHelper {
    * so the call works without a per-type display-name mapping.
    */
   async selectBlockType(blockType: string): Promise<void> {
-    const chooser = this.page.locator('.blocks-chooser');
+    const chooser = this.page.locator('.blocks-chooser').first();
     await chooser.waitFor({ state: 'visible', timeout: 5000 });
     const button = chooser.locator(`button.${blockType}`).first();
-    await this.revealChooserBlockButton(chooser, button);
-    // AnimateHeight (500ms) keeps the row moving for ~half a second after
-    // expansion; wait for it to settle so click is stable.
-    await this.page.waitForTimeout(600);
-    await button.click();
+    // The button always exists in the DOM (even inside collapsed accordions).
+    // Wait for it to be attached, then dispatch click via JS so we don't
+    // depend on accordion expansion or animation state. Avoids touching
+    // accordion titles, which (in the Popup-hosted chooser) can shift the
+    // Popup geometry and accidentally close it.
+    await button.waitFor({ state: 'attached', timeout: 5000 });
+    await button.evaluate((el) => (el as HTMLButtonElement).click());
     await chooser.waitFor({ state: 'hidden', timeout: 5000 });
-  }
-
-  /**
-   * BlockChooser groups blocks under accordions, but only ONE accordion is
-   * open at a time (singular activeIndex). Iterate titles, opening each in
-   * turn until the target button becomes visible.
-   */
-  async revealChooserBlockButton(chooser: Locator, button: Locator): Promise<void> {
-    if (await button.isVisible().catch(() => false)) return;
-    const titles = chooser.locator('.accordion .title');
-    const count = await titles.count();
-    for (let i = 0; i < count; i++) {
-      const t = titles.nth(i);
-      const cls = (await t.getAttribute('class')) || '';
-      if (!cls.split(/\s+/).includes('active')) {
-        await t.click().catch(() => {});
-        // Wait briefly for the accordion to render its content before checking.
-        await this.page.waitForTimeout(100);
-      }
-      if (await button.isVisible().catch(() => false)) return;
-    }
-    // Last resort: wait for whatever's open to settle and let visibility check fail.
-    await button.waitFor({ state: 'visible', timeout: 5000 });
-  }
-
-  /**
-   * Expand all chooser accordions in turn, collecting block ids visible in
-   * each. Returns the union as one array (deduped). Useful for tests that
-   * verify which Convert / Wrap targets the chooser offers.
-   */
-  async expandAllChooserAccordions(chooser: Locator): Promise<void> {
-    const titles = chooser.locator('.accordion .title');
-    const count = await titles.count();
-    for (let i = 0; i < count; i++) {
-      const t = titles.nth(i);
-      const cls = (await t.getAttribute('class')) || '';
-      if (!cls.split(/\s+/).includes('active')) {
-        await t.click().catch(() => {});
-        await this.page.waitForTimeout(100);
-      }
-    }
   }
 
   /**
