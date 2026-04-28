@@ -342,6 +342,43 @@ test.describe('Adding Blocks to Containers', () => {
     expect(finalPageBlocks).toBe(initialPageBlocks);
   });
 
+  // Regression: when the container allows MULTIPLE block types (e.g. gridBlock
+  // with allowedBlocks ['image', 'listing', 'slate', 'teaser']) and no
+  // defaultBlockType is set, View.jsx's ADD_BLOCK_AFTER handler currently falls
+  // through past the single-allowedBlock branch to a hardcoded 'slate' default.
+  // The expected behaviour is "another one of these": if the source block's
+  // @type is in the computed allowed types, create another of that type;
+  // otherwise use the centralised getEmptyBlockType() fallback. Mirrors the
+  // single-allowedBlock test above.
+  test('pressing Enter in container with multiple allowedBlocks creates same type as source', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // grid-1 has two teaser cells (allowedBlocks: image/listing/slate/teaser).
+    const gridCellsLocator = iframe.locator(
+      '[data-block-uid="grid-1"] > .grid-row > [data-block-uid]',
+    );
+    await expect(gridCellsLocator).toHaveCount(2);
+
+    // Click the first teaser cell (block-mode selection — cells are
+    // data-block-readonly so we never enter text mode on the title).
+    await helper.clickBlockInIframe('grid-cell-1');
+
+    // Press Enter — should add another block in grid-1, of type 'teaser'
+    // (same as source), not 'slate' (the old hardcoded default).
+    await page.keyboard.press('Enter');
+    await expect(gridCellsLocator).toHaveCount(3);
+
+    // Verify the new block is a teaser via the sidebar's current-block label.
+    await helper.waitForSidebarCurrentBlock('Teaser');
+  });
+
   test('pressing Enter in container with single allowedBlock creates that type, not slate', async ({
     page,
   }) => {

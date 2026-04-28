@@ -1323,7 +1323,7 @@ export function mutateBlockInContainer(formData, blockPathMap, blockId, newBlock
  * @param {Object|null} containerConfig - Container config with allowedBlocks/defaultBlockType
  * @returns {string} Block type to create
  */
-function getEmptyBlockType(containerConfig) {
+export function getEmptyBlockType(containerConfig) {
   if (containerConfig?.defaultBlockType) {
     return containerConfig.defaultBlockType;
   }

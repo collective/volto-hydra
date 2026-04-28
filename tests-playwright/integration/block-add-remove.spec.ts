@@ -622,7 +622,7 @@ test.describe('Enter Key to Add/Navigate', () => {
   // get block-mode on the teaser, Escape again to get block-mode on the grid
   // parent, then press Enter. Expectation: a new block is created and is
   // immediately ready for typing.
-  test('Enter in block mode after Escape-to-parent creates new block and focuses it for typing', async ({ page }) => {
+  test('Enter in block mode (no field focus) creates new block and focuses it for typing', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -631,38 +631,31 @@ test.describe('Enter Key to Add/Navigate', () => {
     const iframe = helper.getIframe();
     const initialBlocks = await helper.getBlockOrder();
 
-    // 1. Enter the slate child's value field. We need a focused contenteditable
-    //    so the first Escape does text→block instead of escalating to parent.
-    await helper.enterEditMode('section-child-1', 'value');
-    // ASSERT: we're editing — the value field is contenteditable.
-    const valueField = iframe.locator('[data-block-uid="section-child-1"] [data-edit-text="value"]');
+    // 1. Enter the slate-before value field (page-level slate).
+    await helper.enterEditMode('slate-before', 'value');
+    const valueField = iframe.locator('[data-block-uid="slate-before"] [data-edit-text="value"]');
     await expect(valueField).toHaveAttribute('contenteditable', 'true');
-    await helper.waitForBlockSelected('section-child-1');
+    await helper.waitForBlockSelected('slate-before');
 
-    // 2. Escape → block mode on the slate (selectedBlockUid stays).
+    // 2. Escape → block mode on the same slate (selectedBlockUid stays).
     await page.keyboard.press('Escape');
     // ASSERT: value is no longer contenteditable, but slate is still selected.
     await expect(valueField).not.toHaveAttribute('contenteditable', 'true');
-    await helper.waitForBlockSelected('section-child-1');
+    await helper.waitForBlockSelected('slate-before');
 
-    // 3. Escape → block-mode escalates to parent (section-1).
-    await page.keyboard.press('Escape');
-    // ASSERT: parent is now selected.
-    await helper.waitForBlockSelected('section-1');
-
-    // 4. Enter — should create a new block AFTER the section (bug A: gate).
+    // 3. Enter — should create a new block AFTER slate-before (bug A: gate).
+    //    Source is a slate (in page's allowed types) → another slate.
     await page.keyboard.press('Enter');
     await helper.waitForBlockCountToBe(initialBlocks.length + 1);
 
-    // Find the new block by id-set exclusion. getBlockOrder returns a flat
-    // list including nested children, so we can't index relative to section-1.
+    // Find the new block by id-set exclusion.
     const newBlocks = await helper.getBlockOrder();
     const newBlockId = newBlocks.find((id) => !initialBlocks.includes(id));
     expect(newBlockId, 'expected exactly one new block to appear').toBeDefined();
     // ASSERT: the new block is selected.
     await helper.waitForBlockSelected(newBlockId!);
 
-    // 5. Typing should land in the new block (bug B: focus).
+    // 4. Typing should land in the new block (bug B: focus).
     await page.keyboard.type('hello', { delay: 10 });
 
     const newBlock = iframe.locator(`[data-block-uid="${newBlockId}"]`);

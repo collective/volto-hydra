@@ -161,7 +161,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, _getContainerChildFieldName } from '../../utils/blockPath';
+import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, _getContainerChildFieldName } from '../../utils/blockPath';
 import { canContainAll } from '@volto-hydra/hydra-js';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
@@ -1769,14 +1769,23 @@ const Iframe = (props) => {
         }
 
         case 'ADD_BLOCK_AFTER': {
-          // Determine the default block type from the container's schema
+          // "Another one of these" if the source block's @type is in the
+          // computed allowed types for this position; otherwise defer to
+          // the centralised getEmptyBlockType chain (defaultBlockType →
+          // single-allowedBlocks → config.settings.defaultBlockType →
+          // 'empty' slot). Same definition used by ensureEmptyBlockIfEmpty.
           const containerFieldConfig = getContainerFieldConfig(
             event.data.blockId, iframeSyncState.blockPathMap, properties, config.blocks.blocksConfig, intl
           );
-          const defaultType = containerFieldConfig?.defaultBlockType
-            || (containerFieldConfig?.allowedBlocks?.length === 1 ? containerFieldConfig.allowedBlocks[0] : null)
-            || 'slate';
-          insertAndSelectBlock(event.data.blockId, defaultType, 'after');
+          const sourcePathInfo = iframeSyncState.blockPathMap?.[event.data.blockId];
+          const sourceType = sourcePathInfo?.blockType;
+          const allowedSiblings = sourcePathInfo?.allowedSiblingTypes;
+          const sourceAllowed = sourceType
+            && (!allowedSiblings || allowedSiblings.includes(sourceType));
+          const newType = sourceAllowed
+            ? sourceType
+            : getEmptyBlockType(containerFieldConfig);
+          insertAndSelectBlock(event.data.blockId, newType, 'after');
           break;
         }
 
