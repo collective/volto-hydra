@@ -189,7 +189,7 @@
 
     <!-- Facets on top (default or facetsTopSide) -->
     <template v-if="!block.variation || block.variation === 'facetsTopSide'">
-      <h3 v-if="block.facetsTitle" style="font-weight:600; margin-bottom:0.75rem">{{ block.facetsTitle }}</h3>
+      <h3 v-if="block.facetsTitle" data-edit-text="facetsTitle" style="font-weight:600; margin-bottom:0.75rem">{{ block.facetsTitle }}</h3>
       <div v-if="block.facets?.length" class="search-facets" style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem; padding:1rem; background:#f9fafb; border-radius:0.5rem">
         <template v-for="(facet, idx) in expand(block.facets || [], null, '@id')" :key="facet['@uid'] || idx">
           <template v-if="facet.type === 'slate' || facet.type === 'image'">
@@ -261,7 +261,7 @@
         <!-- Sidebar: facets -->
         <aside v-if="block.facets?.length" class="search-facets" style="width:16rem; flex-shrink:0">
           <div style="padding:1rem; background:#f9fafb; border-radius:0.5rem; position:sticky; top:1rem">
-            <h3 v-if="block.facetsTitle" style="font-weight:600; margin-bottom:0.75rem; color:#374151">{{ block.facetsTitle }}</h3>
+            <h3 v-if="block.facetsTitle" data-edit-text="facetsTitle" style="font-weight:600; margin-bottom:0.75rem; color:#374151">{{ block.facetsTitle }}</h3>
             <template v-for="(facet, idx) in expand(block.facets || [], null, '@id')" :key="facet['@uid'] || idx">
               <template v-if="facet.type === 'slate' || facet.type === 'image'">
                 <div :data-block-uid="facet['@uid']" data-block-add="bottom"

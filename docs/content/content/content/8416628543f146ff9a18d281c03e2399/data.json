@@ -23,7 +23,7 @@
                 }
               ],
               "data": {
-                "url": "http://host.docker.internal:8080/Plone/block/button-block"
+                "url": "/block/button-block"
               },
               "type": "link"
             },
@@ -61,7 +61,7 @@
                 }
               ],
               "data": {
-                "url": "http://host.docker.internal:8080/Plone/block/button-block"
+                "url": "/block/button-block"
               },
               "type": "link"
             },
@@ -99,7 +99,7 @@
                 }
               ],
               "data": {
-                "url": "http://host.docker.internal:8080/Plone/block/button-block"
+                "url": "/block/button-block"
               },
               "type": "link"
             },
@@ -137,7 +137,7 @@
                 }
               ],
               "data": {
-                "url": "http://host.docker.internal:8080/Plone/block/button-block"
+                "url": "/block/button-block"
               },
               "type": "link"
             },
@@ -175,7 +175,7 @@
                 }
               ],
               "data": {
-                "url": "http://host.docker.internal:8080/Plone/block/button-block"
+                "url": "/block/button-block"
               },
               "type": "link"
             },

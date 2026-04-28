@@ -1219,7 +1219,12 @@ function Block({ block, id, data, apiUrl, contextPath }) {
                     {cells.map((cell) => {
                       const CellTag = cell.type === "header" ? "th" : "td";
                       return (
-                        <CellTag key={cell["@uid"]} data-block-uid={cell["@uid"]} data-block-add="right">
+                        <CellTag
+                          key={cell["@uid"]}
+                          data-block-uid={cell["@uid"]}
+                          data-block-add="right"
+                          data-edit-text="value"
+                        >
                           <SlateNodes value={cell.value} />
                         </CellTag>
                       );
