@@ -6,6 +6,15 @@
 import { produce } from 'immer';
 import { get } from 'lodash';
 import { applyBlockDefaults } from '@plone/volto/helpers';
+// Block-level initialiser hook (e.g. slate registers one to populate
+// `value: [{type:'p',children:[{text:''}]}]`). Schema-level defaults via
+// applyBlockDefaults don't cover this — initialValue is the per-block escape.
+const applyBlockInitialValue = (blockData, blocksConfig, intl) => {
+  const type = blockData?.['@type'];
+  const fn = type && blocksConfig?.[type]?.initialValue;
+  if (typeof fn !== 'function') return blockData;
+  return fn({ id: undefined, value: blockData, formData: undefined, intl });
+};
 import config from '@plone/volto/registry';
 import { PAGE_BLOCK_UID, isBlockReadonly } from '@volto-hydra/hydra-js';
 import {
@@ -1423,6 +1432,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
 
   if (intl && blocksConfig) {
     blockData = applyBlockDefaults({ data: blockData, intl, metadata, properties }, blocksConfig);
+    blockData = applyBlockInitialValue(blockData, blocksConfig, intl);
   }
 
   const blocksObj = { ...parentBlock.blocks, [newBlockId]: blockData };

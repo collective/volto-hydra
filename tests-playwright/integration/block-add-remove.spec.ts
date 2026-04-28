@@ -65,6 +65,45 @@ test.describe('Adding Blocks', () => {
     expect(newCount).toBe(initialCount + 1);
   });
 
+  // Regression: when a container's last child is deleted, View.jsx +
+  // ensureEmptyBlockIfEmpty auto-creates a new empty slate block of the
+  // container's defaultBlockType. That code path does NOT initialise
+  // `value: [{type: 'p', children: [{text: ''}]}]` (only the add-block flow
+  // does). The renderer then falls back to its empty-state placeholder
+  // `<p data-edit-text="value">Empty block</p>` with no data-node-id.
+  // Clicking into the placeholder trips hydra.js's selection-sync warning
+  // overlay (#hydra-dev-warning).
+  test('deleting last child of a container auto-creates slate without triggering Missing data-node-id warning', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/section-test-page');
+
+    const iframe = helper.getIframe();
+
+    // section-1 starts with one slate child (section-child-1). Remove it
+    // via the Quanta toolbar's ⋯ menu so the whole block is deleted (not
+    // just one character of its text).
+    await helper.clickBlockInIframe('section-child-1');
+    await helper.openQuantaToolbarMenu('section-child-1');
+    await helper.clickQuantaToolbarMenuOption('section-child-1', 'Remove');
+
+    // ensureEmptyBlockIfEmpty creates a fresh slate child in the section.
+    // It has a generated uid, so look for "any data-block-uid descendant".
+    const newChild = iframe
+      .locator('[data-block-uid="section-1"] [data-block-uid]')
+      .first();
+    await expect(newChild).toBeVisible({ timeout: 5000 });
+
+    // Click into the new placeholder slate block to trigger selection sync.
+    await newChild.click();
+    await page.waitForTimeout(300);
+
+    // The developer-warning overlay must not appear.
+    const warning = iframe.locator('#hydra-dev-warning');
+    await expect(warning).toHaveCount(0);
+  });
+
   test('can add an Image block to the page', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
