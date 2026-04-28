@@ -89,12 +89,12 @@
     "block-7-filled-teaser": {
       "@type": "teaser",
       "overwrite": false,
-      "preview_image": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27400%27 height=%27300%27%3E%3Crect width=%27400%27 height=%27300%27 fill=%27%2399bbdd%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 dy=%270.3em%27 font-size=%2718%27%3ETarget%3C/text%3E%3C/svg%3E",
       "href": [
         {
           "@id": "/target-page",
           "title": "Target Page",
-          "description": "Target page description"
+          "description": "Target page description",
+          "hasPreviewImage": false
         }
       ]
     },
