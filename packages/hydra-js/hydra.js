@@ -1594,7 +1594,7 @@ var Bridge = class {
       this.sendMessageToParent({ type: "PASTE_BLOCKS", afterBlockId: afterUid });
       return true;
     }
-    if (e.key === "Enter" && !e.shiftKey && this.isInlineEditing) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       this.sendMessageToParent({
         type: "ADD_BLOCK_AFTER",
@@ -5072,7 +5072,8 @@ DOM path (text node \u2192 container):
       const blockUidToProcess = needsBlockSwitch ? adminSelectedBlockUid : this.selectedBlockUid;
       const blockHandler = needsBlockSwitch ? (el) => {
         log("Selecting new block from afterContentRender:", blockUidToProcess);
-        this.selectBlock(el);
+        this.editMode = "text";
+        this.selectBlock(el, { fieldToFocus: "first" });
       } : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
       if (blockUidToProcess) {
         const blockElement = this.queryBlockElement(blockUidToProcess);

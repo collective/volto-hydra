@@ -1586,8 +1586,12 @@ export class Bridge {
       return true;
     }
 
-    // Enter: add block after (only in edit mode)
-    if (e.key === 'Enter' && !e.shiftKey && this.isInlineEditing) {
+    // Enter: add block after. We reach _handleBlockModeKey only when no
+    // editable field is active (line 4104 returns early otherwise), so
+    // we're in block mode by definition — gating on `isInlineEditing`
+    // here just blocks Enter when the user has selected a container as
+    // a whole (e.g. via Escape-to-parent) and wants to insert after it.
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       this.sendMessageToParent({
         type: 'ADD_BLOCK_AFTER',
@@ -6128,7 +6132,16 @@ export class Bridge {
 
         const blockUidToProcess = needsBlockSwitch ? adminSelectedBlockUid : this.selectedBlockUid;
         const blockHandler = needsBlockSwitch
-          ? (el) => { log('Selecting new block from afterContentRender:', blockUidToProcess); this.selectBlock(el); }
+          ? (el) => {
+              // Admin-initiated block switch (e.g. new block after Enter):
+              // mirror the SELECT_BLOCK direct path — switch to text mode and
+              // focus the first editable field so the user can type without
+              // an extra click. Without this, blocks created from block-mode
+              // Enter land selected-but-not-focused.
+              log('Selecting new block from afterContentRender:', blockUidToProcess);
+              this.editMode = 'text';
+              this.selectBlock(el, { fieldToFocus: 'first' });
+            }
           : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
 
         if (blockUidToProcess) {

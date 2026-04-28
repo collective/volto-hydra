@@ -626,32 +626,43 @@ test.describe('Enter Key to Add/Navigate', () => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
-    await helper.navigateToEdit('/container-test-page');
+    await helper.navigateToEdit('/section-test-page');
 
     const iframe = helper.getIframe();
     const initialBlocks = await helper.getBlockOrder();
 
-    // 1. Click into the teaser's title (text mode on slate inside teaser).
-    await helper.clickBlockInIframe('grid-cell-1');
+    // 1. Enter the slate child's value field. We need a focused contenteditable
+    //    so the first Escape does text→block instead of escalating to parent.
+    await helper.enterEditMode('section-child-1', 'value');
+    // ASSERT: we're editing — the value field is contenteditable.
+    const valueField = iframe.locator('[data-block-uid="section-child-1"] [data-edit-text="value"]');
+    await expect(valueField).toHaveAttribute('contenteditable', 'true');
+    await helper.waitForBlockSelected('section-child-1');
 
-    // 2. Escape → block mode on the teaser.
+    // 2. Escape → block mode on the slate (selectedBlockUid stays).
     await page.keyboard.press('Escape');
-    // 3. Escape → block mode escalates to parent (grid-1).
-    await page.keyboard.press('Escape');
-    await helper.waitForBlockSelected('grid-1');
+    // ASSERT: value is no longer contenteditable, but slate is still selected.
+    await expect(valueField).not.toHaveAttribute('contenteditable', 'true');
+    await helper.waitForBlockSelected('section-child-1');
 
-    // 4. Enter — should create a new block AFTER the grid.
+    // 3. Escape → block-mode escalates to parent (section-1).
+    await page.keyboard.press('Escape');
+    // ASSERT: parent is now selected.
+    await helper.waitForBlockSelected('section-1');
+
+    // 4. Enter — should create a new block AFTER the section (bug A: gate).
     await page.keyboard.press('Enter');
     await helper.waitForBlockCountToBe(initialBlocks.length + 1);
 
+    // Find the new block by id-set exclusion. getBlockOrder returns a flat
+    // list including nested children, so we can't index relative to section-1.
     const newBlocks = await helper.getBlockOrder();
-    const gridIdx = newBlocks.indexOf('grid-1');
-    const newBlockId = newBlocks[gridIdx + 1];
-    expect(initialBlocks).not.toContain(newBlockId);
+    const newBlockId = newBlocks.find((id) => !initialBlocks.includes(id));
+    expect(newBlockId, 'expected exactly one new block to appear').toBeDefined();
+    // ASSERT: the new block is selected.
+    await helper.waitForBlockSelected(newBlockId!);
 
-    // 5. The smoking-gun assertion: typing should go into the new block.
-    //    If the new block is "selected but in block mode", keystrokes won't
-    //    land in any contenteditable field and the new block stays empty.
+    // 5. Typing should land in the new block (bug B: focus).
     await page.keyboard.type('hello', { delay: 10 });
 
     const newBlock = iframe.locator(`[data-block-uid="${newBlockId}"]`);
