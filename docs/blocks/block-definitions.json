@@ -79,7 +79,7 @@
       }
     },
     "examples": {
-      "ex-slate-heading": {
+      "ex-slate": {
         "@type": "slate",
         "value": [
           {

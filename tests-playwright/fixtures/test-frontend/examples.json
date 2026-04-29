@@ -27,7 +27,7 @@
         }
       ]
     },
-    "ex-slate-heading": {
+    "ex-slate": {
       "@type": "slate",
       "value": [
         {
@@ -615,7 +615,7 @@
   "blocks_layout": {
     "items": [
       "ex-hero",
-      "ex-slate-heading",
+      "ex-slate",
       "ex-slate-formatted",
       "ex-slate-list",
       "ex-slate-link",
