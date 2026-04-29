@@ -632,8 +632,11 @@ test.describe('Enter Key to Add/Navigate', () => {
     const initialBlocks = await helper.getBlockOrder();
 
     // 1. Enter the slate-before value field (page-level slate).
+    // Use getSlateField — Nuxt puts data-edit-text on the same element as
+    // data-block-uid, while the mock renderer puts it on a child element.
     await helper.enterEditMode('slate-before', 'value');
-    const valueField = iframe.locator('[data-block-uid="slate-before"] [data-edit-text="value"]');
+    const slateBeforeBlock = iframe.locator('[data-block-uid="slate-before"]');
+    const valueField = helper.getSlateField(slateBeforeBlock);
     await expect(valueField).toHaveAttribute('contenteditable', 'true');
     await helper.waitForBlockSelected('slate-before');
 
