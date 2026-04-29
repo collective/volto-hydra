@@ -15,6 +15,7 @@ const applyBlockInitialValue = (blockData, blocksConfig, intl) => {
   if (typeof fn !== 'function') return blockData;
   return fn({ id: undefined, value: blockData, formData: undefined, intl });
 };
+import config from '@plone/volto/registry';
 import { PAGE_BLOCK_UID, isBlockReadonly } from '@volto-hydra/hydra-js';
 import {
   buildBlockPathMap as _buildBlockPathMap,
@@ -498,6 +499,12 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   // Compute default allowed blocks (used when field doesn't specify allowedBlocks)
   const blockConfig = blocksConfig?.[blockType];
   const defaultAllowedBlocks = getPageAllowedBlocksFromRestricted(blocksConfig, { properties: formData });
+  // Page-level defaultBlockType — used as the empty-block fallback when a
+  // container inherits its allowedBlocks from page-level (i.e. doesn't
+  // restrict types). Without this a generic section would auto-fill its
+  // empty state with the 'empty' picker placeholder, even though the
+  // container is happy to accept the page's typing-friendly default.
+  const pageDefaultBlockType = config.settings.defaultBlockType || null;
 
   // Helper to get current count for a container field
   const getFieldCount = (fieldName, isObjectList = false, dataPath = null) => {
@@ -523,13 +530,18 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
         const maxLength = fieldDef.maxLength || blockConfig?.maxLength || null;
         const currentCount = getFieldCount(fieldName);
         const maxLengthOk = !maxLength || currentCount < maxLength;
+        // When neither the field nor the block restricts allowedBlocks, the
+        // container inherits the page's allowed list — and so should its
+        // empty-block default. Otherwise null falls through to the picker
+        // 'empty' placeholder.
+        const allowedBlocksInherited = !fieldDef.allowedBlocks && !blockConfig?.allowedBlocks;
         containerFields.push({
           fieldName,
           title: fieldDef.title || fieldName,
           allowedBlocks: fieldDef.allowedBlocks || blockConfig?.allowedBlocks || defaultAllowedBlocks,
           allowedTemplates: fieldDef.allowedTemplates || null,
           allowedLayouts: fieldDef.allowedLayouts || null,
-          defaultBlockType: fieldDef.defaultBlockType || blockConfig?.defaultBlockType || null,
+          defaultBlockType: fieldDef.defaultBlockType || blockConfig?.defaultBlockType || (allowedBlocksInherited ? pageDefaultBlockType : null),
           maxLength,
           currentCount,
           canAdd: !parentIsReadonly && maxLengthOk,
@@ -573,11 +585,13 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
     const maxLength = blockConfig?.maxLength || null;
     const currentCount = getFieldCount('blocks_layout');
     const maxLengthOk = !maxLength || currentCount < maxLength;
+    // Same inherited-default rule as the schema-defined branch above.
+    const allowedBlocksInherited = !blockConfig?.allowedBlocks;
     containerFields.push({
       fieldName: 'blocks_layout',
       title: 'Blocks',
       allowedBlocks: blockConfig?.allowedBlocks || defaultAllowedBlocks,
-      defaultBlockType: blockConfig?.defaultBlockType || null,
+      defaultBlockType: blockConfig?.defaultBlockType || (allowedBlocksInherited ? pageDefaultBlockType : null),
       maxLength,
       currentCount,
       canAdd: !parentIsReadonly && maxLengthOk,
@@ -1314,17 +1328,17 @@ export function mutateBlockInContainer(formData, blockPathMap, blockId, newBlock
 /**
  * Determine the block type to use for an empty container.
  * Fallback chain:
- *   1. containerConfig.defaultBlockType (explicit default for this container)
+ *   1. containerConfig.defaultBlockType (set by getAllContainerFields —
+ *      either explicit on the field/blockConfig, or inherited from the
+ *      page when the container doesn't restrict allowedBlocks)
  *   2. Single allowedBlocks entry (only one choice)
- *   3. 'empty' (placeholder block — opens BlockChooser on click,
- *      gets REPLACED on DnD drop)
+ *   3. 'empty' (placeholder — opens BlockChooser on click, REPLACED on DnD)
  *
- * Note: we deliberately do NOT fall back to the global defaultBlockType
- * (e.g. 'slate'). When a container accepts multiple types and has no
- * explicit default, the user should pick — silently substituting slate
- * (a) creates a wrong-type placeholder for grid-like containers and
- * (b) means DnD-into-empty-container drops as a sibling of the placeholder
- * instead of replacing it.
+ * Containers with explicit multi-entry allowedBlocks fall through to (3):
+ * the author opted into the picker, so the user picks. Containers with
+ * NO allowedBlocks restriction get a meaningful default via (1) because
+ * getAllContainerFields fills defaultBlockType from page-level when
+ * allowedBlocks itself was inherited from page.
  *
  * @param {Object|null} containerConfig - Container config with allowedBlocks/defaultBlockType
  * @returns {string} Block type to create

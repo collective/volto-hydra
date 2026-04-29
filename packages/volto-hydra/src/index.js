@@ -359,6 +359,11 @@ const applyConfig = (config) => {
   // and as a reference shape for consumers who want a first-class "section"
   // block. Safe to ship in production: just a blocks_layout wrapper.
   // Reuse slate's icon so slash-menu rendering (Icon component) doesn't crash.
+  // No allowedBlocks/defaultBlockType: getAllContainerFields cascades
+  // both from the page (allowedBlocks → page's allowed list,
+  // defaultBlockType → config.settings.defaultBlockType), so a fresh
+  // empty section auto-fills with a typeable child of the page's default
+  // type and "Enter on a section" lands the cursor inside ready to type.
   config.blocks.blocksConfig.section = {
     ...config.blocks.blocksConfig.section,
     id: 'section',
