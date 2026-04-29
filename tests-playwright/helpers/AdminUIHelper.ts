@@ -3310,11 +3310,14 @@ export class AdminUIHelper {
 
     // Replace mode (drop into a container whose only child is an 'empty'
     // placeholder) renders a shade overlay instead of a line indicator.
-    // If the shade is visible and overlaps the target rect, the drop is
-    // valid — short-circuit the line-indicator edge checks.
-    const shadeVisible = await iframe.locator('.volto-hydra-drop-shade').evaluate(
-      (el) => getComputedStyle(el).display !== 'none',
-    ).catch(() => false);
+    // If the shade is visible the drop is valid — short-circuit the
+    // line-indicator edge checks.
+    // Use evaluateAll (don't wait): the shade often doesn't exist for
+    // ordinary drops, and locator.evaluate would auto-wait ~30s every
+    // retry, blowing the 45s test timeout.
+    const shadeVisible = await iframe.locator('.volto-hydra-drop-shade').evaluateAll(
+      (els) => els.some((el) => getComputedStyle(el).display !== 'none'),
+    );
     if (shadeVisible) return;
 
     // Use iframe's internal getBoundingClientRect for consistent coordinates
