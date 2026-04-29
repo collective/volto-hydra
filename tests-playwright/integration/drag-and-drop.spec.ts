@@ -35,6 +35,34 @@ test.describe('Block Drag and Drop', () => {
       .locator('[data-block-uid="grid-empty"] [data-block-uid]').count();
     expect(initialChildren).toBeLessThanOrEqual(1); // 0 or 1 (placeholder)
 
+    // DIAG: dump grid-empty's children + their pathMap entries.
+    const diag = await iframe.locator('html').first().evaluate(() => {
+      const bridge: any = (window as any).bridge;
+      const pathMap = bridge?.blockPathMap || {};
+      const out: any = { childrenInDOM: [], childrenInPathMap: {} };
+      const grid = document.querySelector('[data-block-uid="grid-empty"]');
+      if (grid) {
+        for (const c of grid.querySelectorAll('[data-block-uid]')) {
+          const uid = (c as Element).getAttribute('data-block-uid');
+          out.childrenInDOM.push(uid);
+        }
+      }
+      for (const uid of Object.keys(pathMap)) {
+        if (uid.startsWith('_')) continue;
+        const info = pathMap[uid];
+        if (info?.parentId === 'grid-empty') {
+          out.childrenInPathMap[uid] = {
+            blockType: info.blockType,
+            allowedSiblingTypes: info.allowedSiblingTypes,
+            isFixed: info.isFixed,
+          };
+        }
+      }
+      return out;
+    });
+    // eslint-disable-next-line no-console
+    console.log('[DIAG] grid-empty:', JSON.stringify(diag));
+
     // Drag grid-cell-1 (a teaser inside grid-1) onto grid-empty.
     await helper.clickBlockInIframe('grid-cell-1');
     await helper.waitForSidebarOpen();

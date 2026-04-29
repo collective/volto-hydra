@@ -2382,8 +2382,12 @@ const Iframe = (props) => {
 
         case 'MOVE_BLOCKS': {
           // Handle drag-and-drop block moves (single or multi, supports containers)
-          const { blockIds: moveBlockIds, targetBlockId, insertAfter, targetParentId, selectAfterMove } = event.data;
-          log('MOVE_BLOCKS: received:', moveBlockIds?.length, 'blocks to', targetBlockId, 'insertAfter:', insertAfter);
+          // replaceTargetId is set when the drop landed on an 'empty' placeholder
+          // (the slot block ensureEmptyBlockIfEmpty creates when a container is
+          // empty). After the move, that placeholder is removed so the dropped
+          // block lives where the placeholder was instead of beside it.
+          const { blockIds: moveBlockIds, targetBlockId, insertAfter, targetParentId, selectAfterMove, replaceTargetId } = event.data;
+          log('MOVE_BLOCKS: received:', moveBlockIds?.length, 'blocks to', targetBlockId, 'insertAfter:', insertAfter, 'replaceTargetId:', replaceTargetId);
 
           // Use properties (Redux) as source of truth for moves
           const currentFormData = properties;
@@ -2515,6 +2519,27 @@ const Iframe = (props) => {
                 { intl, metadata, properties: currentFormData },
               );
             }
+
+            // Replace path: the dragged block was dropped on an 'empty'
+            // placeholder. Remove the placeholder so the dropped block
+            // takes its position rather than sitting beside it.
+            // Done after the move (and after applyBlockDefaultsWithContext)
+            // so the moved block's neighbour-derived fields settle first.
+            if (replaceTargetId) {
+              const replacePathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
+              const replaceBlockData = getBlockById(newFormData, replacePathMap, replaceTargetId);
+              if (replaceBlockData?.['@type'] === 'empty') {
+                const replaceContainerConfig = getContainerFieldConfig(
+                  replaceTargetId, replacePathMap, newFormData, blocksConfig, intl,
+                );
+                if (replaceContainerConfig) {
+                  newFormData = deleteBlockFromContainer(
+                    newFormData, replacePathMap, replaceTargetId, replaceContainerConfig,
+                  );
+                }
+              }
+            }
+
             // Set pendingSelectBlockUid so the moved block stays selected after re-render
             // Rebuild blockPathMap to reflect the new block positions
             // Use flushSync to ensure state is committed before Redux update triggers useEffect

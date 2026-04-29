@@ -8446,6 +8446,12 @@ export class Bridge {
       let closestBlockUid = null;
       let insertAt = null; // 0 for top, 1 for bottom
       let dropIndicatorVisible = false; // Track if drop indicator is shown - drop only allowed when visible
+      // Replace mode: target is an 'empty' placeholder created by
+      // ensureEmptyBlockIfEmpty when its container has no real children.
+      // On drop we delete the placeholder and insert the dragged block in
+      // its position — the only-child placeholder gets REPLACED, not
+      // dropped-next-to. Visualised as a shade overlay rather than a line.
+      let replaceTargetUid = null;
 
       // Auto-scroll: continuous scroll near viewport edges. Dispatches synthetic
       // mousemove on each scroll tick so the drop-indicator-update path below
@@ -8547,14 +8553,78 @@ export class Bridge {
             if (existingIndicator) {
               existingIndicator.style.display = 'none';
             }
+            const existingShade = document.querySelector('.volto-hydra-drop-shade');
+            if (existingShade) existingShade.style.display = 'none';
             dropIndicatorVisible = false;
             closestBlockUid = null;
+            replaceTargetUid = null;
             return;
           }
 
           // Use the valid drop target (may be the original or a parent)
           closestBlock = validDropTarget;
           closestBlockUid = validDropTargetUid;
+
+          // Replace path: target is — or contains as its only child — an
+          // 'empty' placeholder (the slot block ensureEmptyBlockIfEmpty
+          // creates when a container has no real children). Resolve to the
+          // placeholder uid, render a shade overlay over the container's
+          // rect, and remember the placeholder uid so onMouseUp can ask
+          // the admin to delete it. Skip the line-indicator flow.
+          //
+          // The "only-child-is-empty" case matters because for grid-like
+          // containers the 25%-wide cell is much smaller than the
+          // container's whole rect — a cursor in the empty whitespace
+          // doesn't hit the placeholder's element directly, but the user
+          // still means "drop into this empty container".
+          let emptyTargetUid = null;
+          let emptyShadeEl = closestBlock;
+          const validTargetInfo = this.blockPathMap?.[closestBlockUid];
+          if (validTargetInfo?.blockType === 'empty') {
+            emptyTargetUid = closestBlockUid;
+          } else {
+            const targetData = this.getBlockData(closestBlockUid);
+            const layoutItems = targetData?.blocks_layout?.items;
+            if (Array.isArray(layoutItems) && layoutItems.length === 1) {
+              const onlyChildUid = layoutItems[0];
+              if (this.blockPathMap?.[onlyChildUid]?.blockType === 'empty') {
+                emptyTargetUid = onlyChildUid;
+              }
+            }
+          }
+          if (emptyTargetUid) {
+            const lineIndicator = document.querySelector('.volto-hydra-drop-indicator');
+            if (lineIndicator) lineIndicator.style.display = 'none';
+            let shade = document.querySelector('.volto-hydra-drop-shade');
+            if (!shade) {
+              shade = document.createElement('div');
+              shade.className = 'volto-hydra-drop-shade';
+              shade.style.cssText = 'position:absolute;background:rgba(0,123,255,0.15);border:2px dashed #007bff;border-radius:4px;pointer-events:none;z-index:9998;';
+              document.body.appendChild(shade);
+            }
+            const shadeRect = emptyShadeEl.getBoundingClientRect();
+            Object.assign(shade.style, {
+              top: `${shadeRect.top + window.scrollY}px`,
+              left: `${shadeRect.left + window.scrollX}px`,
+              width: `${shadeRect.width}px`,
+              height: `${shadeRect.height}px`,
+              display: 'block',
+            });
+            // Switch the drop target to the placeholder. We always insert
+            // *before* it, so the moved block lands at position 0 in its
+            // container; then the admin's MOVE_BLOCKS handler deletes the
+            // placeholder via replaceTargetId.
+            closestBlockUid = emptyTargetUid;
+            replaceTargetUid = emptyTargetUid;
+            dropIndicatorVisible = true;
+            insertAt = 0;
+            return;
+          }
+          // Not in replace mode — clear any lingering shade from a previous
+          // mousemove tick and fall through to the line-indicator path.
+          replaceTargetUid = null;
+          const existingShade = document.querySelector('.volto-hydra-drop-shade');
+          if (existingShade) existingShade.style.display = 'none';
 
           // Get or create drop indicator
           let dropIndicator = document.querySelector('.volto-hydra-drop-indicator');
@@ -8609,8 +8679,11 @@ export class Bridge {
             if (existingIndicator) {
               existingIndicator.style.display = 'none';
             }
+            const existingShade = document.querySelector('.volto-hydra-drop-shade');
+            if (existingShade) existingShade.style.display = 'none';
             dropIndicatorVisible = false;
             closestBlockUid = null;
+            replaceTargetUid = null;
             return;
           }
 
@@ -8659,8 +8732,11 @@ export class Bridge {
           if (existingIndicator) {
             existingIndicator.style.display = 'none';
           }
+          const existingShade = document.querySelector('.volto-hydra-drop-shade');
+          if (existingShade) existingShade.style.display = 'none';
           dropIndicatorVisible = false;
           closestBlockUid = null;
+          replaceTargetUid = null;
         }
       };
 
@@ -8693,6 +8769,8 @@ export class Bridge {
         } else {
           log('No drop indicator to hide on mouseup');
         }
+        const dropShade = document.querySelector('.volto-hydra-drop-shade');
+        if (dropShade) dropShade.style.display = 'none';
 
         // Only allow drop if indicator was visible - this ensures all validation passed
         if (closestBlockUid && dropIndicatorVisible) {
@@ -8703,7 +8781,7 @@ export class Bridge {
 
           const targetPathInfo = this.blockPathMap?.[closestBlockUid];
 
-          log('DnD: Moving', draggedUids.length, 'blocks relative to', closestBlockUid, 'insertAfter:', insertAt === 1);
+          log('DnD: Moving', draggedUids.length, 'blocks relative to', closestBlockUid, 'insertAfter:', insertAt === 1, 'replace:', !!replaceTargetUid);
           window.parent.postMessage(
             {
               type: 'MOVE_BLOCKS',
@@ -8711,6 +8789,9 @@ export class Bridge {
               targetBlockId: closestBlockUid,
               insertAfter: insertAt === 1,
               targetParentId: targetPathInfo?.parentId || null,
+              // When set, the admin deletes this block after the move so the
+              // 'empty' placeholder is replaced rather than dropped beside.
+              replaceTargetId: replaceTargetUid || null,
             },
             this.adminOrigin,
           );

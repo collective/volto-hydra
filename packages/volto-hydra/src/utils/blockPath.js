@@ -15,7 +15,6 @@ const applyBlockInitialValue = (blockData, blocksConfig, intl) => {
   if (typeof fn !== 'function') return blockData;
   return fn({ id: undefined, value: blockData, formData: undefined, intl });
 };
-import config from '@plone/volto/registry';
 import { PAGE_BLOCK_UID, isBlockReadonly } from '@volto-hydra/hydra-js';
 import {
   buildBlockPathMap as _buildBlockPathMap,
@@ -1317,8 +1316,15 @@ export function mutateBlockInContainer(formData, blockPathMap, blockId, newBlock
  * Fallback chain:
  *   1. containerConfig.defaultBlockType (explicit default for this container)
  *   2. Single allowedBlocks entry (only one choice)
- *   3. config.settings.defaultBlockType if allowed (global default, e.g. 'slate')
- *   4. 'empty' (slot block that opens BlockChooser on click)
+ *   3. 'empty' (placeholder block — opens BlockChooser on click,
+ *      gets REPLACED on DnD drop)
+ *
+ * Note: we deliberately do NOT fall back to the global defaultBlockType
+ * (e.g. 'slate'). When a container accepts multiple types and has no
+ * explicit default, the user should pick — silently substituting slate
+ * (a) creates a wrong-type placeholder for grid-like containers and
+ * (b) means DnD-into-empty-container drops as a sibling of the placeholder
+ * instead of replacing it.
  *
  * @param {Object|null} containerConfig - Container config with allowedBlocks/defaultBlockType
  * @returns {string} Block type to create
@@ -1329,13 +1335,6 @@ export function getEmptyBlockType(containerConfig) {
   }
   if (containerConfig?.allowedBlocks?.length === 1) {
     return containerConfig.allowedBlocks[0];
-  }
-  const globalDefault = config.settings.defaultBlockType;
-  if (globalDefault) {
-    const allowed = containerConfig?.allowedBlocks;
-    if (!allowed || allowed.includes(globalDefault)) {
-      return globalDefault;
-    }
   }
   return 'empty';
 }

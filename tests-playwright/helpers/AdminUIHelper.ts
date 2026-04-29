@@ -3308,6 +3308,15 @@ export class AdminUIHelper {
     const iframeEl = this.page.locator('#previewIframe');
     const iframeBox = await iframeEl.boundingBox();
 
+    // Replace mode (drop into a container whose only child is an 'empty'
+    // placeholder) renders a shade overlay instead of a line indicator.
+    // If the shade is visible and overlaps the target rect, the drop is
+    // valid — short-circuit the line-indicator edge checks.
+    const shadeVisible = await iframe.locator('.volto-hydra-drop-shade').evaluate(
+      (el) => getComputedStyle(el).display !== 'none',
+    ).catch(() => false);
+    if (shadeVisible) return;
+
     // Use iframe's internal getBoundingClientRect for consistent coordinates
     // (Playwright's boundingBox doesn't account for iframe scroll correctly)
     const dropRectInIframeCoords = await dropIndicator.evaluate((el) => {
