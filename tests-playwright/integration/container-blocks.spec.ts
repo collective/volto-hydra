@@ -2690,10 +2690,14 @@ test.describe('Sidebar Child Blocks Reordering', () => {
     // Press Escape to deselect any auto-selected block and show page-level child blocks
     await helper.escapeToParent();
 
-    // Find grid-1 in the page's child blocks widget and click it
+    // Find grid-1 in the page's child blocks widget and click it.
+    // Match by data-rbd-draggable-id rather than `hasText: 'Grid'` —
+    // the fixture has multiple gridBlocks (grid-1/grid-2/grid-empty)
+    // all rendered as 'Grid' in the sidebar, so a text filter would
+    // hit strict-mode violation.
     const pageChildBlocks = page.locator('#sidebar-order .child-blocks-widget');
     await expect(pageChildBlocks).toBeVisible({ timeout: 5000 });
-    const gridItem = pageChildBlocks.locator('.child-block-item', { hasText: 'Grid' });
+    const gridItem = pageChildBlocks.locator('.child-block-item[data-rbd-draggable-id="grid-1"]');
     await expect(gridItem).toBeVisible({ timeout: 5000 });
     await gridItem.click();
 
@@ -4013,9 +4017,11 @@ test.describe('Multi-Container Field Operations', () => {
     await helper.waitForSidebarOpen();
     await helper.waitForSidebarCurrentBlock('Grid', 10000);
 
-    // Find the new gridBlock by looking for blocks with .grid-row child
-    // Use :not([data-block-uid="grid-1"]) to exclude the original grid-1
-    const newGridBlock = iframe.locator('[data-block-uid]:has(> .grid-row):not([data-block-uid="grid-1"])');
+    // Find the new gridBlock by looking for blocks with .grid-row child,
+    // excluding all fixture gridBlocks on /container-test-page.
+    const newGridBlock = iframe.locator(
+      '[data-block-uid]:has(> .grid-row):not([data-block-uid="grid-1"]):not([data-block-uid="grid-2"]):not([data-block-uid="grid-empty"])',
+    );
     await expect(newGridBlock).toBeVisible({ timeout: 5000 });
 
     // The gridBlock should contain at least one child block (ensureEmptyBlockIfEmpty creates it)
