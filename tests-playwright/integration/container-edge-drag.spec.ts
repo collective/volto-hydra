@@ -2,6 +2,144 @@ import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Container UX: Edge-drag', () => {
+  // Edges should only appear when something useful would happen on drag:
+  // (a) a sibling (or descendant of a sibling) is accepted by the
+  //     container's child-allowedBlocks (canAbsorb), or
+  // (b) at least one of the container's own children is accepted by
+  //     the parent's allowedBlocks (canExpel).
+  // Leaf blocks (no children) hit the early-return — no chrome.
+  // Container blocks where neither (a) nor (b) holds get no chrome either.
+  test('leaf blocks (teaser/slate) do not show edge-drag chrome', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="text-after"]').first().evaluate((el) => {
+      (window as any).bridge?.selectBlock(el);
+    });
+    await helper.waitForBlockSelected('text-after');
+
+    // 1) Admin renders no visible edge-handle chrome.
+    const adminEdges = page.locator('.volto-hydra-edge-handle-visual');
+    await expect(adminEdges).toHaveCount(0);
+
+    // 2) Iframe-side invisible event-capture divs (4, created once at init)
+    //    should all be display:none — otherwise mousedown over those
+    //    coordinates would still trigger drag.
+    const visibleIframeEdges = await iframe.locator('html').first().evaluate(() => {
+      return [...document.querySelectorAll('.volto-hydra-edge-handle')]
+        .filter((el) => window.getComputedStyle(el).display !== 'none')
+        .map((el) => el.getAttribute('data-edge'));
+    });
+    expect(visibleIframeEdges).toEqual([]);
+  });
+
+  // Container, but no nearby sibling has an accepted descendant type:
+  // top_images on columns-1 only allows image. Sibling siblings of col-1
+  // (i.e. col-2, top-img-*, …) — col-2 contains slates not images, so the
+  // "absorb across boundary" path doesn't yield an accepted descendant.
+  // Edge-handle should be hidden on the right side (where col-2 sits).
+  // Repro: after selecting a container that has edge handles, selecting
+  // a leaf descendant should NOT inherit those edge sides. The leaf isn't
+  // a container — it shouldn't show edges regardless of what was selected
+  // before. Verifies the iframe → admin canResize lifecycle resets cleanly
+  // on selection change to a non-resizable block.
+  test('selecting a leaf descendant after a container clears edge chrome', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+    const iframe = helper.getIframe();
+
+    // 1. Select col-1 (a container — has children, will show edges).
+    await iframe.locator('[data-block-uid="col-1"]').first().evaluate((el) => {
+      (window as any).bridge?.selectBlock(el);
+    });
+    await helper.waitForBlockSelected('col-1');
+    const adminEdges = page.locator('.volto-hydra-edge-handle-visual');
+    expect(await adminEdges.count()).toBeGreaterThan(0); // sanity: container does show edges
+
+    // 2. Select text-1a (a slate inside col-1 — leaf, no children).
+    await iframe.locator('[data-block-uid="text-1a"]').first().evaluate((el) => {
+      (window as any).bridge?.selectBlock(el);
+    });
+    await helper.waitForBlockSelected('text-1a');
+
+    // 3. NO edge chrome should remain — neither admin-rendered nor
+    //    iframe-side displayed.
+    await expect(adminEdges).toHaveCount(0);
+    const visibleIframeEdges = await iframe.locator('html').first().evaluate(() => {
+      return [...document.querySelectorAll('.volto-hydra-edge-handle')]
+        .filter((el) => window.getComputedStyle(el).display !== 'none')
+        .map((el) => el.getAttribute('data-edge'));
+    });
+    expect(visibleIframeEdges).toEqual([]);
+  });
+
+  // Walk every block on the page and verify that any block whose
+  // selection produces an edge handle is actually a container (has at
+  // least one own data-block-uid descendant). Catches regressions where
+  // leaves like teaser, image, or readonly cells start showing edges.
+  test('no leaf block shows any edge-drag chrome', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+    const iframe = helper.getIframe();
+
+    // Enumerate every data-block-uid on the page.
+    const all = await iframe.locator('[data-block-uid]').evaluateAll(
+      (els) => els.map((el) => ({
+        uid: el.getAttribute('data-block-uid'),
+        // "leaf" iff no descendant has its own data-block-uid.
+        isLeaf: !el.querySelector('[data-block-uid]'),
+      })),
+    );
+    const leafUids = [...new Set(all.filter((b) => b.isLeaf).map((b) => b.uid))]
+      .filter(Boolean) as string[];
+    expect(leafUids.length).toBeGreaterThan(0);
+
+    for (const uid of leafUids) {
+      await iframe.locator(`[data-block-uid="${uid}"]`).first().evaluate((el) => {
+        (window as any).bridge?.selectBlock(el);
+      });
+      await helper.waitForBlockSelected(uid);
+      // No admin-rendered visible chrome.
+      await expect(page.locator('.volto-hydra-edge-handle-visual'),
+        `leaf block "${uid}" should not show admin edge chrome`,
+      ).toHaveCount(0);
+      // No iframe-side invisible div with display !== 'none'.
+      const visible = await iframe.locator('html').first().evaluate(() => {
+        return [...document.querySelectorAll('.volto-hydra-edge-handle')]
+          .filter((el) => window.getComputedStyle(el).display !== 'none')
+          .map((el) => el.getAttribute('data-edge'));
+      });
+      expect(visible, `leaf block "${uid}" should not have any iframe edge handle visible`).toEqual([]);
+    }
+  });
+
+  test('container with no accepted-descendant sibling on a side hides that edge', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+    // top-img-1 is a leaf image block (no children of its own). Documents
+    // the early-return path. Once we have a fixture with a leaf-but-
+    // container shape (e.g. an empty-but-typed container), extend.
+    await iframe.locator('[data-block-uid="top-img-1"]').first().evaluate((el) => {
+      (window as any).bridge?.selectBlock(el);
+    });
+    await helper.waitForBlockSelected('top-img-1');
+    const adminEdges = page.locator('.volto-hydra-edge-handle-visual');
+    await expect(adminEdges).toHaveCount(0);
+    const visibleIframeEdges = await iframe.locator('html').first().evaluate(() => {
+      return [...document.querySelectorAll('.volto-hydra-edge-handle')]
+        .filter((el) => window.getComputedStyle(el).display !== 'none')
+        .map((el) => el.getAttribute('data-edge'));
+    });
+    expect(visibleIframeEdges).toEqual([]);
+  });
+
   test('Drag container bottom edge to absorb next sibling', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();

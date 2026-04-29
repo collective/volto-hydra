@@ -954,7 +954,7 @@ export class Bridge {
    */
   _positionEdgeHandles() {
     const hide = () => {
-      this._lastCanEdgeDrag = false;
+      this._lastCanResize = null;
       if (this._edgeHandles) {
         for (const h of Object.values(this._edgeHandles)) h.style.display = 'none';
       }
@@ -969,15 +969,15 @@ export class Bridge {
     const ownChildren = this._getSiblingsByDomOrder(null, uid);
     if (ownChildren.length === 0) { hide(); return; }
 
-    // childAllowed = allowedBlocks declared on the container's child field.
-    const schema = this.blockPathMap?._schemas?.[info._schemaRef];
-    let childAllowed = null;
-    for (const [, fd] of Object.entries(schema?.properties || {})) {
-      if (fd?.widget === 'blocks_layout' || fd?.widget === 'object_list') {
-        childAllowed = fd.allowedBlocks || null;
-        break;
-      }
-    }
+    // childAllowed = the types this container accepts as direct children.
+    // Most reliable source: the container's first child's allowedSiblingTypes
+    // (computed by buildBlockPathMap from the block-config + schema chain).
+    // Falling back to scanning the block's schema for a blocks_layout/
+    // object_list widget misses cases where allowedBlocks lives on the block
+    // config (e.g. gridBlock has no blocks_layout in its blockSchema —
+    // allowedBlocks is on blocksConfig.gridBlock).
+    const firstChildInfo = this.blockPathMap?.[ownChildren[0]];
+    let childAllowed = firstChildInfo?.allowedSiblingTypes || null;
 
     // parentAllowed = allowedBlocks of the field this container lives in.
     // Used to decide if expel can land children at the parent level.
@@ -994,60 +994,39 @@ export class Bridge {
       parentAllowed = info.allowedSiblingTypes || null;
     }
 
-    // Per-edge geometry: an edge is resizable when there's either an
-    // accepted sibling on its outward side (drag outward → absorb) or an
-    // accepted child closer to it than to the opposite edge (drag inward
-    // → expel). Drag-time `computePlan` doesn't need the axis to be set
-    // here — it walks midpoints freely. This boolean only controls *which
-    // edges show*; the visible chrome is rendered admin-side from
-    // blockUI.canResize and the container's own blockUI.rect.
-    const accepts = (allowedList, type) => !allowedList || (type && allowedList.includes(type));
     const r = el.getBoundingClientRect();
-    const cx = (r.left + r.right) / 2;
-    const cy = (r.top + r.bottom) / 2;
 
-    // Siblings (admissible to this container) keyed by which side they're on.
-    const siblingMid = (sUid) => {
-      const sEl = this.queryBlockElement(sUid);
-      if (!sEl) return null;
-      const sr = sEl.getBoundingClientRect();
-      return { x: (sr.left + sr.right) / 2, y: (sr.top + sr.bottom) / 2 };
+    // canAbsorb / canExpel per-edge: ask the shared _computeEdgePlan
+    // "would dragging this edge to infinity in the outward (absorb) /
+    // inward (expel) direction yield any blocks?". Single source of
+    // truth — the at-rest visibility check and the drag-time chrome
+    // (growth box / tints / MOVE_BLOCKS) use the exact same logic.
+    const planFor = (edge, mode) => {
+      const FAR = 1e7;
+      let cursorCoord;
+      if (mode === 'absorb') {
+        // Cursor far in the outward direction.
+        cursorCoord = (edge === 'bottom') ? r.bottom + FAR
+          : (edge === 'top')   ? r.top - FAR
+          : (edge === 'right') ? r.right + FAR
+          :                       r.left - FAR;
+      } else {
+        // Cursor far in the inward direction (past the opposite edge).
+        cursorCoord = (edge === 'bottom') ? r.top - FAR
+          : (edge === 'top')   ? r.bottom + FAR
+          : (edge === 'right') ? r.left - FAR
+          :                       r.right + FAR;
+      }
+      return this._computeEdgePlan(uid, edge, mode, cursorCoord).blocks.length > 0;
     };
-    const childMid = siblingMid; // same shape
 
-    // canAbsorb: at-rest, "is there a sibling in this geometric direction".
-    // Type filtering happens at drag time (computePlan walks descendants and
-    // applies bottom-up promotion against childAllowed); checking direct
-    // siblings' types here would hide edges whose drag would actually pick
-    // up an accepted descendant — e.g. col-1's right edge absorbs a slate
-    // inside col-2 even though col-2 itself is a column (not accepted).
-    let absorbTop = false, absorbBottom = false, absorbLeft = false, absorbRight = false;
-    for (const sUid of this._getSiblingsByDomOrder(uid, info.parentId).filter((s) => s !== uid)) {
-      const m = siblingMid(sUid);
-      if (!m) continue;
-      if (m.y < r.top) absorbTop = true;
-      else if (m.y > r.bottom) absorbBottom = true;
-      if (m.x < r.left) absorbLeft = true;
-      else if (m.x > r.right) absorbRight = true;
+    const perEdge = {};
+    for (const edge of ['top', 'bottom', 'left', 'right']) {
+      perEdge[edge] = {
+        canAbsorb: planFor(edge, 'absorb'),
+        canExpel:  planFor(edge, 'expel'),
+      };
     }
-
-    // canExpel: any accepted child means dragging any of the 4 edges
-    // inward could expel something. Children's midpoints lie within the
-    // container's bounds by definition, so direction-discrimination here
-    // would only break boundary cases (e.g. single child centered exactly
-    // on the container's mid-axis). Drag-time computePlan resolves which
-    // child gets expelled based on cursor direction.
-    const canExpelAny = ownChildren.some(
-      (c) => accepts(parentAllowed, this.getBlockData(c)?.['@type']),
-    );
-    void cx; void cy; void childMid; // (kept for future per-edge expel refinement)
-
-    const perEdge = {
-      top:    { canAbsorb: absorbTop,    canExpel: canExpelAny },
-      bottom: { canAbsorb: absorbBottom, canExpel: canExpelAny },
-      left:   { canAbsorb: absorbLeft,   canExpel: canExpelAny },
-      right:  { canAbsorb: absorbRight,  canExpel: canExpelAny },
-    };
     // canResize per-edge = either absorb or expel possible. This is the
     // admin-facing summary used to decide which edge handles to render.
     const canResize = {
@@ -1094,6 +1073,155 @@ export class Bridge {
       handle.dataset.childAllowed = childAllowed ? childAllowed.join(',') : '';
       handle.dataset.parentAllowed = parentAllowed ? parentAllowed.join(',') : '';
     }
+  }
+
+  /**
+   * Geometry helper: signed outward distance from the edge in the
+   * direction the user would drag to absorb. Positive = outward
+   * (absorb mode); negative = inward (expel mode).
+   */
+  _edgeGeometry(edge, rect, mouseX, mouseY) {
+    switch (edge) {
+      case 'bottom': return { axis: 'vertical',   edgePos: rect.bottom, mouseCoord: mouseY, outward: mouseY - rect.bottom };
+      case 'top':    return { axis: 'vertical',   edgePos: rect.top,    mouseCoord: mouseY, outward: rect.top - mouseY };
+      case 'right':  return { axis: 'horizontal', edgePos: rect.right,  mouseCoord: mouseX, outward: mouseX - rect.right };
+      case 'left':   return { axis: 'horizontal', edgePos: rect.left,   mouseCoord: mouseX, outward: rect.left - mouseX };
+      default:       return null;
+    }
+  }
+
+  /**
+   * Compute the absorb/expel plan for an edge of a container — the single
+   * source of truth used by both at-rest edge-visibility (canResize) and
+   * drag-time chrome (growth box / tints / MOVE_BLOCKS on release).
+   *
+   * @param {string} containerUid
+   * @param {string} edge   - 'top' | 'bottom' | 'left' | 'right'
+   * @param {'absorb'|'expel'} mode
+   * @param {number} cursorCoord - cursor position on the edge's perpendicular
+   *   axis. Pass ±Infinity to simulate "drag this edge as far as possible";
+   *   that's how _positionEdgeHandles asks "is anything absorbable here?"
+   *   without an actual mouse event.
+   * @returns {{ kind: 'absorb'|'expel'|'none', blocks: string[], boundary: number }}
+   */
+  _computeEdgePlan(containerUid, edge, mode, cursorCoord) {
+    const containerEl = this.queryBlockElement(containerUid);
+    if (!containerEl) return { kind: 'none', blocks: [], boundary: 0 };
+    const cRect = containerEl.getBoundingClientRect();
+    const isVerticalEdge = edge === 'top' || edge === 'bottom';
+    const geo = this._edgeGeometry(
+      edge, cRect,
+      isVerticalEdge ? cRect.left + cRect.width / 2 : cursorCoord,
+      isVerticalEdge ? cursorCoord : cRect.top + cRect.height / 2,
+    );
+    if (!geo) return { kind: 'none', blocks: [], boundary: 0 };
+
+    const containerInfo = this.blockPathMap?.[containerUid];
+    const containerParentId = containerInfo?.parentId;
+
+    // Resolve childAllowed / parentAllowed from blockPathMap (not from
+    // handle dataset — this method is also called at rest, before any
+    // handle exists).
+    const ownChildren = this._getSiblingsByDomOrder(null, containerUid);
+    const firstChildInfo = this.blockPathMap?.[ownChildren[0]];
+    const childAllowed = firstChildInfo?.allowedSiblingTypes || null;
+    let parentAllowed = null;
+    const parentInfo = this.blockPathMap?.[containerParentId];
+    const parentSchema = parentInfo?._schemaRef
+      ? this.blockPathMap?._schemas?.[parentInfo._schemaRef] : null;
+    if (parentSchema?.properties && containerInfo?.containerField) {
+      const fd = parentSchema.properties[containerInfo.containerField];
+      if (fd?.widget === 'blocks_layout' || fd?.widget === 'object_list') {
+        parentAllowed = fd.allowedBlocks || null;
+      }
+    } else if (containerParentId === PAGE_BLOCK_UID) {
+      parentAllowed = containerInfo?.allowedSiblingTypes || null;
+    }
+
+    const blockMid = (el, axis) => {
+      const r = el.getBoundingClientRect();
+      return axis === 'vertical' ? (r.top + r.bottom) / 2 : (r.left + r.right) / 2;
+    };
+    const sign = (edge === 'top' || edge === 'left') ? -1 : 1;
+
+    let candidates;
+    let accepts;
+    if (mode === 'absorb') {
+      accepts = (t) => !childAllowed || (t && childAllowed.includes(t));
+      candidates = new Set();
+      for (const [uid, info] of Object.entries(this.blockPathMap)) {
+        if (!uid || uid === containerUid) continue;
+        if (info?.isFixed) continue;
+        if (this._isAncestor(uid, containerUid)) continue;
+        if (this._isAncestor(containerUid, uid)) continue;
+        if (!this._isAncestor(containerParentId, uid) && uid !== containerParentId) continue;
+        const el = this.queryBlockElement(uid);
+        if (!el) continue;
+        const mid = blockMid(el, geo.axis);
+        const outwardOfEdge = (mid - geo.edgePos) * sign > 0;
+        const inwardOfCursor = (mid - geo.mouseCoord) * sign < 0;
+        if (outwardOfEdge && inwardOfCursor) candidates.add(uid);
+      }
+    } else {
+      accepts = (t) => !parentAllowed || (t && parentAllowed.includes(t));
+      candidates = new Set();
+      for (const [uid, info] of Object.entries(this.blockPathMap)) {
+        if (!uid || uid === containerUid) continue;
+        if (info?.isFixed) continue;
+        if (!this._isAncestor(containerUid, uid)) continue;
+        const el = this.queryBlockElement(uid);
+        if (!el) continue;
+        const mid = blockMid(el, geo.axis);
+        const outwardOfCursor = (mid - geo.mouseCoord) * sign > 0;
+        if (outwardOfCursor) candidates.add(uid);
+      }
+    }
+
+    // Bottom-up promotion.
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const uid of [...candidates]) {
+        const info = this.blockPathMap[uid];
+        const pid = info?.parentId;
+        if (!pid) continue;
+        if (mode === 'absorb' && pid === containerParentId) continue;
+        if (mode === 'expel' && pid === containerUid) continue;
+        const sibs = Object.entries(this.blockPathMap)
+          .filter(([, i]) => i?.parentId === pid).map(([id]) => id);
+        if (sibs.length === 0 || !sibs.every((c) => candidates.has(c))) continue;
+        const pType = this.getBlockData(pid)?.['@type'];
+        if (!accepts(pType)) continue;
+        for (const c of sibs) candidates.delete(c);
+        candidates.add(pid);
+        changed = true;
+      }
+    }
+    // Drop any orphan whose @type isn't accepted.
+    for (const uid of [...candidates]) {
+      const t = this.getBlockData(uid)?.['@type'];
+      if (!accepts(t)) candidates.delete(uid);
+    }
+
+    const blocks = [...candidates].sort((a, b) => {
+      const ea = this.queryBlockElement(a);
+      const eb = this.queryBlockElement(b);
+      if (!ea || !eb) return 0;
+      return ea.compareDocumentPosition(eb) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    });
+
+    let boundary = geo.edgePos;
+    for (const uid of blocks) {
+      const el = this.queryBlockElement(uid);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (edge === 'bottom') boundary = Math.max(boundary, r.bottom);
+      else if (edge === 'top') boundary = Math.min(boundary, r.top);
+      else if (edge === 'right') boundary = Math.max(boundary, r.right);
+      else if (edge === 'left') boundary = Math.min(boundary, r.left);
+    }
+
+    return { kind: blocks.length > 0 ? mode : 'none', blocks, boundary };
   }
 
   _setupEdgeHandleDrag(handle) {
@@ -1146,138 +1274,24 @@ export class Bridge {
       overlays.clear();
     };
 
-    // Edge geometry: signed outward distance from edge in direction the user
-    // would drag to absorb. Positive = outward (absorb mode); negative =
-    // inward (expel mode). axis = which screen axis the edge spans.
-    const edgeGeometry = (edge, rect, mouseX, mouseY) => {
-      switch (edge) {
-        case 'bottom': return { axis: 'vertical', edgePos: rect.bottom, mouseCoord: mouseY, outward: mouseY - rect.bottom };
-        case 'top':    return { axis: 'vertical', edgePos: rect.top,    mouseCoord: mouseY, outward: rect.top - mouseY };
-        case 'right':  return { axis: 'horizontal', edgePos: rect.right, mouseCoord: mouseX, outward: mouseX - rect.right };
-        case 'left':   return { axis: 'horizontal', edgePos: rect.left,  mouseCoord: mouseX, outward: rect.left - mouseX };
-        default: return null;
-      }
-    };
-
-    const blockMid = (el, axis) => {
-      const r = el.getBoundingClientRect();
-      return axis === 'vertical' ? (r.top + r.bottom) / 2 : (r.left + r.right) / 2;
-    };
-
-    // Compute the plan (absorb or expel) given the cursor position. Returns
-    // { kind: 'absorb' | 'expel' | 'none', blocks: [...], boundary: number }.
-    // The same bottom-up promotion algorithm is used for both modes; only the
-    // candidate-collection step differs:
-    //   - Absorb: blocks in A's parent subtree (excl. A, ancestors, descendants)
-    //     whose midpoint along the drag axis lies between A's edge and cursor.
-    //   - Expel: A's descendants whose midpoint lies on the outward side of
-    //     cursor (i.e. they fall "outside" A's new boundary).
+    // Wraps the shared _computeEdgePlan method, deciding mode (absorb vs
+    // expel) from the cursor's signed outward distance.
     const computePlan = (e) => {
       const edge = handle.dataset.edge;
       const containerUid = handle.dataset.container;
       const containerEl = this.queryBlockElement(containerUid);
       if (!containerEl || !edge) return { kind: 'none', blocks: [], boundary: 0 };
       const cRect = containerEl.getBoundingClientRect();
-      const geo = edgeGeometry(edge, cRect, e.clientX, e.clientY);
+      const geo = this._edgeGeometry(edge, cRect, e.clientX, e.clientY);
       if (!geo) return { kind: 'none', blocks: [], boundary: 0 };
-
-      const containerInfo = this.blockPathMap?.[containerUid];
-      const containerParentId = containerInfo?.parentId;
-      const childAllowed = handle.dataset.childAllowed
-        ? handle.dataset.childAllowed.split(',') : null;
-      const parentAllowed = handle.dataset.parentAllowed
-        ? handle.dataset.parentAllowed.split(',') : null;
-
-      // signedOutward >= 0: absorb. < 0: expel. Threshold: a few px of slop
-      // so a tiny drag in the "wrong" direction doesn't immediately switch
-      // modes.
+      // A few px of slop so a tiny drag in the "wrong" direction doesn't
+      // immediately switch modes.
       const slop = 3;
-      let kind, candidates, accepts;
-      if (geo.outward > slop && handle.dataset.canAbsorb) {
-        kind = 'absorb';
-        accepts = (t) => !childAllowed || (t && childAllowed.includes(t));
-        candidates = new Set();
-        for (const [uid, info] of Object.entries(this.blockPathMap)) {
-          if (!uid || uid === containerUid) continue;
-          if (info?.isFixed) continue;
-          if (this._isAncestor(uid, containerUid)) continue;
-          if (this._isAncestor(containerUid, uid)) continue;
-          if (!this._isAncestor(containerParentId, uid) && uid !== containerParentId) continue;
-          const el = this.queryBlockElement(uid);
-          if (!el) continue;
-          const mid = blockMid(el, geo.axis);
-          // Outward side of A's edge AND inward side of cursor.
-          const outwardOfEdge = (mid - geo.edgePos) * (edge === 'top' || edge === 'left' ? -1 : 1) > 0;
-          const inwardOfCursor = (mid - geo.mouseCoord) * (edge === 'top' || edge === 'left' ? -1 : 1) < 0;
-          if (outwardOfEdge && inwardOfCursor) candidates.add(uid);
-        }
-      } else if (geo.outward < -slop && handle.dataset.canExpel) {
-        kind = 'expel';
-        accepts = (t) => !parentAllowed || (t && parentAllowed.includes(t));
-        candidates = new Set();
-        // A's descendants whose midpoint is OUTWARD of cursor (i.e. between
-        // A's outward edge and the cursor sweeping inward).
-        for (const [uid, info] of Object.entries(this.blockPathMap)) {
-          if (!uid || uid === containerUid) continue;
-          if (info?.isFixed) continue;
-          if (!this._isAncestor(containerUid, uid)) continue; // must be A's descendant
-          const el = this.queryBlockElement(uid);
-          if (!el) continue;
-          const mid = blockMid(el, geo.axis);
-          const outwardOfCursor = (mid - geo.mouseCoord) * (edge === 'top' || edge === 'left' ? -1 : 1) > 0;
-          if (outwardOfCursor) candidates.add(uid);
-        }
-      } else {
-        return { kind: 'none', blocks: [], boundary: geo.edgePos };
-      }
-
-      // Bottom-up promotion: replace fully-covered sibling sets with their
-      // parent (if accepted). Stops at the dragged container's level.
-      let changed = true;
-      while (changed) {
-        changed = false;
-        for (const uid of [...candidates]) {
-          const info = this.blockPathMap[uid];
-          const pid = info?.parentId;
-          if (!pid) continue;
-          // Don't promote past the dragged container's level.
-          if (kind === 'absorb' && pid === containerParentId) continue;
-          if (kind === 'expel' && pid === containerUid) continue;
-          const sibs = Object.entries(this.blockPathMap)
-            .filter(([, i]) => i?.parentId === pid).map(([id]) => id);
-          if (sibs.length === 0 || !sibs.every((c) => candidates.has(c))) continue;
-          const pType = this.getBlockData(pid)?.['@type'];
-          if (!accepts(pType)) continue;
-          for (const c of sibs) candidates.delete(c);
-          candidates.add(pid);
-          changed = true;
-        }
-      }
-      // Drop any orphan whose @type isn't accepted.
-      for (const uid of [...candidates]) {
-        const t = this.getBlockData(uid)?.['@type'];
-        if (!accepts(t)) candidates.delete(uid);
-      }
-
-      const plan = [...candidates].sort((a, b) => {
-        const ea = this.queryBlockElement(a);
-        const eb = this.queryBlockElement(b);
-        if (!ea || !eb) return 0;
-        return ea.compareDocumentPosition(eb) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
-      });
-
-      // Boundary on the drag axis = furthest outward extent of the plan.
-      let boundary = geo.edgePos;
-      for (const uid of plan) {
-        const el = this.queryBlockElement(uid);
-        if (!el) continue;
-        const r = el.getBoundingClientRect();
-        if (edge === 'bottom') boundary = Math.max(boundary, r.bottom);
-        else if (edge === 'top') boundary = Math.min(boundary, r.top);
-        else if (edge === 'right') boundary = Math.max(boundary, r.right);
-        else if (edge === 'left') boundary = Math.min(boundary, r.left);
-      }
-      return { kind, blocks: plan, boundary };
+      let mode = null;
+      if (geo.outward > slop && handle.dataset.canAbsorb) mode = 'absorb';
+      else if (geo.outward < -slop && handle.dataset.canExpel) mode = 'expel';
+      if (!mode) return { kind: 'none', blocks: [], boundary: geo.edgePos };
+      return this._computeEdgePlan(containerUid, edge, mode, geo.mouseCoord);
     };
 
     // Update the growth box to span between A's edge and the boundary, with
