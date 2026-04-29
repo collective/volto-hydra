@@ -2699,6 +2699,7 @@ const Iframe = (props) => {
               mediaFields: event.data.mediaFields, // Map of fieldName -> true for image/media fields
               addDirection: event.data.addDirection, // Direction for add button positioning
               isMultiElement: event.data.isMultiElement, // True if block renders as multiple DOM elements
+              canResize: event.data.canResize || null, // {top,bottom,left,right} booleans for edge-drag chrome
               selectionModeRects: event.data.selectionModeRects,
             };
           });
@@ -4084,6 +4085,59 @@ const Iframe = (props) => {
           )}
         </>
         );
+      })()}
+
+      {/* Edge-drag handles — visible chrome rendered admin-side from
+          blockUI.canResize. Each visible handle is pointer-events: none so
+          mouse events pass through to the iframe-side invisible
+          .volto-hydra-edge-handle div underneath, which captures mousedown
+          and runs the actual drag (chrome pattern, see docs/architecture.md).
+          Hidden during multi-select / selection mode like every other
+          single-block visual. */}
+      {blockUI?.canResize && blockUI.rect && referenceElement && !selectionMode
+       && !(blockUI.multiSelectedUids?.length > 1) && (() => {
+        const iframeLeft = referenceElement.getBoundingClientRect().left;
+        const iframeTop = referenceElement.getBoundingClientRect().top;
+        const r = blockUI.rect;
+        const handleStyle = (edge) => {
+          const isVertical = edge === 'top' || edge === 'bottom';
+          const base = {
+            position: 'fixed',
+            background: 'rgba(0, 126, 177, 0.35)',
+            pointerEvents: 'none',
+            zIndex: 2,
+          };
+          // Each visible handle is 1/3 of the edge length, centred — matches
+          // the iframe-side invisible event-capture div underneath.
+          const w3 = r.width / 3;
+          const h3 = r.height / 3;
+          if (isVertical) {
+            return {
+              ...base,
+              left: `${iframeLeft + r.left + w3}px`,
+              top: `${iframeTop + (edge === 'top' ? r.top - 3 : r.top + r.height - 3)}px`,
+              width: `${w3}px`,
+              height: '6px',
+            };
+          }
+          return {
+            ...base,
+            left: `${iframeLeft + (edge === 'left' ? r.left - 3 : r.left + r.width - 3)}px`,
+            top: `${iframeTop + r.top + h3}px`,
+            width: '6px',
+            height: `${h3}px`,
+          };
+        };
+        return ['top', 'bottom', 'left', 'right']
+          .filter((edge) => blockUI.canResize[edge])
+          .map((edge) => (
+            <div
+              key={`edge-handle-${edge}`}
+              className="volto-hydra-edge-handle-visual"
+              data-edge={edge}
+              style={handleStyle(edge)}
+            />
+          ));
       })()}
 
       {/* Touch selection mode — checkbox overlays on all visible blocks */}

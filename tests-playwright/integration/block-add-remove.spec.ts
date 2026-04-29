@@ -662,6 +662,68 @@ test.describe('Enter Key to Add/Navigate', () => {
     await expect(newBlock).toContainText('hello', { timeout: 3000 });
   });
 
+  // Failing on purpose: documents bug B's container-source variant.
+  // When the source block is a container (e.g. user selected the section
+  // via Escape-to-parent and pressed Enter), ADD_BLOCK_AFTER's "another one
+  // of these" rule creates another container, and that new container
+  // auto-initialises one default child via initializeContainerBlock. The
+  // user expects to type into the new container's first leaf editable field.
+  // Currently `selectBlock(fieldToFocus: 'first')` only walks own fields
+  // (not nested blocks' fields), so for a container the focus has no
+  // target and typing is lost.
+  test('Enter in block mode on a container source focuses the new container\'s first nested editable field', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/section-test-page');
+
+    const iframe = helper.getIframe();
+    const initialBlocks = await helper.getBlockOrder();
+
+    // 1. Click into the slate child to get a focused contenteditable.
+    await helper.enterEditMode('section-child-1', 'value');
+    const valueField = iframe.locator('[data-block-uid="section-child-1"] [data-edit-text="value"]');
+    await expect(valueField).toHaveAttribute('contenteditable', 'true');
+
+    // 2. Escape → block mode on the slate.
+    await page.keyboard.press('Escape');
+    await expect(valueField).not.toHaveAttribute('contenteditable', 'true');
+    await helper.waitForBlockSelected('section-child-1');
+
+    // 3. Escape → escalates to parent (section-1).
+    await page.keyboard.press('Escape');
+    await helper.waitForBlockSelected('section-1');
+
+    // 4. Enter creates another section (and an auto-init slate child inside it).
+    await page.keyboard.press('Enter');
+    await helper.waitForBlockCountToBe(initialBlocks.length + 2);
+
+    const newBlocks = await helper.getBlockOrder();
+    const candidates = newBlocks.filter((id) => !initialBlocks.includes(id));
+    expect(candidates.length).toBe(2);
+    let newSectionId: string | undefined;
+    for (const id of candidates) {
+      const isPageLevel = await iframe
+        .locator(`[data-block-uid="${id}"]`)
+        .first()
+        .evaluate((el) => !el.parentElement?.closest('[data-block-uid]'));
+      if (isPageLevel) {
+        newSectionId = id;
+        break;
+      }
+    }
+    expect(newSectionId).toBeDefined();
+    await helper.waitForBlockSelected(newSectionId!);
+
+    // 5. Typing should land in the new section's auto-initialised slate child
+    //    — but currently does NOT, because selectBlock(fieldToFocus: 'first')
+    //    doesn't recurse into nested blocks' editable fields.
+    await page.keyboard.type('hello', { delay: 10 });
+
+    const newBlock = iframe.locator(`[data-block-uid="${newSectionId}"]`);
+    await expect(newBlock).toContainText('hello', { timeout: 3000 });
+  });
+
   test('Enter on hero heading (non-last field) moves focus to next field', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 

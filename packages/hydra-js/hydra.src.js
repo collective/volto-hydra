@@ -954,6 +954,7 @@ export class Bridge {
    */
   _positionEdgeHandles() {
     const hide = () => {
+      this._lastCanEdgeDrag = false;
       if (this._edgeHandles) {
         for (const h of Object.values(this._edgeHandles)) h.style.display = 'none';
       }
@@ -993,41 +994,103 @@ export class Bridge {
       parentAllowed = info.allowedSiblingTypes || null;
     }
 
-    // Geometry-driven edge-drag: the drag-time `computePlan` walks every
-    // sibling/descendant and includes those whose midpoint lies between the
-    // dragged edge and the cursor. The axis of the children/parent doesn't
-    // gate this — cross-axis cases self-resolve degenerately (all-or-none).
-    // Up-front gating only needs: (a) at least one sibling the container
-    // can absorb, OR (b) at least one child the parent can accept on expel.
+    // Per-edge geometry: an edge is resizable when there's either an
+    // accepted sibling on its outward side (drag outward → absorb) or an
+    // accepted child closer to it than to the opposite edge (drag inward
+    // → expel). Drag-time `computePlan` doesn't need the axis to be set
+    // here — it walks midpoints freely. This boolean only controls *which
+    // edges show*; the visible chrome is rendered admin-side from
+    // blockUI.canResize and the container's own blockUI.rect.
     const accepts = (allowedList, type) => !allowedList || (type && allowedList.includes(type));
-    const siblings = this._getSiblingsByDomOrder(uid, info.parentId).filter((s) => s !== uid);
     const r = el.getBoundingClientRect();
+    const cx = (r.left + r.right) / 2;
+    const cy = (r.top + r.bottom) / 2;
 
-    const canAbsorbAny = siblings.some((s) => accepts(childAllowed, this.getBlockData(s)?.['@type']));
-    const canExpelAny = ownChildren.some((c) => accepts(parentAllowed, this.getBlockData(c)?.['@type']));
-
-    if (!canAbsorbAny && !canExpelAny) { hide(); return; }
-
-    const config = {
-      top:    { axis: 'vertical',   position: { left: r.left, top: r.top - 3, width: r.width, height: 6 } },
-      bottom: { axis: 'vertical',   position: { left: r.left, top: r.bottom - 3, width: r.width, height: 6 } },
-      left:   { axis: 'horizontal', position: { left: r.left - 3, top: r.top, width: 6, height: r.height } },
-      right:  { axis: 'horizontal', position: { left: r.right - 3, top: r.top, width: 6, height: r.height } },
+    // Siblings (admissible to this container) keyed by which side they're on.
+    const siblingMid = (sUid) => {
+      const sEl = this.queryBlockElement(sUid);
+      if (!sEl) return null;
+      const sr = sEl.getBoundingClientRect();
+      return { x: (sr.left + sr.right) / 2, y: (sr.top + sr.bottom) / 2 };
     };
+    const childMid = siblingMid; // same shape
 
-    for (const [edge, cfg] of Object.entries(config)) {
+    // canAbsorb: at-rest, "is there a sibling in this geometric direction".
+    // Type filtering happens at drag time (computePlan walks descendants and
+    // applies bottom-up promotion against childAllowed); checking direct
+    // siblings' types here would hide edges whose drag would actually pick
+    // up an accepted descendant — e.g. col-1's right edge absorbs a slate
+    // inside col-2 even though col-2 itself is a column (not accepted).
+    let absorbTop = false, absorbBottom = false, absorbLeft = false, absorbRight = false;
+    for (const sUid of this._getSiblingsByDomOrder(uid, info.parentId).filter((s) => s !== uid)) {
+      const m = siblingMid(sUid);
+      if (!m) continue;
+      if (m.y < r.top) absorbTop = true;
+      else if (m.y > r.bottom) absorbBottom = true;
+      if (m.x < r.left) absorbLeft = true;
+      else if (m.x > r.right) absorbRight = true;
+    }
+
+    // canExpel: any accepted child means dragging any of the 4 edges
+    // inward could expel something. Children's midpoints lie within the
+    // container's bounds by definition, so direction-discrimination here
+    // would only break boundary cases (e.g. single child centered exactly
+    // on the container's mid-axis). Drag-time computePlan resolves which
+    // child gets expelled based on cursor direction.
+    const canExpelAny = ownChildren.some(
+      (c) => accepts(parentAllowed, this.getBlockData(c)?.['@type']),
+    );
+    void cx; void cy; void childMid; // (kept for future per-edge expel refinement)
+
+    const perEdge = {
+      top:    { canAbsorb: absorbTop,    canExpel: canExpelAny },
+      bottom: { canAbsorb: absorbBottom, canExpel: canExpelAny },
+      left:   { canAbsorb: absorbLeft,   canExpel: canExpelAny },
+      right:  { canAbsorb: absorbRight,  canExpel: canExpelAny },
+    };
+    // canResize per-edge = either absorb or expel possible. This is the
+    // admin-facing summary used to decide which edge handles to render.
+    const canResize = {
+      top: perEdge.top.canAbsorb || perEdge.top.canExpel,
+      bottom: perEdge.bottom.canAbsorb || perEdge.bottom.canExpel,
+      left: perEdge.left.canAbsorb || perEdge.left.canExpel,
+      right: perEdge.right.canAbsorb || perEdge.right.canExpel,
+    };
+    if (!canResize.top && !canResize.bottom && !canResize.left && !canResize.right) {
+      hide(); return;
+    }
+    this._lastCanResize = canResize;
+
+    // Position the (invisible) event-capture divs in iframe coords. They
+    // sit underneath the admin's visible chrome (pointer-events: none) so
+    // mouse events pass through to be captured here for drag start.
+    // Each handle is 1/3 of the edge length, centred — gives a clear hit
+    // area without the chrome looking like a full-size frame.
+    const w3 = r.width / 3;
+    const h3 = r.height / 3;
+    const positions = {
+      top:    { left: r.left + w3, top: r.top - 3, width: w3, height: 6, axis: 'vertical' },
+      bottom: { left: r.left + w3, top: r.bottom - 3, width: w3, height: 6, axis: 'vertical' },
+      left:   { left: r.left - 3, top: r.top + h3, width: 6, height: h3, axis: 'horizontal' },
+      right:  { left: r.right - 3, top: r.top + h3, width: 6, height: h3, axis: 'horizontal' },
+    };
+    for (const [edge, pos] of Object.entries(positions)) {
       const handle = this._edgeHandles[edge];
       if (!handle) continue;
-      handle.style.left = `${cfg.position.left}px`;
-      handle.style.top = `${cfg.position.top}px`;
-      handle.style.width = `${cfg.position.width}px`;
-      handle.style.height = `${cfg.position.height}px`;
+      if (!canResize[edge]) {
+        handle.style.display = 'none';
+        continue;
+      }
+      handle.style.left = `${pos.left}px`;
+      handle.style.top = `${pos.top}px`;
+      handle.style.width = `${pos.width}px`;
+      handle.style.height = `${pos.height}px`;
       handle.style.display = 'block';
       handle.dataset.edge = edge;
-      handle.dataset.axis = cfg.axis;
+      handle.dataset.axis = pos.axis;
       handle.dataset.container = uid;
-      handle.dataset.canAbsorb = canAbsorbAny ? '1' : '';
-      handle.dataset.canExpel = canExpelAny ? '1' : '';
+      handle.dataset.canAbsorb = perEdge[edge].canAbsorb ? '1' : '';
+      handle.dataset.canExpel = perEdge[edge].canExpel ? '1' : '';
       handle.dataset.childAllowed = childAllowed ? childAllowed.join(',') : '';
       handle.dataset.parentAllowed = parentAllowed ? parentAllowed.join(',') : '';
     }
@@ -2763,6 +2826,10 @@ export class Bridge {
       focusedLinkableField,
       focusedMediaField,
       addDirection,
+      // canResize tells admin which edge handles to render as visible chrome
+      // (per docs/architecture.md). Iframe keeps invisible event-capture
+      // divs at the same coords for mousedown.
+      canResize: this._lastCanResize || null,
       isMultiElement: blockUid && blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid).length > 1 : false,
     };
 
@@ -8232,6 +8299,11 @@ export class Bridge {
     // into the container's rect) expels the closest children to the parent.
     document.querySelectorAll('.volto-hydra-edge-handle').forEach((el) => el.remove());
     this._edgeHandles = {};
+    // Edge handles follow the chrome pattern (see docs/architecture.md):
+    //   - the visible chrome is rendered by the admin from blockUI.edgeRects;
+    //   - this iframe-side div is *invisible* and only exists to capture
+    //     mouse events that pass through the admin's pointer-events:none
+    //     visual on top of it.
     for (const edge of ['top', 'bottom', 'left', 'right']) {
       const h = document.createElement('div');
       h.className = 'volto-hydra-edge-handle';
@@ -8239,7 +8311,7 @@ export class Bridge {
       const isVertical = edge === 'top' || edge === 'bottom';
       Object.assign(h.style, {
         position: 'fixed',
-        background: 'rgba(0, 126, 177, 0.35)',
+        background: 'transparent',
         cursor: isVertical ? 'ns-resize' : 'ew-resize',
         zIndex: '9998',
         display: 'none',

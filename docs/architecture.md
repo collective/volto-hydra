@@ -642,6 +642,14 @@ Edge-drag — drag a container's edge to absorb adjacent blocks (or expel childr
 
 Earlier versions of edge-drag rendered the visible handles **inside the iframe** (see [Anti-pattern](#anti-pattern-chrome-inside-the-iframe)). That re-introduced exactly the bugs this architecture exists to avoid: handles persisted across selection changes, didn't hide on scroll, and could co-exist with the admin's `.volto-hydra-block-outline` to produce two simultaneous selection rects.
 
+### Frontend's focus styling on selected blocks
+
+Hydra's `selectBlock` calls `.focus()` (after setting `tabindex="-1"`) on the selected block when it has no editable text fields. This is plumbing — without focus inside the iframe, keydown events fire on the parent admin window instead of being caught by the iframe's document keyboard blocker. It is not "the block is selected, so it has focus" — selection is an editor concept tracked in admin Redux, focus is a DOM concept.
+
+Frontends are free to style `:focus` on their blocks however they like. The only request: **on container blocks (gridBlock, columns, accordion, etc.) that you give a `border-radius` on the `data-block-uid` element, suppress the browser's default `:focus` outline** — otherwise it traces a rounded blue rectangle that looks indistinguishable from a selection outline and stacks visually on top of the admin's chrome. Tailwind: add `focus:outline-none`. Vanilla CSS: `[data-block-uid]:focus { outline: none; }` scoped to the relevant blocks.
+
+Hydra does not inject CSS to suppress this — that would override the frontend's styling for `:focus` everywhere and is wrong on principle (frontend owns its CSS).
+
 ### Anti-pattern: chrome inside the iframe
 
 If you find yourself doing any of the following in `hydra.src.js`, stop and reconsider:

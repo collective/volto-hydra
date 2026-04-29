@@ -70,7 +70,7 @@
   </template>
 
   <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid"
-       class="mt-6 mb-6 rounded-lg" :style="gridBgStyle(block)">
+       class="mt-6 mb-6 rounded-lg focus:outline-none" :style="gridBgStyle(block)">
     <div :class="['grid-row grid gap-4 grid-cols-1', ...gridColsClass(block)]">
       <template v-for="entry in gridChildren" :key="entry.id">
         <!-- Listing child: async expand in Suspense, with shared paging -->

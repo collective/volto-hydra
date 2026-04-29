@@ -16,9 +16,15 @@ test.describe('Container UX: Edge-drag', () => {
     });
     await helper.waitForBlockSelected('section-1');
 
-    // An edge handle should appear on the bottom of section-1.
+    // An edge handle should appear on the bottom of section-1, with the
+    // resize cursor — verifies the iframe-side invisible event-capture div
+    // is in place under the admin's visible chrome.
     const bottomHandle = iframe.locator('.volto-hydra-edge-handle[data-edge="bottom"]');
     await expect(bottomHandle).toBeVisible({ timeout: 3000 });
+    await expect(bottomHandle).toHaveCSS('cursor', 'ns-resize');
+    // And the admin renders a corresponding visible bar on top of it.
+    const adminVisibleBottom = page.locator('.volto-hydra-edge-handle-visual[data-edge="bottom"]');
+    await expect(adminVisibleBottom).toBeVisible();
 
     // Starting positions — slate-after is section-1's next sibling at page level.
     const sectionRect = await iframe.locator('[data-block-uid="section-1"]').boundingBox();
@@ -354,6 +360,61 @@ test.describe('Container UX: Edge-drag', () => {
     }, { timeout: 5000 }).toContain('col-2');
 
     await helper.waitForBlockSelected('col-2');
+  });
+
+  // Two grids stacked vertically. Dragging the bottom edge of the top grid
+  // down past the bottom grid's teasers should absorb those teasers as
+  // children of the top grid (bottom-up promotion: teasers are accepted by
+  // the top grid's allowedBlocks ['image','listing','slate','teaser'] but
+  // gridBlock itself isn't, so promotion stops at teaser level — the four
+  // teasers get pulled out of grid-2 and into grid-1).
+  test('Bottom edge: drag DOWN past sibling-container children absorbs them across the boundary', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="grid-1"]').first().evaluate((el) => {
+      (window as any).bridge?.selectBlock(el);
+    });
+    await helper.waitForBlockSelected('grid-1');
+
+    // Initial: each grid has 2 cells (4 teasers total, 2 per grid).
+    const grid2Initial = await iframe
+      .locator('[data-block-uid="grid-2"] [data-block-uid]').count();
+    expect(grid2Initial).toBe(2);
+
+    const bottomHandle = iframe.locator('.volto-hydra-edge-handle[data-edge="bottom"]');
+    await expect(bottomHandle).toBeVisible({ timeout: 3000 });
+
+    // Drag past grid-2's last teaser.
+    const grid4Rect = await iframe.locator('[data-block-uid="grid-cell-4"]')
+      .first().boundingBox();
+    const handleBox = await bottomHandle.boundingBox();
+    expect(grid4Rect).not.toBeNull();
+    expect(handleBox).not.toBeNull();
+    const startX = handleBox!.x + handleBox!.width / 2;
+    const startY = handleBox!.y + handleBox!.height / 2;
+    const endY = grid4Rect!.y + grid4Rect!.height + 10;
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    for (let s = 1; s <= 8; s++) {
+      await page.mouse.move(startX, startY + (endY - startY) * (s / 8));
+      await page.waitForTimeout(20);
+    }
+    await page.mouse.up();
+
+    // Both teasers should now live inside grid-1.
+    await expect.poll(async () => {
+      const cells = ['grid-cell-3', 'grid-cell-4'];
+      const parents = await Promise.all(cells.map((c) =>
+        iframe.locator(`[data-block-uid="${c}"]`).evaluate(
+          (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid') || null,
+        ),
+      ));
+      return parents.every((p) => p === 'grid-1');
+    }, { timeout: 5000 }).toBe(true);
   });
 
   // Cross-axis expel: dragging the left/right edge inward on a vertical-stack

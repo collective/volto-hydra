@@ -1060,6 +1060,7 @@ var Bridge = class {
    */
   _positionEdgeHandles() {
     const hide = () => {
+      this._lastCanEdgeDrag = false;
       if (this._edgeHandles) {
         for (const h of Object.values(this._edgeHandles)) h.style.display = "none";
       }
@@ -1101,33 +1102,73 @@ var Bridge = class {
       parentAllowed = info.allowedSiblingTypes || null;
     }
     const accepts = (allowedList, type) => !allowedList || type && allowedList.includes(type);
-    const siblings = this._getSiblingsByDomOrder(uid, info.parentId).filter((s) => s !== uid);
     const r = el.getBoundingClientRect();
-    const canAbsorbAny = siblings.some((s) => accepts(childAllowed, this.getBlockData(s)?.["@type"]));
-    const canExpelAny = ownChildren.some((c) => accepts(parentAllowed, this.getBlockData(c)?.["@type"]));
-    if (!canAbsorbAny && !canExpelAny) {
+    const cx = (r.left + r.right) / 2;
+    const cy = (r.top + r.bottom) / 2;
+    const siblingMid = (sUid) => {
+      const sEl = this.queryBlockElement(sUid);
+      if (!sEl) return null;
+      const sr = sEl.getBoundingClientRect();
+      return { x: (sr.left + sr.right) / 2, y: (sr.top + sr.bottom) / 2 };
+    };
+    const childMid = siblingMid;
+    let absorbTop = false, absorbBottom = false, absorbLeft = false, absorbRight = false;
+    for (const sUid of this._getSiblingsByDomOrder(uid, info.parentId).filter((s) => s !== uid)) {
+      const m = siblingMid(sUid);
+      if (!m) continue;
+      if (m.y < r.top) absorbTop = true;
+      else if (m.y > r.bottom) absorbBottom = true;
+      if (m.x < r.left) absorbLeft = true;
+      else if (m.x > r.right) absorbRight = true;
+    }
+    const canExpelAny = ownChildren.some(
+      (c) => accepts(parentAllowed, this.getBlockData(c)?.["@type"])
+    );
+    void cx;
+    void cy;
+    void childMid;
+    const perEdge = {
+      top: { canAbsorb: absorbTop, canExpel: canExpelAny },
+      bottom: { canAbsorb: absorbBottom, canExpel: canExpelAny },
+      left: { canAbsorb: absorbLeft, canExpel: canExpelAny },
+      right: { canAbsorb: absorbRight, canExpel: canExpelAny }
+    };
+    const canResize = {
+      top: perEdge.top.canAbsorb || perEdge.top.canExpel,
+      bottom: perEdge.bottom.canAbsorb || perEdge.bottom.canExpel,
+      left: perEdge.left.canAbsorb || perEdge.left.canExpel,
+      right: perEdge.right.canAbsorb || perEdge.right.canExpel
+    };
+    if (!canResize.top && !canResize.bottom && !canResize.left && !canResize.right) {
       hide();
       return;
     }
-    const config = {
-      top: { axis: "vertical", position: { left: r.left, top: r.top - 3, width: r.width, height: 6 } },
-      bottom: { axis: "vertical", position: { left: r.left, top: r.bottom - 3, width: r.width, height: 6 } },
-      left: { axis: "horizontal", position: { left: r.left - 3, top: r.top, width: 6, height: r.height } },
-      right: { axis: "horizontal", position: { left: r.right - 3, top: r.top, width: 6, height: r.height } }
+    this._lastCanResize = canResize;
+    const w3 = r.width / 3;
+    const h3 = r.height / 3;
+    const positions = {
+      top: { left: r.left + w3, top: r.top - 3, width: w3, height: 6, axis: "vertical" },
+      bottom: { left: r.left + w3, top: r.bottom - 3, width: w3, height: 6, axis: "vertical" },
+      left: { left: r.left - 3, top: r.top + h3, width: 6, height: h3, axis: "horizontal" },
+      right: { left: r.right - 3, top: r.top + h3, width: 6, height: h3, axis: "horizontal" }
     };
-    for (const [edge, cfg] of Object.entries(config)) {
+    for (const [edge, pos] of Object.entries(positions)) {
       const handle = this._edgeHandles[edge];
       if (!handle) continue;
-      handle.style.left = `${cfg.position.left}px`;
-      handle.style.top = `${cfg.position.top}px`;
-      handle.style.width = `${cfg.position.width}px`;
-      handle.style.height = `${cfg.position.height}px`;
+      if (!canResize[edge]) {
+        handle.style.display = "none";
+        continue;
+      }
+      handle.style.left = `${pos.left}px`;
+      handle.style.top = `${pos.top}px`;
+      handle.style.width = `${pos.width}px`;
+      handle.style.height = `${pos.height}px`;
       handle.style.display = "block";
       handle.dataset.edge = edge;
-      handle.dataset.axis = cfg.axis;
+      handle.dataset.axis = pos.axis;
       handle.dataset.container = uid;
-      handle.dataset.canAbsorb = canAbsorbAny ? "1" : "";
-      handle.dataset.canExpel = canExpelAny ? "1" : "";
+      handle.dataset.canAbsorb = perEdge[edge].canAbsorb ? "1" : "";
+      handle.dataset.canExpel = perEdge[edge].canExpel ? "1" : "";
       handle.dataset.childAllowed = childAllowed ? childAllowed.join(",") : "";
       handle.dataset.parentAllowed = parentAllowed ? parentAllowed.join(",") : "";
     }
@@ -2534,6 +2575,10 @@ var Bridge = class {
       focusedLinkableField,
       focusedMediaField,
       addDirection,
+      // canResize tells admin which edge handles to render as visible chrome
+      // (per docs/architecture.md). Iframe keeps invisible event-capture
+      // divs at the same coords for mousedown.
+      canResize: this._lastCanResize || null,
       isMultiElement: blockUid && blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid).length > 1 : false
     };
     if (options.selection !== void 0) {
@@ -6653,7 +6698,7 @@ DOM path (text node \u2192 container):
       const isVertical = edge === "top" || edge === "bottom";
       Object.assign(h.style, {
         position: "fixed",
-        background: "rgba(0, 126, 177, 0.35)",
+        background: "transparent",
         cursor: isVertical ? "ns-resize" : "ew-resize",
         zIndex: "9998",
         display: "none",

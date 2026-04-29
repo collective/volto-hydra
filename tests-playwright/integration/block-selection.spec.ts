@@ -2519,4 +2519,64 @@ test.describe('Multi-Block Selection', () => {
     const newOrder = await helper.getBlockOrder();
     expect(newOrder).toEqual(expected);
   });
+
+  // Regression: when the previously-selected block was a container with
+  // edge-drag handles, those handles used to leak into the newly-selected
+  // block's chrome (visible in the iframe, not driven by blockUI), so the
+  // user saw two simultaneous selection rects: the new admin
+  // `.volto-hydra-block-outline` AND a "frame" of stale edge handles drawn
+  // around the previous container. The chrome refactor moves the visible
+  // edge handles into admin-side `.volto-hydra-edge-handle-visual` driven
+  // by `blockUI.canResize`, so they unmount automatically on selection
+  // change.
+  test('switching selection from a container to a descendant does not leave stale edge handles', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // 1. Select the grid via the bridge — admin should render edge handles.
+    await iframe.locator('[data-block-uid="grid-1"]').first().evaluate((el) => {
+      (window as any).bridge?.selectBlock(el);
+    });
+    await helper.waitForBlockSelected('grid-1');
+
+    const adminEdges = page.locator('.volto-hydra-edge-handle-visual');
+    const gridEdgeCountInitial = await adminEdges.count();
+    expect(gridEdgeCountInitial,
+      'expected at least one edge handle while a container is selected'
+    ).toBeGreaterThan(0);
+
+    // 2. Click into a non-editable child (the teaser's image placeholder).
+    //    Use the bridge for the second selection too — what matters is that
+    //    blockUI moves to grid-cell-1.
+    await iframe.locator('[data-block-uid="grid-cell-1"]').first().evaluate((el) => {
+      (window as any).bridge?.selectBlock(el);
+    });
+    await helper.waitForBlockSelected('grid-cell-1');
+
+    // ASSERT: exactly one selection outline (for grid-cell-1).
+    const outlines = page.locator('.volto-hydra-block-outline');
+    await expect(outlines).toHaveCount(1);
+
+    // ASSERT: any edge handles still rendered must be for grid-cell-1's
+    //         rect, not for grid-1's rect. Easiest invariant: their
+    //         bounding boxes must lie within the teaser's bounding box
+    //         (with a small slop for the 3px outset).
+    const teaserBox = await iframe.locator('[data-block-uid="grid-cell-1"]')
+      .first().boundingBox();
+    expect(teaserBox).not.toBeNull();
+    const remaining = await adminEdges.count();
+    for (let i = 0; i < remaining; i++) {
+      const box = await adminEdges.nth(i).boundingBox();
+      if (!box) continue;
+      const slop = 8;
+      expect(box.x + box.width).toBeLessThanOrEqual(teaserBox!.x + teaserBox!.width + slop);
+      expect(box.y + box.height).toBeLessThanOrEqual(teaserBox!.y + teaserBox!.height + slop);
+      expect(box.x).toBeGreaterThanOrEqual(teaserBox!.x - slop);
+      expect(box.y).toBeGreaterThanOrEqual(teaserBox!.y - slop);
+    }
+  });
 });
