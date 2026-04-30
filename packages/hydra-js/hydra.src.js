@@ -6219,9 +6219,16 @@ export class Bridge {
               // focus the first editable field so the user can type without
               // an extra click. Without this, blocks created from block-mode
               // Enter land selected-but-not-focused.
-              log('Selecting new block from afterContentRender:', blockUidToProcess);
+              //
+              // Skip fieldToFocus when admin sends a transformedSelection:
+              // that means a slate transform (split/merge) ran and is
+              // shipping an explicit cursor position to apply on the new
+              // DOM (e.g. backspace-merge places the cursor at the join
+              // point). Forcing focus to "first editable" would clobber
+              // that selection — regression introduced in 97dd597b.
+              log('Selecting new block from afterContentRender:', blockUidToProcess, 'transformedSelection:', !!transformedSelection);
               this.editMode = 'text';
-              this.selectBlock(el, { fieldToFocus: 'first' });
+              this.selectBlock(el, transformedSelection ? {} : { fieldToFocus: 'first' });
             }
           : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
 
