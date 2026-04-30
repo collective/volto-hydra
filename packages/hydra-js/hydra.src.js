@@ -858,6 +858,580 @@ export class Bridge {
     return a.every((uid) => setB.has(uid));
   }
 
+  /** True if `ancestorUid` appears anywhere in `descendantUid`'s parent chain. */
+  _isAncestor(ancestorUid, descendantUid) {
+    if (!ancestorUid || !descendantUid) return false;
+    let cur = this.blockPathMap?.[descendantUid]?.parentId;
+    while (cur) {
+      if (cur === ancestorUid) return true;
+      cur = this.blockPathMap?.[cur]?.parentId;
+    }
+    return false;
+  }
+
+  /**
+   * Auto-scroll helper for drag operations.
+   *
+   * Returns { onMouseMove(e), stop() } that the caller wires into a drag's
+   * mousemove and mouseup. While the cursor is within `threshold` pixels of
+   * the viewport top or bottom, the page scrolls at a speed proportional to
+   * how close it is to the edge (faster nearer the edge). A synthetic
+   * mousemove is dispatched on each scroll tick so the caller's drag
+   * indicator updates while the mouse is stationary at the edge.
+   *
+   * Used by:
+   *  - block DnD (existing drag-and-drop)
+   *  - container edge-drag
+   */
+  _createAutoScroller() {
+    const threshold = 80; // pixels from viewport edge to start scrolling
+    const minSpeed = 10;
+    const maxSpeed = 50;
+    let direction = 0; // -1 up, 0 none, 1 down
+    let speed = 0;
+    let animId = null;
+    let lastX = 0;
+    let lastY = 0;
+
+    const loop = () => {
+      if (direction === 0) return;
+      window.scrollTo({
+        top: window.scrollY + direction * speed,
+        behavior: 'instant',
+      });
+      // Synthetic mousemove so the drag indicator follows the scrolled content
+      // even when the cursor is held still at the edge.
+      document.dispatchEvent(new MouseEvent('mousemove', {
+        clientX: lastX, clientY: lastY, bubbles: true,
+      }));
+      animId = requestAnimationFrame(loop);
+    };
+
+    const setDirection = (d) => {
+      if (direction === d) return;
+      direction = d;
+      if (animId === null && d !== 0) {
+        animId = requestAnimationFrame(loop);
+      }
+    };
+
+    const stop = () => {
+      direction = 0;
+      if (animId !== null) {
+        cancelAnimationFrame(animId);
+        animId = null;
+      }
+    };
+
+    const onMouseMove = (e) => {
+      lastX = e.clientX;
+      lastY = e.clientY;
+      const vh = window.innerHeight;
+      if (e.clientY < threshold) {
+        const factor = 1 - e.clientY / threshold;
+        speed = minSpeed + (maxSpeed - minSpeed) * factor;
+        setDirection(-1);
+      } else if (e.clientY > vh - threshold) {
+        const factor = 1 - (vh - e.clientY) / threshold;
+        speed = minSpeed + (maxSpeed - minSpeed) * factor;
+        setDirection(1);
+      } else {
+        stop();
+      }
+    };
+
+    return { onMouseMove, stop };
+  }
+
+  /**
+   * Position all 4 edge handles for the selected container.
+   * For each edge:
+   *   - Show if absorb is possible: there's a sibling on the outward side
+   *     (parent layout matches edge axis) whose @type the container accepts.
+   *   - Show if expel is possible: the container has a child whose @type
+   *     the parent accepts (children layout matches edge axis).
+   * The drag handler reads dataset attributes to know what to do.
+   */
+  _positionEdgeHandles() {
+    const hide = () => {
+      this._lastCanResize = null;
+      if (this._edgeHandles) {
+        for (const h of Object.values(this._edgeHandles)) h.style.display = 'none';
+      }
+    };
+    if (!this._edgeHandles) return;
+    const uid = this.selectedBlockUid;
+    if (!uid || uid === PAGE_BLOCK_UID) { hide(); return; }
+    const info = this.blockPathMap?.[uid];
+    const el = uid ? this.queryBlockElement(uid) : null;
+    if (!info || !el) { hide(); return; }
+
+    const ownChildren = this._getSiblingsByDomOrder(null, uid);
+    if (ownChildren.length === 0) { hide(); return; }
+
+    // childAllowed = the types this container accepts as direct children.
+    // Most reliable source: the container's first child's allowedSiblingTypes
+    // (computed by buildBlockPathMap from the block-config + schema chain).
+    // Falling back to scanning the block's schema for a blocks_layout/
+    // object_list widget misses cases where allowedBlocks lives on the block
+    // config (e.g. gridBlock has no blocks_layout in its blockSchema —
+    // allowedBlocks is on blocksConfig.gridBlock).
+    const firstChildInfo = this.blockPathMap?.[ownChildren[0]];
+    let childAllowed = firstChildInfo?.allowedSiblingTypes || null;
+
+    // parentAllowed = allowedBlocks of the field this container lives in.
+    // Used to decide if expel can land children at the parent level.
+    const parentInfo = this.blockPathMap?.[info.parentId];
+    const parentSchema = parentInfo?._schemaRef
+      ? this.blockPathMap?._schemas?.[parentInfo._schemaRef] : null;
+    let parentAllowed = null;
+    if (parentSchema?.properties && info.containerField) {
+      const fd = parentSchema.properties[info.containerField];
+      if (fd?.widget === 'blocks_layout' || fd?.widget === 'object_list') {
+        parentAllowed = fd.allowedBlocks || null;
+      }
+    } else if (info.parentId === PAGE_BLOCK_UID) {
+      parentAllowed = info.allowedSiblingTypes || null;
+    }
+
+    const r = el.getBoundingClientRect();
+
+    // canAbsorb / canExpel per-edge: ask the shared _computeEdgePlan
+    // "would dragging this edge to infinity in the outward (absorb) /
+    // inward (expel) direction yield any blocks?". Single source of
+    // truth — the at-rest visibility check and the drag-time chrome
+    // (growth box / tints / MOVE_BLOCKS) use the exact same logic.
+    const planFor = (edge, mode) => {
+      const FAR = 1e7;
+      let cursorCoord;
+      if (mode === 'absorb') {
+        // Cursor far in the outward direction.
+        cursorCoord = (edge === 'bottom') ? r.bottom + FAR
+          : (edge === 'top')   ? r.top - FAR
+          : (edge === 'right') ? r.right + FAR
+          :                       r.left - FAR;
+      } else {
+        // Cursor far in the inward direction (past the opposite edge).
+        cursorCoord = (edge === 'bottom') ? r.top - FAR
+          : (edge === 'top')   ? r.bottom + FAR
+          : (edge === 'right') ? r.left - FAR
+          :                       r.right + FAR;
+      }
+      return this._computeEdgePlan(uid, edge, mode, cursorCoord).blocks.length > 0;
+    };
+
+    const perEdge = {};
+    for (const edge of ['top', 'bottom', 'left', 'right']) {
+      perEdge[edge] = {
+        canAbsorb: planFor(edge, 'absorb'),
+        canExpel:  planFor(edge, 'expel'),
+      };
+    }
+    // canResize per-edge = either absorb or expel possible. This is the
+    // admin-facing summary used to decide which edge handles to render.
+    const canResize = {
+      top: perEdge.top.canAbsorb || perEdge.top.canExpel,
+      bottom: perEdge.bottom.canAbsorb || perEdge.bottom.canExpel,
+      left: perEdge.left.canAbsorb || perEdge.left.canExpel,
+      right: perEdge.right.canAbsorb || perEdge.right.canExpel,
+    };
+    if (!canResize.top && !canResize.bottom && !canResize.left && !canResize.right) {
+      hide(); return;
+    }
+    this._lastCanResize = canResize;
+
+    // Position the (invisible) event-capture divs in iframe coords. They
+    // sit underneath the admin's visible chrome (pointer-events: none) so
+    // mouse events pass through to be captured here for drag start.
+    // Each handle is 1/3 of the edge length, centred — gives a clear hit
+    // area without the chrome looking like a full-size frame.
+    const w3 = r.width / 3;
+    const h3 = r.height / 3;
+    const positions = {
+      top:    { left: r.left + w3, top: r.top - 3, width: w3, height: 6, axis: 'vertical' },
+      bottom: { left: r.left + w3, top: r.bottom - 3, width: w3, height: 6, axis: 'vertical' },
+      left:   { left: r.left - 3, top: r.top + h3, width: 6, height: h3, axis: 'horizontal' },
+      right:  { left: r.right - 3, top: r.top + h3, width: 6, height: h3, axis: 'horizontal' },
+    };
+    for (const [edge, pos] of Object.entries(positions)) {
+      const handle = this._edgeHandles[edge];
+      if (!handle) continue;
+      if (!canResize[edge]) {
+        handle.style.display = 'none';
+        continue;
+      }
+      handle.style.left = `${pos.left}px`;
+      handle.style.top = `${pos.top}px`;
+      handle.style.width = `${pos.width}px`;
+      handle.style.height = `${pos.height}px`;
+      handle.style.display = 'block';
+      handle.dataset.edge = edge;
+      handle.dataset.axis = pos.axis;
+      handle.dataset.container = uid;
+      handle.dataset.canAbsorb = perEdge[edge].canAbsorb ? '1' : '';
+      handle.dataset.canExpel = perEdge[edge].canExpel ? '1' : '';
+      handle.dataset.childAllowed = childAllowed ? childAllowed.join(',') : '';
+      handle.dataset.parentAllowed = parentAllowed ? parentAllowed.join(',') : '';
+    }
+  }
+
+  /**
+   * Geometry helper: signed outward distance from the edge in the
+   * direction the user would drag to absorb. Positive = outward
+   * (absorb mode); negative = inward (expel mode).
+   */
+  _edgeGeometry(edge, rect, mouseX, mouseY) {
+    switch (edge) {
+      case 'bottom': return { axis: 'vertical',   edgePos: rect.bottom, mouseCoord: mouseY, outward: mouseY - rect.bottom };
+      case 'top':    return { axis: 'vertical',   edgePos: rect.top,    mouseCoord: mouseY, outward: rect.top - mouseY };
+      case 'right':  return { axis: 'horizontal', edgePos: rect.right,  mouseCoord: mouseX, outward: mouseX - rect.right };
+      case 'left':   return { axis: 'horizontal', edgePos: rect.left,   mouseCoord: mouseX, outward: rect.left - mouseX };
+      default:       return null;
+    }
+  }
+
+  /**
+   * Compute the absorb/expel plan for an edge of a container — the single
+   * source of truth used by both at-rest edge-visibility (canResize) and
+   * drag-time chrome (growth box / tints / MOVE_BLOCKS on release).
+   *
+   * @param {string} containerUid
+   * @param {string} edge   - 'top' | 'bottom' | 'left' | 'right'
+   * @param {'absorb'|'expel'} mode
+   * @param {number} cursorCoord - cursor position on the edge's perpendicular
+   *   axis. Pass ±Infinity to simulate "drag this edge as far as possible";
+   *   that's how _positionEdgeHandles asks "is anything absorbable here?"
+   *   without an actual mouse event.
+   * @returns {{ kind: 'absorb'|'expel'|'none', blocks: string[], boundary: number }}
+   */
+  _computeEdgePlan(containerUid, edge, mode, cursorCoord) {
+    const containerEl = this.queryBlockElement(containerUid);
+    if (!containerEl) return { kind: 'none', blocks: [], boundary: 0 };
+    const cRect = containerEl.getBoundingClientRect();
+    const isVerticalEdge = edge === 'top' || edge === 'bottom';
+    const geo = this._edgeGeometry(
+      edge, cRect,
+      isVerticalEdge ? cRect.left + cRect.width / 2 : cursorCoord,
+      isVerticalEdge ? cursorCoord : cRect.top + cRect.height / 2,
+    );
+    if (!geo) return { kind: 'none', blocks: [], boundary: 0 };
+
+    const containerInfo = this.blockPathMap?.[containerUid];
+    const containerParentId = containerInfo?.parentId;
+
+    // Resolve childAllowed / parentAllowed from blockPathMap (not from
+    // handle dataset — this method is also called at rest, before any
+    // handle exists).
+    const ownChildren = this._getSiblingsByDomOrder(null, containerUid);
+    const firstChildInfo = this.blockPathMap?.[ownChildren[0]];
+    const childAllowed = firstChildInfo?.allowedSiblingTypes || null;
+    let parentAllowed = null;
+    const parentInfo = this.blockPathMap?.[containerParentId];
+    const parentSchema = parentInfo?._schemaRef
+      ? this.blockPathMap?._schemas?.[parentInfo._schemaRef] : null;
+    if (parentSchema?.properties && containerInfo?.containerField) {
+      const fd = parentSchema.properties[containerInfo.containerField];
+      if (fd?.widget === 'blocks_layout' || fd?.widget === 'object_list') {
+        parentAllowed = fd.allowedBlocks || null;
+      }
+    } else if (containerParentId === PAGE_BLOCK_UID) {
+      parentAllowed = containerInfo?.allowedSiblingTypes || null;
+    }
+
+    const blockMid = (el, axis) => {
+      const r = el.getBoundingClientRect();
+      return axis === 'vertical' ? (r.top + r.bottom) / 2 : (r.left + r.right) / 2;
+    };
+    const sign = (edge === 'top' || edge === 'left') ? -1 : 1;
+
+    let candidates;
+    let accepts;
+    if (mode === 'absorb') {
+      accepts = (t) => !childAllowed || (t && childAllowed.includes(t));
+      candidates = new Set();
+      for (const [uid, info] of Object.entries(this.blockPathMap)) {
+        if (!uid || uid === containerUid) continue;
+        if (info?.isFixed) continue;
+        if (this._isAncestor(uid, containerUid)) continue;
+        if (this._isAncestor(containerUid, uid)) continue;
+        if (!this._isAncestor(containerParentId, uid) && uid !== containerParentId) continue;
+        const el = this.queryBlockElement(uid);
+        if (!el) continue;
+        const mid = blockMid(el, geo.axis);
+        const outwardOfEdge = (mid - geo.edgePos) * sign > 0;
+        const inwardOfCursor = (mid - geo.mouseCoord) * sign < 0;
+        if (outwardOfEdge && inwardOfCursor) candidates.add(uid);
+      }
+    } else {
+      accepts = (t) => !parentAllowed || (t && parentAllowed.includes(t));
+      candidates = new Set();
+      for (const [uid, info] of Object.entries(this.blockPathMap)) {
+        if (!uid || uid === containerUid) continue;
+        if (info?.isFixed) continue;
+        if (!this._isAncestor(containerUid, uid)) continue;
+        const el = this.queryBlockElement(uid);
+        if (!el) continue;
+        const mid = blockMid(el, geo.axis);
+        const outwardOfCursor = (mid - geo.mouseCoord) * sign > 0;
+        if (outwardOfCursor) candidates.add(uid);
+      }
+    }
+
+    // Bottom-up promotion.
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const uid of [...candidates]) {
+        const info = this.blockPathMap[uid];
+        const pid = info?.parentId;
+        if (!pid) continue;
+        if (mode === 'absorb' && pid === containerParentId) continue;
+        if (mode === 'expel' && pid === containerUid) continue;
+        const sibs = Object.entries(this.blockPathMap)
+          .filter(([, i]) => i?.parentId === pid).map(([id]) => id);
+        if (sibs.length === 0 || !sibs.every((c) => candidates.has(c))) continue;
+        const pType = this.getBlockData(pid)?.['@type'];
+        if (!accepts(pType)) continue;
+        for (const c of sibs) candidates.delete(c);
+        candidates.add(pid);
+        changed = true;
+      }
+    }
+    // Drop any orphan whose @type isn't accepted.
+    for (const uid of [...candidates]) {
+      const t = this.getBlockData(uid)?.['@type'];
+      if (!accepts(t)) candidates.delete(uid);
+    }
+
+    const blocks = [...candidates].sort((a, b) => {
+      const ea = this.queryBlockElement(a);
+      const eb = this.queryBlockElement(b);
+      if (!ea || !eb) return 0;
+      return ea.compareDocumentPosition(eb) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    });
+
+    let boundary = geo.edgePos;
+    for (const uid of blocks) {
+      const el = this.queryBlockElement(uid);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (edge === 'bottom') boundary = Math.max(boundary, r.bottom);
+      else if (edge === 'top') boundary = Math.min(boundary, r.top);
+      else if (edge === 'right') boundary = Math.max(boundary, r.right);
+      else if (edge === 'left') boundary = Math.min(boundary, r.left);
+    }
+
+    return { kind: blocks.length > 0 ? mode : 'none', blocks, boundary };
+  }
+
+  _setupEdgeHandleDrag(handle) {
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    // Per-drag visual state.
+    let growthBox = null;
+    const overlays = new Map(); // uid -> tinted overlay div
+    let autoScroller = null;
+
+    const ensureGrowthBox = () => {
+      if (growthBox) return growthBox;
+      growthBox = document.createElement('div');
+      growthBox.className = 'volto-hydra-edge-growth';
+      Object.assign(growthBox.style, {
+        position: 'fixed',
+        background: 'rgba(0, 126, 177, 0.08)',
+        zIndex: '10000',
+        pointerEvents: 'none',
+        display: 'none',
+      });
+      document.body.appendChild(growthBox);
+      return growthBox;
+    };
+
+    const tintBlock = (uid) => {
+      if (overlays.has(uid)) return;
+      const el = this.queryBlockElement(uid);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const overlay = document.createElement('div');
+      overlay.className = 'volto-hydra-edge-absorb-tint';
+      Object.assign(overlay.style, {
+        position: 'fixed',
+        left: `${r.left}px`, top: `${r.top}px`,
+        width: `${r.width}px`, height: `${r.height}px`,
+        background: 'rgba(0, 126, 177, 0.15)',
+        outline: '2px dashed rgba(0, 126, 177, 0.6)',
+        outlineOffset: '-2px',
+        zIndex: '10000', pointerEvents: 'none',
+      });
+      document.body.appendChild(overlay);
+      overlays.set(uid, overlay);
+    };
+
+    const cleanup = () => {
+      if (growthBox) growthBox.style.display = 'none';
+      for (const o of overlays.values()) o.remove();
+      overlays.clear();
+    };
+
+    // Wraps the shared _computeEdgePlan method, deciding mode (absorb vs
+    // expel) from the cursor's signed outward distance.
+    const computePlan = (e) => {
+      const edge = handle.dataset.edge;
+      const containerUid = handle.dataset.container;
+      const containerEl = this.queryBlockElement(containerUid);
+      if (!containerEl || !edge) return { kind: 'none', blocks: [], boundary: 0 };
+      const cRect = containerEl.getBoundingClientRect();
+      const geo = this._edgeGeometry(edge, cRect, e.clientX, e.clientY);
+      if (!geo) return { kind: 'none', blocks: [], boundary: 0 };
+      // A few px of slop so a tiny drag in the "wrong" direction doesn't
+      // immediately switch modes.
+      const slop = 3;
+      let mode = null;
+      if (geo.outward > slop && handle.dataset.canAbsorb) mode = 'absorb';
+      else if (geo.outward < -slop && handle.dataset.canExpel) mode = 'expel';
+      if (!mode) return { kind: 'none', blocks: [], boundary: geo.edgePos };
+      return this._computeEdgePlan(containerUid, edge, mode, geo.mouseCoord);
+    };
+
+    // Update the growth box to span between A's edge and the boundary, with
+    // the moving edge of the box thickened when there's a non-empty plan.
+    const updateGrowthBox = (e, plan) => {
+      if (!growthBox) return;
+      const containerEl = this.queryBlockElement(handle.dataset.container);
+      if (!containerEl) return;
+      const cRect = containerEl.getBoundingClientRect();
+      const edge = handle.dataset.edge;
+      const valid = plan.kind !== 'none' && plan.blocks.length > 0;
+      const reset = (k, v) => growthBox.style.setProperty(k, v);
+      ['borderTopWidth','borderBottomWidth','borderLeftWidth','borderRightWidth']
+        .forEach((p) => reset(p, '0'));
+      // Box spans from container's edge to the plan boundary (or cursor when no plan).
+      const cursor = (edge === 'top' || edge === 'bottom') ? e.clientY : e.clientX;
+      const dragKindIsExpel = plan.kind === 'expel';
+      let endCoord;
+      if (valid) endCoord = plan.boundary;
+      else endCoord = (handle.dataset.canAbsorb || handle.dataset.canExpel) ? cursor : null;
+      if (endCoord === null) { growthBox.style.display = 'none'; return; }
+
+      if (edge === 'bottom' || edge === 'top') {
+        const top = Math.min(edge === 'top' ? endCoord : cRect.bottom,
+                              edge === 'top' ? cRect.top : endCoord);
+        const bottom = Math.max(edge === 'top' ? endCoord : cRect.bottom,
+                                 edge === 'top' ? cRect.top : endCoord);
+        growthBox.style.left = `${cRect.left}px`;
+        growthBox.style.width = `${cRect.width}px`;
+        growthBox.style.top = `${top}px`;
+        growthBox.style.height = `${Math.max(0, bottom - top)}px`;
+        const moving = edge === 'top' ? 'borderTopWidth' : 'borderBottomWidth';
+        growthBox.style[moving] = valid ? '6px' : '1px';
+        growthBox.style.borderColor = '#007eb1';
+        growthBox.style.borderStyle = 'solid';
+      } else {
+        const left = Math.min(edge === 'left' ? endCoord : cRect.right,
+                              edge === 'left' ? cRect.left : endCoord);
+        const right = Math.max(edge === 'left' ? endCoord : cRect.right,
+                                edge === 'left' ? cRect.left : endCoord);
+        growthBox.style.top = `${cRect.top}px`;
+        growthBox.style.height = `${cRect.height}px`;
+        growthBox.style.left = `${left}px`;
+        growthBox.style.width = `${Math.max(0, right - left)}px`;
+        const moving = edge === 'left' ? 'borderLeftWidth' : 'borderRightWidth';
+        growthBox.style[moving] = valid ? '6px' : '1px';
+        growthBox.style.borderColor = '#007eb1';
+        growthBox.style.borderStyle = 'solid';
+      }
+      // Visually distinguish expel from absorb.
+      growthBox.style.background = dragKindIsExpel
+        ? 'rgba(220, 53, 69, 0.06)' : 'rgba(0, 126, 177, 0.08)';
+      growthBox.style.display = 'block';
+    };
+
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragging = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      autoScroller = this._createAutoScroller();
+      ensureGrowthBox();
+      updateGrowthBox(e, { kind: 'none', blocks: [], boundary: 0 });
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      e.preventDefault();
+      lastX = e.clientX;
+      lastY = e.clientY;
+      autoScroller?.onMouseMove(e);
+
+      const plan = computePlan(e);
+      updateGrowthBox(e, plan);
+
+      // Tint blocks in the plan; remove stale tints.
+      const wanted = new Set(plan.blocks);
+      for (const [uid, overlay] of overlays) {
+        if (!wanted.has(uid)) {
+          overlay.remove();
+          overlays.delete(uid);
+        }
+      }
+      for (const uid of plan.blocks) tintBlock(uid);
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      autoScroller?.stop();
+      autoScroller = null;
+
+      const plan = computePlan({ clientX: lastX, clientY: lastY });
+      const containerUid = handle.dataset.container;
+      const containerInfo = containerUid ? this.blockPathMap?.[containerUid] : null;
+      const edge = handle.dataset.edge;
+      cleanup();
+
+      if (plan.kind === 'none' || plan.blocks.length === 0 || !containerUid) return;
+
+      // selectAfterMove pins selection on the dragged container — the user
+      // adjusted its boundary, not selected the moved block.
+      const baseMessage = {
+        type: 'MOVE_BLOCKS',
+        blockIds: plan.blocks,
+        selectAfterMove: containerUid,
+      };
+
+      if (plan.kind === 'absorb') {
+        // Move plan blocks into the container. Two cases:
+        //   - Container has children → target = lastChild / firstChild
+        //     (insertAfter=true for bottom/right, false for top/left).
+        //   - Container is empty → MOVE_BLOCKS targets containerUid itself
+        //     with `insertInside: true` so the admin handler appends.
+        const ownChildren = this._getSiblingsByDomOrder(null, containerUid);
+        const insertAfter = (edge === 'bottom' || edge === 'right');
+        const target = ownChildren.length > 0
+          ? (insertAfter ? ownChildren[ownChildren.length - 1] : ownChildren[0])
+          : containerUid;
+        window.parent.postMessage({
+          ...baseMessage,
+          targetBlockId: target,
+          insertAfter,
+          targetParentId: containerUid,
+        }, this.adminOrigin);
+      } else if (plan.kind === 'expel') {
+        // Move plan blocks out of the container to its parent. They land
+        // before A (top/left edge) or after A (bottom/right edge).
+        const insertAfter = (edge === 'bottom' || edge === 'right');
+        window.parent.postMessage({
+          ...baseMessage,
+          targetBlockId: containerUid,
+          insertAfter,
+          targetParentId: containerInfo?.parentId,
+        }, this.adminOrigin);
+      }
+    });
+  }
+
   /**
    * Filter a list of block UIDs to those that can be mutated by `op`.
    * Single source of truth for locked-block protection on the iframe side.
@@ -1089,8 +1663,12 @@ export class Bridge {
       return true;
     }
 
-    // Enter: add block after (only in edit mode)
-    if (e.key === 'Enter' && !e.shiftKey && this.isInlineEditing) {
+    // Enter: add block after. We reach _handleBlockModeKey only when no
+    // editable field is active (line 4104 returns early otherwise), so
+    // we're in block mode by definition — gating on `isInlineEditing`
+    // here just blocks Enter when the user has selected a container as
+    // a whole (e.g. via Escape-to-parent) and wants to insert after it.
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       this.sendMessageToParent({
         type: 'ADD_BLOCK_AFTER',
@@ -2224,6 +2802,8 @@ export class Bridge {
       dragHandle.style.top = `${handlePos.top}px`;
       dragHandle.style.display = 'block';
     }
+    // Position edge handle on the selected container's bottom, if applicable.
+    this._positionEdgeHandles();
 
     // Get focused field rect for text-mode underline positioning
     // Round to integers to avoid sub-pixel jitter causing unnecessary state updates
@@ -2260,6 +2840,10 @@ export class Bridge {
       focusedLinkableField,
       focusedMediaField,
       addDirection,
+      // canResize tells admin which edge handles to render as visible chrome
+      // (per docs/architecture.md). Iframe keeps invisible event-capture
+      // divs at the same coords for mousedown.
+      canResize: this._lastCanResize || null,
       isMultiElement: blockUid && blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid).length > 1 : false,
     };
 
@@ -5629,7 +6213,23 @@ export class Bridge {
 
         const blockUidToProcess = needsBlockSwitch ? adminSelectedBlockUid : this.selectedBlockUid;
         const blockHandler = needsBlockSwitch
-          ? (el) => { log('Selecting new block from afterContentRender:', blockUidToProcess); this.selectBlock(el); }
+          ? (el) => {
+              // Admin-initiated block switch (e.g. new block after Enter):
+              // mirror the SELECT_BLOCK direct path — switch to text mode and
+              // focus the first editable field so the user can type without
+              // an extra click. Without this, blocks created from block-mode
+              // Enter land selected-but-not-focused.
+              //
+              // Skip fieldToFocus when admin sends a transformedSelection:
+              // that means a slate transform (split/merge) ran and is
+              // shipping an explicit cursor position to apply on the new
+              // DOM (e.g. backspace-merge places the cursor at the join
+              // point). Forcing focus to "first editable" would clobber
+              // that selection — regression introduced in 97dd597b.
+              log('Selecting new block from afterContentRender:', blockUidToProcess, 'transformedSelection:', !!transformedSelection);
+              this.editMode = 'text';
+              this.selectBlock(el, transformedSelection ? {} : { fieldToFocus: 'first' });
+            }
           : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
 
         if (blockUidToProcess) {
@@ -7583,7 +8183,14 @@ export class Bridge {
 
         if (topChanged || leftChanged) {
           this._lastBlockRect = newRect;
-          this.sendBlockSelected('transitionTracker', blockElements[0]);
+          // Pass blockUid explicitly: for template instances (virtual
+          // containers) blockElements[0] is a CHILD element whose
+          // data-block-uid is the child's, not the instance's. Without
+          // an explicit uid, sendBlockSelected resolves the wrong block
+          // and fires BLOCK_SELECTED with isNewBlock:true mid-transition,
+          // which can trip react-beautiful-dnd's "changing droppableId
+          // during drag" invariant in the sidebar.
+          this.sendBlockSelected('transitionTracker', blockElements[0], { blockUid });
         }
       }
 
@@ -7713,6 +8320,38 @@ export class Bridge {
 
     document.body.appendChild(dragButton);
 
+    // Container edge handles — one per side. Each handle is shown only when
+    // its edge has something actionable: a compatible neighbour to absorb
+    // (in the parent's layout axis) or a child to expel (in the container's
+    // own layout axis). Drag outward absorbs neighbours; drag inward (back
+    // into the container's rect) expels the closest children to the parent.
+    document.querySelectorAll('.volto-hydra-edge-handle').forEach((el) => el.remove());
+    this._edgeHandles = {};
+    // Edge handles follow the chrome pattern (see docs/architecture.md):
+    //   - the visible chrome is rendered by the admin from blockUI.edgeRects;
+    //   - this iframe-side div is *invisible* and only exists to capture
+    //     mouse events that pass through the admin's pointer-events:none
+    //     visual on top of it.
+    for (const edge of ['top', 'bottom', 'left', 'right']) {
+      const h = document.createElement('div');
+      h.className = 'volto-hydra-edge-handle';
+      h.setAttribute('data-edge', edge);
+      const isVertical = edge === 'top' || edge === 'bottom';
+      Object.assign(h.style, {
+        position: 'fixed',
+        background: 'transparent',
+        cursor: isVertical ? 'ns-resize' : 'ew-resize',
+        zIndex: '9998',
+        display: 'none',
+        pointerEvents: 'auto',
+      });
+      // Thickness on the perpendicular axis
+      if (isVertical) h.style.height = '6px'; else h.style.width = '6px';
+      document.body.appendChild(h);
+      this._edgeHandles[edge] = h;
+      this._setupEdgeHandleDrag(h);
+    }
+
     // Position the drag handle immediately (not on mousemove)
     const positionDragHandle = () => {
       if (!this.selectedBlockUid) {
@@ -7821,85 +8460,24 @@ export class Bridge {
       let closestBlockUid = null;
       let insertAt = null; // 0 for top, 1 for bottom
       let dropIndicatorVisible = false; // Track if drop indicator is shown - drop only allowed when visible
+      // Replace mode: target is an 'empty' placeholder created by
+      // ensureEmptyBlockIfEmpty when its container has no real children.
+      // On drop we delete the placeholder and insert the dragged block in
+      // its position — the only-child placeholder gets REPLACED, not
+      // dropped-next-to. Visualised as a shade overlay rather than a line.
+      let replaceTargetUid = null;
 
-      // Auto-scroll state - uses requestAnimationFrame for continuous scrolling
-      let scrollDirection = 0; // -1 = up, 0 = none, 1 = down
-      let scrollAnimationId = null;
-      let lastMouseX = 0; // Track last cursor position for scroll updates
-      let lastMouseY = 0;
-      let currentScrollSpeed = 0; // Variable speed based on edge proximity
-      const scrollThreshold = 80; // pixels from edge to trigger scroll
-      const minScrollSpeed = 10; // slowest scroll (at threshold edge)
-      const maxScrollSpeed = 50; // fastest scroll (at viewport edge)
-
-      // Continuous scroll loop using requestAnimationFrame
-      // Dispatches synthetic mousemove to update drop indicator while scrolling
-      const scrollLoop = () => {
-        if (scrollDirection !== 0) {
-          // Use scrollTo with behavior: 'instant' to override CSS scroll-behavior: smooth
-          window.scrollTo({
-            top: window.scrollY + (scrollDirection * currentScrollSpeed),
-            behavior: 'instant'
-          });
-          // Dispatch synthetic mousemove to update drop indicator position
-          // This ensures the indicator updates even when mouse is stationary
-          const syntheticEvent = new MouseEvent('mousemove', {
-            clientX: lastMouseX,
-            clientY: lastMouseY,
-            bubbles: true,
-          });
-          document.dispatchEvent(syntheticEvent);
-          scrollAnimationId = requestAnimationFrame(scrollLoop);
-        }
-      };
-
-      const startScrolling = (direction) => {
-        if (scrollDirection !== direction) {
-          scrollDirection = direction;
-          if (scrollAnimationId === null && direction !== 0) {
-            scrollAnimationId = requestAnimationFrame(scrollLoop);
-          }
-        }
-      };
-
-      const stopScrolling = () => {
-        scrollDirection = 0;
-        if (scrollAnimationId !== null) {
-          cancelAnimationFrame(scrollAnimationId);
-          scrollAnimationId = null;
-        }
-      };
+      // Auto-scroll: continuous scroll near viewport edges. Dispatches synthetic
+      // mousemove on each scroll tick so the drop-indicator-update path below
+      // re-runs even while the cursor is held stationary at an edge.
+      const scroller = this._createAutoScroller();
 
       // Handle mouse movement
       const onMouseMove = (e) => {
-        // Track cursor position for scroll loop updates
-        lastMouseX = e.clientX;
-        lastMouseY = e.clientY;
+        scroller.onMouseMove(e);
 
         draggedBlock.style.left = `${e.clientX}px`;
         draggedBlock.style.top = `${e.clientY}px`;
-
-        // Auto-scroll when dragging near viewport edges
-        // Uses continuous scrolling that works even when mouse is stationary at edge
-        const viewportHeight = window.innerHeight;
-
-        if (e.clientY < scrollThreshold) {
-          // Near top edge - scroll up
-          // Speed increases as cursor gets closer to edge (0 = fastest, threshold = slowest)
-          const distanceFromEdge = e.clientY;
-          const speedFactor = 1 - (distanceFromEdge / scrollThreshold); // 1 at edge, 0 at threshold
-          currentScrollSpeed = minScrollSpeed + (maxScrollSpeed - minScrollSpeed) * speedFactor;
-          startScrolling(-1);
-        } else if (e.clientY > viewportHeight - scrollThreshold) {
-          // Near bottom edge - scroll down
-          const distanceFromEdge = viewportHeight - e.clientY;
-          const speedFactor = 1 - (distanceFromEdge / scrollThreshold);
-          currentScrollSpeed = minScrollSpeed + (maxScrollSpeed - minScrollSpeed) * speedFactor;
-          startScrolling(1);
-        } else {
-          // Not near edge - stop scrolling
-          stopScrolling();
-        }
 
         // Find element under cursor (no throttle - these operations are fast)
         const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
@@ -7989,14 +8567,78 @@ export class Bridge {
             if (existingIndicator) {
               existingIndicator.style.display = 'none';
             }
+            const existingShade = document.querySelector('.volto-hydra-drop-shade');
+            if (existingShade) existingShade.style.display = 'none';
             dropIndicatorVisible = false;
             closestBlockUid = null;
+            replaceTargetUid = null;
             return;
           }
 
           // Use the valid drop target (may be the original or a parent)
           closestBlock = validDropTarget;
           closestBlockUid = validDropTargetUid;
+
+          // Replace path: target is — or contains as its only child — an
+          // 'empty' placeholder (the slot block ensureEmptyBlockIfEmpty
+          // creates when a container has no real children). Resolve to the
+          // placeholder uid, render a shade overlay over the container's
+          // rect, and remember the placeholder uid so onMouseUp can ask
+          // the admin to delete it. Skip the line-indicator flow.
+          //
+          // The "only-child-is-empty" case matters because for grid-like
+          // containers the 25%-wide cell is much smaller than the
+          // container's whole rect — a cursor in the empty whitespace
+          // doesn't hit the placeholder's element directly, but the user
+          // still means "drop into this empty container".
+          let emptyTargetUid = null;
+          let emptyShadeEl = closestBlock;
+          const validTargetInfo = this.blockPathMap?.[closestBlockUid];
+          if (validTargetInfo?.blockType === 'empty') {
+            emptyTargetUid = closestBlockUid;
+          } else {
+            const targetData = this.getBlockData(closestBlockUid);
+            const layoutItems = targetData?.blocks_layout?.items;
+            if (Array.isArray(layoutItems) && layoutItems.length === 1) {
+              const onlyChildUid = layoutItems[0];
+              if (this.blockPathMap?.[onlyChildUid]?.blockType === 'empty') {
+                emptyTargetUid = onlyChildUid;
+              }
+            }
+          }
+          if (emptyTargetUid) {
+            const lineIndicator = document.querySelector('.volto-hydra-drop-indicator');
+            if (lineIndicator) lineIndicator.style.display = 'none';
+            let shade = document.querySelector('.volto-hydra-drop-shade');
+            if (!shade) {
+              shade = document.createElement('div');
+              shade.className = 'volto-hydra-drop-shade';
+              shade.style.cssText = 'position:absolute;background:rgba(0,123,255,0.15);border:2px dashed #007bff;border-radius:4px;pointer-events:none;z-index:9998;';
+              document.body.appendChild(shade);
+            }
+            const shadeRect = emptyShadeEl.getBoundingClientRect();
+            Object.assign(shade.style, {
+              top: `${shadeRect.top + window.scrollY}px`,
+              left: `${shadeRect.left + window.scrollX}px`,
+              width: `${shadeRect.width}px`,
+              height: `${shadeRect.height}px`,
+              display: 'block',
+            });
+            // Switch the drop target to the placeholder. We always insert
+            // *before* it, so the moved block lands at position 0 in its
+            // container; then the admin's MOVE_BLOCKS handler deletes the
+            // placeholder via replaceTargetId.
+            closestBlockUid = emptyTargetUid;
+            replaceTargetUid = emptyTargetUid;
+            dropIndicatorVisible = true;
+            insertAt = 0;
+            return;
+          }
+          // Not in replace mode — clear any lingering shade from a previous
+          // mousemove tick and fall through to the line-indicator path.
+          replaceTargetUid = null;
+          const existingShade = document.querySelector('.volto-hydra-drop-shade');
+          if (existingShade) existingShade.style.display = 'none';
 
           // Get or create drop indicator
           let dropIndicator = document.querySelector('.volto-hydra-drop-indicator');
@@ -8051,8 +8693,11 @@ export class Bridge {
             if (existingIndicator) {
               existingIndicator.style.display = 'none';
             }
+            const existingShade = document.querySelector('.volto-hydra-drop-shade');
+            if (existingShade) existingShade.style.display = 'none';
             dropIndicatorVisible = false;
             closestBlockUid = null;
+            replaceTargetUid = null;
             return;
           }
 
@@ -8101,8 +8746,11 @@ export class Bridge {
           if (existingIndicator) {
             existingIndicator.style.display = 'none';
           }
+          const existingShade = document.querySelector('.volto-hydra-drop-shade');
+          if (existingShade) existingShade.style.display = 'none';
           dropIndicatorVisible = false;
           closestBlockUid = null;
+          replaceTargetUid = null;
         }
       };
 
@@ -8119,7 +8767,7 @@ export class Bridge {
         }
 
         // Stop auto-scroll
-        stopScrolling();
+        scroller.stop();
 
         document.querySelector('body').classList.remove('grabbing');
         document.removeEventListener('mousemove', onMouseMove);
@@ -8135,6 +8783,8 @@ export class Bridge {
         } else {
           log('No drop indicator to hide on mouseup');
         }
+        const dropShade = document.querySelector('.volto-hydra-drop-shade');
+        if (dropShade) dropShade.style.display = 'none';
 
         // Only allow drop if indicator was visible - this ensures all validation passed
         if (closestBlockUid && dropIndicatorVisible) {
@@ -8145,7 +8795,7 @@ export class Bridge {
 
           const targetPathInfo = this.blockPathMap?.[closestBlockUid];
 
-          log('DnD: Moving', draggedUids.length, 'blocks relative to', closestBlockUid, 'insertAfter:', insertAt === 1);
+          log('DnD: Moving', draggedUids.length, 'blocks relative to', closestBlockUid, 'insertAfter:', insertAt === 1, 'replace:', !!replaceTargetUid);
           window.parent.postMessage(
             {
               type: 'MOVE_BLOCKS',
@@ -8153,6 +8803,9 @@ export class Bridge {
               targetBlockId: closestBlockUid,
               insertAfter: insertAt === 1,
               targetParentId: targetPathInfo?.parentId || null,
+              // When set, the admin deletes this block after the move so the
+              // 'empty' placeholder is replaced rather than dropped beside.
+              replaceTargetId: replaceTargetUid || null,
             },
             this.adminOrigin,
           );
@@ -13741,3 +14394,6 @@ const linkFolderSVG = `<img width="20px" height="20px" src="data:image/png;base6
 const linkCancelSVG = `<svg width="20px" height="20px" xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="100" height="100" viewBox="0,0,256,256">
 <g fill="#ffffff" fill-rule="nonzero" stroke="none" stroke-width="1" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="10" stroke-dasharray="" stroke-dashoffset="0" font-family="none" font-weight="none" font-size="none" text-anchor="none" style="mix-blend-mode: normal"><g transform="scale(8.53333,8.53333)"><path d="M7,4c-0.25587,0 -0.51203,0.09747 -0.70703,0.29297l-2,2c-0.391,0.391 -0.391,1.02406 0,1.41406l7.29297,7.29297l-7.29297,7.29297c-0.391,0.391 -0.391,1.02406 0,1.41406l2,2c0.391,0.391 1.02406,0.391 1.41406,0l7.29297,-7.29297l7.29297,7.29297c0.39,0.391 1.02406,0.391 1.41406,0l2,-2c0.391,-0.391 0.391,-1.02406 0,-1.41406l-7.29297,-7.29297l7.29297,-7.29297c0.391,-0.39 0.391,-1.02406 0,-1.41406l-2,-2c-0.391,-0.391 -1.02406,-0.391 -1.41406,0l-7.29297,7.29297l-7.29297,-7.29297c-0.1955,-0.1955 -0.45116,-0.29297 -0.70703,-0.29297z"></path></g></g>
 </svg>`;
+
+// Container UX shared predicates / transforms (used by both iframe and admin).
+export { canContain, canContainAll, findConversionPath, mapLayoutItems } from './containerOps.js';

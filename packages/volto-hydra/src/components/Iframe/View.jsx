@@ -161,7 +161,8 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor } from '../../utils/blockPath';
+import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, _getContainerChildFieldName } from '../../utils/blockPath';
+import { canContainAll } from '@volto-hydra/hydra-js';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
@@ -554,6 +555,10 @@ const Iframe = (props) => {
   const [blockUI, setBlockUI] = useState(null); // { blockUid, rect, focusedFieldName }
   const [mouseActivityCounter, setMouseActivityCounter] = useState(0); // incremented on MOUSE_ACTIVITY from iframe
   const [selectionMode, setSelectionMode] = useState(false); // true when in touch selection mode
+  // Unified chooser overlay used by both Wrap and Convert. Shape:
+  //   { kind: 'wrap', blockIds: string[], allowedBlocks: string[] }
+  //   { kind: 'convert', blockId: string, allowedBlocks: string[] }
+  const [chooser, setChooser] = useState(null);
   const multiSelectedRef = useRef(multiSelected);
   multiSelectedRef.current = multiSelected;
 
@@ -1154,7 +1159,7 @@ const Iframe = (props) => {
    * @returns {string} The new block's ID
    */
   const insertAndSelectBlock = useCallback((blockId, blockType, action, fieldName, options = {}) => {
-    const { blockData: customBlockData, formData: customFormData, blockPathMap: customBlockPathMap, formatRequestId, selectChildIndex } = options;
+    const { blockData: customBlockData, formData: customFormData, blockPathMap: customBlockPathMap, formatRequestId, selectChildIndex, selectFirstLeaf } = options;
     const formData = customFormData || properties;
     const blockPathMap = customBlockPathMap || iframeSyncState.blockPathMap;
     const mergedBlocksConfig = config.blocks.blocksConfig;
@@ -1445,6 +1450,23 @@ const Iframe = (props) => {
           }
         }
       }
+    }
+    // Drill into the new container's first leaf (recursive descent through
+    // blocks_layout.items[0]) when the caller wants the keyboard-Enter UX:
+    // user pressed Enter expecting to type, so put selection on the deepest
+    // typeable child rather than the container shell. Toolbar/sidebar Add
+    // paths don't pass selectFirstLeaf — they want the new container itself
+    // selected so the user can configure it.
+    if (selectFirstLeaf) {
+      const updatedPathMap = buildBlockPathMap(newFormData, mergedBlocksConfig, intl);
+      let walked = selectBlockId;
+      while (true) {
+        const blk = getBlockById(newFormData, updatedPathMap, walked);
+        const firstChildUid = blk?.blocks_layout?.items?.[0];
+        if (!firstChildUid || !updatedPathMap[firstChildUid]) break;
+        walked = firstChildUid;
+      }
+      selectBlockId = walked;
     }
 
     // Set pending selection and blockPathMap, but NOT formData
@@ -1764,14 +1786,29 @@ const Iframe = (props) => {
         }
 
         case 'ADD_BLOCK_AFTER': {
-          // Determine the default block type from the container's schema
+          // "Another one of these" if the source block's @type is in the
+          // computed allowed types for this position; otherwise defer to
+          // the centralised getEmptyBlockType chain (defaultBlockType →
+          // single-allowedBlocks → config.settings.defaultBlockType →
+          // 'empty' slot). Same definition used by ensureEmptyBlockIfEmpty.
           const containerFieldConfig = getContainerFieldConfig(
             event.data.blockId, iframeSyncState.blockPathMap, properties, config.blocks.blocksConfig, intl
           );
-          const defaultType = containerFieldConfig?.defaultBlockType
-            || (containerFieldConfig?.allowedBlocks?.length === 1 ? containerFieldConfig.allowedBlocks[0] : null)
-            || 'slate';
-          insertAndSelectBlock(event.data.blockId, defaultType, 'after');
+          const sourcePathInfo = iframeSyncState.blockPathMap?.[event.data.blockId];
+          const sourceType = sourcePathInfo?.blockType;
+          const allowedSiblings = sourcePathInfo?.allowedSiblingTypes;
+          const sourceAllowed = sourceType
+            && (!allowedSiblings || allowedSiblings.includes(sourceType));
+          const newType = sourceAllowed
+            ? sourceType
+            : getEmptyBlockType(containerFieldConfig);
+          // ADD_BLOCK_AFTER comes from the bridge's keyboard-Enter handler
+          // (block-mode Enter, last-field plain-string Enter, slate split).
+          // Keyboard intent is "ready to type", so drill the selection down
+          // to the new block's first leaf when the new block is a container.
+          // Toolbar/sidebar Add paths use different message types and keep
+          // selection on the new container.
+          insertAndSelectBlock(event.data.blockId, newType, 'after', null, { selectFirstLeaf: true });
           break;
         }
 
@@ -2368,8 +2405,12 @@ const Iframe = (props) => {
 
         case 'MOVE_BLOCKS': {
           // Handle drag-and-drop block moves (single or multi, supports containers)
-          const { blockIds: moveBlockIds, targetBlockId, insertAfter, targetParentId } = event.data;
-          log('MOVE_BLOCKS: received:', moveBlockIds?.length, 'blocks to', targetBlockId, 'insertAfter:', insertAfter);
+          // replaceTargetId is set when the drop landed on an 'empty' placeholder
+          // (the slot block ensureEmptyBlockIfEmpty creates when a container is
+          // empty). After the move, that placeholder is removed so the dropped
+          // block lives where the placeholder was instead of beside it.
+          const { blockIds: moveBlockIds, targetBlockId, insertAfter, targetParentId, selectAfterMove, replaceTargetId } = event.data;
+          log('MOVE_BLOCKS: received:', moveBlockIds?.length, 'blocks to', targetBlockId, 'insertAfter:', insertAfter, 'replaceTargetId:', replaceTargetId);
 
           // Use properties (Redux) as source of truth for moves
           const currentFormData = properties;
@@ -2501,6 +2542,27 @@ const Iframe = (props) => {
                 { intl, metadata, properties: currentFormData },
               );
             }
+
+            // Replace path: the dragged block was dropped on an 'empty'
+            // placeholder. Remove the placeholder so the dropped block
+            // takes its position rather than sitting beside it.
+            // Done after the move (and after applyBlockDefaultsWithContext)
+            // so the moved block's neighbour-derived fields settle first.
+            if (replaceTargetId) {
+              const replacePathMap = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
+              const replaceBlockData = getBlockById(newFormData, replacePathMap, replaceTargetId);
+              if (replaceBlockData?.['@type'] === 'empty') {
+                const replaceContainerConfig = getContainerFieldConfig(
+                  replaceTargetId, replacePathMap, newFormData, blocksConfig, intl,
+                );
+                if (replaceContainerConfig) {
+                  newFormData = deleteBlockFromContainer(
+                    newFormData, replacePathMap, replaceTargetId, replaceContainerConfig,
+                  );
+                }
+              }
+            }
+
             // Set pendingSelectBlockUid so the moved block stays selected after re-render
             // Rebuild blockPathMap to reflect the new block positions
             // Use flushSync to ensure state is committed before Redux update triggers useEffect
@@ -2510,7 +2572,11 @@ const Iframe = (props) => {
               setIframeSyncState(prev => ({
                 ...prev,
                 blockPathMap: newBlockPathMap,
-                pendingSelectBlockUid: blocksToMove[0],
+                // selectAfterMove lets the sender pin selection on a specific
+                // block (e.g. edge-drag wants to stay on the container, not
+                // jump to the absorbed sibling). Defaults to the first moved
+                // block to match the legacy DnD behaviour.
+                pendingSelectBlockUid: selectAfterMove || blocksToMove[0],
               }));
             });
             // Debug: Log column contents after move
@@ -2681,6 +2747,7 @@ const Iframe = (props) => {
               mediaFields: event.data.mediaFields, // Map of fieldName -> true for image/media fields
               addDirection: event.data.addDirection, // Direction for add button positioning
               isMultiElement: event.data.isMultiElement, // True if block renders as multiple DOM elements
+              canResize: event.data.canResize || null, // {top,bottom,left,right} booleans for edge-drag chrome
               selectionModeRects: event.data.selectionModeRects,
             };
           });
@@ -3754,8 +3821,103 @@ const Iframe = (props) => {
     }
   }, [iframeAllowedBlocks, selectedBlock, insertAndSelectBlock]);
 
+  // Commits a chooser action (wrap or convert) once the user picks a target type.
+  const commitChooser = (newType) => {
+    if (!chooser) return;
+    const bpm = iframeSyncState.blockPathMap;
+    try {
+      if (chooser.kind === 'wrap') {
+        const { formData: newFormData, newContainerId } = wrapBlocksInContainer(
+          properties, bpm, chooser.blockIds, newType, blocksConfig, intl,
+        );
+        onChangeFormData(newFormData);
+        if (onSetMultiSelected) onSetMultiSelected([]);
+        if (onSelectBlock) onSelectBlock(newContainerId);
+      } else if (chooser.kind === 'convert') {
+        const blockData = getBlockById(properties, bpm, chooser.blockId);
+        if (blockData) {
+          const blockType = blockData['@type'];
+          const childField = blockType
+            ? _getContainerChildFieldName(blockType, blocksConfig, intl) : null;
+          const hasChildren = childField && (blockData?.[childField]?.items?.length > 0);
+          let updatedProperties;
+          if (hasChildren) {
+            updatedProperties = convertContainerBlock(
+              properties, bpm, chooser.blockId, newType, blocksConfig, intl,
+            );
+          } else {
+            const typeFieldName = bpm?.[chooser.blockId]?.typeField || '@type';
+            const newBlockData = convertBlockType(blockData, newType, blocksConfig, typeFieldName, intl);
+            updatedProperties = updateBlockById(properties, bpm, chooser.blockId, newBlockData);
+          }
+          onChangeFormData(updatedProperties);
+          const newBlockPathMap = buildBlockPathMap(updatedProperties, blocksConfig, intl);
+          setIframeSyncState(prev => ({
+            ...prev,
+            formData: updatedProperties,
+            blockPathMap: newBlockPathMap,
+            toolbarRequestDone: `convert-block-${Date.now()}`,
+          }));
+        }
+      }
+    } catch (err) {
+      log('chooser commit failed:', err);
+    }
+    setChooser(null);
+  };
+
   return (
     <div id="iframeContainer">
+      {chooser && createPortal(
+        <div
+          className="container-block-chooser"
+          style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 10000,
+            background: 'white',
+            border: '1px solid #999',
+            borderRadius: '6px',
+            padding: '12px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+            minWidth: '320px',
+            maxHeight: '70vh',
+            overflowY: 'auto',
+          }}
+          // Stop the underlying iframe from receiving the click and clearing the chooser.
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
+            {chooser.kind === 'wrap' ? 'Wrap in…' : 'Convert to…'}
+          </div>
+          {chooser.allowedBlocks.length === 0 ? (
+            <div style={{ color: '#888', fontSize: '13px' }}>
+              No compatible target available.
+            </div>
+          ) : (
+            <BlockChooser
+              showRestricted
+              allowedBlocks={chooser.allowedBlocks}
+              blocksConfig={blocksConfig}
+              currentBlock={chooser.blockId || null}
+              onInsertBlock={(_id, value) => commitChooser(value['@type'])}
+              onMutateBlock={(_id, value) => commitChooser(value['@type'])}
+            />
+          )}
+          <button
+            onClick={() => setChooser(null)}
+            style={{
+              marginTop: '6px', padding: '6px 10px',
+              background: 'transparent', border: 'none', color: '#666', cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+        </div>,
+        document.body,
+      )}
       <OpenObjectBrowser
         origin={iframeSrc && new URL(iframeSrc).origin}
         pendingFieldMedia={pendingFieldMedia}
@@ -3971,6 +4133,59 @@ const Iframe = (props) => {
           )}
         </>
         );
+      })()}
+
+      {/* Edge-drag handles — visible chrome rendered admin-side from
+          blockUI.canResize. Each visible handle is pointer-events: none so
+          mouse events pass through to the iframe-side invisible
+          .volto-hydra-edge-handle div underneath, which captures mousedown
+          and runs the actual drag (chrome pattern, see docs/architecture.md).
+          Hidden during multi-select / selection mode like every other
+          single-block visual. */}
+      {blockUI?.canResize && blockUI.rect && referenceElement && !selectionMode
+       && !(blockUI.multiSelectedUids?.length > 1) && (() => {
+        const iframeLeft = referenceElement.getBoundingClientRect().left;
+        const iframeTop = referenceElement.getBoundingClientRect().top;
+        const r = blockUI.rect;
+        const handleStyle = (edge) => {
+          const isVertical = edge === 'top' || edge === 'bottom';
+          const base = {
+            position: 'fixed',
+            background: 'rgba(0, 126, 177, 0.35)',
+            pointerEvents: 'none',
+            zIndex: 2,
+          };
+          // Each visible handle is 1/3 of the edge length, centred — matches
+          // the iframe-side invisible event-capture div underneath.
+          const w3 = r.width / 3;
+          const h3 = r.height / 3;
+          if (isVertical) {
+            return {
+              ...base,
+              left: `${iframeLeft + r.left + w3}px`,
+              top: `${iframeTop + (edge === 'top' ? r.top - 3 : r.top + r.height - 3)}px`,
+              width: `${w3}px`,
+              height: '6px',
+            };
+          }
+          return {
+            ...base,
+            left: `${iframeLeft + (edge === 'left' ? r.left - 3 : r.left + r.width - 3)}px`,
+            top: `${iframeTop + r.top + h3}px`,
+            width: '6px',
+            height: `${h3}px`,
+          };
+        };
+        return ['top', 'bottom', 'left', 'right']
+          .filter((edge) => blockUI.canResize[edge])
+          .map((edge) => (
+            <div
+              key={`edge-handle-${edge}`}
+              className="volto-hydra-edge-handle-visual"
+              data-edge={edge}
+              style={handleStyle(edge)}
+            />
+          ));
       })()}
 
       {/* Touch selection mode — checkbox overlays on all visible blocks */}
@@ -4263,28 +4478,183 @@ const Iframe = (props) => {
               setPendingFieldMedia({ fieldName, blockUid });
             }}
             convertibleTypes={(() => {
-              const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
-              const typeFieldName = iframeSyncState.blockPathMap?.[selectedBlock]?.typeField || '@type';
+              const bpm = iframeSyncState.blockPathMap;
+              const blockData = getBlockById(properties, bpm, selectedBlock);
+              const typeFieldName = bpm?.[selectedBlock]?.typeField || '@type';
               const blockType = blockData?.[typeFieldName];
-              const allowedTypes = iframeSyncState.blockPathMap?.[selectedBlock]?.allowedSiblingTypes;
-              return getConvertibleTypes(blockType, blocksConfig, allowedTypes);
+              const allowedTypes = bpm?.[selectedBlock]?.allowedSiblingTypes;
+              const contentTargets = getConvertibleTypes(blockType, blocksConfig, allowedTypes);
+
+              // Container-to-container conversions: source is a container with children.
+              // For each OTHER container whose child field accepts all of source's
+              // children, offer it as a target. The existing getConvertibleTypes
+              // doesn't cover this because it relies on fieldMappings, which are
+              // content-level.
+              const childField = blockType ? _getContainerChildFieldName(blockType, blocksConfig, intl) : null;
+              const childIds = childField ? (blockData?.[childField]?.items || []) : [];
+              if (childIds.length === 0) return contentTargets;
+
+              const childTypes = childIds
+                .map((id) => blockData.blocks?.[id]?.['@type'])
+                .filter(Boolean);
+              const containerTargets = [];
+              const existingTypes = new Set(contentTargets.map(t => t.type));
+              for (const [type, cfg] of Object.entries(blocksConfig || {})) {
+                if (!cfg?.blockSchema) continue;
+                if (type === blockType) continue;
+                if (existingTypes.has(type)) continue;
+                let schema;
+                try {
+                  schema = typeof cfg.blockSchema === 'function'
+                    ? cfg.blockSchema({ blocksConfig, intl }) : cfg.blockSchema;
+                } catch { continue; }
+                const props = schema?.properties || {};
+                let tgtChildField = null;
+                for (const [fn, field] of Object.entries(props)) {
+                  if (field?.widget === 'blocks_layout') { tgtChildField = { fieldName: fn, ...field }; break; }
+                }
+                if (!tgtChildField) continue;
+                if (!canContainAll(tgtChildField, childTypes, 0)) continue;
+                // Also respect parent's allowedBlocks — new container type must be allowed in its place.
+                if (allowedTypes && !allowedTypes.includes(type)) continue;
+                containerTargets.push({ type, title: cfg.title || type });
+              }
+              return [...contentTargets, ...containerTargets];
             })()}
-            onConvertBlock={(newType) => {
-              const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
-              if (!blockData) return;
-              const typeFieldName = iframeSyncState.blockPathMap?.[selectedBlock]?.typeField || '@type';
-              const newBlockData = convertBlockType(blockData, newType, blocksConfig, typeFieldName, intl);
-              const updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, selectedBlock, newBlockData);
-              onChangeFormData(updatedProperties);
-              // Rebuild blockPathMap and update state
-              const newBlockPathMap = buildBlockPathMap(updatedProperties, blocksConfig, intl);
-              setIframeSyncState(prev => ({
-                ...prev,
-                formData: updatedProperties,
-                blockPathMap: newBlockPathMap,
-                toolbarRequestDone: `convert-block-${Date.now()}`,
-              }));
+            onOpenConvertChooser={() => {
+              // Open BlockChooser overlay seeded with convertibleTypes for the
+              // currently selected block. commitChooser handles the actual
+              // mutation when the user picks a target.
+              const bpm = iframeSyncState.blockPathMap;
+              const blockData = getBlockById(properties, bpm, selectedBlock);
+              const typeFieldName = bpm?.[selectedBlock]?.typeField || '@type';
+              const blockType = blockData?.[typeFieldName];
+              const allowedTypes = bpm?.[selectedBlock]?.allowedSiblingTypes;
+              const contentTargets = getConvertibleTypes(blockType, blocksConfig, allowedTypes);
+
+              const childField = blockType
+                ? _getContainerChildFieldName(blockType, blocksConfig, intl) : null;
+              const childIds = childField ? (blockData?.[childField]?.items || []) : [];
+              const containerTargets = [];
+              if (childIds.length > 0) {
+                const childTypes = childIds
+                  .map((id) => blockData.blocks?.[id]?.['@type']).filter(Boolean);
+                const existing = new Set(contentTargets.map(t => t.type));
+                for (const [type, cfg] of Object.entries(blocksConfig || {})) {
+                  if (!cfg?.blockSchema || type === blockType || existing.has(type)) continue;
+                  let schema;
+                  try {
+                    schema = typeof cfg.blockSchema === 'function'
+                      ? cfg.blockSchema({ blocksConfig, intl }) : cfg.blockSchema;
+                  } catch { continue; }
+                  let tgt = null;
+                  for (const [fn, field] of Object.entries(schema?.properties || {})) {
+                    if (field?.widget === 'blocks_layout') { tgt = { fieldName: fn, ...field }; break; }
+                  }
+                  if (!tgt) continue;
+                  if (!canContainAll(tgt, childTypes, 0)) continue;
+                  if (allowedTypes && !allowedTypes.includes(type)) continue;
+                  containerTargets.push({ type });
+                }
+              }
+              const allTargets = [
+                ...contentTargets.map(t => t.type),
+                ...containerTargets.map(t => t.type),
+              ];
+              setChooser({ kind: 'convert', blockId: selectedBlock, allowedBlocks: allTargets });
             }}
+            {...(() => {
+              // Wrap action props — only when there's a multi-selection that
+              // shares a parent and at least one compatible container exists.
+              const blockIds = multiSelected || [];
+              if (blockIds.length < 1) return {};
+              const bpm = iframeSyncState.blockPathMap;
+              const firstCC = getContainerFieldConfig(blockIds[0], bpm, properties, blocksConfig, intl);
+              if (!firstCC || firstCC.isObjectList) return {};
+              for (const id of blockIds.slice(1)) {
+                const cc = getContainerFieldConfig(id, bpm, properties, blocksConfig, intl);
+                if (!cc || cc.parentId !== firstCC.parentId || cc.fieldName !== firstCC.fieldName) {
+                  return {};
+                }
+              }
+              const selectedTypes = blockIds.map((id) => {
+                const data = getBlockById(properties, bpm, id);
+                return data?.['@type'];
+              }).filter(Boolean);
+              const parentPath = firstCC.parentId === PAGE_BLOCK_UID
+                ? [] : bpm[firstCC.parentId]?.path;
+              const parentBlock = getBlockByPath(properties, parentPath);
+              const parentItems = parentBlock ? getContainerItems(parentBlock, firstCC) : [];
+              const itemsAfter = parentItems.length - blockIds.length + 1;
+              const parentAllows = (t) => !firstCC.allowedBlocks || firstCC.allowedBlocks.includes(t);
+
+              const eligibleTypes = [];
+              for (const [type, cfg] of Object.entries(blocksConfig || {})) {
+                if (!cfg?.blockSchema) continue;
+                let schema;
+                try {
+                  schema = typeof cfg.blockSchema === 'function'
+                    ? cfg.blockSchema({ blocksConfig, intl }) : cfg.blockSchema;
+                } catch { continue; }
+                let childField = null;
+                for (const [fn, fd] of Object.entries(schema?.properties || {})) {
+                  if (fd?.widget === 'blocks_layout') { childField = { fieldName: fn, ...fd }; break; }
+                }
+                if (!childField) continue;
+                if (!canContainAll(childField, selectedTypes, 0)) continue;
+                if (!parentAllows(type)) continue;
+                if (firstCC.maxLength != null && itemsAfter > firstCC.maxLength) continue;
+                eligibleTypes.push(type);
+              }
+              if (eligibleTypes.length === 0) return {};
+              return {
+                canWrap: true,
+                onOpenWrapChooser: () => setChooser({
+                  kind: 'wrap', blockIds, allowedBlocks: eligibleTypes,
+                }),
+              };
+            })()}
+            {...(() => {
+              // Unwrap action props — only render for blocks that ARE containers.
+              // For leaf blocks (slate, image, etc.) omit onUnwrap so the menu
+              // item doesn't render.
+              const bpm = iframeSyncState.blockPathMap;
+              if (!selectedBlock || !bpm?.[selectedBlock]) return {};
+              const block = getBlockById(properties, bpm, selectedBlock);
+              if (!block) return {};
+              const childField = _getContainerChildFieldName(block['@type'], blocksConfig, intl);
+              const childIds = block?.[childField]?.items || [];
+              if (childIds.length === 0) return {}; // not a container with children
+
+              const childTypes = childIds
+                .map((id) => block.blocks?.[id]?.['@type'])
+                .filter(Boolean);
+              const parentCC = getContainerFieldConfig(selectedBlock, bpm, properties, blocksConfig, intl);
+              let canUnwrap = false;
+              if (parentCC && !parentCC.isObjectList) {
+                const parentPath = parentCC.parentId === PAGE_BLOCK_UID ? [] : bpm[parentCC.parentId]?.path;
+                const parentBlock = getBlockByPath(properties, parentPath);
+                const currentCount = parentBlock ? (getContainerItems(parentBlock, parentCC).length - 1) : 0;
+                canUnwrap = canContainAll(parentCC, childTypes, currentCount);
+              }
+
+              return {
+                canUnwrap,
+                onUnwrap: () => {
+                  try {
+                    const { formData: newFormData, promotedIds } = unwrapContainer(
+                      properties, bpm, selectedBlock, blocksConfig, intl,
+                    );
+                    onChangeFormData(newFormData);
+                    if (promotedIds.length > 0 && onSelectBlock) {
+                      onSelectBlock(promotedIds[0]);
+                    }
+                  } catch (err) {
+                    log('unwrapContainer failed:', err);
+                  }
+                },
+              };
+            })()}
             templateEditMode={iframeSyncState.templateEditMode}
             onMakeTemplate={() => {
               // Create a new template from the selected block

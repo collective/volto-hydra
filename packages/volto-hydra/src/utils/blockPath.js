@@ -6,6 +6,15 @@
 import { produce } from 'immer';
 import { get } from 'lodash';
 import { applyBlockDefaults } from '@plone/volto/helpers';
+// Block-level initialiser hook (e.g. slate registers one to populate
+// `value: [{type:'p',children:[{text:''}]}]`). Schema-level defaults via
+// applyBlockDefaults don't cover this — initialValue is the per-block escape.
+const applyBlockInitialValue = (blockData, blocksConfig, intl) => {
+  const type = blockData?.['@type'];
+  const fn = type && blocksConfig?.[type]?.initialValue;
+  if (typeof fn !== 'function') return blockData;
+  return fn({ id: undefined, value: blockData, formData: undefined, intl });
+};
 import config from '@plone/volto/registry';
 import { PAGE_BLOCK_UID, isBlockReadonly } from '@volto-hydra/hydra-js';
 import {
@@ -490,6 +499,12 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   // Compute default allowed blocks (used when field doesn't specify allowedBlocks)
   const blockConfig = blocksConfig?.[blockType];
   const defaultAllowedBlocks = getPageAllowedBlocksFromRestricted(blocksConfig, { properties: formData });
+  // Page-level defaultBlockType — used as the empty-block fallback when a
+  // container inherits its allowedBlocks from page-level (i.e. doesn't
+  // restrict types). Without this a generic section would auto-fill its
+  // empty state with the 'empty' picker placeholder, even though the
+  // container is happy to accept the page's typing-friendly default.
+  const pageDefaultBlockType = config.settings.defaultBlockType || null;
 
   // Helper to get current count for a container field
   const getFieldCount = (fieldName, isObjectList = false, dataPath = null) => {
@@ -515,13 +530,18 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
         const maxLength = fieldDef.maxLength || blockConfig?.maxLength || null;
         const currentCount = getFieldCount(fieldName);
         const maxLengthOk = !maxLength || currentCount < maxLength;
+        // When neither the field nor the block restricts allowedBlocks, the
+        // container inherits the page's allowed list — and so should its
+        // empty-block default. Otherwise null falls through to the picker
+        // 'empty' placeholder.
+        const allowedBlocksInherited = !fieldDef.allowedBlocks && !blockConfig?.allowedBlocks;
         containerFields.push({
           fieldName,
           title: fieldDef.title || fieldName,
           allowedBlocks: fieldDef.allowedBlocks || blockConfig?.allowedBlocks || defaultAllowedBlocks,
           allowedTemplates: fieldDef.allowedTemplates || null,
           allowedLayouts: fieldDef.allowedLayouts || null,
-          defaultBlockType: fieldDef.defaultBlockType || blockConfig?.defaultBlockType || null,
+          defaultBlockType: fieldDef.defaultBlockType || blockConfig?.defaultBlockType || (allowedBlocksInherited ? pageDefaultBlockType : null),
           maxLength,
           currentCount,
           canAdd: !parentIsReadonly && maxLengthOk,
@@ -565,11 +585,13 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
     const maxLength = blockConfig?.maxLength || null;
     const currentCount = getFieldCount('blocks_layout');
     const maxLengthOk = !maxLength || currentCount < maxLength;
+    // Same inherited-default rule as the schema-defined branch above.
+    const allowedBlocksInherited = !blockConfig?.allowedBlocks;
     containerFields.push({
       fieldName: 'blocks_layout',
       title: 'Blocks',
       allowedBlocks: blockConfig?.allowedBlocks || defaultAllowedBlocks,
-      defaultBlockType: blockConfig?.defaultBlockType || null,
+      defaultBlockType: blockConfig?.defaultBlockType || (allowedBlocksInherited ? pageDefaultBlockType : null),
       maxLength,
       currentCount,
       canAdd: !parentIsReadonly && maxLengthOk,
@@ -634,6 +656,269 @@ export function insertBlockInContainer(formData, blockPathMap, refBlockId, newBl
   }
 
   return setBlockByPath(formData, parentPath, updatedParentBlock);
+}
+
+/**
+ * Wrap a set of selected blocks in a new container of `newContainerType`.
+ *
+ * All selected blocks must share the same parent container. The new container
+ * is inserted where the first selected block was, and becomes the parent of
+ * all selected blocks in their original order. Selected blocks are removed
+ * from the original parent.
+ *
+ * Requires newContainerType's schema to declare a blocks_layout child field
+ * (the standard container pattern).
+ *
+ * @param {Object} formData
+ * @param {Object} blockPathMap
+ * @param {string[]} selectedIds     Block IDs to wrap (must share parent)
+ * @param {string} newContainerType  @type of the container to create
+ * @param {Object} blocksConfig
+ * @param {Object} intl
+ * @param {Object} [options]
+ * @param {Function} [options.uuidGenerator]  Override for deterministic tests
+ * @returns {{formData: Object, newContainerId: string}}
+ */
+export function wrapBlocksInContainer(
+  formData, blockPathMap, selectedIds, newContainerType, blocksConfig, intl, options = {},
+) {
+  if (!selectedIds || selectedIds.length === 0) {
+    throw new Error('[HYDRA] wrapBlocksInContainer: selectedIds is required and non-empty');
+  }
+  const uuidGen = options.uuidGenerator || (() =>
+    (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)));
+
+  // All selected blocks must share the same parent container.
+  const firstCC = getContainerFieldConfig(selectedIds[0], blockPathMap, formData, blocksConfig, intl);
+  if (!firstCC) {
+    throw new Error(`[HYDRA] wrapBlocksInContainer: no container config for ${selectedIds[0]}`);
+  }
+  for (const id of selectedIds.slice(1)) {
+    const cc = getContainerFieldConfig(id, blockPathMap, formData, blocksConfig, intl);
+    if (!cc || cc.parentId !== firstCC.parentId || cc.fieldName !== firstCC.fieldName) {
+      throw new Error(
+        `[HYDRA] wrapBlocksInContainer: all selected blocks must share a parent field (offender: ${id})`,
+      );
+    }
+  }
+
+  if (firstCC.isObjectList) {
+    throw new Error('[HYDRA] wrapBlocksInContainer: object_list parents not yet supported');
+  }
+
+  // Determine the new container's child field name from its schema.
+  const targetFieldName = _getContainerChildFieldName(newContainerType, blocksConfig, intl);
+
+  // Sort selectedIds in DOM order by reading the parent's current layout.
+  const parentPath = firstCC.parentId === PAGE_BLOCK_UID
+    ? [] : blockPathMap[firstCC.parentId]?.path;
+  const parentBlock = getBlockByPath(formData, parentPath);
+  if (!parentBlock) {
+    throw new Error(`[HYDRA] wrapBlocksInContainer: missing parent ${firstCC.parentId}`);
+  }
+  const layoutItems = getContainerItems(parentBlock, firstCC);
+  const sortedIds = layoutItems.filter((id) => selectedIds.includes(id));
+  if (sortedIds.length !== selectedIds.length) {
+    throw new Error('[HYDRA] wrapBlocksInContainer: some selected ids not found in parent layout');
+  }
+
+  // Collect block data for the children (shared blocks dict on parent).
+  const nestedBlocks = {};
+  for (const id of sortedIds) {
+    const data = parentBlock.blocks?.[id];
+    if (data === undefined) {
+      throw new Error(`[HYDRA] wrapBlocksInContainer: parent.blocks missing ${id}`);
+    }
+    nestedBlocks[id] = data;
+  }
+
+  // Build the new container block.
+  const newContainerId = uuidGen();
+  const newContainer = {
+    '@type': newContainerType,
+    blocks: nestedBlocks,
+    [targetFieldName]: { items: [...sortedIds] },
+  };
+
+  // Remove selectedIds from parent's blocks dict and splice in the new container
+  // at the first selected id's position.
+  const remainingBlocks = { ...parentBlock.blocks };
+  for (const id of sortedIds) delete remainingBlocks[id];
+  remainingBlocks[newContainerId] = newContainer;
+
+  const newItems = [];
+  let inserted = false;
+  for (const id of layoutItems) {
+    if (selectedIds.includes(id)) {
+      if (!inserted) {
+        newItems.push(newContainerId);
+        inserted = true;
+      }
+      // Skip the selected id itself — now lives inside the new container.
+    } else {
+      newItems.push(id);
+    }
+  }
+
+  const updatedParent = setContainerItems(parentBlock, firstCC, newItems, remainingBlocks);
+  const newFormData = setBlockByPath(formData, parentPath, updatedParent);
+  return { formData: newFormData, newContainerId };
+}
+
+/**
+ * Unwrap a container block: promote its children to the parent at the
+ * container's position, then remove the container.
+ *
+ * Caller is responsible for confirming the parent's allowedBlocks accepts
+ * each child type before calling (UI button should be disabled otherwise).
+ * Throws if the container isn't a blocks_layout-style parent or if the
+ * parent can't be located.
+ *
+ * @param {Object} formData
+ * @param {Object} blockPathMap
+ * @param {string} containerId      The container block to unwrap
+ * @param {Object} blocksConfig
+ * @param {Object} intl
+ * @returns {{formData: Object, promotedIds: string[]}}
+ */
+export function unwrapContainer(
+  formData, blockPathMap, containerId, blocksConfig, intl,
+) {
+  const containerInfo = blockPathMap?.[containerId];
+  if (!containerInfo) {
+    throw new Error(`[HYDRA] unwrapContainer: no pathInfo for ${containerId}`);
+  }
+
+  // Load the container and find its child field (first blocks_layout field).
+  const containerBlock = getBlockById(formData, blockPathMap, containerId);
+  if (!containerBlock) {
+    throw new Error(`[HYDRA] unwrapContainer: cannot read block ${containerId}`);
+  }
+  const childFieldName = _getContainerChildFieldName(
+    containerBlock['@type'], blocksConfig, intl,
+  );
+  const childIds = containerBlock[childFieldName]?.items || [];
+  const childData = containerBlock.blocks || {};
+
+  // Get the parent container config where `containerId` lives.
+  const containerCC = getContainerFieldConfig(containerId, blockPathMap, formData, blocksConfig, intl);
+  if (!containerCC) {
+    throw new Error(`[HYDRA] unwrapContainer: no parent config for ${containerId}`);
+  }
+  if (containerCC.isObjectList) {
+    throw new Error('[HYDRA] unwrapContainer: object_list parents not yet supported');
+  }
+
+  const parentPath = containerCC.parentId === PAGE_BLOCK_UID
+    ? [] : blockPathMap[containerCC.parentId]?.path;
+  const parentBlock = getBlockByPath(formData, parentPath);
+  if (!parentBlock) {
+    throw new Error(`[HYDRA] unwrapContainer: cannot find parent ${containerCC.parentId}`);
+  }
+
+  const parentItems = getContainerItems(parentBlock, containerCC);
+  const containerIdx = parentItems.indexOf(containerId);
+  if (containerIdx < 0) {
+    throw new Error(`[HYDRA] unwrapContainer: ${containerId} not in parent layout`);
+  }
+
+  // Build the new parent layout: replace containerId with its child ids.
+  const newParentItems = [
+    ...parentItems.slice(0, containerIdx),
+    ...childIds,
+    ...parentItems.slice(containerIdx + 1),
+  ];
+
+  // Merge the container's children into the parent's blocks dict.
+  const newParentBlocks = { ...parentBlock.blocks };
+  delete newParentBlocks[containerId];
+  for (const id of childIds) {
+    if (id in newParentBlocks) {
+      throw new Error(`[HYDRA] unwrapContainer: child id ${id} collides with parent blocks`);
+    }
+    newParentBlocks[id] = childData[id];
+  }
+
+  const updatedParent = setContainerItems(parentBlock, containerCC, newParentItems, newParentBlocks);
+  const newFormData = setBlockByPath(formData, parentPath, updatedParent);
+  return { formData: newFormData, promotedIds: [...childIds] };
+}
+
+/**
+ * Convert a container block's @type while preserving its children. The
+ * source's layout field items are remapped to the target's layout field,
+ * and the shared blocks dict is carried over verbatim.
+ *
+ * Does NOT validate target.allowedBlocks; caller should have already
+ * confirmed compatibility (the UI surfaces only valid targets).
+ *
+ * @param {Object} formData
+ * @param {Object} blockPathMap
+ * @param {string} blockId
+ * @param {string} targetType
+ * @param {Object} blocksConfig
+ * @param {Object} intl
+ * @returns {Object} new formData
+ */
+export function convertContainerBlock(
+  formData, blockPathMap, blockId, targetType, blocksConfig, intl,
+) {
+  const sourceBlock = getBlockById(formData, blockPathMap, blockId);
+  if (!sourceBlock) {
+    throw new Error(`[HYDRA] convertContainerBlock: block ${blockId} not found`);
+  }
+  const sourceType = sourceBlock['@type'];
+  const sourceField = _getContainerChildFieldName(sourceType, blocksConfig, intl);
+  const targetField = _getContainerChildFieldName(targetType, blocksConfig, intl);
+  const items = sourceBlock[sourceField]?.items || [];
+
+  // Strip ALL known blocks_layout fields from the source so leftover layout
+  // fields (e.g. columns has both `columns` and `top_images`) don't linger on
+  // the converted block. Keep `blocks` and non-layout fields.
+  const sourceSchema = (() => {
+    const cfg = blocksConfig?.[sourceType];
+    if (!cfg?.blockSchema) return null;
+    try {
+      return typeof cfg.blockSchema === 'function'
+        ? cfg.blockSchema({ blocksConfig, intl })
+        : cfg.blockSchema;
+    } catch { return null; }
+  })();
+  const layoutFields = new Set();
+  if (sourceSchema?.properties) {
+    for (const [fn, field] of Object.entries(sourceSchema.properties)) {
+      if (field?.widget === 'blocks_layout') layoutFields.add(fn);
+    }
+  }
+  layoutFields.add(sourceField); // belt-and-braces
+
+  const cleanedRest = { ...sourceBlock };
+  for (const fn of layoutFields) delete cleanedRest[fn];
+
+  const newBlock = {
+    ...cleanedRest,
+    '@type': targetType,
+    [targetField]: { items: [...items] },
+  };
+  return updateBlockById(formData, blockPathMap, blockId, newBlock);
+}
+
+/**
+ * Resolve the child field name a container uses for its blocks_layout children.
+ * Scans the block schema for the first field with widget='blocks_layout'.
+ * Falls back to 'blocks_layout' if none is explicitly declared.
+ */
+export function _getContainerChildFieldName(blockType, blocksConfig, intl) {
+  const cfg = blocksConfig?.[blockType];
+  if (!cfg?.blockSchema) return 'blocks_layout';
+  const schema = typeof cfg.blockSchema === 'function'
+    ? cfg.blockSchema({ blocksConfig, intl })
+    : cfg.blockSchema;
+  const props = schema?.properties || {};
+  for (const [fieldName, field] of Object.entries(props)) {
+    if (field?.widget === 'blocks_layout') return fieldName;
+  }
+  return 'blocks_layout';
 }
 
 /**
@@ -1043,27 +1328,27 @@ export function mutateBlockInContainer(formData, blockPathMap, blockId, newBlock
 /**
  * Determine the block type to use for an empty container.
  * Fallback chain:
- *   1. containerConfig.defaultBlockType (explicit default for this container)
+ *   1. containerConfig.defaultBlockType (set by getAllContainerFields —
+ *      either explicit on the field/blockConfig, or inherited from the
+ *      page when the container doesn't restrict allowedBlocks)
  *   2. Single allowedBlocks entry (only one choice)
- *   3. config.settings.defaultBlockType if allowed (global default, e.g. 'slate')
- *   4. 'empty' (slot block that opens BlockChooser on click)
+ *   3. 'empty' (placeholder — opens BlockChooser on click, REPLACED on DnD)
+ *
+ * Containers with explicit multi-entry allowedBlocks fall through to (3):
+ * the author opted into the picker, so the user picks. Containers with
+ * NO allowedBlocks restriction get a meaningful default via (1) because
+ * getAllContainerFields fills defaultBlockType from page-level when
+ * allowedBlocks itself was inherited from page.
  *
  * @param {Object|null} containerConfig - Container config with allowedBlocks/defaultBlockType
  * @returns {string} Block type to create
  */
-function getEmptyBlockType(containerConfig) {
+export function getEmptyBlockType(containerConfig) {
   if (containerConfig?.defaultBlockType) {
     return containerConfig.defaultBlockType;
   }
   if (containerConfig?.allowedBlocks?.length === 1) {
     return containerConfig.allowedBlocks[0];
-  }
-  const globalDefault = config.settings.defaultBlockType;
-  if (globalDefault) {
-    const allowed = containerConfig?.allowedBlocks;
-    if (!allowed || allowed.includes(globalDefault)) {
-      return globalDefault;
-    }
   }
   return 'empty';
 }
@@ -1160,6 +1445,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
 
   if (intl && blocksConfig) {
     blockData = applyBlockDefaults({ data: blockData, intl, metadata, properties }, blocksConfig);
+    blockData = applyBlockInitialValue(blockData, blocksConfig, intl);
   }
 
   const blocksObj = { ...parentBlock.blocks, [newBlockId]: blockData };

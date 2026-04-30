@@ -342,6 +342,43 @@ test.describe('Adding Blocks to Containers', () => {
     expect(finalPageBlocks).toBe(initialPageBlocks);
   });
 
+  // Regression: when the container allows MULTIPLE block types (e.g. gridBlock
+  // with allowedBlocks ['image', 'listing', 'slate', 'teaser']) and no
+  // defaultBlockType is set, View.jsx's ADD_BLOCK_AFTER handler currently falls
+  // through past the single-allowedBlock branch to a hardcoded 'slate' default.
+  // The expected behaviour is "another one of these": if the source block's
+  // @type is in the computed allowed types, create another of that type;
+  // otherwise use the centralised getEmptyBlockType() fallback. Mirrors the
+  // single-allowedBlock test above.
+  test('pressing Enter in container with multiple allowedBlocks creates same type as source', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // grid-1 has two teaser cells (allowedBlocks: image/listing/slate/teaser).
+    const gridCellsLocator = iframe.locator(
+      '[data-block-uid="grid-1"] > .grid-row > [data-block-uid]',
+    );
+    await expect(gridCellsLocator).toHaveCount(2);
+
+    // Click the first teaser cell (block-mode selection — cells are
+    // data-block-readonly so we never enter text mode on the title).
+    await helper.clickBlockInIframe('grid-cell-1');
+
+    // Press Enter — should add another block in grid-1, of type 'teaser'
+    // (same as source), not 'slate' (the old hardcoded default).
+    await page.keyboard.press('Enter');
+    await expect(gridCellsLocator).toHaveCount(3);
+
+    // Verify the new block is a teaser via the sidebar's current-block label.
+    await helper.waitForSidebarCurrentBlock('Teaser');
+  });
+
   test('pressing Enter in container with single allowedBlock creates that type, not slate', async ({
     page,
   }) => {
@@ -2653,10 +2690,14 @@ test.describe('Sidebar Child Blocks Reordering', () => {
     // Press Escape to deselect any auto-selected block and show page-level child blocks
     await helper.escapeToParent();
 
-    // Find grid-1 in the page's child blocks widget and click it
+    // Find grid-1 in the page's child blocks widget and click it.
+    // Match by data-rbd-draggable-id rather than `hasText: 'Grid'` —
+    // the fixture has multiple gridBlocks (grid-1/grid-2/grid-empty)
+    // all rendered as 'Grid' in the sidebar, so a text filter would
+    // hit strict-mode violation.
     const pageChildBlocks = page.locator('#sidebar-order .child-blocks-widget');
     await expect(pageChildBlocks).toBeVisible({ timeout: 5000 });
-    const gridItem = pageChildBlocks.locator('.child-block-item', { hasText: 'Grid' });
+    const gridItem = pageChildBlocks.locator('.child-block-item[data-rbd-draggable-id="grid-1"]');
     await expect(gridItem).toBeVisible({ timeout: 5000 });
     await gridItem.click();
 
@@ -3976,9 +4017,11 @@ test.describe('Multi-Container Field Operations', () => {
     await helper.waitForSidebarOpen();
     await helper.waitForSidebarCurrentBlock('Grid', 10000);
 
-    // Find the new gridBlock by looking for blocks with .grid-row child
-    // Use :not([data-block-uid="grid-1"]) to exclude the original grid-1
-    const newGridBlock = iframe.locator('[data-block-uid]:has(> .grid-row):not([data-block-uid="grid-1"])');
+    // Find the new gridBlock by looking for blocks with .grid-row child,
+    // excluding all fixture gridBlocks on /container-test-page.
+    const newGridBlock = iframe.locator(
+      '[data-block-uid]:has(> .grid-row):not([data-block-uid="grid-1"]):not([data-block-uid="grid-2"]):not([data-block-uid="grid-empty"])',
+    );
     await expect(newGridBlock).toBeVisible({ timeout: 5000 });
 
     // The gridBlock should contain at least one child block (ensureEmptyBlockIfEmpty creates it)

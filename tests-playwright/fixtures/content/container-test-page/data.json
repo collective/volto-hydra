@@ -84,10 +84,33 @@
         }
       },
       "blocks_layout": {"items": ["grid-cell-1", "grid-cell-2"]}
+    },
+    "grid-2": {
+      "@type": "gridBlock",
+      "blocks": {
+        "grid-cell-3": {
+          "@type": "teaser",
+          "title": "Grid Teaser 3",
+          "description": "Third grid teaser",
+          "href": [{"@id": "/test-page", "@type": "Document", "title": "Test Page"}]
+        },
+        "grid-cell-4": {
+          "@type": "teaser",
+          "title": "Grid Teaser 4",
+          "description": "Fourth grid teaser",
+          "href": [{"@id": "/another-page", "@type": "Document", "title": "Another Page"}]
+        }
+      },
+      "blocks_layout": {"items": ["grid-cell-3", "grid-cell-4"]}
+    },
+    "grid-empty": {
+      "@type": "gridBlock",
+      "blocks": {},
+      "blocks_layout": {"items": []}
     }
   },
   "blocks_layout": {
-    "items": ["title-block", "columns-1", "text-after", "grid-1"]
+    "items": ["title-block", "columns-1", "text-after", "grid-1", "grid-2", "grid-empty"]
   },
   "allow_discussion": false,
   "is_folderish": false,

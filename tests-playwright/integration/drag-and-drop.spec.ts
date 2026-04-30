@@ -16,6 +16,72 @@ import { AdminUIHelper } from '../helpers/AdminUIHelper';
 test.describe('Block Drag and Drop', () => {
   test.setTimeout(60000); // 60 second timeout for all DND tests (variable scroll speed + DOM manipulation)
 
+  // Failing on purpose: dragging a teaser onto an empty grid container
+  // should drop it INSIDE the grid (becoming the grid's first child).
+  // Currently it doesn't — the empty grid has no children, and the
+  // drop-indicator logic relies on existing children to compute drop
+  // positions. The user's hypothesis: the "empty type next sibling"
+  // (the synthetic empty/slot child created when a container is empty)
+  // isn't set up correctly to act as a drop target.
+  test('can drag a teaser into an empty grid', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+    const iframe = helper.getIframe();
+
+    // grid-empty starts with no children; ensureEmptyBlockIfEmpty may have
+    // injected a synthetic placeholder. Either way, no real teaser inside.
+    const initialChildren = await iframe
+      .locator('[data-block-uid="grid-empty"] [data-block-uid]').count();
+    expect(initialChildren).toBeLessThanOrEqual(1); // 0 or 1 (placeholder)
+
+    // DIAG: dump grid-empty's children + their pathMap entries.
+    const diag = await iframe.locator('html').first().evaluate(() => {
+      const bridge: any = (window as any).bridge;
+      const pathMap = bridge?.blockPathMap || {};
+      const out: any = { childrenInDOM: [], childrenInPathMap: {} };
+      const grid = document.querySelector('[data-block-uid="grid-empty"]');
+      if (grid) {
+        for (const c of grid.querySelectorAll('[data-block-uid]')) {
+          const uid = (c as Element).getAttribute('data-block-uid');
+          out.childrenInDOM.push(uid);
+        }
+      }
+      for (const uid of Object.keys(pathMap)) {
+        if (uid.startsWith('_')) continue;
+        const info = pathMap[uid];
+        if (info?.parentId === 'grid-empty') {
+          out.childrenInPathMap[uid] = {
+            blockType: info.blockType,
+            allowedSiblingTypes: info.allowedSiblingTypes,
+            isFixed: info.isFixed,
+          };
+        }
+      }
+      return out;
+    });
+    // eslint-disable-next-line no-console
+    console.log('[DIAG] grid-empty:', JSON.stringify(diag));
+
+    // Drag grid-cell-1 (a teaser inside grid-1) onto grid-empty.
+    await helper.clickBlockInIframe('grid-cell-1');
+    await helper.waitForSidebarOpen();
+    const dragHandle = await helper.getDragHandle();
+    const target = iframe.locator('[data-block-uid="grid-empty"]').first();
+    await helper.dragBlockWithMouse(dragHandle, target, true);
+
+    // grid-cell-1 should now be a descendant of grid-empty.
+    await expect.poll(async () =>
+      iframe.locator('[data-block-uid="grid-cell-1"]').evaluate(
+        (el) => {
+          const ancestor = el.parentElement?.closest('[data-block-uid]');
+          return ancestor?.getAttribute('data-block-uid') || null;
+        },
+      ),
+      { timeout: 5000 },
+    ).toBe('grid-empty');
+  });
+
   test('blocks can be reordered via drag and drop', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 

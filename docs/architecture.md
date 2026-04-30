@@ -1,7 +1,7 @@
-# Slate Transforms Architecture
+# Volto-Hydra Architecture
 
-**Status:** Implemented
-**Updated:** 2025-12-19
+**Status:** Living document
+**Updated:** 2026-04-28
 
 ## Table of Contents
 
@@ -15,6 +15,14 @@
 3. [Bridge Protocol](#bridge-protocol)
 4. [Selection Serialization](#selection-serialization)
 5. [Key Components](#key-components)
+6. [Chrome — Admin-Rendered Editor UI](#chrome--admin-rendered-editor-ui)
+   - [Why the admin owns the chrome](#why-the-admin-owns-the-chrome)
+   - [Pattern: visual in admin, invisible event-capture in iframe](#pattern-visual-in-admin-invisible-event-capture-in-iframe)
+   - [Quanta toolbar](#quanta-toolbar)
+   - [Block drag (DnD)](#block-drag-dnd)
+   - [Scroll lifecycle](#scroll-lifecycle)
+   - [Edge-drag (container resize)](#edge-drag-container-resize)
+   - [Anti-pattern: chrome inside the iframe](#anti-pattern-chrome-inside-the-iframe)
 
 ---
 
@@ -568,6 +576,90 @@ The admin side has two data sources: `iframeSyncState` (updated directly from if
 3. **Universal adoption creates gaps**: Adopting iframe's sequence makes admin's counter jump ahead, then Redux changes with lower sequences are incorrectly rejected
 
 Content comparison avoids all these issues — it doesn't matter what sequence the data has, only whether the content actually changed.
+
+---
+
+## Chrome — Admin-Rendered Editor UI
+
+"Chrome" here means everything the editor draws on top of the user's content: selection outlines, the Quanta toolbar, the block drag handle, multi-select rects, edge-drag handles, the "+" add button, etc. None of this is part of the page being authored — it's the editor's own UI.
+
+### Why the admin owns the chrome
+
+The iframe contains the *content* (the rendered page); the admin contains the *editor*. The primary reason the admin owns the chrome is **isolation from the frontend**:
+
+- The user's frontend ships its own CSS, layout, scripts, third-party widgets, etc. Anything we render *inside* the iframe is at the mercy of that — global selectors, reset stylesheets, transform/overflow contexts, accidental z-index regimes, and scripts that mutate the DOM can all distort or hide our chrome.
+- Anything we render *outside* the iframe is in the admin's own React tree, with our own styles. The frontend can't reach it. The chrome looks and behaves the same regardless of what frontend the user has loaded (Volto, Nuxt, Next.js, F7, custom).
+
+Two secondary reasons follow from the same split:
+
+- **Lifecycle.** Selection state, multi-select state, scroll state, focus, mode (text vs block), and chrome visibility are React state in `View.jsx`. Rendering chrome from React means it follows React's normal lifecycle automatically — unmounts when selection clears, repositions when `blockUI.rect` changes, hides during scroll, suppresses itself during multi-select, etc.
+- **Z-order.** The admin sits above the iframe; portal-mounted React elements can layer over the iframe content without z-index gymnastics inside the page.
+
+The iframe's job is to **measure** (compute bounding rects in iframe coordinates) and **report** (`postMessage` rects to admin), nothing more.
+
+### Pattern: visual in admin, invisible event-capture in iframe
+
+When chrome needs to receive mouse events that target the *iframe content underneath* (drag handles, edge handles), we use a two-element pattern:
+
+- **Admin side**: a visible div positioned via `blockUI` rects, styled however we want, with `pointerEvents: 'none'`. It's purely cosmetic.
+- **Iframe side**: an invisible (or transparent) div at the same iframe-coordinates with `pointerEvents: 'auto'`, attached to `document.body` inside the iframe. It owns the actual `mousedown` / `mousemove` / `mouseup` / `click` listeners.
+
+Because the admin visual has `pointerEvents: 'none'`, mouse events pass through it to the iframe — and the iframe's invisible element catches them. Drag computations stay where they need to (in hydra.js, with access to iframe DOM rects), while the visuals stay where they belong (in the admin, with React lifecycle).
+
+Codified by `createDragHandle` in `packages/hydra-js/hydra.src.js` (see comment at the top of that method). The Quanta toolbar's drag-button is the original example.
+
+### Quanta toolbar
+
+- **Visual** (admin): `SyncedSlateToolbar.jsx` — rendered as a portal whose position is computed from `blockUI.rect`. Buttons are real Slate buttons inside a synthetic Slate context (see [Key Components](#key-components)).
+- **Iframe**: contributes nothing visible. It computes the block's rect, sends `BLOCK_SELECTED { rect, focusedFieldName, focusedFieldRect, ... }`, and that's it.
+- **Lifecycle**: hides on selection clear (`blockUI` becomes null), during multi-select (`multiSelectedUids.length > 1`), during scroll (`HIDE_BLOCK_UI` from iframe scroll handler), and during DnD (`grabbing` class).
+
+### Block drag (DnD)
+
+- **Visual** (admin): a `volto-hydra-drag-button` div positioned over the block's top-left corner, rendered from `blockUI` data, `pointerEvents: 'none'`.
+- **Iframe**: an *invisible* `volto-hydra-drag-button` div, also positioned over the block's top-left corner inside `document.body` (iframe), `pointerEvents: 'auto'`. Owns mousedown for drag start and mousemove during drag (with auto-scroll, drop-indicator placement, and `MOVE_BLOCKS` postMessage on release).
+- The user sees the admin's visible button; their click passes through to the iframe's invisible one. Drag computations have access to iframe block rects directly.
+- **Lifecycle**: same as toolbar — both elements update from selection, hide on scroll, etc.
+
+### Scroll lifecycle
+
+The iframe scrolls independently of the admin (the iframe's `body` has its own scroll position). When the user scrolls the iframe:
+
+1. Iframe-side hydra listens for `scroll` and posts `HIDE_BLOCK_UI` to admin.
+2. Admin hides chrome (toolbar, outline, drag button) until selection settles.
+3. Iframe re-emits `BLOCK_SELECTED` with the new rect once scroll settles.
+4. Admin re-renders chrome at the new rect.
+
+Anything chrome-like the iframe draws inside its own DOM **does not** participate in this — it stays at its last computed position regardless of admin scroll. That's the second reason chrome belongs in the admin: scroll behaviour comes for free.
+
+### Edge-drag (container resize)
+
+Edge-drag — drag a container's edge to absorb adjacent blocks (or expel children) — follows the same pattern:
+
+- **Iframe** (`hydra.src.js`): for the selected container, computes 4 edge rects (top/bottom/left/right) plus per-edge `canAbsorb` / `canExpel` flags, attaches them to `BLOCK_SELECTED` (or a dedicated `EDGE_RECTS_UPDATED` message). It also creates 4 invisible event-capture divs in `document.body` aligned to those rects, with mousedown handlers that run absorb/expel computation and emit `MOVE_BLOCKS` on release.
+- **Admin** (`View.jsx`): renders 4 visible edge handles + the translucent "growth box" overlay + per-block tints during a drag, all positioned from `blockUI.edgeRects`. `pointerEvents: 'none'` on the visuals so they pass through to the iframe.
+- **Lifecycle**: piggybacks on `blockUI` — handles disappear when selection changes, when scrolling, when multi-select is active, etc.
+
+Earlier versions of edge-drag rendered the visible handles **inside the iframe** (see [Anti-pattern](#anti-pattern-chrome-inside-the-iframe)). That re-introduced exactly the bugs this architecture exists to avoid: handles persisted across selection changes, didn't hide on scroll, and could co-exist with the admin's `.volto-hydra-block-outline` to produce two simultaneous selection rects.
+
+### Frontend's focus styling on selected blocks
+
+Hydra's `selectBlock` calls `.focus()` (after setting `tabindex="-1"`) on the selected block when it has no editable text fields. This is plumbing — without focus inside the iframe, keydown events fire on the parent admin window instead of being caught by the iframe's document keyboard blocker. It is not "the block is selected, so it has focus" — selection is an editor concept tracked in admin Redux, focus is a DOM concept.
+
+Frontends are free to style `:focus` on their blocks however they like. The only request: **on container blocks (gridBlock, columns, accordion, etc.) that you give a `border-radius` on the `data-block-uid` element, suppress the browser's default `:focus` outline** — otherwise it traces a rounded blue rectangle that looks indistinguishable from a selection outline and stacks visually on top of the admin's chrome. Tailwind: add `focus:outline-none`. Vanilla CSS: `[data-block-uid]:focus { outline: none; }` scoped to the relevant blocks.
+
+Hydra does not inject CSS to suppress this — that would override the frontend's styling for `:focus` everywhere and is wrong on principle (frontend owns its CSS).
+
+### Anti-pattern: chrome inside the iframe
+
+If you find yourself doing any of the following in `hydra.src.js`, stop and reconsider:
+
+- Calling `document.body.appendChild(...)` to add a *visible* div (border, background, shadow, etc.).
+- Using `position: 'fixed'` for chrome (it's fixed to the iframe viewport, which doesn't scroll the way the user expects).
+- Reaching for a manual cleanup pass on selection change or scroll to hide your visual.
+- Building your own state machine for "is this currently the selected block".
+
+The fix in every case is: hand the geometry to the admin via `BLOCK_SELECTED` (or a dedicated message), let React render the visible chrome from `blockUI`, and keep an invisible event-capture div on the iframe side if you also need to handle mouse events.
 
 ---
 

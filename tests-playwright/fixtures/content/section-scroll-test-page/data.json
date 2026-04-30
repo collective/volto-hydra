@@ -1,0 +1,78 @@
+{
+  "@id": "http://localhost:8888/section-scroll-test-page",
+  "@type": "Document",
+  "UID": "section-scroll-test-page-uid",
+  "id": "section-scroll-test-page",
+  "title": "Section Scroll Test Page",
+  "description": "Tall page with a section container and many slate siblings below — exercises edge-drag auto-scroll.",
+  "review_state": "published",
+  "parent": {
+    "@id": "http://localhost:8888",
+    "@type": "Plone Site",
+    "title": "Site"
+  },
+  "blocks": {
+    "title-block": { "@type": "title" },
+    "section-1": {
+      "@type": "section",
+      "blocks": {
+        "section-child-1": {
+          "@type": "slate",
+          "value": [{"type": "p", "children": [{"text": "Inside the section"}]}],
+          "plaintext": "Inside the section"
+        }
+      },
+      "blocks_layout": {"items": ["section-child-1"]}
+    },
+    "filler-01": {"@type": "slate", "value": [{"type":"p","children":[{"text":"Filler 1 — keeps page tall enough to require scrolling during edge-drag."}]}], "plaintext": "Filler 1"},
+    "filler-02": {"@type": "slate", "value": [{"type":"p","children":[{"text":"Filler 2 — keeps page tall enough to require scrolling during edge-drag."}]}], "plaintext": "Filler 2"},
+    "filler-03": {"@type": "slate", "value": [{"type":"p","children":[{"text":"Filler 3 — keeps page tall enough to require scrolling during edge-drag."}]}], "plaintext": "Filler 3"},
+    "filler-04": {"@type": "slate", "value": [{"type":"p","children":[{"text":"Filler 4 — keeps page tall enough to require scrolling during edge-drag."}]}], "plaintext": "Filler 4"},
+    "filler-05": {"@type": "slate", "value": [{"type":"p","children":[{"text":"Filler 5 — keeps page tall enough to require scrolling during edge-drag."}]}], "plaintext": "Filler 5"},
+    "filler-06": {"@type": "slate", "value": [{"type":"p","children":[{"text":"Filler 6 — keeps page tall enough to require scrolling during edge-drag."}]}], "plaintext": "Filler 6"},
+    "filler-07": {"@type": "slate", "value": [{"type":"p","children":[{"text":"Filler 7 — keeps page tall enough to require scrolling during edge-drag."}]}], "plaintext": "Filler 7"},
+    "filler-08": {"@type": "slate", "value": [{"type":"p","children":[{"text":"Filler 8 — keeps page tall enough to require scrolling during edge-drag."}]}], "plaintext": "Filler 8"},
+    "filler-09": {"@type": "slate", "value": [{"type":"p","children":[{"text":"Filler 9 — keeps page tall enough to require scrolling during edge-drag."}]}], "plaintext": "Filler 9"},
+    "filler-10": {"@type": "slate", "value": [{"type":"p","children":[{"text":"Filler 10 — keeps page tall enough to require scrolling during edge-drag."}]}], "plaintext": "Filler 10"},
+    "filler-11": {"@type": "slate", "value": [{"type":"p","children":[{"text":"Filler 11 — keeps page tall enough to require scrolling during edge-drag."}]}], "plaintext": "Filler 11"},
+    "filler-12": {"@type": "slate", "value": [{"type":"p","children":[{"text":"Filler 12 — keeps page tall enough to require scrolling during edge-drag."}]}], "plaintext": "Filler 12"},
+    "filler-13": {"@type": "slate", "value": [{"type":"p","children":[{"text":"Filler 13 — keeps page tall enough to require scrolling during edge-drag."}]}], "plaintext": "Filler 13"},
+    "filler-14": {"@type": "slate", "value": [{"type":"p","children":[{"text":"Filler 14 — keeps page tall enough to require scrolling during edge-drag."}]}], "plaintext": "Filler 14"},
+    "filler-15": {"@type": "slate", "value": [{"type":"p","children":[{"text":"Filler 15 — keeps page tall enough to require scrolling during edge-drag."}]}], "plaintext": "Filler 15"}
+  },
+  "blocks_layout": {
+    "items": ["title-block", "section-1", "filler-01", "filler-02", "filler-03", "filler-04", "filler-05", "filler-06", "filler-07", "filler-08", "filler-09", "filler-10", "filler-11", "filler-12", "filler-13", "filler-14", "filler-15"]
+  },
+  "allow_discussion": false,
+  "is_folderish": false,
+  "exclude_from_nav": false,
+  "created": "2025-01-01T12:00:00+00:00",
+  "modified": "2025-01-01T12:00:00+00:00",
+  "lock": {"locked": false, "stealable": true},
+  "@components": {
+    "actions": {
+      "@id": "http://localhost:8888/section-scroll-test-page/@actions",
+      "document_actions": [],
+      "object": [{"id": "view", "title": "View"}, {"id": "edit", "title": "Edit"}, {"id": "folderContents", "title": "Contents"}],
+      "object_buttons": [],
+      "portal_tabs": [],
+      "site_actions": [],
+      "user": []
+    },
+    "breadcrumbs": {
+      "@id": "http://localhost:8888/section-scroll-test-page/@breadcrumbs",
+      "items": [
+        {"@id": "http://localhost:8888", "title": "Home"},
+        {"@id": "http://localhost:8888/section-scroll-test-page", "title": "Section Scroll Test Page"}
+      ],
+      "root": "http://localhost:8888"
+    },
+    "navigation": {"@id": "http://localhost:8888/section-scroll-test-page/@navigation", "items": []},
+    "workflow": {"@id": "http://localhost:8888/section-scroll-test-page/@workflow"}
+  },
+  "can_manage_portlets": true,
+  "can_view": true,
+  "can_edit": true,
+  "can_delete": true,
+  "can_add": true
+}

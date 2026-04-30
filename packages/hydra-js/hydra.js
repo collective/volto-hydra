@@ -313,6 +313,72 @@ var tabbable = function tabbable2(container, options) {
   return _sortByOrder(candidates);
 };
 
+// containerOps.js
+function canContain(config, blockType, currentCount) {
+  if (config?.readOnly) return false;
+  if (config?.fixed) return false;
+  const { allowedBlocks, maxLength } = config || {};
+  if (allowedBlocks != null && !allowedBlocks.includes(blockType)) return false;
+  if (maxLength != null && currentCount >= maxLength) return false;
+  return true;
+}
+function canContainAll(config, blockTypes, currentCount) {
+  if (blockTypes.length === 0) return true;
+  if (config?.readOnly || config?.fixed) return false;
+  const { allowedBlocks, maxLength } = config || {};
+  if (allowedBlocks != null) {
+    for (const type of blockTypes) {
+      if (!allowedBlocks.includes(type)) return false;
+    }
+  }
+  if (maxLength != null && currentCount + blockTypes.length > maxLength) {
+    return false;
+  }
+  return true;
+}
+function mapLayoutItems(sourceConfig, targetConfig, sourceBlock) {
+  const sourceField = sourceConfig.fieldName;
+  const targetField = targetConfig.fieldName;
+  const items = sourceBlock[sourceField]?.items ?? [];
+  const blocks = sourceBlock.blocks ?? {};
+  return {
+    blocks,
+    [targetField]: { items }
+  };
+}
+function findConversionPath(srcType, allowedTargets, blocksConfig, depth = 3) {
+  if (!srcType || !blocksConfig?.[srcType]) return null;
+  const targetSet = new Set(allowedTargets);
+  if (targetSet.has(srcType)) return [srcType];
+  const parents = /* @__PURE__ */ new Map();
+  parents.set(srcType, null);
+  let frontier = [srcType];
+  for (let hop = 1; hop <= depth; hop++) {
+    const next = [];
+    for (const current of frontier) {
+      for (const [candidate, candidateCfg] of Object.entries(blocksConfig)) {
+        if (parents.has(candidate)) continue;
+        if (!candidateCfg?.fieldMappings) continue;
+        if (!candidateCfg.fieldMappings[current]) continue;
+        parents.set(candidate, current);
+        if (targetSet.has(candidate)) {
+          const path = [candidate];
+          let node = current;
+          while (node !== null) {
+            path.unshift(node);
+            node = parents.get(node);
+          }
+          return path;
+        }
+        next.push(candidate);
+      }
+    }
+    if (next.length === 0) break;
+    frontier = next;
+  }
+  return null;
+}
+
 // hydra.src.js
 var debugEnabled = false;
 try {
@@ -905,6 +971,509 @@ var Bridge = class {
     const setB = new Set(b);
     return a.every((uid) => setB.has(uid));
   }
+  /** True if `ancestorUid` appears anywhere in `descendantUid`'s parent chain. */
+  _isAncestor(ancestorUid, descendantUid) {
+    if (!ancestorUid || !descendantUid) return false;
+    let cur = this.blockPathMap?.[descendantUid]?.parentId;
+    while (cur) {
+      if (cur === ancestorUid) return true;
+      cur = this.blockPathMap?.[cur]?.parentId;
+    }
+    return false;
+  }
+  /**
+   * Auto-scroll helper for drag operations.
+   *
+   * Returns { onMouseMove(e), stop() } that the caller wires into a drag's
+   * mousemove and mouseup. While the cursor is within `threshold` pixels of
+   * the viewport top or bottom, the page scrolls at a speed proportional to
+   * how close it is to the edge (faster nearer the edge). A synthetic
+   * mousemove is dispatched on each scroll tick so the caller's drag
+   * indicator updates while the mouse is stationary at the edge.
+   *
+   * Used by:
+   *  - block DnD (existing drag-and-drop)
+   *  - container edge-drag
+   */
+  _createAutoScroller() {
+    const threshold = 80;
+    const minSpeed = 10;
+    const maxSpeed = 50;
+    let direction = 0;
+    let speed = 0;
+    let animId = null;
+    let lastX = 0;
+    let lastY = 0;
+    const loop = () => {
+      if (direction === 0) return;
+      window.scrollTo({
+        top: window.scrollY + direction * speed,
+        behavior: "instant"
+      });
+      document.dispatchEvent(new MouseEvent("mousemove", {
+        clientX: lastX,
+        clientY: lastY,
+        bubbles: true
+      }));
+      animId = requestAnimationFrame(loop);
+    };
+    const setDirection = (d) => {
+      if (direction === d) return;
+      direction = d;
+      if (animId === null && d !== 0) {
+        animId = requestAnimationFrame(loop);
+      }
+    };
+    const stop = () => {
+      direction = 0;
+      if (animId !== null) {
+        cancelAnimationFrame(animId);
+        animId = null;
+      }
+    };
+    const onMouseMove = (e) => {
+      lastX = e.clientX;
+      lastY = e.clientY;
+      const vh = window.innerHeight;
+      if (e.clientY < threshold) {
+        const factor = 1 - e.clientY / threshold;
+        speed = minSpeed + (maxSpeed - minSpeed) * factor;
+        setDirection(-1);
+      } else if (e.clientY > vh - threshold) {
+        const factor = 1 - (vh - e.clientY) / threshold;
+        speed = minSpeed + (maxSpeed - minSpeed) * factor;
+        setDirection(1);
+      } else {
+        stop();
+      }
+    };
+    return { onMouseMove, stop };
+  }
+  /**
+   * Position all 4 edge handles for the selected container.
+   * For each edge:
+   *   - Show if absorb is possible: there's a sibling on the outward side
+   *     (parent layout matches edge axis) whose @type the container accepts.
+   *   - Show if expel is possible: the container has a child whose @type
+   *     the parent accepts (children layout matches edge axis).
+   * The drag handler reads dataset attributes to know what to do.
+   */
+  _positionEdgeHandles() {
+    const hide = () => {
+      this._lastCanResize = null;
+      if (this._edgeHandles) {
+        for (const h of Object.values(this._edgeHandles)) h.style.display = "none";
+      }
+    };
+    if (!this._edgeHandles) return;
+    const uid = this.selectedBlockUid;
+    if (!uid || uid === PAGE_BLOCK_UID) {
+      hide();
+      return;
+    }
+    const info = this.blockPathMap?.[uid];
+    const el = uid ? this.queryBlockElement(uid) : null;
+    if (!info || !el) {
+      hide();
+      return;
+    }
+    const ownChildren = this._getSiblingsByDomOrder(null, uid);
+    if (ownChildren.length === 0) {
+      hide();
+      return;
+    }
+    const firstChildInfo = this.blockPathMap?.[ownChildren[0]];
+    let childAllowed = firstChildInfo?.allowedSiblingTypes || null;
+    const parentInfo = this.blockPathMap?.[info.parentId];
+    const parentSchema = parentInfo?._schemaRef ? this.blockPathMap?._schemas?.[parentInfo._schemaRef] : null;
+    let parentAllowed = null;
+    if (parentSchema?.properties && info.containerField) {
+      const fd = parentSchema.properties[info.containerField];
+      if (fd?.widget === "blocks_layout" || fd?.widget === "object_list") {
+        parentAllowed = fd.allowedBlocks || null;
+      }
+    } else if (info.parentId === PAGE_BLOCK_UID) {
+      parentAllowed = info.allowedSiblingTypes || null;
+    }
+    const r = el.getBoundingClientRect();
+    const planFor = (edge, mode) => {
+      const FAR = 1e7;
+      let cursorCoord;
+      if (mode === "absorb") {
+        cursorCoord = edge === "bottom" ? r.bottom + FAR : edge === "top" ? r.top - FAR : edge === "right" ? r.right + FAR : r.left - FAR;
+      } else {
+        cursorCoord = edge === "bottom" ? r.top - FAR : edge === "top" ? r.bottom + FAR : edge === "right" ? r.left - FAR : r.right + FAR;
+      }
+      return this._computeEdgePlan(uid, edge, mode, cursorCoord).blocks.length > 0;
+    };
+    const perEdge = {};
+    for (const edge of ["top", "bottom", "left", "right"]) {
+      perEdge[edge] = {
+        canAbsorb: planFor(edge, "absorb"),
+        canExpel: planFor(edge, "expel")
+      };
+    }
+    const canResize = {
+      top: perEdge.top.canAbsorb || perEdge.top.canExpel,
+      bottom: perEdge.bottom.canAbsorb || perEdge.bottom.canExpel,
+      left: perEdge.left.canAbsorb || perEdge.left.canExpel,
+      right: perEdge.right.canAbsorb || perEdge.right.canExpel
+    };
+    if (!canResize.top && !canResize.bottom && !canResize.left && !canResize.right) {
+      hide();
+      return;
+    }
+    this._lastCanResize = canResize;
+    const w3 = r.width / 3;
+    const h3 = r.height / 3;
+    const positions = {
+      top: { left: r.left + w3, top: r.top - 3, width: w3, height: 6, axis: "vertical" },
+      bottom: { left: r.left + w3, top: r.bottom - 3, width: w3, height: 6, axis: "vertical" },
+      left: { left: r.left - 3, top: r.top + h3, width: 6, height: h3, axis: "horizontal" },
+      right: { left: r.right - 3, top: r.top + h3, width: 6, height: h3, axis: "horizontal" }
+    };
+    for (const [edge, pos] of Object.entries(positions)) {
+      const handle = this._edgeHandles[edge];
+      if (!handle) continue;
+      if (!canResize[edge]) {
+        handle.style.display = "none";
+        continue;
+      }
+      handle.style.left = `${pos.left}px`;
+      handle.style.top = `${pos.top}px`;
+      handle.style.width = `${pos.width}px`;
+      handle.style.height = `${pos.height}px`;
+      handle.style.display = "block";
+      handle.dataset.edge = edge;
+      handle.dataset.axis = pos.axis;
+      handle.dataset.container = uid;
+      handle.dataset.canAbsorb = perEdge[edge].canAbsorb ? "1" : "";
+      handle.dataset.canExpel = perEdge[edge].canExpel ? "1" : "";
+      handle.dataset.childAllowed = childAllowed ? childAllowed.join(",") : "";
+      handle.dataset.parentAllowed = parentAllowed ? parentAllowed.join(",") : "";
+    }
+  }
+  /**
+   * Geometry helper: signed outward distance from the edge in the
+   * direction the user would drag to absorb. Positive = outward
+   * (absorb mode); negative = inward (expel mode).
+   */
+  _edgeGeometry(edge, rect, mouseX, mouseY) {
+    switch (edge) {
+      case "bottom":
+        return { axis: "vertical", edgePos: rect.bottom, mouseCoord: mouseY, outward: mouseY - rect.bottom };
+      case "top":
+        return { axis: "vertical", edgePos: rect.top, mouseCoord: mouseY, outward: rect.top - mouseY };
+      case "right":
+        return { axis: "horizontal", edgePos: rect.right, mouseCoord: mouseX, outward: mouseX - rect.right };
+      case "left":
+        return { axis: "horizontal", edgePos: rect.left, mouseCoord: mouseX, outward: rect.left - mouseX };
+      default:
+        return null;
+    }
+  }
+  /**
+   * Compute the absorb/expel plan for an edge of a container — the single
+   * source of truth used by both at-rest edge-visibility (canResize) and
+   * drag-time chrome (growth box / tints / MOVE_BLOCKS on release).
+   *
+   * @param {string} containerUid
+   * @param {string} edge   - 'top' | 'bottom' | 'left' | 'right'
+   * @param {'absorb'|'expel'} mode
+   * @param {number} cursorCoord - cursor position on the edge's perpendicular
+   *   axis. Pass ±Infinity to simulate "drag this edge as far as possible";
+   *   that's how _positionEdgeHandles asks "is anything absorbable here?"
+   *   without an actual mouse event.
+   * @returns {{ kind: 'absorb'|'expel'|'none', blocks: string[], boundary: number }}
+   */
+  _computeEdgePlan(containerUid, edge, mode, cursorCoord) {
+    const containerEl = this.queryBlockElement(containerUid);
+    if (!containerEl) return { kind: "none", blocks: [], boundary: 0 };
+    const cRect = containerEl.getBoundingClientRect();
+    const isVerticalEdge = edge === "top" || edge === "bottom";
+    const geo = this._edgeGeometry(
+      edge,
+      cRect,
+      isVerticalEdge ? cRect.left + cRect.width / 2 : cursorCoord,
+      isVerticalEdge ? cursorCoord : cRect.top + cRect.height / 2
+    );
+    if (!geo) return { kind: "none", blocks: [], boundary: 0 };
+    const containerInfo = this.blockPathMap?.[containerUid];
+    const containerParentId = containerInfo?.parentId;
+    const ownChildren = this._getSiblingsByDomOrder(null, containerUid);
+    const firstChildInfo = this.blockPathMap?.[ownChildren[0]];
+    const childAllowed = firstChildInfo?.allowedSiblingTypes || null;
+    let parentAllowed = null;
+    const parentInfo = this.blockPathMap?.[containerParentId];
+    const parentSchema = parentInfo?._schemaRef ? this.blockPathMap?._schemas?.[parentInfo._schemaRef] : null;
+    if (parentSchema?.properties && containerInfo?.containerField) {
+      const fd = parentSchema.properties[containerInfo.containerField];
+      if (fd?.widget === "blocks_layout" || fd?.widget === "object_list") {
+        parentAllowed = fd.allowedBlocks || null;
+      }
+    } else if (containerParentId === PAGE_BLOCK_UID) {
+      parentAllowed = containerInfo?.allowedSiblingTypes || null;
+    }
+    const blockMid = (el, axis) => {
+      const r = el.getBoundingClientRect();
+      return axis === "vertical" ? (r.top + r.bottom) / 2 : (r.left + r.right) / 2;
+    };
+    const sign = edge === "top" || edge === "left" ? -1 : 1;
+    let candidates;
+    let accepts;
+    if (mode === "absorb") {
+      accepts = (t) => !childAllowed || t && childAllowed.includes(t);
+      candidates = /* @__PURE__ */ new Set();
+      for (const [uid, info] of Object.entries(this.blockPathMap)) {
+        if (!uid || uid === containerUid) continue;
+        if (info?.isFixed) continue;
+        if (this._isAncestor(uid, containerUid)) continue;
+        if (this._isAncestor(containerUid, uid)) continue;
+        if (!this._isAncestor(containerParentId, uid) && uid !== containerParentId) continue;
+        const el = this.queryBlockElement(uid);
+        if (!el) continue;
+        const mid = blockMid(el, geo.axis);
+        const outwardOfEdge = (mid - geo.edgePos) * sign > 0;
+        const inwardOfCursor = (mid - geo.mouseCoord) * sign < 0;
+        if (outwardOfEdge && inwardOfCursor) candidates.add(uid);
+      }
+    } else {
+      accepts = (t) => !parentAllowed || t && parentAllowed.includes(t);
+      candidates = /* @__PURE__ */ new Set();
+      for (const [uid, info] of Object.entries(this.blockPathMap)) {
+        if (!uid || uid === containerUid) continue;
+        if (info?.isFixed) continue;
+        if (!this._isAncestor(containerUid, uid)) continue;
+        const el = this.queryBlockElement(uid);
+        if (!el) continue;
+        const mid = blockMid(el, geo.axis);
+        const outwardOfCursor = (mid - geo.mouseCoord) * sign > 0;
+        if (outwardOfCursor) candidates.add(uid);
+      }
+    }
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const uid of [...candidates]) {
+        const info = this.blockPathMap[uid];
+        const pid = info?.parentId;
+        if (!pid) continue;
+        if (mode === "absorb" && pid === containerParentId) continue;
+        if (mode === "expel" && pid === containerUid) continue;
+        const sibs = Object.entries(this.blockPathMap).filter(([, i]) => i?.parentId === pid).map(([id]) => id);
+        if (sibs.length === 0 || !sibs.every((c) => candidates.has(c))) continue;
+        const pType = this.getBlockData(pid)?.["@type"];
+        if (!accepts(pType)) continue;
+        for (const c of sibs) candidates.delete(c);
+        candidates.add(pid);
+        changed = true;
+      }
+    }
+    for (const uid of [...candidates]) {
+      const t = this.getBlockData(uid)?.["@type"];
+      if (!accepts(t)) candidates.delete(uid);
+    }
+    const blocks = [...candidates].sort((a, b) => {
+      const ea = this.queryBlockElement(a);
+      const eb = this.queryBlockElement(b);
+      if (!ea || !eb) return 0;
+      return ea.compareDocumentPosition(eb) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    });
+    let boundary = geo.edgePos;
+    for (const uid of blocks) {
+      const el = this.queryBlockElement(uid);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (edge === "bottom") boundary = Math.max(boundary, r.bottom);
+      else if (edge === "top") boundary = Math.min(boundary, r.top);
+      else if (edge === "right") boundary = Math.max(boundary, r.right);
+      else if (edge === "left") boundary = Math.min(boundary, r.left);
+    }
+    return { kind: blocks.length > 0 ? mode : "none", blocks, boundary };
+  }
+  _setupEdgeHandleDrag(handle) {
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    let growthBox = null;
+    const overlays = /* @__PURE__ */ new Map();
+    let autoScroller = null;
+    const ensureGrowthBox = () => {
+      if (growthBox) return growthBox;
+      growthBox = document.createElement("div");
+      growthBox.className = "volto-hydra-edge-growth";
+      Object.assign(growthBox.style, {
+        position: "fixed",
+        background: "rgba(0, 126, 177, 0.08)",
+        zIndex: "10000",
+        pointerEvents: "none",
+        display: "none"
+      });
+      document.body.appendChild(growthBox);
+      return growthBox;
+    };
+    const tintBlock = (uid) => {
+      if (overlays.has(uid)) return;
+      const el = this.queryBlockElement(uid);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const overlay = document.createElement("div");
+      overlay.className = "volto-hydra-edge-absorb-tint";
+      Object.assign(overlay.style, {
+        position: "fixed",
+        left: `${r.left}px`,
+        top: `${r.top}px`,
+        width: `${r.width}px`,
+        height: `${r.height}px`,
+        background: "rgba(0, 126, 177, 0.15)",
+        outline: "2px dashed rgba(0, 126, 177, 0.6)",
+        outlineOffset: "-2px",
+        zIndex: "10000",
+        pointerEvents: "none"
+      });
+      document.body.appendChild(overlay);
+      overlays.set(uid, overlay);
+    };
+    const cleanup = () => {
+      if (growthBox) growthBox.style.display = "none";
+      for (const o of overlays.values()) o.remove();
+      overlays.clear();
+    };
+    const computePlan = (e) => {
+      const edge = handle.dataset.edge;
+      const containerUid = handle.dataset.container;
+      const containerEl = this.queryBlockElement(containerUid);
+      if (!containerEl || !edge) return { kind: "none", blocks: [], boundary: 0 };
+      const cRect = containerEl.getBoundingClientRect();
+      const geo = this._edgeGeometry(edge, cRect, e.clientX, e.clientY);
+      if (!geo) return { kind: "none", blocks: [], boundary: 0 };
+      const slop = 3;
+      let mode = null;
+      if (geo.outward > slop && handle.dataset.canAbsorb) mode = "absorb";
+      else if (geo.outward < -slop && handle.dataset.canExpel) mode = "expel";
+      if (!mode) return { kind: "none", blocks: [], boundary: geo.edgePos };
+      return this._computeEdgePlan(containerUid, edge, mode, geo.mouseCoord);
+    };
+    const updateGrowthBox = (e, plan) => {
+      if (!growthBox) return;
+      const containerEl = this.queryBlockElement(handle.dataset.container);
+      if (!containerEl) return;
+      const cRect = containerEl.getBoundingClientRect();
+      const edge = handle.dataset.edge;
+      const valid = plan.kind !== "none" && plan.blocks.length > 0;
+      const reset = (k, v) => growthBox.style.setProperty(k, v);
+      ["borderTopWidth", "borderBottomWidth", "borderLeftWidth", "borderRightWidth"].forEach((p) => reset(p, "0"));
+      const cursor = edge === "top" || edge === "bottom" ? e.clientY : e.clientX;
+      const dragKindIsExpel = plan.kind === "expel";
+      let endCoord;
+      if (valid) endCoord = plan.boundary;
+      else endCoord = handle.dataset.canAbsorb || handle.dataset.canExpel ? cursor : null;
+      if (endCoord === null) {
+        growthBox.style.display = "none";
+        return;
+      }
+      if (edge === "bottom" || edge === "top") {
+        const top = Math.min(
+          edge === "top" ? endCoord : cRect.bottom,
+          edge === "top" ? cRect.top : endCoord
+        );
+        const bottom = Math.max(
+          edge === "top" ? endCoord : cRect.bottom,
+          edge === "top" ? cRect.top : endCoord
+        );
+        growthBox.style.left = `${cRect.left}px`;
+        growthBox.style.width = `${cRect.width}px`;
+        growthBox.style.top = `${top}px`;
+        growthBox.style.height = `${Math.max(0, bottom - top)}px`;
+        const moving = edge === "top" ? "borderTopWidth" : "borderBottomWidth";
+        growthBox.style[moving] = valid ? "6px" : "1px";
+        growthBox.style.borderColor = "#007eb1";
+        growthBox.style.borderStyle = "solid";
+      } else {
+        const left = Math.min(
+          edge === "left" ? endCoord : cRect.right,
+          edge === "left" ? cRect.left : endCoord
+        );
+        const right = Math.max(
+          edge === "left" ? endCoord : cRect.right,
+          edge === "left" ? cRect.left : endCoord
+        );
+        growthBox.style.top = `${cRect.top}px`;
+        growthBox.style.height = `${cRect.height}px`;
+        growthBox.style.left = `${left}px`;
+        growthBox.style.width = `${Math.max(0, right - left)}px`;
+        const moving = edge === "left" ? "borderLeftWidth" : "borderRightWidth";
+        growthBox.style[moving] = valid ? "6px" : "1px";
+        growthBox.style.borderColor = "#007eb1";
+        growthBox.style.borderStyle = "solid";
+      }
+      growthBox.style.background = dragKindIsExpel ? "rgba(220, 53, 69, 0.06)" : "rgba(0, 126, 177, 0.08)";
+      growthBox.style.display = "block";
+    };
+    handle.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragging = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      autoScroller = this._createAutoScroller();
+      ensureGrowthBox();
+      updateGrowthBox(e, { kind: "none", blocks: [], boundary: 0 });
+    });
+    document.addEventListener("mousemove", (e) => {
+      if (!dragging) return;
+      e.preventDefault();
+      lastX = e.clientX;
+      lastY = e.clientY;
+      autoScroller?.onMouseMove(e);
+      const plan = computePlan(e);
+      updateGrowthBox(e, plan);
+      const wanted = new Set(plan.blocks);
+      for (const [uid, overlay] of overlays) {
+        if (!wanted.has(uid)) {
+          overlay.remove();
+          overlays.delete(uid);
+        }
+      }
+      for (const uid of plan.blocks) tintBlock(uid);
+    });
+    document.addEventListener("mouseup", () => {
+      if (!dragging) return;
+      dragging = false;
+      autoScroller?.stop();
+      autoScroller = null;
+      const plan = computePlan({ clientX: lastX, clientY: lastY });
+      const containerUid = handle.dataset.container;
+      const containerInfo = containerUid ? this.blockPathMap?.[containerUid] : null;
+      const edge = handle.dataset.edge;
+      cleanup();
+      if (plan.kind === "none" || plan.blocks.length === 0 || !containerUid) return;
+      const baseMessage = {
+        type: "MOVE_BLOCKS",
+        blockIds: plan.blocks,
+        selectAfterMove: containerUid
+      };
+      if (plan.kind === "absorb") {
+        const ownChildren = this._getSiblingsByDomOrder(null, containerUid);
+        const insertAfter = edge === "bottom" || edge === "right";
+        const target = ownChildren.length > 0 ? insertAfter ? ownChildren[ownChildren.length - 1] : ownChildren[0] : containerUid;
+        window.parent.postMessage({
+          ...baseMessage,
+          targetBlockId: target,
+          insertAfter,
+          targetParentId: containerUid
+        }, this.adminOrigin);
+      } else if (plan.kind === "expel") {
+        const insertAfter = edge === "bottom" || edge === "right";
+        window.parent.postMessage({
+          ...baseMessage,
+          targetBlockId: containerUid,
+          insertAfter,
+          targetParentId: containerInfo?.parentId
+        }, this.adminOrigin);
+      }
+    });
+  }
   /**
    * Filter a list of block UIDs to those that can be mutated by `op`.
    * Single source of truth for locked-block protection on the iframe side.
@@ -1093,7 +1662,7 @@ var Bridge = class {
       this.sendMessageToParent({ type: "PASTE_BLOCKS", afterBlockId: afterUid });
       return true;
     }
-    if (e.key === "Enter" && !e.shiftKey && this.isInlineEditing) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       this.sendMessageToParent({
         type: "ADD_BLOCK_AFTER",
@@ -2001,6 +2570,7 @@ var Bridge = class {
       dragHandle.style.top = `${handlePos.top}px`;
       dragHandle.style.display = "block";
     }
+    this._positionEdgeHandles();
     let focusedFieldRect = null;
     if (focusedFieldName && elementForFields) {
       const focusedEl = elementForFields.querySelector(`[data-edit-text="${focusedFieldName}"]`) || (elementForFields.getAttribute("data-edit-text") === focusedFieldName ? elementForFields : null);
@@ -2032,6 +2602,10 @@ var Bridge = class {
       focusedLinkableField,
       focusedMediaField,
       addDirection,
+      // canResize tells admin which edge handles to render as visible chrome
+      // (per docs/architecture.md). Iframe keeps invisible event-capture
+      // divs at the same coords for mousedown.
+      canResize: this._lastCanResize || null,
       isMultiElement: blockUid && blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid).length > 1 : false
     };
     if (options.selection !== void 0) {
@@ -4570,7 +5144,8 @@ DOM path (text node \u2192 container):
       const blockUidToProcess = needsBlockSwitch ? adminSelectedBlockUid : this.selectedBlockUid;
       const blockHandler = needsBlockSwitch ? (el) => {
         log("Selecting new block from afterContentRender:", blockUidToProcess);
-        this.selectBlock(el);
+        this.editMode = "text";
+        this.selectBlock(el, { fieldToFocus: "first" });
       } : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
       if (blockUidToProcess) {
         const blockElement = this.queryBlockElement(blockUidToProcess);
@@ -6141,6 +6716,27 @@ DOM path (text node \u2192 container):
       // Hidden until positioned
     });
     document.body.appendChild(dragButton);
+    document.querySelectorAll(".volto-hydra-edge-handle").forEach((el) => el.remove());
+    this._edgeHandles = {};
+    for (const edge of ["top", "bottom", "left", "right"]) {
+      const h = document.createElement("div");
+      h.className = "volto-hydra-edge-handle";
+      h.setAttribute("data-edge", edge);
+      const isVertical = edge === "top" || edge === "bottom";
+      Object.assign(h.style, {
+        position: "fixed",
+        background: "transparent",
+        cursor: isVertical ? "ns-resize" : "ew-resize",
+        zIndex: "9998",
+        display: "none",
+        pointerEvents: "auto"
+      });
+      if (isVertical) h.style.height = "6px";
+      else h.style.width = "6px";
+      document.body.appendChild(h);
+      this._edgeHandles[edge] = h;
+      this._setupEdgeHandleDrag(h);
+    }
     const positionDragHandle = () => {
       if (!this.selectedBlockUid) {
         dragButton.style.display = "none";
@@ -6212,63 +6808,11 @@ DOM path (text node \u2192 container):
       let closestBlockUid = null;
       let insertAt = null;
       let dropIndicatorVisible = false;
-      let scrollDirection = 0;
-      let scrollAnimationId = null;
-      let lastMouseX = 0;
-      let lastMouseY = 0;
-      let currentScrollSpeed = 0;
-      const scrollThreshold = 80;
-      const minScrollSpeed = 10;
-      const maxScrollSpeed = 50;
-      const scrollLoop = () => {
-        if (scrollDirection !== 0) {
-          window.scrollTo({
-            top: window.scrollY + scrollDirection * currentScrollSpeed,
-            behavior: "instant"
-          });
-          const syntheticEvent = new MouseEvent("mousemove", {
-            clientX: lastMouseX,
-            clientY: lastMouseY,
-            bubbles: true
-          });
-          document.dispatchEvent(syntheticEvent);
-          scrollAnimationId = requestAnimationFrame(scrollLoop);
-        }
-      };
-      const startScrolling = (direction) => {
-        if (scrollDirection !== direction) {
-          scrollDirection = direction;
-          if (scrollAnimationId === null && direction !== 0) {
-            scrollAnimationId = requestAnimationFrame(scrollLoop);
-          }
-        }
-      };
-      const stopScrolling = () => {
-        scrollDirection = 0;
-        if (scrollAnimationId !== null) {
-          cancelAnimationFrame(scrollAnimationId);
-          scrollAnimationId = null;
-        }
-      };
+      const scroller = this._createAutoScroller();
       const onMouseMove = (e2) => {
-        lastMouseX = e2.clientX;
-        lastMouseY = e2.clientY;
+        scroller.onMouseMove(e2);
         draggedBlock.style.left = `${e2.clientX}px`;
         draggedBlock.style.top = `${e2.clientY}px`;
-        const viewportHeight = window.innerHeight;
-        if (e2.clientY < scrollThreshold) {
-          const distanceFromEdge = e2.clientY;
-          const speedFactor = 1 - distanceFromEdge / scrollThreshold;
-          currentScrollSpeed = minScrollSpeed + (maxScrollSpeed - minScrollSpeed) * speedFactor;
-          startScrolling(-1);
-        } else if (e2.clientY > viewportHeight - scrollThreshold) {
-          const distanceFromEdge = viewportHeight - e2.clientY;
-          const speedFactor = 1 - distanceFromEdge / scrollThreshold;
-          currentScrollSpeed = minScrollSpeed + (maxScrollSpeed - minScrollSpeed) * speedFactor;
-          startScrolling(1);
-        } else {
-          stopScrolling();
-        }
         const elementBelow = document.elementFromPoint(e2.clientX, e2.clientY);
         let closestBlock = elementBelow;
         while (closestBlock && !closestBlock.hasAttribute("data-block-uid")) {
@@ -6424,7 +6968,7 @@ DOM path (text node \u2192 container):
           clearTimeout(this.scrollTimeout);
           this.scrollTimeout = null;
         }
-        stopScrolling();
+        scroller.stop();
         document.querySelector("body").classList.remove("grabbing");
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
@@ -10365,6 +10909,8 @@ export {
   buildQuerystringSearchBody,
   calculateDragHandlePosition,
   calculatePaging,
+  canContain,
+  canContainAll,
   cloneBlocksWithNewIds,
   contentPath,
   convertFieldValue,
@@ -10372,6 +10918,7 @@ export {
   expandListingBlocks,
   expandTemplates,
   expandTemplatesSync,
+  findConversionPath,
   findSlotRegions,
   formDataContentEqual,
   getAccessToken,
@@ -10398,6 +10945,7 @@ export {
   isTextEditableFieldType,
   isTextareaFieldType,
   loadTemplates,
+  mapLayoutItems,
   ploneFetchItems,
   staticBlocks,
   templateIdToPath

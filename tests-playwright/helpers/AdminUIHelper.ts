@@ -2983,70 +2983,111 @@ export class AdminUIHelper {
   }
 
   /**
-   * Select a block type from the block chooser.
-   * Block types: 'slate', 'image', 'video', 'listing', etc.
+   * Select a block type from the BlockChooser by its @type id.
+   *
+   * BlockChooser renders each block as `<button class={block.id}>`. The button
+   * exists in the DOM regardless of accordion state, but is hidden inside
+   * collapsed groups. We open every collapsed accordion title before clicking
+   * so the call works without a per-type display-name mapping.
    */
   async selectBlockType(blockType: string): Promise<void> {
-    // Wait for block chooser to be fully visible
-    await this.page.waitForSelector('.blocks-chooser', { state: 'visible', timeout: 5000 });
+    const chooser = this.page.locator('.blocks-chooser').first();
+    await chooser.waitFor({ state: 'visible', timeout: 5000 });
+    const button = chooser.locator(`button.${blockType}`).first();
+    // The button always exists in the DOM (even inside collapsed accordions).
+    // Wait for it to be attached, then dispatch click via JS so we don't
+    // depend on accordion expansion or animation state. Avoids touching
+    // accordion titles, which (in the Popup-hosted chooser) can shift the
+    // Popup geometry and accidentally close it.
+    await button.waitFor({ state: 'attached', timeout: 5000 });
+    await button.evaluate((el) => (el as HTMLButtonElement).click());
+    await chooser.waitFor({ state: 'hidden', timeout: 5000 });
+  }
 
-    // Different block types have different display names
-    const blockNames: Record<string, string[]> = {
-      slate: ['Text', 'Slate', 'text'],
-      image: ['Image', 'image'],
-      video: ['Video', 'video'],
-      listing: ['Listing', 'listing'],
-      columns: ['Columns', 'columns'],
-      accordion: ['Accordion', 'accordion'],
-      slider: ['Slider', 'slider'],
-      gridblock: ['Grid'],
+  /**
+   * Open the toolbar ⋯ menu and click "Convert to…", which opens the
+   * BlockChooser overlay (chooser is rendered in a portal above the page).
+   */
+  async openConvertChooser(): Promise<void> {
+    const toolbar = this.page.locator('.quanta-toolbar');
+    await toolbar.waitFor({ state: 'visible', timeout: 5000 });
+    await toolbar.locator('button:has-text("⋯")').click();
+    const dropdownMenu = this.page.locator('.volto-hydra-dropdown-menu');
+    await dropdownMenu.waitFor({ state: 'visible', timeout: 3000 });
+    await dropdownMenu.locator('.convert-to-menu').click();
+    const chooser = this.page.locator('.blocks-chooser');
+    await chooser.waitFor({ state: 'visible', timeout: 5000 });
+  }
+
+  /**
+   * Returns block-type ids currently offered by the open BlockChooser.
+   * Each block button has `class={block.id}`; we collect those ids after
+   * expanding every accordion. Helper for tests that verify which targets
+   * are present/absent in a Convert-to or Wrap-in chooser.
+   */
+  async getBlockChooserTypes(): Promise<string[]> {
+    const chooser = this.page.locator('.blocks-chooser');
+    await chooser.waitFor({ state: 'visible', timeout: 5000 });
+
+    const collectVisibleIds = async (): Promise<string[]> => {
+      const buttons = chooser.locator('.accordion .content.active .button.basic, .accordion-noaccordion .button.basic');
+      const count = await buttons.count();
+      const out: string[] = [];
+      for (let i = 0; i < count; i++) {
+        if (!(await buttons.nth(i).isVisible().catch(() => false))) continue;
+        const cls = (await buttons.nth(i).getAttribute('class')) || '';
+        const tokens = cls.split(/\s+/).filter((t) =>
+          t && t !== 'ui' && t !== 'button' && t !== 'basic' && t !== 'icon');
+        if (tokens.length > 0) out.push(tokens[0]);
+      }
+      return out;
     };
 
-    const possibleNames = blockNames[blockType.toLowerCase()] || [blockType];
+    const ids = new Set<string>();
 
-    // Block chooser is rendered as a portal directly on document.body
-    // with class "blocks-chooser". Look specifically within this container
-    // to avoid matching sidebar buttons with similar text.
-    const blockChooser = this.page.locator('.blocks-chooser');
-
-    // Wait for block chooser buttons to be rendered (at least one button should exist)
-    await blockChooser.locator('button').first().waitFor({ state: 'visible', timeout: 5000 });
-
-    // Try to find and click the block type button within the block chooser
-    for (const name of possibleNames) {
-      // Look for button within block chooser, excluding sidebar items (which have ⋮⋮ prefix)
-      const blockButton = blockChooser.locator(`button:has-text("${name}")`).first();
-
-      if (await blockButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await blockButton.click();
-        // Wait for block chooser to close (indicates block was added)
-        await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });
-        return;
+    // BlockChooser only renders accordions when filterValue is empty. If the
+    // chooser is in flat mode, collect once.
+    const titles = chooser.locator('.accordion .title');
+    const titleCount = await titles.count();
+    if (titleCount === 0) {
+      const flatButtons = chooser.locator('.button.basic');
+      const fbCount = await flatButtons.count();
+      for (let i = 0; i < fbCount; i++) {
+        const cls = (await flatButtons.nth(i).getAttribute('class')) || '';
+        const tokens = cls.split(/\s+/).filter((t) =>
+          t && t !== 'ui' && t !== 'button' && t !== 'basic' && t !== 'icon');
+        if (tokens.length > 0) ids.add(tokens[0]);
       }
+      return [...ids];
     }
 
-    // Block not visible in MOST USED section, try using search
-    const searchInput = blockChooser.locator('input[placeholder="Search"]');
-    if (await searchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      // Use the first possible name for search
-      await searchInput.fill(possibleNames[0]);
-      // Wait for search results to update (buttons should change)
-      await this.page.waitForTimeout(300);
-
-      // Now try to find the block button again
-      for (const name of possibleNames) {
-        const blockButton = blockChooser.locator(`button:has-text("${name}")`).first();
-
-        if (await blockButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await blockButton.click();
-          // Wait for block chooser to close (indicates block was added)
-          await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });
-          return;
-        }
+    // Open each accordion in turn, collecting visible block buttons.
+    for (let i = 0; i < titleCount; i++) {
+      const t = titles.nth(i);
+      const cls = (await t.getAttribute('class')) || '';
+      if (!cls.split(/\s+/).includes('active')) {
+        await t.click().catch(() => {});
+        await this.page.waitForTimeout(100);
       }
+      // Wait for the now-active content area to render.
+      const content = chooser.locator('.accordion .content.active');
+      await content.waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
+      for (const id of await collectVisibleIds()) ids.add(id);
     }
 
-    throw new Error(`Block type "${blockType}" not found in chooser`);
+    return [...ids];
+  }
+
+  /**
+   * Cancels the open BlockChooser overlay (used after assertion-only checks
+   * that don't actually pick a target).
+   */
+  async cancelBlockChooser(): Promise<void> {
+    const chooserOverlay = this.page.locator('.container-block-chooser');
+    if (await chooserOverlay.isVisible().catch(() => false)) {
+      await chooserOverlay.locator('button:has-text("Cancel")').click();
+      await chooserOverlay.waitFor({ state: 'hidden', timeout: 5000 });
+    }
   }
 
   /**
@@ -3266,6 +3307,18 @@ export class AdminUIHelper {
     // Get iframe offset for coordinate translation
     const iframeEl = this.page.locator('#previewIframe');
     const iframeBox = await iframeEl.boundingBox();
+
+    // Replace mode (drop into a container whose only child is an 'empty'
+    // placeholder) renders a shade overlay instead of a line indicator.
+    // If the shade is visible the drop is valid — short-circuit the
+    // line-indicator edge checks.
+    // Use evaluateAll (don't wait): the shade often doesn't exist for
+    // ordinary drops, and locator.evaluate would auto-wait ~30s every
+    // retry, blowing the 45s test timeout.
+    const shadeVisible = await iframe.locator('.volto-hydra-drop-shade').evaluateAll(
+      (els) => els.some((el) => getComputedStyle(el).display !== 'none'),
+    );
+    if (shadeVisible) return;
 
     // Use iframe's internal getBoundingClientRect for consistent coordinates
     // (Playwright's boundingBox doesn't account for iframe scroll correctly)

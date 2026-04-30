@@ -65,6 +65,45 @@ test.describe('Adding Blocks', () => {
     expect(newCount).toBe(initialCount + 1);
   });
 
+  // Regression: when a container's last child is deleted, View.jsx +
+  // ensureEmptyBlockIfEmpty auto-creates a new empty slate block of the
+  // container's defaultBlockType. That code path does NOT initialise
+  // `value: [{type: 'p', children: [{text: ''}]}]` (only the add-block flow
+  // does). The renderer then falls back to its empty-state placeholder
+  // `<p data-edit-text="value">Empty block</p>` with no data-node-id.
+  // Clicking into the placeholder trips hydra.js's selection-sync warning
+  // overlay (#hydra-dev-warning).
+  test('deleting last child of a container auto-creates slate without triggering Missing data-node-id warning', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/section-test-page');
+
+    const iframe = helper.getIframe();
+
+    // section-1 starts with one slate child (section-child-1). Remove it
+    // via the Quanta toolbar's ⋯ menu so the whole block is deleted (not
+    // just one character of its text).
+    await helper.clickBlockInIframe('section-child-1');
+    await helper.openQuantaToolbarMenu('section-child-1');
+    await helper.clickQuantaToolbarMenuOption('section-child-1', 'Remove');
+
+    // ensureEmptyBlockIfEmpty creates a fresh slate child in the section.
+    // It has a generated uid, so look for "any data-block-uid descendant".
+    const newChild = iframe
+      .locator('[data-block-uid="section-1"] [data-block-uid]')
+      .first();
+    await expect(newChild).toBeVisible({ timeout: 5000 });
+
+    // Click into the new placeholder slate block to trigger selection sync.
+    await newChild.click();
+    await page.waitForTimeout(300);
+
+    // The developer-warning overlay must not appear.
+    const warning = iframe.locator('#hydra-dev-warning');
+    await expect(warning).toHaveCount(0);
+  });
+
   test('can add an Image block to the page', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
@@ -557,6 +596,145 @@ test.describe('Enter Key to Add/Navigate', () => {
     const imageIdx = newBlocks.indexOf('block-2-uuid');
     const newBlockId = newBlocks[imageIdx + 1];
     expect(initialBlocks).not.toContain(newBlockId);
+  });
+
+
+  // Two related bugs reproduced by the same scenario:
+  //
+  //   (A) hydra.src.js:1590 gates the block-mode Enter handler on
+  //       `this.isInlineEditing`. By the time _handleBlockModeKey is reached
+  //       (line 4142), the document handler has already returned for any
+  //       active edit field (line 4104), so we're in block mode by
+  //       definition — the flag is leftover state from a prior selection.
+  //       The gate just blocks Enter in exactly the case it's most useful
+  //       (creating a new block from block-mode), so no block is created.
+  //
+  //   (B) Even when ADD_BLOCK_AFTER fires and a new block is added, the
+  //       FORM_DATA-driven select path in afterContentRender (line 6131)
+  //       calls selectBlock(el) without fieldToFocus. selectBlock respects
+  //       the current editMode and only focuses an editable field when
+  //       fieldToFocus is passed, so the user lands on a "selected but in
+  //       block mode" new block and can't type until they click into it.
+  //       The SELECT_BLOCK direct path at line 8738 handles this correctly,
+  //       so this is an oversight in the FORM_DATA branch.
+  //
+  // Repro: click into a teaser inside a grid (text mode), press Escape to
+  // get block-mode on the teaser, Escape again to get block-mode on the grid
+  // parent, then press Enter. Expectation: a new block is created and is
+  // immediately ready for typing.
+  test('Enter in block mode (no field focus) creates new block and focuses it for typing', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/section-test-page');
+
+    const iframe = helper.getIframe();
+    const initialBlocks = await helper.getBlockOrder();
+
+    // 1. Enter the slate-before value field (page-level slate).
+    // Use getSlateField — Nuxt puts data-edit-text on the same element as
+    // data-block-uid, while the mock renderer puts it on a child element.
+    await helper.enterEditMode('slate-before', 'value');
+    const slateBeforeBlock = iframe.locator('[data-block-uid="slate-before"]');
+    const valueField = helper.getSlateField(slateBeforeBlock);
+    await expect(valueField).toHaveAttribute('contenteditable', 'true');
+    await helper.waitForBlockSelected('slate-before');
+
+    // 2. Escape → block mode on the same slate (selectedBlockUid stays).
+    await page.keyboard.press('Escape');
+    // ASSERT: value is no longer contenteditable, but slate is still selected.
+    await expect(valueField).not.toHaveAttribute('contenteditable', 'true');
+    await helper.waitForBlockSelected('slate-before');
+
+    // 3. Enter — should create a new block AFTER slate-before (bug A: gate).
+    //    Source is a slate (in page's allowed types) → another slate.
+    await page.keyboard.press('Enter');
+    await helper.waitForBlockCountToBe(initialBlocks.length + 1);
+
+    // Find the new block by id-set exclusion.
+    const newBlocks = await helper.getBlockOrder();
+    const newBlockId = newBlocks.find((id) => !initialBlocks.includes(id));
+    expect(newBlockId, 'expected exactly one new block to appear').toBeDefined();
+    // ASSERT: the new block is selected.
+    await helper.waitForBlockSelected(newBlockId!);
+
+    // 4. Typing should land in the new block (bug B: focus).
+    await page.keyboard.type('hello', { delay: 10 });
+
+    const newBlock = iframe.locator(`[data-block-uid="${newBlockId}"]`);
+    await expect(newBlock).toContainText('hello', { timeout: 3000 });
+  });
+
+  // Failing on purpose: documents bug B's container-source variant.
+  // When the source block is a container (e.g. user selected the section
+  // via Escape-to-parent and pressed Enter), ADD_BLOCK_AFTER's "another one
+  // of these" rule creates another container, and that new container
+  // auto-initialises one default child via initializeContainerBlock. The
+  // user expects to type into the new container's first leaf editable field.
+  // Currently `selectBlock(fieldToFocus: 'first')` only walks own fields
+  // (not nested blocks' fields), so for a container the focus has no
+  // target and typing is lost.
+  test('Enter in block mode on a container source focuses the new container\'s first nested editable field', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/section-test-page');
+
+    const iframe = helper.getIframe();
+    const initialBlocks = await helper.getBlockOrder();
+
+    // 1. Click into the slate child to get a focused contenteditable.
+    // Use getSlateField — Nuxt puts data-edit-text on the same element as
+    // data-block-uid, while the mock renderer puts it on a child element.
+    await helper.enterEditMode('section-child-1', 'value');
+    const sectionChildBlock = iframe.locator('[data-block-uid="section-child-1"]');
+    const valueField = helper.getSlateField(sectionChildBlock);
+    await expect(valueField).toHaveAttribute('contenteditable', 'true');
+
+    // 2. Escape → block mode on the slate.
+    await page.keyboard.press('Escape');
+    await expect(valueField).not.toHaveAttribute('contenteditable', 'true');
+    await helper.waitForBlockSelected('section-child-1');
+
+    // 3. Escape → escalates to parent (section-1).
+    await page.keyboard.press('Escape');
+    await helper.waitForBlockSelected('section-1');
+
+    // 4. Enter creates another section (and an auto-init slate child inside it).
+    await page.keyboard.press('Enter');
+    await helper.waitForBlockCountToBe(initialBlocks.length + 2);
+
+    const newBlocks = await helper.getBlockOrder();
+    const candidates = newBlocks.filter((id) => !initialBlocks.includes(id));
+    expect(candidates.length).toBe(2);
+    let newSectionId: string | undefined;
+    for (const id of candidates) {
+      const isPageLevel = await iframe
+        .locator(`[data-block-uid="${id}"]`)
+        .first()
+        .evaluate((el) => !el.parentElement?.closest('[data-block-uid]'));
+      if (isPageLevel) {
+        newSectionId = id;
+        break;
+      }
+    }
+    expect(newSectionId).toBeDefined();
+    // The new section auto-creates a slate child. Keyboard-Enter intent is
+    // "ready to type", so the admin's ADD_BLOCK_AFTER handler drills the
+    // pendingSelectBlockUid down to the new container's first leaf rather
+    // than the container shell. Look up that leaf and assert IT is selected.
+    const newSectionChildId = await iframe
+      .locator(`[data-block-uid="${newSectionId!}"] [data-block-uid]`)
+      .first()
+      .getAttribute('data-block-uid');
+    expect(newSectionChildId).toBeTruthy();
+    await helper.waitForBlockSelected(newSectionChildId!);
+
+    // 5. Typing should land in the new section's auto-initialised slate child.
+    await page.keyboard.type('hello', { delay: 10 });
+
+    const newBlock = iframe.locator(`[data-block-uid="${newSectionId}"]`);
+    await expect(newBlock).toContainText('hello', { timeout: 3000 });
   });
 
   test('Enter on hero heading (non-last field) moves focus to next field', async ({ page }) => {
