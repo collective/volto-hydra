@@ -684,8 +684,11 @@ test.describe('Enter Key to Add/Navigate', () => {
     const initialBlocks = await helper.getBlockOrder();
 
     // 1. Click into the slate child to get a focused contenteditable.
+    // Use getSlateField — Nuxt puts data-edit-text on the same element as
+    // data-block-uid, while the mock renderer puts it on a child element.
     await helper.enterEditMode('section-child-1', 'value');
-    const valueField = iframe.locator('[data-block-uid="section-child-1"] [data-edit-text="value"]');
+    const sectionChildBlock = iframe.locator('[data-block-uid="section-child-1"]');
+    const valueField = helper.getSlateField(sectionChildBlock);
     await expect(valueField).toHaveAttribute('contenteditable', 'true');
 
     // 2. Escape → block mode on the slate.
