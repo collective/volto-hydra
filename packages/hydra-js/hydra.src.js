@@ -8183,7 +8183,14 @@ export class Bridge {
 
         if (topChanged || leftChanged) {
           this._lastBlockRect = newRect;
-          this.sendBlockSelected('transitionTracker', blockElements[0]);
+          // Pass blockUid explicitly: for template instances (virtual
+          // containers) blockElements[0] is a CHILD element whose
+          // data-block-uid is the child's, not the instance's. Without
+          // an explicit uid, sendBlockSelected resolves the wrong block
+          // and fires BLOCK_SELECTED with isNewBlock:true mid-transition,
+          // which can trip react-beautiful-dnd's "changing droppableId
+          // during drag" invariant in the sidebar.
+          this.sendBlockSelected('transitionTracker', blockElements[0], { blockUid });
         }
       }
 
