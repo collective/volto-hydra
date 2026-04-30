@@ -7048,23 +7048,6 @@ export class Bridge {
               targetField = fields[fields.length - 1] || null;
             } else if (fieldToFocus === 'first') {
               targetField = this.getOwnFirstEditableField(currentElement);
-              // Container blocks (section, columns, gridBlock, ...) have
-              // no own editable fields — only their nested children do.
-              // Hand the selection off to the container's first child so
-              // "Enter on a container source" lands the cursor in the
-              // new container's first typeable leaf, not silently nowhere.
-              // Walks the chain, since the first child may itself be a
-              // container.
-              if (!targetField) {
-                const containerData = this.getBlockData(blockUid);
-                const firstChildUid = containerData?.blocks_layout?.items?.[0];
-                log('selectBlock first: no own field, container HTML head:', currentElement.innerHTML.slice(0, 300));
-                if (firstChildUid && this.blockPathMap?.[firstChildUid]) {
-                  log('selectBlock first: no own field, recursing into first child:', firstChildUid);
-                  this.selectBlock(firstChildUid, { fieldToFocus: 'first', cursorAt });
-                  return;
-                }
-              }
             } else {
               // Specific field name
               targetField = currentElement.querySelector(`[data-edit-text="${fieldToFocus}"]`);

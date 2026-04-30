@@ -716,11 +716,18 @@ test.describe('Enter Key to Add/Navigate', () => {
       }
     }
     expect(newSectionId).toBeDefined();
-    await helper.waitForBlockSelected(newSectionId!);
+    // The new section auto-creates a slate child. Keyboard-Enter intent is
+    // "ready to type", so the admin's ADD_BLOCK_AFTER handler drills the
+    // pendingSelectBlockUid down to the new container's first leaf rather
+    // than the container shell. Look up that leaf and assert IT is selected.
+    const newSectionChildId = await iframe
+      .locator(`[data-block-uid="${newSectionId!}"] [data-block-uid]`)
+      .first()
+      .getAttribute('data-block-uid');
+    expect(newSectionChildId).toBeTruthy();
+    await helper.waitForBlockSelected(newSectionChildId!);
 
-    // 5. Typing should land in the new section's auto-initialised slate child
-    //    — but currently does NOT, because selectBlock(fieldToFocus: 'first')
-    //    doesn't recurse into nested blocks' editable fields.
+    // 5. Typing should land in the new section's auto-initialised slate child.
     await page.keyboard.type('hello', { delay: 10 });
 
     const newBlock = iframe.locator(`[data-block-uid="${newSectionId}"]`);

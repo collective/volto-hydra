@@ -1159,7 +1159,7 @@ const Iframe = (props) => {
    * @returns {string} The new block's ID
    */
   const insertAndSelectBlock = useCallback((blockId, blockType, action, fieldName, options = {}) => {
-    const { blockData: customBlockData, formData: customFormData, blockPathMap: customBlockPathMap, formatRequestId, selectChildIndex } = options;
+    const { blockData: customBlockData, formData: customFormData, blockPathMap: customBlockPathMap, formatRequestId, selectChildIndex, selectFirstLeaf } = options;
     const formData = customFormData || properties;
     const blockPathMap = customBlockPathMap || iframeSyncState.blockPathMap;
     const mergedBlocksConfig = config.blocks.blocksConfig;
@@ -1450,6 +1450,23 @@ const Iframe = (props) => {
           }
         }
       }
+    }
+    // Drill into the new container's first leaf (recursive descent through
+    // blocks_layout.items[0]) when the caller wants the keyboard-Enter UX:
+    // user pressed Enter expecting to type, so put selection on the deepest
+    // typeable child rather than the container shell. Toolbar/sidebar Add
+    // paths don't pass selectFirstLeaf — they want the new container itself
+    // selected so the user can configure it.
+    if (selectFirstLeaf) {
+      const updatedPathMap = buildBlockPathMap(newFormData, mergedBlocksConfig, intl);
+      let walked = selectBlockId;
+      while (true) {
+        const blk = getBlockById(newFormData, updatedPathMap, walked);
+        const firstChildUid = blk?.blocks_layout?.items?.[0];
+        if (!firstChildUid || !updatedPathMap[firstChildUid]) break;
+        walked = firstChildUid;
+      }
+      selectBlockId = walked;
     }
 
     // Set pending selection and blockPathMap, but NOT formData
@@ -1785,7 +1802,13 @@ const Iframe = (props) => {
           const newType = sourceAllowed
             ? sourceType
             : getEmptyBlockType(containerFieldConfig);
-          insertAndSelectBlock(event.data.blockId, newType, 'after');
+          // ADD_BLOCK_AFTER comes from the bridge's keyboard-Enter handler
+          // (block-mode Enter, last-field plain-string Enter, slate split).
+          // Keyboard intent is "ready to type", so drill the selection down
+          // to the new block's first leaf when the new block is a container.
+          // Toolbar/sidebar Add paths use different message types and keep
+          // selection on the new container.
+          insertAndSelectBlock(event.data.blockId, newType, 'after', null, { selectFirstLeaf: true });
           break;
         }
 
