@@ -208,7 +208,7 @@ test.describe('replayOneKey — cursor movement and editing', () => {
     helper = new AdminUIHelper(page);
     await page.goto('http://localhost:8889/mock-parent.html');
     await helper.waitForIframeReady();
-    await helper.waitForBlockSelected('mock-block-1');
+    await helper.waitForIframeBlockHandle('mock-block-1');
   });
 
   // --- Plain text ---
@@ -404,7 +404,7 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
     helper = new AdminUIHelper(page);
     await page.goto('http://localhost:8889/mock-parent.html');
     await helper.waitForIframeReady();
-    await helper.waitForBlockSelected('mock-block-1');
+    await helper.waitForIframeBlockHandle('mock-block-1');
   });
 
   test('slash menu ArrowDown sends SLASH_MENU down', async () => {

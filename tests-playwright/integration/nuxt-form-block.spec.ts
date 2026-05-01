@@ -151,7 +151,7 @@ test.describe('Form Block', () => {
     await nameItem.click();
 
     // Wait for the field to be selected
-    await helper.waitForBlockSelected('field-name', 5000);
+    await helper.waitForIframeBlockHandle('field-name', 5000);
     const toolbar = page.locator('.quanta-toolbar');
     await expect(toolbar).toBeVisible({ timeout: 5000 });
 

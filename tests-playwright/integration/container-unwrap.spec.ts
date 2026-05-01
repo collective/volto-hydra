@@ -13,10 +13,10 @@ test.describe('Container UX: Unwrap', () => {
     // A section's body is taken up by its children, so a direct click on the
     // container lands on the child instead.
     await helper.clickBlockInIframe('section-child-1');
-    await helper.waitForBlockSelected('section-child-1');
+    await helper.waitForIframeBlockHandle('section-child-1');
     await helper.escapeFromEditing(); // exits text mode, still on section-child-1
     await page.keyboard.press('Escape'); // Escape → parent = section-1
-    await helper.waitForBlockSelected('section-1');
+    await helper.waitForIframeBlockHandle('section-1');
 
     // Open the quanta toolbar 3-dot menu; Unwrap is a menu item.
     const menuButton = page.locator('.quanta-toolbar .volto-hydra-menu-trigger');
@@ -52,10 +52,10 @@ test.describe('Container UX: Unwrap', () => {
     // unwrapping col-1 would try to promote slates to columns-1, which is not allowed.
     // Select col-1 by clicking a text child and escaping up.
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeFromEditing();
     await page.keyboard.press('Escape'); // → col-1
-    await helper.waitForBlockSelected('col-1');
+    await helper.waitForIframeBlockHandle('col-1');
 
     // Open the 3-dot menu; Unwrap should either be absent or disabled.
     const menuButton = page.locator('.quanta-toolbar .volto-hydra-menu-trigger');

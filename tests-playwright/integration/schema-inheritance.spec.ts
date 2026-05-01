@@ -589,7 +589,7 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
     await facetItem.click();
 
     // Wait for facet to be selected and toolbar to appear
-    await helper.waitForBlockSelected('facet-type', 5000);
+    await helper.waitForIframeBlockHandle('facet-type', 5000);
     const toolbar = page.locator('.quanta-toolbar');
     await expect(toolbar).toBeVisible({ timeout: 5000 });
 
@@ -620,7 +620,7 @@ test.describe('Schema Inheritance - Search Block with Listing Container', () => 
 
     // Wait for the new facet to be selected (should happen automatically after add)
     const newFacet = iframe.locator(`[data-block-uid="${newFacetId}"]`);
-    await helper.waitForBlockSelected(newFacetId!, 10000);
+    await helper.waitForIframeBlockHandle(newFacetId!, 10000);
 
     // Wait for iframe blocks to stabilize — adding a facet triggers re-renders
     // that cause sidebar re-mounts, detaching react-select DOM nodes mid-click
@@ -977,7 +977,7 @@ test.describe('Frontend-Driven Schema Enhancers', () => {
     await listingBlock.click();
 
     // Verify listing-in-grid was selected
-    await helper.waitForBlockSelected('listing-in-grid');
+    await helper.waitForIframeBlockHandle('listing-in-grid');
 
     // Verify the listing block sidebar still shows listing settings
     // The listing's @type should still be "listing", only its variation changed to "image"

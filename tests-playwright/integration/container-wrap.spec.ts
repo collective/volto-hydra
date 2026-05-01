@@ -11,7 +11,7 @@ test.describe('Container UX: Wrap', () => {
 
     // Multi-select slate-before and slate-after at page level via Ctrl+Click
     await helper.clickBlockInIframe('slate-before');
-    await helper.waitForBlockSelected('slate-before');
+    await helper.waitForIframeBlockHandle('slate-before');
     await helper.escapeFromEditing();
 
     const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';

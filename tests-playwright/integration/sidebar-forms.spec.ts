@@ -24,7 +24,7 @@ test.describe('Sidebar Forms - Slate Block Behavior', () => {
     await helper.waitForSidebarOpen();
 
     // Wait for Quanta toolbar to appear in iframe (visual confirmation of selection)
-    await helper.waitForQuantaToolbar('block-1-uuid');
+    await helper.waitForBlockSelectedInAdmin('block-1-uuid');
     const hasQuantaToolbar = await helper.isQuantaToolbarVisibleInIframe('block-1-uuid');
     expect(hasQuantaToolbar).toBe(true);
 
@@ -533,7 +533,7 @@ test.describe('Sidebar Forms - object_list Item Fields', () => {
 
     // Click on slide-1 to select it
     await helper.clickBlockInIframe('slide-1');
-    await helper.waitForQuantaToolbar('slide-1');
+    await helper.waitForBlockSelectedInAdmin('slide-1');
     await helper.waitForSidebarOpen();
     await helper.openSidebarTab('Block');
 

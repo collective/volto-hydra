@@ -452,7 +452,7 @@ export class AdminUIHelper {
       // Try to wait for the target block to be selected
       // If it times out, check if we need to navigate to parent (container case)
       try {
-        await this.waitForBlockSelected(blockId, 3000);
+        await this.waitForIframeBlockHandle(blockId, 3000);
       } catch (error) {
         // Selection timed out - check if a CHILD block got selected instead
         // (happens when clicking a container block like grid)
@@ -465,14 +465,14 @@ export class AdminUIHelper {
         if (childWasSelected) {
           // A child of the target block is selected - navigate up to the target
           await this.navigateToParentBlock(blockId);
-          await this.waitForBlockSelected(blockId);
+          await this.waitForIframeBlockHandle(blockId);
         } else {
           // Target is not parent of selected block - rethrow original error
           throw error;
         }
       }
 
-      await this.waitForQuantaToolbar(blockId);
+      await this.waitForBlockSelectedInAdmin(blockId);
     } else {
       // For mock parent tests: wait for block to become editable instead of toolbar
       // Handle both: contenteditable on child (mock) OR on block itself (Nuxt)
@@ -541,7 +541,7 @@ export class AdminUIHelper {
     await blockLocator.click();
 
     if (waitForToolbar) {
-      await this.waitForQuantaToolbar(blockId);
+      await this.waitForBlockSelectedInAdmin(blockId);
     }
 
     return blockId;
@@ -600,7 +600,7 @@ export class AdminUIHelper {
       // Check if target block is now selected
       const result = await this.isBlockSelectedInIframe(targetBlockId);
       if (result.ok) {
-        await this.waitForQuantaToolbar(targetBlockId);
+        await this.waitForBlockSelectedInAdmin(targetBlockId);
         return;
       }
 
@@ -682,7 +682,7 @@ export class AdminUIHelper {
 
     if (waitForToolbar) {
       // Wait for toolbar to be positioned correctly
-      await this.waitForQuantaToolbar(blockId);
+      await this.waitForBlockSelectedInAdmin(blockId);
     } else {
       // Wait for sidebar to show the block is selected
       await this.waitForSidebarOpen();
@@ -734,7 +734,7 @@ export class AdminUIHelper {
    * Wait for a block to be selected in the iframe.
    * Handles multi-element blocks (multiple elements with same UID).
    */
-  async waitForBlockSelected(blockId: string, timeout: number = 5000) {
+  async waitForIframeBlockHandle(blockId: string, timeout: number = 5000) {
     const iframe = this.getIframe();
     const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
 
@@ -749,7 +749,7 @@ export class AdminUIHelper {
       const isVisible = await dragHandle.isVisible();
       if (!isVisible) {
         const exists = await dragHandle.count() > 0;
-        console.log(`[waitForBlockSelected] Drag handle exists=${exists} visible=${isVisible}`);
+        console.log(`[waitForIframeBlockHandle] Drag handle exists=${exists} visible=${isVisible}`);
       }
       expect(isVisible).toBe(true);
     }).toPass({ timeout });
@@ -1096,7 +1096,7 @@ export class AdminUIHelper {
    * Also verifies the toolbar is not covered by the sidebar.
    * For template instances, pass an array of child block IDs to verify combined bounds.
    */
-  async waitForQuantaToolbar(blockIds: string | string[], timeout: number = 10000): Promise<void> {
+  async waitForBlockSelectedInAdmin(blockIds: string | string[], timeout: number = 10000): Promise<void> {
     // Normalize to array
     const ids = Array.isArray(blockIds) ? blockIds : [blockIds];
     const firstBlockId = ids[0];
@@ -1113,7 +1113,7 @@ export class AdminUIHelper {
       const res: any = await this.isBlockSelectedInIframe(ids);
       if (typeof res === 'boolean') return res;
       if (res?.reason && res.reason !== lastReason) {
-        console.log(`[waitForQuantaToolbar] ${displayId}: ${res.reason}`);
+        console.log(`[waitForBlockSelectedInAdmin] ${displayId}: ${res.reason}`);
         lastReason = res.reason;
       }
       return !!res && !!res.ok;
@@ -1174,7 +1174,7 @@ export class AdminUIHelper {
   async openQuantaToolbarMenu(blockId: string): Promise<void> {
 
     // First wait for the Quanta toolbar to appear
-    await this.waitForQuantaToolbar(blockId);
+    await this.waitForBlockSelectedInAdmin(blockId);
 
     const menuButton = await this.getMenuButtonInQuantaToolbar(blockId, 'options');
     await menuButton.click();
@@ -2485,10 +2485,10 @@ export class AdminUIHelper {
     await blockContainer.click();
 
     // Wait for block selection to be confirmed by Admin UI
-    await this.waitForBlockSelected(blockId);
+    await this.waitForIframeBlockHandle(blockId);
 
     // Wait for the Quanta toolbar to appear (indicating block is selected)
-    await this.waitForQuantaToolbar(blockId, 5000);
+    await this.waitForBlockSelectedInAdmin(blockId, 5000);
 
     // Now get the editor element (after block is selected and rendered)
     const editor = await this.getEditorLocator(blockId, fieldName);
@@ -3911,7 +3911,7 @@ export class AdminUIHelper {
 
     // Select the source block first
     await this.clickBlockInIframe(sourceBlockId);
-    await this.waitForQuantaToolbar(sourceBlockId);
+    await this.waitForBlockSelectedInAdmin(sourceBlockId);
 
     // Get target block locator
     const targetBlock = iframe.locator(`[data-block-uid="${targetBlockId}"]`).first();
@@ -3931,7 +3931,7 @@ export class AdminUIHelper {
 
     // Select the source block first
     await this.clickBlockInIframe(sourceBlockId);
-    await this.waitForQuantaToolbar(sourceBlockId);
+    await this.waitForBlockSelectedInAdmin(sourceBlockId);
 
     // Get target block locator
     const targetBlock = iframe.locator(`[data-block-uid="${targetBlockId}"]`).first();

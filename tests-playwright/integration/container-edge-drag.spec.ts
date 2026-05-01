@@ -18,7 +18,7 @@ test.describe('Container UX: Edge-drag', () => {
     await iframe.locator('[data-block-uid="text-after"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForBlockSelected('text-after');
+    await helper.waitForIframeBlockHandle('text-after');
 
     // 1) Admin renders no visible edge-handle chrome.
     const adminEdges = page.locator('.volto-hydra-edge-handle-visual');
@@ -55,7 +55,7 @@ test.describe('Container UX: Edge-drag', () => {
     await iframe.locator('[data-block-uid="col-1"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForBlockSelected('col-1');
+    await helper.waitForIframeBlockHandle('col-1');
     const adminEdges = page.locator('.volto-hydra-edge-handle-visual');
     expect(await adminEdges.count()).toBeGreaterThan(0); // sanity: container does show edges
 
@@ -63,7 +63,7 @@ test.describe('Container UX: Edge-drag', () => {
     await iframe.locator('[data-block-uid="text-1a"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
 
     // 3. NO edge chrome should remain — neither admin-rendered nor
     //    iframe-side displayed.
@@ -102,7 +102,7 @@ test.describe('Container UX: Edge-drag', () => {
       await iframe.locator(`[data-block-uid="${uid}"]`).first().evaluate((el) => {
         (window as any).bridge?.selectBlock(el);
       });
-      await helper.waitForBlockSelected(uid);
+      await helper.waitForIframeBlockHandle(uid);
       // No admin-rendered visible chrome.
       await expect(page.locator('.volto-hydra-edge-handle-visual'),
         `leaf block "${uid}" should not show admin edge chrome`,
@@ -129,7 +129,7 @@ test.describe('Container UX: Edge-drag', () => {
     await iframe.locator('[data-block-uid="top-img-1"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForBlockSelected('top-img-1');
+    await helper.waitForIframeBlockHandle('top-img-1');
     const adminEdges = page.locator('.volto-hydra-edge-handle-visual');
     await expect(adminEdges).toHaveCount(0);
     const visibleIframeEdges = await iframe.locator('html').first().evaluate(() => {
@@ -152,7 +152,7 @@ test.describe('Container UX: Edge-drag', () => {
     await iframe.locator('[data-block-uid="section-1"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForBlockSelected('section-1');
+    await helper.waitForIframeBlockHandle('section-1');
 
     // An edge handle should appear on the bottom of section-1, with the
     // resize cursor — verifies the iframe-side invisible event-capture div
@@ -205,7 +205,7 @@ test.describe('Container UX: Edge-drag', () => {
     // Selection stays on the container the user was adjusting (section-1),
     // not on the absorbed sibling — they were resizing the boundary, not
     // selecting a new block.
-    await helper.waitForBlockSelected('section-1');
+    await helper.waitForIframeBlockHandle('section-1');
   });
 
   test('Auto-scrolls and absorbs blocks below the viewport', async ({ page }) => {
@@ -221,7 +221,7 @@ test.describe('Container UX: Edge-drag', () => {
     await iframe.locator('[data-block-uid="section-1"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForBlockSelected('section-1');
+    await helper.waitForIframeBlockHandle('section-1');
 
     // Capture iframe scroll position before drag.
     const initialScrollY = await iframe.locator('body').evaluate(() => window.scrollY);
@@ -267,7 +267,7 @@ test.describe('Container UX: Edge-drag', () => {
     expect(filler01Parent).toBe('section-1');
 
     // Selection still pinned to section-1.
-    await helper.waitForBlockSelected('section-1');
+    await helper.waitForIframeBlockHandle('section-1');
   });
 
   test('Top edge: drag UP past previous sibling absorbs it as first child', async ({ page }) => {
@@ -279,7 +279,7 @@ test.describe('Container UX: Edge-drag', () => {
     await iframe.locator('[data-block-uid="section-1"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForBlockSelected('section-1');
+    await helper.waitForIframeBlockHandle('section-1');
 
     const topHandle = iframe.locator('.volto-hydra-edge-handle[data-edge="top"]');
     await expect(topHandle).toBeVisible({ timeout: 3000 });
@@ -307,7 +307,7 @@ test.describe('Container UX: Edge-drag', () => {
       { timeout: 5000 },
     ).toBe('section-1');
 
-    await helper.waitForBlockSelected('section-1');
+    await helper.waitForIframeBlockHandle('section-1');
   });
 
   test('Bottom edge: drag UP past last child expels it to the parent', async ({ page }) => {
@@ -319,7 +319,7 @@ test.describe('Container UX: Edge-drag', () => {
     await iframe.locator('[data-block-uid="section-1"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForBlockSelected('section-1');
+    await helper.waitForIframeBlockHandle('section-1');
 
     // section-child-1 starts inside section-1.
     const initialParent = await iframe.locator('[data-block-uid="section-child-1"]').evaluate(
@@ -354,7 +354,7 @@ test.describe('Container UX: Edge-drag', () => {
       { timeout: 5000 },
     ).toBe(null);
 
-    await helper.waitForBlockSelected('section-1');
+    await helper.waitForIframeBlockHandle('section-1');
   });
 
   test('Right edge: drag RIGHT past adjacent column child absorbs it', async ({ page }) => {
@@ -366,7 +366,7 @@ test.describe('Container UX: Edge-drag', () => {
     await iframe.locator('[data-block-uid="col-1"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForBlockSelected('col-1');
+    await helper.waitForIframeBlockHandle('col-1');
 
     const rightHandle = iframe.locator('.volto-hydra-edge-handle[data-edge="right"]');
     await expect(rightHandle).toBeVisible({ timeout: 3000 });
@@ -402,7 +402,7 @@ test.describe('Container UX: Edge-drag', () => {
       });
     }, { timeout: 5000 }).toContain('col-1');
 
-    await helper.waitForBlockSelected('col-1');
+    await helper.waitForIframeBlockHandle('col-1');
   });
 
   test('Top edge: drag DOWN into container expels first child to parent', async ({ page }) => {
@@ -414,7 +414,7 @@ test.describe('Container UX: Edge-drag', () => {
     await iframe.locator('[data-block-uid="section-1"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForBlockSelected('section-1');
+    await helper.waitForIframeBlockHandle('section-1');
 
     const initialParent = await iframe.locator('[data-block-uid="section-child-1"]').evaluate(
       (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid') || null,
@@ -449,7 +449,7 @@ test.describe('Container UX: Edge-drag', () => {
       { timeout: 5000 },
     ).toBe(null);
 
-    await helper.waitForBlockSelected('section-1');
+    await helper.waitForIframeBlockHandle('section-1');
   });
 
   test('Left edge: drag LEFT past adjacent column child absorbs it', async ({ page }) => {
@@ -461,7 +461,7 @@ test.describe('Container UX: Edge-drag', () => {
     await iframe.locator('[data-block-uid="col-2"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForBlockSelected('col-2');
+    await helper.waitForIframeBlockHandle('col-2');
 
     const leftHandle = iframe.locator('.volto-hydra-edge-handle[data-edge="left"]');
     await expect(leftHandle).toBeVisible({ timeout: 3000 });
@@ -497,7 +497,7 @@ test.describe('Container UX: Edge-drag', () => {
       });
     }, { timeout: 5000 }).toContain('col-2');
 
-    await helper.waitForBlockSelected('col-2');
+    await helper.waitForIframeBlockHandle('col-2');
   });
 
   // Two grids stacked vertically. Dragging the bottom edge of the top grid
@@ -515,7 +515,7 @@ test.describe('Container UX: Edge-drag', () => {
     await iframe.locator('[data-block-uid="grid-1"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForBlockSelected('grid-1');
+    await helper.waitForIframeBlockHandle('grid-1');
 
     // Initial: each grid has 2 cells (4 teasers total, 2 per grid).
     const grid2Initial = await iframe
@@ -568,7 +568,7 @@ test.describe('Container UX: Edge-drag', () => {
     await iframe.locator('[data-block-uid="section-1"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForBlockSelected('section-1');
+    await helper.waitForIframeBlockHandle('section-1');
 
     const initialParent = await iframe.locator('[data-block-uid="section-child-1"]').evaluate(
       (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid') || null,
@@ -600,6 +600,6 @@ test.describe('Container UX: Edge-drag', () => {
       { timeout: 5000 },
     ).toBe(null);
 
-    await helper.waitForBlockSelected('section-1');
+    await helper.waitForIframeBlockHandle('section-1');
   });
 });

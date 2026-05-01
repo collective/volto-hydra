@@ -194,7 +194,7 @@ test.describe('Adding Blocks', () => {
 
     // Now click Add button to create third block
     await helper.clickBlockInIframe(secondNewBlockUid!);
-    await helper.waitForBlockSelected(secondNewBlockUid!);
+    await helper.waitForIframeBlockHandle(secondNewBlockUid!);
     await helper.clickAddBlockButton();
     await helper.selectBlockType('slate');
     await helper.waitForBlockCountToBe(initialCount + 3);
@@ -320,7 +320,7 @@ test.describe('Removing Blocks', () => {
 
     // Select the block to delete
     await helper.clickBlockInIframe(blockToDelete);
-    await helper.waitForQuantaToolbar(blockToDelete);
+    await helper.waitForBlockSelectedInAdmin(blockToDelete);
 
     // Verify block is selected (toolbar positioned on it)
     const toolbarCheck = await helper.isBlockSelectedInIframe(blockToDelete);
@@ -334,7 +334,7 @@ test.describe('Removing Blocks', () => {
     await helper.waitForBlockToDisappear(blockToDelete);
 
     // Toolbar should now be on the previous block
-    await helper.waitForQuantaToolbar(prevBlock);
+    await helper.waitForBlockSelectedInAdmin(prevBlock);
     const newToolbarCheck = await helper.isBlockSelectedInIframe(prevBlock);
     expect(newToolbarCheck.ok).toBe(true);
   });
@@ -638,13 +638,13 @@ test.describe('Enter Key to Add/Navigate', () => {
     const slateBeforeBlock = iframe.locator('[data-block-uid="slate-before"]');
     const valueField = helper.getSlateField(slateBeforeBlock);
     await expect(valueField).toHaveAttribute('contenteditable', 'true');
-    await helper.waitForBlockSelected('slate-before');
+    await helper.waitForIframeBlockHandle('slate-before');
 
     // 2. Escape → block mode on the same slate (selectedBlockUid stays).
     await page.keyboard.press('Escape');
     // ASSERT: value is no longer contenteditable, but slate is still selected.
     await expect(valueField).not.toHaveAttribute('contenteditable', 'true');
-    await helper.waitForBlockSelected('slate-before');
+    await helper.waitForIframeBlockHandle('slate-before');
 
     // 3. Enter — should create a new block AFTER slate-before (bug A: gate).
     //    Source is a slate (in page's allowed types) → another slate.
@@ -656,7 +656,7 @@ test.describe('Enter Key to Add/Navigate', () => {
     const newBlockId = newBlocks.find((id) => !initialBlocks.includes(id));
     expect(newBlockId, 'expected exactly one new block to appear').toBeDefined();
     // ASSERT: the new block is selected.
-    await helper.waitForBlockSelected(newBlockId!);
+    await helper.waitForIframeBlockHandle(newBlockId!);
 
     // 4. Typing should land in the new block (bug B: focus).
     await page.keyboard.type('hello', { delay: 10 });
@@ -694,11 +694,11 @@ test.describe('Enter Key to Add/Navigate', () => {
     // 2. Escape → block mode on the slate.
     await page.keyboard.press('Escape');
     await expect(valueField).not.toHaveAttribute('contenteditable', 'true');
-    await helper.waitForBlockSelected('section-child-1');
+    await helper.waitForIframeBlockHandle('section-child-1');
 
     // 3. Escape → escalates to parent (section-1).
     await page.keyboard.press('Escape');
-    await helper.waitForBlockSelected('section-1');
+    await helper.waitForIframeBlockHandle('section-1');
 
     // 4. Enter creates another section (and an auto-init slate child inside it).
     await page.keyboard.press('Enter');
@@ -728,7 +728,7 @@ test.describe('Enter Key to Add/Navigate', () => {
       .first()
       .getAttribute('data-block-uid');
     expect(newSectionChildId).toBeTruthy();
-    await helper.waitForBlockSelected(newSectionChildId!);
+    await helper.waitForIframeBlockHandle(newSectionChildId!);
 
     // 5. Typing should land in the new section's auto-initialised slate child.
     await page.keyboard.type('hello', { delay: 10 });
@@ -824,7 +824,7 @@ test.describe('Enter Key to Add/Navigate', () => {
     // Wait for editable field to appear and block to be fully selected
     const newEditor = await helper.getEditorLocator(newBlockUid);
     await expect(newEditor).toBeAttached({ timeout: 10000 });
-    await helper.waitForQuantaToolbar(newBlockUid);
+    await helper.waitForBlockSelectedInAdmin(newBlockUid);
 
     // Backspace in the empty block should remove it
     await newEditor.press('Backspace');

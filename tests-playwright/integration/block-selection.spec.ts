@@ -93,7 +93,7 @@ test.describe('Block Selection', () => {
     expect(hasToolbar).toBe(true);
 
     // Verify block appears selected with proper positioning
-    await helper.waitForQuantaToolbar(blockId);
+    await helper.waitForBlockSelectedInAdmin(blockId);
   });
 
   test('switching block selection updates visual state', async ({ page }, testInfo) => {
@@ -173,7 +173,7 @@ test.describe('Block Selection', () => {
     await expect(altTextField).toBeVisible({ timeout: 5000 });
 
     // Wait for Quanta toolbar to appear and be positioned on the selected block
-    await helper.waitForQuantaToolbar('block-2-uuid');
+    await helper.waitForBlockSelectedInAdmin('block-2-uuid');
   });
 
   // IMPORTANT: This test verifies that a SINGLE click on a text block focuses the editor
@@ -209,7 +209,7 @@ test.describe('Block Selection', () => {
     await editor.click({ position: clickPos! });
 
     // Wait for block to be selected
-    await helper.waitForBlockSelected(blockId);
+    await helper.waitForIframeBlockHandle(blockId);
 
     // Wait for contenteditable to become true after click
     await expect(editor).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
@@ -463,7 +463,7 @@ test.describe('Block Selection', () => {
 
     // Select the title block (first block at very top)
     await helper.clickBlockInIframe('title-block');
-    await helper.waitForQuantaToolbar('title-block');
+    await helper.waitForBlockSelectedInAdmin('title-block');
 
     // Get initial scroll position (should be 0 or near top)
     const iframeBody = iframe.locator('body');
@@ -506,7 +506,7 @@ test.describe('Block Mode (Escape state machine)', () => {
 
     // Click a Slate text block — enters text editing mode (contenteditable)
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
 
     // Verify we're in text editing mode: field should be contenteditable
     const editFieldEditable = await helper.getEditorLocator('block-1-uuid', 'value');
@@ -545,7 +545,7 @@ test.describe('Block Mode (Escape state machine)', () => {
 
     // Click a container block (columns-1 has a title field)
     await helper.clickContainerBlockInIframe('columns-1');
-    await helper.waitForBlockSelected('columns-1');
+    await helper.waitForIframeBlockHandle('columns-1');
 
     // Verify outline is visible
     await expect(page.locator('.volto-hydra-block-outline')).toBeVisible({ timeout: 5000 });
@@ -566,7 +566,7 @@ test.describe('Block Mode (Escape state machine)', () => {
 
     // Click a Slate text block — enters text editing mode
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
 
     // First Escape: enter block mode
     await helper.escapeFromEditing();
@@ -589,13 +589,13 @@ test.describe('Block Mode (Escape state machine)', () => {
 
     // Click block-1, enter block mode
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
 
     // Arrow Down twice to reach block-3 (Slate text block) — must stay in block mode
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('ArrowDown');
-    await helper.waitForBlockSelected('block-3-uuid');
+    await helper.waitForIframeBlockHandle('block-3-uuid');
 
     // Should still be in block mode (full border, not subtle/text mode)
     await expect(page.locator('.volto-hydra-block-outline[data-outline-style="border"]'))
@@ -610,7 +610,7 @@ test.describe('Block Mode (Escape state machine)', () => {
     // block-1 (slate text), block-2 (image, no fields), block-3 (slate text)
     // Click block-1, cursor at end
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
 
     // Verify text mode (subtle border)
     await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
@@ -620,12 +620,12 @@ test.describe('Block Mode (Escape state machine)', () => {
     // Should show block mode border for this block but editMode stays 'text'
     await page.keyboard.press('End');
     await page.keyboard.press('ArrowDown');
-    await helper.waitForBlockSelected('block-2-uuid');
+    await helper.waitForIframeBlockHandle('block-2-uuid');
 
     // ArrowDown again → lands on block-3 (slate text)
     // Should re-enter text mode (subtle border) because editMode is 'text'
     await page.keyboard.press('ArrowDown');
-    await helper.waitForBlockSelected('block-3-uuid');
+    await helper.waitForIframeBlockHandle('block-3-uuid');
 
     // Should be in text mode with cursor at start
     await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
@@ -639,12 +639,12 @@ test.describe('Block Mode (Escape state machine)', () => {
 
     // Click text-1a (inside col-1 of columns-1), enter block mode
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeFromEditing();
 
     // Arrow Down should move to text-1b (sibling inside same column)
     await page.keyboard.press('ArrowDown');
-    await helper.waitForBlockSelected('text-1b');
+    await helper.waitForIframeBlockHandle('text-1b');
 
     // Should still be in block mode
     await expect(page.locator('.volto-hydra-block-outline[data-outline-style="border"]'))
@@ -660,7 +660,7 @@ test.describe('Block Mode (Escape state machine)', () => {
 
     // Click text-1a inside col-1 — enters text mode
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
 
     // Verify text mode (subtle border)
     await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
@@ -700,7 +700,7 @@ test.describe('Block Mode (Escape state machine)', () => {
 
     // Click text-1a, enter block mode
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeFromEditing();
 
     // Verify block mode
@@ -720,7 +720,7 @@ test.describe('Block Mode (Escape state machine)', () => {
 
     // Click image block (non-editable — no contenteditable fields)
     await helper.clickBlockInIframe('block-2-uuid');
-    await helper.waitForBlockSelected('block-2-uuid');
+    await helper.waitForIframeBlockHandle('block-2-uuid');
 
     // Already in block mode (image has no editable fields)
     await expect(page.locator('.volto-hydra-block-outline[data-outline-style="border"]'))
@@ -740,7 +740,7 @@ test.describe('Block Mode (Escape state machine)', () => {
 
     // Enter text mode on text-1a (deepest leaf)
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
 
     // Press 1: text in field. Press 2: block mode. Press 3: siblings in col-1.
     await page.keyboard.press('ControlOrMeta+a');
@@ -785,7 +785,7 @@ test.describe('Block Mode (Escape state machine)', () => {
 
     // Click text-1a inside col-1, enter block mode
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeFromEditing();
 
     // Step 1: Single block — full border around text-1a only
@@ -827,7 +827,7 @@ test.describe('Block Mode (Escape state machine)', () => {
 
     // Click block-1, enter block mode
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
 
     // Shift+ArrowDown should extend selection to include block-2
@@ -847,7 +847,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click text-1a, enter block mode
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeFromEditing();
 
     // Verify block mode
@@ -862,7 +862,7 @@ test.describe('Multi-Block Selection', () => {
     await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
       .toBeVisible({ timeout: 3000 });
     await expect(page.locator('.volto-hydra-field-underline')).toBeVisible({ timeout: 3000 });
-    await helper.waitForQuantaToolbar('text-1a');
+    await helper.waitForBlockSelectedInAdmin('text-1a');
   });
 
   test('Shift+Click on text block from block mode multi-selects (not text mode)', async ({ page }) => {
@@ -874,7 +874,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click block-1 (Slate text) and enter block mode
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
 
     // Verify we're in block mode (full border, not subtle)
@@ -901,7 +901,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click first block and enter block mode (Shift+Click only works in block mode)
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
 
     // Get single block outline height for comparison
@@ -939,7 +939,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click first block
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
 
     // Ctrl/Meta+Click third block — outline should expand to cover both
     const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
@@ -957,7 +957,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Create multi-selection via Shift+Click (need block mode first)
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
     await iframe.locator('[data-block-uid="block-3-uuid"]').click({ modifiers: ['Shift'] });
 
@@ -965,13 +965,13 @@ test.describe('Multi-Block Selection', () => {
 
     // Plain click on block-2 — should clear multi-selection
     await helper.clickBlockInIframe('block-2-uuid');
-    await helper.waitForBlockSelected('block-2-uuid');
+    await helper.waitForIframeBlockHandle('block-2-uuid');
 
     // Should be back to single outline (multi-select outline removed)
     await expect(page.locator('.volto-hydra-block-outline')).toHaveCount(1, { timeout: 5000 });
 
     // Quanta toolbar should be back (single-select mode)
-    await helper.waitForQuantaToolbar('block-2-uuid');
+    await helper.waitForBlockSelectedInAdmin('block-2-uuid');
   });
 
   test('Delete via left toolbar removes all multi-selected blocks', async ({ page }) => {
@@ -983,7 +983,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Select block-1, enter block mode, Shift+ArrowDown twice to select block-1 + block-2 + block-3
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
     await page.keyboard.press('Shift+ArrowDown');
     await page.keyboard.press('Shift+ArrowDown');
@@ -1011,9 +1011,9 @@ test.describe('Multi-Block Selection', () => {
 
     // Navigate into col-1 to see its children
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeToParent();
-    await helper.waitForBlockSelected('col-1');
+    await helper.waitForIframeBlockHandle('col-1');
 
     const blockList = page.locator('.child-blocks-widget');
     await expect(blockList).toBeVisible({ timeout: 5000 });
@@ -1046,7 +1046,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Navigate to page-level block list
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     const backArrow = page.locator('.sidebar-section-header .nav-back').last();
     await expect(backArrow).toBeVisible({ timeout: 5000 });
     await backArrow.click();
@@ -1080,7 +1080,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Select text-1a (inside col-1), enter block mode
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeFromEditing();
 
     // Ctrl+Click text-2a (inside col-2) to add to multi-selection
@@ -1110,7 +1110,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Select block-1, enter block mode, Shift+ArrowDown twice to select block-1 + block-2 + block-3
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
     await page.keyboard.press('Shift+ArrowDown');
     await page.keyboard.press('Shift+ArrowDown');
@@ -1136,7 +1136,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click block-1, enter block mode
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
 
     // Cmd+C in block mode should send COPY_BLOCKS to admin
@@ -1156,7 +1156,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click block-1, enter block mode, Shift+ArrowDown to multi-select
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
     await page.keyboard.press('Shift+ArrowDown');
 
@@ -1173,7 +1173,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click block-1, enter block mode, Shift+ArrowDown to multi-select 2 blocks
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
     await page.keyboard.press('Shift+ArrowDown');
 
@@ -1194,7 +1194,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Select block-1, enter block mode, copy
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
     await page.keyboard.press('ControlOrMeta+c');
 
@@ -1204,7 +1204,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click block-3 to select as paste target
     await helper.clickBlockInIframe('block-3-uuid');
-    await helper.waitForBlockSelected('block-3-uuid');
+    await helper.waitForIframeBlockHandle('block-3-uuid');
     await expect(pasteButton).toBeVisible({ timeout: 3000 });
 
     // Click paste — block should be inserted after block-3
@@ -1234,7 +1234,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Select block-1 in block mode, Shift+Arrow to also select block-2
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
     await page.keyboard.press('Shift+ArrowDown');
 
@@ -1250,7 +1250,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click block-3 to set paste target
     await helper.clickBlockInIframe('block-3-uuid');
-    await helper.waitForBlockSelected('block-3-uuid');
+    await helper.waitForIframeBlockHandle('block-3-uuid');
 
     // Paste button should show with count of 2
     const pasteButton = page.locator('#toolbar-paste-blocks');
@@ -1274,7 +1274,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Copy a text block (type=slate) from inside a column
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeFromEditing();
     await page.keyboard.press('ControlOrMeta+c');
 
@@ -1286,10 +1286,10 @@ test.describe('Multi-Block Selection', () => {
     // col-1's parent (columns-1) only allows 'column' children,
     // so pasting 'slate' after col-1 is not allowed
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeFromEditing();  // text mode → block mode
     await page.keyboard.press('Escape');  // block mode → select parent (col-1)
-    await helper.waitForQuantaToolbar('col-1');
+    await helper.waitForBlockSelectedInAdmin('col-1');
 
     // Left toolbar paste button should be disabled
     await expect(pasteButton).toBeVisible({ timeout: 5000 });
@@ -1320,7 +1320,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Select block-1
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
 
     // Open the ⋯ dropdown
     const menuButton = page.locator('.quanta-toolbar .volto-hydra-menu-trigger');
@@ -1338,7 +1338,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Re-select block and reopen menu — paste should now be available
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await expect(menuButton).toBeVisible({ timeout: 3000 });
     await menuButton.click();
     await expect(dropdown.locator('[data-action="paste-block"]')).toBeVisible();
@@ -1351,7 +1351,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Multi-select: block-1 + block-2
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
     await page.keyboard.press('Shift+ArrowDown');
 
@@ -1380,13 +1380,13 @@ test.describe('Multi-Block Selection', () => {
 
     // Copy block-1 via keyboard
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
     await page.keyboard.press('ControlOrMeta+c');
 
     // Select block-3
     await helper.clickBlockInIframe('block-3-uuid');
-    await helper.waitForBlockSelected('block-3-uuid');
+    await helper.waitForIframeBlockHandle('block-3-uuid');
 
     // Open ⋯ dropdown and click paste
     const menuButton = page.locator('.quanta-toolbar .volto-hydra-menu-trigger');
@@ -1413,7 +1413,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Select block-1, enter block mode, copy
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
     await page.keyboard.press('ControlOrMeta+c');
 
@@ -1445,7 +1445,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Select block-1, enter block mode
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
 
     // Cut via Cmd+X (block mode sends COPY_BLOCKS with action='cut')
@@ -1459,7 +1459,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click block-3 to set paste target
     await helper.clickBlockInIframe('block-3-uuid');
-    await helper.waitForBlockSelected('block-3-uuid');
+    await helper.waitForIframeBlockHandle('block-3-uuid');
 
     // Paste button should be visible
     const pasteButton = page.locator('#toolbar-paste-blocks');
@@ -1486,7 +1486,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Select block-1, block mode, extend to block-2
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
     await page.keyboard.press('Shift+ArrowDown');
 
@@ -1504,7 +1504,7 @@ test.describe('Multi-Block Selection', () => {
     // Paste button should show count of 2
     // Select block-3 first to have a paste target
     await helper.clickBlockInIframe('block-3-uuid');
-    await helper.waitForBlockSelected('block-3-uuid');
+    await helper.waitForIframeBlockHandle('block-3-uuid');
     const pasteButton = page.locator('#toolbar-paste-blocks');
     await expect(pasteButton).toBeVisible({ timeout: 3000 });
     await expect(pasteButton.locator('.blockCount')).toHaveText('2');
@@ -1517,7 +1517,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Select block-1, block mode, extend to block-2
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
     await page.keyboard.press('Shift+ArrowDown');
 
@@ -1544,7 +1544,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click text-1a inside col-1, enter block mode
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeFromEditing();
 
     // Shift+ArrowDown should select text-1a + text-1b (siblings in col-1)
@@ -1568,7 +1568,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click text-1a, block mode, extend to text-1b
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeFromEditing();
     await page.keyboard.press('Shift+ArrowDown');
 
@@ -1593,7 +1593,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click text-1a (inside col-1), block mode
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeFromEditing();
 
     // Shift+Click on text-2a (inside col-2 — different container)
@@ -1616,7 +1616,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click text-1a (inside col-1), enter block mode
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeFromEditing();
 
     // Ctrl+Click text-2a (inside col-2 — different container)
@@ -1631,7 +1631,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click on text-after (page-level block outside containers), enter block mode
     await helper.clickBlockInIframe('text-after');
-    await helper.waitForBlockSelected('text-after');
+    await helper.waitForIframeBlockHandle('text-after');
     await helper.escapeFromEditing();
 
     // Count blocks before paste
@@ -1656,7 +1656,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click block-1 to select it first
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
 
     // Long press on block-1 — enters selection mode with checkbox overlays
     await helper.longPressBlock('block-1-uuid');
@@ -1685,7 +1685,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click block-3, enter block mode to paste after it
     await helper.clickBlockInIframe('block-3-uuid');
-    await helper.waitForBlockSelected('block-3-uuid');
+    await helper.waitForIframeBlockHandle('block-3-uuid');
     await helper.escapeFromEditing();
 
     // Count blocks before paste
@@ -1710,7 +1710,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Enter selection mode
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.longPressBlock('block-1-uuid');
 
     // Check block-2
@@ -1746,7 +1746,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Enter selection mode with block-1 checked
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.longPressBlock('block-1-uuid');
 
     // Block-1 is checked
@@ -1768,7 +1768,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Enter selection mode with block-1 checked
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.longPressBlock('block-1-uuid');
 
     // Block-2 should be unchecked
@@ -1795,7 +1795,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Enter selection mode with block-1 checked
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.longPressBlock('block-1-uuid');
 
     // Click block-2 in the iframe (away from the checkbox overlay on the left edge)
@@ -1824,7 +1824,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Enter selection mode with block-1 checked
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.longPressBlock('block-1-uuid');
 
     // Block-1 is checked
@@ -1852,7 +1852,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click block-1 — enters text mode (cursor in text)
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
 
     // Verify text mode
     await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
@@ -1875,7 +1875,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click block-1 — enters text mode
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
 
     // Verify text mode (subtle border)
     await expect(page.locator('.volto-hydra-block-outline[data-outline-style="subtle"]'))
@@ -1903,7 +1903,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click block-1 — enters text mode
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
 
     // Ctrl+Click on block-3 — should toggle it into multi-selection regardless of mode
     await iframe.locator('[data-block-uid="block-3-uuid"]').click({ modifiers: ['ControlOrMeta'] });
@@ -1920,7 +1920,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Multi-select block-1 and block-3 via Ctrl+Click (selectedBlockUid becomes null)
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
     await iframe.locator('[data-block-uid="block-3-uuid"]').click({ modifiers: ['ControlOrMeta'] });
     await helper.waitForMultiSelectOutlines(2);
@@ -1959,7 +1959,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click text-1a (inside col-1), enter selection mode via long press
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.longPressBlock('text-1a');
 
     // Checkbox should appear on text-after (page-level, different container)
@@ -1979,9 +1979,9 @@ test.describe('Multi-Block Selection', () => {
 
     // Select text-1a, escape to col-1 level
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeToParent();
-    await helper.waitForBlockSelected('col-1');
+    await helper.waitForIframeBlockHandle('col-1');
 
     // ChildBlocksWidget visible with col-1's children
     const blockList = page.locator('.child-blocks-widget');
@@ -2009,9 +2009,9 @@ test.describe('Multi-Block Selection', () => {
 
     // Navigate to col-1 children in sidebar
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeToParent();
-    await helper.waitForBlockSelected('col-1');
+    await helper.waitForIframeBlockHandle('col-1');
 
     // Ctrl+Click items in sidebar
     const blockList = page.locator('.child-blocks-widget');
@@ -2035,7 +2035,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Shift+Arrow to multi-select text-1a + text-1b (siblings in col-1)
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeFromEditing();
     await page.keyboard.press('Shift+ArrowDown');
 
@@ -2054,7 +2054,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Select text-1a (col-1), Ctrl+Click text-2a (col-2)
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeFromEditing();
     await iframe.locator('[data-block-uid="text-2a"]').click({ modifiers: ['ControlOrMeta'] });
 
@@ -2074,7 +2074,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Select text-1a (leaf block - no ChildBlocksWidget), Ctrl+Click text-after
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeFromEditing();
     await iframe.locator('[data-block-uid="text-after"]').click({ modifiers: ['ControlOrMeta'] });
 
@@ -2095,7 +2095,7 @@ test.describe('Multi-Block Selection', () => {
     // Select text-1a (inside columns-1 > col-1), Ctrl+Click text-2a (inside columns-1 > col-2)
     // Common ancestor = columns-1. Path should be "Columns > ... > Slate" style.
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.escapeFromEditing();
     await iframe.locator('[data-block-uid="text-2a"]').click({ modifiers: ['ControlOrMeta'] });
 
@@ -2116,7 +2116,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Enter selection mode via iframe long press
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.longPressBlock('text-1a');
 
     // Verify selection mode is active before navigation
@@ -2149,7 +2149,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Enter selection mode
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.longPressBlock('block-1-uuid');
 
     // Checkboxes should be visible
@@ -2177,7 +2177,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Start with block-3 selected (slate, so we get text mode first)
     await helper.clickBlockInIframe('block-3-uuid');
-    await helper.waitForBlockSelected('block-3-uuid');
+    await helper.waitForIframeBlockHandle('block-3-uuid');
     await helper.escapeFromEditing();
 
     // Baseline: single-block toolbar offset above block-3 top
@@ -2241,7 +2241,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Enter selection mode via iframe long press on text-1a
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.longPressBlock('text-1a');
 
     // Sidebar navigation: click text-1a's "Go to parent" (last one — its section's nav-back → col-1)
@@ -2273,7 +2273,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Enter selection mode
     await helper.clickBlockInIframe('text-1a');
-    await helper.waitForBlockSelected('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
     await helper.longPressBlock('text-1a');
 
     // Navigate up to columns-1 level to see col-1, col-2 (two Go to parent clicks)
@@ -2311,7 +2311,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Enter selection mode with 2 blocks
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.longPressBlock('block-1-uuid');
 
     const checkbox2 = page.locator('.volto-hydra-selection-checkbox[data-block-uid="block-2-uuid"]');
@@ -2342,7 +2342,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Click into block-1 first to establish text mode, then select across to block-3
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
 
     await helper.selectTextAcrossBlocks('block-1-uuid', 0, 'block-3-uuid', 3);
 
@@ -2376,7 +2376,7 @@ test.describe('Multi-Block Selection', () => {
     // block-1 text is "This is a test paragraph" — start at offset 5 ("is a test paragraph")
     // block-3 text is "Another paragraph for testing" — end at offset 7 ("Another")
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
 
     await helper.selectTextAcrossBlocks('block-1-uuid', 5, 'block-3-uuid', 7);
 
@@ -2425,7 +2425,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Multi-select block-1 + block-2 via Shift+ArrowDown from block mode
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
     await helper.escapeFromEditing();
     await page.keyboard.press('Shift+ArrowDown');
     await helper.waitForMultiSelectOutlines(2);
@@ -2459,7 +2459,7 @@ test.describe('Multi-Block Selection', () => {
     // Select standalone-block-1 then Ctrl+Click the locked template-header
     const iframe = helper.getIframe();
     await helper.clickBlockInIframe('standalone-block-1');
-    await helper.waitForBlockSelected('standalone-block-1');
+    await helper.waitForIframeBlockHandle('standalone-block-1');
     await helper.escapeFromEditing();
 
     const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
@@ -2499,7 +2499,7 @@ test.describe('Multi-Block Selection', () => {
     // Multi-select standalone-block-1 + template-header (one locked)
     const iframe = helper.getIframe();
     await helper.clickBlockInIframe('standalone-block-1');
-    await helper.waitForBlockSelected('standalone-block-1');
+    await helper.waitForIframeBlockHandle('standalone-block-1');
     await helper.escapeFromEditing();
     const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
     await iframe.locator('[data-block-uid="template-header"]').click({ modifiers: [modifier] });
@@ -2538,10 +2538,15 @@ test.describe('Multi-Block Selection', () => {
     const iframe = helper.getIframe();
 
     // 1. Select the grid via the bridge — admin should render edge handles.
+    // Use waitForBlockSelectedInAdmin: the assertions below target admin
+    // chrome (edge-handle visuals), so we need to wait for admin's
+    // BLOCK_SELECTED handler → setBlockUI → React commit to mount the
+    // chrome. waitForIframeBlockHandle only confirms the iframe-side
+    // drag handle and races the admin render.
     await iframe.locator('[data-block-uid="grid-1"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForBlockSelected('grid-1');
+    await helper.waitForBlockSelectedInAdmin('grid-1');
 
     const adminEdges = page.locator('.volto-hydra-edge-handle-visual');
     const gridEdgeCountInitial = await adminEdges.count();
@@ -2555,7 +2560,7 @@ test.describe('Multi-Block Selection', () => {
     await iframe.locator('[data-block-uid="grid-cell-1"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForBlockSelected('grid-cell-1');
+    await helper.waitForBlockSelectedInAdmin('grid-cell-1');
 
     // ASSERT: exactly one selection outline (for grid-cell-1).
     const outlines = page.locator('.volto-hydra-block-outline');

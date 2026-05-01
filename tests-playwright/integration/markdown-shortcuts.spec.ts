@@ -395,7 +395,7 @@ test.describe('Markdown Shortcuts', () => {
 
       // Move cursor to "beta" (second item) — click on it directly
       await block.locator('ul li', { hasText: 'beta' }).click();
-      await helper.waitForBlockSelected(blockId);
+      await helper.waitForIframeBlockHandle(blockId);
 
       // Shift+Tab on top-level item should split into 3 blocks:
       // 1) list with "alpha", 2) paragraph "beta", 3) list with "gamma"

@@ -50,7 +50,7 @@ test.describe('Inline Editing - Formatting', () => {
     });
 
     // STEP 5: Wait for toolbar to be fully ready and stable
-    await helper.waitForQuantaToolbar(blockId);
+    await helper.waitForBlockSelectedInAdmin(blockId);
 
     // STEP 6: Trigger the bold button using dispatchEvent
     console.log('[TEST] Step 6: Clicking bold button...');
@@ -285,7 +285,7 @@ test.describe('Inline Editing - Formatting', () => {
     const editor = await helper.enterEditMode(blockId);
 
     // Wait for toolbar
-    await helper.waitForQuantaToolbar(blockId);
+    await helper.waitForBlockSelectedInAdmin(blockId);
 
     // Clear and type text
     await helper.selectAllTextInEditor(editor);

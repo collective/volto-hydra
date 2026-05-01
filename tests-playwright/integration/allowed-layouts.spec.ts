@@ -82,7 +82,7 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Wait for initial block selection to settle (first block auto-selected on page load)
-      await helper.waitForQuantaToolbar('block-1-uuid');
+      await helper.waitForBlockSelectedInAdmin('block-1-uuid');
 
       // Remember initial block order
       const initialBlocks = await iframe.locator('[data-block-uid]').allTextContents();
@@ -286,7 +286,7 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Wait for initial block selection to settle (first block auto-selected on page load)
-      await helper.waitForQuantaToolbar('block-1-uuid');
+      await helper.waitForBlockSelectedInAdmin('block-1-uuid');
 
       // Apply layout
       await page.locator('.sidebar-section-header .section-title').click();
@@ -358,7 +358,7 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Wait for initial block selection to settle (first block auto-selected on page load)
-      await helper.waitForQuantaToolbar('block-1-uuid');
+      await helper.waitForBlockSelectedInAdmin('block-1-uuid');
 
       // Verify multiple user blocks exist before layout
       const { locator: block1 } = await helper.waitForBlockByContent('test paragraph');
@@ -407,7 +407,7 @@ test.describe('allowedLayouts', () => {
       await helper.waitForIframeReady();
 
       // Wait for initial block selection to settle (first block auto-selected on page load)
-      await helper.waitForQuantaToolbar('block-1-uuid');
+      await helper.waitForBlockSelectedInAdmin('block-1-uuid');
 
       const originalContent = 'another test page';
 
@@ -709,7 +709,7 @@ test.describe('allowedLayouts', () => {
       await expect(headerBlock).toBeVisible();
       await headerBlock.click();
       const headerBlockId = await headerBlock.getAttribute('data-block-uid');
-      await helper.waitForQuantaToolbar(headerBlockId!);
+      await helper.waitForBlockSelectedInAdmin(headerBlockId!);
 
       // Enter template edit mode — blocks outside the template become readonly
       const editTemplateLabel = page.getByText('Edit Template', { exact: true });

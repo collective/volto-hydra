@@ -14,7 +14,7 @@ test.describe('Container UX: Convert (container-to-container)', () => {
     await iframe.locator('[data-block-uid="grid-1"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForBlockSelected('grid-1');
+    await helper.waitForIframeBlockHandle('grid-1');
 
     // Sanity: teaser children exist before conversion
     await expect(iframe.locator('[data-block-uid="grid-cell-1"]')).toBeVisible();

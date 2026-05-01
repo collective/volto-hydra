@@ -473,7 +473,7 @@ test.describe('Adding Blocks to Containers', () => {
     expect(lastBlockUid).not.toBe('grid-1'); // Not the original last block
 
     // The new block should be selected (toolbar visible for it)
-    await helper.waitForBlockSelected(lastBlockUid!);
+    await helper.waitForIframeBlockHandle(lastBlockUid!);
   });
 });
 
@@ -900,7 +900,7 @@ test.describe('Hierarchical Sidebar', () => {
     await helper.clickBlockInIframe('text-1a');
     await helper.waitForSidebarOpen();
     // Wait for quanta toolbar to ensure block is fully selected
-    await helper.waitForQuantaToolbar('text-1a');
+    await helper.waitForBlockSelectedInAdmin('text-1a');
 
     // Should see parent block headers in sidebar-parents
     const sidebarParents = page.locator('#sidebar-parents');
@@ -985,7 +985,7 @@ test.describe('Hierarchical Sidebar', () => {
 
     // Select a block to show toolbar
     await helper.clickBlockInIframe('text-after');
-    await helper.waitForQuantaToolbar('text-after');
+    await helper.waitForBlockSelectedInAdmin('text-after');
 
     // Close sidebar
     const closeButton = page.locator('.sidebar-close-button');
@@ -994,7 +994,7 @@ test.describe('Hierarchical Sidebar', () => {
     const sidebarContainer = page.locator('.sidebar-container');
     await expect(sidebarContainer).toHaveClass(/collapsed/, { timeout: 5000 });
     // Wait for toolbar to reposition after iframe resize
-    await helper.waitForQuantaToolbar('text-after');
+    await helper.waitForBlockSelectedInAdmin('text-after');
 
     // Re-open sidebar
     const triggerButton = page.locator('.sidebar-container .trigger');
@@ -1002,7 +1002,7 @@ test.describe('Hierarchical Sidebar', () => {
     // Wait for sidebar animation to complete (collapsed class removed)
     await expect(sidebarContainer).not.toHaveClass(/collapsed/, { timeout: 5000 });
     // Wait for toolbar to reposition after iframe resize
-    await helper.waitForQuantaToolbar('text-after');
+    await helper.waitForBlockSelectedInAdmin('text-after');
   });
 });
 
@@ -1490,7 +1490,7 @@ test.describe('Single Allowed Block Auto-Insert', () => {
     const newColumnId = await newColumn.getAttribute('data-block-uid');
     expect(newColumnId).toBeTruthy();
     // Wait for toolbar to appear after block insertion
-    await helper.waitForQuantaToolbar(newColumnId!);
+    await helper.waitForBlockSelectedInAdmin(newColumnId!);
 
     // The add button should be to the RIGHT of the new column (columns go horizontally)
     const positioning = await helper.verifyBlockUIPositioning(newColumnId!);
@@ -2757,7 +2757,7 @@ test.describe('data-block-selector Navigation', () => {
     await nextButton.click();
 
     // Verify slide-2 is now selected (toolbar visible on slide-2)
-    await helper.waitForQuantaToolbar('slide-2');
+    await helper.waitForBlockSelectedInAdmin('slide-2');
   });
 
   test('clicking prev button (-1) selects previous sibling', async ({
@@ -2781,7 +2781,7 @@ test.describe('data-block-selector Navigation', () => {
     const nextButton = iframe.locator('[data-block-selector="+1"]');
     await expect(nextButton).toBeVisible();
     await nextButton.click();
-    await helper.waitForQuantaToolbar('slide-2');
+    await helper.waitForBlockSelectedInAdmin('slide-2');
 
     // Click the "prev" button (←) with data-block-selector="-1"
     const prevButton = iframe.locator('[data-block-selector="-1"]');
@@ -2789,7 +2789,7 @@ test.describe('data-block-selector Navigation', () => {
     await prevButton.click();
 
     // Verify slide-1 is now selected
-    await helper.waitForQuantaToolbar('slide-1');
+    await helper.waitForBlockSelectedInAdmin('slide-1');
   });
 
   test('clicking +1 at last sibling stays on current block', async ({
@@ -2808,16 +2808,16 @@ test.describe('data-block-selector Navigation', () => {
     // Navigate to slide-3 (last slide) by clicking +1 twice from slide-1
     // (slide-3 doesn't have a direct selector dot - we only show dots for first half)
     await helper.clickBlockInIframe('slide-1');
-    await helper.waitForQuantaToolbar('slide-1');
+    await helper.waitForBlockSelectedInAdmin('slide-1');
 
     // Click +1 to go to slide-2
     const nextButton = iframe.locator('[data-block-selector="+1"]');
     await nextButton.click();
-    await helper.waitForQuantaToolbar('slide-2');
+    await helper.waitForBlockSelectedInAdmin('slide-2');
 
     // Click +1 again to go to slide-3
     await nextButton.click();
-    await helper.waitForQuantaToolbar('slide-3');
+    await helper.waitForBlockSelectedInAdmin('slide-3');
 
     // Click the "next" button at the last slide
     // Behavior depends on carousel implementation:
@@ -2848,7 +2848,7 @@ test.describe('data-block-selector Navigation', () => {
 
     // Select slide-1
     await helper.clickBlockInIframe('slide-1');
-    await helper.waitForQuantaToolbar('slide-1');
+    await helper.waitForBlockSelectedInAdmin('slide-1');
 
     // Get the initial outline position as baseline
     const initialBox = await helper.getBlockOutlineBoundingBox();
@@ -2864,7 +2864,7 @@ test.describe('data-block-selector Navigation', () => {
     const result = await helper.monitorOutlinePositionDuringAction(
       async () => {
         await nextButton.click();
-        await helper.waitForQuantaToolbar('slide-2');
+        await helper.waitForBlockSelectedInAdmin('slide-2');
       },
       baselineX - 50, // Allow 50px tolerance for minor positioning variations
       16, // Check every 16ms (~60fps)
@@ -2892,7 +2892,7 @@ test.describe('data-block-selector Navigation', () => {
 
     // Click on slide-1 first
     await helper.clickBlockInIframe('slide-1');
-    await helper.waitForQuantaToolbar('slide-1');
+    await helper.waitForBlockSelectedInAdmin('slide-1');
 
     // Click the dot indicator for slide-2 (data-block-selector="slide-2")
     // Note: Only first half of slides have dot indicators (slide-1, slide-2)
@@ -2902,7 +2902,7 @@ test.describe('data-block-selector Navigation', () => {
     await slide2Dot.click();
 
     // Verify slide-2 is now selected
-    await helper.waitForQuantaToolbar('slide-2');
+    await helper.waitForBlockSelectedInAdmin('slide-2');
   });
 
   // Sidebar-based selection tests
@@ -2922,12 +2922,12 @@ test.describe('data-block-selector Navigation', () => {
     // For carousels, we can't click directly on the container because slides fill it.
     // Instead, click on a visible child first, then press Escape to go to parent.
     await helper.clickBlockInIframe('slide-1');
-    await helper.waitForQuantaToolbar('slide-1');
+    await helper.waitForBlockSelectedInAdmin('slide-1');
 
     // Press Escape to navigate up to the parent container
     await helper.escapeToParent();
-    await helper.waitForBlockSelected('slider-1');
-    await helper.waitForQuantaToolbar('slider-1');
+    await helper.waitForIframeBlockHandle('slider-1');
+    await helper.waitForBlockSelectedInAdmin('slider-1');
 
     const sidebar = page.locator('.sidebar-container');
     // Wait for sidebar to show Slider as current block
@@ -2946,7 +2946,7 @@ test.describe('data-block-selector Navigation', () => {
     await slideButtons.nth(1).click();
 
     // Wait for slide-2 to be selected (includes waiting for carousel transition)
-    await helper.waitForQuantaToolbar('slide-2');
+    await helper.waitForBlockSelectedInAdmin('slide-2');
   });
 
   test('sidebar selection works for all carousel slides', async ({ page }) => {
@@ -2962,7 +2962,7 @@ test.describe('data-block-selector Navigation', () => {
 
     // For carousels, navigate to container via child -> Escape
     await helper.clickBlockInIframe('slide-1');
-    await helper.waitForQuantaToolbar('slide-1');
+    await helper.waitForBlockSelectedInAdmin('slide-1');
     await helper.escapeToParent();
     // Wait for sidebar to show Slider as current block (more reliable than toolbar positioning)
     await helper.waitForSidebarCurrentBlock('Slider');
@@ -2980,7 +2980,7 @@ test.describe('data-block-selector Navigation', () => {
     // Wait for sidebar to show Slide as current (carousel transition happening)
     await helper.waitForSidebarCurrentBlock('Slide');
     // Wait for slide-3 to be selected (toolbar positioned correctly)
-    await helper.waitForQuantaToolbar('slide-3');
+    await helper.waitForBlockSelectedInAdmin('slide-3');
 
     // Now go back to carousel container and select slide-1
     await helper.escapeToParent();
@@ -2994,7 +2994,7 @@ test.describe('data-block-selector Navigation', () => {
     await helper.waitForSidebarCurrentBlock('Slide');
     // Wait for slide-1 to be selected (toolbar positioned correctly)
     // Note: hydra.js debounces BLOCK_SELECTED during animations, so this waits for stable position
-    await helper.waitForQuantaToolbar('slide-1');
+    await helper.waitForBlockSelectedInAdmin('slide-1');
   });
 
   test('adding a new slide selects the new slide', async ({ page }) => {
@@ -3007,9 +3007,9 @@ test.describe('data-block-selector Navigation', () => {
 
     // Navigate to carousel container: click slide-1, then press Escape
     await helper.clickBlockInIframe('slide-1');
-    await helper.waitForQuantaToolbar('slide-1');
+    await helper.waitForBlockSelectedInAdmin('slide-1');
     await helper.escapeToParent();
-    await helper.waitForQuantaToolbar('slider-1');
+    await helper.waitForBlockSelectedInAdmin('slider-1');
 
     // Wait for sidebar to show Slides section
     await expect(sidebar.locator('text=Slides').first()).toBeVisible();
@@ -3052,7 +3052,7 @@ test.describe('data-block-selector Navigation', () => {
     expect(newSlideId).toBeTruthy();
 
     // Verify the new slide is selected (toolbar is on it)
-    await helper.waitForQuantaToolbar(newSlideId!);
+    await helper.waitForBlockSelectedInAdmin(newSlideId!);
 
     // Use the helper to get the editor and verify it's empty
     const editor = await helper.getEditorLocator(newSlideId!);
@@ -3061,7 +3061,7 @@ test.describe('data-block-selector Navigation', () => {
 
     // 4. Navigate back to slider to verify 4 slides now exist
     await helper.escapeToParent();
-    await helper.waitForQuantaToolbar('slider-1');
+    await helper.waitForBlockSelectedInAdmin('slider-1');
     await expect(sidebar.locator('text=Slides').first()).toBeVisible();
     await expect(slideItems).toHaveCount(4);
   });
@@ -3079,7 +3079,7 @@ test.describe('data-block-selector Navigation', () => {
 
     // Select slide-1 to get the add button to appear
     await helper.clickBlockInIframe('slide-1');
-    await helper.waitForQuantaToolbar('slide-1');
+    await helper.waitForBlockSelectedInAdmin('slide-1');
 
     // Click the add button in the iframe — typed object_list shows block chooser
     await helper.clickAddBlockButton();
@@ -3117,7 +3117,7 @@ test.describe('data-block-selector Navigation', () => {
     await expect(titleInput).not.toHaveValue('Slide 2');
 
     // Verify the new slide is selected (toolbar is on it)
-    await helper.waitForQuantaToolbar(newSlideId!);
+    await helper.waitForBlockSelectedInAdmin(newSlideId!);
 
     // Use the helper to get the editor and verify it's empty
     const editor = await helper.getEditorLocator(newSlideId!);
@@ -3126,7 +3126,7 @@ test.describe('data-block-selector Navigation', () => {
 
     // Navigate back to slider to verify 4 slides now exist
     await helper.escapeToParent();
-    await helper.waitForQuantaToolbar('slider-1');
+    await helper.waitForBlockSelectedInAdmin('slider-1');
     await expect(sidebar.locator('text=Slides').first()).toBeVisible();
     const slideItems = sidebar.locator('.child-block-item');
     await expect(slideItems).toHaveCount(4);
@@ -3155,7 +3155,7 @@ test.describe('data-block-selector Navigation', () => {
 
     // Click on the slide to select it
     await helper.clickBlockInIframe('slide-1');
-    await helper.waitForQuantaToolbar('slide-1');
+    await helper.waitForBlockSelectedInAdmin('slide-1');
 
     // Wait for add button to appear
     const addButton = page.locator('.volto-hydra-add-button');
@@ -3243,7 +3243,7 @@ test.describe('Slider with listing expansion', () => {
 
     // First visible slide is a listing slide — click it
     await helper.clickBlockInIframe('gallery-listing');
-    await helper.waitForQuantaToolbar('gallery-listing');
+    await helper.waitForBlockSelectedInAdmin('gallery-listing');
 
     // Navigate +1 through all 11 listing slides to reach manual-image-1
     const nextButton = iframe.locator('[data-block-selector="+1"]');
@@ -3252,12 +3252,12 @@ test.describe('Slider with listing expansion', () => {
     for (let i = 0; i < 11; i++) {
       await nextButton.click();
       if (i < 10) {
-        await helper.waitForQuantaToolbar('gallery-listing');
+        await helper.waitForBlockSelectedInAdmin('gallery-listing');
       }
     }
 
     // After 11 clicks we should be on the manual image slide
-    await helper.waitForQuantaToolbar('manual-image-1');
+    await helper.waitForBlockSelectedInAdmin('manual-image-1');
   });
 
   test('-1 navigates from manual image back to listing slide', async ({ page }) => {
@@ -3274,20 +3274,20 @@ test.describe('Slider with listing expansion', () => {
 
     // Select gallery-listing (first visible slide), navigate up to slider, then select manual-image-1
     await helper.clickBlockInIframe('gallery-listing');
-    await helper.waitForQuantaToolbar('gallery-listing');
+    await helper.waitForBlockSelectedInAdmin('gallery-listing');
     // Click ‹ Listing in sidebar to go up to the Slider level
     await page.locator('.parent-nav:has-text("Listing") .nav-back').click();
-    await helper.waitForQuantaToolbar('gallery-slider');
+    await helper.waitForBlockSelectedInAdmin('gallery-slider');
     // Select manual-image-1 from the slider's child blocks list
     await page.locator('#sidebar-order .child-block-item').last().click();
-    await helper.waitForQuantaToolbar('manual-image-1');
+    await helper.waitForBlockSelectedInAdmin('manual-image-1');
 
     // Click -1 to go back to the last listing slide
     const prevButton = iframe.locator('[data-block-selector="-1"]');
     await expect(prevButton).toBeVisible();
     await prevButton.click();
 
-    await helper.waitForQuantaToolbar('gallery-listing');
+    await helper.waitForBlockSelectedInAdmin('gallery-listing');
   });
 });
 
@@ -3549,7 +3549,7 @@ test.describe('slateTable Container', () => {
     await helper.clickBlockInIframe('cell-1-1');
     await helper.waitForSidebarOpen();
     await helper.escapeToParent();
-    await helper.waitForBlockSelected('row-1');
+    await helper.waitForIframeBlockHandle('row-1');
 
     // Should show "Add row" title with SVG icon
     const addButton = page.locator('.volto-hydra-add-button');
@@ -3572,7 +3572,7 @@ test.describe('slateTable Container', () => {
     await helper.clickBlockInIframe('cell-1-1');
     await helper.waitForSidebarOpen();
     await helper.escapeToParent();
-    await helper.waitForBlockSelected('row-1');
+    await helper.waitForIframeBlockHandle('row-1');
 
     // Open dropdown menu (three dots button)
     const menuButton = page.locator('.quanta-toolbar button:has-text("⋯")');
@@ -3663,7 +3663,7 @@ test.describe('slateTable Container', () => {
     await expect(table.locator('tr[data-block-uid]')).toHaveCount(initialRowCount - 1);
 
     // Should select corresponding cell in previous row (cell-1-2 - same column position)
-    await helper.waitForBlockSelected('cell-1-2');
+    await helper.waitForIframeBlockHandle('cell-1-2');
   });
 
   test('Remove Column removes cell from all rows and selects corresponding cell in previous column', async ({ page }) => {
@@ -3699,7 +3699,7 @@ test.describe('slateTable Container', () => {
     await expect(secondRow.locator('th[data-block-uid], td[data-block-uid]')).toHaveCount(initialCellCount - 1);
 
     // Should select corresponding cell in previous column (cell-1-1 - same row, previous column position)
-    await helper.waitForBlockSelected('cell-1-1');
+    await helper.waitForIframeBlockHandle('cell-1-1');
   });
 
   test('toolbar shows insert action buttons for cells', async ({ page }) => {
@@ -3736,7 +3736,7 @@ test.describe('slateTable Container', () => {
     await helper.clickBlockInIframe('cell-1-1');
     await helper.waitForSidebarOpen();
     await helper.escapeToParent();
-    await helper.waitForBlockSelected('row-1');
+    await helper.waitForIframeBlockHandle('row-1');
 
     // Toolbar should have insert row action buttons
     const toolbar = page.locator('.quanta-toolbar');
@@ -3761,7 +3761,7 @@ test.describe('slateTable Container', () => {
     await helper.clickBlockInIframe('cell-2-1');
     await helper.waitForSidebarOpen();
     await helper.escapeToParent();
-    await helper.waitForBlockSelected('row-2');
+    await helper.waitForIframeBlockHandle('row-2');
 
     // Click Add Row Before button
     const toolbar = page.locator('.quanta-toolbar');
@@ -3833,7 +3833,7 @@ test.describe('slateTable Container', () => {
     // Should select the SECOND cell in the new row (corresponding to the cell we were in)
     const secondCellInNewRow = newRow.locator('th[data-block-uid], td[data-block-uid]').nth(1);
     const selectedBlockUid = await secondCellInNewRow.getAttribute('data-block-uid');
-    await helper.waitForBlockSelected(selectedBlockUid!);
+    await helper.waitForIframeBlockHandle(selectedBlockUid!);
   });
 });
 
@@ -4007,7 +4007,7 @@ test.describe('Multi-Container Field Operations', () => {
 
     // Click on a page-level block (title-block) to enable add button
     await helper.clickBlockInIframe('title-block');
-    await helper.waitForQuantaToolbar('title-block');
+    await helper.waitForBlockSelectedInAdmin('title-block');
 
     // Add a new gridBlock
     await helper.clickAddBlockButton();
@@ -4053,7 +4053,7 @@ test.describe('Multi-Container Field Operations', () => {
 
     // Click on a page-level block (title-block) to enable add button
     await helper.clickBlockInIframe('title-block');
-    await helper.waitForQuantaToolbar('title-block');
+    await helper.waitForBlockSelectedInAdmin('title-block');
 
     // Add a new columns block
     await helper.clickAddBlockButton();
@@ -4099,7 +4099,7 @@ test.describe('Multi-Container Field Operations', () => {
 
     // Click on an existing grid cell (grid-cell-1 is inside grid-1)
     await helper.clickBlockInIframe('grid-cell-1');
-    await helper.waitForQuantaToolbar('grid-cell-1');
+    await helper.waitForBlockSelectedInAdmin('grid-cell-1');
 
     // Click the add button to open block chooser
     await helper.clickAddBlockButton();
@@ -4142,7 +4142,7 @@ test.describe('Single-Schema Object_List (table rows)', () => {
     await helper.clickBlockInIframe('cell-1-1');
     await helper.waitForSidebarOpen();
     await helper.escapeToParent();
-    await helper.waitForBlockSelected('row-1');
+    await helper.waitForIframeBlockHandle('row-1');
 
     const sidebar = page.locator('.sidebar-container');
     const table = iframe.locator('[data-block-uid="table-1"] table');
@@ -4178,9 +4178,9 @@ test.describe('Single-Schema Object_List (table rows)', () => {
     await helper.clickBlockInIframe('cell-1-1');
     await helper.waitForSidebarOpen();
     await helper.escapeToParent();
-    await helper.waitForBlockSelected('row-1');
+    await helper.waitForIframeBlockHandle('row-1');
     await helper.escapeToParent();
-    await helper.waitForBlockSelected('table-1');
+    await helper.waitForIframeBlockHandle('table-1');
 
     const sidebar = page.locator('.sidebar-container');
     await expect(sidebar.locator('text=rows').first()).toBeVisible();
@@ -4202,12 +4202,12 @@ test.describe('Single-Schema Object_List (table rows)', () => {
     await removeOption.click();
 
     // After deleting row-2, selection should move to previous sibling (row-1)
-    // Use waitForQuantaToolbar which verifies outline rect matches the block
-    await helper.waitForQuantaToolbar('row-1');
+    // Use waitForBlockSelectedInAdmin which verifies outline rect matches the block
+    await helper.waitForBlockSelectedInAdmin('row-1');
 
     // Navigate back to table level to verify child count
     await helper.escapeToParent();
-    await helper.waitForQuantaToolbar('table-1');
+    await helper.waitForBlockSelectedInAdmin('table-1');
     const rowItemsAfter = sidebar.locator('.child-block-item');
     await expect(rowItemsAfter).toHaveCount(2, { timeout: 5000 });
   });
@@ -4227,9 +4227,9 @@ test.describe('Single-Schema Object_List (table rows)', () => {
     await helper.clickBlockInIframe('cell-1-1');
     await helper.waitForSidebarOpen();
     await helper.escapeToParent();
-    await helper.waitForBlockSelected('row-1');
+    await helper.waitForIframeBlockHandle('row-1');
     await helper.escapeToParent();
-    await helper.waitForBlockSelected('table-1');
+    await helper.waitForIframeBlockHandle('table-1');
 
     const sidebar = page.locator('.sidebar-container');
     await expect(sidebar.locator('text=rows').first()).toBeVisible();
@@ -4300,7 +4300,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
 
     // Select the search block
     await helper.clickBlockInIframe('search-block-1', { selector: 'h2' });
-    await helper.waitForQuantaToolbar('search-block-1');
+    await helper.waitForBlockSelectedInAdmin('search-block-1');
 
     const sidebar = page.locator('.sidebar-container');
     await helper.waitForSidebarCurrentBlock('Search');
@@ -4314,7 +4314,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     await facetItems.first().click();
 
     // Wait for facet-type to be selected (quanta toolbar visible on it)
-    await helper.waitForQuantaToolbar('facet-type');
+    await helper.waitForBlockSelectedInAdmin('facet-type');
     expect(
       await helper.isQuantaToolbarVisibleInIframe('facet-type')
     ).toBe(true);
@@ -4331,7 +4331,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
 
     // Select the search block
     await helper.clickBlockInIframe('search-block-1', { selector: 'h2' });
-    await helper.waitForQuantaToolbar('search-block-1');
+    await helper.waitForBlockSelectedInAdmin('search-block-1');
 
     const sidebar = page.locator('.sidebar-container');
     await helper.waitForSidebarCurrentBlock('Search');
@@ -4362,7 +4362,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
 
     // Select search block, then select a facet via sidebar
     await helper.clickBlockInIframe('search-block-1', { selector: 'h2' });
-    await helper.waitForQuantaToolbar('search-block-1');
+    await helper.waitForBlockSelectedInAdmin('search-block-1');
 
     const sidebar = page.locator('.sidebar-container');
     await helper.waitForSidebarCurrentBlock('Search');
@@ -4372,7 +4372,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
 
     // Click first facet in sidebar to select it
     await facetItems.first().click();
-    await helper.waitForQuantaToolbar('facet-type');
+    await helper.waitForBlockSelectedInAdmin('facet-type');
 
     // Click add button
     await helper.clickAddBlockButton();
@@ -4408,7 +4408,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
 
     // Select the search block
     await helper.clickBlockInIframe('search-block-1', { selector: 'h2' });
-    await helper.waitForQuantaToolbar('search-block-1');
+    await helper.waitForBlockSelectedInAdmin('search-block-1');
 
     const sidebar = page.locator('.sidebar-container');
     await helper.waitForSidebarCurrentBlock('Search');
@@ -4450,7 +4450,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
 
     // Select search block, then select a facet via sidebar
     await helper.clickBlockInIframe('search-block-1', { selector: 'h2' });
-    await helper.waitForQuantaToolbar('search-block-1');
+    await helper.waitForBlockSelectedInAdmin('search-block-1');
 
     const sidebar = page.locator('.sidebar-container');
     await helper.waitForSidebarCurrentBlock('Search');
@@ -4460,7 +4460,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
 
     // Select a facet to enable the toolbar add button
     await facetItems.first().click();
-    await helper.waitForQuantaToolbar('facet-type');
+    await helper.waitForBlockSelectedInAdmin('facet-type');
 
     // Click the toolbar add button (iframe "+")
     await helper.clickAddBlockButton();
@@ -4483,7 +4483,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     const newFacet = iframe.locator('.facet-item').nth(3); // 4th facet (0-indexed)
     await expect(newFacet).toBeVisible({ timeout: 5000 });
     const newBlockId = await newFacet.getAttribute('data-block-uid');
-    await helper.waitForBlockSelected(newBlockId!);
+    await helper.waitForIframeBlockHandle(newBlockId!);
 
     // Sidebar should show the new facet's form
     await helper.waitForSidebarCurrentBlock('Checkbox');
@@ -4512,7 +4512,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
     // Select search block, then select second facet via sidebar
     // Facets order: facet-type, facet-state, facet-subject
     await helper.clickBlockInIframe('search-block-1', { selector: 'h2' });
-    await helper.waitForQuantaToolbar('search-block-1');
+    await helper.waitForBlockSelectedInAdmin('search-block-1');
 
     const sidebar = page.locator('.sidebar-container');
     await helper.waitForSidebarCurrentBlock('Search');
@@ -4522,13 +4522,13 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
 
     // Delete facet-state (second item) — should select facet-type (previous sibling)
     await facetItems.nth(1).click();
-    await helper.waitForQuantaToolbar('facet-state');
+    await helper.waitForBlockSelectedInAdmin('facet-state');
 
     await helper.openQuantaToolbarMenu('facet-state');
     await helper.clickQuantaToolbarMenuOption('facet-state', 'Remove');
 
     // After deleting facet-state, selection should move to previous sibling (facet-type)
-    await helper.waitForQuantaToolbar('facet-type');
+    await helper.waitForBlockSelectedInAdmin('facet-type');
 
     // Navigate back to search by clicking current block's parent-nav
     await sidebar.locator('[data-is-current="true"] .nav-back').click();
@@ -4549,7 +4549,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
 
     // Select the search block
     await helper.clickBlockInIframe('search-block-1', { selector: 'h2' });
-    await helper.waitForQuantaToolbar('search-block-1');
+    await helper.waitForBlockSelectedInAdmin('search-block-1');
 
     const sidebar = page.locator('.sidebar-container');
     await helper.waitForSidebarCurrentBlock('Search');
@@ -4619,7 +4619,7 @@ test.describe('Typed Object_List (search facets with allowedBlocks)', () => {
 
     // Click on facet title to select it (avoid checkboxes in the facet body)
     await helper.clickBlockInIframe('facet-type', { selector: '[data-edit-text="title"]' });
-    await helper.waitForQuantaToolbar('facet-type');
+    await helper.waitForBlockSelectedInAdmin('facet-type');
 
     // Drag after last facet
     const targetBlock = iframe.locator('[data-block-uid="facet-subject"]').first();
