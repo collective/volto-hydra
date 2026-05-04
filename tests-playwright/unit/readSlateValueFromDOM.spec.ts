@@ -748,4 +748,27 @@ test.describe('Bridge.readSlateValueFromDOM()', () => {
       ]}],
     });
   });
+
+  // Regression: NBSP (U+00A0) is user-enterable (Opt+Space on macOS) and
+  // semantically meaningful. domNodeToSlate must preserve it verbatim instead
+  // of collapsing it to a regular space. The bridge's internal
+  // stripZeroWidthSpaces DOES normalise NBSP→space for cursor/text-equality
+  // math; the read-back-for-save path must use a separate helper that only
+  // strips ZWS/BOM and keeps NBSP.
+  test('NBSP in user content is preserved verbatim (not collapsed to space)', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'nbsp1',
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: 'How we use your\u00A0personal data' },
+      ]}],
+      dom:
+        '<p data-edit-text="value" data-node-id="0">' +
+          'How we use your\u00A0personal data' +
+        '</p>',
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: 'How we use your\u00A0personal data' },
+      ]}],
+    });
+  });
 });
