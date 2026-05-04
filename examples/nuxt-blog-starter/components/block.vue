@@ -70,7 +70,7 @@
   </template>
 
   <div v-else-if="block['@type'] == 'gridBlock'" :data-block-uid="block_uid"
-       class="mt-6 mb-6 rounded-lg" :style="gridBgStyle(block)">
+       class="mt-6 mb-6 rounded-lg focus:outline-none" :style="gridBgStyle(block)">
     <div :class="['grid-row grid gap-4 grid-cols-1', ...gridColsClass(block)]">
       <template v-for="entry in gridChildren" :key="entry.id">
         <!-- Listing child: async expand in Suspense, with shared paging -->
@@ -125,6 +125,22 @@
         <Block v-for="item in expand(block.blocks?.[columnId]?.blocks_layout?.items || [], block.blocks?.[columnId]?.blocks || {})"
                :key="item['@uid']" :block_uid="item['@uid']" :block="item" :data="data" :contained="true" />
       </div>
+    </div>
+  </div>
+
+  <!-- Generic section container — accepts any block type. Used by the
+       container UX feature tests (wrap, unwrap, edge-drag, convert).
+       Inner .section-body wrapper matches the vanilla test-frontend so
+       cross-renderer tests can use the same selector. -->
+  <div v-else-if="block['@type'] == 'section'" :data-block-uid="block_uid">
+    <div class="section-body p-3 border border-dashed border-gray-500 rounded">
+      <Block v-for="childId in (block.blocks_layout?.items || [])"
+             :key="childId"
+             :block_uid="childId"
+             :block="block.blocks?.[childId]"
+             :data="data"
+             :contained="true"
+             class="my-2" />
     </div>
   </div>
 

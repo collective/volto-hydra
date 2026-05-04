@@ -218,6 +218,9 @@ async function renderBlock(blockId, block) {
         case 'column':
             wrapper.innerHTML = renderColumnBlock(block);
             break;
+        case 'section':
+            wrapper.innerHTML = await renderSectionBlock(block);
+            break;
         case 'gridBlock':
             wrapper.innerHTML = await renderGridBlock(block, blockId);
             break;
@@ -1166,6 +1169,35 @@ async function renderColumnContent(column, columnId) {
  */
 function renderColumnBlock(block) {
     return renderColumnContent(block);
+}
+
+/**
+ * Render a generic section block — vertical-stacked children with no
+ * allowedBlocks restriction. Test-only block for container UX features
+ * (wrap, unwrap, edge-drag, convert).
+ * @param {Object} block
+ * @returns {Promise<string>} HTML string
+ */
+async function renderSectionBlock(block) {
+    const blocks = block.blocks || {};
+    const items = block.blocks_layout?.items || [];
+
+    let html = '<div class="section-body" style="padding: 12px; border: 1px dashed #888; border-radius: 4px;">';
+    for (const childId of items) {
+        const child = blocks[childId];
+        if (!child) continue;
+        const rendered = await renderBlock(childId, child);
+        // renderBlock returns a DOM node with data-block-uid attr already set.
+        if (rendered instanceof DocumentFragment) {
+            const container = document.createElement('div');
+            container.appendChild(rendered);
+            html += container.innerHTML;
+        } else {
+            html += rendered.outerHTML;
+        }
+    }
+    html += '</div>';
+    return html;
 }
 
 /**

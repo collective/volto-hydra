@@ -205,7 +205,7 @@ test.describe('Quanta Toolbar - Positioning', () => {
 
     // Click the block and wait for toolbar to be properly positioned
     await block.click();
-    await helper.waitForQuantaToolbar('grid-cell-2');
+    await helper.waitForBlockSelectedInAdmin('grid-cell-2');
 
     // Get bounding boxes for alignment check
     const blockBox = await helper.getBlockBoundingBoxInIframe('grid-cell-2');
@@ -243,7 +243,7 @@ test.describe('Quanta Toolbar - Positioning', () => {
     // Click on grid-cell-2 (right side block in gridBlock) and wait for toolbar
     const block = iframe.locator('[data-block-uid="grid-cell-2"]');
     await block.click();
-    await helper.waitForQuantaToolbar('grid-cell-2');
+    await helper.waitForBlockSelectedInAdmin('grid-cell-2');
 
     // Try to open the toolbar menu using the helper
     // The menu button should be clickable and not intercepted by the sidebar
@@ -850,33 +850,33 @@ test.describe('Quanta Toolbar - Auto-fade', () => {
 
     // Start at the last user content block inside the template
     await helper.clickBlockInIframe('user-content-2');
-    await helper.waitForQuantaToolbar('user-content-2');
+    await helper.waitForBlockSelectedInAdmin('user-content-2');
 
     // ArrowDown from user-content-2 reaches fixed slider (selected but not editable)
     await page.keyboard.press('ArrowDown');
-    await helper.waitForQuantaToolbar(sliderBlockId);
+    await helper.waitForBlockSelectedInAdmin(sliderBlockId);
 
     // ArrowDown from slider reaches fixed template-footer
     await page.keyboard.press('ArrowDown');
-    await helper.waitForQuantaToolbar(footerBlockId);
+    await helper.waitForBlockSelectedInAdmin(footerBlockId);
 
     // ArrowDown from template-footer crosses template boundary to standalone-block-2
     await page.keyboard.press('ArrowDown');
-    await helper.waitForQuantaToolbar('standalone-block-2');
+    await helper.waitForBlockSelectedInAdmin('standalone-block-2');
 
     // ArrowUp from standalone-block-2: first press moves cursor to "home" (start of line),
     // second press detects edge and crosses template boundary to template-footer
     await page.keyboard.press('ArrowUp');
     await page.keyboard.press('ArrowUp');
-    await helper.waitForQuantaToolbar(footerBlockId);
+    await helper.waitForBlockSelectedInAdmin(footerBlockId);
 
     // ArrowUp from template-footer reaches slider
     await page.keyboard.press('ArrowUp');
-    await helper.waitForQuantaToolbar(sliderBlockId);
+    await helper.waitForBlockSelectedInAdmin(sliderBlockId);
 
     // ArrowUp from slider returns to user-content-2
     await page.keyboard.press('ArrowUp');
-    await helper.waitForQuantaToolbar('user-content-2');
+    await helper.waitForBlockSelectedInAdmin('user-content-2');
   });
 
   test('arrow keys navigate across page block field boundaries', async ({ page }, testInfo) => {
@@ -893,7 +893,7 @@ test.describe('Quanta Toolbar - Auto-fade', () => {
 
     // Click footer-block-1 (first block in footer_blocks field)
     await helper.clickBlockInIframe('footer-block-1');
-    await helper.waitForQuantaToolbar('footer-block-1');
+    await helper.waitForBlockSelectedInAdmin('footer-block-1');
 
     // ArrowUp should cross the block field boundary into the main blocks area.
     // First ArrowUp goes "home" (cursor normalization), second triggers edge navigation.
@@ -913,6 +913,6 @@ test.describe('Quanta Toolbar - Auto-fade', () => {
 
     // ArrowDown should return to footer-block-1 (cross back into footer_blocks)
     await page.keyboard.press('ArrowDown');
-    await helper.waitForQuantaToolbar('footer-block-1');
+    await helper.waitForBlockSelectedInAdmin('footer-block-1');
   });
 });

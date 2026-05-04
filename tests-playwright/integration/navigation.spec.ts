@@ -224,7 +224,7 @@ test.describe('Navigation and URL Handling', () => {
     expect(dialogAppeared, 'No beforeunload warning should appear - link click should be prevented').toBe(false);
 
     // Verify the block got selected (Quanta toolbar should appear)
-    await helper.waitForQuantaToolbar('block-5-linked-image');
+    await helper.waitForBlockSelectedInAdmin('block-5-linked-image');
   });
 
   test('Cancelling navigation warning stays on edit page', async ({ page }) => {
@@ -631,7 +631,7 @@ test.describe('Navigation and URL Handling', () => {
 
     const newIframe = helper.getIframe();
     await expect(newIframe.locator(`[data-block-uid="${blockId}"]`)).toContainText('Unsaved changes test', { timeout: 10000 });
-    await helper.waitForQuantaToolbar(blockId);
+    await helper.waitForBlockSelectedInAdmin(blockId);
   });
 
   test('Frontend switcher button visible in view mode', async ({ page }) => {

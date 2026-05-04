@@ -41,6 +41,11 @@ const DropdownMenu = ({
   addDirection, // 'right' or 'bottom' - determines Column vs Row terminology
   convertibleTypes = [], // Array of { type, title } for block type conversion
   onConvertBlock, // Handler for block conversion: (newType) => void
+  onOpenConvertChooser, // Handler to open BlockChooser for convert: () => void
+  canWrap = false, // True when there's a multi-selection that can be wrapped
+  onOpenWrapChooser, // Handler to open BlockChooser for wrap: () => void
+  canUnwrap = false, // True when selected block is a container whose children can live in the parent
+  onUnwrap, // Handler for unwrap: () => void
   isFixed = false, // Template blocks that can't be moved/deleted
   isReadonly = false, // Template blocks that can't be edited
   isInTemplate = false, // Whether block is already part of a template
@@ -50,7 +55,6 @@ const DropdownMenu = ({
   pasteAllowed = true, // Whether clipboard types are allowed in target container
 }) => {
   const menuRef = useRef(null);
-  const [convertSubmenuOpen, setConvertSubmenuOpen] = React.useState(false);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -300,80 +304,95 @@ const DropdownMenu = ({
           />
         </>
       )}
-      {/* Convert to submenu - only shown when there are convertible types */}
-      {convertibleTypes?.length > 0 && onConvertBlock && (
+      {/* Wrap selected blocks in a container — opens BlockChooser overlay
+          filtered to compatible container types. Visible during multi-select. */}
+      {onOpenWrapChooser && canWrap && (
         <>
-          <div
-            className="volto-hydra-dropdown-item convert-to-menu"
+          <button
+            data-testid="wrap-selected"
+            className="volto-hydra-dropdown-item wrap-container"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+              onOpenWrapChooser();
+            }}
             style={{
-              display: 'flex',
-              alignItems: 'center',
+              display: 'block',
+              width: '100%',
+              textAlign: 'left',
               padding: '10px',
+              background: 'transparent',
+              border: 'none',
               cursor: 'pointer',
               fontSize: '15px',
               fontWeight: '500',
-              position: 'relative',
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.background = '#f0f0f0';
-              setConvertSubmenuOpen(true);
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = 'transparent';
             }}
           >
-            🔄 Convert to
-            <span style={{ marginLeft: 'auto' }}>▸</span>
-            {/* Submenu */}
-            {convertSubmenuOpen && (
-              <div
-                className="volto-hydra-submenu"
-                style={{
-                  position: 'absolute',
-                  left: '100%',
-                  top: '0',
-                  background: 'white',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
-                  minWidth: '150px',
-                  zIndex: 10001,
-                }}
-                onMouseEnter={() => setConvertSubmenuOpen(true)}
-                onMouseLeave={() => setConvertSubmenuOpen(false)}
-              >
-                {convertibleTypes.map(({ type, title }) => (
-                  <div
-                    key={type}
-                    className="volto-hydra-dropdown-item"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '10px',
-                      cursor: 'pointer',
-                      fontSize: '15px',
-                      fontWeight: '500',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                    onClick={() => {
-                      onClose();
-                      onConvertBlock(type);
-                    }}
-                  >
-                    {title}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div
-            style={{
-              height: '1px',
-              background: 'rgba(0, 0, 0, 0.1)',
-              margin: '0 10px',
+            🎁 Wrap in container…
+          </button>
+          <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.1)', margin: '0 10px' }} />
+        </>
+      )}
+      {/* Unwrap — promotes children to the parent. Renders for containers when
+          the parent accepts the children; disabled state shown when it doesn't
+          accept (still rendered so users can see the action exists). */}
+      {onUnwrap && (
+        <>
+          <button
+            data-testid="unwrap-container"
+            disabled={!canUnwrap}
+            className="volto-hydra-dropdown-item unwrap-container"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!canUnwrap) return;
+              onClose();
+              onUnwrap();
             }}
-          />
+            style={{
+              display: 'block',
+              width: '100%',
+              textAlign: 'left',
+              padding: '10px',
+              background: 'transparent',
+              border: 'none',
+              cursor: canUnwrap ? 'pointer' : 'not-allowed',
+              fontSize: '15px',
+              fontWeight: '500',
+              color: canUnwrap ? 'inherit' : '#888',
+            }}
+          >
+            ⤴ Unwrap container
+          </button>
+          <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.1)', margin: '0 10px' }} />
+        </>
+      )}
+      {/* Convert to — opens BlockChooser overlay filtered to compatible
+          target types. Same pattern as Wrap so users get one chooser UI. */}
+      {convertibleTypes?.length > 0 && onOpenConvertChooser && (
+        <>
+          <button
+            data-testid="convert-block"
+            className="volto-hydra-dropdown-item convert-to-menu"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+              onOpenConvertChooser();
+            }}
+            style={{
+              display: 'block',
+              width: '100%',
+              textAlign: 'left',
+              padding: '10px',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '15px',
+              fontWeight: '500',
+            }}
+          >
+            🔄 Convert to…
+          </button>
+          <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.1)', margin: '0 10px' }} />
         </>
       )}
       {/* Copy / Cut / Paste actions */}

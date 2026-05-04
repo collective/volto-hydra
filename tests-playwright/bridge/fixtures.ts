@@ -36,7 +36,7 @@ const test = base.extend<{ helper: AdminUIHelper }>({
     const frontend = url ? `?frontend=${encodeURIComponent(url)}` : '';
     await page.goto(`http://localhost:8889/mock-parent.html${frontend}`);
     await helper.waitForIframeReady();
-    await helper.waitForBlockSelected('mock-block-1');
+    await helper.waitForIframeBlockHandle('mock-block-1');
     await use(helper);
   },
 });

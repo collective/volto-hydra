@@ -13,7 +13,7 @@ test.describe('Bridge.restoreSlateSelection()', () => {
     helper = new AdminUIHelper(page);
     await page.goto('http://localhost:8889/mock-parent.html');
     await helper.waitForIframeReady();
-    await helper.waitForBlockSelected('mock-block-1');
+    await helper.waitForIframeBlockHandle('mock-block-1');
   });
 
   test('range selection across inline boundary selects correct text', async () => {
