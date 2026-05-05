@@ -540,7 +540,13 @@ function generateComponents(urlPath, baseUrl) {
     },
     'workflow': {
       '@id': `${fullUrl}/@workflow`
-    }
+    },
+    // Volto's default apiExpanders include 'types' for GET_CONTENT, so the
+    // types reducer reads `@components.types` and ignores the separate
+    // /@types fetch when an expander is configured. The toolbar Add button
+    // gates on `state.types.types` having `addable` entries — without
+    // these here, the button is hidden.
+    'types': listAddableTypes(),
   };
 }
 
@@ -1467,6 +1473,31 @@ function getTypeSchema(typeName) {
 app.get('/@types/:typeName', (req, res) => {
   const { typeName } = req.params;
   res.json(getTypeSchema(typeName));
+});
+
+/**
+ * GET /@types  (and GET /<folder>/@types)
+ * List addable content types for the current container. Volto's toolbar
+ * Add button reads this to populate the type-picker menu — without it the
+ * button is hidden (Toolbar.jsx requires types.length > 0).
+ *
+ * Returns just Document for now; extend if a test needs Folder/News Item.
+ */
+function listAddableTypes() {
+  return [
+    {
+      '@id': `http://localhost:${PORT}/@types/Document`,
+      addable: true,
+      title: 'Page',
+    },
+  ];
+}
+
+app.get('/@types', (req, res) => {
+  res.json(listAddableTypes());
+});
+app.get('*/@types', (req, res) => {
+  res.json(listAddableTypes());
 });
 
 /**

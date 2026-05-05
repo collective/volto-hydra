@@ -31,7 +31,13 @@
     </template>
   </div>
 
-  <div v-else-if="block['@type'] == 'leadimage'" :data-block-uid="block_uid" class="mb-6">
+  <!-- leadimage: only render the wrapper when there's an actual image to
+       show. With no image (e.g. a template definition page that hosts a
+       leadimage placeholder for the host content to populate), an empty
+       wrapper would collapse to zero height and be invisible / unclickable
+       — better to omit it entirely so the page reflows naturally. -->
+  <div v-else-if="block['@type'] == 'leadimage' && (data.image || data.preview_image)"
+       :data-block-uid="block_uid" class="mb-6">
     <template v-for="props in [imageProps(data.image || data.preview_image)]">
       <NuxtImg v-if="props.url" :src="props.url" :data-edit-media="data.image ? '/image' : '/preview_image'"
         class="w-full rounded-lg object-cover max-h-96" loading="lazy" decoding="async" />

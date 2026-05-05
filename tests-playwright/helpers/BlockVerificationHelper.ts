@@ -358,8 +358,30 @@ export async function verifyBlockRendering(
     return;
   }
 
-  // Wait for block to render in iframe
+  // Wait for block to render in iframe.
+  //
+  // Some blocks have no fields of their own — they only project page-level
+  // metadata (title, description, leadimage, etc.). When that metadata is
+  // empty the frontend may legitimately omit the wrapper rather than
+  // render a zero-height invisible div. Detect this from blockData shape:
+  // a block whose only keys are @type plus template-system fields has no
+  // own content, so its render depends entirely on page-level data and
+  // "absent on empty data" is a correct outcome, not a renderer bug.
+  const TEMPLATE_SYSTEM_KEYS = new Set([
+    '@type',
+    'fixed',
+    'readOnly',
+    'templateId',
+    'templateInstanceId',
+    'slotId',
+  ]);
+  const isFieldlessBlock = blockData
+    && Object.keys(blockData).every((k) => TEMPLATE_SYSTEM_KEYS.has(k));
+
   const block = iframe.locator(`[data-block-uid="${blockId}"]`);
+  if (isFieldlessBlock && (await block.count()) === 0) {
+    return; // metadata-projection block legitimately rendered nothing
+  }
   await expect(block).toBeVisible({ timeout: 15000 });
 
   // Verify expected text content renders
