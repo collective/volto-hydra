@@ -1021,6 +1021,39 @@ app.post('/*', (req, res, next) => {
     return res.status(201).json(imageContent);
   }
 
+  if (contentType === 'Document') {
+    // Plone-side fields the bridge does NOT set (and shouldn't): id, UID,
+    // created, modified, effective, review_state. Server populates them on
+    // create. The bridge supplies title, blocks, blocks_layout (and an
+    // optional id when it has a stable name in mind, e.g. for templates).
+    const id = body.id || `untitled-document-${Date.now()}`;
+    const docPath = `${parentPath === '/' ? '' : parentPath}/${id}`.replace(/\/+/g, '/');
+    const now = new Date().toISOString();
+    const docContent = {
+      '@id': `http://localhost:8888${docPath}`,
+      '@type': 'Document',
+      UID: `uid-${id}`,
+      id,
+      title: body.title || id,
+      description: body.description || '',
+      blocks: body.blocks || {},
+      blocks_layout: body.blocks_layout || { items: [] },
+      created: now,
+      modified: now,
+      effective: now,
+      review_state: 'published',
+    };
+
+    const sessionId = getSessionId(req);
+    setSessionContent(sessionId, docPath, docContent);
+
+    if (process.env.DEBUG) {
+      console.log(`Created Document: ${docPath}${sessionId ? ` (session: ${sessionId})` : ''}`);
+    }
+
+    return res.status(201).json(docContent);
+  }
+
   // Unsupported content type - return 501 instead of passing to next
   return res.status(501).json({ error: `Content type '${contentType}' not supported` });
 });

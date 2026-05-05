@@ -12235,14 +12235,23 @@ export function getUniqueTemplateIds(formData) {
   const templateIds = new Set();
   for (const blockId of Object.keys(formData.blocks || {})) {
     const block = formData.blocks[blockId];
-    // Skip template definitions (templateInstanceId === templateId)
-    // Only include pages using templates (templateInstanceId !== templateId)
-    if (block?.templateId && block.templateInstanceId !== block.templateId) {
+    if (block?.templateId) {
       templateIds.add(block.templateId);
     }
   }
   return Array.from(templateIds);
 }
+// Note: callers that need to avoid recursing into the template's own
+// definition page (e.g. saveTemplatesRef) filter by `id !== currentPath`
+// — that's the load-bearing check. Earlier this function ALSO skipped
+// blocks where `templateInstanceId === templateId` as a heuristic for
+// "definition-side", but the load/expand path
+// (loadTemplates / expandTemplatesSync) never reads stored instanceIds
+// from a definition (it generates fresh per-application ids), so the
+// only consumer of the heuristic was this very function. Removing it
+// also unblocks make-template, where the page-side block can have
+// instanceId === templateId for unrelated reasons and was being silently
+// excluded from save → the new template never POSTed to the backend.
 
 /**
  * Check if an object looks like a blocks map (string keys -> objects with @type).
