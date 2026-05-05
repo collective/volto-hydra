@@ -546,12 +546,22 @@ function generateComponents(urlPath, baseUrl) {
 
 /**
  * Resolve resolveuid/UID references in content to actual paths.
- * Like Plone's serializer, converts resolveuid/UID strings to full URLs.
- * All string values are resolved, including templateId/templateInstanceId —
- * these are real Plone paths that the serializer resolves.
+ * Like Plone's serializer, converts resolveuid/UID strings to addressable
+ * locations.
+ *
+ * Most fields get a full URL (matches Plone's serializer behaviour for
+ * link/href fields). templateId / templateInstanceId / slotId resolve to
+ * paths only — these are template-system identifiers compared against the
+ * admin's currentPath (also a path), so an origin prefix would defeat
+ * equality checks like the save-flow's `id !== currentPath` filter and
+ * the load-flow's "don't recursively expand a template into its own page"
+ * guard.
  */
-function resolveUidUrls(obj) {
+function resolveUidUrls(obj, parentKey = null) {
   if (typeof obj === 'string') {
+    const resolveAsPath = parentKey === 'templateId'
+      || parentKey === 'templateInstanceId'
+      || parentKey === 'slotId';
     return obj.replace(/(?:\.\.\/)*resolveuid\/([a-z0-9][-a-z0-9]*)/g, (match, uid) => {
       let resolvedPath = uidToPathMap[uid];
       if (!resolvedPath) {
@@ -560,14 +570,14 @@ function resolveUidUrls(obj) {
         resolvedPath = uidToPathMap[uid];
       }
       if (!resolvedPath) return match;
-      return `http://localhost:${PORT}${resolvedPath}`;
+      return resolveAsPath ? resolvedPath : `http://localhost:${PORT}${resolvedPath}`;
     });
   }
-  if (Array.isArray(obj)) return obj.map(item => resolveUidUrls(item));
+  if (Array.isArray(obj)) return obj.map(item => resolveUidUrls(item, parentKey));
   if (obj && typeof obj === 'object') {
     const result = {};
     for (const [key, value] of Object.entries(obj)) {
-      result[key] = resolveUidUrls(value);
+      result[key] = resolveUidUrls(value, key);
     }
     return result;
   }

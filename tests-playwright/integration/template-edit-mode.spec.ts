@@ -164,6 +164,41 @@ test.describe('Template Creation', () => {
       .not.toMatch(/\/templates\/$/);
   });
 
+  // Failing on purpose (TDD): a template document is just a Document at
+  // /templates/<name> whose blocks happen to have templateId/slotId set.
+  // It should be openable + editable in the admin like any other page.
+  // The save flow's existing `id !== currentPath` filter already covers
+  // "don't recursively save the template's own page as a template", but
+  // the LOAD path (View.jsx ~2751 + ~2936) calls getUniqueTemplateIds
+  // without the same filter — after dropping the instanceId-equality
+  // heuristic, that means navigating to a template page tries to fetch
+  // and re-merge the template into itself, which breaks rendering /
+  // selection of its own blocks.
+  //
+  // Expected behaviour: open /templates/test-layout in the editor → its
+  // blocks render visibly, clicking one selects it (admin chrome appears).
+  // Same as opening any non-template Document.
+  test('a template page loads + edits like a normal page', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/templates/test-layout');
+
+    const iframe = helper.getIframe();
+
+    // Block from the test-layout fixture. Identified by content (template
+    // fixtures' own UUIDs are stable in this fixture but the test cares
+    // about the rendered state, not the id, so use plaintext to find it).
+    const { blockId: headerBlockId, locator: headerBlock } =
+      await helper.waitForBlockByContent('Template Header - From Template');
+    await expect(headerBlock).toBeVisible();
+
+    // Click + verify admin reflects the selection (toolbar + outline
+    // mounted over the block — i.e. the page is interactive, not stuck
+    // mid-load or stuck in a template-expansion loop).
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForQuantaToolbar(headerBlockId);
+  });
+
   test.skip('template edit mode is automatically activated when creating template', async ({ page }) => {
     // Skipped: auto-activation feature not yet implemented
     const helper = new AdminUIHelper(page);
