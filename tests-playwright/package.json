@@ -1,4 +1,7 @@
 {
   "name": "@volto-hydra/testing",
-  "type": "module"
+  "type": "module",
+  "exports": {
+    "helpers/*": "./helpers"
+  }
 }
