@@ -259,7 +259,7 @@
                 if (token) {
                     fetchHeaders['Authorization'] = `Bearer ${token}`;
                 }
-                const response = await fetch(`${window._apiOrigin}/++api++${contentPath}`, { headers: fetchHeaders });
+                const response = await fetch(`${window._apiOrigin}/++api++${contentPath}?expand=navigation`, { headers: fetchHeaders });
                 let content = await response.json();
 
                 // Helper to load templates
