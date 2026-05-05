@@ -14,5 +14,8 @@
   },
   "review_state": "published",
   "is_folderish": true,
-  "exclude_from_nav": true
+  "exclude_from_nav": true,
+  "effective": "2025-01-01T00:00:00",
+  "modified": "2025-01-01T00:00:00+00:00",
+  "created": "2025-01-01T00:00:00+00:00"
 }

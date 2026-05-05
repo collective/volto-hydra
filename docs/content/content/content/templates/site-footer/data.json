@@ -15,10 +15,38 @@
       "templateInstanceId": "site-footer-def-instance",
       "slotId": "social",
       "links": [
-        { "@id": "link-1", "url": "https://github.com/collective/volto-hydra", "fixed": true, "readOnly": true, "templateId": "/templates/site-footer", "templateInstanceId": "site-footer-def-instance" },
-        { "@id": "link-2", "url": "https://discord.gg/plone", "fixed": true, "readOnly": true, "templateId": "/templates/site-footer", "templateInstanceId": "site-footer-def-instance" },
-        { "@id": "link-3", "url": "https://plone.org", "fixed": true, "readOnly": true, "templateId": "/templates/site-footer", "templateInstanceId": "site-footer-def-instance" },
-        { "@id": "link-4", "url": "https://www.youtube.com/@plonecms", "fixed": true, "readOnly": true, "templateId": "/templates/site-footer", "templateInstanceId": "site-footer-def-instance" }
+        {
+          "@id": "link-1",
+          "url": "https://github.com/collective/volto-hydra",
+          "fixed": true,
+          "readOnly": true,
+          "templateId": "/templates/site-footer",
+          "templateInstanceId": "site-footer-def-instance"
+        },
+        {
+          "@id": "link-2",
+          "url": "https://discord.gg/plone",
+          "fixed": true,
+          "readOnly": true,
+          "templateId": "/templates/site-footer",
+          "templateInstanceId": "site-footer-def-instance"
+        },
+        {
+          "@id": "link-3",
+          "url": "https://plone.org",
+          "fixed": true,
+          "readOnly": true,
+          "templateId": "/templates/site-footer",
+          "templateInstanceId": "site-footer-def-instance"
+        },
+        {
+          "@id": "link-4",
+          "url": "https://www.youtube.com/@plonecms",
+          "fixed": true,
+          "readOnly": true,
+          "templateId": "/templates/site-footer",
+          "templateInstanceId": "site-footer-def-instance"
+        }
       ]
     },
     "footer-copyright": {
@@ -32,7 +60,9 @@
         {
           "type": "p",
           "children": [
-            { "text": "Hydra — visual editing for headless Plone. © 2024-2026 Plone Foundation." }
+            {
+              "text": "Hydra — visual editing for headless Plone. © 2024-2026 Plone Foundation."
+            }
           ]
         }
       ],
@@ -46,14 +76,22 @@
       "value": [
         {
           "type": "p",
-          "children": [{ "text": "" }]
+          "children": [
+            {
+              "text": ""
+            }
+          ]
         }
       ],
       "plaintext": ""
     }
   },
   "blocks_layout": {
-    "items": ["footer-social", "footer-copyright", "default-slot"]
+    "items": [
+      "footer-social",
+      "footer-copyright",
+      "default-slot"
+    ]
   },
   "@components": {
     "actions": {
@@ -70,9 +108,18 @@
     "breadcrumbs": {
       "@id": "/templates/site-footer/@breadcrumbs",
       "items": [
-        { "@id": "/templates", "title": "Templates" },
-        { "@id": "/templates/site-footer", "title": "Site Footer" }
+        {
+          "@id": "/templates",
+          "title": "Templates"
+        },
+        {
+          "@id": "/templates/site-footer",
+          "title": "Site Footer"
+        }
       ]
     }
-  }
+  },
+  "effective": "2025-01-01T00:00:00",
+  "modified": "2025-01-01T00:00:00+00:00",
+  "created": "2025-01-01T00:00:00+00:00"
 }
