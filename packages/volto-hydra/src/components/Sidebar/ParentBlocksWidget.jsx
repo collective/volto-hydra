@@ -29,7 +29,7 @@ import { SidebarPortalTargetContext } from './SidebarPortalTargetContext';
 import DropdownMenu from '../Toolbar/DropdownMenu';
 import { getBlockById, updateBlockById, getResolvedSchema, getCommonAncestor } from '../../utils/blockPath';
 import { HydraSchemaProvider } from '../../context';
-import { getConvertibleTypes, convertBlockType } from '../../utils/schemaInheritance';
+import { getConvertibleTypes, convertBlockType, findTypeField } from '../../utils/schemaInheritance';
 import { PAGE_BLOCK_UID, isBlockReadonly } from '@volto-hydra/hydra-js';
 
 /**
@@ -282,10 +282,10 @@ const ParentBlockSection = ({
     const parentBlock = liveBlockDataRef.current[parentId];
     if (!parentBlock) return '';
     const parentConfig = config.blocks?.blocksConfig?.[parentBlock['@type']];
-    const parentTypeField = parentConfig?.itemTypeField;
+    const parentTypeField = findTypeField(parentConfig, contextIntl);
     if (!parentTypeField) return '';
     return `-parent-${parentTypeField}:${parentBlock[parentTypeField] || 'none'}`;
-  }, [parentId, liveBlockDataRef?.current?.[parentId]]);
+  }, [parentId, liveBlockDataRef?.current?.[parentId], contextIntl]);
 
   const handleMenuClick = (e) => {
     e.stopPropagation();

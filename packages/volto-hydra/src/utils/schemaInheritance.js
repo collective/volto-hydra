@@ -14,6 +14,76 @@ import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '
 export { getBlockTypeSchema };
 
 /**
+ * Resolve a block's blockSchema.properties, handling both static and
+ * factory-form blockSchemas. Returns null if no schema declared.
+ *
+ * @private
+ */
+function _resolveBlockSchemaProperties(blockConfig, intl) {
+  const schemaSource = blockConfig?.blockSchema || blockConfig?.schema;
+  if (!schemaSource) return null;
+  const schema = typeof schemaSource === 'function'
+    ? schemaSource({ formData: {}, data: {}, intl })
+    : schemaSource;
+  return schema?.properties || null;
+}
+
+/**
+ * Find the typeField name for a block.
+ *
+ * Lookup order:
+ *   1. inheritSchemaFrom recipe with explicit `typeField` (used by listings,
+ *    which have no blocks field to declare on).
+ *   2. Schema walk: first blocks field with `itemTypeField` declared on it
+ *    (used by container blocks).
+ *
+ * Returns null if no typeField is found.
+ *
+ * @param {Object} blockConfig - blocksConfig entry for the block type
+ * @param {Object} intl - react-intl object (for resolving factory schemas)
+ * @returns {string|null} The typeField name, or null
+ */
+export function findTypeField(blockConfig, intl) {
+  if (!blockConfig) return null;
+
+  // 1. Recipe-level typeField
+  const enhancerCfg = blockConfig.schemaEnhancer;
+  const recipeTypeField =
+    enhancerCfg?.inheritSchemaFrom?.typeField ||
+    enhancerCfg?.config?.typeField;
+  if (recipeTypeField) return recipeTypeField;
+
+  // 2. Schema walk for blocks field with itemTypeField declaration
+  const properties = _resolveBlockSchemaProperties(blockConfig, intl);
+  if (properties) {
+    for (const fieldDef of Object.values(properties)) {
+      if (fieldDef?.itemTypeField) return fieldDef.itemTypeField;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find which blocks field declares the given typeField (for sync scope).
+ * Returns the field name, or null if no declaration found.
+ *
+ * @param {Object} blockConfig - blocksConfig entry for the block type
+ * @param {string} typeField - the typeField name to look up
+ * @param {Object} intl - react-intl object (for resolving factory schemas)
+ * @returns {string|null} The blocks field name, or null
+ */
+export function findBlocksFieldForTypeField(blockConfig, typeField, intl) {
+  if (!blockConfig || !typeField) return null;
+  const properties = _resolveBlockSchemaProperties(blockConfig, intl);
+  if (!properties) return null;
+  for (const [fieldName, fieldDef] of Object.entries(properties)) {
+    if (fieldDef?.itemTypeField === typeField) return fieldName;
+  }
+  return null;
+}
+
+/**
  * Generate a unique slotId name based on block type.
  * Format: "blocktype-N" where N is the next available number.
  */
@@ -262,7 +332,6 @@ export function applyBlockDefaultsWithContext(blockData, context) {
  * @param {Object} typeFieldOptions - Options for the typeField (optional)
  * @param {string} typeFieldOptions.title - Title for the typeField (default: 'Item Type')
  * @param {string} typeFieldOptions.filterConvertibleFrom - Only show types with fieldMappings[this]
- * @param {string[]} typeFieldOptions.allowedBlocks - Static list of allowed types
  * @param {string} typeFieldOptions.default - Default value for the typeField
  * @returns {Function} - A schemaEnhancer function
  *
@@ -279,9 +348,10 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
 
     const blocksConfig = config.blocks.blocksConfig;
 
-    // Read typeField from block-level config if not provided directly
+    // Read typeField from block-level config if not provided directly.
+    // Uses the standard lookup (recipe → schema walk).
     if (!typeField) {
-      typeField = blocksConfig[formData?.['@type']]?.itemTypeField;
+      typeField = findTypeField(blocksConfig[formData?.['@type']], intl);
       if (!typeField) return schema;
     }
 
@@ -291,10 +361,10 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
     const blockId = hydraContext?.currentBlockId;
 
     // Create or update typeField with computed choices
-    const { filterConvertibleFrom, allowedBlocks, blocksField, title, default: defaultValue } = typeFieldOptions;
-    if (filterConvertibleFrom || allowedBlocks || blocksField) {
+    const { filterConvertibleFrom, blocksField, title, default: defaultValue } = typeFieldOptions;
+    if (filterConvertibleFrom || blocksField) {
       const choices = getBlockTypeChoices(
-        { filterConvertibleFrom, allowedBlocks, blocksField },
+        { filterConvertibleFrom, blocksField },
         blocksConfig,
         blockPathMap,
         blockId,
@@ -331,7 +401,7 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
         const parentBlock = getLiveBlockData(pathInfo.parentId);
         if (parentBlock) {
           const parentConfig = blocksConfig?.[parentBlock['@type']];
-          const parentTypeField = parentConfig?.itemTypeField;
+          const parentTypeField = findTypeField(parentConfig, intl);
           // If parent has a typeField AND has selected a value, it controls our type
           if (parentTypeField && parentBlock[parentTypeField]) {
             parentControlsType = true;
@@ -347,7 +417,7 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
       const pathInfo = blockPathMap[blockId];
       const parentBlock = getLiveBlockData(pathInfo.parentId);
       const parentConfig = blocksConfig?.[parentBlock?.['@type']];
-      const parentTypeField = parentConfig?.itemTypeField;
+      const parentTypeField = findTypeField(parentConfig, intl);
       const parentSelectedType = parentBlock?.[parentTypeField];
 
       // Use parent's selected type for computing fieldMapping
@@ -601,7 +671,7 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
 export function hideParentOwnedFields({ editableFields, parentControlledFields } = {}) {
 
   return (args) => {
-    const { schema, blockPathMap: passedBlockPathMap, blockId: passedBlockId } = args;
+    const { schema, intl, blockPathMap: passedBlockPathMap, blockId: passedBlockId } = args;
 
     // Resolve blockPathMap/blockId. Volto's applySchemaEnhancer invokes
     // block enhancers without passing these args, so we fall back on the
@@ -626,7 +696,7 @@ export function hideParentOwnedFields({ editableFields, parentControlledFields }
       const parentBlock = getLiveBlockData(pathInfo.parentId);
       if (parentBlock) {
         const parentConfig = blocksConfig[parentBlock['@type']];
-        const typeField = parentConfig?.itemTypeField;
+        const typeField = findTypeField(parentConfig, intl);
         // If parent doesn't use schema inheritance (no typeField), or no type selected,
         // don't filter child fields - they're independent blocks
         if (!typeField || !parentBlock[typeField]) {
@@ -1128,7 +1198,7 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
  * Create a schemaEnhancer function from a declarative recipe.
  *
  * New format (supports combining multiple enhancers):
- *   { inheritSchemaFrom: { typeField, defaultsField, mappingField?, filterConvertibleFrom?, allowedBlocks?, title?, default? } }
+ *   { inheritSchemaFrom: { typeField, defaultsField, mappingField?, filterConvertibleFrom?, blocksField?, title?, default? } }
  *   { childBlockConfig: { defaultsField, editableFields?, parentControlledFields? } }
  *   { fieldRules: { fieldName: false | { set, when?, else? } | [rule, ...] } }
  *
@@ -1271,11 +1341,11 @@ function createEnhancerByType(type, config) {
 
   switch (type) {
     case 'inheritSchemaFrom': {
-      const { typeField, mappingField, defaultsField = 'itemDefaults', filterConvertibleFrom, allowedBlocks, blocksField, title, default: defaultValue } = config;
+      const { typeField, mappingField, defaultsField = 'itemDefaults', filterConvertibleFrom, blocksField, title, default: defaultValue } = config;
       // typeField is optional — if not in recipe, inheritSchemaFrom reads
       // blocksConfig[blockType].itemTypeField at call time
-      const typeFieldOptions = (filterConvertibleFrom || allowedBlocks || blocksField || title || defaultValue)
-        ? { filterConvertibleFrom, allowedBlocks, blocksField, title, default: defaultValue }
+      const typeFieldOptions = (filterConvertibleFrom || blocksField || title || defaultValue)
+        ? { filterConvertibleFrom, blocksField, title, default: defaultValue }
         : {};
       enhancer = inheritSchemaFrom(typeField || null, mappingField || null, defaultsField, typeFieldOptions);
       enhancer.config = { ...config, enhancerType: 'inheritSchemaFrom' };
@@ -1617,14 +1687,12 @@ function createSingleEnhancerLegacy(recipe) {
  *
  * Used by inheritSchemaFrom to compute choices for the typeField.
  * Logic:
- * 1. Start with allowedBlocks (if provided)
- * 2. Or derive from blocksField (container's blocks field schema)
- * 3. Or fall back to parent's allowedSiblingTypes from pathMap
- * 4. Fall back to all non-restricted blocks (or all if filtering)
- * 5. Filter by filterConvertibleFrom (types with fieldMappings[source])
+ * 1. Derive from blocksField (container's blocks field schema, or auto-discovered)
+ * 2. Or fall back to parent's allowedSiblingTypes from pathMap
+ * 3. Fall back to all non-restricted blocks (or all if filtering)
+ * 4. Filter by filterConvertibleFrom (types with fieldMappings[source])
  *
  * @param {Object} options - Configuration options
- * @param {string[]} options.allowedBlocks - Static list of allowed types
  * @param {string} options.blocksField - Container field name to derive allowedBlocks from (e.g., 'blocks')
  * @param {string} options.filterConvertibleFrom - Source type to filter by (e.g., '@default')
  * @param {Object} blocksConfig - Block configuration registry
@@ -1652,10 +1720,7 @@ function getFirstBlocksField(blockId, blockPathMap) {
 export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId, formData, intl) {
   if (!blocksConfig) return [];
 
-  const { allowedBlocks, blocksField, filterConvertibleFrom } = options || {};
-
-  // Determine base types in order of precedence
-  let types = allowedBlocks;
+  const { blocksField, filterConvertibleFrom } = options || {};
 
   // Derive from container's blocks field schema
   // blocksField specifies which container field to get allowedBlocks from
@@ -1666,7 +1731,8 @@ export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId
     effectiveBlocksField = getFirstBlocksField(blockId, blockPathMap);
   }
 
-  if (!types && effectiveBlocksField) {
+  let types;
+  if (effectiveBlocksField) {
     if (effectiveBlocksField === '..') {
       // ".." means get sibling allowed types from parent container
       // This is available via blockPathMap[blockId].allowedSiblingTypes
@@ -2060,8 +2126,8 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
   const blockType = newBlockData['@type'];
   const blockConfig = blocksConfig?.[blockType];
 
-  // Check if block has itemTypeField configured
-  const typeField = blockConfig?.itemTypeField;
+  // Resolve typeField via the standard lookup (recipe → schema walk → legacy)
+  const typeField = findTypeField(blockConfig, intl);
   if (!typeField) return formData;
 
   // Check if typeField value changed
@@ -2084,11 +2150,11 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
     }
   }
 
-  // Determine which blocks field to sync
-  // Use configured blocksField from enhancer or default to first blocks field from pathMap
-  const enhancerConfig = blockConfig?.schemaEnhancer?.config;
-  const configuredBlocksField = enhancerConfig?.blocksField;
-  const effectiveBlocksField = configuredBlocksField ?? getFirstBlocksField(blockId, blockPathMap);
+  // Determine which blocks field to sync.
+  // 1. Schema declaration: blocks field with `itemTypeField: '<typeField>'`
+  // 2. Fallback: first blocks field discovered from pathMap (legacy)
+  const declaredBlocksField = findBlocksFieldForTypeField(blockConfig, typeField, intl);
+  const effectiveBlocksField = declaredBlocksField ?? getFirstBlocksField(blockId, blockPathMap);
 
   // Get child block IDs, filtered to the effective blocks field
   const allChildIds = getChildBlockIds(blockId, blockPathMap);
@@ -2105,7 +2171,7 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
 
     const childType = childBlock['@type'];
     const childConfig = blocksConfig?.[childType];
-    const childTypeField = childConfig?.itemTypeField;
+    const childTypeField = findTypeField(childConfig, intl);
 
     if (childTypeField) {
       // Child has its own inheritSchemaFrom - change its typeField, not @type

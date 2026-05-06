@@ -747,19 +747,26 @@ When `type` is specified, the value is converted at runtime:
 
 The saved `fieldMapping` is read at render time by `expandListingBlocks` — no block registry access needed at render time.
 
-#### Synchronised block types in a container
+#### Synchronised block types in a container (itemTypeField)
 
-A parent container can control the type of all its children. Setting `itemTypeField` on the parent's block config tells the system which field drives the child type. When the editor changes that field, all children are converted using `fieldMappings`, and new children added to the container default to that type.
+A container block can control the @type of all its children. Declare `itemTypeField` on the *blocks field* (the `blocks_layout` or `object_list` field whose children should be synced); its value names a sibling field on the same schema whose value drives every child's `@type`. When the editor changes that sibling field, all existing children are converted (using each child's `fieldMappings`) and any block newly added gets the selected type.
 
 ```js
 const bridge = initBridge({
   blocks: {
     gridBlock: {
-      itemTypeField: 'variation',   // field that drives child type syncing
       allowedBlocks: ['teaser', 'image'],
-      schemaEnhancer: {
-        inheritSchemaFrom: {
-          blocksField: 'blocks',    // which blocks field to sync children in
+      blockSchema: {
+        fieldsets: [{ id: 'default', title: 'Default', fields: ['slides', 'variation'] }],
+        properties: {
+          slides: {
+            widget: 'blocks_layout',
+            itemTypeField: 'variation',         // sync trigger — names the sibling field
+            allowedBlocks: ['teaser', 'image'],
+          },
+          variation: {
+            widget: 'blockTypeSelect',          // hydra widget — see below
+          },
         },
       },
     },
@@ -767,27 +774,130 @@ const bridge = initBridge({
       fieldMappings: {
         '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
       },
-      // childBlockConfig not needed — editableFields auto-derived from fieldMappings['@default'] targets
+    },
+    image: {
+      fieldMappings: {
+        '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },
+      },
     },
   },
 });
 ```
 
-**`itemTypeField`** (block config, not recipe) — field name on the block that selects the child type (e.g., `'variation'`). Setting this enables child type syncing when the value changes. If omitted, no syncing happens.
+The relationship is local: read the schema and you can see "the children of `slides` get their @type from `variation`" right next to the field declaration. Works the same for `widget: 'blocks_layout'` and `widget: 'object_list'` — both kinds of children sync identically.
 
-**`inheritSchemaFrom`** recipe options:
+##### The dropdown — `widget: 'blockTypeSelect'`
 
-- `blocksField`: which blocks field the sub-blocks live in. Required for child type syncing and for deriving `allowedBlocks` choices. Set to `".."` to use the parent's own `allowedBlocks`. Omit for standalone schema defaults with no sub-block syncing.
-- `mappingField`: field name where the `FieldMappingWidget` saves its output (e.g., `'fieldMapping'`). Enables the mapping widget in the sidebar.
-- `defaultsField`: where to store inherited default values so they don't collide with other fields (e.g., `'itemDefaults'`).
-- `filterConvertibleFrom`: only offer child types that can convert from this source type. Use `'@default'` for listings where all items must be populatable from catalog query results.
-- `title`: label for the type selector field in the sidebar.
-- `default`: default type value when none is selected.
+For the editor to change the selected type, the sibling field needs a select widget. `blockTypeSelect` is a hydra-provided widget that computes its `choices` from the surrounding block's `allowedBlocks` at render time, so you don't have to keep a static `choices` array in sync with the block's allowed children.
 
-**`childBlockConfig`** recipe options (on the child block type):
+Field options on a `blockTypeSelect`:
 
-- `editableFields`: allowlist of fields that stay on the child block's sidebar form — everything else is moved to the parent's "Defaults" fieldset. **Optional**: if omitted, the fields are derived automatically from `fieldMappings['@default']` targets (the fields that receive mapped data stay on the child). Specify explicitly when the desired split differs from what the mapping targets suggest.
-- `parentControlledFields`: blocklist alternative — only these fields are moved to the parent. Use when you want to specify the parent-owned fields rather than the child-owned ones.
+- `blocksField`: which sub-blocks field's `allowedBlocks` to use for the choices. **Optional** — auto-discovers if omitted. Set to `'..'` when the block has no sub-blocks of its own and the choices should come from the _enclosing parent's_ `allowedSiblingTypes` (used when this block IS the item being typed within a parent — e.g., a single template item inside a typed parent).
+- `filterConvertibleFrom`: only offer types whose `fieldMappings` accept the named source. **Optional** — typically `'@default'` for listings (every item type must be populatable from canonical content fields).
+- `title`, `default`: standard JSON schema properties — same as any other field.
+
+The widget is *only* concerned with the dropdown UI. It doesn't drive sync — sync is keyed off the `itemTypeField` declaration on the blocks field. Use the widget if you want the dropdown; if you'd rather hand-write `choices: [['teaser', 'Teaser'], ['image', 'Image']]` the syncing still works.
+
+##### Field-value syncing (optional enhancement)
+
+On top of type syncing, you can also have certain field _values_ centrally controlled at the parent — the editor sets them once on the parent and they apply to every child. This needs two enhancers, one on each side:
+
+- On the parent: `schemaEnhancer.inheritSchemaFrom` — surfaces the relevant child fields on the parent's sidebar under a "Defaults" fieldset (prefixed with `defaultsField`, e.g., `itemDefaults_title`).
+- On the child: `schemaEnhancer.childBlockConfig` — hides those same fields from the child's own sidebar so the editor isn't editing the same value in two places.
+
+Leave one off and you get a half-broken result: parent enhancer alone → fields appear in both places (duplicated edit); child enhancer alone → fields disappear from child but never surface on parent (effectively lost).
+
+```js
+gridBlock: {
+  allowedBlocks: ['teaser', 'image'],
+  blockSchema: {
+    fieldsets: [{ id: 'default', title: 'Default', fields: ['slides', 'variation'] }],
+    properties: {
+      slides: {
+        widget: 'blocks_layout',
+        itemTypeField: 'variation',
+        allowedBlocks: ['teaser', 'image'],
+      },
+      variation: { widget: 'blockTypeSelect' },
+    },
+  },
+  schemaEnhancer: {
+    inheritSchemaFrom: {
+      defaultsField: 'itemDefaults',
+    },
+  },
+},
+teaser: {
+  fieldMappings: { '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' } },
+  schemaEnhancer: {
+    childBlockConfig: {},  // auto-derives editableFields from fieldMappings['@default']
+  },
+},
+image: {
+  fieldMappings: { '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' } },
+  schemaEnhancer: { childBlockConfig: {} },
+},
+```
+
+`inheritSchemaFrom` discovers the typeField by walking the schema for blocks fields with an `itemTypeField` declaration. Single concern: surface inherited defaults on the parent.
+
+##### Listings
+
+Listings use this same mechanism but differ in one structural way: there's no blocks field to declare `itemTypeField` on. A listing's children are _virtual_ — produced by `expandListingBlocks` from query results at render time, not authored as page data. Instead of declaring on a blocks field, listings declare the typeField directly on the `inheritSchemaFrom` recipe (which is always present anyway, for the field-mapping widget).
+
+Two other differences from a regular container:
+
+- The children don't physically exist in `blocks` / `blocks_layout` — they're produced from query results. Source fields are the canonical content fields (`@id`, `title`, `description`, `image`).
+- Each item type's `fieldMappings['@default']` (on its own block config) defines how those source fields land on its schema. That static mapping is enough to make listings work. Add `mappingField` to the enhancer if you want to expose the `FieldMappingWidget` so the editor can override the mapping per listing instance. Use `filterConvertibleFrom: '@default'` on the widget so the type chooser only offers types with a `fieldMappings['@default']` entry.
+
+```js
+listing: {
+  blockSchema: {
+    fieldsets: [{ id: 'default', title: 'Default', fields: ['variation', 'fieldMapping'] }],
+    properties: {
+      variation: {
+        widget: 'blockTypeSelect',
+        filterConvertibleFrom: '@default',     // restrict choices to types with @default mappings
+        default: 'summary',
+        title: 'Item Type',
+      },
+      fieldMapping: { /* mapping widget rendered via inheritSchemaFrom below */ },
+    },
+  },
+  schemaEnhancer: {
+    inheritSchemaFrom: {
+      typeField: 'variation',                 // listing has no blocks field — declare here
+      mappingField: 'fieldMapping',           // enables FieldMappingWidget
+      defaultsField: 'itemDefaults',
+    },
+  },
+},
+```
+
+The widget saves its output as `fieldMapping` (singular) on the block data. `expandListingBlocks` reads that at render time to translate each query result into an item block. See [Listings and dynamic repeating blocks](#listings-and-dynamic-repeating-blocks) for fetching, paging, and `expandListingBlocks` itself.
+
+##### How the typeField is found
+
+Every consumer (sync, dropdown, inheritSchemaFrom) needs to know which field is the typeField. The lookup rule, in order:
+
+1. If `inheritSchemaFrom` recipe has an explicit `typeField` → use that. (Listings.)
+2. Otherwise, walk `schema.properties` for a blocks field with `itemTypeField` declared on it → use that field's `itemTypeField` value. (Containers.)
+
+Container blocks declare on the blocks field and let auto-discovery handle the rest. Listings, which have no blocks field, declare on the recipe explicitly.
+
+##### Reference: where each option lives
+
+| Option | Lives on | What it does |
+| -- | -- | -- |
+| `itemTypeField` | The blocks field (`blocks_layout` / `object_list`) in the schema | Names the sibling field whose value drives the children's @type. Used for containers. |
+| `typeField` | `schemaEnhancer.inheritSchemaFrom` recipe | Names the typeField directly. Used for listings (no blocks field to declare on). |
+| `widget: 'blockTypeSelect'` | The named typeField in the schema | Renders a select whose choices are computed from `allowedBlocks` at render time. |
+| `blocksField` | The `blockTypeSelect` field def | Which sub-blocks field's `allowedBlocks` to use for choices. Optional (auto-discovered). `'..'` for "use enclosing parent's `allowedSiblingTypes`". |
+| `filterConvertibleFrom` | The `blockTypeSelect` field def | Restricts choices to types with `fieldMappings[<source>]`. Typically `'@default'` for listings. |
+| `title`, `default` | The typeField in the schema | Standard JSON schema properties. |
+| `mappingField` | `schemaEnhancer.inheritSchemaFrom` | Names a field on the block where `FieldMappingWidget` saves its output. Optional — surfaces the widget. |
+| `defaultsField` | `schemaEnhancer.inheritSchemaFrom` | Where parent-stored child-field defaults live. Defaults to `'itemDefaults'`. |
+| `editableFields` / `parentControlledFields` | `schemaEnhancer.childBlockConfig` (on the *child* block type) | Allow/blocklist of fields that stay on the child's sidebar. Optional — auto-derived from `fieldMappings['@default']` if omitted. |
 
 #### HTML Paste support (TODO)
 

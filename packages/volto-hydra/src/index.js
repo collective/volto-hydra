@@ -41,6 +41,7 @@ import {
 import HiddenBlocksWidget from './components/Widgets/HiddenBlocksWidget';
 import HiddenObjectListWidget from './components/Widgets/HiddenObjectListWidget';
 import FieldMappingWidget from './components/Widgets/FieldMappingWidget';
+import BlockTypeSelectWidget from './components/Widgets/BlockTypeSelectWidget';
 import TableSchema, { TableBlockSchema } from '@plone/volto-slate/blocks/Table/schema';
 import { ImageSchema } from '@plone/volto/components/manage/Blocks/Image/schema';
 import {
@@ -112,6 +113,10 @@ const applyConfig = (config) => {
 
   // Field mapping widget - for mapping source fields to target block fields
   config.widgets.widget.field_mapping = FieldMappingWidget;
+
+  // Block-type select widget - choices computed from allowedBlocks at render time.
+  // See README "Synchronised block types in a container".
+  config.widgets.widget.blockTypeSelect = BlockTypeSelectWidget;
 
   // Add the slate block in the sidebar with proper initialization
   // blockSchema is used by applyBlockDefaults to set initial values for new blocks
@@ -315,6 +320,21 @@ const applyConfig = (config) => {
     ...config.blocks.blocksConfig.listing,
     itemTypeField: 'variation',
     schemaEnhancer: listingSchemaEnhancer,
+    // Volto core ships listing with 3 template variations (default/imageGallery/summary)
+    // for its built-in render path. Hydra renders listing items via expandListingBlocks
+    // in the user's frontend, but Volto's admin-side ListingBody.jsx still mounts a
+    // template component, so we keep one passthrough entry. Critically, reducing the
+    // array to length === 1 stops Volto's withVariationSchemaEnhancer from
+    // wholesale-replacing the `variation` field definition (it only fires for
+    // variations.length > 1) — that's what would wipe our `widget: 'blockTypeSelect'`.
+    variations: [
+      {
+        id: 'default',
+        isDefault: true,
+        title: 'Default',
+        template: () => null,
+      },
+    ],
   };
 
   // Configure image block with blockSchema for schema inheritance

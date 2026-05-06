@@ -157,12 +157,9 @@ export const sharedBlocksConfig = {
         title: 'Slider',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/></svg>',
         group: 'common',
-        itemTypeField: 'variation',
         schemaEnhancer: {
             inheritSchemaFrom: {
                 defaultsField: 'itemDefaults',
-                blocksField: 'slides',
-                title: 'Item Type',
             },
         },
         blockSchema: {
@@ -170,16 +167,21 @@ export const sharedBlocksConfig = {
                 {
                     id: 'default',
                     title: 'Default',
-                    fields: ['slides', 'autoplayEnabled', 'autoplayDelay', 'autoplayJump'],
+                    fields: ['slides', 'variation', 'autoplayEnabled', 'autoplayDelay', 'autoplayJump'],
                 },
             ],
             properties: {
                 slides: {
                     title: 'Slides',
                     widget: 'object_list',
+                    itemTypeField: 'variation',  // sync trigger — names the sibling field
                     allowedBlocks: ['slide', 'image', 'listing', 'teaser'],
                     typeField: '@type',
                     defaultBlockType: 'slide',
+                },
+                variation: {
+                    title: 'Item Type',
+                    widget: 'blockTypeSelect',
                 },
                 autoplayEnabled: {
                     title: 'Autoplay Enabled',
@@ -331,14 +333,23 @@ export const sharedBlocksConfig = {
     // filterConvertibleFrom: '@default' means only show types whose fieldMappings
     // include @default as a source (i.e., can convert from catalog brain fields)
     listing: {
-        itemTypeField: 'variation',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['variation', 'fieldMapping'] }],
+            properties: {
+                variation: {
+                    title: 'Item Type',
+                    widget: 'blockTypeSelect',
+                    filterConvertibleFrom: '@default',
+                    default: 'summary',
+                },
+                // fieldMapping field is rendered by inheritSchemaFrom via mappingField
+            },
+        },
         schemaEnhancer: {
             inheritSchemaFrom: {
+                typeField: 'variation',  // listing has no blocks field — declare on recipe
                 mappingField: 'fieldMapping',
                 defaultsField: 'itemDefaults',
-                filterConvertibleFrom: '@default',
-                title: 'Item Type',
-                default: 'summary',
             },
         },
     },
@@ -394,12 +405,23 @@ export const sharedBlocksConfig = {
     },
     gridBlock: {
         allowedBlocks: ['teaser', 'image'],
-        itemTypeField: 'variation',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['blocks_layout', 'variation'] }],
+            properties: {
+                blocks_layout: {
+                    widget: 'blocks_layout',
+                    itemTypeField: 'variation',  // sync trigger
+                    allowedBlocks: ['teaser', 'image'],
+                },
+                variation: {
+                    title: 'Item Type',
+                    widget: 'blockTypeSelect',
+                },
+            },
+        },
         schemaEnhancer: {
             inheritSchemaFrom: {
                 defaultsField: 'itemDefaults',
-                blocksField: 'blocks_layout',
-                title: 'Item Type',
             },
         },
     },
