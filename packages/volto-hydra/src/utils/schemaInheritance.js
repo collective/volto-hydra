@@ -14,6 +14,139 @@ import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '
 export { getBlockTypeSchema };
 
 /**
+ * Synthesize a schemaEnhancer that adds Volto's "variation" field to the
+ * schema for blocks that declare `variations` on their config.
+ *
+ * Volto adds this field at sidebar render time via `withVariationSchemaEnhancer`
+ * — but that means it's never present in pathmap-built schemas (`pathMap._schemas`),
+ * causing a split between what the sidebar sees and what hydra sees.
+ *
+ * Prepending this enhancer to a block's schemaEnhancer chain at INIT
+ * (see `installVariationFieldEnhancers` below) puts the variation field
+ * into the schema during pathmap-build, so the cached schema is a true
+ * superset of what Volto would render. Volto's own
+ * `withVariationSchemaEnhancer` is then redundant — it runs the same field
+ * add and overwrites with identical content (harmless), or we suppress
+ * it via `applySchemaEnhancers=false` on the sidebar form.
+ *
+ * Mirrors the field shape produced by Volto's `addExtensionFieldToSchema`
+ * so the resulting schema is identical regardless of which path produced it.
+ */
+function addVariationFieldEnhancer(variations) {
+  const fn = ({ schema, intl }) => {
+    if (!variations || variations.length <= 1) return schema;
+
+    const _ = (msg) =>
+      typeof intl?.formatMessage === 'function'
+        ? intl.formatMessage(typeof msg === 'string' ? { id: msg, defaultMessage: msg } : msg)
+        : (typeof msg === 'string' ? msg : msg?.defaultMessage || msg?.id || '');
+
+    const hasDefault = variations.findIndex(({ isDefault }) => isDefault) > -1;
+
+    const newSchema = {
+      ...schema,
+      properties: {
+        ...schema.properties,
+        variation: {
+          title: _('Variation'),
+          choices: variations.map(({ id, title }) => [id, _(title)]),
+          noValueOption: false,
+          default: hasDefault ? variations.find((v) => v.isDefault).id : null,
+        },
+      },
+      fieldsets: schema.fieldsets ? schema.fieldsets.map((fs) => ({ ...fs })) : [],
+    };
+
+    // Ensure 'variation' appears in the default fieldset (mirrors Volto's _addField).
+    const defaultFs = newSchema.fieldsets.find((fs) => fs.id === 'default');
+    if (defaultFs) {
+      if (!defaultFs.fields?.includes('variation')) {
+        defaultFs.fields = ['variation', ...(defaultFs.fields || [])];
+      }
+    } else {
+      newSchema.fieldsets.unshift({
+        id: 'default',
+        title: _('Default'),
+        fields: ['variation'],
+      });
+    }
+
+    return newSchema;
+  };
+  // Tag so installVariationFieldEnhancers can detect already-installed and avoid double-prepend.
+  fn._isVariationFieldEnhancer = true;
+  return fn;
+}
+
+/**
+ * Eager-populate the module-level `_typeSchemaCache` for every registered
+ * block type by calling `getBlockTypeSchema(type, intl, blocksConfig)`.
+ *
+ * Why: the cache was lazy and could be filled during a sidebar render
+ * (when `hydraContext.currentBlockId` is set to whatever's rendering),
+ * leaking instance context into a type-only lookup and producing
+ * filtered schemas that all later callers got. Filling at INIT — when no
+ * sidebar is rendering and `hydraContext` is null — guarantees the cached
+ * value reflects the type's intrinsic schema, not "image-as-it-appears-
+ * inside-the-grid-currently-being-rendered."
+ *
+ * Call after `installVariationFieldEnhancers` so cached schemas include
+ * the variation field for blocks that have one.
+ */
+export function populateTypeSchemaCache(blocksConfig, intl) {
+  if (!blocksConfig) return;
+  for (const blockType of Object.keys(blocksConfig)) {
+    // getBlockTypeSchema short-circuits on cache hit; first call fills.
+    getBlockTypeSchema(blockType, intl, blocksConfig);
+  }
+}
+
+/**
+ * Walk the registered blocksConfig and, for any block with
+ * `variations.length > 1`, prepend an `addVariationFieldEnhancer` to its
+ * schemaEnhancer chain. Idempotent — re-running is safe (already-installed
+ * enhancers are tagged and skipped).
+ *
+ * Call this once at INIT after blocksConfig is fully populated, so every
+ * code path that runs the schemaEnhancer chain (pathmap build, sidebar
+ * render, type-cache fill) sees the same fully-resolved schema.
+ */
+export function installVariationFieldEnhancers(blocksConfig) {
+  if (!blocksConfig) return;
+  for (const blockType of Object.keys(blocksConfig)) {
+    const cfg = blocksConfig[blockType];
+    if (!cfg || !Array.isArray(cfg.variations) || cfg.variations.length <= 1) continue;
+
+    const existing = cfg.schemaEnhancer;
+    // Detect already-installed (top of chain or via _parts):
+    if (typeof existing === 'function' && existing._isVariationFieldEnhancer) continue;
+    if (typeof existing === 'function' && Array.isArray(existing._parts)
+        && existing._parts[0]?._isVariationFieldEnhancer) continue;
+
+    const variationEnhancer = addVariationFieldEnhancer(cfg.variations);
+
+    let combined;
+    if (typeof existing === 'function') {
+      const parts = Array.isArray(existing._parts)
+        ? [variationEnhancer, ...existing._parts]
+        : [variationEnhancer, existing];
+      combined = (args) => parts.reduce((schema, fn) => fn({ ...args, schema }), args.schema);
+      combined.config = existing.config;
+      combined._parts = parts;
+    } else if (existing && typeof existing === 'object') {
+      // Recipe form (rare here — recipes are turned into functions by createSchemaEnhancerFromRecipe).
+      // Don't touch — the recipe processor will invoke its own composition; we'll be re-run after.
+      continue;
+    } else {
+      // No existing enhancer — set the variation enhancer as the sole one.
+      combined = variationEnhancer;
+    }
+
+    cfg.schemaEnhancer = combined;
+  }
+}
+
+/**
  * Resolve a block's blockSchema.properties, handling both static and
  * factory-form blockSchemas. Returns null if no schema declared.
  *
