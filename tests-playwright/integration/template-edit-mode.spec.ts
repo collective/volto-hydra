@@ -134,7 +134,7 @@ test.describe('Template Creation', () => {
 
     // Make-template on a regular block.
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForQuantaToolbar('block-1-uuid');
+    await helper.waitForBlockSelectedInAdmin('block-1-uuid');
     await helper.openQuantaToolbarMenu('block-1-uuid');
     const makeTemplateOption = page.locator('.volto-hydra-dropdown-menu .volto-hydra-dropdown-item')
       .filter({ hasText: /make.*template/i });
@@ -196,7 +196,7 @@ test.describe('Template Creation', () => {
     // mounted over the block — i.e. the page is interactive, not stuck
     // mid-load or stuck in a template-expansion loop).
     await helper.clickBlockInIframe(headerBlockId);
-    await helper.waitForQuantaToolbar(headerBlockId);
+    await helper.waitForBlockSelectedInAdmin(headerBlockId);
   });
 
   test.skip('template edit mode is automatically activated when creating template', async ({ page }) => {

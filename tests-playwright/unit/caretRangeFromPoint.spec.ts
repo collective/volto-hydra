@@ -29,7 +29,7 @@ test.describe('Bridge.caretRangeFromPoint()', () => {
       : mockParent;
     await page.goto(url);
     await helper.waitForIframeReady();
-    await helper.waitForBlockSelected('mock-block-1');
+    await helper.waitForIframeBlockHandle('mock-block-1');
   });
 
   test('uses native caretRangeFromPoint when available', async () => {
