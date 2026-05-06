@@ -4,6 +4,33 @@
  * Helpers for blocks that reference other block types and inherit their schemas.
  * Used by listing blocks, grid blocks, and other containers that need to show
  * editable fields from a referenced block type.
+ *
+ * ## Two valid sources for blockId / blockPathMap
+ *
+ * Three enhancers in this file — `inheritSchemaFrom`, `hideParentOwnedFields`,
+ * and `resolveFieldPath` (used by `fieldRules`) — need to know which block
+ * they're enhancing and where it lives in the page tree. They get that from
+ * one of two sources, both first-class (NOT a fallback chain):
+ *
+ *   1. **`args.blockId` / `args.blockPathMap`** — passed explicitly by
+ *      `buildBlockPathMap` pass 2 in `packages/hydra-js/buildBlockPathMap.js`.
+ *      That code runs the enhancer outside any React tree to populate
+ *      `pathMap._schemas` with fully-enhanced schemas.
+ *
+ *   2. **`hydraContext`** (from `../context/HydraSchemaContext`) — set by
+ *      `HydraSchemaProvider` around the sidebar render in
+ *      `components/Sidebar/ParentBlocksWidget.jsx`. Volto core call sites
+ *      (`withVariationSchemaEnhancer` HOC wrapping `BlockDataForm`,
+ *      `applySchemaEnhancer` in `Form.jsx` validation, `Blocks.js`
+ *      schema-derived helpers, etc.) invoke block enhancers with only
+ *      `{ schema, formData, intl }` — no blockId. `hydraContext` is the
+ *      bridge that carries the currently-rendering block id from
+ *      `ParentBlocksWidget` down through Volto's HOCs to our enhancers.
+ *
+ * Each path is the canonical source for its caller; one is not a substitute
+ * for the other. If you ever shadow Volto's `withBlockSchemaEnhancer.jsx` to
+ * inject `blockId` into the args at every Volto call site, the `hydraContext`
+ * branch can be removed — until then, both branches are load-bearing.
  */
 import config from '@plone/volto/registry';
 import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds } from './blockPath';
@@ -488,14 +515,26 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
       if (!typeField) return schema;
     }
 
-    // Resolve blockPathMap/blockId from explicit args (set during
-    // buildBlockPathMap pass 2) before falling back to the hydraContext
-    // singleton (set by HydraSchemaProvider around the sidebar render).
+    // Resolve blockPathMap/blockId from one of two sources, depending on
+    // who is calling the enhancer. These are NOT a fallback chain — each
+    // is the canonical source for its respective code path:
+    //
+    //   - args.blockId / args.blockPathMap: set by buildBlockPathMap pass 2,
+    //     which runs the enhancer outside any React tree to populate
+    //     pathMap._schemas with fully-enhanced schemas.
+    //
+    //   - hydraContext: set by HydraSchemaProvider in ParentBlocksWidget
+    //     around the sidebar render. Volto core call sites (the variation
+    //     HOC, applySchemaEnhancer in Form.jsx validation, etc.) don't pass
+    //     blockId in args, so hydraContext is the only way to know which
+    //     block is currently rendering.
     const hydraContext = getHydraSchemaContext();
     const blockPathMap = args.blockPathMap || hydraContext?.blockPathMap;
     const blockId = args.blockId ?? hydraContext?.currentBlockId;
-    // Fallback args for getLiveBlockData when there is no React context
-    // (e.g., buildBlockPathMap pass 2 calls the enhancer outside any provider).
+    // For getLiveBlockData calls below: pass current pageFormData + pathMap
+    // so a getBlockById lookup works when there is no React context (i.e.,
+    // the buildBlockPathMap pass 2 path). The React-render path goes
+    // through hydraContext.liveBlockDataRef inside getLiveBlockData itself.
     const liveFallback = { formData: args.pageFormData, blockPathMap };
 
     // Create or update typeField with computed choices
@@ -811,18 +850,21 @@ export function hideParentOwnedFields({ editableFields, parentControlledFields }
   return (args) => {
     const { schema, intl, blockPathMap: passedBlockPathMap, blockId: passedBlockId } = args;
 
-    // Resolve blockPathMap/blockId. Volto's applySchemaEnhancer invokes
-    // block enhancers without passing these args, so we fall back on the
-    // HydraSchemaProvider context that wraps the sidebar render — the
-    // presence of currentBlockId there is the signal that we're in a
-    // specific-instance render path (not type inspection, which runs
-    // outside the provider).
+    // blockPathMap/blockId come from one of two sources, both first-class:
+    //
+    //   - args.blockId / args.blockPathMap: set by buildBlockPathMap pass 2
+    //     (no React context).
+    //
+    //   - hydraContext: set by HydraSchemaProvider around the sidebar
+    //     render. Volto's applySchemaEnhancer / variation HOC invoke block
+    //     enhancers without blockId in args, so hydraContext is how the
+    //     enhancer learns which specific instance is being edited.
     const hydraContext = getHydraSchemaContext();
     const blockPathMap = passedBlockPathMap || hydraContext?.blockPathMap;
     const blockId = passedBlockId ?? hydraContext?.currentBlockId;
     const blocksConfig = hydraContext?.blocksConfig || config.blocks.blocksConfig;
-    // Fallback args for getLiveBlockData when there is no React context
-    // (e.g., buildBlockPathMap pass 2 calls the enhancer outside any provider).
+    // For getLiveBlockData below: pageFormData + pathMap let getBlockById
+    // resolve siblings/parents during buildBlockPathMap pass 2 (no React).
     const liveFallback = { formData: args.pageFormData, blockPathMap };
 
     if (!blockPathMap || !blockId) return schema;
@@ -1789,8 +1831,9 @@ function resolveFieldPath(fieldPath, formData, args) {
   // Parent path: ../field
   if (fieldPath.startsWith('../')) {
     const parentField = fieldPath.slice(3);
-    // Prefer explicit args (set by buildBlockPathMap pass 2), then hydraContext
-    // (set by HydraSchemaProvider around the sidebar render).
+    // Two valid sources for blockPathMap/blockId, see inheritSchemaFrom and
+    // hideParentOwnedFields for the full design note. Args drives the
+    // buildBlockPathMap pass 2 path; hydraContext drives sidebar render.
     const hydraContext = getHydraSchemaContext?.();
     const blockPathMap = args?.blockPathMap || hydraContext?.blockPathMap;
     const blockId = args?.blockId ?? hydraContext?.currentBlockId;
@@ -1807,7 +1850,8 @@ function resolveFieldPath(fieldPath, formData, args) {
         return pageFormData?.[parentField];
       }
     }
-    // Fallback for schema builds outside live UI (e.g., buildBlockPathMap)
+    // Last resort: pageFormData was passed but pathmap/blockId weren't.
+    // Treat ../field as a page-level lookup.
     return args?.pageFormData?.[parentField];
   }
 
