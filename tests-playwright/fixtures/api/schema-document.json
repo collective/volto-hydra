@@ -13,36 +13,28 @@
       "type": "string",
       "widget": "textarea"
     },
-    "text": {
-      "title": "Text",
-      "description": "",
-      "type": "object",
-      "widget": "richtext"
-    },
     "changeNote": {
       "title": "Change Note",
       "description": "",
       "type": "string"
     },
     "blocks": {
+      "behavior": "volto.blocks",
+      "default": {},
+      "description": "The JSON representation of the object blocks information. Must be a JSON object.",
+      "factory": "JSONField",
       "title": "Blocks",
-      "type": "object",
-      "propertyNames": {
-        "minLength": 1,
-        "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
-      }
+      "type": "dict",
+      "widget": "json"
     },
     "blocks_layout": {
+      "behavior": "volto.blocks",
+      "default": { "items": [] },
+      "description": "The JSON representation of the object blocks layout. Must be a JSON array.",
+      "factory": "JSONField",
       "title": "Blocks Layout",
-      "type": "object",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
+      "type": "dict",
+      "widget": "json"
     }
   },
   "required": ["title"],

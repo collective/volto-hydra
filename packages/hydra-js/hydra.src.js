@@ -4836,6 +4836,31 @@ export class Bridge {
   }
 
   /**
+   * Cross-browser caret-at-point. Chromium/WebKit implement the non-standard
+   * `document.caretRangeFromPoint` directly; Firefox only implements the W3C
+   * `document.caretPositionFromPoint` which returns a CaretPosition
+   * ({offsetNode, offset}). Wrap both so callers always get a collapsed Range.
+   *
+   * @param {number} x - Viewport X coordinate
+   * @param {number} y - Viewport Y coordinate
+   * @returns {Range|null} Collapsed Range at (x,y), or null if no API available
+   */
+  caretRangeFromPoint(x, y) {
+    if (typeof document.caretRangeFromPoint === 'function') {
+      return document.caretRangeFromPoint(x, y);
+    }
+    if (typeof document.caretPositionFromPoint === 'function') {
+      const pos = document.caretPositionFromPoint(x, y);
+      if (!pos || !pos.offsetNode) return null;
+      const range = document.createRange();
+      range.setStart(pos.offsetNode, pos.offset);
+      range.collapse(true);
+      return range;
+    }
+    return null;
+  }
+
+  /**
    * Corrects cursor/selection if it's on invalid whitespace.
    * For collapsed selections, moves cursor to nearest valid position.
    * For range selections, corrects each end independently.
@@ -5882,7 +5907,7 @@ export class Bridge {
     if (hasNonCollapsedSelection) {
       log('activateEditableField: skipping cursor positioning - non-collapsed selection exists');
     } else {
-      const range = document.caretRangeFromPoint(clientX, clientY);
+      const range = this.caretRangeFromPoint(clientX, clientY);
       if (range) {
         log('activateEditableField: caretRangeFromPoint result:', {
           startContainer: range.startContainer.nodeName,
@@ -6881,7 +6906,7 @@ export class Bridge {
               const clientY = currentRect.top + this.savedClickPosition.relativeY;
 
               // Position cursor at the click location using caretRangeFromPoint
-              const range = document.caretRangeFromPoint(clientX, clientY);
+              const range = this.caretRangeFromPoint(clientX, clientY);
               if (range) {
                 selection.removeAllRanges();
                 selection.addRange(range);
@@ -13450,14 +13475,23 @@ export function getUniqueTemplateIds(formData) {
   const templateIds = new Set();
   for (const blockId of Object.keys(formData.blocks || {})) {
     const block = formData.blocks[blockId];
-    // Skip template definitions (templateInstanceId === templateId)
-    // Only include pages using templates (templateInstanceId !== templateId)
-    if (block?.templateId && block.templateInstanceId !== block.templateId) {
+    if (block?.templateId) {
       templateIds.add(block.templateId);
     }
   }
   return Array.from(templateIds);
 }
+// Note: callers that need to avoid recursing into the template's own
+// definition page (e.g. saveTemplatesRef) filter by `id !== currentPath`
+// — that's the load-bearing check. Earlier this function ALSO skipped
+// blocks where `templateInstanceId === templateId` as a heuristic for
+// "definition-side", but the load/expand path
+// (loadTemplates / expandTemplatesSync) never reads stored instanceIds
+// from a definition (it generates fresh per-application ids), so the
+// only consumer of the heuristic was this very function. Removing it
+// also unblocks make-template, where the page-side block can have
+// instanceId === templateId for unrelated reasons and was being silently
+// excluded from save → the new template never POSTed to the backend.
 
 /**
  * Check if an object looks like a blocks map (string keys -> objects with @type).
@@ -13872,16 +13906,14 @@ export function expandTemplatesSync(inputItems, options = {}) {
     firstInsert,  // When true, copy slot block defaults as fieldPlaceholders
   } = options;
 
-  if (!templates) {
-    throw new Error('expandTemplatesSync requires options.templates with pre-loaded templates');
-  }
-
   const items = [];
   const addItem = (block, blockId) => {
     items.push({ ...block, '@uid': blockId });
   };
 
-  // In edit mode, admin handles template merging - pass blocks through as-is
+  // In edit mode, admin handles template merging - pass blocks through as-is.
+  // Templates option is only needed for view-mode expansion, so the check
+  // for it runs after this early return.
   const editMode = isEditMode();
   if (editMode) {
     return (inputItems || []).map(item => {
@@ -13896,6 +13928,10 @@ export function expandTemplatesSync(inputItems, options = {}) {
       }
       return item;
     }).filter(Boolean);
+  }
+
+  if (!templates) {
+    throw new Error('expandTemplatesSync requires options.templates with pre-loaded templates');
   }
 
   // Normalize items

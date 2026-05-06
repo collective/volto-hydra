@@ -24,6 +24,8 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 interface DiscoveredBlock {
   blockType: string;
+  variation?: string;
+  kind?: 'rich' | 'simple';
   blockId: string;
   pagePath: string;
   blockData: Record<string, unknown>;
@@ -37,10 +39,20 @@ if (fs.existsSync(discoveredPath)) {
   discoveredBlocks = JSON.parse(fs.readFileSync(discoveredPath, 'utf-8'));
 }
 
-// Skip entire file if no discovered blocks
+// Block sanity is the cross-cutting render contract. We only enforce it on
+// the three frontends that ship full block coverage and are the canonical
+// references for downstream consumers — the mock test frontend (the spec's
+// own ground truth), Nuxt, and Next.js. Other example frontends (react,
+// svelte, vue, f7) intentionally skip block-sanity so missing block types or
+// in-flight renderer changes don't gate the suite.
+const SANITY_PROJECTS = new Set(['mock', 'nuxt', 'nextjs']);
+
 base.beforeEach(async ({}, testInfo) => {
   if (discoveredBlocks.length === 0) {
     testInfo.skip(true, 'No .discovered-blocks.json found — run with DISCOVER_BLOCKS_API=<url>');
+  }
+  if (!SANITY_PROJECTS.has(testInfo.project.name)) {
+    testInfo.skip(true, `block-sanity only runs on mock/nuxt/nextjs (skipping ${testInfo.project.name})`);
   }
 });
 
@@ -53,7 +65,12 @@ const test = base.extend<{ helper: AdminUIHelper }>({
 
 test.describe('Block sanity (auto-discovered)', () => {
   for (const block of discoveredBlocks) {
-    test(`${block.blockType} block renders and has edit annotations`, async ({ page, helper }, testInfo) => {
+    const labelVariation = block.variation && block.variation !== 'default'
+      ? ` (${block.variation})`
+      : '';
+    const labelKind = block.kind ? ` [${block.kind}]` : '';
+    const label = `${block.blockType}${labelVariation}${labelKind}`;
+    test(`${label} block renders and has edit annotations`, async ({ page, helper }, testInfo) => {
       const frontendUrl = process.env.FRONTEND_URL || getFrontendUrl(testInfo.project.name);
       const frontend = frontendUrl ? `&frontend=${encodeURIComponent(frontendUrl)}` : '';
 
@@ -71,9 +88,9 @@ test.describe('Block sanity (auto-discovered)', () => {
 
       await verifyBlockRendering(page, iframe, block.blockId, block.blockData, {
         isListing: block.isListing,
-        // Skip sub-block checks — without blocksConfig the heuristic produces false
-        // positives (e.g. teaser href arrays have @id+@type but aren't sub-blocks)
-        checkSubBlocks: false,
+        // Sub-block iteration uses the bridge's blockPathMap (canonical,
+        // schema-resolved) rather than a shape heuristic on blockData.
+        checkSubBlocks: true,
         // Skip data-edit-text clicks for discovered content — we just want rendering + annotation checks
         checkEditTextClicks: false,
       });

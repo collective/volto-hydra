@@ -72,7 +72,7 @@
           "@id": "ref-grid-rendering-vue-1d61ab",
           "label": "Vue",
           "language": "vue",
-          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"grid-block\">\n    <div :style=\"{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }\">\n      <div v-for=\"id in items\" :key=\"id\" class=\"grid-cell\">\n        <Block :data=\"{ ...block.blocks?.[id], '@uid': id }\" />\n      </div>\n    </div>\n  </div>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nconst props = defineProps({ block: Object });\nconst items = computed(() => props.block.blocks_layout?.items || []);\n</script>"
+          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"grid-block\">\n    <div :style=\"{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }\">\n      <div v-for=\"id in items\" :key=\"id\" class=\"grid-cell\">\n        <BlockRenderer :block=\"{ ...block.blocks?.[id], '@uid': id }\" />\n      </div>\n    </div>\n  </div>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nimport BlockRenderer from './BlockRenderer.vue';\nconst props = defineProps({ block: Object });\nconst items = computed(() => props.block.blocks_layout?.items || []);\n</script>"
         },
         {
           "@id": "ref-grid-rendering-svelte-8158ec",

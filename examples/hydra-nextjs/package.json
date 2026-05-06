@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "copy:hydra": "cp ../../packages/hydra-js/hydra.js ./src/utils/hydra.js",
+    "copy:hydra": "pnpm -F @volto-hydra/hydra-js build && cp ../../packages/hydra-js/hydra.js ./src/utils/hydra.js",
     "predev": "pnpm run copy:hydra",
     "dev": "next dev -p 3002",
     "dev:test": "pnpm run copy:hydra && next dev -p 3007",

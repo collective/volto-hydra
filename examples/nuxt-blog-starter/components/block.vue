@@ -4,8 +4,8 @@
   </div>
 
   <div v-else-if="block['@type'] == 'introduction'" :data-block-uid="block_uid"
-       data-edit-text="/description" class="text-xl text-gray-600 leading-relaxed my-6 border-t border-b border-gray-200 py-4">
-    {{ data.description }}
+       data-edit-text="value" class="text-xl text-gray-600 leading-relaxed my-6 border-t border-b border-gray-200 py-4">
+    <RichText v-for="node in block.value || []" :key="node" :node="node" />
   </div>
 
   <h1 v-else-if="block['@type'] == 'title'" :data-block-uid="block_uid" data-edit-text="/title">{{ data.title }}
@@ -31,7 +31,13 @@
     </template>
   </div>
 
-  <div v-else-if="block['@type'] == 'leadimage'" :data-block-uid="block_uid" class="mb-6">
+  <!-- leadimage: only render the wrapper when there's an actual image to
+       show. With no image (e.g. a template definition page that hosts a
+       leadimage placeholder for the host content to populate), an empty
+       wrapper would collapse to zero height and be invisible / unclickable
+       — better to omit it entirely so the page reflows naturally. -->
+  <div v-else-if="block['@type'] == 'leadimage' && (data.image || data.preview_image)"
+       :data-block-uid="block_uid" class="mb-6">
     <template v-for="props in [imageProps(data.image || data.preview_image)]">
       <NuxtImg v-if="props.url" :src="props.url" :data-edit-media="data.image ? '/image' : '/preview_image'"
         class="w-full rounded-lg object-cover max-h-96" loading="lazy" decoding="async" />
@@ -161,7 +167,7 @@
       <!-- data-block-readonly on the wrapper controls editability — hydra.js respects it -->
       <!-- Key forces Vue to recreate element when overwrite changes (clears stale contenteditable text) -->
       <NuxtLink :to="getUrl(block.href)" v-if="getTeaserTitle(block)" data-edit-link="href">
-        <div>{{ block.head_title }}</div>
+        <div data-edit-text="head_title">{{ block.head_title }}</div>
         <h5 class="mb-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white"
           :key="`title-${block.overwrite}`"
           data-edit-text="title">{{ getTeaserTitle(block) }}</h5>
@@ -334,7 +340,7 @@
     <!-- Facets on top (default or facetsTopSide) -->
     <template v-if="!block.variation || block.variation === 'facetsTopSide'">
       <!-- Facets horizontal -->
-      <h3 v-if="block.facetsTitle" class="font-semibold mb-3 text-gray-700">{{ block.facetsTitle }}</h3>
+      <h3 v-if="block.facetsTitle" data-edit-text="facetsTitle" class="font-semibold mb-3 text-gray-700">{{ block.facetsTitle }}</h3>
       <div v-if="block.facets?.length" class="search-facets mb-4 p-4 bg-gray-50 rounded-lg flex flex-wrap gap-4">
         <template v-for="(facet, idx) in expand(block.facets, null, '@id')" :key="facet['@uid'] || idx">
           <!-- Non-facet types (slate, image) rendered as generic blocks -->
@@ -409,7 +415,7 @@
         <!-- Sidebar: facets -->
         <aside v-if="block.facets?.length" class="search-facets w-full md:w-64 shrink-0">
           <div class="p-4 bg-gray-50 rounded-lg sticky top-4">
-            <h3 v-if="block.facetsTitle" class="font-semibold mb-3 text-gray-700">{{ block.facetsTitle }}</h3>
+            <h3 v-if="block.facetsTitle" data-edit-text="facetsTitle" class="font-semibold mb-3 text-gray-700">{{ block.facetsTitle }}</h3>
             <template v-for="(facet, idx) in expand(block.facets, null, '@id')" :key="facet['@uid'] || idx">
               <!-- Non-facet types (slate, image) rendered as generic blocks -->
               <template v-if="facet.type === 'slate' || facet.type === 'image'">
@@ -535,7 +541,7 @@
     <div class="relative z-20 py-16 px-4 mx-auto max-w-screen-xl text-center lg:py-24">
       <h2 data-edit-text="title" class="mb-4 text-4xl font-extrabold text-white md:text-5xl lg:text-6xl">
         {{ block.title }}</h2>
-      <div class="mb-8 text-lg text-gray-200 lg:text-xl sm:px-16 lg:px-48">
+      <div data-edit-text="description" class="mb-8 text-lg text-gray-200 lg:text-xl sm:px-16 lg:px-48">
         <RichText v-for="node in (block.description || block['value'] || [])" :key="node" :node="node" />
       </div>
       <NuxtLink v-if="block.cta_title" :to="getUrl(block.cta_link)"
@@ -814,9 +820,10 @@
     <p v-else class="text-gray-400 italic">No map URL configured</p>
   </div>
 
-  <div v-else :data-block-uid="block_uid">
-    {{ 'Not implemented Block: @type=' + block['@type'] }}
-    <pre>{{ block }}</pre>
+  <div v-else :data-block-uid="block_uid" :data-unknown-block-type="block['@type']"
+       class="my-2 px-3 py-2 border border-dashed border-gray-300 rounded text-gray-500 italic text-sm"
+       style="min-height: 2.5rem;">
+    [not implemented]
   </div>
 
 </template>
@@ -1289,22 +1296,15 @@ const handleSortChange = (event) => {
   navigateTo({ path: route.path, query: { ...route.query, sort_on: event.target.value } });
 };
 
-// Facet field options - maps field name to available options
-const FACET_FIELD_OPTIONS = {
-  'review_state': [
-    { value: 'private', title: 'Private' },
-    { value: 'pending', title: 'Pending' },
-    { value: 'published', title: 'Published' },
-  ],
-  'portal_type': [
-    { value: 'Document', title: 'Page' },
-    { value: 'News Item', title: 'News Item' },
-    { value: 'Event', title: 'Event' },
-    { value: 'Image', title: 'Image' },
-    { value: 'File', title: 'File' },
-    { value: 'Link', title: 'Link' },
-  ],
-};
+// Querystring metadata — fetched once globally, cached in Nuxt payload.
+// Same pattern as Volto's withQueryString HOC. lazy:true keeps this
+// component synchronous so event handlers work correctly.
+const runtimeConfig = useRuntimeConfig();
+const { data: querystringData } = useFetch(
+  `${runtimeConfig.public.backendBaseUrl}/++api++/@querystring`,
+  { key: 'querystring', headers: { Accept: 'application/json' }, lazy: true },
+);
+const querystringIndexes = computed(() => querystringData.value?.indexes || {});
 
 // Get facet field value (handles object { label, value } or plain string)
 const getFacetField = (facet) => {
@@ -1314,10 +1314,15 @@ const getFacetField = (facet) => {
   return facet.field || '';
 };
 
-// Get facet options based on field
+// Get facet options from @querystring index values (dynamic, not hardcoded)
 const getFacetOptions = (facet) => {
   const field = getFacetField(facet);
-  return FACET_FIELD_OPTIONS[field] || [];
+  const index = querystringIndexes.value[field];
+  if (!index?.values) return [];
+  return Object.entries(index.values).map(([value, info]) => ({
+    value,
+    title: info?.title || value,
+  }));
 };
 
 // Check if a facet value is currently selected (from URL params)

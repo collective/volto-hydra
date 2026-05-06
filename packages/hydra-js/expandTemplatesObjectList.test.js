@@ -1,4 +1,4 @@
-import { expandTemplatesSync } from './hydra.js';
+import { expandTemplatesSync } from './hydra.src.js';
 
 describe('expandTemplatesSync: object_list arrays in template blocks', () => {
   let counter = 0;

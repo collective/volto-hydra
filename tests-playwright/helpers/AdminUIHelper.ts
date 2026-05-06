@@ -239,8 +239,12 @@ export class AdminUIHelper {
     // Wait for iframe to have at least one block visible.
     // This ensures the frontend has actually rendered page content, not just
     // put elements in the DOM (e.g. Nuxt SSR before hydration).
+    // Match ANY visible block-uid — picking `.first()` and waiting on its
+    // visibility is fragile when the first block in DOM order is a templated
+    // header/metadata block (e.g. tpl-ni-date) that ends up zero-height or
+    // hidden, even though later blocks on the page are fully rendered.
     const iframe = this.getIframe();
-    await iframe.locator('[data-block-uid]').first().waitFor({ state: 'visible', timeout });
+    await iframe.locator('[data-block-uid]:visible').first().waitFor({ state: 'attached', timeout });
 
     // Propagate run ID from admin page to iframe for log filtering
     const runId = await this.page.evaluate(() => (window as any).__testRunId);

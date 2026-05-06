@@ -100,6 +100,105 @@ test.describe('Template Creation', () => {
     await expect(locationField).toBeVisible({ timeout: 5000 });
   });
 
+  // Failing on purpose (TDD): when the user makes a block into a template
+  // and saves the page, the new template document needs to be POSTed to
+  // the API as a brand-new Document. Currently onMakeTemplate only stores
+  // the template object in templateCacheRef and saveTemplatesRef does an
+  // api.patch — which 404s on a real Plone backend because the document
+  // doesn't exist yet. Plone (not the client) is what populates created /
+  // modified / effective / UID timestamps, so a missing POST is also why
+  // hand-crafted template fixtures end up with null timestamps.
+  //
+  // Expected behaviour: on save after make-template, a POST hits the
+  // template's parent folder with @type:'Document' and the block payload.
+  // The folder path comes from the sidebar's 'folder' field, NOT from a
+  // hard-coded '/templates/' prefix in the bridge (so consumers can host
+  // templates anywhere in the content tree).
+  test('saving a page after Make Template POSTs a new template document', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Capture every POST that goes to the API while we save. Filter for
+    // content-creation requests (body has @type) so we don't catch login,
+    // search, etc.
+    const contentPosts: Array<{ url: string; body: any }> = [];
+    page.on('request', (req) => {
+      if (req.method() !== 'POST') return;
+      if (!req.url().startsWith('http://localhost:8888')) return;
+      let body: any = null;
+      try { body = req.postDataJSON(); } catch { /* not JSON */ }
+      if (!body || !body['@type']) return;
+      contentPosts.push({ url: req.url(), body });
+    });
+
+    // Make-template on a regular block.
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelectedInAdmin('block-1-uuid');
+    await helper.openQuantaToolbarMenu('block-1-uuid');
+    const makeTemplateOption = page.locator('.volto-hydra-dropdown-menu .volto-hydra-dropdown-item')
+      .filter({ hasText: /make.*template/i });
+    await makeTemplateOption.click();
+    await helper.waitForSidebarOpen();
+
+    // Save. saveContent waits for redirect out of /edit so any POSTs
+    // dispatched as part of the save will have been observed by then.
+    await helper.saveContent();
+
+    // EXPECTED: at least one POST whose body @type is Document — that's
+    // the new template being created. Path is the parent folder; client
+    // doesn't set timestamps (Plone fills those server-side).
+    const templatePosts = contentPosts.filter((r) => r.body['@type'] === 'Document');
+    expect(templatePosts.length,
+      'expected the save flow to POST a new template document for the just-created template',
+    ).toBeGreaterThanOrEqual(1);
+    const tplPost = templatePosts[0];
+    expect(tplPost.body.blocks, 'POSTed template should carry the source block in its blocks dict').toBeTruthy();
+    expect(tplPost.body.blocks_layout?.items?.length,
+      'POSTed template should have blocks_layout.items',
+    ).toBeGreaterThan(0);
+    // Path must not be hard-coded to /templates/ — it should reflect the
+    // sidebar 'folder' field's value (default folder is fine here, just
+    // not a baked-in literal in the bridge).
+    expect(tplPost.url, 'template POST URL must come from the sidebar folder, not a hard-coded /templates/ literal')
+      .not.toMatch(/\/templates\/$/);
+  });
+
+  // Failing on purpose (TDD): a template document is just a Document at
+  // /templates/<name> whose blocks happen to have templateId/slotId set.
+  // It should be openable + editable in the admin like any other page.
+  // The save flow's existing `id !== currentPath` filter already covers
+  // "don't recursively save the template's own page as a template", but
+  // the LOAD path (View.jsx ~2751 + ~2936) calls getUniqueTemplateIds
+  // without the same filter — after dropping the instanceId-equality
+  // heuristic, that means navigating to a template page tries to fetch
+  // and re-merge the template into itself, which breaks rendering /
+  // selection of its own blocks.
+  //
+  // Expected behaviour: open /templates/test-layout in the editor → its
+  // blocks render visibly, clicking one selects it (admin chrome appears).
+  // Same as opening any non-template Document.
+  test('a template page loads + edits like a normal page', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/templates/test-layout');
+
+    const iframe = helper.getIframe();
+
+    // Block from the test-layout fixture. Identified by content (template
+    // fixtures' own UUIDs are stable in this fixture but the test cares
+    // about the rendered state, not the id, so use plaintext to find it).
+    const { blockId: headerBlockId, locator: headerBlock } =
+      await helper.waitForBlockByContent('Template Header - From Template');
+    await expect(headerBlock).toBeVisible();
+
+    // Click + verify admin reflects the selection (toolbar + outline
+    // mounted over the block — i.e. the page is interactive, not stuck
+    // mid-load or stuck in a template-expansion loop).
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForBlockSelectedInAdmin(headerBlockId);
+  });
+
   test.skip('template edit mode is automatically activated when creating template', async ({ page }) => {
     // Skipped: auto-activation feature not yet implemented
     const helper = new AdminUIHelper(page);

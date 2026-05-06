@@ -87,7 +87,8 @@ function TeaserBlock({ block }) {
 
   const title = useBlockData ? block.title : hrefObj?.title || '';
   const description = useBlockData ? block.description : hrefObj?.description || '';
-  const href = hrefObj?.['@id'] || '';
+  // Strip API origin from brain @id so the link resolves same-origin.
+  const href = contentPath(hrefObj?.['@id'] || '');
   const imageSrc = block.preview_image
     ? getImageUrl(block.preview_image)
     : (hrefObj?.hasPreviewImage ? getImageUrl({ '@id': `${href}/@@images/preview_image` }) : '');
@@ -138,7 +139,7 @@ const hrefObj = computed(() => props.block.href?.[0] || null);
 const useBlockData = computed(() => props.block.overwrite || !hrefObj.value?.title);
 const title = computed(() => useBlockData.value ? props.block.title : hrefObj.value?.title || '');
 const description = computed(() => useBlockData.value ? props.block.description : hrefObj.value?.description || '');
-const href = computed(() => hrefObj.value?.['@id'] || '');
+const href = computed(() => contentPath(hrefObj.value?.['@id'] || ''));
 const imageSrc = computed(() => {
   if (props.block.preview_image) {
     return getImageUrl(props.block.preview_image);
@@ -160,7 +161,7 @@ const imageSrc = computed(() => {
   $: useBlockData = block.overwrite || !hrefObj?.title;
   $: title = useBlockData ? block.title : hrefObj?.title || '';
   $: description = useBlockData ? block.description : hrefObj?.description || '';
-  $: href = hrefObj?.['@id'] || '';
+  $: href = contentPath(hrefObj?.['@id'] || '');
   $: imageSrc = block.preview_image
     ? getImageUrl(block.preview_image)
     : (hrefObj?.hasPreviewImage ? getImageUrl(`${href}/@@images/preview_image`) : '');

@@ -14,7 +14,7 @@ function HeroBlock({ block }) {
       )}
       <h1 data-edit-text="heading">{heading}</h1>
       <p data-edit-text="subheading" dangerouslySetInnerHTML={{ __html: subheading }} />
-      <div className="hero-description">
+      <div className="hero-description" data-edit-text="description">
         {(block.description || []).map((node, i) => (
           <SlateNode key={i} node={node} />
         ))}

@@ -78,5 +78,5 @@
     {#if block.description}<p data-edit-text="description">{block.description}</p>{/if}
   </div>
 {:else}
-  <div data-block-uid={block['@uid']}>Unknown block: {block['@type']}</div>
+  <div data-block-uid={block['@uid']} data-unknown-block-type={block['@type']}>[not implemented]</div>
 {/if}

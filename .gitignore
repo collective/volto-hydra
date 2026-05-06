@@ -34,3 +34,9 @@ coverage/
 *.txt
 cache/
 .discovered-blocks.json
+
+# Built bridge artifacts — source of truth is packages/hydra-js/hydra.src.js.
+# Consumers either bundle from source via their build tool's alias, or import
+# via the package's exports field which now points at the source.
+packages/hydra-js/hydra.js
+packages/hydra-js/hydra.js.map

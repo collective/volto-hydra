@@ -800,6 +800,11 @@ export const sharedBlocksConfig = {
                     type: 'string',
                     description: 'Only visible when page has a description',
                 },
+                switchField: {
+                    title: 'Switch Field',
+                    type: 'string',
+                    description: 'Array rule with bare false as catch-all hide',
+                },
             },
         },
         schemaEnhancer: {
@@ -808,7 +813,43 @@ export const sharedBlocksConfig = {
                 simpleWarning: { when: { mode: { isNot: 'advanced' } }, else: false },
                 columnLayout: { when: { columns: { gte: 2 } }, else: false },
                 pageNotice: { when: { '../description': { isSet: true } }, else: false },
+                // Array rule: show when simple OR advanced, bare false hides otherwise
+                switchField: [
+                    { when: { mode: 'simple' } },
+                    { when: { mode: 'advanced' } },
+                    false,
+                ],
             },
+        },
+    },
+    // Highlight block: banner with title, slate description, image, CTA
+    highlight: {
+        id: 'highlight',
+        title: 'Highlight',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2l3 6 6 .75-4.5 4.25L18 20l-6-3-6 3 1.5-7L3 8.75 9 8z"/></svg>',
+        group: 'common',
+        blockSchema: {
+            properties: {
+                title: { title: 'Title', type: 'string' },
+                description: { title: 'Description', widget: 'slate' },
+                image: { title: 'Background Image', widget: 'image' },
+                cta_title: { title: 'CTA Text', type: 'string' },
+                cta_link: { title: 'CTA Link', widget: 'object_browser', mode: 'link' },
+            },
+            required: [],
+        },
+    },
+    // Introduction block: standalone slate paragraph used as page intro.
+    // The data shape is { @type: 'introduction', value: [slate...] } — not page fields.
+    introduction: {
+        id: 'introduction',
+        title: 'Introduction',
+        group: 'common',
+        blockSchema: {
+            properties: {
+                value: { title: 'Text', widget: 'slate' },
+            },
+            required: [],
         },
     },
 };

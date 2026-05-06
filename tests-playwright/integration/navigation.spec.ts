@@ -644,3 +644,76 @@ test.describe('Navigation and URL Handling', () => {
     await expect(switcherBtn).toBeVisible({ timeout: 10000 });
   });
 });
+
+test.describe('Page Creation', () => {
+  // Failing on purpose (TDD): adding a brand-new Document via Volto's
+  // toolbar Add button uses the same createContent → POST flow that the
+  // bridge's Make Template feature relies on. There was no existing
+  // test exercising it end-to-end through the admin UI — and on the mock
+  // API path, POST of @type:Document was returning 501 until the recent
+  // Make-Template-POST commit added a Document handler. Locks in:
+  //
+  //   - clicking #toolbar-add → types menu opens
+  //   - picking Document goes to /<folder>/add?type=Document
+  //   - filling Title + Save POSTs to the parent folder with @type:Document
+  //   - admin navigates to the new doc's view, which we can edit
+  //
+  // /_test_data is folderish in the fixture, so the toolbar-add button is
+  // shown. Avoiding navigateToEdit's prefix here — we're navigating
+  // *into* the test mount root, not editing a specific child.
+  test('adding a new Document via the toolbar Add button creates and edits it', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await page.goto(`${helper.adminUrl}/_test_data`);
+
+    // Capture the POST 201 response from createContent so we can navigate
+    // to the new doc by its server-assigned @id.
+    let createdAtId: string | null = null;
+    page.on('response', async (resp) => {
+      if (resp.request().method() !== 'POST' || resp.status() !== 201) return;
+      try {
+        const body = await resp.json();
+        if (body && body['@type'] === 'Document' && body['@id']) {
+          createdAtId = body['@id'];
+        }
+      } catch {
+        /* not JSON */
+      }
+    });
+
+    // Open toolbar Add menu and pick Document.
+    await page.locator('#toolbar-add').click();
+    await page.locator('#toolbar-add-document').click();
+    await page.waitForURL(/\/add\?type=Document/, { timeout: 10000 });
+
+    // Fill Title and save.
+    const titleField = page.locator('#field-title input, input[name="title"]').first();
+    await expect(titleField).toBeVisible({ timeout: 5000 });
+    await titleField.fill('TDD Created Document');
+    await page.locator('#toolbar-save, button:has-text("Save")').click();
+
+    // POST should have happened with @type:Document.
+    await expect.poll(() => createdAtId, { timeout: 10000 }).toBeTruthy();
+
+    // Navigate to the newly created doc's /edit. createdAtId is an
+    // absolute API URL — strip origin for the admin route.
+    // Use client-side navigation so the admin's session/auth state
+    // (including any in-memory session content stored against the
+    // test auth token in the mock-api) survives the route change.
+    // page.goto() would force an SSR round-trip and the admin server's
+    // own fetch may not include the same Authorization header.
+    const newDocPath = new URL(createdAtId!).pathname;
+    await page.evaluate((path) => {
+      window.history.pushState({}, '', path);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }, `${newDocPath}/edit`);
+    await helper.waitForIframeReady();
+
+    // The new document loads with at least one block (Volto auto-creates
+    // an empty slate on new pages). Visible + selectable proves the round
+    // trip works.
+    const iframe = helper.getIframe();
+    const anyBlock = iframe.locator('[data-block-uid]').first();
+    await expect(anyBlock).toBeVisible({ timeout: 10000 });
+  });
+});

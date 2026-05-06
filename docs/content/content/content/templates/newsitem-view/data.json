@@ -36,10 +36,27 @@
       "templateInstanceId": "tpl-ni-def",
       "slotId": "content",
       "plaintext": "",
-      "value": [{ "type": "p", "children": [{ "text": "" }] }]
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": ""
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
-    "items": ["tpl-ni-date", "tpl-ni-title", "tpl-ni-leadimage", "tpl-ni-content"]
-  }
+    "items": [
+      "tpl-ni-date",
+      "tpl-ni-title",
+      "tpl-ni-leadimage",
+      "tpl-ni-content"
+    ]
+  },
+  "effective": "2025-01-01T00:00:00",
+  "modified": "2025-01-01T00:00:00+00:00",
+  "created": "2025-01-01T00:00:00+00:00"
 }

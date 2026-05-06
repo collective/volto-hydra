@@ -671,7 +671,7 @@ const bridge = initBridge({
 - `{ set: { title: '...', widget: '...' } }` — always add/replace a field definition
 - `{ when: { fieldName: value }, else: false }` — show only when condition met
 - `{ when: { fieldName: { gte: 2 } }, set: { ... } }` — conditional definition override
-- `[rule, rule, ...]` — switch: first matching rule wins
+- `[rule, rule, ...]` — switch: first matching rule wins. A bare `false` in the array is a catch-all hide: `[{ when: A }, { when: B }, false]` shows on A or B, hides otherwise.
 - `'parent.child': false` — hide a field inside a widget's inner schema
 - Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`
 - Field paths: `../field` for parent block, `/field` for root

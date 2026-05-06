@@ -365,10 +365,7 @@ const getUrlWithAdminParams = (url, token, isEdit) => {
   // _edit param ensures mode change triggers URL change and iframe reload
   if (typeof window === 'undefined') return null;
   const contentPath = window.location.pathname.replace(/\/edit$/, '');
-  const params = { access_token: token };
-  if (isEdit) {
-    params._edit = 'true';
-  }
+  const params = { access_token: token, _edit: isEdit ? 'true' : 'false' };
   // Forward debug param to iframe so hydra.js enables logging
   const adminUrl = new URL(window.location.href);
   if (adminUrl.searchParams.has('_hydra_debug')) {
@@ -916,7 +913,7 @@ const Iframe = (props) => {
         const template = templateCache[templateId];
         if (!template) return;
 
-        log('SAVE TEMPLATE: Saving template:', templateId);
+        log('SAVE TEMPLATE: Saving template:', templateId, 'isNew:', !!template._isNew);
         log('SAVE TEMPLATE: Template blocks:', Object.keys(template.blocks || {}));
         // Log first block's value to check if edit is present
         const firstBlockId = template.blocks_layout?.items?.[0];
@@ -925,14 +922,44 @@ const Iframe = (props) => {
           log('SAVE TEMPLATE: First block value:', JSON.stringify(block.value)?.substring(0, 200));
         }
 
-        // PATCH the template - cache already has merged content from edit mode exit
         try {
-          await api.patch(templateId, {
-            data: {
-              blocks: template.blocks,
-              blocks_layout: template.blocks_layout,
-            },
-          });
+          if (template._isNew) {
+            // New template: POST to parent folder so Plone creates the
+            // Document and populates server-side fields (UID, created,
+            // modified, effective). Without this, a downstream PATCH would
+            // 404 because the document doesn't exist yet.
+            //
+            // Parent folder = templateId minus the trailing /<id> segment.
+            // The id portion goes in the body so Plone uses it instead of
+            // generating a slug from title — keeps cached templateId stable
+            // across the save round-trip.
+            const lastSlash = templateId.lastIndexOf('/');
+            const parentFolder = lastSlash > 0 ? templateId.slice(0, lastSlash) : '/';
+            const id = templateId.slice(lastSlash + 1);
+            await api.post(parentFolder, {
+              data: {
+                '@type': 'Document',
+                id,
+                title: template.title || id,
+                blocks: template.blocks,
+                blocks_layout: template.blocks_layout,
+              },
+            });
+            // Mark as no-longer-new — subsequent saves should PATCH, not
+            // re-POST. We mutate in place so the existing reference in
+            // formData stays valid; another save flush won't trigger a
+            // duplicate create.
+            delete template._isNew;
+          } else {
+            // PATCH existing template - cache already has merged content
+            // from edit mode exit
+            await api.patch(templateId, {
+              data: {
+                blocks: template.blocks,
+                blocks_layout: template.blocks_layout,
+              },
+            });
+          }
         } catch (error) {
           console.error(`[HYDRA] Failed to save template ${templateId}:`, error);
         }
@@ -4661,12 +4688,17 @@ const Iframe = (props) => {
               const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
               if (!blockData) return;
 
-              // Generate a unique template ID and instance ID
+              // Generate a unique template ID and instance ID. Parent folder
+              // comes from config (default '/templates') so consumers can
+              // host templates anywhere in the content tree without forking
+              // the bridge. The user can also retarget the save location
+              // via the sidebar 'folder' field after creation.
               const templateCount = Object.values(properties.blocks || {})
                 .filter(b => b.templateInstanceId === b.templateId)
                 .length;
               const defaultName = `untitled-template-${templateCount + 1}`;
-              const newTemplateId = `/templates/${defaultName}`;
+              const templatesFolder = config.settings.templatesPath || '/templates';
+              const newTemplateId = `${templatesFolder.replace(/\/$/, '')}/${defaultName}`;
               const newInstanceId = newTemplateId; // For new template, templateInstanceId === templateId
 
               // Add template fields to the block
@@ -4685,8 +4717,10 @@ const Iframe = (props) => {
                 updatedBlock
               );
 
-              // Create a template document structure in cache
-              // (will be saved when page is saved)
+              // Create a template document structure in cache. _isNew flags
+              // this for the save flow to POST (create on the backend) the
+              // first time, then PATCH on subsequent saves. Without _isNew,
+              // saveTemplatesRef would PATCH-only and 404 on a real Plone.
               templateCacheRef.current[newTemplateId] = {
                 '@id': newTemplateId,
                 '@type': 'Document',
@@ -4695,6 +4729,7 @@ const Iframe = (props) => {
                   [selectedBlock]: updatedBlock,
                 },
                 'blocks_layout': { items: [selectedBlock] },
+                _isNew: true,
               };
 
               // Update Redux

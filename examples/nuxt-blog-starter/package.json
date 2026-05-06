@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "sync-hydra": "mkdir -p ./packages && cp ../../packages/hydra-js/hydra.js ./packages/hydra.js",
+    "sync-hydra": "pnpm -F @volto-hydra/hydra-js build && mkdir -p ./packages && cp ../../packages/hydra-js/hydra.js ./packages/hydra.js",
     "prebuild": "pnpm run sync-hydra",
     "build": "nuxt build",
     "predev": "pnpm run sync-hydra",
