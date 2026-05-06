@@ -38,8 +38,12 @@ test.describe('Page Metadata Editing', () => {
     const slateWarning = page.locator('text=Missing data-node-id attributes');
     await expect(slateWarning).not.toBeVisible();
 
-    // Clear and type new title
-    await pageTitle.fill('');
+    // Select all text and verify selection before clearing
+    await helper.selectAllTextInEditor(pageTitle);
+    const selText = await pageTitle.evaluate(() => window.getSelection()?.toString() || '');
+    expect(selText).toBe(expectedInitialTitle);
+
+    // Clear by typing over the selection
     await pageTitle.pressSequentially('Updated Page Title', { delay: 50 });
 
     // Click elsewhere to trigger blur and save
@@ -83,7 +87,7 @@ test.describe('Page Metadata Editing', () => {
     // Make it editable and wait for focus
     await expect(pageTitle).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
     await helper.waitForEditorFocus(pageTitle);
-    await pageTitle.fill('');
+    await helper.selectAllTextInEditor(pageTitle);
     await pageTitle.pressSequentially('New Title', { delay: 50 });
 
     // Trigger save by clicking elsewhere

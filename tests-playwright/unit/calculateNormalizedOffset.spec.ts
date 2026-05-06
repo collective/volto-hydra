@@ -13,7 +13,7 @@ test.describe('calculateNormalizedOffset() - Vue whitespace handling', () => {
     helper = new AdminUIHelper(page);
     await page.goto('http://localhost:8889/mock-parent.html');
     await helper.waitForIframeReady();
-    await helper.waitForBlockSelected('mock-block-1');
+    await helper.waitForIframeBlockHandle('mock-block-1');
   });
 
   test('offset calculation in plain paragraph without formatting', async () => {

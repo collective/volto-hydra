@@ -456,7 +456,7 @@ export class AdminUIHelper {
       // Try to wait for the target block to be selected
       // If it times out, check if we need to navigate to parent (container case)
       try {
-        await this.waitForBlockSelected(blockId, 3000);
+        await this.waitForIframeBlockHandle(blockId, 3000);
       } catch (error) {
         // Selection timed out - check if a CHILD block got selected instead
         // (happens when clicking a container block like grid)
@@ -469,14 +469,14 @@ export class AdminUIHelper {
         if (childWasSelected) {
           // A child of the target block is selected - navigate up to the target
           await this.navigateToParentBlock(blockId);
-          await this.waitForBlockSelected(blockId);
+          await this.waitForIframeBlockHandle(blockId);
         } else {
           // Target is not parent of selected block - rethrow original error
           throw error;
         }
       }
 
-      await this.waitForQuantaToolbar(blockId);
+      await this.waitForBlockSelectedInAdmin(blockId);
     } else {
       // For mock parent tests: wait for block to become editable instead of toolbar
       // Handle both: contenteditable on child (mock) OR on block itself (Nuxt)
@@ -545,7 +545,7 @@ export class AdminUIHelper {
     await blockLocator.click();
 
     if (waitForToolbar) {
-      await this.waitForQuantaToolbar(blockId);
+      await this.waitForBlockSelectedInAdmin(blockId);
     }
 
     return blockId;
@@ -604,7 +604,7 @@ export class AdminUIHelper {
       // Check if target block is now selected
       const result = await this.isBlockSelectedInIframe(targetBlockId);
       if (result.ok) {
-        await this.waitForQuantaToolbar(targetBlockId);
+        await this.waitForBlockSelectedInAdmin(targetBlockId);
         return;
       }
 
@@ -686,7 +686,7 @@ export class AdminUIHelper {
 
     if (waitForToolbar) {
       // Wait for toolbar to be positioned correctly
-      await this.waitForQuantaToolbar(blockId);
+      await this.waitForBlockSelectedInAdmin(blockId);
     } else {
       // Wait for sidebar to show the block is selected
       await this.waitForSidebarOpen();
@@ -738,7 +738,7 @@ export class AdminUIHelper {
    * Wait for a block to be selected in the iframe.
    * Handles multi-element blocks (multiple elements with same UID).
    */
-  async waitForBlockSelected(blockId: string, timeout: number = 5000) {
+  async waitForIframeBlockHandle(blockId: string, timeout: number = 5000) {
     const iframe = this.getIframe();
     const blockLocator = iframe.locator(`[data-block-uid="${blockId}"]`);
 
@@ -753,13 +753,105 @@ export class AdminUIHelper {
       const isVisible = await dragHandle.isVisible();
       if (!isVisible) {
         const exists = await dragHandle.count() > 0;
-        console.log(`[waitForBlockSelected] Drag handle exists=${exists} visible=${isVisible}`);
+        console.log(`[waitForIframeBlockHandle] Drag handle exists=${exists} visible=${isVisible}`);
       }
       expect(isVisible).toBe(true);
     }).toPass({ timeout });
 
     // Return the first element locator for chaining
     return blockLocator.first();
+  }
+
+  /**
+   * Press Escape once to exit text editing and enter block mode.
+   * Block stays selected but fields are no longer contenteditable.
+   */
+  async escapeFromEditing(): Promise<void> {
+    await this.page.keyboard.press('Escape');
+    // Wait for outline to switch to block mode (full border)
+    await expect(this.page.locator('.volto-hydra-block-outline[data-outline-style="border"]'))
+      .toBeVisible({ timeout: 3000 });
+  }
+
+  /**
+   * Simulate a long press (touch) on a block in the iframe.
+   * Dispatches touchstart/touchend events inside the iframe with a 700ms hold.
+   * Triggers ENTER_SELECTION_MODE in hydra.js for mobile selection mode.
+   */
+  async longPressBlock(blockUid: string): Promise<void> {
+    const iframe = this.getIframe();
+    const block = iframe.locator(`[data-block-uid="${blockUid}"]`);
+
+    // Get block center in iframe-relative coordinates
+    const center = await block.evaluate(el => {
+      const r = el.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    });
+
+    // Dispatch touchstart
+    await iframe.locator('body').evaluate((body, pos) => {
+      const el = document.elementFromPoint(pos.x, pos.y) || body;
+      el.dispatchEvent(new TouchEvent('touchstart', {
+        bubbles: true,
+        cancelable: true,
+        touches: [new Touch({ identifier: 1, target: el, clientX: pos.x, clientY: pos.y })],
+      }));
+    }, center);
+
+    // Hold for long press threshold
+    await this.page.waitForTimeout(700);
+
+    // Dispatch touchend
+    await iframe.locator('body').evaluate((body, pos) => {
+      const el = document.elementFromPoint(pos.x, pos.y) || body;
+      el.dispatchEvent(new TouchEvent('touchend', {
+        bubbles: true,
+        cancelable: true,
+        changedTouches: [new Touch({ identifier: 1, target: el, clientX: pos.x, clientY: pos.y })],
+      }));
+    }, center);
+
+    // Wait for selection checkboxes to appear
+    await expect(this.page.locator('.volto-hydra-selection-checkbox').first())
+      .toBeVisible({ timeout: 5000 });
+  }
+
+  /**
+   * Wait for multi-block selection outlines to appear.
+   * Each selected block gets its own outline element.
+   * @param minCount - minimum number of outlines expected (default 2)
+   */
+  async waitForMultiSelectOutlines(minCount = 2): Promise<void> {
+    await expect(async () => {
+      const count = await this.page.locator('.volto-hydra-block-outline').count();
+      expect(count).toBeGreaterThanOrEqual(minCount);
+    }).toPass({ timeout: 5000 });
+  }
+
+  /**
+   * Press Escape twice to navigate from text editing to parent block (or deselect).
+   * First Escape: text mode → block mode. Second Escape: block mode → parent.
+   * If already in block mode (not editing), only one Escape is needed.
+   */
+  async escapeToParent(): Promise<void> {
+    // Get current sidebar header count to detect navigation
+    const headersBefore = await this.page
+      .locator('.sidebar-section-header.sticky-header')
+      .count();
+
+    await this.page.keyboard.press('Escape');
+
+    // Check if we actually navigated (header count changed) or just entered block mode
+    // If still on same level after 300ms, press Escape again
+    await this.page.waitForTimeout(300);
+    const headersAfter = await this.page
+      .locator('.sidebar-section-header.sticky-header')
+      .count();
+
+    if (headersAfter >= headersBefore) {
+      // Didn't navigate — we entered block mode. Press again.
+      await this.page.keyboard.press('Escape');
+    }
   }
 
   /**
@@ -1008,7 +1100,7 @@ export class AdminUIHelper {
    * Also verifies the toolbar is not covered by the sidebar.
    * For template instances, pass an array of child block IDs to verify combined bounds.
    */
-  async waitForQuantaToolbar(blockIds: string | string[], timeout: number = 10000): Promise<void> {
+  async waitForBlockSelectedInAdmin(blockIds: string | string[], timeout: number = 10000): Promise<void> {
     // Normalize to array
     const ids = Array.isArray(blockIds) ? blockIds : [blockIds];
     const firstBlockId = ids[0];
@@ -1025,7 +1117,7 @@ export class AdminUIHelper {
       const res: any = await this.isBlockSelectedInIframe(ids);
       if (typeof res === 'boolean') return res;
       if (res?.reason && res.reason !== lastReason) {
-        console.log(`[waitForQuantaToolbar] ${displayId}: ${res.reason}`);
+        console.log(`[waitForBlockSelectedInAdmin] ${displayId}: ${res.reason}`);
         lastReason = res.reason;
       }
       return !!res && !!res.ok;
@@ -1086,7 +1178,7 @@ export class AdminUIHelper {
   async openQuantaToolbarMenu(blockId: string): Promise<void> {
 
     // First wait for the Quanta toolbar to appear
-    await this.waitForQuantaToolbar(blockId);
+    await this.waitForBlockSelectedInAdmin(blockId);
 
     const menuButton = await this.getMenuButtonInQuantaToolbar(blockId, 'options');
     await menuButton.click();
@@ -1260,8 +1352,8 @@ export class AdminUIHelper {
    * Handles both plain text and formatted text (where text is inside SPAN, STRONG, etc.)
    */
   async selectAllTextInEditor(editor: Locator): Promise<void> {
-    // Get the expected text content (visible text, trimmed)
-    const expectedText = await editor.evaluate((el) => el.textContent?.trim() || '');
+    // Get the expected text content (visible text, trimmed, strip ZWS/BOM)
+    const expectedText = await editor.evaluate((el) => (el.textContent || '').replace(/[\uFEFF\u200B]/g, '').trim());
 
     // Use platform-appropriate keyboard shortcut (Cmd+A on Mac, Ctrl+A elsewhere)
     await editor.press('ControlOrMeta+a');
@@ -1272,7 +1364,7 @@ export class AdminUIHelper {
         async () => {
           return editor.evaluate(() => {
             const sel = window.getSelection();
-            return sel?.toString().trim() || '';
+            return (sel?.toString() || '').replace(/[\uFEFF\u200B]/g, '').trim();
           });
         },
         { timeout: 5000 }
@@ -2397,10 +2489,10 @@ export class AdminUIHelper {
     await blockContainer.click();
 
     // Wait for block selection to be confirmed by Admin UI
-    await this.waitForBlockSelected(blockId);
+    await this.waitForIframeBlockHandle(blockId);
 
     // Wait for the Quanta toolbar to appear (indicating block is selected)
-    await this.waitForQuantaToolbar(blockId, 5000);
+    await this.waitForBlockSelectedInAdmin(blockId, 5000);
 
     // Now get the editor element (after block is selected and rendered)
     const editor = await this.getEditorLocator(blockId, fieldName);
@@ -2494,6 +2586,60 @@ export class AdminUIHelper {
     );
 
     // Wait for selection change to propagate
+    await this.page.waitForTimeout(100);
+  }
+
+  /**
+   * Set a text selection that spans from startOffset in startBlockId to
+   * endOffset in endBlockId. Same ZWS-aware position logic as selectTextRange
+   * but across two blocks in the iframe. Used to simulate a user's cross-block
+   * text drag.
+   */
+  async selectTextAcrossBlocks(
+    startBlockId: string,
+    startOffset: number,
+    endBlockId: string,
+    endOffset: number,
+  ): Promise<void> {
+    const iframe = this.getIframe();
+    await iframe.locator('body').evaluate(
+      (_body, args) => {
+        const findPositionInTextNodes = (root: Element, targetOffset: number) => {
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+          let currentOffset = 0;
+          let node: Node | null;
+          while ((node = walker.nextNode())) {
+            const text = node.textContent || '';
+            const cleanText = text.replace(/[﻿​]/g, '');
+            const nodeLength = cleanText.length;
+            if (currentOffset + nodeLength >= targetOffset) {
+              let charsSeen = 0;
+              let rawOffset = 0;
+              for (let i = 0; i < text.length && charsSeen < targetOffset - currentOffset; i++) {
+                if (text[i] !== '﻿' && text[i] !== '​') charsSeen++;
+                rawOffset++;
+              }
+              return { node, offset: rawOffset };
+            }
+            currentOffset += nodeLength;
+          }
+          return null;
+        };
+        const startEl = document.querySelector(`[data-block-uid="${args.startId}"]`);
+        const endEl = document.querySelector(`[data-block-uid="${args.endId}"]`);
+        if (!startEl || !endEl) throw new Error('blocks not found');
+        const startPos = findPositionInTextNodes(startEl, args.startOffset);
+        const endPos = findPositionInTextNodes(endEl, args.endOffset);
+        if (!startPos || !endPos) throw new Error('text positions not found');
+        const range = document.createRange();
+        range.setStart(startPos.node, startPos.offset);
+        range.setEnd(endPos.node, endPos.offset);
+        const sel = window.getSelection()!;
+        sel.removeAllRanges();
+        sel.addRange(range);
+      },
+      { startId: startBlockId, endId: endBlockId, startOffset, endOffset },
+    );
     await this.page.waitForTimeout(100);
   }
 
@@ -2841,70 +2987,111 @@ export class AdminUIHelper {
   }
 
   /**
-   * Select a block type from the block chooser.
-   * Block types: 'slate', 'image', 'video', 'listing', etc.
+   * Select a block type from the BlockChooser by its @type id.
+   *
+   * BlockChooser renders each block as `<button class={block.id}>`. The button
+   * exists in the DOM regardless of accordion state, but is hidden inside
+   * collapsed groups. We open every collapsed accordion title before clicking
+   * so the call works without a per-type display-name mapping.
    */
   async selectBlockType(blockType: string): Promise<void> {
-    // Wait for block chooser to be fully visible
-    await this.page.waitForSelector('.blocks-chooser', { state: 'visible', timeout: 5000 });
+    const chooser = this.page.locator('.blocks-chooser').first();
+    await chooser.waitFor({ state: 'visible', timeout: 5000 });
+    const button = chooser.locator(`button.${blockType}`).first();
+    // The button always exists in the DOM (even inside collapsed accordions).
+    // Wait for it to be attached, then dispatch click via JS so we don't
+    // depend on accordion expansion or animation state. Avoids touching
+    // accordion titles, which (in the Popup-hosted chooser) can shift the
+    // Popup geometry and accidentally close it.
+    await button.waitFor({ state: 'attached', timeout: 5000 });
+    await button.evaluate((el) => (el as HTMLButtonElement).click());
+    await chooser.waitFor({ state: 'hidden', timeout: 5000 });
+  }
 
-    // Different block types have different display names
-    const blockNames: Record<string, string[]> = {
-      slate: ['Text', 'Slate', 'text'],
-      image: ['Image', 'image'],
-      video: ['Video', 'video'],
-      listing: ['Listing', 'listing'],
-      columns: ['Columns', 'columns'],
-      accordion: ['Accordion', 'accordion'],
-      slider: ['Slider', 'slider'],
-      gridblock: ['Grid'],
+  /**
+   * Open the toolbar ⋯ menu and click "Convert to…", which opens the
+   * BlockChooser overlay (chooser is rendered in a portal above the page).
+   */
+  async openConvertChooser(): Promise<void> {
+    const toolbar = this.page.locator('.quanta-toolbar');
+    await toolbar.waitFor({ state: 'visible', timeout: 5000 });
+    await toolbar.locator('button:has-text("⋯")').click();
+    const dropdownMenu = this.page.locator('.volto-hydra-dropdown-menu');
+    await dropdownMenu.waitFor({ state: 'visible', timeout: 3000 });
+    await dropdownMenu.locator('.convert-to-menu').click();
+    const chooser = this.page.locator('.blocks-chooser');
+    await chooser.waitFor({ state: 'visible', timeout: 5000 });
+  }
+
+  /**
+   * Returns block-type ids currently offered by the open BlockChooser.
+   * Each block button has `class={block.id}`; we collect those ids after
+   * expanding every accordion. Helper for tests that verify which targets
+   * are present/absent in a Convert-to or Wrap-in chooser.
+   */
+  async getBlockChooserTypes(): Promise<string[]> {
+    const chooser = this.page.locator('.blocks-chooser');
+    await chooser.waitFor({ state: 'visible', timeout: 5000 });
+
+    const collectVisibleIds = async (): Promise<string[]> => {
+      const buttons = chooser.locator('.accordion .content.active .button.basic, .accordion-noaccordion .button.basic');
+      const count = await buttons.count();
+      const out: string[] = [];
+      for (let i = 0; i < count; i++) {
+        if (!(await buttons.nth(i).isVisible().catch(() => false))) continue;
+        const cls = (await buttons.nth(i).getAttribute('class')) || '';
+        const tokens = cls.split(/\s+/).filter((t) =>
+          t && t !== 'ui' && t !== 'button' && t !== 'basic' && t !== 'icon');
+        if (tokens.length > 0) out.push(tokens[0]);
+      }
+      return out;
     };
 
-    const possibleNames = blockNames[blockType.toLowerCase()] || [blockType];
+    const ids = new Set<string>();
 
-    // Block chooser is rendered as a portal directly on document.body
-    // with class "blocks-chooser". Look specifically within this container
-    // to avoid matching sidebar buttons with similar text.
-    const blockChooser = this.page.locator('.blocks-chooser');
-
-    // Wait for block chooser buttons to be rendered (at least one button should exist)
-    await blockChooser.locator('button').first().waitFor({ state: 'visible', timeout: 5000 });
-
-    // Try to find and click the block type button within the block chooser
-    for (const name of possibleNames) {
-      // Look for button within block chooser, excluding sidebar items (which have ⋮⋮ prefix)
-      const blockButton = blockChooser.locator(`button:has-text("${name}")`).first();
-
-      if (await blockButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await blockButton.click();
-        // Wait for block chooser to close (indicates block was added)
-        await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });
-        return;
+    // BlockChooser only renders accordions when filterValue is empty. If the
+    // chooser is in flat mode, collect once.
+    const titles = chooser.locator('.accordion .title');
+    const titleCount = await titles.count();
+    if (titleCount === 0) {
+      const flatButtons = chooser.locator('.button.basic');
+      const fbCount = await flatButtons.count();
+      for (let i = 0; i < fbCount; i++) {
+        const cls = (await flatButtons.nth(i).getAttribute('class')) || '';
+        const tokens = cls.split(/\s+/).filter((t) =>
+          t && t !== 'ui' && t !== 'button' && t !== 'basic' && t !== 'icon');
+        if (tokens.length > 0) ids.add(tokens[0]);
       }
+      return [...ids];
     }
 
-    // Block not visible in MOST USED section, try using search
-    const searchInput = blockChooser.locator('input[placeholder="Search"]');
-    if (await searchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      // Use the first possible name for search
-      await searchInput.fill(possibleNames[0]);
-      // Wait for search results to update (buttons should change)
-      await this.page.waitForTimeout(300);
-
-      // Now try to find the block button again
-      for (const name of possibleNames) {
-        const blockButton = blockChooser.locator(`button:has-text("${name}")`).first();
-
-        if (await blockButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await blockButton.click();
-          // Wait for block chooser to close (indicates block was added)
-          await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });
-          return;
-        }
+    // Open each accordion in turn, collecting visible block buttons.
+    for (let i = 0; i < titleCount; i++) {
+      const t = titles.nth(i);
+      const cls = (await t.getAttribute('class')) || '';
+      if (!cls.split(/\s+/).includes('active')) {
+        await t.click().catch(() => {});
+        await this.page.waitForTimeout(100);
       }
+      // Wait for the now-active content area to render.
+      const content = chooser.locator('.accordion .content.active');
+      await content.waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
+      for (const id of await collectVisibleIds()) ids.add(id);
     }
 
-    throw new Error(`Block type "${blockType}" not found in chooser`);
+    return [...ids];
+  }
+
+  /**
+   * Cancels the open BlockChooser overlay (used after assertion-only checks
+   * that don't actually pick a target).
+   */
+  async cancelBlockChooser(): Promise<void> {
+    const chooserOverlay = this.page.locator('.container-block-chooser');
+    if (await chooserOverlay.isVisible().catch(() => false)) {
+      await chooserOverlay.locator('button:has-text("Cancel")').click();
+      await chooserOverlay.waitFor({ state: 'hidden', timeout: 5000 });
+    }
   }
 
   /**
@@ -3124,6 +3311,18 @@ export class AdminUIHelper {
     // Get iframe offset for coordinate translation
     const iframeEl = this.page.locator('#previewIframe');
     const iframeBox = await iframeEl.boundingBox();
+
+    // Replace mode (drop into a container whose only child is an 'empty'
+    // placeholder) renders a shade overlay instead of a line indicator.
+    // If the shade is visible the drop is valid — short-circuit the
+    // line-indicator edge checks.
+    // Use evaluateAll (don't wait): the shade often doesn't exist for
+    // ordinary drops, and locator.evaluate would auto-wait ~30s every
+    // retry, blowing the 45s test timeout.
+    const shadeVisible = await iframe.locator('.volto-hydra-drop-shade').evaluateAll(
+      (els) => els.some((el) => getComputedStyle(el).display !== 'none'),
+    );
+    if (shadeVisible) return;
 
     // Use iframe's internal getBoundingClientRect for consistent coordinates
     // (Playwright's boundingBox doesn't account for iframe scroll correctly)
@@ -3716,7 +3915,7 @@ export class AdminUIHelper {
 
     // Select the source block first
     await this.clickBlockInIframe(sourceBlockId);
-    await this.waitForQuantaToolbar(sourceBlockId);
+    await this.waitForBlockSelectedInAdmin(sourceBlockId);
 
     // Get target block locator
     const targetBlock = iframe.locator(`[data-block-uid="${targetBlockId}"]`).first();
@@ -3736,7 +3935,7 @@ export class AdminUIHelper {
 
     // Select the source block first
     await this.clickBlockInIframe(sourceBlockId);
-    await this.waitForQuantaToolbar(sourceBlockId);
+    await this.waitForBlockSelectedInAdmin(sourceBlockId);
 
     // Get target block locator
     const targetBlock = iframe.locator(`[data-block-uid="${targetBlockId}"]`).first();

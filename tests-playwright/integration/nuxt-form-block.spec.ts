@@ -136,7 +136,7 @@ test.describe('Form Block', () => {
 
     // Select the form block via sidebar — press Escape to get to page level
     await helper.waitForSidebarOpen();
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
 
     // Drill down to the form block in the sidebar
     const pageChildBlocks = page.locator('#sidebar-order .child-blocks-widget');
@@ -151,7 +151,7 @@ test.describe('Form Block', () => {
     await nameItem.click();
 
     // Wait for the field to be selected
-    await helper.waitForBlockSelected('field-name', 5000);
+    await helper.waitForIframeBlockHandle('field-name', 5000);
     const toolbar = page.locator('.quanta-toolbar');
     await expect(toolbar).toBeVisible({ timeout: 5000 });
 

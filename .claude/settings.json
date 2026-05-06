@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//private/tmp/**)",
+      "Bash(gh pr *)",
+      "Read(//tmp/**)",
+      "Read(//Users/dylanjay/Servlet/pretagovhydra/hydraadmin/volto-hydra/core/packages/volto/src/helpers/Blocks/**)",
+      "Bash(NO_WEBSERVER=1 pnpm exec playwright test tests-playwright/integration/block-add-remove.spec.ts --project=admin-mock --workers=1 --retries=0 --reporter=line --grep \"Enter in block mode after Escape\")",
+      "Bash(NO_WEBSERVER=1 pnpm exec playwright test tests-playwright/integration/container-blocks.spec.ts --project=admin-mock --workers=1 --retries=0 --reporter=line --grep \"multiple allowedBlocks creates same type|single allowedBlock creates that type|nested block adds new block to container\")",
+      "Bash(NO_WEBSERVER=1 pnpm exec playwright test tests-playwright/integration/container-edge-drag.spec.ts --project=admin-mock --workers=1 --retries=0 --reporter=line)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  }
+}

@@ -51,14 +51,17 @@ export const Item = forwardRef(
         onFocus={() => dispatch(setUIState({ hovered: id }))}
         onMouseLeave={() => dispatch(setUIState({ hovered: null }))}
         onClick={(e) => {
-          if (depth === 0) {
-            const isMultipleSelection = e.shiftKey || e.ctrlKey || e.metaKey;
-            selected !== id &&
-              onSelectBlock(
-                id,
-                selected === id ? false : isMultipleSelection,
-                e,
-              );
+          if (e.ctrlKey || e.metaKey) {
+            // Ctrl/Cmd+Click: toggle in/out of multi-selection (any depth)
+            const current = multiSelected || [];
+            if (current.includes(id)) {
+              dispatch(setUIState({ multiSelected: current.filter(uid => uid !== id) }));
+            } else {
+              const base = current.length === 0 && selected ? [selected] : [...current];
+              dispatch(setUIState({ selected: null, multiSelected: [...base, id] }));
+            }
+          } else if (depth === 0) {
+            selected !== id && onSelectBlock(id);
           } else {
             dispatch(
               setUIState({

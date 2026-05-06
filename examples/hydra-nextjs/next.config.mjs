@@ -10,17 +10,12 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  webpack: (config, { dev }) => {
-    if (dev) {
-      // In dev mode, resolve hydra.js directly from source for live reload
-      // without needing to re-run copy:hydra after each change.
-      // In production builds, the copy:hydra script (prebuild) copies it to
-      // ./src/utils/hydra.js which the #utils/hydra import map resolves to.
-      config.resolve.alias['#utils/hydra'] = path.resolve(
-        __dirname,
-        '../../packages/hydra-js/hydra.js',
-      );
-    }
+  webpack: (config) => {
+    // Always resolve hydra.js from workspace source — webpack bundles tabbable
+    config.resolve.alias['#utils/hydra'] = path.resolve(
+      __dirname,
+      '../../packages/hydra-js/hydra.src.js',
+    );
     return config;
   },
 };

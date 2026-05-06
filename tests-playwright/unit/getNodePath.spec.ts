@@ -15,7 +15,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     // Load the mock parent page which initializes the real hydra.js bridge
     await page.goto('http://localhost:8889/mock-parent.html');
     await helper.waitForIframeReady();
-    await helper.waitForBlockSelected('mock-block-1');
+    await helper.waitForIframeBlockHandle('mock-block-1');
 
     // Inject helper for creating DOM with preserved whitespace (Vue/Nuxt template artifacts)
     await helper.injectPreserveWhitespaceHelper();
@@ -1543,7 +1543,7 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
     // Load the mock parent page which initializes the real hydra.js bridge
     await page.goto('http://localhost:8889/mock-parent.html');
     await helper.waitForIframeReady();
-    await helper.waitForBlockSelected('mock-block-1');
+    await helper.waitForIframeBlockHandle('mock-block-1');
 
     // Inject helper for creating DOM with preserved whitespace
     await helper.injectPreserveWhitespaceHelper();
