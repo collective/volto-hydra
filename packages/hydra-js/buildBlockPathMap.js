@@ -390,6 +390,18 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
     const layout = parent[fieldName]?.items;
     if (!blocks || !layout) return;
 
+    // Container constraints (allowedBlocks, maxLength) can be declared either
+    // at the field level (`blockSchema.properties.blocks_layout.maxLength`) or
+    // at Volto's block level (`blockConfig.maxLength` — the existing
+    // convention for built-ins like gridBlock). Field-level wins; otherwise
+    // fall back to the block-level values so adding an explicit blockSchema
+    // doesn't silently drop the legacy block-level constraints.
+    const parentBlockConfig = blocksConfig?.[parent?.['@type']];
+    const effectiveAllowedBlocks =
+      fieldDef.allowedBlocks ?? parentBlockConfig?.allowedBlocks ?? null;
+    const effectiveMaxLength =
+      fieldDef.maxLength ?? parentBlockConfig?.maxLength ?? null;
+
     // First pass: collect fixed status for all blocks to determine insert restrictions
     const blockFixedStatus = {};
     layout.forEach(blockId => {
@@ -472,13 +484,13 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         containerField: fieldName,
         blockType, // Block type for uniform lookups (single source of truth)
         _schemaRef: storeSchema(blockSchema), // Deduplicated schema reference
-        allowedSiblingTypes: fieldDef.allowedBlocks
+        allowedSiblingTypes: effectiveAllowedBlocks
           ? (parentId === PAGE_BLOCK_UID
-            ? fieldDef.allowedBlocks.filter(t => defaultPageAllowedBlocks.includes(t))
-            : fieldDef.allowedBlocks)
+            ? effectiveAllowedBlocks.filter(t => defaultPageAllowedBlocks.includes(t))
+            : effectiveAllowedBlocks)
           : defaultPageAllowedBlocks,
         allowedTemplates: fieldDef.allowedTemplates || null,
-        maxSiblings: fieldDef.maxLength || null,
+        maxSiblings: effectiveMaxLength,
         siblingCount: layout.length, // Total siblings in this container
         emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
         ...(isFixed && { isFixed: true }), // Fixed template blocks can't be moved/deleted
