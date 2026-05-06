@@ -488,10 +488,15 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
       if (!typeField) return schema;
     }
 
-    // Get context for computing choices
+    // Resolve blockPathMap/blockId from explicit args (set during
+    // buildBlockPathMap pass 2) before falling back to the hydraContext
+    // singleton (set by HydraSchemaProvider around the sidebar render).
     const hydraContext = getHydraSchemaContext();
-    const blockPathMap = hydraContext?.blockPathMap;
-    const blockId = hydraContext?.currentBlockId;
+    const blockPathMap = args.blockPathMap || hydraContext?.blockPathMap;
+    const blockId = args.blockId ?? hydraContext?.currentBlockId;
+    // Fallback args for getLiveBlockData when there is no React context
+    // (e.g., buildBlockPathMap pass 2 calls the enhancer outside any provider).
+    const liveFallback = { formData: args.pageFormData, blockPathMap };
 
     // Create or update typeField with computed choices
     const { filterConvertibleFrom, blocksField, title, default: defaultValue } = typeFieldOptions;
@@ -531,7 +536,7 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
       const pathInfo = blockPathMap[blockId];
       if (pathInfo?.parentId) {
         // Use getLiveBlockData to get fresh parent data from form internal state
-        const parentBlock = getLiveBlockData(pathInfo.parentId);
+        const parentBlock = getLiveBlockData(pathInfo.parentId, liveFallback);
         if (parentBlock) {
           const parentConfig = blocksConfig?.[parentBlock['@type']];
           const parentTypeField = findTypeField(parentConfig, intl);
@@ -548,7 +553,7 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
     if (parentControlsType) {
       // Get the type from parent's selection (via getLiveBlockData)
       const pathInfo = blockPathMap[blockId];
-      const parentBlock = getLiveBlockData(pathInfo.parentId);
+      const parentBlock = getLiveBlockData(pathInfo.parentId, liveFallback);
       const parentConfig = blocksConfig?.[parentBlock?.['@type']];
       const parentTypeField = findTypeField(parentConfig, intl);
       const parentSelectedType = parentBlock?.[parentTypeField];
@@ -815,7 +820,10 @@ export function hideParentOwnedFields({ editableFields, parentControlledFields }
     const hydraContext = getHydraSchemaContext();
     const blockPathMap = passedBlockPathMap || hydraContext?.blockPathMap;
     const blockId = passedBlockId ?? hydraContext?.currentBlockId;
-    const blocksConfig = hydraContext?.blocksConfig;
+    const blocksConfig = hydraContext?.blocksConfig || config.blocks.blocksConfig;
+    // Fallback args for getLiveBlockData when there is no React context
+    // (e.g., buildBlockPathMap pass 2 calls the enhancer outside any provider).
+    const liveFallback = { formData: args.pageFormData, blockPathMap };
 
     if (!blockPathMap || !blockId) return schema;
 
@@ -826,7 +834,7 @@ export function hideParentOwnedFields({ editableFields, parentControlledFields }
     // Only filter fields if parent uses schema inheritance (has typeField configured)
     // AND has a type selected. Otherwise children keep all their fields.
     if (blocksConfig) {
-      const parentBlock = getLiveBlockData(pathInfo.parentId);
+      const parentBlock = getLiveBlockData(pathInfo.parentId, liveFallback);
       if (parentBlock) {
         const parentConfig = blocksConfig[parentBlock['@type']];
         const typeField = findTypeField(parentConfig, intl);
@@ -853,13 +861,13 @@ export function hideParentOwnedFields({ editableFields, parentControlledFields }
       fieldsToHide = new Set(parentControlledFields);
     } else if (blocksConfig) {
       // Resolve from child config (editableFields → fieldMappings['@default'])
-      const childBlock = getLiveBlockData(blockId);
+      const childBlock = getLiveBlockData(blockId, liveFallback);
       const childType = childBlock?.['@type'];
       let childOwnFields = childType ? resolveChildOwnFields(blocksConfig[childType]) : null;
 
       // Last resort: parent's runtime fieldMapping widget targets
       if (!childOwnFields) {
-        const parentBlock = getLiveBlockData(pathInfo.parentId);
+        const parentBlock = getLiveBlockData(pathInfo.parentId, liveFallback);
         if (parentBlock) {
           const parentConfig = blocksConfig[parentBlock['@type']];
           const mappingField = parentConfig?.schemaEnhancer?.config?.mappingField;
@@ -1781,17 +1789,22 @@ function resolveFieldPath(fieldPath, formData, args) {
   // Parent path: ../field
   if (fieldPath.startsWith('../')) {
     const parentField = fieldPath.slice(3);
-    // Get parent data from hydra context (live UI) or pageFormData (during buildBlockPathMap)
+    // Prefer explicit args (set by buildBlockPathMap pass 2), then hydraContext
+    // (set by HydraSchemaProvider around the sidebar render).
     const hydraContext = getHydraSchemaContext?.();
-    if (hydraContext?.blockPathMap && hydraContext?.currentBlockId) {
-      const pathInfo = hydraContext.blockPathMap[hydraContext.currentBlockId];
+    const blockPathMap = args?.blockPathMap || hydraContext?.blockPathMap;
+    const blockId = args?.blockId ?? hydraContext?.currentBlockId;
+    if (blockPathMap && blockId) {
+      const pathInfo = blockPathMap[blockId];
       if (pathInfo?.parentId && pathInfo.parentId !== PAGE_BLOCK_UID) {
         // Nested block - get parent block data
-        const parentBlock = getLiveBlockData?.(pathInfo.parentId);
+        const liveFallback = { formData: args?.pageFormData, blockPathMap };
+        const parentBlock = getLiveBlockData?.(pathInfo.parentId, liveFallback);
         return parentBlock?.[parentField];
       } else {
-        // Top-level block - parent is the page, use hydraContext.formData
-        return hydraContext.formData?.[parentField];
+        // Top-level block - parent is the page, use page-level formData
+        const pageFormData = args?.pageFormData || hydraContext?.formData;
+        return pageFormData?.[parentField];
       }
     }
     // Fallback for schema builds outside live UI (e.g., buildBlockPathMap)

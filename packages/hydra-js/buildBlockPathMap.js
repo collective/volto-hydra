@@ -86,9 +86,12 @@ export function getBlockTypeSchema(blockType, intl, blocksConfig) {
  * @param {Object} intl - The intl object from react-intl (optional; only needed for i18n schemas)
  * @param {Object} blocksConfig - The blocks config from registry
  * @param {Object} formData - Block instance data passed to schemaEnhancer
+ * @param {Object} [pageFormData] - Full page formData (passed to enhancer for ../field lookups etc.)
+ * @param {string} [blockId] - This block's ID (passed to enhancer so it can look itself up in blockPathMap)
+ * @param {Object} [blockPathMap] - Block path map (passed to enhancer for parent/sibling lookups)
  * @returns {Object|null} - The enhanced block schema or null
  */
-export function getBlockSchema(blockType, intl, blocksConfig, formData, pageFormData) {
+export function getBlockSchema(blockType, intl, blocksConfig, formData, pageFormData, blockId, blockPathMap) {
   if (!blockType) return null;
   if (!blocksConfig) throw new Error('getBlockSchema requires blocksConfig');
 
@@ -138,6 +141,8 @@ export function getBlockSchema(blockType, intl, blocksConfig, formData, pageForm
       formData: effectiveFormData,
       intl,
       pageFormData,
+      blockId,
+      blockPathMap,
     });
   }
 
@@ -642,11 +647,56 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
     _schemaRef: storeSchema(pageSchema),
   };
 
-  // Start traversal with page as root container
-  // pageSchema was retrieved from blocksConfig['_page'] at the top of this function
-  // parentId=PAGE_BLOCK_UID means page-level blocks have the page as parent
-  // parentPath=[] means paths start with [fieldName, blockId]
+  // PASS 1: structural traversal
+  // Builds pathMap entries with parentId, path, blockType, allowedSiblingTypes,
+  // canInsertBefore/After, etc. _schemaRef is also set during pass 1 but with
+  // schemas computed without blockId/blockPathMap (since pathMap isn't fully
+  // built yet) — pass 2 will overwrite with fully-enhanced schemas.
   processItem(formData, PAGE_BLOCK_UID, [], pageSchema);
+
+  // PASS 2: re-enhance schemas with full blockId + blockPathMap context
+  // Now that pass 1 has built the structural pathMap, run each block's
+  // schemaEnhancer again with { blockId, blockPathMap, pageFormData } in args.
+  // This lets enhancers like inheritSchemaFrom and hideParentOwnedFields
+  // resolve parent/sibling state from the pathMap directly — without falling
+  // back to the global hydraContext singleton.
+  //
+  // Skip entries that don't have a real blocksConfig entry (template
+  // instances, virtual object_list types, _page) — pass 1's schema is
+  // authoritative for those.
+  for (const [blockId, pathInfo] of Object.entries(pathMap)) {
+    if (blockId === '_schemas') continue;
+    if (blockId === PAGE_BLOCK_UID) continue;
+    if (pathInfo.isTemplateInstance) continue;
+    if (!pathInfo.path) continue;
+
+    const { blockType } = pathInfo;
+    const blockConfig = blocksConfig?.[blockType];
+    // No config or no enhancer → nothing to re-do.
+    if (!blockConfig || typeof blockConfig.schemaEnhancer !== 'function') continue;
+
+    // Look up block data via path
+    let blockData = formData;
+    for (const key of pathInfo.path) {
+      if (blockData == null) break;
+      blockData = blockData[key];
+    }
+    if (!blockData) continue;
+
+    const enhancedSchema = getBlockSchema(
+      blockType,
+      intl,
+      blocksConfig,
+      blockData,
+      formData,      // pageFormData
+      blockId,       // NEW: blockId in enhancer args
+      pathMap,       // NEW: full pathMap in enhancer args
+    );
+    if (!enhancedSchema) continue;
+
+    pathInfo._schemaRef = storeSchema(enhancedSchema);
+    pathInfo.emptyRequiredFields = getEmptyRequiredFields(blockData, enhancedSchema);
+  }
 
   return pathMap;
 }

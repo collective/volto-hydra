@@ -68,22 +68,32 @@ export const setHydraSchemaContext = (value) => {
  * Get block data, checking liveBlockDataRef first for fresh data.
  * Use this instead of getBlockById when you need the most current data
  * (e.g., checking if parent has a type selected).
+ *
+ * Accepts an optional `fallback` object with { formData, blockPathMap } —
+ * used by callers that have those values explicitly (e.g., buildBlockPathMap
+ * pass 2, where there is no React context). The hydraContext path still
+ * takes precedence so live form-internal state wins during sidebar renders.
  */
-export const getLiveBlockData = (blockId) => {
-  if (!currentContextValue) {
-    return null;
-  }
-  const { liveBlockDataRef, formData, blockPathMap } = currentContextValue;
+export const getLiveBlockData = (blockId, fallback) => {
+  if (currentContextValue) {
+    const { liveBlockDataRef, formData, blockPathMap } = currentContextValue;
 
-  // Check liveBlockDataRef first (contains fresh data from form internal state)
-  if (liveBlockDataRef?.current?.[blockId]) {
-    return liveBlockDataRef.current[blockId];
+    // Check liveBlockDataRef first (contains fresh data from form internal state)
+    if (liveBlockDataRef?.current?.[blockId]) {
+      return liveBlockDataRef.current[blockId];
+    }
+
+    // Fall back to formData (page-level state)
+    if (formData && blockPathMap) {
+      const { getBlockById } = require('../utils/blockPath');
+      return getBlockById(formData, blockPathMap, blockId);
+    }
   }
 
-  // Fall back to formData (page-level state)
-  if (formData && blockPathMap) {
+  // Last resort: caller-provided formData + blockPathMap (no React context)
+  if (fallback?.formData && fallback?.blockPathMap) {
     const { getBlockById } = require('../utils/blockPath');
-    return getBlockById(formData, blockPathMap, blockId);
+    return getBlockById(fallback.formData, fallback.blockPathMap, blockId);
   }
 
   return null;
