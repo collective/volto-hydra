@@ -35,4 +35,26 @@ For most frameworks switching between SSG/SSR and SPA is just a config toggle, s
 
 ## Without Hydra (Two-Window Editing)
 
-You can use Plone headless without Hydra — use Volto for editing and your custom frontend for viewing. But Volto's default theme won't match your frontend, so editors have to switch tabs to see the real result. For WYSIWYG editing, you'd need to recreate your design in Volto (duplicating work), or just use Hydra.
+You can use Plone headless without Hydra — use Volto for editing and your custom frontend for viewing.
+
+To set this up:
+
+1. Deploy the Plone API server
+2. Deploy your frontend
+3. Deploy a Volto site with a default theme
+4. Set up your content types and block types
+    - Currently adding new blocks requires a custom Volto theme to be deployed
+    - Content types can be added via Volto's Site Setup
+
+### During editing
+
+- You'll use Volto with its out-of-the-box theme, so it won't look like your frontend.
+- Any new blocks you create will have a skeleton presentation within the Volto preview.
+- Any header/footer CSS etc. won't reflect your frontend.
+- Once a page is edited, editors switch to another tab and load the frontend URL to see the result.
+    - If the page is private, you'll additionally need a login flow on your frontend.
+
+### If you need a more WYSIWYG editing experience
+
+- Theme Volto to recreate the design (this duplicates effort you already did on the frontend).
+- Or just use Hydra.

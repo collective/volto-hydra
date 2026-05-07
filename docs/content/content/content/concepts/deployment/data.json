@@ -335,13 +335,196 @@
     },
     "p-15": {
       "@type": "slate",
-      "plaintext": "You can use Plone headless without Hydra — use Volto for editing and your custom frontend for viewing. But Volto's default theme won't match your frontend, so editors have to switch tabs to see the real result. For WYSIWYG editing, you'd need to recreate your design in Volto (duplicating work), or just use Hydra.",
+      "plaintext": "You can use Plone headless without Hydra — use Volto for editing and your custom frontend for viewing.",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "You can use Plone headless without Hydra — use Volto for editing and your custom frontend for viewing. But Volto's default theme won't match your frontend, so editors have to switch tabs to see the real result. For WYSIWYG editing, you'd need to recreate your design in Volto (duplicating work), or just use Hydra."
+              "text": "You can use Plone headless without Hydra — use Volto for editing and your custom frontend for viewing."
+            }
+          ]
+        }
+      ]
+    },
+    "p-16": {
+      "@type": "slate",
+      "plaintext": "To set this up:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "To set this up:"
+            }
+          ]
+        }
+      ]
+    },
+    "ol-17": {
+      "@type": "slate",
+      "plaintext": "Deploy the Plone API server Deploy your frontend Deploy a Volto site with a default theme Set up your content types and block types",
+      "value": [
+        {
+          "type": "ol",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Deploy the Plone API server"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Deploy your frontend"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Deploy a Volto site with a default theme"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Set up your content types and block types"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-18": {
+      "@type": "slate",
+      "plaintext": "- Currently adding new blocks requires a custom Volto theme to be deployed     - Content types can be added via Volto's Site Setup",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "- Currently adding new blocks requires a custom Volto theme to be deployed     - Content types can be added via Volto's Site Setup"
+            }
+          ]
+        }
+      ]
+    },
+    "h-19": {
+      "@type": "slate",
+      "plaintext": "During editing",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "During editing"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-20": {
+      "@type": "slate",
+      "plaintext": "You'll use Volto with its out-of-the-box theme, so it won't look like your frontend. Any new blocks you create will have a skeleton presentation within the Volto preview. Any header/footer CSS etc. won't reflect your frontend. Once a page is edited, editors switch to another tab and load the frontend URL to see the result.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "You'll use Volto with its out-of-the-box theme, so it won't look like your frontend."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Any new blocks you create will have a skeleton presentation within the Volto preview."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Any header/footer CSS etc. won't reflect your frontend."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Once a page is edited, editors switch to another tab and load the frontend URL to see the result."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-21": {
+      "@type": "slate",
+      "plaintext": "- If the page is private, you'll additionally need a login flow on your frontend.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "- If the page is private, you'll additionally need a login flow on your frontend."
+            }
+          ]
+        }
+      ]
+    },
+    "h-22": {
+      "@type": "slate",
+      "plaintext": "If you need a more WYSIWYG editing experience",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "If you need a more WYSIWYG editing experience"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-23": {
+      "@type": "slate",
+      "plaintext": "Theme Volto to recreate the design (this duplicates effort you already did on the frontend). Or just use Hydra.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Theme Volto to recreate the design (this duplicates effort you already did on the frontend)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Or just use Hydra."
+                }
+              ]
             }
           ]
         }
@@ -365,7 +548,15 @@
       "ul-12",
       "p-13",
       "h-14",
-      "p-15"
+      "p-15",
+      "p-16",
+      "ol-17",
+      "p-18",
+      "h-19",
+      "ul-20",
+      "p-21",
+      "h-22",
+      "ul-23"
     ]
   },
   "contributors": [],
