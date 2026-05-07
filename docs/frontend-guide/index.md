@@ -54,7 +54,7 @@ Several helper functions get reused in many blocks:
 
 ## 8. Listing Blocks
 
-- Use the [Listing Helpers](../listings-templates/index) or make your own [REST API call to query items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html)
+- Use the [Listing Helpers](../concepts/listings.md) or make your own [REST API call to query items](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html)
 - Create your own pagination scheme (e.g., embed page in URL for static generation)
 - Render the items and pagination
 

@@ -333,20 +333,170 @@
     },
     "p-11": {
       "@type": "slate",
-      "plaintext": "If a block type has a `fieldMappings` defined it will enable a \"Convert to...\" UI action. You specify either conversions to a specific type, or to a generic search result schema (`@id`, `title`, `preview-image`, `description`):",
+      "plaintext": "`fieldMappings` (plural) on a block config defines how fields map between block types. This enables three things:",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "If a block type has a "
+              "text": "fieldMappings",
+              "code": true
+            },
+            {
+              "text": " (plural) on a block config defines how fields map between block types. This enables three things:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-12": {
+      "@type": "slate",
+      "plaintext": "\"Convert to...\" UI action — editors can convert a block to another type (e.g. teaser → image). Listing item types — query results are mapped to item blocks via @default (see Listings). Synchronised container children — a parent controls child type, all children convert together (see Container Blocks › Synchronised Block Types).",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "\"Convert to...\" UI action",
+                  "strong": true
+                },
+                {
+                  "text": " — editors can convert a block to another type (e.g. teaser → image)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Listing item types",
+                  "strong": true
+                },
+                {
+                  "text": " — query results are mapped to item blocks via "
+                },
+                {
+                  "text": "@default",
+                  "code": true
+                },
+                {
+                  "text": " (see "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "listings.md"
+                  },
+                  "children": [
+                    {
+                      "text": "Listings"
+                    }
+                  ]
+                },
+                {
+                  "text": ")."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Synchronised container children",
+                  "strong": true
+                },
+                {
+                  "text": " — a parent controls child type, all children convert together (see "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "container-blocks.md#synchronised-block-types-in-a-container"
+                  },
+                  "children": [
+                    {
+                      "text": "Container Blocks › Synchronised Block Types"
+                    }
+                  ]
+                },
+                {
+                  "text": ")."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-13": {
+      "@type": "slate",
+      "plaintext": "Each key in `fieldMappings` is either a **specific block type name** or **`@default`**.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Each key in "
             },
             {
               "text": "fieldMappings",
               "code": true
             },
             {
-              "text": " defined it will enable a \"Convert to...\" UI action. You specify either conversions to a specific type, or to a generic search result schema ("
+              "text": " is either a "
+            },
+            {
+              "text": "specific block type name",
+              "strong": true
+            },
+            {
+              "text": " or "
+            },
+            {
+              "text": "`@default`",
+              "strong": true
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    "h-14": {
+      "@type": "slate",
+      "plaintext": "@default — the canonical content shape",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "@default",
+              "code": true
+            },
+            {
+              "text": " — the canonical content shape"
+            }
+          ]
+        }
+      ]
+    },
+    "p-15": {
+      "@type": "slate",
+      "plaintext": "`@default` is a virtual type representing canonical Plone content item fields: `@id`, `title`, `description`, `image`. These are the same fields that listing query results provide. A block with `fieldMappings['@default']` is saying \"I can be populated from standard content item fields.\" The keys in `@default` must only use these four canonical fields — using other keys (e.g. `label`, `field`, `required`) is invalid and produces a console warning.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "@default",
+              "code": true
+            },
+            {
+              "text": " is a virtual type representing canonical Plone content item fields: "
             },
             {
               "text": "@id",
@@ -363,56 +513,714 @@
               "text": ", "
             },
             {
-              "text": "preview-image",
+              "text": "description",
               "code": true
             },
             {
               "text": ", "
             },
             {
-              "text": "description",
+              "text": "image",
               "code": true
             },
             {
-              "text": "):"
+              "text": ". These are the same fields that listing query results provide. A block with "
+            },
+            {
+              "text": "fieldMappings['@default']",
+              "code": true
+            },
+            {
+              "text": " is saying \"I can be populated from standard content item fields.\" The keys in "
+            },
+            {
+              "text": "@default",
+              "code": true
+            },
+            {
+              "text": " must only use these four canonical fields — using other keys (e.g. "
+            },
+            {
+              "text": "label",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "field",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "required",
+              "code": true
+            },
+            {
+              "text": ") is invalid and produces a console warning."
             }
           ]
         }
       ]
     },
-    "ce-12": {
-      "@type": "codeExample",
-      "tabs": [
+    "h-16": {
+      "@type": "slate",
+      "plaintext": "Explicit type-to-type mappings",
+      "value": [
         {
-          "@id": "ce-12-javascript-329e2e",
-          "label": "Javascript",
-          "language": "javascript",
-          "code": "blocks: {\n    teaser: {\n        fieldMappings: {\n            '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },\n            image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },\n        },\n    },\n    image: {\n        fieldMappings: {\n            '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },\n            teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },\n        },\n    },\n}"
+          "type": "h3",
+          "children": [
+            {
+              "text": "Explicit type-to-type mappings"
+            }
+          ]
         }
       ]
     },
-    "p-13": {
+    "p-17": {
       "@type": "slate",
-      "plaintext": "Transitive conversions are performed automatically by using paths through intermediate types (e.g., `hero -> teaser -> image`). Any fields that don't match will still be kept in the data so if the block is converted back that data will reappear.",
+      "plaintext": "Use these when blocks share fields that aren't part of the `@default` set — for example, facet types sharing `{ title, field, hidden }` or form field types sharing `{ label, description, required }`.",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "Transitive conversions are performed automatically by using paths through intermediate types (e.g., "
+              "text": "Use these when blocks share fields that aren't part of the "
             },
             {
-              "text": "hero -> teaser -> image",
+              "text": "@default",
               "code": true
             },
             {
-              "text": "). Any fields that don't match will still be kept in the data so if the block is converted back that data will reappear."
+              "text": " set — for example, facet types sharing "
+            },
+            {
+              "text": "{ title, field, hidden }",
+              "code": true
+            },
+            {
+              "text": " or form field types sharing "
+            },
+            {
+              "text": "{ label, description, required }",
+              "code": true
+            },
+            {
+              "text": "."
             }
           ]
         }
       ]
     },
-    "h-14": {
+    "ce-18": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-18-javascript-9b9a53",
+          "label": "Javascript",
+          "language": "javascript",
+          "code": "// Content item types: use @default (canonical fields) + explicit cross-mappings\nteaser: {\n    fieldMappings: {\n        '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },\n        image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },\n    },\n},\nimage: {\n    fieldMappings: {\n        '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },\n        teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },\n    },\n},\n\n// Non-content types: use explicit hub-type mappings (NOT @default).\n// All facet types map through checkboxFacet as a hub:\nselectFacet:  { fieldMappings: { checkboxFacet: { title: 'title', field: 'field', hidden: 'hidden' } } },\ncheckboxFacet: { fieldMappings: { selectFacet: { /* ... */ }, daterangeFacet: { /* ... */ } } },"
+        }
+      ]
+    },
+    "h-19": {
+      "@type": "slate",
+      "plaintext": "Conversion graph rules",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Conversion graph rules"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-20": {
+      "@type": "slate",
+      "plaintext": "Explicit fieldMappings[typeName] always creates a conversion edge. @default only creates edges between types that both have valid @default mappings (keys from { @id, title, description, image }). Types with non-canonical @default keys are ignored. Types without fieldMappings never appear in the \"Convert to...\" menu. Transitive conversions use paths through intermediate types (e.g. hero → teaser → image). Unmapped fields are kept in the data so converting back restores them.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Explicit "
+                },
+                {
+                  "text": "fieldMappings[typeName]",
+                  "code": true
+                },
+                {
+                  "text": " always creates a conversion edge."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "@default",
+                  "code": true
+                },
+                {
+                  "text": " only creates edges between types that both have valid "
+                },
+                {
+                  "text": "@default",
+                  "code": true
+                },
+                {
+                  "text": " mappings (keys from "
+                },
+                {
+                  "text": "{ @id, title, description, image }",
+                  "code": true
+                },
+                {
+                  "text": "). Types with non-canonical "
+                },
+                {
+                  "text": "@default",
+                  "code": true
+                },
+                {
+                  "text": " keys are ignored."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Types without "
+                },
+                {
+                  "text": "fieldMappings",
+                  "code": true
+                },
+                {
+                  "text": " never appear in the \"Convert to...\" menu."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Transitive conversions use paths through intermediate types (e.g. hero → teaser → image)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Unmapped fields are kept in the data so converting back restores them."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "h-21": {
+      "@type": "slate",
+      "plaintext": "Mapping value format",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Mapping value format"
+            }
+          ]
+        }
+      ]
+    },
+    "p-22": {
+      "@type": "slate",
+      "plaintext": "A mapping value is either a string (simple field rename) or `{ field, type }` (rename with type conversion):",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A mapping value is either a string (simple field rename) or "
+            },
+            {
+              "text": "{ field, type }",
+              "code": true
+            },
+            {
+              "text": " (rename with type conversion):"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-23": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-23-json-431cb2",
+          "label": "Json",
+          "language": "json",
+          "code": "{\n    \"@id\": { \"field\": \"href\", \"type\": \"link\" },\n    \"title\": \"title\",\n    \"description\": \"description\",\n    \"image\": \"preview_image\"\n}"
+        }
+      ]
+    },
+    "p-24": {
+      "@type": "slate",
+      "plaintext": "When `type` is specified, the value is converted at runtime:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "When "
+            },
+            {
+              "text": "type",
+              "code": true
+            },
+            {
+              "text": " is specified, the value is converted at runtime:"
+            }
+          ]
+        }
+      ]
+    },
+    "tbl-25": {
+      "@type": "slateTable",
+      "table": {
+        "fixed": true,
+        "compact": false,
+        "basic": false,
+        "celled": true,
+        "inverted": false,
+        "striped": false,
+        "rows": [
+          {
+            "key": "tbl-25-r0",
+            "cells": [
+              {
+                "key": "tbl-25-r0c0",
+                "type": "header",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Type"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-25-r0c1",
+                "type": "header",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Conversion"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-25-r1",
+            "cells": [
+              {
+                "key": "tbl-25-r1c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "string",
+                        "code": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-25-r1c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Arrays joined with "
+                      },
+                      {
+                        "text": "\", \"",
+                        "code": true
+                      },
+                      {
+                        "text": "; image objects resolved to URL string"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-25-r2",
+            "cells": [
+              {
+                "key": "tbl-25-r2c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "link",
+                        "code": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-25-r2c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "String wrapped as "
+                      },
+                      {
+                        "text": "[{ \"@id\": value }]",
+                        "code": true
+                      },
+                      {
+                        "text": " (Volto link format)"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-25-r3",
+            "cells": [
+              {
+                "key": "tbl-25-r3c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "image",
+                        "code": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-25-r3c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Pass through (expects "
+                      },
+                      {
+                        "text": "{ \"@id\", image_field, image_scales }",
+                        "code": true
+                      },
+                      {
+                        "text": ")"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-25-r4",
+            "cells": [
+              {
+                "key": "tbl-25-r4c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "array",
+                        "code": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-25-r4c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Non-arrays wrapped in "
+                      },
+                      {
+                        "text": "[value]",
+                        "code": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-25-r5",
+            "cells": [
+              {
+                "key": "tbl-25-r5c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "(none)",
+                        "code": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-25-r5c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Copied as-is"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "h-26": {
+      "@type": "slate",
+      "plaintext": "FieldMappingWidget",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "FieldMappingWidget"
+            }
+          ]
+        }
+      ]
+    },
+    "p-27": {
+      "@type": "slate",
+      "plaintext": "When a parent block has `mappingField` set in its `inheritSchemaFrom` recipe, the admin sidebar shows a widget that lets editors configure field mappings visually:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "When a parent block has "
+            },
+            {
+              "text": "mappingField",
+              "code": true
+            },
+            {
+              "text": " set in its "
+            },
+            {
+              "text": "inheritSchemaFrom",
+              "code": true
+            },
+            {
+              "text": " recipe, the admin sidebar shows a widget that lets editors configure field mappings visually:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-28": {
+      "@type": "slate",
+      "plaintext": "Shows the @default source fields (@id, title, description, image) on the left. For each source field, lets the editor pick a field from the selected child type's schema. Auto-detects the conversion type from the target field definition (e.g. object_browser with mode=link → type: \"link\"). Saves the result as fieldMapping (singular) on the block data.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Shows the "
+                },
+                {
+                  "text": "@default",
+                  "code": true
+                },
+                {
+                  "text": " source fields ("
+                },
+                {
+                  "text": "@id",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "title",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "description",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "image",
+                  "code": true
+                },
+                {
+                  "text": ") on the left."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "For each source field, lets the editor pick a field from the selected child type's schema."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Auto-detects the conversion "
+                },
+                {
+                  "text": "type",
+                  "code": true
+                },
+                {
+                  "text": " from the target field definition (e.g. "
+                },
+                {
+                  "text": "object_browser",
+                  "code": true
+                },
+                {
+                  "text": " with "
+                },
+                {
+                  "text": "mode=link",
+                  "code": true
+                },
+                {
+                  "text": " → "
+                },
+                {
+                  "text": "type: \"link\"",
+                  "code": true
+                },
+                {
+                  "text": ")."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Saves the result as "
+                },
+                {
+                  "text": "fieldMapping",
+                  "code": true
+                },
+                {
+                  "text": " (singular) on the block data."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-29": {
+      "@type": "slate",
+      "plaintext": "The saved `fieldMapping` is read at render time by `expandListingBlocks` — no block registry access needed at render time.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The saved "
+            },
+            {
+              "text": "fieldMapping",
+              "code": true
+            },
+            {
+              "text": " is read at render time by "
+            },
+            {
+              "text": "expandListingBlocks",
+              "code": true
+            },
+            {
+              "text": " — no block registry access needed at render time."
+            }
+          ]
+        }
+      ]
+    },
+    "h-30": {
       "@type": "slate",
       "plaintext": "HTML Paste Support (TODO)",
       "value": [
@@ -426,7 +1234,7 @@
         }
       ]
     },
-    "p-15": {
+    "p-31": {
       "@type": "slate",
       "plaintext": "When the editor pastes rich HTML into the page, Hydra will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:",
       "value": [
@@ -440,18 +1248,18 @@
         }
       ]
     },
-    "ce-16": {
+    "ce-32": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-16-javascript-f81ad2",
+          "@id": "ce-32-javascript-adae5e",
           "label": "Javascript",
           "language": "javascript",
           "code": "video: {\n    fieldMappings: {\n        'css:video': { 'src': 'url', 'caption[@class=\"alt\"]': 'alt' },\n    },\n}"
         }
       ]
     },
-    "p-17": {
+    "p-33": {
       "@type": "slate",
       "plaintext": "The `css:<selector>` key in `fieldMappings` matches a pasted HTML element; the value maps element attributes to block fields. Not yet implemented — open question on whether this should run via `htmlTagsToSlate` (bypassing slate conversion) or be encoded into slate so attributes/classes survive.",
       "value": [
@@ -501,12 +1309,28 @@
       "ul-9",
       "h-10",
       "p-11",
-      "ce-12",
+      "ul-12",
       "p-13",
       "h-14",
       "p-15",
-      "ce-16",
-      "p-17"
+      "h-16",
+      "p-17",
+      "ce-18",
+      "h-19",
+      "ul-20",
+      "h-21",
+      "p-22",
+      "ce-23",
+      "p-24",
+      "tbl-25",
+      "h-26",
+      "p-27",
+      "ul-28",
+      "p-29",
+      "h-30",
+      "p-31",
+      "ce-32",
+      "p-33"
     ]
   },
   "contributors": [],

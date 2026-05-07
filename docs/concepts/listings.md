@@ -78,9 +78,30 @@ async function ListingItems({ id, blocks, paging, seen, fetchItems, onPaging }) 
 
 ## ploneFetchItems Helper
 
-**`ploneFetchItems({ apiUrl, contextPath, extraCriteria })`** — creates a fetcher function for Plone backends, suitable as a value in the `fetchItems` map. Normalizes results by packaging `image_field` + `image_scales` into a self-contained image object `{ @id, image_field, image_scales }`.
+`ploneFetchItems({ apiUrl, contextPath, extraCriteria })` creates a fetcher function for Plone's `@querystring-search` endpoint, suitable as a value in the `fetchItems` map.
 
-For non-Plone backends (RSS feeds, external APIs, etc.), write your own fetcher: `async (block, { start, size }) => { items, total }`.
+| Option | Default | Description |
+|--------|---------|-------------|
+| `apiUrl` | — | Plone site URL (e.g. `'http://localhost:8080/Plone'`) |
+| `contextPath` | `'/'` | Path for relative queries |
+| `extraCriteria` | `{}` | Additional query params — `SearchableText`, `sort_on`, `sort_order`, `facet.*` keys |
+
+A listing with no `querystring` defaults to showing the current folder's contents in folder order.
+
+`ploneFetchItems` also normalizes Plone's image data — packaging `image_field` + `image_scales` into a self-contained `image` object with `@id` duplicated inside (needed for URL resolution):
+
+<!-- codeExample: json -->
+```json
+// Plone search result:
+{ "@id": "/news/article", "image_field": "image", "image_scales": { "image": [{ "...": "..." }] } }
+
+// After normalization:
+{ "@id": "/news/article", "image": { "@id": "/news/article", "image_field": "image", "image_scales": { "...": "..." } } }
+```
+
+This self-contained object has everything needed to resolve image URLs with scale support — see the Nuxt example's `composables/imageProps.js` for one approach.
+
+For non-Plone backends (RSS feeds, external APIs, etc.), write your own fetcher: `async (block, { start, size }) => ({ items, total })`. `start` is the zero-based offset, `size` is the number of items to return (or `0` for total-only), and `total` in the return value is the full count, not just this page.
 
 ## Field Mapping
 
@@ -200,6 +221,12 @@ Both `expandListingBlocks` and `staticBlocks` return `{ items, paging }`. You pa
 - **`next`** (number | null) — Next page index, or null on last page
 - **`pages`** (array) — Window of ~5 page objects: `{ start, page }` where page is 1-based
 - **`seen`** (number) — Running item count — pass to the next call's `seen` option for position tracking in grids
+
+Neither function mutates the input `paging` object — calling again with the same `{ start, size }` is safe.
+
+When multiple listings share a pager (e.g. a grid with several listings), `expandListingBlocks` walks them sequentially. Each fetch returns `{ items, total }`, so the total is learned from the response and used to compute where the next listing starts. One request per listing. Listings outside the page window are fetched with `size: 0` (total only, no items).
+
+When mixing listings with static blocks in a shared pager, use `staticBlocks(ids, { blocks, paging, seen })` for the non-listing blocks — it tracks their position in the paging window. Chain the returned `paging.seen` to the next call so each block knows its offset (see the React example above).
 
 ## Notes
 

@@ -98,27 +98,86 @@ const bridge = initBridge({
 
 ## Block Conversion & fieldMappings
 
-If a block type has a `fieldMappings` defined it will enable a "Convert to..." UI action. You specify either conversions to a specific type, or to a generic search result schema (`@id`, `title`, `preview-image`, `description`):
+`fieldMappings` (plural) on a block config defines how fields map between block types. This enables three things:
+
+- **"Convert to..." UI action** — editors can convert a block to another type (e.g. teaser → image).
+- **Listing item types** — query results are mapped to item blocks via `@default` (see [Listings](listings.md)).
+- **Synchronised container children** — a parent controls child type, all children convert together (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)).
+
+Each key in `fieldMappings` is either a **specific block type name** or **`@default`**.
+
+### `@default` — the canonical content shape
+
+`@default` is a virtual type representing canonical Plone content item fields: `@id`, `title`, `description`, `image`. These are the same fields that listing query results provide. A block with `fieldMappings['@default']` is saying "I can be populated from standard content item fields." The keys in `@default` must only use these four canonical fields — using other keys (e.g. `label`, `field`, `required`) is invalid and produces a console warning.
+
+### Explicit type-to-type mappings
+
+Use these when blocks share fields that aren't part of the `@default` set — for example, facet types sharing `{ title, field, hidden }` or form field types sharing `{ label, description, required }`.
 
 <!-- codeExample: javascript -->
 ```javascript
-blocks: {
-    teaser: {
-        fieldMappings: {
-            '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
-            image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },
-        },
+// Content item types: use @default (canonical fields) + explicit cross-mappings
+teaser: {
+    fieldMappings: {
+        '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
+        image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },
     },
-    image: {
-        fieldMappings: {
-            '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },
-            teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },
-        },
+},
+image: {
+    fieldMappings: {
+        '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },
+        teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },
     },
+},
+
+// Non-content types: use explicit hub-type mappings (NOT @default).
+// All facet types map through checkboxFacet as a hub:
+selectFacet:  { fieldMappings: { checkboxFacet: { title: 'title', field: 'field', hidden: 'hidden' } } },
+checkboxFacet: { fieldMappings: { selectFacet: { /* ... */ }, daterangeFacet: { /* ... */ } } },
+```
+
+### Conversion graph rules
+
+- Explicit `fieldMappings[typeName]` always creates a conversion edge.
+- `@default` only creates edges between types that both have valid `@default` mappings (keys from `{ @id, title, description, image }`). Types with non-canonical `@default` keys are ignored.
+- Types without `fieldMappings` never appear in the "Convert to..." menu.
+- Transitive conversions use paths through intermediate types (e.g. hero → teaser → image).
+- Unmapped fields are kept in the data so converting back restores them.
+
+### Mapping value format
+
+A mapping value is either a string (simple field rename) or `{ field, type }` (rename with type conversion):
+
+<!-- codeExample: json -->
+```json
+{
+    "@id": { "field": "href", "type": "link" },
+    "title": "title",
+    "description": "description",
+    "image": "preview_image"
 }
 ```
 
-Transitive conversions are performed automatically by using paths through intermediate types (e.g., `hero -> teaser -> image`). Any fields that don't match will still be kept in the data so if the block is converted back that data will reappear.
+When `type` is specified, the value is converted at runtime:
+
+| Type | Conversion |
+|------|------------|
+| `string` | Arrays joined with `", "`; image objects resolved to URL string |
+| `link` | String wrapped as `[{ "@id": value }]` (Volto link format) |
+| `image` | Pass through (expects `{ "@id", image_field, image_scales }`) |
+| `array` | Non-arrays wrapped in `[value]` |
+| `(none)` | Copied as-is |
+
+### FieldMappingWidget
+
+When a parent block has `mappingField` set in its `inheritSchemaFrom` recipe, the admin sidebar shows a widget that lets editors configure field mappings visually:
+
+- Shows the `@default` source fields (`@id`, `title`, `description`, `image`) on the left.
+- For each source field, lets the editor pick a field from the selected child type's schema.
+- Auto-detects the conversion `type` from the target field definition (e.g. `object_browser` with `mode=link` → `type: "link"`).
+- Saves the result as `fieldMapping` (singular) on the block data.
+
+The saved `fieldMapping` is read at render time by `expandListingBlocks` — no block registry access needed at render time.
 
 ## HTML Paste Support (TODO)
 
