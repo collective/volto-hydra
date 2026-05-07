@@ -144,7 +144,6 @@ const applyConfig = (config) => {
   // pattern (which used to add `value` at sidebar render via the variation
   // HOC) is gone — eliminating ~150 redundant per-slate enhancer re-runs in
   // buildBlockPathMap pass 2 on slate-heavy pages.
-  const _slateOriginalSchema = config.blocks.blocksConfig.slate.schema;
   config.blocks.blocksConfig.slate = {
     ...config.blocks.blocksConfig.slate,
     // initialValue is called by Volto's _applyBlockInitialValue when adding new blocks
@@ -154,19 +153,22 @@ const applyConfig = (config) => {
       value: value.value || config.settings.slate.defaultValue(),
     }),
     schema: (props) => {
-      // _slateOriginalSchema = blocksConfig.slate.schema set by Volto-slate =
-      //   the Settings-tab schema (./TextBlockSchema.js).
-      // _slateBlockTabSchema = the Block-tab schema (./schema.js) with the
-      //   TOC settings (override_toc / level / entry_text). Volto's
-      //   DefaultTextBlockEditor imports it directly; we merge it here so
-      //   we have a SINGLE source of truth that includes both.
-      const settings = typeof _slateOriginalSchema === 'function'
-        ? _slateOriginalSchema(props)
-        : _slateOriginalSchema;
+      // We expose only the Block-tab schema (./schema.js — TOC settings:
+      // override_toc / level / entry_text) plus the slate body field.
+      //
+      // We deliberately don't include Volto-slate's Settings-tab schema
+      // (./TextBlockSchema.js — placeholder / instructions / required /
+      // fixed / disableNewBlocks / readOnly):
+      //   - `fixed` and `readOnly` are surfaced separately by
+      //     ParentBlocksWidget's template-block-settings schema and would
+      //     duplicate in template-edit mode.
+      //   - `placeholder` / `instructions` are template-author-only fields
+      //     that the previous Volto Hydra slate sidebar didn't expose.
+      //   - These fields are still honored at runtime (block.fixed,
+      //     block.readOnly, etc. read straight from data).
       const blockTab = typeof _slateBlockTabSchema === 'function'
         ? _slateBlockTabSchema(props?.formData || props?.data || {})
         : _slateBlockTabSchema;
-      const settingsFields = settings?.fieldsets?.[0]?.fields || [];
       const blockTabFields = blockTab?.fieldsets?.[0]?.fields || [];
       // Placeholder text for the slate body. props.intl may not be passed
       // (e.g. when called by buildBlockPathMap via getBlockTypeSchema with
@@ -175,26 +177,20 @@ const applyConfig = (config) => {
         ? props.intl.formatMessage(messages.typeText)
         : messages.typeText.defaultMessage;
       return {
-        title: settings?.title || blockTab?.title || 'Slate',
+        title: blockTab?.title || 'Slate',
         fieldsets: [
           {
             id: 'default',
             title: 'Default',
-            fields: ['value', ...blockTabFields, ...settingsFields],
+            fields: ['value', ...blockTabFields],
           },
-          // Preserve any extra fieldsets either schema declared.
-          ...(settings?.fieldsets?.slice(1) || []),
           ...(blockTab?.fieldsets?.slice(1) || []),
         ],
         properties: {
           value: { title: 'Body', widget: 'slate', placeholder },
           ...(blockTab?.properties || {}),
-          ...(settings?.properties || {}),
         },
-        required: [
-          ...(settings?.required || []),
-          ...(blockTab?.required || []),
-        ],
+        required: blockTab?.required || [],
       };
     },
     sidebarTab: 1,
