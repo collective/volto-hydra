@@ -56,18 +56,919 @@
         }
       ]
     },
-    "ce-2": {
+    "h-2": {
+      "@type": "slate",
+      "plaintext": "initBridge() Reference",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "initBridge()",
+              "code": true
+            },
+            {
+              "text": " Reference"
+            }
+          ]
+        }
+      ]
+    },
+    "p-3": {
+      "@type": "slate",
+      "plaintext": "`initBridge(options)` opens the iframe bridge and registers your frontend's page and block configuration with the admin. Call it once during page setup when running inside the admin iframe.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "initBridge(options)",
+              "code": true
+            },
+            {
+              "text": " opens the iframe bridge and registers your frontend's page and block configuration with the admin. Call it once during page setup when running inside the admin iframe."
+            }
+          ]
+        }
+      ]
+    },
+    "ce-4": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-2-javascript-addcef",
+          "@id": "ce-4-js-dec45b",
+          "label": "Js",
+          "language": "js",
+          "code": "import { initBridge } from '@hydra-js/hydra.js';\n\nconst bridge = initBridge({\n  page:        { /* page-level blocks fields */ },\n  blocks:      { /* block type registry */ },\n  voltoConfig: { /* other Volto settings */ },\n  onEditChange: (formData) => { /* re-render on edit */ },\n  pathToApiPath: (path) => path,\n  debug: false,\n});"
+        }
+      ]
+    },
+    "h-5": {
+      "@type": "slate",
+      "plaintext": "page — page-level blocks fields",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "page",
+              "code": true
+            },
+            {
+              "text": " — page-level blocks fields"
+            }
+          ]
+        }
+      ]
+    },
+    "p-6": {
+      "@type": "slate",
+      "plaintext": "Defines the **regions of a page** where blocks can live. `page.schema.properties` is keyed by field name; each entry is one region.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Defines the "
+            },
+            {
+              "text": "regions of a page",
+              "strong": true
+            },
+            {
+              "text": " where blocks can live. "
+            },
+            {
+              "text": "page.schema.properties",
+              "code": true
+            },
+            {
+              "text": " is keyed by field name; each entry is one region."
+            }
+          ]
+        }
+      ]
+    },
+    "ce-7": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-7-javascript-f817db",
+          "label": "Js",
+          "language": "js",
+          "code": "page: {\n  schema: {\n    properties: {\n      blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'slider'] },\n      header_blocks: { title: 'Header',  allowedBlocks: ['slate'], maxLength: 3 },\n      footer_blocks: { title: 'Footer',  allowedBlocks: ['slate', 'link'] },\n    },\n  },\n}"
+        }
+      ]
+    },
+    "p-8": {
+      "@type": "slate",
+      "plaintext": "Per-field options:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Per-field options:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-9": {
+      "@type": "slate",
+      "plaintext": "title — sidebar section title (defaults to the field name). allowedBlocks — array of block-type names this region accepts. Acts as a per-region filter on top of the registry. allowedTemplates — array of template URLs shown in the BlockChooser's \"Templates\" group for this field. See Templates. allowedLayouts — array of template URLs shown in the Layout dropdown for this field. maxLength — maximum number of blocks in the field.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`title`",
+                  "strong": true
+                },
+                {
+                  "text": " — sidebar section title (defaults to the field name)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`allowedBlocks`",
+                  "strong": true
+                },
+                {
+                  "text": " — array of block-type names this region accepts. Acts as a per-region filter on top of the registry."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`allowedTemplates`",
+                  "strong": true
+                },
+                {
+                  "text": " — array of template URLs shown in the BlockChooser's \"Templates\" group for this field. See "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "templates.md"
+                  },
+                  "children": [
+                    {
+                      "text": "Templates"
+                    }
+                  ]
+                },
+                {
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`allowedLayouts`",
+                  "strong": true
+                },
+                {
+                  "text": " — array of template URLs shown in the Layout dropdown for this field."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`maxLength`",
+                  "strong": true
+                },
+                {
+                  "text": " — maximum number of blocks in the field."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-10": {
+      "@type": "slate",
+      "plaintext": "Defaults and side effects:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Defaults and side effects:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-11": {
+      "@type": "slate",
+      "plaintext": "If you don't include blocks_layout, it's auto-added with { title: 'Blocks' }. The sidebar shows one section per field when no block is selected. Auto-restrict: any block type that's not in any field's allowedBlocks is auto-restricted (hidden from the BlockChooser globally). To bypass, set the block's restricted to a function instead of true/false. Fields not present in saved page data are auto-initialised with { items: [] } on load. You can't currently change the page metadata schema itself — custom content types are created via \"Site Setup > Content types\" in Volto.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "If you don't include "
+                },
+                {
+                  "text": "blocks_layout",
+                  "code": true
+                },
+                {
+                  "text": ", it's auto-added with "
+                },
+                {
+                  "text": "{ title: 'Blocks' }",
+                  "code": true
+                },
+                {
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "The sidebar shows one section per field when no block is selected."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Auto-restrict",
+                  "strong": true
+                },
+                {
+                  "text": ": any block type that's not in "
+                },
+                {
+                  "text": "any",
+                  "em": true
+                },
+                {
+                  "text": " field's "
+                },
+                {
+                  "text": "allowedBlocks",
+                  "code": true
+                },
+                {
+                  "text": " is auto-restricted (hidden from the BlockChooser globally). To bypass, set the block's "
+                },
+                {
+                  "text": "restricted",
+                  "code": true
+                },
+                {
+                  "text": " to a function instead of "
+                },
+                {
+                  "text": "true",
+                  "code": true
+                },
+                {
+                  "text": "/"
+                },
+                {
+                  "text": "false",
+                  "code": true
+                },
+                {
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Fields not present in saved page data are auto-initialised with "
+                },
+                {
+                  "text": "{ items: [] }",
+                  "code": true
+                },
+                {
+                  "text": " on load."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "You can't currently change the page metadata schema itself — custom content types are created via \"Site Setup > Content types\" in Volto."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "h-12": {
+      "@type": "slate",
+      "plaintext": "blocks — block type registry",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "blocks",
+              "code": true
+            },
+            {
+              "text": " — block type registry"
+            }
+          ]
+        }
+      ]
+    },
+    "p-13": {
+      "@type": "slate",
+      "plaintext": "Defines or overrides individual block types. Each key is the block type name (matching what appears in `allowedBlocks` and `@type` on saved blocks).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Defines or overrides individual block types. Each key is the block type name (matching what appears in "
+            },
+            {
+              "text": "allowedBlocks",
+              "code": true
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "@type",
+              "code": true
+            },
+            {
+              "text": " on saved blocks)."
+            }
+          ]
+        }
+      ]
+    },
+    "ce-14": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-14-js-c5449c",
+          "label": "Js",
+          "language": "js",
+          "code": "blocks: {\n  slider: {                          // new custom block\n    id: 'slider',\n    title: 'Slider',\n    icon: 'data:...',\n    group: 'common',\n    mostUsed: true,\n    blockSchema: { properties: { /* fields */ } },\n  },\n  slate: {                           // override the built-in slate block\n    blockSchema: { /* override */ },\n  },\n}"
+        }
+      ]
+    },
+    "p-15": {
+      "@type": "slate",
+      "plaintext": "Per-block options (most are passed through to Volto's block config):",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Per-block options (most are passed through to Volto's block config):"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-16": {
+      "@type": "slate",
+      "plaintext": "id — block type identifier (matches the key). title — display name in the BlockChooser. icon — icon shown in the BlockChooser (data URL or SVG component). group — chooser group (e.g. 'common'). restricted — true hides the block from the chooser; can also be a function for conditional restrictions. mostUsed — pin to the top of the chooser. disableCustomSidebarEditForm — set true to use only the schema form in the sidebar (no custom edit component). blockSchema — JSON-schema-style definition of the block's fields. See Schema Enhancers below and the Block reference. fieldMappings — block-to-block conversion rules. See Block Conversion & fieldMappings below. schemaEnhancer — recipe-based schema modifier; supports fieldRules, inheritSchemaFrom, etc. See Schema Enhancers.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`id`",
+                  "strong": true
+                },
+                {
+                  "text": " — block type identifier (matches the key)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`title`",
+                  "strong": true
+                },
+                {
+                  "text": " — display name in the BlockChooser."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`icon`",
+                  "strong": true
+                },
+                {
+                  "text": " — icon shown in the BlockChooser (data URL or SVG component)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`group`",
+                  "strong": true
+                },
+                {
+                  "text": " — chooser group (e.g. "
+                },
+                {
+                  "text": "'common'",
+                  "code": true
+                },
+                {
+                  "text": ")."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`restricted`",
+                  "strong": true
+                },
+                {
+                  "text": " — "
+                },
+                {
+                  "text": "true",
+                  "code": true
+                },
+                {
+                  "text": " hides the block from the chooser; can also be a function for conditional restrictions."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`mostUsed`",
+                  "strong": true
+                },
+                {
+                  "text": " — pin to the top of the chooser."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`disableCustomSidebarEditForm`",
+                  "strong": true
+                },
+                {
+                  "text": " — set "
+                },
+                {
+                  "text": "true",
+                  "code": true
+                },
+                {
+                  "text": " to use only the schema form in the sidebar (no custom edit component)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`blockSchema`",
+                  "strong": true
+                },
+                {
+                  "text": " — JSON-schema-style definition of the block's fields. See "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "#schema-enhancers"
+                  },
+                  "children": [
+                    {
+                      "text": "Schema Enhancers"
+                    }
+                  ]
+                },
+                {
+                  "text": " below and the "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "../blocks/README.md"
+                  },
+                  "children": [
+                    {
+                      "text": "Block reference"
+                    }
+                  ]
+                },
+                {
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`fieldMappings`",
+                  "strong": true
+                },
+                {
+                  "text": " — block-to-block conversion rules. See "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "#block-conversion--fieldmappings"
+                  },
+                  "children": [
+                    {
+                      "text": "Block Conversion & fieldMappings"
+                    }
+                  ]
+                },
+                {
+                  "text": " below."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`schemaEnhancer`",
+                  "strong": true
+                },
+                {
+                  "text": " — recipe-based schema modifier; supports "
+                },
+                {
+                  "text": "fieldRules",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "inheritSchemaFrom",
+                  "code": true
+                },
+                {
+                  "text": ", etc. See "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "#schema-enhancers"
+                  },
+                  "children": [
+                    {
+                      "text": "Schema Enhancers"
+                    }
+                  ]
+                },
+                {
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-17": {
+      "@type": "slate",
+      "plaintext": "`page` and `blocks` interact via name lookup: a region's `allowedBlocks: ['slate', 'slider']` references keys of the `blocks` registry. You can use one without the other — `page` alone restricts placement of built-in blocks; `blocks` alone registers custom types and gets a default `blocks_layout` region accepting everything.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "page",
+              "code": true
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "blocks",
+              "code": true
+            },
+            {
+              "text": " interact via name lookup: a region's "
+            },
+            {
+              "text": "allowedBlocks: ['slate', 'slider']",
+              "code": true
+            },
+            {
+              "text": " references keys of the "
+            },
+            {
+              "text": "blocks",
+              "code": true
+            },
+            {
+              "text": " registry. You can use one without the other — "
+            },
+            {
+              "text": "page",
+              "code": true
+            },
+            {
+              "text": " alone restricts placement of built-in blocks; "
+            },
+            {
+              "text": "blocks",
+              "code": true
+            },
+            {
+              "text": " alone registers custom types and gets a default "
+            },
+            {
+              "text": "blocks_layout",
+              "code": true
+            },
+            {
+              "text": " region accepting everything."
+            }
+          ]
+        }
+      ]
+    },
+    "h-18": {
+      "@type": "slate",
+      "plaintext": "Other top-level options",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Other top-level options"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-19": {
+      "@type": "slate",
+      "plaintext": "onEditChange(formData) — callback invoked with the new form data whenever the editor changes anything. See Live Preview › Setting Up the Bridge. pathToApiPath(path) — function transforming a frontend path to the API/admin path on PATH_CHANGE messages. Use when your frontend embeds state (paging, filters) in URL segments that don't exist on the CMS side. See Listings › Path Transformation. voltoConfig — passes additional Volto config (non-block settings) through to the admin. Future home for things like slate formats (TODO #109) and toolbar actions. debug — true enables verbose console logging in the bridge. Default false.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`onEditChange(formData)`",
+                  "strong": true
+                },
+                {
+                  "text": " — callback invoked with the new form data whenever the editor changes anything. See "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "live-preview.md#setting-up-the-bridge"
+                  },
+                  "children": [
+                    {
+                      "text": "Live Preview › Setting Up the Bridge"
+                    }
+                  ]
+                },
+                {
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`pathToApiPath(path)`",
+                  "strong": true
+                },
+                {
+                  "text": " — function transforming a frontend path to the API/admin path on "
+                },
+                {
+                  "text": "PATH_CHANGE",
+                  "code": true
+                },
+                {
+                  "text": " messages. Use when your frontend embeds state (paging, filters) in URL segments that don't exist on the CMS side. See "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "listings.md#path-transformation-pathtoapipath"
+                  },
+                  "children": [
+                    {
+                      "text": "Listings › Path Transformation"
+                    }
+                  ]
+                },
+                {
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`voltoConfig`",
+                  "strong": true
+                },
+                {
+                  "text": " — passes additional Volto config (non-block settings) through to the admin. Future home for things like slate formats ("
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "https://github.com/collective/volto-hydra/issues/109"
+                  },
+                  "children": [
+                    {
+                      "text": "TODO #109"
+                    }
+                  ]
+                },
+                {
+                  "text": ") and toolbar actions."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`debug`",
+                  "strong": true
+                },
+                {
+                  "text": " — "
+                },
+                {
+                  "text": "true",
+                  "code": true
+                },
+                {
+                  "text": " enables verbose console logging in the bridge. Default "
+                },
+                {
+                  "text": "false",
+                  "code": true
+                },
+                {
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "h-20": {
+      "@type": "slate",
+      "plaintext": "Returns",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Returns"
+            }
+          ]
+        }
+      ]
+    },
+    "p-21": {
+      "@type": "slate",
+      "plaintext": "The `Bridge` instance, which exposes additional API methods you can call from the frontend (e.g. `getAccessToken()`, `sendBlockUpdate()`, `sendBlockAction()`). See [Advanced › Custom Sidebar UI](advanced.md#custom-sidebar-and-cms-ui) for those.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The "
+            },
+            {
+              "text": "Bridge",
+              "code": true
+            },
+            {
+              "text": " instance, which exposes additional API methods you can call from the frontend (e.g. "
+            },
+            {
+              "text": "getAccessToken()",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "sendBlockUpdate()",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "sendBlockAction()",
+              "code": true
+            },
+            {
+              "text": "). See "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "advanced.md#custom-sidebar-and-cms-ui"
+              },
+              "children": [
+                {
+                  "text": "Advanced › Custom Sidebar UI"
+                }
+              ]
+            },
+            {
+              "text": " for those."
+            }
+          ]
+        }
+      ]
+    },
+    "h-22": {
+      "@type": "slate",
+      "plaintext": "Defining a custom block",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Defining a custom block"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-23": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-23-javascript-a47dd8",
           "label": "Javascript",
           "language": "javascript",
           "code": "const bridge = initBridge({\n    page: {\n        schema: {\n            properties: {\n                blocks_layout: {\n                    title: 'Content',\n                    allowedBlocks: ['slate', 'image', 'video', 'slider'],\n                },\n            },\n        },\n    },\n    blocks: {\n        slider: {\n            id: 'slider',\n            title: 'Slider',\n            icon: 'data:...',\n            group: 'common',\n            restricted: false,\n            mostUsed: true,\n            disableCustomSidebarEditForm: false,\n            blockSchema: {\n                properties: {\n                    slider_timing: {\n                        title: 'Delay',\n                        widget: 'float',\n                    },\n                    slides: {\n                        title: 'Slides',\n                        widget: 'blocks_layout',\n                        allowedBlocks: ['slide', 'image'],\n                        defaultBlockType: 'slide',\n                    }\n                },\n            }\n        },\n        slide: {\n            id: 'slide',\n            title: 'Slide',\n            blockSchema: {\n                properties: {\n                    url: { title: 'Link', widget: 'url' },\n                    title: { title: 'Title' },\n                    image: { title: 'Image', widget: 'image' },\n                    description: { title: 'Description',\n                                   widget: 'slate' },\n                },\n            },\n        },\n    },\n});"
         }
       ]
     },
-    "p-3": {
+    "p-24": {
       "@type": "slate",
       "plaintext": "Child block types (like `slide` above) must be defined at the top level of `blocks`. You can also:",
       "value": [
@@ -95,7 +996,7 @@
         }
       ]
     },
-    "ul-4": {
+    "ul-25": {
       "@type": "slate",
       "plaintext": "Set restricted: true to hide a block from the block chooser (only usable as child blocks) Set mostUsed: true to pin a block to the top of the chooser Set disableCustomSidebarEditForm: true to use only the schema form in the sidebar (no custom edit component) Use fieldsets in the schema to organize fields into tabs",
       "value": [
@@ -166,7 +1067,7 @@
         }
       ]
     },
-    "h-5": {
+    "h-26": {
       "@type": "slate",
       "plaintext": "Schema Enhancers",
       "value": [
@@ -180,7 +1081,7 @@
         }
       ]
     },
-    "p-6": {
+    "p-27": {
       "@type": "slate",
       "plaintext": "Schema enhancers modify block schemas dynamically:",
       "value": [
@@ -194,18 +1095,18 @@
         }
       ]
     },
-    "ce-7": {
+    "ce-28": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-7-javascript-f817db",
+          "@id": "ce-28-javascript-b52851",
           "label": "Javascript",
           "language": "javascript",
           "code": "const bridge = initBridge({\n    blocks: {\n        myBlock: {\n            blockSchema: {\n                properties: {\n                    mode: {\n                        title: 'Mode', widget: 'select',\n                        choices: [['simple', 'Simple'], ['advanced', 'Advanced']],\n                    },\n                    advancedOptions: { title: 'Advanced Options', type: 'string' },\n                },\n            },\n            schemaEnhancer: {\n                fieldRules: {\n                    advancedOptions: { when: { mode: 'advanced' }, else: false },\n                },\n            },\n        },\n    },\n});"
         }
       ]
     },
-    "p-8": {
+    "p-29": {
       "@type": "slate",
       "plaintext": "**`fieldRules`** — add, remove, or conditionally modify field definitions. The value for each rule key can be:",
       "value": [
@@ -223,7 +1124,7 @@
         }
       ]
     },
-    "ul-9": {
+    "ul-30": {
       "@type": "slate",
       "plaintext": "false — always hide the field { set: { title: '...', widget: '...' } } — always add or replace the field definition { when: { fieldName: value }, else: false } — show only when condition met { when: { fieldName: { gte: 2 } }, set: { ... } } — conditional definition override [rule, rule, ...] — switch: first matching rule wins. A bare false in the array is a catch-all hide: [{ when: A }, { when: B }, false] shows on A or B, hides otherwise. 'parent.child': false — hide a field inside a widget's inner schema",
       "value": [
@@ -320,7 +1221,7 @@
         }
       ]
     },
-    "p-10": {
+    "p-31": {
       "@type": "slate",
       "plaintext": "Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`.",
       "value": [
@@ -390,7 +1291,7 @@
         }
       ]
     },
-    "p-11": {
+    "p-32": {
       "@type": "slate",
       "plaintext": "Field paths: `../field` for the parent block's field, `/field` for a page metadata field.",
       "value": [
@@ -418,7 +1319,7 @@
         }
       ]
     },
-    "h-12": {
+    "h-33": {
       "@type": "slate",
       "plaintext": "Block Conversion & fieldMappings",
       "value": [
@@ -432,7 +1333,7 @@
         }
       ]
     },
-    "p-13": {
+    "p-34": {
       "@type": "slate",
       "plaintext": "`fieldMappings` (plural) on a block config defines how fields map between block types. This enables three things:",
       "value": [
@@ -450,7 +1351,7 @@
         }
       ]
     },
-    "ul-14": {
+    "ul-35": {
       "@type": "slate",
       "plaintext": "\"Convert to...\" UI action — editors can convert a block to another type (e.g. teaser → image). Listing item types — query results are mapped to item blocks via @default (see Listings). Synchronised container children — a parent controls child type, all children convert together (see Container Blocks › Synchronised Block Types).",
       "value": [
@@ -532,7 +1433,7 @@
         }
       ]
     },
-    "p-15": {
+    "p-36": {
       "@type": "slate",
       "plaintext": "Each key in `fieldMappings` is either a **specific block type name** or **`@default`**.",
       "value": [
@@ -567,7 +1468,7 @@
         }
       ]
     },
-    "h-16": {
+    "h-37": {
       "@type": "slate",
       "plaintext": "@default — the canonical content shape",
       "value": [
@@ -585,7 +1486,7 @@
         }
       ]
     },
-    "p-17": {
+    "p-38": {
       "@type": "slate",
       "plaintext": "`@default` is a virtual type representing canonical Plone content item fields: `@id`, `title`, `description`, `image`. These are the same fields that listing query results provide. A block with `fieldMappings['@default']` is saying \"I can be populated from standard content item fields.\" The keys in `@default` must only use these four canonical fields — using other keys (e.g. `label`, `field`, `required`) is invalid and produces a console warning.",
       "value": [
@@ -666,7 +1567,7 @@
         }
       ]
     },
-    "h-18": {
+    "h-39": {
       "@type": "slate",
       "plaintext": "Explicit type-to-type mappings",
       "value": [
@@ -680,7 +1581,7 @@
         }
       ]
     },
-    "p-19": {
+    "p-40": {
       "@type": "slate",
       "plaintext": "Use these when blocks share fields that aren't part of the `@default` set — for example, facet types sharing `{ title, field, hidden }` or form field types sharing `{ label, description, required }`.",
       "value": [
@@ -715,18 +1616,18 @@
         }
       ]
     },
-    "ce-20": {
+    "ce-41": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-20-javascript-ec555b",
+          "@id": "ce-41-javascript-151450",
           "label": "Javascript",
           "language": "javascript",
           "code": "// Content item types: use @default (canonical fields) + explicit cross-mappings\nteaser: {\n    fieldMappings: {\n        '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },\n        image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },\n    },\n},\nimage: {\n    fieldMappings: {\n        '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },\n        teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },\n    },\n},\n\n// Non-content types: use explicit hub-type mappings (NOT @default).\n// All facet types map through checkboxFacet as a hub:\nselectFacet:  { fieldMappings: { checkboxFacet: { title: 'title', field: 'field', hidden: 'hidden' } } },\ncheckboxFacet: { fieldMappings: { selectFacet: { /* ... */ }, daterangeFacet: { /* ... */ } } },"
         }
       ]
     },
-    "h-21": {
+    "h-42": {
       "@type": "slate",
       "plaintext": "Conversion graph rules",
       "value": [
@@ -740,7 +1641,7 @@
         }
       ]
     },
-    "ul-22": {
+    "ul-43": {
       "@type": "slate",
       "plaintext": "Explicit fieldMappings[typeName] always creates a conversion edge. @default only creates edges between types that both have valid @default mappings (keys from { @id, title, description, image }). Types with non-canonical @default keys are ignored. Types without fieldMappings never appear in the \"Convert to...\" menu. Transitive conversions use paths through intermediate types (e.g. hero → teaser → image). Unmapped fields are kept in the data so converting back restores them.",
       "value": [
@@ -830,7 +1731,7 @@
         }
       ]
     },
-    "h-23": {
+    "h-44": {
       "@type": "slate",
       "plaintext": "Mapping value format",
       "value": [
@@ -844,7 +1745,7 @@
         }
       ]
     },
-    "p-24": {
+    "p-45": {
       "@type": "slate",
       "plaintext": "A mapping value is either a string (simple field rename) or `{ field, type }` (rename with type conversion):",
       "value": [
@@ -865,18 +1766,18 @@
         }
       ]
     },
-    "ce-25": {
+    "ce-46": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-25-json-91dabe",
+          "@id": "ce-46-json-4e0dc1",
           "label": "Json",
           "language": "json",
           "code": "{\n    \"@id\": { \"field\": \"href\", \"type\": \"link\" },\n    \"title\": \"title\",\n    \"description\": \"description\",\n    \"image\": \"preview_image\"\n}"
         }
       ]
     },
-    "p-26": {
+    "p-47": {
       "@type": "slate",
       "plaintext": "When `type` is specified, the value is converted at runtime:",
       "value": [
@@ -897,7 +1798,7 @@
         }
       ]
     },
-    "tbl-27": {
+    "tbl-48": {
       "@type": "slateTable",
       "table": {
         "fixed": true,
@@ -908,10 +1809,10 @@
         "striped": false,
         "rows": [
           {
-            "key": "tbl-27-r0",
+            "key": "tbl-48-r0",
             "cells": [
               {
-                "key": "tbl-27-r0c0",
+                "key": "tbl-48-r0c0",
                 "type": "header",
                 "value": [
                   {
@@ -925,7 +1826,7 @@
                 ]
               },
               {
-                "key": "tbl-27-r0c1",
+                "key": "tbl-48-r0c1",
                 "type": "header",
                 "value": [
                   {
@@ -941,10 +1842,10 @@
             ]
           },
           {
-            "key": "tbl-27-r1",
+            "key": "tbl-48-r1",
             "cells": [
               {
-                "key": "tbl-27-r1c0",
+                "key": "tbl-48-r1c0",
                 "type": "data",
                 "value": [
                   {
@@ -959,7 +1860,7 @@
                 ]
               },
               {
-                "key": "tbl-27-r1c1",
+                "key": "tbl-48-r1c1",
                 "type": "data",
                 "value": [
                   {
@@ -982,10 +1883,10 @@
             ]
           },
           {
-            "key": "tbl-27-r2",
+            "key": "tbl-48-r2",
             "cells": [
               {
-                "key": "tbl-27-r2c0",
+                "key": "tbl-48-r2c0",
                 "type": "data",
                 "value": [
                   {
@@ -1000,7 +1901,7 @@
                 ]
               },
               {
-                "key": "tbl-27-r2c1",
+                "key": "tbl-48-r2c1",
                 "type": "data",
                 "value": [
                   {
@@ -1023,10 +1924,10 @@
             ]
           },
           {
-            "key": "tbl-27-r3",
+            "key": "tbl-48-r3",
             "cells": [
               {
-                "key": "tbl-27-r3c0",
+                "key": "tbl-48-r3c0",
                 "type": "data",
                 "value": [
                   {
@@ -1041,7 +1942,7 @@
                 ]
               },
               {
-                "key": "tbl-27-r3c1",
+                "key": "tbl-48-r3c1",
                 "type": "data",
                 "value": [
                   {
@@ -1064,10 +1965,10 @@
             ]
           },
           {
-            "key": "tbl-27-r4",
+            "key": "tbl-48-r4",
             "cells": [
               {
-                "key": "tbl-27-r4c0",
+                "key": "tbl-48-r4c0",
                 "type": "data",
                 "value": [
                   {
@@ -1082,7 +1983,7 @@
                 ]
               },
               {
-                "key": "tbl-27-r4c1",
+                "key": "tbl-48-r4c1",
                 "type": "data",
                 "value": [
                   {
@@ -1102,10 +2003,10 @@
             ]
           },
           {
-            "key": "tbl-27-r5",
+            "key": "tbl-48-r5",
             "cells": [
               {
-                "key": "tbl-27-r5c0",
+                "key": "tbl-48-r5c0",
                 "type": "data",
                 "value": [
                   {
@@ -1120,7 +2021,7 @@
                 ]
               },
               {
-                "key": "tbl-27-r5c1",
+                "key": "tbl-48-r5c1",
                 "type": "data",
                 "value": [
                   {
@@ -1138,7 +2039,7 @@
         ]
       }
     },
-    "h-28": {
+    "h-49": {
       "@type": "slate",
       "plaintext": "FieldMappingWidget",
       "value": [
@@ -1152,7 +2053,7 @@
         }
       ]
     },
-    "p-29": {
+    "p-50": {
       "@type": "slate",
       "plaintext": "When a parent block has `mappingField` set in its `inheritSchemaFrom` recipe, the admin sidebar shows a widget that lets editors configure field mappings visually:",
       "value": [
@@ -1180,7 +2081,7 @@
         }
       ]
     },
-    "ul-30": {
+    "ul-51": {
       "@type": "slate",
       "plaintext": "Shows the @default source fields (@id, title, description, image) on the left. For each source field, lets the editor pick a field from the selected child type's schema. Auto-detects the conversion type from the target field definition (e.g. object_browser with mode=link → type: \"link\"). Saves the result as fieldMapping (singular) on the block data.",
       "value": [
@@ -1293,7 +2194,7 @@
         }
       ]
     },
-    "p-31": {
+    "p-52": {
       "@type": "slate",
       "plaintext": "The saved `fieldMapping` is read at render time by `expandListingBlocks` — no block registry access needed at render time.",
       "value": [
@@ -1321,7 +2222,7 @@
         }
       ]
     },
-    "h-32": {
+    "h-53": {
       "@type": "slate",
       "plaintext": "HTML Paste Support (TODO)",
       "value": [
@@ -1335,7 +2236,7 @@
         }
       ]
     },
-    "p-33": {
+    "p-54": {
       "@type": "slate",
       "plaintext": "When the editor pastes rich HTML into the page, Hydra will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:",
       "value": [
@@ -1349,18 +2250,18 @@
         }
       ]
     },
-    "ce-34": {
+    "ce-55": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-34-javascript-0e6bda",
+          "@id": "ce-55-javascript-99cd97",
           "label": "Javascript",
           "language": "javascript",
           "code": "video: {\n    fieldMappings: {\n        'css:video': { 'src': 'url', 'caption[@class=\"alt\"]': 'alt' },\n    },\n}"
         }
       ]
     },
-    "p-35": {
+    "p-56": {
       "@type": "slate",
       "plaintext": "The `css:<selector>` key in `fieldMappings` matches a pasted HTML element; the value maps element attributes to block fields. Not yet implemented — open question on whether this should run via `htmlTagsToSlate` (bypassing slate conversion) or be encoded into slate so attributes/classes survive.",
       "value": [
@@ -1400,40 +2301,61 @@
     "items": [
       "cb-title-1",
       "p-1",
-      "ce-2",
+      "h-2",
       "p-3",
-      "ul-4",
+      "ce-4",
       "h-5",
       "p-6",
       "ce-7",
       "p-8",
       "ul-9",
       "p-10",
-      "p-11",
+      "ul-11",
       "h-12",
       "p-13",
-      "ul-14",
+      "ce-14",
       "p-15",
-      "h-16",
+      "ul-16",
       "p-17",
       "h-18",
-      "p-19",
-      "ce-20",
-      "h-21",
-      "ul-22",
-      "h-23",
+      "ul-19",
+      "h-20",
+      "p-21",
+      "h-22",
+      "ce-23",
       "p-24",
-      "ce-25",
-      "p-26",
-      "tbl-27",
-      "h-28",
+      "ul-25",
+      "h-26",
+      "p-27",
+      "ce-28",
       "p-29",
       "ul-30",
       "p-31",
-      "h-32",
-      "p-33",
-      "ce-34",
-      "p-35"
+      "p-32",
+      "h-33",
+      "p-34",
+      "ul-35",
+      "p-36",
+      "h-37",
+      "p-38",
+      "h-39",
+      "p-40",
+      "ce-41",
+      "h-42",
+      "ul-43",
+      "h-44",
+      "p-45",
+      "ce-46",
+      "p-47",
+      "tbl-48",
+      "h-49",
+      "p-50",
+      "ul-51",
+      "p-52",
+      "h-53",
+      "p-54",
+      "ce-55",
+      "p-56"
     ]
   },
   "contributors": [],

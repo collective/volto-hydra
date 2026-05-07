@@ -2,6 +2,103 @@
 
 Define custom block types directly in your frontend configuration via the `blocks` option in `initBridge`. No Volto plugin deployment required. Each block type needs an `id`, `title`, and a `blockSchema` with its field properties.
 
+## `initBridge()` Reference
+
+`initBridge(options)` opens the iframe bridge and registers your frontend's page and block configuration with the admin. Call it once during page setup when running inside the admin iframe.
+
+```js
+import { initBridge } from '@hydra-js/hydra.js';
+
+const bridge = initBridge({
+  page:        { /* page-level blocks fields */ },
+  blocks:      { /* block type registry */ },
+  voltoConfig: { /* other Volto settings */ },
+  onEditChange: (formData) => { /* re-render on edit */ },
+  pathToApiPath: (path) => path,
+  debug: false,
+});
+```
+
+### `page` — page-level blocks fields
+
+Defines the **regions of a page** where blocks can live. `page.schema.properties` is keyed by field name; each entry is one region.
+
+```js
+page: {
+  schema: {
+    properties: {
+      blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'slider'] },
+      header_blocks: { title: 'Header',  allowedBlocks: ['slate'], maxLength: 3 },
+      footer_blocks: { title: 'Footer',  allowedBlocks: ['slate', 'link'] },
+    },
+  },
+}
+```
+
+Per-field options:
+
+- **`title`** — sidebar section title (defaults to the field name).
+- **`allowedBlocks`** — array of block-type names this region accepts. Acts as a per-region filter on top of the registry.
+- **`allowedTemplates`** — array of template URLs shown in the BlockChooser's "Templates" group for this field. See [Templates](templates.md).
+- **`allowedLayouts`** — array of template URLs shown in the Layout dropdown for this field.
+- **`maxLength`** — maximum number of blocks in the field.
+
+Defaults and side effects:
+
+- If you don't include `blocks_layout`, it's auto-added with `{ title: 'Blocks' }`.
+- The sidebar shows one section per field when no block is selected.
+- **Auto-restrict**: any block type that's not in *any* field's `allowedBlocks` is auto-restricted (hidden from the BlockChooser globally). To bypass, set the block's `restricted` to a function instead of `true`/`false`.
+- Fields not present in saved page data are auto-initialised with `{ items: [] }` on load.
+- You can't currently change the page metadata schema itself — custom content types are created via "Site Setup > Content types" in Volto.
+
+### `blocks` — block type registry
+
+Defines or overrides individual block types. Each key is the block type name (matching what appears in `allowedBlocks` and `@type` on saved blocks).
+
+```js
+blocks: {
+  slider: {                          // new custom block
+    id: 'slider',
+    title: 'Slider',
+    icon: 'data:...',
+    group: 'common',
+    mostUsed: true,
+    blockSchema: { properties: { /* fields */ } },
+  },
+  slate: {                           // override the built-in slate block
+    blockSchema: { /* override */ },
+  },
+}
+```
+
+Per-block options (most are passed through to Volto's block config):
+
+- **`id`** — block type identifier (matches the key).
+- **`title`** — display name in the BlockChooser.
+- **`icon`** — icon shown in the BlockChooser (data URL or SVG component).
+- **`group`** — chooser group (e.g. `'common'`).
+- **`restricted`** — `true` hides the block from the chooser; can also be a function for conditional restrictions.
+- **`mostUsed`** — pin to the top of the chooser.
+- **`disableCustomSidebarEditForm`** — set `true` to use only the schema form in the sidebar (no custom edit component).
+- **`blockSchema`** — JSON-schema-style definition of the block's fields. See [Schema Enhancers](#schema-enhancers) below and the [Block reference](../blocks/README.md).
+- **`fieldMappings`** — block-to-block conversion rules. See [Block Conversion & fieldMappings](#block-conversion--fieldmappings) below.
+- **`schemaEnhancer`** — recipe-based schema modifier; supports `fieldRules`, `inheritSchemaFrom`, etc. See [Schema Enhancers](#schema-enhancers).
+
+`page` and `blocks` interact via name lookup: a region's `allowedBlocks: ['slate', 'slider']` references keys of the `blocks` registry. You can use one without the other — `page` alone restricts placement of built-in blocks; `blocks` alone registers custom types and gets a default `blocks_layout` region accepting everything.
+
+### Other top-level options
+
+- **`onEditChange(formData)`** — callback invoked with the new form data whenever the editor changes anything. See [Live Preview › Setting Up the Bridge](live-preview.md#setting-up-the-bridge).
+- **`pathToApiPath(path)`** — function transforming a frontend path to the API/admin path on `PATH_CHANGE` messages. Use when your frontend embeds state (paging, filters) in URL segments that don't exist on the CMS side. See [Listings › Path Transformation](listings.md#path-transformation-pathtoapipath).
+- **`voltoConfig`** — passes additional Volto config (non-block settings) through to the admin. Future home for things like slate formats ([TODO #109](https://github.com/collective/volto-hydra/issues/109)) and toolbar actions.
+- **`debug`** — `true` enables verbose console logging in the bridge. Default `false`.
+
+### Returns
+
+The `Bridge` instance, which exposes additional API methods you can call from the frontend (e.g. `getAccessToken()`, `sendBlockUpdate()`, `sendBlockAction()`). See [Advanced › Custom Sidebar UI](advanced.md#custom-sidebar-and-cms-ui) for those.
+
+## Defining a custom block
+
 <!-- codeExample: javascript -->
 ```javascript
 const bridge = initBridge({

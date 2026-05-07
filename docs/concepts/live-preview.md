@@ -24,6 +24,8 @@ if (window.name.startsWith('hydra')) {
 
 The `formData` passed to `onEditChange` has the same structure as the Plone REST API response, so the same rendering code works for both live editing and normal page display.
 
+Either hashbang (`/#!/path`) or normal (`/path`) style paths are supported.
+
 ## A Simple Page Renderer
 
 Iterate `blocks_layout.items` and render each block by type. Add `data-block-uid` so Hydra knows which block the user clicked.

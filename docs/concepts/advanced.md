@@ -91,3 +91,28 @@ export default function Blog({ params }) {
 ## Preventing Reloads
 
 If you wish to make the editing experience smoother you can register for `onRoute` callbacks to prevent the frontend being forced to reload at certain times using the hydra editor. (TODO)
+
+## Custom Sidebar and CMS UI
+
+If the auto-generated sidebar UI from your block or content schemas isn't suitable, the React Volto framework has an addon system that lets you override CMS components — at widget level, block-settings level, or even whole views like Contents or Site Settings. For example, you might want to replace the image picker with a custom map editor.
+
+- [Volto Block Edit Component documentation](https://6.docs.plone.org/volto/blocks/editcomponent.html)
+
+```{note}
+Volto is built as a monolith CMS framework, so ignore the parts of the documentation that apply to its presentation layer — Hydra replaces that piece.
+```
+
+## Custom Visual Editing (TODO)
+
+In some cases you might want to provide editors with more visual editing inside the preview than Hydra currently supports out of the box. For example, a newly created table block might display a form to set the initial number of columns and rows. The bridge exposes the following hooks to make this possible:
+
+- **`sendBlockUpdate`** — send an updated version of the block back to the admin after frontend-side changes (TODO).
+- **`sendBlockAction`** — perform actions like select, add, move, copy or remove blocks, or invoke custom actions on the Volto block edit component.
+- You can disable Hydra's default handling of selection, DnD, or other interactions if you want to replace some parts of Hydra and not others (TODO).
+
+## Custom API Endpoints
+
+With an open-source headless CMS you have a choice between creating custom server-side functionality as:
+
+- A separately deployed microservice, or
+- An [API endpoint addon](https://2022.training.plone.org/mastering-plone/endpoints.html) attached to the backend API server.
