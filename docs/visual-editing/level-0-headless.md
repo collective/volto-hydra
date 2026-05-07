@@ -21,23 +21,16 @@ const { data, error } = await ploneApi({});
 
 Now you have a true headless site where the deployment of your frontend is not tightly integrated with your editor.
 
-## Editor Capabilities at Level 0
+## What editors can do at Level 0
 
-At this point, an editor can:
+The frontend is a true headless site — its deployment isn't tied to the CMS. With no Hydra integration yet, the editing experience is **sidebar-driven**:
 
-- **Login to Hydra** and see the frontend in an iframe — the result will look similar to Volto
-  - But they can't see private pages yet because your renderer is not yet logged in
-- **Browse in Hydra** (contents view) and your frontend page will change
-  - But browsing in your frontend won't yet change the CMS context as it can't detect the page switch
-- **Add a page** in Hydra
-  - Since pages are created private, you won't see a preview unless you publish first
-  - You now need to create a page and give it a title before editing
-    - This has the benefit that images added during editing always default to being contained inside the page
-- **Edit a page**
-  - Selecting, adding, editing and rearranging the block layout is all done via the sidebar
-    - You will see more fields than normal Volto to make this possible
-  - Only after you save will it reload the iframe and the changes will appear on your frontend
-  - (Later it should be possible to do live updates even with SSR via the REST API — TODO)
-- **Remove a page**
-- All other CMS features such as site setup, contents, workflow will work the same as Volto
-  - History won't show a visual diff (TODO — explore if there is a way)
+- All block selection, editing, and rearrangement happens in the sidebar (no clicking in the preview).
+- The preview reloads after save; until then, sidebar changes don't appear in it.
+- Browsing in Hydra navigates the iframe, but browsing in the frontend doesn't update Hydra's context (no bridge yet).
+- Pages must be created and titled before they can be edited.
+- Private pages don't render in the preview yet (the frontend isn't authenticated — see Level 1).
+- Live updates with SSR via REST API are still on the roadmap (TODO).
+- All other CMS features (site setup, content tree, workflow) work the same as standard Volto. (Visual diff in history is still a TODO.)
+
+Editors who want any of the visual interactions described in the [Editor Guide](../editor-guide/index.md) (click-to-select, inline text editing, drag-and-drop, etc.) need at least Level 3 integration — see the next levels.

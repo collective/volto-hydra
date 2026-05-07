@@ -7,6 +7,7 @@ A Visual Headless CMS using Plone as a server, providing true visual editing wit
 :caption: Contents
 
 getting-started/index
+editor-guide/index
 concepts/index
 visual-editing/index
 frontend-guide/index

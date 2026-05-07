@@ -21,14 +21,15 @@ const bridge = initBridge({
 
 Since the data structure is the same as returned by the [REST API](https://6.docs.plone.org/plone.restapi/docs/source/index.html), it's normally easy to re-render your page dynamically using the same code your frontend used to render the page previously.
 
-## Editor Capabilities at Level 4
+## What editors get at Level 4
 
-In addition to the preview changing as you type in the sidebar:
+The preview changes as the editor types in the sidebar — and a number of structural operations become available directly in the preview rather than requiring sidebar trips:
 
-- **Click on "+" icon** directly on the frontend to add a block after the current block — the BlockChooser popup will appear
-  - The "+" icon appears outside the corner of the element with `data-block-uid` in the direction the block will be added
-- **Remove a block** via the Quanta Toolbar dropdown
-- **Drag and drop** and cut, copy and paste on the preview
-- **Open or close** the block settings
-- Multiple block selection to move, delete, or copy in bulk ([TODO #104](https://github.com/collective/volto-hydra/issues/104))
-- And more ([TODO #4](https://github.com/collective/volto-hydra/issues/4))
+- **"+" button** in the preview to add blocks after the current one (BlockChooser popup).
+- **Drag and drop** to move blocks; cut / copy / paste with keyboard shortcuts.
+- **Remove a block** via the Quanta Toolbar dropdown.
+- **Multi-block selection** — Shift+Click range, Ctrl/Cmd+Click toggle, Shift+Arrow extend (block mode).
+- **Block-mode keyboard nav** — arrows move between siblings, Enter adds, Delete removes.
+- **Container operations** — wrap selected blocks in a container, unwrap, edge-drag to absorb/expel adjacent blocks, convert container type while preserving children.
+
+For how editors actually use these (visuals, modes, keyboard map), see the [Editor Guide](../editor-guide/index.md). For the integration mechanics (`onEditChange`, blocks dict, etc.), continue below.

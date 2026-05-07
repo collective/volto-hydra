@@ -26,14 +26,14 @@ To know you are being managed by Hydra, check if `window.name` starts with `hydr
 
 To see private content, you will need to change your authentication token (see [Advanced](../concepts/advanced.md)).
 
-## Editor Capabilities at Level 1
+## What editors get at Level 1
 
-This will enable an editor to:
+Frontend navigation is now bidirectional, and authentication is shared:
 
-- **Browse in your frontend** and Hydra will change context so AdminUI actions are on the current page you are seeing
-- **Add a page** in Hydra and it will appear — now the frontend has the same editor authentication and can see private content
-- **Edit a page** — content still won't change until after save
+- Browsing in the frontend updates Hydra's context — admin actions stay on the page the editor is looking at.
+- Private content renders in the preview because the frontend has the editor's auth token.
+- Editing still happens via the sidebar; preview updates on save.
 
-```{note}
-Either hashbang `/#!/path` or normal `/path` style paths are supported.
-```
+Either hashbang (`/#!/path`) or normal (`/path`) style paths are supported.
+
+For the editor-side UX (selecting, editing, moving blocks), see the [Editor Guide](../editor-guide/index.md) — those interactions need Level 3+.

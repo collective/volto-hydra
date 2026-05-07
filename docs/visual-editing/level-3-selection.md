@@ -2,12 +2,11 @@
 
 Now that you have defined your blocks and your frontend renders them, in edit mode you can make blocks selectable using a tag that the bridge will use to locate which HTML represents your block.
 
-## Editor Capabilities at Level 3
+## What editors get at Level 3
 
-- **Click directly** on your block on the frontend preview to select it and edit the block settings in the sidebar
-  - The block will be highlighted and a toolbar (called the Quanta Toolbar) will appear above it
-- **Selecting a block in the sidebar** will highlight that block on the frontend and scroll it into view
-- If your block is rendered as **multiple items**, give each one the same `data-block-uid`. Selecting one will select all of them.
+Click-to-select in the preview. The selected block is highlighted, the Quanta Toolbar appears above it, and the sidebar switches to the block's settings. Selection works both ways — clicking a block in the sidebar scrolls it into view in the preview.
+
+For the full editor-side interaction model (text mode vs block mode, multi-selection, keyboard navigation), see the [Editor Guide › Selecting blocks](../editor-guide/selecting-blocks.md). Editors won't see *changes* in the preview yet — that needs Level 4.
 
 ## Adding Block UIDs
 
