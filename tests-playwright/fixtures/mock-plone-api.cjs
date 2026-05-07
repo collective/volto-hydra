@@ -3,7 +3,7 @@
  * Implements minimal Plone REST API endpoints for content editing.
  * Serves content from disk (JSON files in content directories).
  *
- * Run standalone: node mock-plone-api.js
+ * Run standalone: node mock-plone-api.cjs
  * Or import the express app: const { app } = require('./mock-plone-api');
  */
 
@@ -38,6 +38,24 @@ function parseContentMounts() {
 }
 
 const CONTENT_MOUNTS = parseContentMounts();
+
+// Validate each mounted content tree at startup. Errors are loud (listed)
+// but non-fatal — tests using the mock API still start. Set
+// SKIP_CONTENT_VALIDATION=true to suppress entirely.
+if (process.env.SKIP_CONTENT_VALIDATION !== 'true') {
+  const { validate, checkIntegrity, formatReport } = require('./plone-content-validator.cjs');
+  for (const { mountPath, dirPath } of CONTENT_MOUNTS) {
+    if (!fs.existsSync(path.join(dirPath, '__metadata__.json'))) continue;
+    const v = validate(dirPath);
+    const c = checkIntegrity(dirPath);
+    const problems = v.errors.length + v.warnings.length + c.errors.length + c.warnings.length;
+    if (problems > 0) {
+      console.log(`[content-check] ${mountPath} -> ${dirPath}`);
+      if (v.errors.length || v.warnings.length) console.log(formatReport('validate', v));
+      if (c.errors.length || c.warnings.length) console.log(formatReport('check', c));
+    }
+  }
+}
 
 // Session-based transient content storage for uploads
 // Uploads are stored per-session so they don't appear for other users
@@ -124,8 +142,10 @@ app.use((req, res, next) => {
     cleanPath = vhmMatch[1] || '/';
   }
 
-  // Handle simple ++api++ prefix: /++api++/@site -> /@site
-  cleanPath = cleanPath.replace(/^\/\+\+api\+\+/, '');
+  // Strip ++api++ anywhere in path (start or mid-path):
+  //   /++api++/@site           -> /@site
+  //   /blocks/search/++api++/@ -> /blocks/search/@
+  cleanPath = cleanPath.replace(/\/?\+\+api\+\+\/?/g, '/');
 
   // Normalize multiple slashes to single slash (e.g., //@search -> /@search)
   cleanPath = cleanPath.replace(/\/+/g, '/');
@@ -382,12 +402,23 @@ function loadRawContentFromDisk(urlPath) {
  * @param {string} urlPath - The URL path to load content for
  * @returns {Object|null} The enriched content object or null if not found
  */
-function loadContentFromDisk(urlPath) {
+/**
+ * Parse the ?expand= query string into an array of component names.
+ * Real Plone treats this as a comma-separated list driving which
+ * @components entries are returned expanded vs as @id stubs.
+ */
+function parseExpand(req) {
+  const raw = req?.query?.expand;
+  if (!raw) return [];
+  return String(raw).split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+function loadContentFromDisk(urlPath, expandList = []) {
   const baseUrl = `http://localhost:${PORT}`;
   const content = loadRawContentFromDisk(urlPath);
   if (!content) return null;
 
-  return enrichContent(content, urlPath, baseUrl);
+  return enrichContent(content, urlPath, baseUrl, expandList);
 }
 
 /**
@@ -440,6 +471,7 @@ function getNavigationItems(basePath = '/', depth = 1) {
     })
     .map((itemPath) => {
       const rawContent = loadRawContentFromDisk(itemPath);
+      if (!rawContent) return null;
       if (rawContent.exclude_from_nav) return null;
       if (rawContent['@type'] === 'Image' || rawContent['@type'] === 'File') return null;
       return formatNavItem(rawContent, itemPath, baseUrl);
@@ -472,65 +504,125 @@ function getRootNavigationItems() {
   return getNavigationItems('/', 1);
 }
 
-/**
- * Generate @components for a content item (breadcrumbs, navigation, workflow, actions)
- */
-function generateComponents(urlPath, baseUrl) {
-  // Remove trailing slash for URL construction
-  const cleanPath = urlPath.replace(/\/$/, '') || '/';
-  const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
-  const pathParts = urlPath.split('/').filter(Boolean);
+// ── Per-component builders ────────────────────────────────────────────────
+//
+// Single source of truth for each @components entry. Used by:
+//   1. generateComponents() — the inline expansion path that fills
+//      @components when ?expand=... lists the component on a content GET/POST.
+//   2. Dedicated endpoint handlers (`/@actions`, `/@breadcrumbs`, ...) that
+//      respond to direct fetches from clients.
+//
+// Without this dedupe the two paths drift: the inline @components.actions
+// historically had `view + edit + folderContents` while the dedicated
+// /@actions endpoint had only `view + edit`, so reducers seeing the same
+// "actions" data via different code paths got different results.
 
-  // Build breadcrumb items (use raw content to avoid circular calls)
-  const breadcrumbItems = [{ '@id': baseUrl, 'title': 'Home' }];
+function buildBreadcrumbsComponent(cleanPath, baseUrl) {
+  const pathParts = cleanPath.split('/').filter(Boolean);
+  const items = [{ '@id': baseUrl, title: 'Home' }];
   let currentPath = '';
   for (const part of pathParts) {
     currentPath += '/' + part;
     const partContent = loadRawContentFromDisk(currentPath);
-    breadcrumbItems.push({
+    items.push({
       '@id': baseUrl + currentPath,
-      'title': partContent?.title || part
+      title: partContent?.title || part,
     });
   }
-
+  const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
   return {
-    'actions': {
-      '@id': `${fullUrl}/@actions`,
-      'document_actions': [],
-      'object': [
-        { 'id': 'view', 'title': 'View' },
-        { 'id': 'edit', 'title': 'Edit' },
-        { 'id': 'folderContents', 'title': 'Contents' }
-      ],
-      'object_buttons': [],
-      'portal_tabs': [],
-      'site_actions': [],
-      'user': []
+    '@id': `${fullUrl}/@breadcrumbs`,
+    items,
+    root: baseUrl,
+  };
+}
+
+function buildActionsComponent(cleanPath, baseUrl) {
+  const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
+  return {
+    '@id': `${fullUrl}/@actions`,
+    document_actions: [],
+    object: [
+      { '@id': fullUrl, icon: '', id: 'view', title: 'View' },
+      { '@id': `${fullUrl}/edit`, icon: '', id: 'edit', title: 'Edit' },
+      { id: 'folderContents', title: 'Contents' },
+    ],
+    object_buttons: [],
+    portal_tabs: [],
+    site_actions: [],
+    user: [],
+  };
+}
+
+function buildNavigationComponent(cleanPath, baseUrl) {
+  const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
+  return {
+    '@id': `${fullUrl}/@navigation`,
+    // Always rooted at site root — top-level items with nested children
+    items: getRootNavigationItems(),
+  };
+}
+
+function buildWorkflowComponent(cleanPath, baseUrl) {
+  const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
+  return {
+    '@id': `${fullUrl}/@workflow`,
+    history: [],
+    transitions: [],
+  };
+}
+
+function buildNavrootComponent(cleanPath, baseUrl) {
+  const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
+  return {
+    '@id': `${fullUrl}/@navroot`,
+    navroot: {
+      '@id': baseUrl,
+      '@type': 'Plone Site',
+      title: 'Site',
     },
-    'breadcrumbs': {
-      '@id': `${fullUrl}/@breadcrumbs`,
-      'items': breadcrumbItems,
-      'root': baseUrl
-    },
-    'navigation': {
-      '@id': `${fullUrl}/@navigation`,
-      // Always rooted at site root — top-level items with nested children
-      'items': getRootNavigationItems()
-    },
-    'workflow': {
-      '@id': `${fullUrl}/@workflow`
-    }
+  };
+}
+
+function buildTypesComponent() {
+  return listAddableTypes();
+}
+
+/**
+ * Generate the FULL @components map (every entry expanded). The
+ * expand-aware caller (enrichContent) decides which entries are included
+ * vs left as @id stubs.
+ */
+function generateComponents(urlPath, baseUrl) {
+  const cleanPath = urlPath.replace(/\/$/, '') || '/';
+  return {
+    actions: buildActionsComponent(cleanPath, baseUrl),
+    breadcrumbs: buildBreadcrumbsComponent(cleanPath, baseUrl),
+    navigation: buildNavigationComponent(cleanPath, baseUrl),
+    navroot: buildNavrootComponent(cleanPath, baseUrl),
+    types: buildTypesComponent(),
+    workflow: buildWorkflowComponent(cleanPath, baseUrl),
   };
 }
 
 /**
  * Resolve resolveuid/UID references in content to actual paths.
- * Like Plone's serializer, converts resolveuid/UID strings to full URLs.
- * All string values are resolved, including templateId/templateInstanceId —
- * these are real Plone paths that the serializer resolves.
+ * Like Plone's serializer, converts resolveuid/UID strings to addressable
+ * locations.
+ *
+ * Most fields get a full URL (matches Plone's serializer behaviour for
+ * link/href fields). templateId / templateInstanceId / slotId resolve to
+ * paths only — these are template-system identifiers compared against the
+ * admin's currentPath (also a path), so an origin prefix would defeat
+ * equality checks like the save-flow's `id !== currentPath` filter and
+ * the load-flow's "don't recursively expand a template into its own page"
+ * guard.
  */
-function resolveUidUrls(obj) {
+function resolveUidUrls(obj, parentKey = null) {
   if (typeof obj === 'string') {
+    const resolveAsPath = parentKey === 'templateId'
+      || parentKey === 'templateInstanceId'
+      || parentKey === 'slotId';
     return obj.replace(/(?:\.\.\/)*resolveuid\/([a-z0-9][-a-z0-9]*)/g, (match, uid) => {
       let resolvedPath = uidToPathMap[uid];
       if (!resolvedPath) {
@@ -539,14 +631,14 @@ function resolveUidUrls(obj) {
         resolvedPath = uidToPathMap[uid];
       }
       if (!resolvedPath) return match;
-      return `http://localhost:${PORT}${resolvedPath}`;
+      return resolveAsPath ? resolvedPath : `http://localhost:${PORT}${resolvedPath}`;
     });
   }
-  if (Array.isArray(obj)) return obj.map(item => resolveUidUrls(item));
+  if (Array.isArray(obj)) return obj.map(item => resolveUidUrls(item, parentKey));
   if (obj && typeof obj === 'object') {
     const result = {};
     for (const [key, value] of Object.entries(obj)) {
-      result[key] = resolveUidUrls(value);
+      result[key] = resolveUidUrls(value, key);
     }
     return result;
   }
@@ -633,7 +725,37 @@ function getFolderChildItems(folderPath, baseUrl) {
  * Enrich content with generated fields (@id, @components, permissions, etc.)
  * Content files use distribution format with relative @id paths.
  */
-function enrichContent(content, urlPath, baseUrl) {
+/**
+ * Build a stubbed @components map: every component is just {'@id': '<endpoint URL>'}.
+ * Mirrors real Plone — without ?expand=, components are stubs that point to
+ * dedicated endpoints (`@actions`, `@breadcrumbs`, ...). Reducers that need
+ * the data either dispatch separate fetches or rely on the apiExpanders
+ * middleware to add ?expand= which the request handler then expands.
+ */
+function stubComponents(fullUrl) {
+  const ids = ['actions', 'aliases', 'breadcrumbs', 'contextnavigation', 'navigation', 'navroot', 'types', 'workflow'];
+  const stubs = {};
+  for (const k of ids) {
+    stubs[k] = { '@id': `${fullUrl}/@${k}` };
+  }
+  return stubs;
+}
+
+/**
+ * Replace stubs for the named components with their fully-expanded bodies.
+ * `expandList` is parsed from ?expand= on the incoming request.
+ */
+function expandComponents(stubs, expandList, urlPath, baseUrl) {
+  if (!expandList || expandList.length === 0) return stubs;
+  const expanded = generateComponents(urlPath, baseUrl);
+  const out = { ...stubs };
+  for (const name of expandList) {
+    if (expanded[name] !== undefined) out[name] = expanded[name];
+  }
+  return out;
+}
+
+function enrichContent(content, urlPath, baseUrl, expandList = []) {
   // Always use urlPath for @id (includes mount prefix), normalize trailing slash
   const cleanPath = urlPath.replace(/\/$/, '') || '/';
   const fullUrl = cleanPath === '/' ? baseUrl : `${baseUrl}${cleanPath}`;
@@ -675,7 +797,7 @@ function enrichContent(content, urlPath, baseUrl) {
     'parent': parent,
     'items': childItems,
     'items_total': childItems.length,
-    '@components': generateComponents(urlPath, baseUrl),
+    '@components': expandComponents(stubComponents(fullUrl), expandList, urlPath, baseUrl),
     // Permissions - always grant for mock API
     'can_manage_portlets': true,
     'can_view': true,
@@ -802,14 +924,20 @@ initContentDirMap();
  * @param {string} urlPath - Content path
  * @param {string} sessionId - Session ID for session-specific uploads
  */
-function getContent(urlPath, sessionId) {
+function getContent(urlPath, sessionId, expandList = []) {
   // Check session-specific storage first (for uploads created in this session)
   if (sessionId && sessionContent[sessionId]?.[urlPath]) {
-    return sessionContent[sessionId][urlPath];
+    const stored = sessionContent[sessionId][urlPath];
+    // Session content may be stored raw (POST handlers) or already-enriched
+    // (legacy callers that built full responses inline). Re-enrich
+    // unconditionally so the read-time @components reflect the current
+    // request's ?expand= choices, like Plone does.
+    const baseUrl = `http://localhost:${PORT}`;
+    return enrichContent(stored, urlPath, baseUrl, expandList);
   }
 
   // Try disk first (distribution content may have a site root)
-  const diskContent = loadContentFromDisk(urlPath);
+  const diskContent = loadContentFromDisk(urlPath, expandList);
   if (diskContent) return diskContent;
 
   // Fall back to generated site root
@@ -1000,6 +1128,43 @@ app.post('/*', (req, res, next) => {
     return res.status(201).json(imageContent);
   }
 
+  if (contentType === 'Document') {
+    // Plone populates server-side fields (UID, created, modified,
+    // effective, review_state, etc.) on create — the client only sends
+    // title, blocks, blocks_layout (and an optional id, e.g. for
+    // templates that want a stable path). Match real Plone's response
+    // shape so Volto can transition straight from Add → Edit on the
+    // POST response without re-fetching: store the bare doc, then
+    // serialize through enrichContent so the response carries
+    // @components / is_folderish / parent / items / etc., same as a
+    // GET on the same path would.
+    const id = body.id || `untitled-document-${Date.now()}`;
+    const docPath = `${parentPath === '/' ? '' : parentPath}/${id}`.replace(/\/+/g, '/');
+    const now = new Date().toISOString();
+    const baseUrl = `http://localhost:${PORT}`;
+    const rawDoc = {
+      '@type': 'Document',
+      id,
+      title: body.title || id,
+      description: body.description || '',
+      blocks: body.blocks || {},
+      blocks_layout: body.blocks_layout || { items: [] },
+      created: now,
+      modified: now,
+      effective: now,
+      review_state: 'published',
+    };
+
+    const sessionId = getSessionId(req);
+    setSessionContent(sessionId, docPath, rawDoc);
+
+    if (process.env.DEBUG) {
+      console.log(`Created Document: ${docPath}${sessionId ? ` (session: ${sessionId})` : ''}`);
+    }
+
+    return res.status(201).json(enrichContent(rawDoc, docPath, baseUrl, parseExpand(req)));
+  }
+
   // Unsupported content type - return 501 instead of passing to next
   return res.status(501).json({ error: `Content type '${contentType}' not supported` });
 });
@@ -1017,7 +1182,7 @@ app.get('/health', (req, res) => {
  * Get querystring schema (available indexes, operators, sortable indexes)
  * Used by QuerystringWidget to populate criteria and sort dropdowns
  */
-app.get('/@querystring', (req, res) => {
+app.get('*/@querystring', (req, res) => {
   res.json({
     '@id': 'http://localhost:8888/@querystring',
     'indexes': {
@@ -1312,12 +1477,9 @@ app.get('/@site', (req, res) => {
  * GET /@workflow
  * Get workflow information for site root
  */
-app.get('/@workflow', (req, res) => {
-  res.json({
-    '@id': 'http://localhost:8888/@workflow',
-    history: [],
-    transitions: [],
-  });
+app.get(/.*\/@workflow$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@workflow$/, '') || '/').replace(/\/+$/, '') || '/';
+  res.json(buildWorkflowComponent(cleanPath, `http://localhost:${PORT}`));
 });
 
 /**
@@ -1406,6 +1568,31 @@ app.get('/@types/:typeName', (req, res) => {
 });
 
 /**
+ * GET /@types  (and GET /<folder>/@types)
+ * List addable content types for the current container. Volto's toolbar
+ * Add button reads this to populate the type-picker menu — without it the
+ * button is hidden (Toolbar.jsx requires types.length > 0).
+ *
+ * Returns just Document for now; extend if a test needs Folder/News Item.
+ */
+function listAddableTypes() {
+  return [
+    {
+      '@id': `http://localhost:${PORT}/@types/Document`,
+      addable: true,
+      title: 'Page',
+    },
+  ];
+}
+
+app.get('/@types', (req, res) => {
+  res.json(listAddableTypes());
+});
+app.get('*/@types', (req, res) => {
+  res.json(listAddableTypes());
+});
+
+/**
  * GET /:path/@types/:typeName
  * Get content type schema for a specific content path
  */
@@ -1419,23 +1606,8 @@ app.get('*/@types/:typeName', (req, res) => {
  * Get breadcrumb trail
  */
 app.get('*/@breadcrumbs', (req, res) => {
-  const fullPath = req.path.replace('/@breadcrumbs', '');
-  const parts = fullPath.split('/').filter((p) => p);
-  const items = [{ '@id': 'http://localhost:8888/', title: 'Home' }];
-
-  let currentPath = '';
-  parts.forEach((part) => {
-    currentPath += '/' + part;
-    items.push({
-      '@id': `http://localhost:8888${currentPath}`,
-      title: part.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
-    });
-  });
-
-  res.json({
-    '@id': `http://localhost:8888${req.path}`,
-    items,
-  });
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@breadcrumbs$/, '') || '/').replace(/\/+$/, '') || '/';
+  res.json(buildBreadcrumbsComponent(cleanPath, `http://localhost:${PORT}`));
 });
 
 /**
@@ -1444,28 +1616,23 @@ app.get('*/@breadcrumbs', (req, res) => {
  * Use regex to ensure matching with ++api++ prefix
  */
 app.get(/.*\/@actions$/, (req, res) => {
-  // Handle ++api++ prefix
-  const cleanPath = req.path.replace('/++api++', '').replace('/@actions', '') || '/';
-  const baseUrl = 'http://localhost:8888';
-  res.json({
-    '@id': `${baseUrl}${cleanPath}/@actions`,
-    object: [
-      {
-        '@id': `${baseUrl}${cleanPath}`,
-        icon: '',
-        id: 'view',
-        title: 'View',
-      },
-      {
-        '@id': `${baseUrl}${cleanPath}/edit`,
-        icon: '',
-        id: 'edit',
-        title: 'Edit',
-      },
-    ],
-    object_buttons: [],
-    user: [],
-  });
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@actions$/, '') || '/').replace(/\/+$/, '') || '/';
+  res.json(buildActionsComponent(cleanPath, `http://localhost:${PORT}`));
+});
+
+/**
+ * GET /<path>/@navigation, /<path>/@navroot — sibling components reachable
+ * via the @id stubs that @components emits when not in ?expand=. Same
+ * builders feed the inline expansion path.
+ */
+app.get(/.*\/@navigation$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@navigation$/, '') || '/').replace(/\/+$/, '') || '/';
+  res.json(buildNavigationComponent(cleanPath, `http://localhost:${PORT}`));
+});
+
+app.get(/.*\/@navroot$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@navroot$/, '') || '/').replace(/\/+$/, '') || '/';
+  res.json(buildNavrootComponent(cleanPath, `http://localhost:${PORT}`));
 });
 
 /**
@@ -1742,7 +1909,10 @@ app.get('*/@search', (req, res) => {
       }
     }
   } else {
-    // No depth filter - return all content items from disk
+    // No depth filter - return all content items from disk.
+    // Rescan so newly-added fixture directories surface without a server
+    // restart — same "rescan on miss" pattern as resolveUidUrls() above.
+    initContentDirMap();
     items = Object.keys(contentDirMap)
       .filter((itemPath) => itemPath !== '/')
       .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl));
@@ -1973,6 +2143,51 @@ app.get('*/@@download/*', (req, res) => {
 });
 
 /**
+ * GET /<content-path-that-is-an-Image>
+ *
+ * Plone's Zope-traversal layer serves Image content items' blob bytes
+ * directly at their plain content path (no /@@images/image suffix, no
+ * ++api++ prefix, Accept != application/json). Frontend <img src> URLs
+ * rely on this so image refs like `/company/about-us/screenshot.png`
+ * resolve against the backend. The @@images handler above covers
+ * explicit scale paths; this covers the implicit default-view case.
+ */
+app.get('*', (req, res, next) => {
+  if (req.isApiRequest) return next();
+
+  const dirInfo = contentDirMap[req.path];
+  if (!dirInfo) return next();
+
+  const dataFile = path.join(dirInfo.dirPath, 'data.json');
+  if (!fs.existsSync(dataFile)) return next();
+
+  let item;
+  try { item = JSON.parse(fs.readFileSync(dataFile, 'utf8')); }
+  catch { return next(); }
+  if (item['@type'] !== 'Image') return next();
+
+  // Image items store the blob in an `image/` subdirectory (same shape as
+  // the @@images handler reads from). Serve whatever file is in there.
+  const imageDir = path.join(dirInfo.dirPath, 'image');
+  if (!fs.existsSync(imageDir)) return next();
+  const files = fs.readdirSync(imageDir);
+  if (files.length === 0) return next();
+
+  const imageFile = path.join(imageDir, files[0]);
+  const ext = path.extname(files[0]).toLowerCase();
+  const mimeTypes = {
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+  };
+  res.set('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+  res.sendFile(imageFile);
+});
+
+/**
  * GET /:path
  * Get content by path (API requests only)
  * Frontend requests fall through to static file serving
@@ -2009,8 +2224,10 @@ app.get('*', (req, res, next) => {
     console.log(logMsg);
   }
 
-  // Reload content from disk to pick up changes during development
-  const content = getContent(cleanPath, sessionId);
+  // Reload content from disk to pick up changes during development.
+  // Pass ?expand= so @components matches what the client requested
+  // (real Plone behaviour: stub by default, expand only what's listed).
+  const content = getContent(cleanPath, sessionId, parseExpand(req));
 
   if (content) {
     // Filter actions based on authentication

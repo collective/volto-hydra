@@ -59,7 +59,7 @@ pnpm test:e2e:debug
 
 **Terminal 1** - Start Mock API:
 ```bash
-node tests-playwright/fixtures/mock-api-server.js
+node tests-playwright/fixtures/mock-api-server.cjs
 ```
 
 **Terminal 2** - Start Volto Dev Server:
@@ -247,7 +247,7 @@ tests-playwright/
 │   ├── api/                      # Mock API data
 │   │   ├── content.json         # Sample page with blocks
 │   │   └── schema-document.json # Document schema
-│   └── mock-api-server.js       # Express mock server
+│   └── mock-api-server.cjs       # Express mock server
 ├── helpers/
 │   └── AdminUIHelper.ts         # Volto UI helper methods
 ├── integration/
@@ -350,7 +350,7 @@ Key settings:
     screenshot: 'only-on-failure',
   },
   webServer: [
-    { command: 'node tests-playwright/fixtures/mock-api-server.js', port: 8888 },
+    { command: 'node tests-playwright/fixtures/mock-api-server.cjs', port: 8888 },
     { command: 'RAZZLE_API_PATH=http://localhost:8888 pnpm start', port: 3001 },
   ],
 }
@@ -433,12 +433,12 @@ cat tests-playwright/fixtures/api/content.json
 
 Check mock server is loading it:
 ```bash
-DEBUG=1 node tests-playwright/fixtures/mock-api-server.js
+DEBUG=1 node tests-playwright/fixtures/mock-api-server.cjs
 ```
 
 ### Volto Can't Connect to Mock API
 
-Check CORS headers in mock server (`mock-api-server.js`):
+Check CORS headers in mock server (`mock-api-server.cjs`):
 ```javascript
 app.use(cors()); // Should be present
 ```

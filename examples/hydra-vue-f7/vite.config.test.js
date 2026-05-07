@@ -29,6 +29,7 @@ export default {
   resolve: {
     alias: {
       '@': SRC_DIR,
+      '@hydra-js/hydra.js': path.resolve(HYDRA_JS_DIR, 'hydra.src.js'),
       '@hydra-js': HYDRA_JS_DIR,
     },
   },

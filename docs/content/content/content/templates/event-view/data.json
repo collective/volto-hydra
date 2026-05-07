@@ -27,10 +27,26 @@
       "templateInstanceId": "tpl-ev-def",
       "slotId": "content",
       "plaintext": "",
-      "value": [{ "type": "p", "children": [{ "text": "" }] }]
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": ""
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
-    "items": ["tpl-ev-title", "tpl-ev-metadata", "tpl-ev-content"]
-  }
+    "items": [
+      "tpl-ev-title",
+      "tpl-ev-metadata",
+      "tpl-ev-content"
+    ]
+  },
+  "effective": "2025-01-01T00:00:00",
+  "modified": "2025-01-01T00:00:00+00:00",
+  "created": "2025-01-01T00:00:00+00:00"
 }

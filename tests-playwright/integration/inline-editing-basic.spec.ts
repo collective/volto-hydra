@@ -410,7 +410,7 @@ test.describe('Inline Editing - Basic', () => {
     const newBlock = iframe.locator(`[data-block-uid="${newBlockUid}"]`);
 
     // Wait for the new block to be selected (visible with toolbar)
-    await helper.waitForBlockSelected(newBlockUid!);
+    await helper.waitForIframeBlockHandle(newBlockUid!);
 
     // Verify the new block is contenteditable
     const newEditor = await helper.getEditorLocator(newBlockUid!);
@@ -457,7 +457,7 @@ test.describe('Inline Editing - Basic', () => {
     expect(newBlockUid).toBeTruthy();
 
     // Wait for new block to be selected and editable
-    await helper.waitForBlockSelected(newBlockUid!);
+    await helper.waitForIframeBlockHandle(newBlockUid!);
     const newEditor = await helper.getEditorLocator(newBlockUid!);
     await expect(newEditor).toBeVisible({ timeout: 5000 });
     await newEditor.pressSequentially('Second block', { delay: 10 });
@@ -654,7 +654,7 @@ test.describe('Inline Editing - Basic', () => {
     await expect(remainingBlock.locator('li')).toHaveCount(2, { timeout: 5000 });
 
     // Demoted block should be selected with cursor at offset 0
-    await helper.waitForBlockSelected(demotedBlockId!);
+    await helper.waitForIframeBlockHandle(demotedBlockId!);
     const demotedEditor = await helper.getEditorLocator(demotedBlockId!);
     await expect(demotedEditor).toBeVisible({ timeout: 5000 });
 
@@ -719,7 +719,7 @@ test.describe('Inline Editing - Basic', () => {
 
     // Select a slate block and use the sidebar Slate editor
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForBlockSelected('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
 
     const sidebarEditor = helper.getSidebarSlateEditor('value');
     await expect(sidebarEditor).toBeVisible({ timeout: 5000 });
@@ -776,7 +776,7 @@ test.describe('Inline Editing - Basic', () => {
     await expect(newBlock.locator('li')).toHaveCount(0);
 
     // The new block should be selected
-    await helper.waitForBlockSelected(newBlockId!);
+    await helper.waitForIframeBlockHandle(newBlockId!);
   });
 
   test('editing text in Admin UI updates iframe', async ({ page }, testInfo) => {
@@ -1110,7 +1110,7 @@ test.describe('Inline Editing - Basic', () => {
     const editor = await helper.enterEditMode(blockId);
 
     // Wait for toolbar
-    await helper.waitForQuantaToolbar(blockId);
+    await helper.waitForBlockSelectedInAdmin(blockId);
 
     // Clear and type text
     await helper.selectAllTextInEditor(editor);
@@ -1179,7 +1179,7 @@ test.describe('Inline Editing - Basic', () => {
 
     // Click on a different block to deselect the empty block
     await helper.clickBlockInIframe('block-2-uuid');
-    await helper.waitForBlockSelected('block-2-uuid');
+    await helper.waitForIframeBlockHandle('block-2-uuid');
 
     // Get the editable field locator - handles both Nuxt (attr on root) and mock (attr on child)
     const editableField = iframe.locator(`[data-block-uid="${blockId}"] [data-edit-text="value"]`).or(
@@ -1200,7 +1200,7 @@ test.describe('Inline Editing - Basic', () => {
     await helper.clickBlockInIframe(blockId);
 
     // Verify the empty block is now selected
-    await helper.waitForBlockSelected(blockId);
+    await helper.waitForIframeBlockHandle(blockId);
   });
 
   test('deleting across node boundaries (bold to normal text)', async ({ page }) => {
@@ -1281,7 +1281,7 @@ test.describe('Inline Editing - Basic', () => {
     await helper.clickBlockInIframe(newBlockUid!);
 
     // Verify the new block is selected
-    await helper.waitForBlockSelected(newBlockUid!);
+    await helper.waitForIframeBlockHandle(newBlockUid!);
 
     // Verify the editor is focusable and has correct cursor placement
     const newEditor = await helper.getEditorLocator(newBlockUid!);
@@ -1343,7 +1343,7 @@ test.describe('Inline Editing - Basic', () => {
 
     // Click the new block to select it
     await helper.clickBlockInIframe(newBlockUid!);
-    await helper.waitForBlockSelected(newBlockUid!);
+    await helper.waitForIframeBlockHandle(newBlockUid!);
 
     // Get the editor and type some text
     const newEditor = await helper.getEditorLocator(newBlockUid!);

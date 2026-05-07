@@ -181,6 +181,7 @@ function SearchBlock({ block, blockId }) {
 
   return (
     <div data-block-uid={blockId} className="search-block">
+      {block.headline && <h2 data-edit-text="headline">{block.headline}</h2>}
       <input
         type="search"
         placeholder="Search..."
@@ -190,7 +191,7 @@ function SearchBlock({ block, blockId }) {
 
       {facets.length > 0 && (
         <div className="facets">
-          <h4>{block.facetsTitle || 'Filter'}</h4>
+          <h4 data-edit-text="facetsTitle">{block.facetsTitle || 'Filter'}</h4>
           {facets.map(facet => (
             <FacetRenderer key={facet['@id']} facet={facet} />
           ))}
@@ -226,10 +227,11 @@ function FacetRenderer({ facet }) {
 ```vue
 <template>
   <div :data-block-uid="blockId" class="search-block">
+    <h2 v-if="block.headline" data-edit-text="headline">{{ block.headline }}</h2>
     <input type="search" placeholder="Search..." v-model="query" />
 
     <div v-if="visibleFacets.length" class="facets">
-      <h4>{{ block.facetsTitle || 'Filter' }}</h4>
+      <h4 data-edit-text="facetsTitle">{{ block.facetsTitle || 'Filter' }}</h4>
       <template v-for="facet in visibleFacets" :key="facet['@id']">
         <fieldset v-if="facet.type === 'checkboxFacet'" :data-block-uid="facet['@id']">
           <legend data-edit-text="title">{{ facet.title }}</legend>
@@ -282,11 +284,12 @@ const listingBlock = computed(() => listingId.value ? props.block.blocks?.[listi
 </script>
 
 <div data-block-uid={blockId} class="search-block">
+  {#if block.headline}<h2 data-edit-text="headline">{block.headline}</h2>{/if}
   <input type="search" placeholder="Search..." bind:value={query} />
 
   {#if visibleFacets.length}
     <div class="facets">
-      <h4>{block.facetsTitle || 'Filter'}</h4>
+      <h4 data-edit-text="facetsTitle">{block.facetsTitle || 'Filter'}</h4>
       {#each visibleFacets as facet (facet['@id'])}
         {#if facet.type === 'checkboxFacet'}
           <fieldset data-block-uid={facet['@id']}><legend data-edit-text="title">{facet.title}</legend><!-- checkbox options --></fieldset>

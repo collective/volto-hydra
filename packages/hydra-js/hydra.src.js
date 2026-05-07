@@ -1,3 +1,5 @@
+import { tabbable } from 'tabbable';
+
 /**
  * This IS a large file and it needs to be written in one file so for better understanding and
  * usage of this file in future, Below is the lineup of methods this class provides and also
@@ -101,12 +103,12 @@ try {
     (window.location?.search && new URLSearchParams(window.location.search).has('_hydra_debug'))
   );
 } catch { /* SSR or restricted environment */ }
-const log = (...args) => {
-  if (!debugEnabled) return;
+function log(...args) {
+  if (!debugEnabled && !window['HYDRA_DEBUG']) return;
   const runId = typeof window !== 'undefined' && window.__testRunId;
   const prefix = runId != null ? `[HYDRA][RUN-${runId}]` : '[HYDRA]';
   console.log(prefix, ...args);
-};
+}
 
 /**
  * Validates a data-node-id value is a real Slate path (dot-separated integers like "0", "0.1").
@@ -157,6 +159,8 @@ export class Bridge {
     this.blockTextMutationObserver = null;
     this.attributeMutationObserver = null;
     this.selectedBlockUid = null;
+    this.editMode = 'text'; // 'text' | 'block' — user switches via Escape/Enter/click
+    this.multiSelectedBlockUids = []; // Array of block UIDs in multi-selection
     this.focusedFieldName = null; // Track which editable field within the block has focus
     this.focusedLinkableField = null; // Track which linkable field has focus (for link editing)
     this.focusedMediaField = null; // Track which media field has focus (for image selection)
@@ -554,6 +558,63 @@ export class Bridge {
   }
 
   /**
+   * Compile a per-block list of editable fields, derived from the rendered DOM.
+   * Each block's user-frontend renders elements with `data-edit-text` (slate),
+   * `data-edit-link` (link), or `data-edit-media` (media) attributes — the
+   * authoritative declaration of "this field is end-user editable in the
+   * iframe." This is distinct from the block's full schema, which also
+   * includes settings fields (placeholder, instructions, fixed, etc.) that
+   * appear in the sidebar but aren't user content.
+   *
+   * Result shape: `{ blockId: [{ fieldName, type }, ...], ... }`
+   *   type ∈ 'slate' | 'link' | 'media'
+   *
+   * Sent with SLATE_TRANSFORM_REQUEST so the admin's merge / transform
+   * handlers can decide e.g. "is the previous block a single-slate-content
+   * block?" without schema-introspecting (which double-counts settings).
+   */
+  getEditableFieldsByBlock() {
+    const ATTR_TO_TYPE = {
+      'data-edit-text': 'slate',
+      'data-edit-link': 'link',
+      'data-edit-media': 'media',
+    };
+    const result = {};
+    if (!this.blockPathMap) return result;
+    for (const blockUid of Object.keys(this.blockPathMap)) {
+      if (blockUid === '_schemas' || blockUid === '_page') continue;
+      const elements = this.getAllBlockElements(blockUid);
+      if (!elements?.length) continue;
+      const fields = [];
+      const seen = new Set();
+      for (const el of elements) {
+        for (const [attr, type] of Object.entries(ATTR_TO_TYPE)) {
+          // Block element itself may carry the attribute (Nuxt pattern).
+          if (el.hasAttribute?.(attr)) {
+            const fieldName = el.getAttribute(attr);
+            const key = `${attr}:${fieldName}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              fields.push({ fieldName, type });
+            }
+          }
+          for (const node of el.querySelectorAll(`[${attr}]`)) {
+            if (!this.fieldBelongsToBlock(node, el)) continue;
+            const fieldName = node.getAttribute(attr);
+            const key = `${attr}:${fieldName}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              fields.push({ fieldName, type });
+            }
+          }
+        }
+      }
+      if (fields.length) result[blockUid] = fields;
+    }
+    return result;
+  }
+
+  /**
    * Get the first editable field that belongs directly to a block, excluding nested blocks' fields.
    * Also checks if the blockElement itself has data-edit-text (Nuxt pattern).
    *
@@ -848,6 +909,665 @@ export class Bridge {
     return siblings;
   }
 
+  _sameUids(a, b) {
+    if (a.length !== b.length) return false;
+    const setB = new Set(b);
+    return a.every((uid) => setB.has(uid));
+  }
+
+  /** True if `ancestorUid` appears anywhere in `descendantUid`'s parent chain. */
+  _isAncestor(ancestorUid, descendantUid) {
+    if (!ancestorUid || !descendantUid) return false;
+    let cur = this.blockPathMap?.[descendantUid]?.parentId;
+    while (cur) {
+      if (cur === ancestorUid) return true;
+      cur = this.blockPathMap?.[cur]?.parentId;
+    }
+    return false;
+  }
+
+  /**
+   * Auto-scroll helper for drag operations.
+   *
+   * Returns { onMouseMove(e), stop() } that the caller wires into a drag's
+   * mousemove and mouseup. While the cursor is within `threshold` pixels of
+   * the viewport top or bottom, the page scrolls at a speed proportional to
+   * how close it is to the edge (faster nearer the edge). A synthetic
+   * mousemove is dispatched on each scroll tick so the caller's drag
+   * indicator updates while the mouse is stationary at the edge.
+   *
+   * Used by:
+   *  - block DnD (existing drag-and-drop)
+   *  - container edge-drag
+   */
+  _createAutoScroller() {
+    const threshold = 80; // pixels from viewport edge to start scrolling
+    const minSpeed = 10;
+    const maxSpeed = 50;
+    let direction = 0; // -1 up, 0 none, 1 down
+    let speed = 0;
+    let animId = null;
+    let lastX = 0;
+    let lastY = 0;
+
+    const loop = () => {
+      if (direction === 0) return;
+      window.scrollTo({
+        top: window.scrollY + direction * speed,
+        behavior: 'instant',
+      });
+      // Synthetic mousemove so the drag indicator follows the scrolled content
+      // even when the cursor is held still at the edge.
+      document.dispatchEvent(new MouseEvent('mousemove', {
+        clientX: lastX, clientY: lastY, bubbles: true,
+      }));
+      animId = requestAnimationFrame(loop);
+    };
+
+    const setDirection = (d) => {
+      if (direction === d) return;
+      direction = d;
+      if (animId === null && d !== 0) {
+        animId = requestAnimationFrame(loop);
+      }
+    };
+
+    const stop = () => {
+      direction = 0;
+      if (animId !== null) {
+        cancelAnimationFrame(animId);
+        animId = null;
+      }
+    };
+
+    const onMouseMove = (e) => {
+      lastX = e.clientX;
+      lastY = e.clientY;
+      const vh = window.innerHeight;
+      if (e.clientY < threshold) {
+        const factor = 1 - e.clientY / threshold;
+        speed = minSpeed + (maxSpeed - minSpeed) * factor;
+        setDirection(-1);
+      } else if (e.clientY > vh - threshold) {
+        const factor = 1 - (vh - e.clientY) / threshold;
+        speed = minSpeed + (maxSpeed - minSpeed) * factor;
+        setDirection(1);
+      } else {
+        stop();
+      }
+    };
+
+    return { onMouseMove, stop };
+  }
+
+  /**
+   * Position all 4 edge handles for the selected container.
+   * For each edge:
+   *   - Show if absorb is possible: there's a sibling on the outward side
+   *     (parent layout matches edge axis) whose @type the container accepts.
+   *   - Show if expel is possible: the container has a child whose @type
+   *     the parent accepts (children layout matches edge axis).
+   * The drag handler reads dataset attributes to know what to do.
+   */
+  _positionEdgeHandles() {
+    const hide = () => {
+      this._lastCanResize = null;
+      if (this._edgeHandles) {
+        for (const h of Object.values(this._edgeHandles)) h.style.display = 'none';
+      }
+    };
+    if (!this._edgeHandles) return;
+    const uid = this.selectedBlockUid;
+    if (!uid || uid === PAGE_BLOCK_UID) { hide(); return; }
+    const info = this.blockPathMap?.[uid];
+    const el = uid ? this.queryBlockElement(uid) : null;
+    if (!info || !el) { hide(); return; }
+
+    const ownChildren = this._getSiblingsByDomOrder(null, uid);
+    if (ownChildren.length === 0) { hide(); return; }
+
+    // childAllowed = the types this container accepts as direct children.
+    // Most reliable source: the container's first child's allowedSiblingTypes
+    // (computed by buildBlockPathMap from the block-config + schema chain).
+    // Falling back to scanning the block's schema for a blocks_layout/
+    // object_list widget misses cases where allowedBlocks lives on the block
+    // config (e.g. gridBlock has no blocks_layout in its blockSchema —
+    // allowedBlocks is on blocksConfig.gridBlock).
+    const firstChildInfo = this.blockPathMap?.[ownChildren[0]];
+    let childAllowed = firstChildInfo?.allowedSiblingTypes || null;
+
+    // parentAllowed = allowedBlocks of the field this container lives in.
+    // Used to decide if expel can land children at the parent level.
+    const parentInfo = this.blockPathMap?.[info.parentId];
+    const parentSchema = parentInfo?._schemaRef
+      ? this.blockPathMap?._schemas?.[parentInfo._schemaRef] : null;
+    let parentAllowed = null;
+    if (parentSchema?.properties && info.containerField) {
+      const fd = parentSchema.properties[info.containerField];
+      if (fd?.widget === 'blocks_layout' || fd?.widget === 'object_list') {
+        parentAllowed = fd.allowedBlocks || null;
+      }
+    } else if (info.parentId === PAGE_BLOCK_UID) {
+      parentAllowed = info.allowedSiblingTypes || null;
+    }
+
+    const r = el.getBoundingClientRect();
+
+    // canAbsorb / canExpel per-edge: ask the shared _computeEdgePlan
+    // "would dragging this edge to infinity in the outward (absorb) /
+    // inward (expel) direction yield any blocks?". Single source of
+    // truth — the at-rest visibility check and the drag-time chrome
+    // (growth box / tints / MOVE_BLOCKS) use the exact same logic.
+    const planFor = (edge, mode) => {
+      const FAR = 1e7;
+      let cursorCoord;
+      if (mode === 'absorb') {
+        // Cursor far in the outward direction.
+        cursorCoord = (edge === 'bottom') ? r.bottom + FAR
+          : (edge === 'top')   ? r.top - FAR
+          : (edge === 'right') ? r.right + FAR
+          :                       r.left - FAR;
+      } else {
+        // Cursor far in the inward direction (past the opposite edge).
+        cursorCoord = (edge === 'bottom') ? r.top - FAR
+          : (edge === 'top')   ? r.bottom + FAR
+          : (edge === 'right') ? r.left - FAR
+          :                       r.right + FAR;
+      }
+      return this._computeEdgePlan(uid, edge, mode, cursorCoord).blocks.length > 0;
+    };
+
+    const perEdge = {};
+    for (const edge of ['top', 'bottom', 'left', 'right']) {
+      perEdge[edge] = {
+        canAbsorb: planFor(edge, 'absorb'),
+        canExpel:  planFor(edge, 'expel'),
+      };
+    }
+    // canResize per-edge = either absorb or expel possible. This is the
+    // admin-facing summary used to decide which edge handles to render.
+    const canResize = {
+      top: perEdge.top.canAbsorb || perEdge.top.canExpel,
+      bottom: perEdge.bottom.canAbsorb || perEdge.bottom.canExpel,
+      left: perEdge.left.canAbsorb || perEdge.left.canExpel,
+      right: perEdge.right.canAbsorb || perEdge.right.canExpel,
+    };
+    if (!canResize.top && !canResize.bottom && !canResize.left && !canResize.right) {
+      hide(); return;
+    }
+    this._lastCanResize = canResize;
+
+    // Position the (invisible) event-capture divs in iframe coords. They
+    // sit underneath the admin's visible chrome (pointer-events: none) so
+    // mouse events pass through to be captured here for drag start.
+    // Each handle is 1/3 of the edge length, centred — gives a clear hit
+    // area without the chrome looking like a full-size frame.
+    const w3 = r.width / 3;
+    const h3 = r.height / 3;
+    const positions = {
+      top:    { left: r.left + w3, top: r.top - 3, width: w3, height: 6, axis: 'vertical' },
+      bottom: { left: r.left + w3, top: r.bottom - 3, width: w3, height: 6, axis: 'vertical' },
+      left:   { left: r.left - 3, top: r.top + h3, width: 6, height: h3, axis: 'horizontal' },
+      right:  { left: r.right - 3, top: r.top + h3, width: 6, height: h3, axis: 'horizontal' },
+    };
+    for (const [edge, pos] of Object.entries(positions)) {
+      const handle = this._edgeHandles[edge];
+      if (!handle) continue;
+      if (!canResize[edge]) {
+        handle.style.display = 'none';
+        continue;
+      }
+      handle.style.left = `${pos.left}px`;
+      handle.style.top = `${pos.top}px`;
+      handle.style.width = `${pos.width}px`;
+      handle.style.height = `${pos.height}px`;
+      handle.style.display = 'block';
+      handle.dataset.edge = edge;
+      handle.dataset.axis = pos.axis;
+      handle.dataset.container = uid;
+      handle.dataset.canAbsorb = perEdge[edge].canAbsorb ? '1' : '';
+      handle.dataset.canExpel = perEdge[edge].canExpel ? '1' : '';
+      handle.dataset.childAllowed = childAllowed ? childAllowed.join(',') : '';
+      handle.dataset.parentAllowed = parentAllowed ? parentAllowed.join(',') : '';
+    }
+  }
+
+  /**
+   * Geometry helper: signed outward distance from the edge in the
+   * direction the user would drag to absorb. Positive = outward
+   * (absorb mode); negative = inward (expel mode).
+   */
+  _edgeGeometry(edge, rect, mouseX, mouseY) {
+    switch (edge) {
+      case 'bottom': return { axis: 'vertical',   edgePos: rect.bottom, mouseCoord: mouseY, outward: mouseY - rect.bottom };
+      case 'top':    return { axis: 'vertical',   edgePos: rect.top,    mouseCoord: mouseY, outward: rect.top - mouseY };
+      case 'right':  return { axis: 'horizontal', edgePos: rect.right,  mouseCoord: mouseX, outward: mouseX - rect.right };
+      case 'left':   return { axis: 'horizontal', edgePos: rect.left,   mouseCoord: mouseX, outward: rect.left - mouseX };
+      default:       return null;
+    }
+  }
+
+  /**
+   * Compute the absorb/expel plan for an edge of a container — the single
+   * source of truth used by both at-rest edge-visibility (canResize) and
+   * drag-time chrome (growth box / tints / MOVE_BLOCKS on release).
+   *
+   * @param {string} containerUid
+   * @param {string} edge   - 'top' | 'bottom' | 'left' | 'right'
+   * @param {'absorb'|'expel'} mode
+   * @param {number} cursorCoord - cursor position on the edge's perpendicular
+   *   axis. Pass ±Infinity to simulate "drag this edge as far as possible";
+   *   that's how _positionEdgeHandles asks "is anything absorbable here?"
+   *   without an actual mouse event.
+   * @returns {{ kind: 'absorb'|'expel'|'none', blocks: string[], boundary: number }}
+   */
+  _computeEdgePlan(containerUid, edge, mode, cursorCoord) {
+    const containerEl = this.queryBlockElement(containerUid);
+    if (!containerEl) return { kind: 'none', blocks: [], boundary: 0 };
+    const cRect = containerEl.getBoundingClientRect();
+    const isVerticalEdge = edge === 'top' || edge === 'bottom';
+    const geo = this._edgeGeometry(
+      edge, cRect,
+      isVerticalEdge ? cRect.left + cRect.width / 2 : cursorCoord,
+      isVerticalEdge ? cursorCoord : cRect.top + cRect.height / 2,
+    );
+    if (!geo) return { kind: 'none', blocks: [], boundary: 0 };
+
+    const containerInfo = this.blockPathMap?.[containerUid];
+    const containerParentId = containerInfo?.parentId;
+
+    // Resolve childAllowed / parentAllowed from blockPathMap (not from
+    // handle dataset — this method is also called at rest, before any
+    // handle exists).
+    const ownChildren = this._getSiblingsByDomOrder(null, containerUid);
+    const firstChildInfo = this.blockPathMap?.[ownChildren[0]];
+    const childAllowed = firstChildInfo?.allowedSiblingTypes || null;
+    let parentAllowed = null;
+    const parentInfo = this.blockPathMap?.[containerParentId];
+    const parentSchema = parentInfo?._schemaRef
+      ? this.blockPathMap?._schemas?.[parentInfo._schemaRef] : null;
+    if (parentSchema?.properties && containerInfo?.containerField) {
+      const fd = parentSchema.properties[containerInfo.containerField];
+      if (fd?.widget === 'blocks_layout' || fd?.widget === 'object_list') {
+        parentAllowed = fd.allowedBlocks || null;
+      }
+    } else if (containerParentId === PAGE_BLOCK_UID) {
+      parentAllowed = containerInfo?.allowedSiblingTypes || null;
+    }
+
+    const blockMid = (el, axis) => {
+      const r = el.getBoundingClientRect();
+      return axis === 'vertical' ? (r.top + r.bottom) / 2 : (r.left + r.right) / 2;
+    };
+    const sign = (edge === 'top' || edge === 'left') ? -1 : 1;
+
+    let candidates;
+    let accepts;
+    if (mode === 'absorb') {
+      accepts = (t) => !childAllowed || (t && childAllowed.includes(t));
+      candidates = new Set();
+      for (const [uid, info] of Object.entries(this.blockPathMap)) {
+        if (!uid || uid === containerUid) continue;
+        if (info?.isFixed) continue;
+        if (this._isAncestor(uid, containerUid)) continue;
+        if (this._isAncestor(containerUid, uid)) continue;
+        if (!this._isAncestor(containerParentId, uid) && uid !== containerParentId) continue;
+        const el = this.queryBlockElement(uid);
+        if (!el) continue;
+        const mid = blockMid(el, geo.axis);
+        const outwardOfEdge = (mid - geo.edgePos) * sign > 0;
+        const inwardOfCursor = (mid - geo.mouseCoord) * sign < 0;
+        if (outwardOfEdge && inwardOfCursor) candidates.add(uid);
+      }
+    } else {
+      accepts = (t) => !parentAllowed || (t && parentAllowed.includes(t));
+      candidates = new Set();
+      for (const [uid, info] of Object.entries(this.blockPathMap)) {
+        if (!uid || uid === containerUid) continue;
+        if (info?.isFixed) continue;
+        if (!this._isAncestor(containerUid, uid)) continue;
+        const el = this.queryBlockElement(uid);
+        if (!el) continue;
+        const mid = blockMid(el, geo.axis);
+        const outwardOfCursor = (mid - geo.mouseCoord) * sign > 0;
+        if (outwardOfCursor) candidates.add(uid);
+      }
+    }
+
+    // Bottom-up promotion.
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const uid of [...candidates]) {
+        const info = this.blockPathMap[uid];
+        const pid = info?.parentId;
+        if (!pid) continue;
+        if (mode === 'absorb' && pid === containerParentId) continue;
+        if (mode === 'expel' && pid === containerUid) continue;
+        const sibs = Object.entries(this.blockPathMap)
+          .filter(([, i]) => i?.parentId === pid).map(([id]) => id);
+        if (sibs.length === 0 || !sibs.every((c) => candidates.has(c))) continue;
+        const pType = this.getBlockData(pid)?.['@type'];
+        if (!accepts(pType)) continue;
+        for (const c of sibs) candidates.delete(c);
+        candidates.add(pid);
+        changed = true;
+      }
+    }
+    // Drop any orphan whose @type isn't accepted.
+    for (const uid of [...candidates]) {
+      const t = this.getBlockData(uid)?.['@type'];
+      if (!accepts(t)) candidates.delete(uid);
+    }
+
+    const blocks = [...candidates].sort((a, b) => {
+      const ea = this.queryBlockElement(a);
+      const eb = this.queryBlockElement(b);
+      if (!ea || !eb) return 0;
+      return ea.compareDocumentPosition(eb) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    });
+
+    let boundary = geo.edgePos;
+    for (const uid of blocks) {
+      const el = this.queryBlockElement(uid);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (edge === 'bottom') boundary = Math.max(boundary, r.bottom);
+      else if (edge === 'top') boundary = Math.min(boundary, r.top);
+      else if (edge === 'right') boundary = Math.max(boundary, r.right);
+      else if (edge === 'left') boundary = Math.min(boundary, r.left);
+    }
+
+    return { kind: blocks.length > 0 ? mode : 'none', blocks, boundary };
+  }
+
+  _setupEdgeHandleDrag(handle) {
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    // Per-drag visual state.
+    let growthBox = null;
+    const overlays = new Map(); // uid -> tinted overlay div
+    let autoScroller = null;
+
+    const ensureGrowthBox = () => {
+      if (growthBox) return growthBox;
+      growthBox = document.createElement('div');
+      growthBox.className = 'volto-hydra-edge-growth';
+      Object.assign(growthBox.style, {
+        position: 'fixed',
+        background: 'rgba(0, 126, 177, 0.08)',
+        zIndex: '10000',
+        pointerEvents: 'none',
+        display: 'none',
+      });
+      document.body.appendChild(growthBox);
+      return growthBox;
+    };
+
+    const tintBlock = (uid) => {
+      if (overlays.has(uid)) return;
+      const el = this.queryBlockElement(uid);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const overlay = document.createElement('div');
+      overlay.className = 'volto-hydra-edge-absorb-tint';
+      Object.assign(overlay.style, {
+        position: 'fixed',
+        left: `${r.left}px`, top: `${r.top}px`,
+        width: `${r.width}px`, height: `${r.height}px`,
+        background: 'rgba(0, 126, 177, 0.15)',
+        outline: '2px dashed rgba(0, 126, 177, 0.6)',
+        outlineOffset: '-2px',
+        zIndex: '10000', pointerEvents: 'none',
+      });
+      document.body.appendChild(overlay);
+      overlays.set(uid, overlay);
+    };
+
+    const cleanup = () => {
+      if (growthBox) growthBox.style.display = 'none';
+      for (const o of overlays.values()) o.remove();
+      overlays.clear();
+    };
+
+    // Wraps the shared _computeEdgePlan method, deciding mode (absorb vs
+    // expel) from the cursor's signed outward distance.
+    const computePlan = (e) => {
+      const edge = handle.dataset.edge;
+      const containerUid = handle.dataset.container;
+      const containerEl = this.queryBlockElement(containerUid);
+      if (!containerEl || !edge) return { kind: 'none', blocks: [], boundary: 0 };
+      const cRect = containerEl.getBoundingClientRect();
+      const geo = this._edgeGeometry(edge, cRect, e.clientX, e.clientY);
+      if (!geo) return { kind: 'none', blocks: [], boundary: 0 };
+      // A few px of slop so a tiny drag in the "wrong" direction doesn't
+      // immediately switch modes.
+      const slop = 3;
+      let mode = null;
+      if (geo.outward > slop && handle.dataset.canAbsorb) mode = 'absorb';
+      else if (geo.outward < -slop && handle.dataset.canExpel) mode = 'expel';
+      if (!mode) return { kind: 'none', blocks: [], boundary: geo.edgePos };
+      return this._computeEdgePlan(containerUid, edge, mode, geo.mouseCoord);
+    };
+
+    // Update the growth box to span between A's edge and the boundary, with
+    // the moving edge of the box thickened when there's a non-empty plan.
+    const updateGrowthBox = (e, plan) => {
+      if (!growthBox) return;
+      const containerEl = this.queryBlockElement(handle.dataset.container);
+      if (!containerEl) return;
+      const cRect = containerEl.getBoundingClientRect();
+      const edge = handle.dataset.edge;
+      const valid = plan.kind !== 'none' && plan.blocks.length > 0;
+      const reset = (k, v) => growthBox.style.setProperty(k, v);
+      ['borderTopWidth','borderBottomWidth','borderLeftWidth','borderRightWidth']
+        .forEach((p) => reset(p, '0'));
+      // Box spans from container's edge to the plan boundary (or cursor when no plan).
+      const cursor = (edge === 'top' || edge === 'bottom') ? e.clientY : e.clientX;
+      const dragKindIsExpel = plan.kind === 'expel';
+      let endCoord;
+      if (valid) endCoord = plan.boundary;
+      else endCoord = (handle.dataset.canAbsorb || handle.dataset.canExpel) ? cursor : null;
+      if (endCoord === null) { growthBox.style.display = 'none'; return; }
+
+      if (edge === 'bottom' || edge === 'top') {
+        const top = Math.min(edge === 'top' ? endCoord : cRect.bottom,
+                              edge === 'top' ? cRect.top : endCoord);
+        const bottom = Math.max(edge === 'top' ? endCoord : cRect.bottom,
+                                 edge === 'top' ? cRect.top : endCoord);
+        growthBox.style.left = `${cRect.left}px`;
+        growthBox.style.width = `${cRect.width}px`;
+        growthBox.style.top = `${top}px`;
+        growthBox.style.height = `${Math.max(0, bottom - top)}px`;
+        const moving = edge === 'top' ? 'borderTopWidth' : 'borderBottomWidth';
+        growthBox.style[moving] = valid ? '6px' : '1px';
+        growthBox.style.borderColor = '#007eb1';
+        growthBox.style.borderStyle = 'solid';
+      } else {
+        const left = Math.min(edge === 'left' ? endCoord : cRect.right,
+                              edge === 'left' ? cRect.left : endCoord);
+        const right = Math.max(edge === 'left' ? endCoord : cRect.right,
+                                edge === 'left' ? cRect.left : endCoord);
+        growthBox.style.top = `${cRect.top}px`;
+        growthBox.style.height = `${cRect.height}px`;
+        growthBox.style.left = `${left}px`;
+        growthBox.style.width = `${Math.max(0, right - left)}px`;
+        const moving = edge === 'left' ? 'borderLeftWidth' : 'borderRightWidth';
+        growthBox.style[moving] = valid ? '6px' : '1px';
+        growthBox.style.borderColor = '#007eb1';
+        growthBox.style.borderStyle = 'solid';
+      }
+      // Visually distinguish expel from absorb.
+      growthBox.style.background = dragKindIsExpel
+        ? 'rgba(220, 53, 69, 0.06)' : 'rgba(0, 126, 177, 0.08)';
+      growthBox.style.display = 'block';
+    };
+
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragging = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      autoScroller = this._createAutoScroller();
+      ensureGrowthBox();
+      updateGrowthBox(e, { kind: 'none', blocks: [], boundary: 0 });
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      e.preventDefault();
+      lastX = e.clientX;
+      lastY = e.clientY;
+      autoScroller?.onMouseMove(e);
+
+      const plan = computePlan(e);
+      updateGrowthBox(e, plan);
+
+      // Tint blocks in the plan; remove stale tints.
+      const wanted = new Set(plan.blocks);
+      for (const [uid, overlay] of overlays) {
+        if (!wanted.has(uid)) {
+          overlay.remove();
+          overlays.delete(uid);
+        }
+      }
+      for (const uid of plan.blocks) tintBlock(uid);
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      autoScroller?.stop();
+      autoScroller = null;
+
+      const plan = computePlan({ clientX: lastX, clientY: lastY });
+      const containerUid = handle.dataset.container;
+      const containerInfo = containerUid ? this.blockPathMap?.[containerUid] : null;
+      const edge = handle.dataset.edge;
+      cleanup();
+
+      if (plan.kind === 'none' || plan.blocks.length === 0 || !containerUid) return;
+
+      // selectAfterMove pins selection on the dragged container — the user
+      // adjusted its boundary, not selected the moved block.
+      const baseMessage = {
+        type: 'MOVE_BLOCKS',
+        blockIds: plan.blocks,
+        selectAfterMove: containerUid,
+      };
+
+      if (plan.kind === 'absorb') {
+        // Move plan blocks into the container. Two cases:
+        //   - Container has children → target = lastChild / firstChild
+        //     (insertAfter=true for bottom/right, false for top/left).
+        //   - Container is empty → MOVE_BLOCKS targets containerUid itself
+        //     with `insertInside: true` so the admin handler appends.
+        const ownChildren = this._getSiblingsByDomOrder(null, containerUid);
+        const insertAfter = (edge === 'bottom' || edge === 'right');
+        const target = ownChildren.length > 0
+          ? (insertAfter ? ownChildren[ownChildren.length - 1] : ownChildren[0])
+          : containerUid;
+        window.parent.postMessage({
+          ...baseMessage,
+          targetBlockId: target,
+          insertAfter,
+          targetParentId: containerUid,
+        }, this.adminOrigin);
+      } else if (plan.kind === 'expel') {
+        // Move plan blocks out of the container to its parent. They land
+        // before A (top/left edge) or after A (bottom/right edge).
+        const insertAfter = (edge === 'bottom' || edge === 'right');
+        window.parent.postMessage({
+          ...baseMessage,
+          targetBlockId: containerUid,
+          insertAfter,
+          targetParentId: containerInfo?.parentId,
+        }, this.adminOrigin);
+      }
+    });
+  }
+
+  /**
+   * Filter a list of block UIDs to those that can be mutated by `op`.
+   * Single source of truth for locked-block protection on the iframe side.
+   * op: 'delete' | 'move' | 'edit'.
+   */
+  _filterMutableBlockUids(uids, op = 'delete') {
+    return uids.filter((uid) => {
+      if (!uid) return false;
+      const blockData = this.getBlockData(uid);
+      if ((op === 'delete' || op === 'move')
+          && isBlockPositionLocked(blockData, this.templateEditMode)) {
+        return false;
+      }
+      if ((op === 'delete' || op === 'edit')
+          && isBlockReadonly(blockData, this.templateEditMode)) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  /**
+   * Detects text selections that span multiple blocks and converts them into
+   * a multi-block selection. Fires on each selectionchange.
+   * Only active in text mode — block-mode Shift+Click extends text selection
+   * as a side effect; block-level click handlers own that state transition.
+   */
+  _checkCrossBlockSelection(range) {
+    if (!this.focusedFieldName) return;
+    const anchorBlock = this._closestBlockElement(range.startContainer);
+    const focusBlock = this._closestBlockElement(range.endContainer);
+    if (!anchorBlock || !focusBlock) return;
+    const anchorUid = anchorBlock.getAttribute('data-block-uid');
+    const focusUid = focusBlock.getAttribute('data-block-uid');
+    if (!anchorUid || !focusUid || anchorUid === focusUid) return;
+
+    // Collect all blocks intersecting the range, preserve DOM order
+    const uids = [];
+    const seen = new Set();
+    for (const el of document.querySelectorAll('[data-block-uid]')) {
+      if (!range.intersectsNode(el)) continue;
+      const uid = el.getAttribute('data-block-uid');
+      if (!uid || seen.has(uid)) continue;
+      // Skip containers: only include blocks whose entire UID doesn't contain another selected block
+      // (keeps the selection at the leaf level the user dragged across)
+      seen.add(uid);
+      uids.push(uid);
+    }
+    if (uids.length < 2) return;
+
+    // Prune containers: remove any block that is an ancestor of another selected block
+    const pruned = uids.filter((uid) => {
+      const el = this.queryBlockElement(uid);
+      if (!el) return false;
+      return !uids.some((other) => {
+        if (other === uid) return false;
+        const otherEl = this.queryBlockElement(other);
+        return otherEl && el !== otherEl && el.contains(otherEl);
+      });
+    });
+    if (pruned.length < 2) return;
+
+    if (this._sameUids(pruned, this.multiSelectedBlockUids)) return;
+    this.multiSelectedBlockUids = pruned;
+    this.selectedBlockUid = pruned[pruned.length - 1];
+    this._sendMultiBlockSelected();
+  }
+
+  _closestBlockElement(node) {
+    let current = node;
+    while (current) {
+      if (current.nodeType === Node.ELEMENT_NODE && current.hasAttribute?.('data-block-uid')) {
+        return current;
+      }
+      current = current.parentNode;
+    }
+    return null;
+  }
+
   /**
    * Handle arrow key press when cursor is at the edge of an editable field.
    * Navigates between fields within a block, or to adjacent blocks.
@@ -857,14 +1577,179 @@ export class Bridge {
    * @param {HTMLElement} editableField - The currently focused editable field
    * @param {HTMLElement} blockElement - The block element
    */
-  handleArrowAtEdge(key, blockUid, editableField, blockElement) {
-    const pathInfo = this.blockPathMap?.[blockUid];
-    if (!pathInfo) return;
+  /**
+   * Handle keys in block mode (no contenteditable field focused).
+   * Called from the document keyboard blocker for body-focused and
+   * block-focused keys. Returns true if the key was handled (caller
+   * should not buffer it for text replay).
+   *
+   * Covers: Arrow navigation, Shift+Arrow multi-select, Delete/Backspace,
+   * Cmd+A select-all escalation, Enter to add block.
+   */
+  _handleBlockModeKey(e) {
+    // Arrow keys: navigate between sibling blocks or extend multi-selection
+    if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      const blockEl = this.queryBlockElement(this.selectedBlockUid);
+      const nav = this.getArrowNavigationTarget(e.key, this.selectedBlockUid, blockEl);
+      if (!nav) return false; // at boundary or wrong direction for layout
+      const { adjacentId, adjacentEl } = nav;
 
-    // Determine layout direction for navigation (skip addability checks — we want
-    // navigation direction even for blocks that can't have siblings added)
-    let addDirection = blockElement.getAttribute('data-block-add');
-    if (!addDirection) {
+      e.preventDefault();
+
+      if (e.shiftKey) {
+        // Shift+Arrow: extend/shrink multi-selection
+        if (this.multiSelectedBlockUids.length === 0) {
+          this.multiSelectedBlockUids = [this.selectedBlockUid, adjacentId];
+        } else if (this.multiSelectedBlockUids.includes(adjacentId)) {
+          this.multiSelectedBlockUids = this.multiSelectedBlockUids.filter(
+            uid => uid !== this.selectedBlockUid,
+          );
+        } else {
+          this.multiSelectedBlockUids.push(adjacentId);
+        }
+        this.selectedBlockUid = adjacentId;
+        if (this.multiSelectedBlockUids.length <= 1) {
+          const singleUid = this.multiSelectedBlockUids[0] || adjacentId;
+          this.multiSelectedBlockUids = [];
+          this.selectedBlockUid = singleUid;
+          this.focusedFieldName = null;
+          window.getSelection()?.removeAllRanges();
+          const el = this.queryBlockElement(singleUid);
+          if (el) this.sendBlockSelected('shiftArrowSingle', el, { focusedFieldName: null });
+        } else {
+          this._sendMultiBlockSelected();
+        }
+      } else {
+        // Plain arrow: navigate to adjacent block, stay in block mode
+        // editMode is already 'block', selectBlock reads it
+        this.multiSelectedBlockUids = [];
+        this._navigatingToBlock = true;
+        this.selectBlock(adjacentEl);
+        this._navigatingToBlock = false;
+      }
+      return true;
+    }
+
+    // Delete/Backspace: delete selected block(s) — locked blocks are spared
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      if (this.multiSelectedBlockUids.length > 0) {
+        const deletable = this._filterMutableBlockUids(
+          this.multiSelectedBlockUids, 'delete',
+        );
+        log('Block mode Delete: deleting', deletable.length, '/', this.multiSelectedBlockUids.length, 'blocks');
+        if (deletable.length > 0) {
+          this.sendMessageToParent({ type: 'DELETE_BLOCKS', uids: deletable });
+        }
+        this.multiSelectedBlockUids = [];
+        this.selectedBlockUid = null;
+      } else if (
+        this.selectedBlockUid
+        && this._filterMutableBlockUids([this.selectedBlockUid], 'delete').length > 0
+      ) {
+        log('Block mode Delete: deleting single block', this.selectedBlockUid);
+        this.sendMessageToParent({ type: 'DELETE_BLOCK', uid: this.selectedBlockUid });
+      }
+      return true;
+    }
+
+    // Cmd+A: escalate selection up the parent chain
+    // Press 1 (in block mode, no multi): select siblings of current block
+    // Press 2+: replace with siblings of the current selection's parent (walk up)
+    if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      let anchorUid;
+      if (this.multiSelectedBlockUids.length > 0) {
+        // Already multi-selected: escalate by walking up from any selected block's parent
+        anchorUid = this.multiSelectedBlockUids[0];
+      } else {
+        anchorUid = this.selectedBlockUid;
+      }
+      const anchorInfo = this.blockPathMap?.[anchorUid];
+      if (!anchorInfo) return true;
+      // Current "container" of the selection is anchor's parentId.
+      // For escalation, select siblings at that level; next press walks up.
+      let containerId = anchorInfo.parentId || null;
+      if (this.multiSelectedBlockUids.length > 0) {
+        // Escalate: move up one level — select siblings of the container itself
+        const containerInfo = this.blockPathMap?.[containerId];
+        if (!containerInfo) return true; // already at root (page-level)
+        containerId = containerInfo.parentId || null;
+        anchorUid = anchorInfo.parentId;
+      }
+      const siblings = this._getSiblingsByDomOrder(anchorUid, containerId);
+      if (siblings.length > 0 && !this._sameUids(siblings, this.multiSelectedBlockUids)) {
+        this.multiSelectedBlockUids = siblings;
+        this._sendMultiBlockSelected();
+      }
+      return true;
+    }
+
+    // Cmd+C / Cmd+X: copy/cut blocks (uses Volto's blocksClipboard)
+    if ((e.key === 'c' || e.key === 'x') && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      const uids = this.multiSelectedBlockUids.length > 0
+        ? [...this.multiSelectedBlockUids]
+        : [this.selectedBlockUid];
+      const action = e.key === 'c' ? 'copy' : 'cut';
+      log('Block mode', action, uids.length, 'blocks');
+      // Cut drops locked blocks entirely: you can't "move" what can't move.
+      // Copy is non-destructive so locked blocks are fine.
+      const transferUids = action === 'cut'
+        ? this._filterMutableBlockUids(uids, 'delete')
+        : uids;
+      if (transferUids.length > 0) {
+        this.sendMessageToParent({ type: 'COPY_BLOCKS', uids: transferUids, action });
+      }
+      if (action === 'cut' && transferUids.length > 0) {
+        this.sendMessageToParent({ type: 'DELETE_BLOCKS', uids: transferUids });
+        this.multiSelectedBlockUids = [];
+        this.selectedBlockUid = null;
+      }
+      return true;
+    }
+
+    // Cmd+V: paste blocks from clipboard (admin handles actual insertion)
+    if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      const afterUid = this.multiSelectedBlockUids.length > 0
+        ? this.multiSelectedBlockUids[this.multiSelectedBlockUids.length - 1]
+        : this.selectedBlockUid;
+      log('Block mode paste after:', afterUid);
+      this.sendMessageToParent({ type: 'PASTE_BLOCKS', afterBlockId: afterUid });
+      return true;
+    }
+
+    // Enter: add block after. We reach _handleBlockModeKey only when no
+    // editable field is active (line 4104 returns early otherwise), so
+    // we're in block mode by definition — gating on `isInlineEditing`
+    // here just blocks Enter when the user has selected a container as
+    // a whole (e.g. via Escape-to-parent) and wants to insert after it.
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      this.sendMessageToParent({
+        type: 'ADD_BLOCK_AFTER',
+        blockId: this.selectedBlockUid,
+      });
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Single source of truth for arrow-key → adjacent block navigation.
+   * Maps the arrow key to a direction based on layout mode (vertical,
+   * horizontal, table), then resolves the navigation target via blockPathMap.
+   *
+   * @returns {{ adjacentId, adjacentEl, direction, isTableVertical }} or null
+   */
+  getArrowNavigationTarget(key, blockUid, blockElement) {
+    const pathInfo = this.blockPathMap?.[blockUid];
+    if (!pathInfo) return null;
+
+    let addDirection = blockElement?.getAttribute('data-block-add');
+    if (!addDirection && blockElement) {
       let depth = 0;
       let parent = blockElement.parentElement;
       while (parent) {
@@ -875,34 +1760,37 @@ export class Bridge {
     }
     const isTableMode = pathInfo.parentAddMode === 'table';
 
-    // Map arrow keys to directions
     const isForwardKey = (key === 'ArrowDown' || key === 'ArrowRight');
     const isVerticalKey = (key === 'ArrowUp' || key === 'ArrowDown');
     const isHorizontalKey = (key === 'ArrowLeft' || key === 'ArrowRight');
 
-    // Determine if this key should trigger navigation
     let shouldNavigate = false;
     let isTableVertical = false;
 
     if (isTableMode) {
-      // Table mode: both directions work
-      // Horizontal (Left/Right) → navigate between cells in same row
-      // Vertical (Up/Down) → navigate between rows (same column)
-      if (isHorizontalKey) {
-        shouldNavigate = true;
-      } else if (isVerticalKey) {
-        shouldNavigate = true;
-        isTableVertical = true;
-      }
+      if (isHorizontalKey) shouldNavigate = true;
+      else if (isVerticalKey) { shouldNavigate = true; isTableVertical = true; }
     } else if (addDirection === 'bottom' && isVerticalKey) {
       shouldNavigate = true;
     } else if (addDirection === 'right' && isHorizontalKey) {
       shouldNavigate = true;
     }
 
-    if (!shouldNavigate) return;
+    if (!shouldNavigate) return null;
 
     const direction = isForwardKey ? 'forward' : 'backward';
+    const adjacentId = this._resolveNavigationTarget(blockUid, direction, isTableVertical);
+    if (!adjacentId) return null;
+    const adjacentEl = this.queryBlockElement(adjacentId);
+    if (!adjacentEl) return null;
+
+    return { adjacentId, adjacentEl, direction, isTableVertical };
+  }
+
+  handleArrowAtEdge(key, blockUid, editableField, blockElement) {
+    const nav = this.getArrowNavigationTarget(key, blockUid, blockElement);
+    if (!nav) return;
+    const { adjacentId, adjacentEl, direction, isTableVertical } = nav;
 
     // Check multi-field: navigate between fields within the block first
     const ownFields = this.getOwnEditableFields(blockElement);
@@ -931,49 +1819,15 @@ export class Bridge {
       }
     }
 
-    // Navigate to adjacent block, resolving through template instance boundaries.
-    // Template instances are virtual containers with no DOM element — we must
-    // drill into them (when entering) or skip past them (when leaving).
-    let adjacentId = this._resolveNavigationTarget(blockUid, direction, isTableVertical);
-    if (!adjacentId) return;
-
-    const adjacentElement = this.queryBlockElement(adjacentId);
-    if (!adjacentElement) return;
-
     log('handleArrowAtEdge: navigating from', blockUid, 'to', adjacentId, 'direction:', direction);
 
-    // selectBlock() sets up toolbar, contenteditable, and sends BLOCK_SELECTED to admin.
-    // Admin echoes back SELECT_BLOCK but iframe skips it (alreadySelected).
-    // So we handle field focusing and cursor placement directly here.
-    this.selectBlock(adjacentElement);
-
-    // Focus the appropriate field and place cursor after DOM settles
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const currentElement = this.queryBlockElement(adjacentId);
-        if (!currentElement) return;
-        let targetField;
-        if (direction === 'backward') {
-          const fields = this.getOwnEditableFields(currentElement);
-          targetField = fields[fields.length - 1] || null;
-        } else {
-          targetField = this.getOwnFirstEditableField(currentElement);
-        }
-        if (targetField && targetField.getAttribute('contenteditable') === 'true') {
-          targetField.focus();
-          if (direction === 'backward') {
-            this._placeCursorAtEnd(targetField);
-          } else {
-            const sel = window.getSelection();
-            const range = document.createRange();
-            range.selectNodeContents(targetField);
-            range.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(range);
-          }
-        }
-      });
+    // editMode stays 'text' — selectBlock will set up contenteditable
+    this._navigatingToBlock = true;
+    this.selectBlock(adjacentEl, {
+      fieldToFocus: direction === 'backward' ? 'last' : 'first',
+      cursorAt: direction === 'backward' ? 'end' : 'start',
     });
+    this._navigatingToBlock = false;
   }
 
   /**
@@ -1069,13 +1923,81 @@ export class Bridge {
    * cursor movement. Used by buffer replay and testable independently.
    * @returns {boolean} true if handled
    */
-  replayOneKey(blockId, evt, editableField) {
+  /**
+   * Handle structural/special key actions that need preventDefault.
+   * Shared by both live (_handleFieldKeydown) and replay (replayOneKey).
+   * Returns true if the key was fully handled (caller should preventDefault).
+   * Returns false if the key is a content key (text char, normal delete, space
+   * without markdown) — caller decides: live lets native handle, replay uses
+   * _insertTextAtCursor / execCommand.
+   */
+  handleSpecialKey(blockId, evt, editableField) {
     const { key, shiftKey = false, ctrlKey = false, metaKey = false } = evt;
     const hasMod = ctrlKey || metaKey;
 
-    // Paste (Ctrl+V with stored clipboard data)
-    if (evt._type === 'paste' || (hasMod && key?.toLowerCase() === 'v')) {
+    // Clear prospective inline on navigation keys
+    const navigationKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Escape', 'Tab', 'Home', 'End', 'PageUp', 'PageDown'];
+    if ((navigationKeys.includes(key) || hasMod || evt.altKey) && this.prospectiveInlineElement) {
+      this.prospectiveInlineElement = null;
+    }
+
+    // Slash menu navigation
+    if (this._slashMenuActive) {
+      if (key === 'ArrowUp' || key === 'ArrowDown') {
+        this.sendMessageToParent({ type: 'SLASH_MENU', action: key === 'ArrowUp' ? 'up' : 'down', blockId });
+        return true;
+      }
+      if (key === 'Enter' && !shiftKey) {
+        this.sendMessageToParent({ type: 'SLASH_MENU', action: 'select', blockId });
+        return true;
+      }
+      if (key === 'Escape') {
+        this._slashMenuActive = false;
+        this.sendMessageToParent({ type: 'SLASH_MENU', action: 'hide', blockId });
+        return true;
+      }
+    }
+
+    // Paste: replay has clipboard data stored at buffer time (evt.html).
+    // Live Ctrl+V reads clipboard now (user gesture is active).
+    if (evt._type === 'paste') {
       if (evt.html) this._doPaste(blockId, evt.html);
+      return true;
+    }
+    if (hasMod && key?.toLowerCase() === 'v') {
+      // Read clipboard async (user gesture active for live keys)
+      navigator.clipboard.read().then(async (items) => {
+        for (const item of items) {
+          if (item.types.includes('text/html')) {
+            this._doPaste(blockId, await (await item.getType('text/html')).text());
+            return;
+          }
+          if (item.types.includes('text/plain')) {
+            this._doPaste(blockId, await (await item.getType('text/plain')).text());
+            return;
+          }
+        }
+      }).catch(() => {
+        navigator.clipboard.readText().then(text => {
+          if (text) this._doPaste(blockId, text);
+        }).catch(() => {});
+      });
+      return true;
+    }
+
+    // Save, Undo, Redo
+    if (hasMod && key === 's' && !shiftKey) {
+      this.sendMessageToParent({ type: 'SAVE_REQUEST' });
+      return true;
+    }
+    if (hasMod && key === 'z' && !shiftKey) {
+      this.flushPendingTextUpdates();
+      this.sendMessageToParent({ type: 'SLATE_UNDO_REQUEST', blockId });
+      return true;
+    }
+    if (hasMod && ((key === 'z' && shiftKey) || key === 'y')) {
+      this.flushPendingTextUpdates();
+      this.sendMessageToParent({ type: 'SLATE_REDO_REQUEST', blockId });
       return true;
     }
 
@@ -1091,16 +2013,15 @@ export class Bridge {
             (hasShift ? shiftKey : !shiftKey) &&
             (hasAlt ? evt.altKey : !evt.altKey) &&
             key?.toLowerCase() === hotkey && config.type === 'inline') {
-          log('Replaying format hotkey:', config.format);
+          if (!this.isSlateField(blockId, this.focusedFieldName)) return true;
           this.sendTransformRequest(blockId, 'format', { format: config.format });
           return true;
         }
       }
     }
 
-    // Modifier shortcuts
+    // Cmd+A, Cmd+C, Cmd+X
     if (hasMod && key?.toLowerCase() === 'a') {
-      // Select all — use text node endpoints to avoid correctInvalidWhitespaceSelection
       const sel = window.getSelection();
       if (sel && editableField) {
         const walker = document.createTreeWalker(editableField, NodeFilter.SHOW_TEXT);
@@ -1117,29 +2038,207 @@ export class Bridge {
       }
       return true;
     }
-    if (hasMod && key.toLowerCase() === 'c') {
+    if (hasMod && key?.toLowerCase() === 'c') {
+      // Option A: cross-block multi-selection copies whole blocks, not text
+      if (this.multiSelectedBlockUids.length > 1) {
+        this.sendMessageToParent({
+          type: 'COPY_BLOCKS',
+          uids: [...this.multiSelectedBlockUids],
+          action: 'copy',
+        });
+        return true;
+      }
       document.execCommand('copy');
       return true;
     }
-    if (hasMod && key.toLowerCase() === 'x') {
+    if (hasMod && key?.toLowerCase() === 'x') {
+      if (this.multiSelectedBlockUids.length > 1) {
+        const transferUids = this._filterMutableBlockUids(
+          [...this.multiSelectedBlockUids], 'delete',
+        );
+        if (transferUids.length > 0) {
+          this.sendMessageToParent({ type: 'COPY_BLOCKS', uids: transferUids, action: 'cut' });
+          this.sendMessageToParent({ type: 'DELETE_BLOCKS', uids: transferUids });
+        }
+        this.multiSelectedBlockUids = [];
+        return true;
+      }
       this._doCut(blockId);
       return true;
     }
-    if (hasMod && key.toLowerCase() === 'z') {
-      // Undo/redo — not replayable, skip
+
+    // Space: markdown shortcut only (text insertion is NOT special)
+    if (key === ' ' && !hasMod) {
+      if (this.handleSpaceKey(blockId)) return true;
+      return false; // let caller handle as text
+    }
+
+    // Delete/Backspace: boundary cases only (normal delete is NOT special)
+    if (key === 'Backspace') {
+      if (this.handleDeleteKey(blockId, 'Backspace')) return true;
+      return false; // let caller handle as native delete
+    }
+    if (key === 'Delete') {
+      this._skipZwsNode('forward');
+      if (this.handleDeleteKey(blockId, 'Delete')) return true;
+      return false; // let caller handle as native delete
+    }
+
+    // Arrow keys
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
+      if (!hasMod && !evt.altKey) {
+        this.moveArrowKey(key, editableField, shiftKey);
+      }
       return true;
     }
 
-    // Space: check markdown first, then insert as text
-    if (key === ' ' && !hasMod) {
-      if (this.handleSpaceKey(blockId)) {
-        return true; // markdown transform sent
+    // Home/End
+    if (key === 'Home' || key === 'End') {
+      if (!hasMod && !evt.altKey) {
+        const sel = window.getSelection();
+        if (sel) {
+          const dir = key === 'Home' ? 'backward' : 'forward';
+          sel.modify(shiftKey ? 'extend' : 'move', dir, 'lineboundary');
+          this._skipZwsNode(dir === 'backward' ? 'forward' : 'backward');
+        }
       }
-      // Fall through to text insertion
+      return true;
     }
 
-    // Text character (including space without markdown)
-    // Run the same preprocessing as the live keydown handler, then insert.
+    // Tab
+    if (key === 'Tab' && !hasMod) {
+      const isPreElement = editableField?.tagName === 'PRE' || !!editableField?.closest('pre');
+      if (isPreElement) {
+        const sel = window.getSelection();
+        if (sel?.rangeCount) {
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+          const spaces = document.createTextNode('  ');
+          range.insertNode(spaces);
+          range.setStartAfter(spaces);
+          range.setEndAfter(spaces);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          editableField.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        return true;
+      }
+      if (this.isSlateField(blockId, this.focusedFieldName)) {
+        const selection = window.getSelection();
+        if (selection?.rangeCount) {
+          const tabNode = selection.getRangeAt(0).startContainer;
+          const tabEl = this._toElement(tabNode);
+          if (tabEl?.closest('li')) {
+            this.sendTransformRequest(blockId, shiftKey ? 'outdent' : 'indent', {});
+            return true;
+          }
+        }
+      }
+      // Focus navigation via tabbable
+      {
+        const ordered = tabbable(document.documentElement);
+        const currentIdx = ordered.indexOf(editableField || document.activeElement);
+        if (currentIdx !== -1 && ordered.length > 1) {
+          const nextIdx = shiftKey
+            ? (currentIdx - 1 + ordered.length) % ordered.length
+            : (currentIdx + 1) % ordered.length;
+          ordered[nextIdx].focus();
+        }
+      }
+      return true;
+    }
+
+    // Enter
+    if (key === 'Enter' && !shiftKey) {
+      const isPreElement = editableField?.tagName === 'PRE' || !!editableField?.closest('pre');
+      if (isPreElement) {
+        const sel = window.getSelection();
+        if (sel?.rangeCount) {
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+          const textNode = document.createTextNode('\n');
+          range.insertNode(textNode);
+          range.setStartAfter(textNode);
+          range.setEndAfter(textNode);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          editableField.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        return true;
+      }
+      // Plain string fields: navigate to next field or add block.
+      // Textarea and unknown types: let native handle (inserts newline).
+      // Slate fields: multi-field check then split via transform.
+      const fieldType = this.getFieldType(blockId, this.focusedFieldName);
+      if (!this.isSlateField(blockId, this.focusedFieldName) &&
+          !this.fieldTypeIsPlainString(fieldType)) {
+        // Textarea or unknown — let native insert newline
+        return false;
+      }
+      if (this.fieldTypeIsPlainString(fieldType)) {
+        const blockEl = editableField?.closest('[data-block-uid]');
+        if (!blockEl) return true;
+        const ownFields = this.getOwnEditableFields(blockEl);
+        const idx = editableField ? ownFields.indexOf(editableField) : -1;
+        if (idx >= 0 && idx < ownFields.length - 1) {
+          const nextField = ownFields[idx + 1];
+          nextField.focus();
+          const sel = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(nextField);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } else {
+          this.sendMessageToParent({ type: 'ADD_BLOCK_AFTER', blockId });
+        }
+        return true;
+      }
+      // Slate: multi-field then split
+      const blockElement = editableField?.closest('[data-block-uid]');
+      if (!blockElement) return true;
+      const ownFields = this.getOwnEditableFields(blockElement);
+      const currentIndex = editableField ? ownFields.indexOf(editableField) : -1;
+      if (currentIndex >= 0 && currentIndex < ownFields.length - 1) {
+        const nextField = ownFields[currentIndex + 1];
+        nextField.focus();
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(nextField);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        return true;
+      }
+      this.correctInvalidWhitespaceSelection();
+      const selection = window.getSelection();
+      if (!selection?.rangeCount) return true;
+      const node = selection.getRangeAt(0).startContainer;
+      const parentElement = this._toElement(node);
+      if (parentElement?.closest('[data-node-id]')) {
+        this.sendTransformRequest(blockId, 'enter', {});
+      }
+      return true;
+    }
+
+    return false; // Not a special key
+  }
+
+  /**
+   * Replay a buffered key. Calls handleSpecialKey first, then handles
+   * content keys (text insertion, normal delete) that can't go native.
+   */
+  replayOneKey(blockId, evt, editableField) {
+    // Try special/structural handling first (shared with live _handleFieldKeydown)
+    if (this.handleSpecialKey(blockId, evt, editableField)) return true;
+
+    const { key, ctrlKey = false, metaKey = false } = evt;
+    const hasMod = ctrlKey || metaKey;
+
+    // Content keys: in replay, no native events — handle explicitly.
+    // (For live keys, _handleFieldKeydown lets these go native instead.)
+
+    // Text character (including space that wasn't a markdown shortcut)
     if (key?.length === 1 && !hasMod) {
       this.correctInvalidWhitespaceSelection();
       this.ensureValidInsertionTarget();
@@ -1147,62 +2246,33 @@ export class Bridge {
       return true;
     }
 
-    // Delete keys
+    // Backspace (not handled by handleSpecialKey = normal char delete)
     if (key === 'Backspace') {
-      if (!this.handleDeleteKey(blockId, 'Backspace')) {
-        if (!this.preserveLastCharDelete()) {
-          document.execCommand('delete', false);
-        }
+      if (!this.preserveLastCharDelete()) {
+        document.execCommand('delete', false);
       }
       return true;
     }
+
+    // Delete (not handled by handleSpecialKey = normal char delete)
     if (key === 'Delete') {
-      this._skipZwsNode('forward');
-      if (!this.handleDeleteKey(blockId, 'Delete')) {
-        if (!this.preserveLastCharDelete()) {
-          const sel = window.getSelection();
-          if (sel?.isCollapsed && sel.focusNode?.nodeType === Node.TEXT_NODE) {
-            const text = sel.focusNode.textContent || '';
-            let offset = sel.focusOffset;
-            while (offset < text.length &&
-              (text[offset] === '\uFEFF' || text[offset] === '\u200B')) {
-              offset++;
-            }
-            if (offset < text.length) {
-              const range = document.createRange();
-              range.setStart(sel.focusNode, offset);
-              range.setEnd(sel.focusNode, offset + 1);
-              range.deleteContents();
-            }
+      if (!this.preserveLastCharDelete()) {
+        const sel = window.getSelection();
+        if (sel?.isCollapsed && sel.focusNode?.nodeType === Node.TEXT_NODE) {
+          const text = sel.focusNode.textContent || '';
+          let offset = sel.focusOffset;
+          while (offset < text.length &&
+            (text[offset] === '\uFEFF' || text[offset] === '\u200B')) {
+            offset++;
+          }
+          if (offset < text.length) {
+            const range = document.createRange();
+            range.setStart(sel.focusNode, offset);
+            range.setEnd(sel.focusNode, offset + 1);
+            range.deleteContents();
           }
         }
       }
-      return true;
-    }
-
-    // Navigation keys
-    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
-      this.moveArrowKey(key, editableField, shiftKey);
-      return true;
-    }
-    if (key === 'Home' || key === 'End') {
-      const sel = window.getSelection();
-      if (sel) {
-        const dir = key === 'Home' ? 'backward' : 'forward';
-        sel.modify(shiftKey ? 'extend' : 'move', dir, 'lineboundary');
-        this._skipZwsNode(dir === 'backward' ? 'forward' : 'backward');
-      }
-      return true;
-    }
-
-    // Keys needing full field context (Enter→split, Tab→indent)
-    // Call the field keydown handler directly instead of synthetic event dispatch
-    if (key === 'Enter' || key === 'Tab') {
-      const syntheticEvt = new KeyboardEvent('keydown', {
-        key, code: evt.code, shiftKey, ctrlKey, metaKey,
-        altKey: evt.altKey, bubbles: true, cancelable: true,
-      });
-      this._handleFieldKeydown(syntheticEvt, blockId, editableField);
       return true;
     }
 
@@ -1308,11 +2378,13 @@ export class Bridge {
     const sel = window.getSelection();
     if (!sel?.rangeCount) return;
     const range = sel.getRangeAt(0);
-    if (!range.collapsed) range.deleteContents();
 
     // NBSP for spaces to prevent CSS whitespace collapse in inline elements.
     // handleTextChange converts NBSP back to regular space in the model.
     const insertionText = text.replace(/^ /, '\u00A0').replace(/ $/, '\u00A0');
+
+    if (!range.collapsed) range.deleteContents();
+
     const textNode = document.createTextNode(insertionText);
     range.insertNode(textNode);
 
@@ -1739,7 +2811,11 @@ export class Bridge {
     }
 
     // Get all elements for this block (multi-element blocks, template instances)
-    const allElements = blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid) : [];
+    // For multi-selection, gather elements from ALL selected blocks for combined rect
+    const multiBlockUids = options.isMultipleSelection ? (options.blockUids || []) : [];
+    const allElements = multiBlockUids.length > 1
+      ? multiBlockUids.flatMap(uid => [...this.getAllBlockElements(uid)])
+      : (blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid) : []);
 
     // Use first element for field detection if no element was passed
     const elementForFields = blockElement || allElements[0] || null;
@@ -1783,6 +2859,25 @@ export class Bridge {
       dragHandle.style.top = `${handlePos.top}px`;
       dragHandle.style.display = 'block';
     }
+    // Position edge handle on the selected container's bottom, if applicable.
+    this._positionEdgeHandles();
+
+    // Get focused field rect for text-mode underline positioning
+    // Round to integers to avoid sub-pixel jitter causing unnecessary state updates
+    let focusedFieldRect = null;
+    if (focusedFieldName && elementForFields) {
+      const focusedEl = elementForFields.querySelector(`[data-edit-text="${focusedFieldName}"]`)
+        || (elementForFields.getAttribute('data-edit-text') === focusedFieldName ? elementForFields : null);
+      if (focusedEl) {
+        const fr = focusedEl.getBoundingClientRect();
+        focusedFieldRect = {
+          top: Math.round(fr.top),
+          left: Math.round(fr.left),
+          width: Math.round(fr.width),
+          height: Math.round(fr.height),
+        };
+      }
+    }
 
     const message = {
       type: 'BLOCK_SELECTED',
@@ -1798,9 +2893,14 @@ export class Bridge {
       linkableFields,
       mediaFields,
       focusedFieldName,
+      focusedFieldRect,
       focusedLinkableField,
       focusedMediaField,
       addDirection,
+      // canResize tells admin which edge handles to render as visible chrome
+      // (per docs/architecture.md). Iframe keeps invisible event-capture
+      // divs at the same coords for mousedown.
+      canResize: this._lastCanResize || null,
       isMultiElement: blockUid && blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid).length > 1 : false,
     };
 
@@ -1809,7 +2909,197 @@ export class Bridge {
       message.selection = options.selection;
     }
 
+    // Multi-selection: include block UIDs and per-block rects
+    if (options.isMultipleSelection) {
+      message.isMultipleSelection = true;
+      message.blockUids = options.blockUids;
+      message.rects = options.rects;
+    }
+
+    // Selection mode: include updated rects for all checkbox blocks.
+    // If caller provided explicit rects, use those; otherwise auto-include
+    // current selection mode rects when active so admin keeps checkboxes.
+    if (options.selectionModeRects) {
+      message.selectionModeRects = options.selectionModeRects;
+    } else if (this._selectionModeBlockUids) {
+      const rects = {};
+      for (const uid of this._selectionModeBlockUids) {
+        const el = this.queryBlockElement(uid);
+        if (el) {
+          const r = el.getBoundingClientRect();
+          rects[uid] = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+      }
+      message.selectionModeRects = rects;
+    }
+
+    log('sendBlockSelected:', src, 'blockUid:', blockUid, 'isMulti:', !!message.isMultipleSelection, 'rect:', !!rect);
     window.parent.postMessage(message, this.adminOrigin);
+  }
+
+  /**
+   * Handle Shift/Ctrl/Meta click for multi-block selection.
+   * Updates multiSelectedBlockUids and sends combined rect to admin.
+   */
+  _handleMultiSelectClick(blockUid, event) {
+    if (event.shiftKey) {
+      // Shift+Click: select range from anchor to clicked block
+      // Find siblings at the same container level using DOM, not page-level layout
+      const anchor = this.multiSelectedBlockUids.length > 0
+        ? this.multiSelectedBlockUids[0]
+        : this.selectedBlockUid;
+      const anchorEl = anchor ? this.queryBlockElement(anchor) : null;
+      const parentBlock = anchorEl?.parentElement?.closest('[data-block-uid]');
+      const allBlocks = document.querySelectorAll('[data-block-uid]');
+      const siblings = parentBlock
+        ? Array.from(allBlocks).filter(el =>
+            el.parentElement?.closest('[data-block-uid]') === parentBlock,
+          )
+        : Array.from(allBlocks).filter(el =>
+            !el.parentElement?.closest('[data-block-uid]'),
+          );
+      const siblingUids = siblings.map(el => el.getAttribute('data-block-uid'));
+      const anchorIdx = siblingUids.indexOf(anchor);
+      const focusIdx = siblingUids.indexOf(blockUid);
+
+      if (anchorIdx >= 0 && focusIdx >= 0) {
+        const start = Math.min(anchorIdx, focusIdx);
+        const end = Math.max(anchorIdx, focusIdx);
+        this.multiSelectedBlockUids = siblingUids.slice(start, end + 1);
+      } else {
+        // Cross-container Shift+Click: fall through to toggle (Ctrl-like)
+        const current = this.multiSelectedBlockUids.length > 0
+          ? [...this.multiSelectedBlockUids]
+          : this.selectedBlockUid ? [this.selectedBlockUid] : [];
+        const idx = current.indexOf(blockUid);
+        if (idx >= 0) {
+          current.splice(idx, 1);
+        } else {
+          current.push(blockUid);
+        }
+        this.multiSelectedBlockUids = current;
+      }
+    } else {
+      // Ctrl/Meta+Click: toggle block in/out of selection
+      const current = this.multiSelectedBlockUids.length > 0
+        ? [...this.multiSelectedBlockUids]
+        : this.selectedBlockUid ? [this.selectedBlockUid] : [];
+
+      const idx = current.indexOf(blockUid);
+      if (idx >= 0) {
+        current.splice(idx, 1);
+      } else {
+        current.push(blockUid);
+      }
+      this.multiSelectedBlockUids = current;
+    }
+
+    log('Multi-select:', this.multiSelectedBlockUids.length, 'blocks:', this.multiSelectedBlockUids);
+
+    // Clear single selection — multi-selection takes over
+    this.selectedBlockUid = null;
+    this.isInlineEditing = false;
+
+    this._sendMultiBlockSelected();
+  }
+
+  /**
+   * Enter touch selection mode. Sends all sibling block rects to admin
+   * so it can render checkbox overlays for toggling selection.
+   * @param {string} blockUid - The long-pressed block (initially checked)
+   */
+  _enterSelectionMode(blockUid) {
+    // Get ALL blocks in the document, not just siblings, so checkboxes
+    // appear on every visible block regardless of container hierarchy.
+    const blockElements = document.querySelectorAll('[data-block-uid]');
+    const seen = new Set();
+    const allVisibleUids = [];
+    for (const el of blockElements) {
+      const uid = el.getAttribute('data-block-uid');
+      if (uid && !seen.has(uid)) {
+        seen.add(uid);
+        allVisibleUids.push(uid);
+      }
+    }
+
+    const allBlockRects = {};
+    for (const uid of allVisibleUids) {
+      const el = this.queryBlockElement(uid);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        allBlockRects[uid] = { top: r.top, left: r.left, width: r.width, height: r.height };
+      }
+    }
+
+    // Store UIDs so scroll handler can re-send updated rects
+    this._selectionModeBlockUids = allVisibleUids;
+
+    this.sendMessageToParent({
+      type: 'ENTER_SELECTION_MODE',
+      blockUid,
+      allBlockRects,
+    });
+  }
+
+  /**
+   * Enter selection mode without toggling any block.
+   * Used when admin (sidebar) initiates — admin already set multiSelected.
+   * Iframe just needs to start showing checkboxes on all visible blocks.
+   */
+  _enterSelectionModeActivateOnly() {
+    const blockElements = document.querySelectorAll('[data-block-uid]');
+    const seen = new Set();
+    const allVisibleUids = [];
+    for (const el of blockElements) {
+      const uid = el.getAttribute('data-block-uid');
+      if (uid && !seen.has(uid)) {
+        seen.add(uid);
+        allVisibleUids.push(uid);
+      }
+    }
+    const allBlockRects = {};
+    for (const uid of allVisibleUids) {
+      const el = this.queryBlockElement(uid);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        allBlockRects[uid] = { top: r.top, left: r.left, width: r.width, height: r.height };
+      }
+    }
+    this._selectionModeBlockUids = allVisibleUids;
+    // Send without blockUid so admin does not toggle
+    this.sendMessageToParent({
+      type: 'ENTER_SELECTION_MODE',
+      allBlockRects,
+    });
+  }
+
+  /**
+   * Send BLOCK_SELECTED with all multi-selected block UIDs and their rects.
+   * The admin uses these to render combined outline and determine common parent.
+   */
+  _sendMultiBlockSelected() {
+    const rects = {};
+    for (const uid of this.multiSelectedBlockUids) {
+      const el = this.queryBlockElement(uid);
+      if (el) {
+        const r = el.getBoundingClientRect();
+        rects[uid] = { top: r.top, left: r.left, width: r.width, height: r.height };
+      }
+    }
+
+    // Use sendBlockSelected with the anchor block — it handles drag handle
+    // positioning, combined rect computation, and the BLOCK_SELECTED message.
+    const anchorUid = this.multiSelectedBlockUids[0];
+    const anchorEl = this.queryBlockElement(anchorUid);
+    if (!anchorEl) return;
+
+    this.sendBlockSelected('multiSelect', anchorEl, {
+      blockUid: anchorUid,
+      blockUids: this.multiSelectedBlockUids,
+      rects,
+      isMultipleSelection: true,
+      focusedFieldName: null,
+    });
   }
 
   /**
@@ -2429,6 +3719,17 @@ export class Bridge {
           // Admin closed the slash menu (user selected a block type or dismissed)
           log('Received SLASH_MENU_CLOSED');
           this._slashMenuActive = false;
+        } else if (event.data.type === 'ENTER_SELECTION_MODE') {
+          log('Received ENTER_SELECTION_MODE from admin');
+          // Admin (sidebar Ctrl+Click) asked us to enter selection mode.
+          // Enter without toggling any block — admin already set multiSelected.
+          this._enterSelectionModeActivateOnly();
+        } else if (event.data.type === 'EXIT_SELECTION_MODE') {
+          log('Received EXIT_SELECTION_MODE');
+          this._selectionModeBlockUids = null;
+          this.multiSelectedBlockUids = [];
+          // Ack back to admin so it can clear selectionMode
+          this.sendMessageToParent({ type: 'EXIT_SELECTION_MODE' });
         } else if (event.data.type === 'TEMPLATE_EDIT_MODE') {
           // Toggle template edit mode - affects which blocks are editable via isBlockReadonly
           // instanceId: the template instance being edited, or null to exit edit mode
@@ -2516,6 +3817,21 @@ export class Bridge {
    */
   enableBlockClickListener() {
     this.blockClickHandler = (event) => {
+      // Selection mode: clicks toggle blocks instead of selecting
+      if (this._selectionModeBlockUids) {
+        const blockElement = event.target.closest('[data-block-uid]');
+        if (blockElement) {
+          event.preventDefault();
+          event.stopPropagation();
+          const blockUid = blockElement.getAttribute('data-block-uid');
+          log('blockClickHandler: selection mode toggle:', blockUid);
+          this.sendMessageToParent({
+            type: 'ENTER_SELECTION_MODE',
+            blockUid,
+          });
+        }
+        return;
+      }
       log('blockClickHandler: event target:', event.target.tagName, event.target.className);
       log('blockClickHandler: _isDragging:', this._isDragging, '_navigatingToBlock:', this._navigatingToBlock);
 
@@ -2641,6 +3957,27 @@ export class Bridge {
           clearTimeout(this._pendingInitialSelectTimer);
           this._pendingInitialSelectTimer = null;
         }
+
+        // Multi-selection: Shift or Ctrl/Meta click
+        // Only in block mode — in text mode, Shift+Click extends text selection (browser native)
+        // Ctrl/Meta+Click always toggles block selection regardless of mode
+        if (event.shiftKey || event.ctrlKey || event.metaKey) {
+          const isTextMode = this.editMode === 'text';
+          // Shift+Click on the same block in block mode → enter text mode (not multi-select)
+          const isSameBlock = blockUid === this.selectedBlockUid;
+          if ((!isTextMode && !isSameBlock) || event.ctrlKey || event.metaKey) {
+            this._handleMultiSelectClick(blockUid, event);
+            return;
+          }
+          // In text mode with Shift — fall through to normal click handling (text selection)
+        }
+
+        // Plain click clears multi-selection
+        if (this.multiSelectedBlockUids.length > 0) {
+          this.multiSelectedBlockUids = [];
+        }
+
+        this.editMode = 'text';
         this.selectBlock(blockElement);
       } else {
         // No block - check for page-level fields
@@ -2659,6 +3996,7 @@ export class Bridge {
             // Check if field was already editable (user may be re-clicking an edited field)
             const wasAlreadyEditable = pageField.getAttribute('contenteditable') === 'true';
 
+            this.editMode = 'text';
             this.isInlineEditing = true;
             this.activateEditableField(pageField, this.focusedFieldName, null, 'pageFieldClick', {
               wasAlreadyEditable,
@@ -2708,114 +4046,65 @@ export class Bridge {
       document.addEventListener('mousedown', this._blockSelectorMousedownHandler, true);
     }
 
-    // Add global keydown handler for space on interactive elements
-    // Certain elements (buttons, inputs, summary) have space key behavior that conflicts
-    // with text editing when contenteditable. This handler is at document level so it
-    // survives DOM re-renders.
-    if (!this._interactiveSpaceHandler) {
-      this._interactiveSpaceHandler = (e) => {
-        if (e.key !== ' ' || !e.target.isContentEditable) return;
+    // Long press detection for touch devices (mobile selection mode)
+    if (!this._longPressHandlersAttached) {
+      this._longPressHandlersAttached = true;
+      this._longPressTimer = null;
+      const LONG_PRESS_MS = 600;
+      const MOVE_THRESHOLD = 10;
+      let startX = 0, startY = 0;
 
-        const tag = e.target.tagName;
-        const type = e.target.type?.toLowerCase();
+      document.addEventListener('touchstart', (e) => {
+        if (this._longPressTimer) clearTimeout(this._longPressTimer);
+        const touch = e.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        const blockEl = target?.closest('[data-block-uid]');
+        if (!blockEl) return;
+        const blockUid = blockEl.getAttribute('data-block-uid');
 
-        // Elements where space has special activation behavior
-        const needsSpaceOverride =
-          tag === 'BUTTON' ||
-          tag === 'SUMMARY' ||
-          (tag === 'INPUT' && (type === 'submit' || type === 'button' || type === 'reset'));
-
-        if (needsSpaceOverride) {
-          e.preventDefault();
-          document.execCommand('insertText', false, ' ');
-        }
-      };
-      document.addEventListener('keydown', this._interactiveSpaceHandler, true);
-    }
-
-    // Add global keydown handler for Escape to select parent block
-    // This allows navigating up the block hierarchy with keyboard
-    if (!this._escapeKeyHandler) {
-      this._escapeKeyHandler = (e) => {
-        if (e.key !== 'Escape') return;
-        // If no block is selected in iframe, still send deselect to admin —
-        // the admin may have a selectedBlock (from Redux) that the iframe
-        // hasn't processed yet (e.g., during INITIAL_DATA waitForStable).
-        if (!this.selectedBlockUid) {
-          this.sendBlockSelected('escapeKey', null);
-          return;
-        }
-
-        // Don't interfere with escape in modals, dropdowns, etc.
-        const isInPopup = e.target.closest('.volto-hydra-dropdown-menu, .blocks-chooser, [role="dialog"]');
-        if (isInPopup) return;
-
-        e.preventDefault();
-
-        // Get parent from blockPathMap
-        const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
-        const parentId = pathInfo?.parentId || null;
-        log('Escape key - selecting parent:', parentId, 'from:', this.selectedBlockUid);
-
-        // PAGE_BLOCK_UID is the virtual root - treat as "no parent" (deselect)
-        if (parentId && parentId !== PAGE_BLOCK_UID) {
-          // Handle template instances (virtual containers with no DOM element)
-          if (this.blockPathMap?.[parentId]?.isTemplateInstance) {
-            this.selectBlock(parentId);
+        this._longPressTimer = setTimeout(() => {
+          this._longPressTimer = null;
+          if (this._selectionModeBlockUids) {
+            // Already in selection mode — send toggle to admin
+            log('Long press in selection mode, toggling:', blockUid);
+            this.sendMessageToParent({
+              type: 'ENTER_SELECTION_MODE',
+              blockUid,
+            });
           } else {
-            // Select the parent block
-            const parentElement = this.queryBlockElement(parentId);
-            if (parentElement) {
-              this.selectBlock(parentElement, 'escapeKey');
-            }
+            log('Long press detected on block:', blockUid);
+            this._enterSelectionMode(blockUid);
           }
-        } else {
-          // No parent or parent is page - deselect by sending BLOCK_SELECTED with null
-          this.selectedBlockUid = null;
-          this.sendBlockSelected('escapeKey', null);
+        }, LONG_PRESS_MS);
+      }, { passive: true });
+
+      document.addEventListener('touchmove', (e) => {
+        if (!this._longPressTimer) return;
+        const touch = e.touches[0];
+        const dx = touch.clientX - startX;
+        const dy = touch.clientY - startY;
+        if (Math.abs(dx) > MOVE_THRESHOLD || Math.abs(dy) > MOVE_THRESHOLD) {
+          clearTimeout(this._longPressTimer);
+          this._longPressTimer = null;
         }
-      };
-      document.addEventListener('keydown', this._escapeKeyHandler, true);
+      }, { passive: true });
+
+      document.addEventListener('touchend', () => {
+        if (this._longPressTimer) {
+          clearTimeout(this._longPressTimer);
+          this._longPressTimer = null;
+        }
+      }, { passive: true });
     }
 
-    // Add global ArrowDown handler for "no block selected" → select first page-level block
-    if (!this._arrowDownNoSelectionHandler) {
-      this._arrowDownNoSelectionHandler = (e) => {
-        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-        if (this.selectedBlockUid) return;
+    // Space on interactive contenteditable elements (buttons, etc.) is handled
+    // by _handleFieldKeydown → replayOneKey which preventDefault + insertText.
 
-        const allBlocks = document.querySelectorAll('[data-block-uid]');
-        // Find page-level blocks (not nested inside another block)
-        const pageBlocks = Array.from(allBlocks).filter(el =>
-          !el.parentElement?.closest('[data-block-uid]'),
-        );
-        if (pageBlocks.length === 0) return;
-
-        e.preventDefault();
-        const target = e.key === 'ArrowDown' ? pageBlocks[0] : pageBlocks[pageBlocks.length - 1];
-        this.selectBlock(target);
-      };
-      document.addEventListener('keydown', this._arrowDownNoSelectionHandler);
-    }
-
-    // Add global Enter handler for "block selected, no field focused" → add block after
-    if (!this._enterKeyHandler) {
-      this._enterKeyHandler = (e) => {
-        if (e.key !== 'Enter' || e.shiftKey) return;
-        if (!this.selectedBlockUid) return;
-        // Only fire if no editable field is currently focused
-        if (document.activeElement?.closest('[data-edit-text]')) return;
-        // Must be in edit mode
-        if (!this.isInlineEditing) return;
-
-        e.preventDefault();
-        this.sendMessageToParent({
-          type: 'ADD_BLOCK_AFTER',
-          blockId: this.selectedBlockUid,
-        });
-      };
-      document.addEventListener('keydown', this._enterKeyHandler);
-    }
+    // All keyboard handling (Escape, arrows, delete, Cmd+A, Enter) is
+    // consolidated in _documentKeyboardBlocker → _handleKeydown.
+    // No separate document-level keydown handlers needed.
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -2844,23 +4133,170 @@ export class Bridge {
         log('DEBUG blocker:', e.type, e.key || e.inputType || '?', 'target:', e.target?.nodeName,
           'block:', e.target?.closest?.('[data-block-uid]')?.getAttribute('data-block-uid'));
       }
-      // Not blocked: capture body-focused keys (field destroyed by re-render).
-      // Same buffer — replayed by restoreContentEditableOnFields when field is ready.
+      // Not blocked — handle all keydown events based on current mode.
       if (!this.blockedBlockId) {
-        if (e.type === 'keydown' && this.selectedBlockUid) {
-          const isBodyTarget = e.target === document.body || e.target === document.documentElement;
-          if (isBodyTarget && !['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key)) {
-            log('Buffering body-focused key:', e.key, 'for', this.selectedBlockUid);
-            this.eventBuffer.push({
-              key: e.key,
-              code: e.code,
-              ctrlKey: e.ctrlKey,
-              metaKey: e.metaKey,
-              shiftKey: e.shiftKey,
-              altKey: e.altKey,
-            });
-            e.preventDefault();
+        if (e.type !== 'keydown') return;
+        if (['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key)) return;
+        if (e.defaultPrevented) return; // Already handled by field-level handler
+
+        // DEBUG: trace arrow events through blocker
+        if (['ArrowDown', 'ArrowUp'].includes(e.key)) {
+          log('BLOCKER arrow:', e.key, 'ts:', Math.round(e.timeStamp), 'trusted:', e.isTrusted,
+            'target:', e.target?.nodeName, 'class:', e.target?.className?.substring?.(0, 30),
+            'activeEl:', document.activeElement?.nodeName, 'selected:', this.selectedBlockUid);
+        }
+
+        const activeEditField = document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]');
+
+        // === Escape: three-state machine (works in all modes) ===
+        if (e.key === 'Escape') {
+          // Multi-select → single block (anchor)
+          if (this.multiSelectedBlockUids.length > 0) {
+            const anchorUid = this.multiSelectedBlockUids[0];
+            this.multiSelectedBlockUids = [];
+            this.selectedBlockUid = anchorUid;
+            const anchorEl = this.queryBlockElement(anchorUid);
+            if (anchorEl) {
+              this.sendBlockSelected('escapeMultiSelect', anchorEl, { focusedFieldName: null });
+            }
+            return;
           }
+          // No block selected: send deselect to admin
+          if (!this.selectedBlockUid) {
+            this.sendBlockSelected('escapeKey', null);
+            return;
+          }
+          // Don't interfere with slash menu, modals, dropdowns
+          if (this._slashMenuActive) return;
+          const isInPopup = e.target?.closest?.('.volto-hydra-dropdown-menu, .blocks-chooser, [role="dialog"]');
+          if (isInPopup) return;
+
+          e.preventDefault();
+          if (activeEditField) {
+            // Text mode → Block mode
+            log('Escape key - entering block mode from text editing:', this.selectedBlockUid);
+            this.editMode = 'block';
+            const blockElement = this.queryBlockElement(this.selectedBlockUid);
+            if (blockElement) {
+              this.collectBlockFields(blockElement, 'data-edit-text', (el) => {
+                if (el.getAttribute('contenteditable') === 'true') {
+                  el.setAttribute('contenteditable', 'false');
+                }
+              });
+            }
+            activeEditField.blur();
+            this.focusedFieldName = null;
+            if (blockElement) {
+              this.sendBlockSelected('escapeToBlockMode', blockElement, { focusedFieldName: null });
+            }
+          } else {
+            // Block mode → Parent (or deselect)
+            this.editMode = 'block'; // stay in block mode for parent
+            const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
+            const parentId = pathInfo?.parentId || null;
+            log('Escape key - selecting parent:', parentId, 'from:', this.selectedBlockUid);
+            if (parentId && parentId !== PAGE_BLOCK_UID) {
+              if (this.blockPathMap?.[parentId]?.isTemplateInstance) {
+                this.selectBlock(parentId);
+              } else {
+                const parentElement = this.queryBlockElement(parentId);
+                if (parentElement) this.selectBlock(parentElement);
+              }
+            } else {
+              this.selectedBlockUid = null;
+              this.editMode = 'text';
+              this.sendBlockSelected('escapeKey', null);
+            }
+          }
+          return;
+        }
+
+        // === Cmd+A: escalation (text → block → all siblings) ===
+        if (e.key === 'a' && (e.ctrlKey || e.metaKey) && this.selectedBlockUid) {
+          if (activeEditField) {
+            // Text mode: if all text already selected, escalate to block mode
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            const fieldText = activeEditField.textContent || '';
+            const selText = sel.toString();
+            if (selText.length < fieldText.replace(/[\uFEFF\u200B]/g, '').length) return; // let field handler select all
+            // Escalate to block mode
+            e.preventDefault();
+            this.editMode = 'block';
+            const blockElement = this.queryBlockElement(this.selectedBlockUid);
+            if (blockElement) {
+              this.collectBlockFields(blockElement, 'data-edit-text', (el) => {
+                if (el.getAttribute('contenteditable') === 'true') {
+                  el.setAttribute('contenteditable', 'false');
+                }
+              });
+            }
+            activeEditField.blur();
+            window.getSelection()?.removeAllRanges();
+            this.focusedFieldName = null;
+            if (blockElement) {
+              this.sendBlockSelected('selectAllBlock', blockElement, { focusedFieldName: null });
+            }
+            return;
+          }
+          // Block mode Cmd+A handled by _handleBlockModeKey below
+        }
+
+        // === Text mode: let field-level handlers deal with everything else ===
+        if (activeEditField) return;
+
+        // === Multi-select: handle keys before the no-block guard ===
+        // After Ctrl+Click multi-select, selectedBlockUid may be null but
+        // multiSelectedBlockUids is populated. _handleBlockModeKey handles
+        // Cmd+C, Cmd+X, Cmd+V, Delete, Escape for multi-selection.
+        if (this.multiSelectedBlockUids.length > 0) {
+          if (this._handleBlockModeKey(e)) return;
+        }
+
+        // === No block selected: Arrow selects first/last page-level block ===
+        if (!this.selectedBlockUid) {
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            const allBlocks = document.querySelectorAll('[data-block-uid]');
+            const pageBlocks = Array.from(allBlocks).filter(el =>
+              !el.parentElement?.closest('[data-block-uid]'),
+            );
+            if (pageBlocks.length === 0) return;
+            e.preventDefault();
+            this.editMode = 'text';
+            this.selectBlock(e.key === 'ArrowDown' ? pageBlocks[0] : pageBlocks[pageBlocks.length - 1]);
+          }
+          return;
+        }
+
+        // === Text mode on non-editable block (no field to focus): use same
+        // edge navigation as text mode at field boundary ===
+        if (this.editMode === 'text' &&
+            ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+          const blockEl = this.queryBlockElement(this.selectedBlockUid);
+          if (blockEl) {
+            e.preventDefault();
+            this.handleArrowAtEdge(e.key, this.selectedBlockUid, null, blockEl);
+            return;
+          }
+        }
+
+        // === Block mode: structural keys handled immediately ===
+        if (this._handleBlockModeKey(e)) return;
+
+        // === Remaining body-focused keys: buffer for text replay ===
+        // (keys that arrive on body during block transitions, before new field is ready)
+        const isBodyTarget = e.target === document.body || e.target === document.documentElement;
+        if (isBodyTarget) {
+          log('Buffering body-focused key:', e.key, 'for', this.selectedBlockUid);
+          this.eventBuffer.push({
+            key: e.key,
+            code: e.code,
+            ctrlKey: e.ctrlKey,
+            metaKey: e.metaKey,
+            shiftKey: e.shiftKey,
+            altKey: e.altKey,
+          });
+          e.preventDefault();
         }
         return;
       }
@@ -3050,6 +4486,14 @@ export class Bridge {
     }
 
     this.pendingBufferReplay = null;
+
+    // Ensure field is focused before replay — sel.modify (Home/End) and
+    // execCommand (Delete/Backspace) require focus to work correctly.
+    if (currentEditable &&
+        document.activeElement !== currentEditable &&
+        !currentEditable.contains(document.activeElement)) {
+      currentEditable.focus({ preventScroll: true });
+    }
 
     // Clear blockedBlockId so the capture-phase blocker doesn't interfere;
     // if a replayed event starts a new transform, blockedBlockId gets re-set.
@@ -3446,6 +4890,31 @@ export class Bridge {
       }
     }
     return { node, offset };
+  }
+
+  /**
+   * Cross-browser caret-at-point. Chromium/WebKit implement the non-standard
+   * `document.caretRangeFromPoint` directly; Firefox only implements the W3C
+   * `document.caretPositionFromPoint` which returns a CaretPosition
+   * ({offsetNode, offset}). Wrap both so callers always get a collapsed Range.
+   *
+   * @param {number} x - Viewport X coordinate
+   * @param {number} y - Viewport Y coordinate
+   * @returns {Range|null} Collapsed Range at (x,y), or null if no API available
+   */
+  caretRangeFromPoint(x, y) {
+    if (typeof document.caretRangeFromPoint === 'function') {
+      return document.caretRangeFromPoint(x, y);
+    }
+    if (typeof document.caretPositionFromPoint === 'function') {
+      const pos = document.caretPositionFromPoint(x, y);
+      if (!pos || !pos.offsetNode) return null;
+      const range = document.createRange();
+      range.setStart(pos.offsetNode, pos.offset);
+      range.collapse(true);
+      return range;
+    }
+    return null;
   }
 
   /**
@@ -4286,6 +5755,12 @@ export class Bridge {
    * @param {string} caller - The caller for debugging (e.g., 'selectBlock', 'FORM_DATA')
    */
   restoreContentEditableOnFields(blockElement, caller = 'unknown') {
+    // In block mode, don't set contenteditable on any fields
+    if (this.editMode === 'block') {
+      log(`restoreContentEditableOnFields: skipped (editMode=block) caller=${caller}`);
+      return;
+    }
+
     // Get blockUid from the element - don't rely on this.selectedBlockUid as it may not be set yet
     const blockUid = blockElement.getAttribute('data-block-uid');
 
@@ -4334,85 +5809,13 @@ export class Bridge {
         this.updateEmptyState(field);
         log(`  ${fieldPath}: ${wasEditable ? 'already editable' : 'SET editable'} (type: ${fieldType})${placeholder ? ` placeholder: "${placeholder}"` : ''}`);
 
-        // For <pre> elements, handle Enter (newline) and Tab (indent) properly
-        const isPreElement = field.tagName === 'PRE' || !!field.closest('pre');
-        if (isPreElement && !field._preKeyHandler) {
-          field._preKeyHandler = (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              // Insert a plain \n at cursor position instead of browser's <div>
-              const sel = window.getSelection();
-              if (!sel.rangeCount) return;
-              const range = sel.getRangeAt(0);
-              range.deleteContents();
-              const textNode = document.createTextNode('\n');
-              range.insertNode(textNode);
-              // Move cursor after the newline
-              range.setStartAfter(textNode);
-              range.setEndAfter(textNode);
-              sel.removeAllRanges();
-              sel.addRange(range);
-              field.dispatchEvent(new Event('input', { bubbles: true }));
-            } else if (e.key === 'Tab') {
-              e.preventDefault();
-              // Insert 2 spaces for indentation
-              const sel = window.getSelection();
-              if (!sel.rangeCount) return;
-              const range = sel.getRangeAt(0);
-              range.deleteContents();
-              const spaces = document.createTextNode('  ');
-              range.insertNode(spaces);
-              range.setStartAfter(spaces);
-              range.setEndAfter(spaces);
-              sel.removeAllRanges();
-              sel.addRange(range);
-              field.dispatchEvent(new Event('input', { bubbles: true }));
-            }
+        // Register keydown handler on every editable field (not just the focused one).
+        // One handler per field, all keys go through _handleFieldKeydown → replayOneKey.
+        if (!field._hydraKeydownHandler) {
+          field._hydraKeydownHandler = (e) => {
+            this._handleFieldKeydown(e, blockUid, field);
           };
-          field.addEventListener('keydown', field._preKeyHandler);
-        }
-
-        // For plain string fields (single-line), Enter navigates to next field or adds a block
-        if (this.fieldTypeIsPlainString(fieldType) && !field._enterKeyHandler) {
-          field._enterKeyHandler = (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              const blockEl = field.closest('[data-block-uid]');
-              if (!blockEl) return;
-              const ownFields = this.getOwnEditableFields(blockEl);
-              const idx = ownFields.indexOf(field);
-              if (idx < ownFields.length - 1) {
-                // Not last field → focus next field
-                const nextField = ownFields[idx + 1];
-                nextField.focus();
-                const sel = window.getSelection();
-                const range = document.createRange();
-                range.selectNodeContents(nextField);
-                range.collapse(true);
-                sel.removeAllRanges();
-                sel.addRange(range);
-              } else {
-                // Last field → add new block after
-                const blockUid = blockEl.getAttribute('data-block-uid');
-                this.sendMessageToParent({
-                  type: 'ADD_BLOCK_AFTER',
-                  blockId: blockUid,
-                });
-              }
-            }
-          };
-          field.addEventListener('keydown', field._enterKeyHandler);
-        }
-
-        // Arrow key edge navigation: move between fields/blocks when cursor is at edge
-        if (!field._arrowNavHandler) {
-          field._arrowNavHandler = (e) => {
-            if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
-            if (e.ctrlKey || e.metaKey || e.altKey) return;
-            this.moveArrowKey(e.key, field, e.shiftKey);
-            e.preventDefault();
-          };
-          field.addEventListener('keydown', field._arrowNavHandler);
+          field.addEventListener('keydown', field._hydraKeydownHandler);
         }
       } else {
         log(`  ${fieldPath}: skipped (type: ${fieldType})`);
@@ -4561,7 +5964,7 @@ export class Bridge {
     if (hasNonCollapsedSelection) {
       log('activateEditableField: skipping cursor positioning - non-collapsed selection exists');
     } else {
-      const range = document.caretRangeFromPoint(clientX, clientY);
+      const range = this.caretRangeFromPoint(clientX, clientY);
       if (range) {
         log('activateEditableField: caretRangeFromPoint result:', {
           startContainer: range.startContainer.nodeName,
@@ -4892,7 +6295,23 @@ export class Bridge {
 
         const blockUidToProcess = needsBlockSwitch ? adminSelectedBlockUid : this.selectedBlockUid;
         const blockHandler = needsBlockSwitch
-          ? (el) => { log('Selecting new block from afterContentRender:', blockUidToProcess); this.selectBlock(el); }
+          ? (el) => {
+              // Admin-initiated block switch (e.g. new block after Enter):
+              // mirror the SELECT_BLOCK direct path — switch to text mode and
+              // focus the first editable field so the user can type without
+              // an extra click. Without this, blocks created from block-mode
+              // Enter land selected-but-not-focused.
+              //
+              // Skip fieldToFocus when admin sends a transformedSelection:
+              // that means a slate transform (split/merge) ran and is
+              // shipping an explicit cursor position to apply on the new
+              // DOM (e.g. backspace-merge places the cursor at the join
+              // point). Forcing focus to "first editable" would clobber
+              // that selection — regression introduced in 97dd597b.
+              log('Selecting new block from afterContentRender:', blockUidToProcess, 'transformedSelection:', !!transformedSelection);
+              this.editMode = 'text';
+              this.selectBlock(el, transformedSelection ? {} : { fieldToFocus: 'first' });
+            }
           : (el) => this.updateBlockUIAfterFormData(el, skipFocus);
 
         if (blockUidToProcess) {
@@ -5544,7 +6963,7 @@ export class Bridge {
               const clientY = currentRect.top + this.savedClickPosition.relativeY;
 
               // Position cursor at the click location using caretRangeFromPoint
-              const range = document.caretRangeFromPoint(clientX, clientY);
+              const range = this.caretRangeFromPoint(clientX, clientY);
               if (range) {
                 selection.removeAllRanges();
                 selection.addRange(range);
@@ -5622,7 +7041,16 @@ export class Bridge {
    *
    * @param {HTMLElement|string} blockElementOrUid - The block element or block UID to select.
    */
-  selectBlock(blockElementOrUid) {
+  /**
+   * Select a block. The caller decides the editing intent via options.fieldToFocus:
+   *   undefined → auto (focus first editable field, set contenteditable — text mode)
+   *   null      → block mode (no contenteditable, no field focus)
+   *   'value'   → focus specific field
+   */
+  selectBlock(blockElementOrUid, options = {}) {
+    // Back-compat: old callers pass a string as second arg (caller name for logging)
+    const opts = typeof options === 'string' ? {} : options;
+    const fieldToFocus = opts.fieldToFocus; // undefined=auto, null=block mode, string=specific field
     // Accept either a DOM element (from click handlers) or a block UID string
     const blockUidFromArg = typeof blockElementOrUid === 'string' ? blockElementOrUid : null;
 
@@ -5677,16 +7105,17 @@ export class Bridge {
       this.eventBuffer = [];
     }
 
-    // Skip contenteditable setup for template instances (they're virtual containers)
-    if (!isTemplateInstance) {
+    // editMode is controlled by user actions only (Escape → block, click/Enter → text).
+    // selectBlock never changes editMode — it just respects the current mode.
+    const isBlockMode = this.editMode === 'block';
+
+    if (!isTemplateInstance && !isBlockMode) {
       this.isInlineEditing = true;
 
       // Set contenteditable on all text-editable fields
       this.restoreContentEditableOnFields(blockElement, 'selectBlock');
 
       // For slate blocks (value field), also set up paste/keydown handlers
-      // Check blockElement itself first (Nuxt puts both attributes on same element)
-      // then fall back to querying for child elements
       let valueField = blockElement.hasAttribute('data-edit-text') &&
                        blockElement.getAttribute('data-edit-text') === 'value'
                        ? blockElement
@@ -5695,8 +7124,49 @@ export class Bridge {
         this.makeBlockContentEditable(valueField);
       }
 
-      // For blocks with no usable editable fields (e.g., image, readOnly template blocks),
-      // make the block element focusable and attach arrow key navigation so user can navigate away.
+      // Focus specific field + cursor placement after DOM settles
+      if (fieldToFocus === 'first' || fieldToFocus === 'last' || typeof fieldToFocus === 'string') {
+        const cursorAt = opts.cursorAt || 'start';
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const currentElement = this.queryBlockElement(blockUid);
+            if (!currentElement) return;
+            let targetField;
+            if (fieldToFocus === 'last') {
+              const fields = this.getOwnEditableFields(currentElement);
+              targetField = fields[fields.length - 1] || null;
+            } else if (fieldToFocus === 'first') {
+              targetField = this.getOwnFirstEditableField(currentElement);
+            } else {
+              // Specific field name
+              targetField = currentElement.querySelector(`[data-edit-text="${fieldToFocus}"]`);
+            }
+            if (targetField && targetField.getAttribute('contenteditable') === 'true') {
+              targetField.focus();
+              if (cursorAt === 'end') {
+                this._placeCursorAtEnd(targetField);
+              } else {
+                const sel = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(targetField);
+                range.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(range);
+              }
+            }
+          });
+        });
+      }
+    }
+
+    if (isBlockMode) {
+      this.focusedFieldName = null;
+    }
+
+    // For non-editable blocks (no text fields), make the block focusable so
+    // the document-level keyboard blocker receives key events. Without focus
+    // in the iframe, keydown events go to the parent page instead.
+    if (!isTemplateInstance) {
       const isReadonly = this.isBlockReadonly(blockUid);
       const hasEditableFields = !isReadonly && this.getOwnEditableFields(blockElement).length > 0;
       if (!hasEditableFields) {
@@ -5704,16 +7174,6 @@ export class Bridge {
           blockElement.setAttribute('tabindex', '-1');
         }
         blockElement.focus({ preventScroll: true });
-        if (!blockElement._nonEditableArrowHandler) {
-          blockElement._nonEditableArrowHandler = (e) => {
-            if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
-            if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
-            e.preventDefault();
-            const uid = blockElement.getAttribute('data-block-uid');
-            this.handleArrowAtEdge(e.key, uid, null, blockElement);
-          };
-          blockElement.addEventListener('keydown', blockElement._nonEditableArrowHandler);
-        }
       }
     }
 
@@ -5772,8 +7232,9 @@ export class Bridge {
       }
     }
 
-    // If no clicked field, use the first editable field that belongs to THIS block (skip for template instances)
-    if (!isTemplateInstance && !this.focusedFieldName && blockElement) {
+    // If no clicked field, use the first editable field that belongs to THIS block
+    // Skip for template instances and block mode (no field should be focused)
+    if (!isTemplateInstance && !isBlockMode && !this.focusedFieldName && blockElement) {
       const firstEditableField = this.getOwnFirstEditableField(blockElement);
       if (firstEditableField) {
         this.focusedFieldName = firstEditableField.getAttribute('data-edit-text');
@@ -5841,19 +7302,33 @@ export class Bridge {
       this.observeBlockTextChanges(blockElement);
     }
 
-    // For template instances, send BLOCK_SELECTED immediately (no text selection to trigger it)
-    if (isTemplateInstance && this._pendingBlockSelected) {
-      const pending = this._pendingBlockSelected;
-      this._pendingBlockSelected = null;
-      log('Sending BLOCK_SELECTED for template instance:', pending.blockUid);
-      // Use sendBlockSelected with blockUid override (template instances have no DOM element)
-      this.sendBlockSelected('templateInstance', blockElement, {
-        blockUid: pending.blockUid,
-        focusedFieldName: pending.focusedFieldName,
-        focusedLinkableField: pending.focusedLinkableField,
-        focusedMediaField: pending.focusedMediaField,
-      });
-      return; // Exit early - no further processing needed for template instances
+    // Send BLOCK_SELECTED immediately when selectionchange won't fire:
+    // - Template instances (no DOM element)
+    // - Non-editable blocks (no contenteditable field)
+    // - Block mode (contenteditable not set)
+    {
+      const isReadonly = this.isBlockReadonly(blockUid);
+      const hasEditableFields = !isReadonly && this.getOwnEditableFields(blockElement).length > 0;
+      const needsImmediateSend = isTemplateInstance || isBlockMode || !hasEditableFields;
+      if (needsImmediateSend && this._pendingBlockSelected) {
+        const pending = this._pendingBlockSelected;
+        this._pendingBlockSelected = null;
+        const src = isTemplateInstance ? 'templateInstance'
+          : isBlockMode ? 'blockMode'
+          : 'nonEditableBlock';
+        log('Sending BLOCK_SELECTED immediately for:', pending.blockUid, `(${src})`,
+            'mediaField:', pending.focusedMediaField, 'hasEditable:', hasEditableFields, 'isBlockMode:', isBlockMode);
+        // focusedFieldName: null for non-editable and block mode (no text field
+        // focused). Media/linkable fields always pass through — they're set from
+        // the click and the toolbar needs them regardless of block type.
+        this.sendBlockSelected(src, blockElement, {
+          blockUid: pending.blockUid,
+          focusedFieldName: (isBlockMode || !hasEditableFields) ? null : pending.focusedFieldName,
+          focusedLinkableField: pending.focusedLinkableField,
+          focusedMediaField: pending.focusedMediaField,
+        });
+        if (isTemplateInstance) return;
+      }
     }
 
     // Track selection changes to preserve selection across format operations
@@ -5871,6 +7346,12 @@ export class Bridge {
           rangeEnd: range?.endOffset,
           collapsed: selection?.isCollapsed,
         });
+
+        // Cross-block text drag: if selection spans multiple blocks, enter multi-block mode
+        if (selection && !selection.isCollapsed && range) {
+          this._checkCrossBlockSelection(range);
+        }
+
         // Save both cursor positions (collapsed) and text selections (non-collapsed)
         if (selection && selection.rangeCount > 0) {
           // Correct cursor if it's on invalid whitespace (template artifacts)
@@ -5922,6 +7403,11 @@ export class Bridge {
             this.needsFieldDetection = false;
           }
 
+          // In block mode, don't set up contenteditable or focus fields
+          if (this.editMode === 'block') {
+            this.sendBlockSelected('blockMode', currentBlockElement, { focusedFieldName: null });
+          } else if (this.editMode === 'text') {
+
           // Check if field was already editable before we do anything
           const editableField = this.getOwnFirstEditableField(currentBlockElement);
           const wasAlreadyEditable = editableField?.getAttribute('contenteditable') === 'true';
@@ -5961,6 +7447,8 @@ export class Bridge {
             log('selectBlock: no editable field found, clearing lastClickPosition');
             this.lastClickPosition = null;
           }
+
+          } // end editMode === 'text'
 
           // Now send BLOCK_SELECTED with selection - both arrive atomically
           // This prevents race conditions where toolbar gets new block but old selection
@@ -6777,7 +8265,14 @@ export class Bridge {
 
         if (topChanged || leftChanged) {
           this._lastBlockRect = newRect;
-          this.sendBlockSelected('transitionTracker', blockElements[0]);
+          // Pass blockUid explicitly: for template instances (virtual
+          // containers) blockElements[0] is a CHILD element whose
+          // data-block-uid is the child's, not the instance's. Without
+          // an explicit uid, sendBlockSelected resolves the wrong block
+          // and fires BLOCK_SELECTED with isNewBlock:true mid-transition,
+          // which can trip react-beautiful-dnd's "changing droppableId
+          // during drag" invariant in the sidebar.
+          this.sendBlockSelected('transitionTracker', blockElements[0], { blockUid });
         }
       }
 
@@ -6907,6 +8402,38 @@ export class Bridge {
 
     document.body.appendChild(dragButton);
 
+    // Container edge handles — one per side. Each handle is shown only when
+    // its edge has something actionable: a compatible neighbour to absorb
+    // (in the parent's layout axis) or a child to expel (in the container's
+    // own layout axis). Drag outward absorbs neighbours; drag inward (back
+    // into the container's rect) expels the closest children to the parent.
+    document.querySelectorAll('.volto-hydra-edge-handle').forEach((el) => el.remove());
+    this._edgeHandles = {};
+    // Edge handles follow the chrome pattern (see docs/architecture.md):
+    //   - the visible chrome is rendered by the admin from blockUI.edgeRects;
+    //   - this iframe-side div is *invisible* and only exists to capture
+    //     mouse events that pass through the admin's pointer-events:none
+    //     visual on top of it.
+    for (const edge of ['top', 'bottom', 'left', 'right']) {
+      const h = document.createElement('div');
+      h.className = 'volto-hydra-edge-handle';
+      h.setAttribute('data-edge', edge);
+      const isVertical = edge === 'top' || edge === 'bottom';
+      Object.assign(h.style, {
+        position: 'fixed',
+        background: 'transparent',
+        cursor: isVertical ? 'ns-resize' : 'ew-resize',
+        zIndex: '9998',
+        display: 'none',
+        pointerEvents: 'auto',
+      });
+      // Thickness on the perpendicular axis
+      if (isVertical) h.style.height = '6px'; else h.style.width = '6px';
+      document.body.appendChild(h);
+      this._edgeHandles[edge] = h;
+      this._setupEdgeHandleDrag(h);
+    }
+
     // Position the drag handle immediately (not on mousemove)
     const positionDragHandle = () => {
       if (!this.selectedBlockUid) {
@@ -6958,9 +8485,18 @@ export class Bridge {
       // Set flag to suppress scrollHandler during drag
       this._isDragging = true;
 
-      // Get all elements for this block (multi-element blocks like listings, template instances)
-      // Convert NodeList to array for .map() and .includes() support
-      const allElements = [...this.getAllBlockElements(this.selectedBlockUid)];
+      // Get all elements for dragged blocks — supports multi-selection.
+      // Drop locked blocks from the dragged set: they can't be moved.
+      // For single-block drag: if the sole block is locked, abort.
+      const rawDraggedUids = this.multiSelectedBlockUids.length > 0
+        ? [...this.multiSelectedBlockUids]
+        : [this.selectedBlockUid];
+      const draggedUids = this._filterMutableBlockUids(rawDraggedUids, 'move');
+      if (draggedUids.length === 0) {
+        this._isDragging = false;
+        return;
+      }
+      const allElements = draggedUids.flatMap(uid => [...this.getAllBlockElements(uid)]);
       if (allElements.length === 0) return;
 
       // Compute bounding box for all elements
@@ -6971,8 +8507,8 @@ export class Bridge {
 
       // Create a visual ghost for dragging
       let draggedBlock;
-      if (allElements.length > 1) {
-        // Multi-element block: create a placeholder box representing the bounding area
+      if (draggedUids.length > 1 || allElements.length > 1) {
+        // Multi-block or multi-element: create a placeholder box
         draggedBlock = document.createElement('div');
         draggedBlock.classList.add('dragging', 'multi-element-ghost');
         draggedBlock.style.cssText = `
@@ -7006,85 +8542,24 @@ export class Bridge {
       let closestBlockUid = null;
       let insertAt = null; // 0 for top, 1 for bottom
       let dropIndicatorVisible = false; // Track if drop indicator is shown - drop only allowed when visible
+      // Replace mode: target is an 'empty' placeholder created by
+      // ensureEmptyBlockIfEmpty when its container has no real children.
+      // On drop we delete the placeholder and insert the dragged block in
+      // its position — the only-child placeholder gets REPLACED, not
+      // dropped-next-to. Visualised as a shade overlay rather than a line.
+      let replaceTargetUid = null;
 
-      // Auto-scroll state - uses requestAnimationFrame for continuous scrolling
-      let scrollDirection = 0; // -1 = up, 0 = none, 1 = down
-      let scrollAnimationId = null;
-      let lastMouseX = 0; // Track last cursor position for scroll updates
-      let lastMouseY = 0;
-      let currentScrollSpeed = 0; // Variable speed based on edge proximity
-      const scrollThreshold = 80; // pixels from edge to trigger scroll
-      const minScrollSpeed = 10; // slowest scroll (at threshold edge)
-      const maxScrollSpeed = 50; // fastest scroll (at viewport edge)
-
-      // Continuous scroll loop using requestAnimationFrame
-      // Dispatches synthetic mousemove to update drop indicator while scrolling
-      const scrollLoop = () => {
-        if (scrollDirection !== 0) {
-          // Use scrollTo with behavior: 'instant' to override CSS scroll-behavior: smooth
-          window.scrollTo({
-            top: window.scrollY + (scrollDirection * currentScrollSpeed),
-            behavior: 'instant'
-          });
-          // Dispatch synthetic mousemove to update drop indicator position
-          // This ensures the indicator updates even when mouse is stationary
-          const syntheticEvent = new MouseEvent('mousemove', {
-            clientX: lastMouseX,
-            clientY: lastMouseY,
-            bubbles: true,
-          });
-          document.dispatchEvent(syntheticEvent);
-          scrollAnimationId = requestAnimationFrame(scrollLoop);
-        }
-      };
-
-      const startScrolling = (direction) => {
-        if (scrollDirection !== direction) {
-          scrollDirection = direction;
-          if (scrollAnimationId === null && direction !== 0) {
-            scrollAnimationId = requestAnimationFrame(scrollLoop);
-          }
-        }
-      };
-
-      const stopScrolling = () => {
-        scrollDirection = 0;
-        if (scrollAnimationId !== null) {
-          cancelAnimationFrame(scrollAnimationId);
-          scrollAnimationId = null;
-        }
-      };
+      // Auto-scroll: continuous scroll near viewport edges. Dispatches synthetic
+      // mousemove on each scroll tick so the drop-indicator-update path below
+      // re-runs even while the cursor is held stationary at an edge.
+      const scroller = this._createAutoScroller();
 
       // Handle mouse movement
       const onMouseMove = (e) => {
-        // Track cursor position for scroll loop updates
-        lastMouseX = e.clientX;
-        lastMouseY = e.clientY;
+        scroller.onMouseMove(e);
 
         draggedBlock.style.left = `${e.clientX}px`;
         draggedBlock.style.top = `${e.clientY}px`;
-
-        // Auto-scroll when dragging near viewport edges
-        // Uses continuous scrolling that works even when mouse is stationary at edge
-        const viewportHeight = window.innerHeight;
-
-        if (e.clientY < scrollThreshold) {
-          // Near top edge - scroll up
-          // Speed increases as cursor gets closer to edge (0 = fastest, threshold = slowest)
-          const distanceFromEdge = e.clientY;
-          const speedFactor = 1 - (distanceFromEdge / scrollThreshold); // 1 at edge, 0 at threshold
-          currentScrollSpeed = minScrollSpeed + (maxScrollSpeed - minScrollSpeed) * speedFactor;
-          startScrolling(-1);
-        } else if (e.clientY > viewportHeight - scrollThreshold) {
-          // Near bottom edge - scroll down
-          const distanceFromEdge = viewportHeight - e.clientY;
-          const speedFactor = 1 - (distanceFromEdge / scrollThreshold);
-          currentScrollSpeed = minScrollSpeed + (maxScrollSpeed - minScrollSpeed) * speedFactor;
-          startScrolling(1);
-        } else {
-          // Not near edge - stop scrolling
-          stopScrolling();
-        }
 
         // Find element under cursor (no throttle - these operations are fast)
         const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
@@ -7174,14 +8649,78 @@ export class Bridge {
             if (existingIndicator) {
               existingIndicator.style.display = 'none';
             }
+            const existingShade = document.querySelector('.volto-hydra-drop-shade');
+            if (existingShade) existingShade.style.display = 'none';
             dropIndicatorVisible = false;
             closestBlockUid = null;
+            replaceTargetUid = null;
             return;
           }
 
           // Use the valid drop target (may be the original or a parent)
           closestBlock = validDropTarget;
           closestBlockUid = validDropTargetUid;
+
+          // Replace path: target is — or contains as its only child — an
+          // 'empty' placeholder (the slot block ensureEmptyBlockIfEmpty
+          // creates when a container has no real children). Resolve to the
+          // placeholder uid, render a shade overlay over the container's
+          // rect, and remember the placeholder uid so onMouseUp can ask
+          // the admin to delete it. Skip the line-indicator flow.
+          //
+          // The "only-child-is-empty" case matters because for grid-like
+          // containers the 25%-wide cell is much smaller than the
+          // container's whole rect — a cursor in the empty whitespace
+          // doesn't hit the placeholder's element directly, but the user
+          // still means "drop into this empty container".
+          let emptyTargetUid = null;
+          let emptyShadeEl = closestBlock;
+          const validTargetInfo = this.blockPathMap?.[closestBlockUid];
+          if (validTargetInfo?.blockType === 'empty') {
+            emptyTargetUid = closestBlockUid;
+          } else {
+            const targetData = this.getBlockData(closestBlockUid);
+            const layoutItems = targetData?.blocks_layout?.items;
+            if (Array.isArray(layoutItems) && layoutItems.length === 1) {
+              const onlyChildUid = layoutItems[0];
+              if (this.blockPathMap?.[onlyChildUid]?.blockType === 'empty') {
+                emptyTargetUid = onlyChildUid;
+              }
+            }
+          }
+          if (emptyTargetUid) {
+            const lineIndicator = document.querySelector('.volto-hydra-drop-indicator');
+            if (lineIndicator) lineIndicator.style.display = 'none';
+            let shade = document.querySelector('.volto-hydra-drop-shade');
+            if (!shade) {
+              shade = document.createElement('div');
+              shade.className = 'volto-hydra-drop-shade';
+              shade.style.cssText = 'position:absolute;background:rgba(0,123,255,0.15);border:2px dashed #007bff;border-radius:4px;pointer-events:none;z-index:9998;';
+              document.body.appendChild(shade);
+            }
+            const shadeRect = emptyShadeEl.getBoundingClientRect();
+            Object.assign(shade.style, {
+              top: `${shadeRect.top + window.scrollY}px`,
+              left: `${shadeRect.left + window.scrollX}px`,
+              width: `${shadeRect.width}px`,
+              height: `${shadeRect.height}px`,
+              display: 'block',
+            });
+            // Switch the drop target to the placeholder. We always insert
+            // *before* it, so the moved block lands at position 0 in its
+            // container; then the admin's MOVE_BLOCKS handler deletes the
+            // placeholder via replaceTargetId.
+            closestBlockUid = emptyTargetUid;
+            replaceTargetUid = emptyTargetUid;
+            dropIndicatorVisible = true;
+            insertAt = 0;
+            return;
+          }
+          // Not in replace mode — clear any lingering shade from a previous
+          // mousemove tick and fall through to the line-indicator path.
+          replaceTargetUid = null;
+          const existingShade = document.querySelector('.volto-hydra-drop-shade');
+          if (existingShade) existingShade.style.display = 'none';
 
           // Get or create drop indicator
           let dropIndicator = document.querySelector('.volto-hydra-drop-indicator');
@@ -7236,8 +8775,11 @@ export class Bridge {
             if (existingIndicator) {
               existingIndicator.style.display = 'none';
             }
+            const existingShade = document.querySelector('.volto-hydra-drop-shade');
+            if (existingShade) existingShade.style.display = 'none';
             dropIndicatorVisible = false;
             closestBlockUid = null;
+            replaceTargetUid = null;
             return;
           }
 
@@ -7286,8 +8828,11 @@ export class Bridge {
           if (existingIndicator) {
             existingIndicator.style.display = 'none';
           }
+          const existingShade = document.querySelector('.volto-hydra-drop-shade');
+          if (existingShade) existingShade.style.display = 'none';
           dropIndicatorVisible = false;
           closestBlockUid = null;
+          replaceTargetUid = null;
         }
       };
 
@@ -7304,7 +8849,7 @@ export class Bridge {
         }
 
         // Stop auto-scroll
-        stopScrolling();
+        scroller.stop();
 
         document.querySelector('body').classList.remove('grabbing');
         document.removeEventListener('mousemove', onMouseMove);
@@ -7320,6 +8865,8 @@ export class Bridge {
         } else {
           log('No drop indicator to hide on mouseup');
         }
+        const dropShade = document.querySelector('.volto-hydra-drop-shade');
+        if (dropShade) dropShade.style.display = 'none';
 
         // Only allow drop if indicator was visible - this ensures all validation passed
         if (closestBlockUid && dropIndicatorVisible) {
@@ -7328,24 +8875,19 @@ export class Bridge {
           // Only set on successful drop, not on cancelled drags.
           this._justFinishedDragBlockId = this.selectedBlockUid;
 
-          // Use selectedBlockUid (not blockElement's UID) to support template instances
-          // For template instances, selectedBlockUid is the instance ID, blockElement is first child
-          const draggedBlockId = this.selectedBlockUid;
-          const draggedPathInfo = this.blockPathMap?.[draggedBlockId];
           const targetPathInfo = this.blockPathMap?.[closestBlockUid];
 
-          // Send MOVE_BLOCK message with all info needed for the move
-          // Admin will handle the complex mutation (works for page-level and container blocks)
-          log('DnD: Moving block', draggedBlockId, 'relative to', closestBlockUid, 'insertAfter:', insertAt === 1);
+          log('DnD: Moving', draggedUids.length, 'blocks relative to', closestBlockUid, 'insertAfter:', insertAt === 1, 'replace:', !!replaceTargetUid);
           window.parent.postMessage(
             {
-              type: 'MOVE_BLOCK',
-              blockId: draggedBlockId,
+              type: 'MOVE_BLOCKS',
+              blockIds: draggedUids,
               targetBlockId: closestBlockUid,
               insertAfter: insertAt === 1,
-              // Include path info for Admin to determine source/target containers
-              sourceParentId: draggedPathInfo?.parentId || null,
               targetParentId: targetPathInfo?.parentId || null,
+              // When set, the admin deletes this block after the move so the
+              // 'empty' placeholder is replaced rather than dropped beside.
+              replaceTargetId: replaceTargetUid || null,
             },
             this.adminOrigin,
           );
@@ -7386,6 +8928,7 @@ export class Bridge {
             this.deselectBlock(prevUid, null);
           }
           // Send BLOCK_SELECTED(null) so Admin knows iframe acknowledged deselection
+          this.editMode = 'text';
           this.sendBlockSelected('adminDeselect', null);
           return;
         }
@@ -7468,6 +9011,7 @@ export class Bridge {
 
           // Call selectBlock() to properly set up toolbar and contenteditable
           // This ensures blocks selected via Order tab work the same as clicking
+          this.editMode = 'text';
           this.selectBlock(blockElement);
 
           // Focus the contenteditable element for blocks with editable fields
@@ -7547,7 +9091,7 @@ export class Bridge {
       // UI state, and scrollBlockIntoViewWithToolbarRoom can trigger scroll events
       // that would hide the toolbar with no BLOCK_SELECTED to restore it (the
       // debounced handler below also skips when _blockSelectorNavigating is true).
-      if (this.selectedBlockUid && !this._blockSelectorNavigating) {
+      if ((this.selectedBlockUid || this.multiSelectedBlockUids.length > 0) && !this._blockSelectorNavigating) {
         window.parent.postMessage(
           { type: 'HIDE_BLOCK_UI' },
           this.adminOrigin,
@@ -7566,6 +9110,14 @@ export class Bridge {
         if (this._isDragging || this._blockSelectorNavigating) {
           return; // Don't send BLOCK_SELECTED during drag or carousel navigation
         }
+
+        // Re-send multi-select with updated rects after scroll
+        // (checked before selectedBlockUid — Ctrl+Click sets selectedBlockUid to null)
+        if (this.multiSelectedBlockUids.length > 1) {
+          this._sendMultiBlockSelected();
+          return;
+        }
+
         if (this.selectedBlockUid) {
           let element;
           if (this.selectedBlockUid === PAGE_BLOCK_UID) {
@@ -7585,9 +9137,20 @@ export class Bridge {
           }
 
           if (element) {
-            // Pass blockUid explicitly to preserve template instance selection
-            // (element may be a child block with different UID)
-            this.sendBlockSelected('scrollHandler', element, { blockUid: this.selectedBlockUid });
+            // Single block: include selection mode rects if active
+            const extra = {};
+            if (this._selectionModeBlockUids) {
+              const selectionModeRects = {};
+              for (const uid of this._selectionModeBlockUids) {
+                const el = this.queryBlockElement(uid);
+                if (el) {
+                  const r = el.getBoundingClientRect();
+                  selectionModeRects[uid] = { top: r.top, left: r.left, width: r.width, height: r.height };
+                }
+              }
+              extra.selectionModeRects = selectionModeRects;
+            }
+            this.sendBlockSelected('scrollHandler', element, { blockUid: this.selectedBlockUid, ...extra });
           }
         }
       }, 150);
@@ -7785,19 +9348,15 @@ export class Bridge {
         }
       });
 
-      // Per-field keydown listener: handles keys when the field has focus.
-      // The document-level fallback (registered in init) buffers keys that
-      // arrive on body during block transitions when this field doesn't exist yet.
-      editableField.addEventListener('keydown', (e) => {
-        this._handleFieldKeydown(e, blockUid, editableField);
-      });
+      // Keydown handler is registered per-field in restoreContentEditableOnFields
+      // (_hydraKeydownHandler). No duplicate listener needed here.
 
       // Replay any keys buffered during block transition (focus was on body,
       // document-level handler captured them). Uses the same replay logic as
       // transform unblock — handles transform interruption mid-replay.
       if (this.eventBuffer.length > 0 && !this.blockedBlockId) {
         const buffer = this.eventBuffer.splice(0);
-        log('restoreContentEditableOnFields: replaying', buffer.length, 'buffered keys for', blockUid);
+        log('activateEditableField: replaying', buffer.length, 'buffered keys for', blockUid);
         this.pendingBufferReplay = { blockId: blockUid, buffer };
         this.replayBufferedEvents();
       }
@@ -7805,280 +9364,43 @@ export class Bridge {
   }
 
   /**
-   * Handle keydown events for an editable field. Shared entry point called from
-   * both per-field listeners and the document-level fallback listener.
+   * Handle live keydown events for an editable field.
+   * Default: replayOneKey handles everything (same code path as buffered replay).
+   * Exceptions let native handle: text characters (performance, IME compat),
+   * Paste/Copy (need native clipboard events).
+   * If performance issues arise, more keys can be moved to native.
    */
   _handleFieldKeydown(e, blockUid, editableField) {
-        // DEBUG: trace End/Backspace key arrival and selection state
-        if (e.key === 'End' || e.key === 'Backspace') {
-          const sel = window.getSelection();
-          log('DEBUG keydown:', e.key, 'isTrusted:', e.isTrusted,
-              'collapsed:', sel?.isCollapsed, 'anchorOffset:', sel?.anchorOffset,
-              'focusOffset:', sel?.focusOffset, 'anchorNode:', sel?.anchorNode?.nodeName,
-              'focusNode:', sel?.focusNode?.nodeName,
-              'sameNode:', sel?.anchorNode === sel?.focusNode,
-              'rangeCollapsed:', sel?.rangeCount ? sel.getRangeAt(0).collapsed : 'no-range',
-              'blockedBlockId:', this.blockedBlockId);
+        // Skip modifier-only keys
+        if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
+
+        // IME composition: let native handle entirely
+        if (e.isComposing) return;
+
+        // Try special/structural handling (shared with replayOneKey).
+        // If handled, preventDefault to suppress native action.
+        if (this.handleSpecialKey(blockUid, {
+          key: e.key, code: e.code,
+          shiftKey: e.shiftKey, ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey, altKey: e.altKey,
+        }, editableField)) {
+          e.preventDefault();
+          return;
         }
-        // Ensure cursor is inside a data-node-id element before processing.
-        // After transforms (e.g. delete), Vue/Nuxt may re-render and leave the
-        // cursor on template whitespace outside the content element.
-        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+
+        // Content keys: let native handle.
+        // Text chars: browser inserts, MutationObserver detects.
+        // Space (non-markdown): browser inserts space.
+        // Delete/Backspace (non-boundary): browser deletes, beforeinput
+        //   handles preserveLastCharDelete.
+        // Paste/Copy: native clipboard events.
+        // Pre-processing for text input:
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
           this.correctInvalidWhitespaceSelection();
-          // Also fix whitespace-only text nodes INSIDE data-node-id elements.
-          // Nuxt renders empty paragraphs as <p> </p> (space). The browser's
-          // contenteditable refuses to insert characters into a whitespace-only
-          // text node inside a block element, creating a new node on the parent
-          // instead. Replace the whitespace with FEFF so the browser has a valid
-          // insertion target.
           this.ensureValidInsertionTarget();
         }
-
-        // Clear prospective inline on navigation keys (user intentionally leaving the inline)
-        const navigationKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Escape', 'Tab', 'Home', 'End', 'PageUp', 'PageDown'];
-        const isNavigationKey = navigationKeys.includes(e.key) || e.ctrlKey || e.metaKey || e.altKey;
-        if (isNavigationKey && this.prospectiveInlineElement) {
-          log('Clearing prospective inline due to navigation key:', e.key);
-          this.prospectiveInlineElement = null;
-        }
-
-        // Ensure navigation keys actually move the cursor.
-        // CDP-dispatched keydown events (e.g. from Playwright or automation) don't always
-        // trigger the browser's native cursor movement in contenteditable. Apply
-        // selection.modify explicitly — this is idempotent with the native action.
-        // Arrow keys are handled by _arrowNavHandler (attached in restoreContentEditableOnFields)
-        // for ALL field types, so only handle Home/End and Shift+arrow here.
-        const navActions = {
-          Home: ['backward', 'lineboundary'],
-          End: ['forward', 'lineboundary'],
-        };
-        // Arrow keys are handled by _arrowNavHandler (from restoreContentEditableOnFields).
-        // Only handle Home/End here.
-        if (navActions[e.key] && !e.ctrlKey && !e.metaKey && !e.altKey) {
-          const sel = window.getSelection();
-          if (sel) {
-            const alter = e.shiftKey ? 'extend' : 'move';
-            sel.modify(alter, navActions[e.key][0], navActions[e.key][1]);
-            e.preventDefault();
-          }
-        }
-
-        // When slash menu is active, forward navigation keys to admin
-        if (this._slashMenuActive) {
-          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-            e.preventDefault();
-            this.sendMessageToParent({
-              type: 'SLASH_MENU',
-              action: e.key === 'ArrowUp' ? 'up' : 'down',
-              blockId: blockUid,
-            });
-            return;
-          }
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            this.sendMessageToParent({
-              type: 'SLASH_MENU',
-              action: 'select',
-              blockId: blockUid,
-            });
-            return;
-          }
-          if (e.key === 'Escape') {
-            e.preventDefault();
-            this._slashMenuActive = false;
-            this.sendMessageToParent({
-              type: 'SLASH_MENU',
-              action: 'hide',
-              blockId: blockUid,
-            });
-            return;
-          }
-        }
-
-        // Always suppress native contenteditable formatting shortcuts (Ctrl/Cmd+B/I/U/S)
-        // to prevent native formatting from conflicting with Slate-based formatting
-        const nativeFormattingKeys = ['b', 'i', 'u', 's'];
-        if ((e.ctrlKey || e.metaKey) && nativeFormattingKeys.includes(e.key.toLowerCase())) {
-          log('Suppressing native formatting for:', e.key);
-          e.preventDefault();
-        }
-
-        // Handle formatting keyboard shortcuts (Ctrl+B, Ctrl+I, etc.)
-        if (this.slateConfig && this.slateConfig.hotkeys) {
-          for (const [shortcut, config] of Object.entries(this.slateConfig.hotkeys)) {
-            // Parse shortcut like "mod+b" into components
-            const parts = shortcut.toLowerCase().split('+');
-            const hasmod = parts.includes('mod');
-            const hasShift = parts.includes('shift');
-            const hasAlt = parts.includes('alt');
-            const key = parts[parts.length - 1]; // Last part is the key
-
-            // Check if this shortcut matches the current event
-            const modifierMatch = hasmod ? (e.ctrlKey || e.metaKey) : true;
-            const shiftMatch = hasShift ? e.shiftKey : !e.shiftKey;
-            const altMatch = hasAlt ? e.altKey : !e.altKey;
-            const keyMatch = e.key.toLowerCase() === key;
-
-            if (modifierMatch && shiftMatch && altMatch && keyMatch && config.type === 'inline') {
-
-              // Only apply format hotkeys to slate fields - text/textarea fields don't support formatting
-              if (!this.isSlateField(blockUid, this.focusedFieldName)) {
-                console.warn('[HYDRA] Skipping format hotkey - field is not slate');
-                // Still prevent default to avoid native contenteditable formatting
-                e.preventDefault();
-                return;
-              }
-
-              e.preventDefault();
-
-              // Send format request with current form data included
-              // This ensures admin receives latest text along with the format action
-              this.sendTransformRequest(blockUid, 'format', {
-                format: config.format,
-              });
-              return;
-            }
-          }
-        }
-
-        // Handle Undo (Ctrl+Z / Cmd+Z)
-        if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-          log('Undo detected');
-          e.preventDefault();
-
-          // Flush pending text so undo manager has the latest state
-          this.flushPendingTextUpdates();
-          this.sendMessageToParent({
-            type: 'SLATE_UNDO_REQUEST',
-            blockId: blockUid,
-          });
-          return;
-        }
-
-        // Handle Redo (Ctrl+Shift+Z / Cmd+Shift+Z or Ctrl+Y / Cmd+Y)
-        if ((e.ctrlKey || e.metaKey) && ((e.key === 'z' && e.shiftKey) || e.key === 'y')) {
-          log('Redo detected');
-          e.preventDefault();
-
-          // Flush pending text so redo manager has the latest state
-          this.flushPendingTextUpdates();
-          this.sendMessageToParent({
-            type: 'SLATE_REDO_REQUEST',
-            blockId: blockUid,
-          });
-          return;
-        }
-
-        // Handle Save (Ctrl+S / Cmd+S) - forward to parent for CMS save
-        // Note: strikethrough was moved to Ctrl+Shift+S to free this shortcut
-        if ((e.ctrlKey || e.metaKey) && e.key === 's' && !e.shiftKey) {
-          log('Save shortcut detected');
-          e.preventDefault();
-          this.sendMessageToParent({
-            type: 'SAVE_REQUEST',
-          });
-          return;
-        }
-
-        // Copy (Ctrl+C / Cmd+C): let native keydown propagate → copy event
-        // fires → _doCopy cleans clipboard with both HTML and plain text.
-
-        // Cut (Ctrl+X / Cmd+X): copy via execCommand (triggers _doCopy),
-        // then delete via transform. Synchronous — no async clipboard API.
-        if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
-          e.preventDefault();
-          this._doCut(blockUid);
-          return;
-        }
-
-        // Paste (Ctrl+V / Cmd+V): let native keydown propagate → paste
-        // event fires → field-level handler calls _doPaste with HTML.
-
-        // Handle markdown shortcuts (Space triggers autoformat)
-        // Shared handler checks text before cursor for block/inline patterns
-        if (e.key === ' ' && this.handleSpaceKey(blockUid)) {
-          e.preventDefault();
-          return;
-        }
-
-        // Handle Tab/Shift+Tab for list indentation in slate fields
-        if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) {
-          if (this.isSlateField(blockUid, this.focusedFieldName)) {
-            const selection = window.getSelection();
-            if (selection.rangeCount) {
-              const tabNode = selection.getRangeAt(0).startContainer;
-              const tabEl = this._toElement(tabNode);
-              if (tabEl?.closest('li')) {
-                e.preventDefault();
-                this.sendTransformRequest(blockUid, e.shiftKey ? 'outdent' : 'indent', {});
-                return;
-              }
-            }
-          }
-        }
-
-        // Handle Enter key to create new block (slate fields only)
-        // Non-slate fields handle Enter via _enterKeyHandler in restoreContentEditableOnFields
-        if (e.key === 'Enter' && !e.shiftKey) {
-          if (!this.isSlateField(blockUid, this.focusedFieldName)) {
-            // Non-slate field — _enterKeyHandler handles navigation/add-block
-            return;
-          }
-
-          log('Enter key detected in slate field (no Shift)');
-
-          const blockElement = editableField.closest('[data-block-uid]');
-          if (!blockElement) return;
-
-          // Check if this is the last editable field — if not, navigate to next field
-          const ownFields = this.getOwnEditableFields(blockElement);
-          const currentIndex = ownFields.indexOf(editableField);
-          const isLastField = currentIndex === ownFields.length - 1;
-
-          if (!isLastField && ownFields.length > 1) {
-            e.preventDefault();
-            const nextField = ownFields[currentIndex + 1];
-            nextField.focus();
-            const sel = window.getSelection();
-            const range = document.createRange();
-            range.selectNodeContents(nextField);
-            range.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(range);
-            return;
-          }
-
-          // Last (or only) slate field — split/create via transform
-          // Correct cursor if it's on invalid whitespace before checking data-node-id
-          this.correctInvalidWhitespaceSelection();
-
-          const selection = window.getSelection();
-          log('Selection rangeCount:', selection.rangeCount);
-          if (!selection.rangeCount) return;
-
-          const range = selection.getRangeAt(0);
-          const node = range.startContainer;
-
-          const parentElement = this._toElement(node);
-          const hasNodeId = parentElement?.closest('[data-node-id]');
-          log('Has data-node-id?', !!hasNodeId);
-
-          if (hasNodeId) {
-            log('Preventing default Enter and sending transform request for block:', blockUid);
-            e.preventDefault();
-            this.sendTransformRequest(blockUid, 'enter', {});
-            return;
-          }
-        }
-
-        // Handle Delete/Backspace special cases (unwrap, delete block, boundary)
-        // via shared handler. If not handled, let browser perform native action.
-        if (e.key === 'Delete' || e.key === 'Backspace') {
-          if (this.handleDeleteKey(blockUid, e.key)) {
-            e.preventDefault();
-          }
-        }
   }
+
 
   /**
    * Observes changes in the text content of a block.
@@ -9706,7 +11028,11 @@ export class Bridge {
     // Get current form data (includes any typed text since formData is updated immediately)
     const data = this.getFormDataWithoutNodeIds();
 
-    // Send the unified transform request with form data included
+    // Send the unified transform request with form data included.
+    // editableFieldsByBlock tells the admin what's user-editable per block
+    // (derived from data-edit-* attributes the user's frontend renders);
+    // admin's merge / transform handlers use it instead of schema-counting,
+    // which would over-count settings fields like placeholder/instructions.
     window.parent.postMessage({
       type: 'SLATE_TRANSFORM_REQUEST',
       transformType: transformType,
@@ -9715,6 +11041,7 @@ export class Bridge {
       data: data,
       selection: this.serializeSelection() || {},
       requestId: requestId,
+      editableFieldsByBlock: this.getEditableFieldsByBlock(),
       ...transformFields,
     }, this.adminOrigin);
 
@@ -12210,14 +13537,23 @@ export function getUniqueTemplateIds(formData) {
   const templateIds = new Set();
   for (const blockId of Object.keys(formData.blocks || {})) {
     const block = formData.blocks[blockId];
-    // Skip template definitions (templateInstanceId === templateId)
-    // Only include pages using templates (templateInstanceId !== templateId)
-    if (block?.templateId && block.templateInstanceId !== block.templateId) {
+    if (block?.templateId) {
       templateIds.add(block.templateId);
     }
   }
   return Array.from(templateIds);
 }
+// Note: callers that need to avoid recursing into the template's own
+// definition page (e.g. saveTemplatesRef) filter by `id !== currentPath`
+// — that's the load-bearing check. Earlier this function ALSO skipped
+// blocks where `templateInstanceId === templateId` as a heuristic for
+// "definition-side", but the load/expand path
+// (loadTemplates / expandTemplatesSync) never reads stored instanceIds
+// from a definition (it generates fresh per-application ids), so the
+// only consumer of the heuristic was this very function. Removing it
+// also unblocks make-template, where the page-side block can have
+// instanceId === templateId for unrelated reasons and was being silently
+// excluded from save → the new template never POSTed to the backend.
 
 /**
  * Check if an object looks like a blocks map (string keys -> objects with @type).
@@ -12632,16 +13968,14 @@ export function expandTemplatesSync(inputItems, options = {}) {
     firstInsert,  // When true, copy slot block defaults as fieldPlaceholders
   } = options;
 
-  if (!templates) {
-    throw new Error('expandTemplatesSync requires options.templates with pre-loaded templates');
-  }
-
   const items = [];
   const addItem = (block, blockId) => {
     items.push({ ...block, '@uid': blockId });
   };
 
-  // In edit mode, admin handles template merging - pass blocks through as-is
+  // In edit mode, admin handles template merging - pass blocks through as-is.
+  // Templates option is only needed for view-mode expansion, so the check
+  // for it runs after this early return.
   const editMode = isEditMode();
   if (editMode) {
     return (inputItems || []).map(item => {
@@ -12656,6 +13990,10 @@ export function expandTemplatesSync(inputItems, options = {}) {
       }
       return item;
     }).filter(Boolean);
+  }
+
+  if (!templates) {
+    throw new Error('expandTemplatesSync requires options.templates with pre-loaded templates');
   }
 
   // Normalize items
@@ -13154,3 +14492,6 @@ const linkFolderSVG = `<img width="20px" height="20px" src="data:image/png;base6
 const linkCancelSVG = `<svg width="20px" height="20px" xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="100" height="100" viewBox="0,0,256,256">
 <g fill="#ffffff" fill-rule="nonzero" stroke="none" stroke-width="1" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="10" stroke-dasharray="" stroke-dashoffset="0" font-family="none" font-weight="none" font-size="none" text-anchor="none" style="mix-blend-mode: normal"><g transform="scale(8.53333,8.53333)"><path d="M7,4c-0.25587,0 -0.51203,0.09747 -0.70703,0.29297l-2,2c-0.391,0.391 -0.391,1.02406 0,1.41406l7.29297,7.29297l-7.29297,7.29297c-0.391,0.391 -0.391,1.02406 0,1.41406l2,2c0.391,0.391 1.02406,0.391 1.41406,0l7.29297,-7.29297l7.29297,7.29297c0.39,0.391 1.02406,0.391 1.41406,0l2,-2c0.391,-0.391 0.391,-1.02406 0,-1.41406l-7.29297,-7.29297l7.29297,-7.29297c0.391,-0.39 0.391,-1.02406 0,-1.41406l-2,-2c-0.391,-0.391 -1.02406,-0.391 -1.41406,0l-7.29297,7.29297l-7.29297,-7.29297c-0.1955,-0.1955 -0.45116,-0.29297 -0.70703,-0.29297z"></path></g></g>
 </svg>`;
+
+// Container UX shared predicates / transforms (used by both iframe and admin).
+export { canContain, canContainAll, findConversionPath, mapLayoutItems } from './containerOps.js';

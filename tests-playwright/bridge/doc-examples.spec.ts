@@ -16,6 +16,8 @@ import { checkDataEditTextClicks, verifyBlockRendering } from '../helpers/BlockV
 import { getFrontendUrl } from './fixtures';
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Doc-example tests run on frontends that render blocks from fixture data.
 // Skip mock/nuxt (different block handling). Skip nextjs/f7 unless their
@@ -181,7 +183,6 @@ test.describe('Doc example blocks', () => {
       await verifyBlockRendering(page, iframe, example.blockId, blockData, {
         expectedText: example.expectedText,
         isListing: example.isListing,
-        blocksConfig: flatBlocksConfig,
       });
     });
   }

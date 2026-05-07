@@ -83,7 +83,9 @@ function getImageUrl(value) {
         const field = value.image_field;
         const scales = value.image_scales[field];
         if (scales?.[0]?.download) {
-            const baseUrl = value['@id'] || '';
+            // Brain @id is often an absolute URL (matches apiOrigin); strip to
+            // relative so we don't double-prepend. External absolutes are kept.
+            const baseUrl = stripApiOrigin(value['@id'] || '');
             return `${apiOrigin}${baseUrl}/${scales[0].download}`;
         }
     }
@@ -218,6 +220,9 @@ async function renderBlock(blockId, block) {
         case 'column':
             wrapper.innerHTML = renderColumnBlock(block);
             break;
+        case 'section':
+            wrapper.innerHTML = await renderSectionBlock(block);
+            break;
         case 'gridBlock':
             wrapper.innerHTML = await renderGridBlock(block, blockId);
             break;
@@ -298,7 +303,9 @@ async function renderBlock(blockId, block) {
             wrapper.innerHTML = '';
             break;
         default:
-            wrapper.innerHTML = `<p>Unknown block type: ${block['@type']}</p>`;
+            // Diagnostic only — keep type in a data attribute so it doesn't
+            // leak as visible text that fails checkEditAnnotations.
+            wrapper.innerHTML = `<p data-unknown-block-type="${block['@type']}">[not implemented]</p>`;
     }
 
     return wrapper;
@@ -637,8 +644,9 @@ function renderTeaserBlock(block, blockUid) {
     const hrefObjHasContentData = hrefObj?.title !== undefined;
     const useBlockData = block.overwrite || !hrefObjHasContentData;
 
-    // Get href: always from hrefObj @id (link destination)
-    const href = hrefObj?.['@id'] || '';
+    // Get href: always from hrefObj @id (link destination). Strip apiOrigin
+    // so brain-absolute URLs render as same-origin relative paths.
+    const href = stripApiOrigin(hrefObj?.['@id'] || '');
 
     // Get title/description/image based on useBlockData (all or nothing, no mixing)
     const title = useBlockData ? (block.title || '') : (hrefObj?.title || '');
@@ -807,20 +815,13 @@ function renderVideoBlock(block) {
 }
 
 /**
- * Render an introduction block (page title + description).
- * The introduction block has no content of its own — it displays the page's
- * title and description from metadata, making them inline-editable.
- * @param {Object} block - Introduction block data (typically just @type)
+ * Render an introduction block — a standalone slate value used as page intro.
+ * Data shape: { @type: 'introduction', value: [slate nodes…] }.
+ * @param {Object} block - Introduction block data
  * @returns {string} HTML string
  */
 function renderIntroductionBlock(block) {
-    const title = document.getElementById('page-title')?.textContent || '';
-    const description = block._pageDescription || '';
-    let html = `<h1 data-edit-text="/title">${title}</h1>`;
-    if (description) {
-        html += `<p data-edit-text="/description" class="description" style="font-size:1.2em;color:#555;">${description}</p>`;
-    }
-    return html;
+    return renderSlateBlock(block);
 }
 
 /**
@@ -974,7 +975,7 @@ function renderFormBlock(block) {
         }
         html += '</div>';
     }
-    html += `<button type="button" class="form-submit" style="padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 4px;">${submitLabel}</button>`;
+    html += `<button type="button" class="form-submit" data-edit-text="submit_label" style="padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 4px;">${submitLabel}</button>`;
     html += '</form>';
     return html;
 }
@@ -1150,7 +1151,7 @@ async function renderColumnContent(column, columnId) {
                 html += renderTeaserBlock(block, null);
                 break;
             default:
-                html += `<p>Unknown block type: ${block['@type']}</p>`;
+                html += `<p data-unknown-block-type="${block['@type']}">[not implemented]</p>`;
         }
 
         html += '</div>';
@@ -1166,6 +1167,35 @@ async function renderColumnContent(column, columnId) {
  */
 function renderColumnBlock(block) {
     return renderColumnContent(block);
+}
+
+/**
+ * Render a generic section block — vertical-stacked children with no
+ * allowedBlocks restriction. Test-only block for container UX features
+ * (wrap, unwrap, edge-drag, convert).
+ * @param {Object} block
+ * @returns {Promise<string>} HTML string
+ */
+async function renderSectionBlock(block) {
+    const blocks = block.blocks || {};
+    const items = block.blocks_layout?.items || [];
+
+    let html = '<div class="section-body" style="padding: 12px; border: 1px dashed #888; border-radius: 4px;">';
+    for (const childId of items) {
+        const child = blocks[childId];
+        if (!child) continue;
+        const rendered = await renderBlock(childId, child);
+        // renderBlock returns a DOM node with data-block-uid attr already set.
+        if (rendered instanceof DocumentFragment) {
+            const container = document.createElement('div');
+            container.appendChild(rendered);
+            html += container.innerHTML;
+        } else {
+            html += rendered.outerHTML;
+        }
+    }
+    html += '</div>';
+    return html;
 }
 
 /**
@@ -1296,7 +1326,7 @@ async function renderGridBlock(block, blockId) {
                 html += renderEmptyBlock(childBlock);
                 break;
             default:
-                html += `<p>Unknown block type: ${childBlock['@type']}</p>`;
+                html += `<p data-unknown-block-type="${childBlock['@type']}">[not implemented]</p>`;
         }
 
         html += '</div>';
@@ -1816,8 +1846,7 @@ async function renderSearchBlock(block, blockId) {
  * @returns {string} HTML string
  */
 function renderNestedSlateBlock(block) {
-    const plaintext = block.plaintext || '';
-    return `<p data-edit-text="value" style="margin: 0;">${plaintext}</p>`;
+    return renderSlateBlock(block);
 }
 
 /**
@@ -1872,9 +1901,9 @@ function renderSkiplogicTestBlock(block) {
     return `
         <div class="skiplogic-test-block" style="padding: 16px; border: 1px solid #ccc; background: #f9f9f9;">
             <h4>Skiplogic Test Block</h4>
-            <p>Mode: ${mode}</p>
-            <p>Columns: ${columns}</p>
-            <p>Title: ${title}</p>
+            <p data-skiplogic-mode="${mode}">Mode</p>
+            <p data-skiplogic-columns="${columns}">Columns</p>
+            <p data-edit-text="basicTitle">${title}</p>
         </div>
     `;
 }

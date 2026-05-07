@@ -12,7 +12,7 @@ A complete E2E test suite for Volto Hydra using modern JavaScript tooling.
    - Screenshot/video capture on failure
    - Trace collection for debugging
 
-2. **Mock Plone REST API** (`fixtures/mock-api-server.js`)
+2. **Mock Plone REST API** (`fixtures/mock-api-server.cjs`)
    - Express-based mock server
    - Essential endpoints: `/@login`, `GET/PATCH /{path}`, `/@types`
    - Auto-loads fixtures from JSON files
@@ -65,7 +65,7 @@ tests-playwright/
 │   ├── api/
 │   │   ├── content.json              # Test page with blocks
 │   │   └── schema-document.json      # Document schema
-│   └── mock-api-server.js            # Express mock server
+│   └── mock-api-server.cjs            # Express mock server
 ├── helpers/
 │   └── AdminUIHelper.ts              # Volto interaction helper
 ├── integration/
@@ -95,7 +95,7 @@ For fast test runs during development:
 
 ```bash
 # Terminal 1: Start Mock API (leave running)
-node tests-playwright/fixtures/mock-api-server.js
+node tests-playwright/fixtures/mock-api-server.cjs
 
 # Terminal 2: Start Volto (wait for webpack to finish, ~5 min first time)
 RAZZLE_API_PATH=http://localhost:8888 pnpm start
@@ -220,7 +220,7 @@ The Python test suite (`tests/`) is still present but not used. Key migrations:
 
 1. **pytest → @playwright/test** - Different test runner
 2. **Python helpers → TypeScript helpers** - `AdminUIHelper.ts`
-3. **Python mock server → Express server** - `mock-api-server.js`
+3. **Python mock server → Express server** - `mock-api-server.cjs`
 4. **pytest fixtures → Playwright config** - `webServer` in config
 
 ## Next Steps

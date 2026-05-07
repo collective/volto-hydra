@@ -126,7 +126,7 @@ test.describe('Templates', () => {
 
     // Edit the placeholder content (user-content-1)
     await helper.clickBlockInIframe('user-content-1');
-    await helper.waitForQuantaToolbar('user-content-1');
+    await helper.waitForBlockSelectedInAdmin('user-content-1');
 
     const userBlock = iframe.locator('[data-block-uid="user-content-1"]');
     const editor = helper.getSlateField(userBlock);
@@ -262,7 +262,7 @@ test.describe('Templates', () => {
 
     // Click the user content block
     await helper.clickBlockInIframe('user-content-1');
-    await helper.waitForQuantaToolbar('user-content-1');
+    await helper.waitForBlockSelectedInAdmin('user-content-1');
 
     // The toolbar (in admin UI) should show drag handle (not lock)
     const toolbar = page.locator('.quanta-toolbar');
@@ -330,7 +330,7 @@ test.describe('Templates', () => {
     await expect(stickyHeaders).toHaveCount(3);
 
     // Press Escape to navigate up to template instance
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
     await page.waitForTimeout(200);
 
     // Now should have 2 headers: Page > Template Instance
@@ -373,8 +373,8 @@ test.describe('Templates', () => {
 
     // Select template header, then navigate up to template instance
     await headerBlock.click();
-    await helper.waitForQuantaToolbar(headerBlockId!);
-    await page.keyboard.press('Escape');
+    await helper.waitForBlockSelectedInAdmin(headerBlockId!);
+    await helper.escapeToParent();
 
     // Wait for the template instance toolbar to appear with a drag handle
     // Template instances are virtual (no DOM element), so just check toolbar visibility
@@ -449,7 +449,7 @@ test.describe('Templates', () => {
 
     // Click on the fixed grid cell (it's the only block in the grid, so it's at both edges)
     await helper.clickBlockInIframe(gridCellId!);
-    await helper.waitForQuantaToolbar(gridCellId!);
+    await helper.waitForBlockSelectedInAdmin(gridCellId!);
 
     // The add button should NOT be visible because:
     // 1. It's a fixed block at the end of the container (no placeholder after it)
@@ -634,7 +634,7 @@ test.describe('Templates', () => {
 
     // Select template header, then Escape to navigate up to template instance
     const headerBlockId = await helper.clickBlockByContent('Template Header');
-    await page.keyboard.press('Escape');
+    await helper.escapeToParent();
 
     // Find the footer block to get its ID for toolbar positioning
     const { blockId: footerBlockId } = await helper.waitForBlockByContent('Template Footer');
@@ -644,13 +644,13 @@ test.describe('Templates', () => {
     const templateChildBlocks = [headerBlockId, 'user-content-1', 'user-content-2', footerBlockId];
 
     // Wait for template instance toolbar to be positioned correctly
-    await helper.waitForQuantaToolbar(templateChildBlocks);
+    await helper.waitForBlockSelectedInAdmin(templateChildBlocks);
 
     // Scroll the iframe content down
     await iframe.locator('body').evaluate((body) => body.ownerDocument.defaultView?.scrollBy(0, 200));
 
     // After scrolling, the toolbar should still be visible and positioned
     // correctly for the template instance.
-    await helper.waitForQuantaToolbar(templateChildBlocks);
+    await helper.waitForBlockSelectedInAdmin(templateChildBlocks);
   });
 });

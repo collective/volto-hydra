@@ -1,6 +1,6 @@
 # Architecture Documentation
 
-Read `docs/slate-transforms-architecture.md` for understanding how Slate transforms work between hydra.js and View.jsx (Enter key, formatting, paste, delete handling).
+Read `docs/architecture.md` for the iframe ↔ admin bridge: Slate transforms, selection sync, and the chrome pattern. The chrome pattern is non-negotiable — selection outlines, toolbars, drag handles, edge handles, etc. are rendered in the admin (React) so frontend CSS/JS can't interfere; the iframe only measures rects and captures pointer events through invisible elements layered under the admin's visuals.
 
 ## Block Access - NEVER use formData.blocks[blockId] directly
 
@@ -61,7 +61,7 @@ pnpm exec playwright show-report
 ## Test Architecture
 
 The Playwright tests use:
-- **Mock API server** (`tests-playwright/fixtures/mock-api-server.js`) - Serves both mock Plone API and test frontend on port 8888
+- **Mock API server** (`tests-playwright/fixtures/mock-api-server.cjs`) - Serves both mock Plone API and test frontend on port 8888
 - **Test frontend** (`tests-playwright/fixtures/test-frontend/`) - Simple HTML/JS frontend that loads the real Hydra bridge
 - **Real Hydra bridge** (`packages/hydra-js/hydra.js`) - Production bridge code for iframe-Admin UI communication
 - **Admin UI** - Runs on port 3001 (auto-started by Playwright via `webServer` config)

@@ -40,11 +40,16 @@ function serializeNode(node) {
   }
 
   const children = node.children ? node.children.map(serializeNode) : null;
+  // Only attach data-node-id when nodeId is a valid path. The previous
+  // `${node?.nodeId}` template would emit the literal string "undefined"
+  // when missing, which the bridge then treated as a real (broken) anchor
+  // path and the DOM-to-Slate round-trip would short-circuit to [].
+  const nodeIdProps = node?.nodeId != null ? { "data-node-id": `${node.nodeId}` } : {};
 
   switch (node.type) {
     case "link":
       return (
-        <a key={uid} href={node.data?.url} data-node-id={`${node?.nodeId}`}>
+        <a key={uid} href={node.data?.url} {...nodeIdProps}>
           {children}
         </a>
       );
@@ -53,7 +58,7 @@ function serializeNode(node) {
       const Tag = node.type;
       if (Tag)
         return (
-          <Tag key={uid} data-node-id={`${node?.nodeId}`}>
+          <Tag key={uid} {...nodeIdProps}>
             {children}
           </Tag>
         );
@@ -73,4 +78,13 @@ export default function SlateBlock({ value }) {
       {elements}
     </div>
   );
+}
+
+/**
+ * Render slate nodes WITHOUT the [data-edit-text="value"] wrapper. Use this
+ * when the slate value is a FIELD of another block (e.g. hero.description),
+ * since that parent already owns the edit-text container for its own field.
+ */
+export function SlateInline({ value }) {
+  return <>{serializeSlateJSON(value)}</>;
 }

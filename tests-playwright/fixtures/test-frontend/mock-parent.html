@@ -124,6 +124,12 @@
     // when it receives FORM_DATA, so the mock parent (acting as admin) should
     // send plain Slate JSON without nodeIds, just like the real admin does.
 
+    // Track which block keys arrived via frontend INIT vs. live in this
+    // baseline. Sanity discovery uses this to ignore mock-parent's test
+    // fixtures (hero, slate, mock-*) when checking that every frontend-
+    // registered block type has a content example.
+    const frontendBlockKeys = new Set();
+
     // blocksConfig for schema-driven buildBlockPathMap (no Volto deps)
     const mockBlocksConfig = {
       _page: {
@@ -154,6 +160,16 @@
       },
       column: {
         id: 'column',
+        blockSchema: {
+          properties: {
+            blocks_layout: { widget: 'blocks_layout' },
+          },
+        },
+      },
+      // Test-only generic section — accepts any block type (no allowedBlocks restriction).
+      // Used by container UX tests: wrap, unwrap, edge-drag, convert.
+      section: {
+        id: 'section',
         blockSchema: {
           properties: {
             blocks_layout: { widget: 'blocks_layout' },
@@ -475,9 +491,15 @@
       switch (message.type) {
         case 'INIT': {
           // New INIT message format from hydra.js
-          // Merge frontend's blocksConfig (sent via bridge, just like View.jsx does)
+          // Merge frontend's blocksConfig (sent via bridge, just like View.jsx does).
+          // Track which keys came from the frontend so consumers (e.g. sanity
+          // discovery) can distinguish frontend-registered types from
+          // mock-parent's own test baseline (slate, hero, columns…).
           console.log('[MOCK_PARENT] Received INIT message:', message);
           if (message.blocks) {
+            for (const blockType of Object.keys(message.blocks)) {
+              frontendBlockKeys.add(blockType);
+            }
             for (const [blockType, blockDef] of Object.entries(message.blocks)) {
               if (!mockBlocksConfig[blockType]) {
                 mockBlocksConfig[blockType] = blockDef;
@@ -631,6 +653,8 @@
             };
 
             // Compute transformedSelection based on the transform result.
+            // After a transform, the Slate tree structure changes, so the original
+            // selection paths are invalid. We need to compute new paths.
             let transformedSelection = selection;
             if (transformType === 'delete') {
               // After delete, content is empty — cursor at start of first node
@@ -638,20 +662,30 @@
                 anchor: { path: [0, 0], offset: 0 },
                 focus: { path: [0, 0], offset: 0 },
               };
-            } else if (selection && selection.anchor.offset === selection.focus.offset
-                && JSON.stringify(selection.anchor.path) === JSON.stringify(selection.focus.path)) {
-              // Collapsed selection — for prospective formatting, the cursor
-              // moves into the new inline element.
+            } else if (transformType === 'format') {
+              // After format, text may have moved into an inline element.
+              // Find the inline element in the updated value and adjust paths.
               const block = mockFormData.blocks[blockId];
               const val = block[fieldName] || block.value;
               if (val && val[0] && val[0].children) {
                 const inlineIdx = val[0].children.findIndex(c => c.type === format);
                 if (inlineIdx >= 0) {
-                  const newPath = [0, inlineIdx, 0];
-                  transformedSelection = {
-                    anchor: { path: newPath, offset: 0 },
-                    focus: { path: newPath, offset: 0 },
-                  };
+                  const inlineChild = val[0].children[inlineIdx];
+                  const textLen = inlineChild.children?.[0]?.text?.length || 0;
+                  if (selection && selection.anchor.offset === selection.focus.offset
+                      && JSON.stringify(selection.anchor.path) === JSON.stringify(selection.focus.path)) {
+                    // Collapsed selection (prospective formatting) — cursor inside inline
+                    transformedSelection = {
+                      anchor: { path: [0, inlineIdx, 0], offset: 0 },
+                      focus: { path: [0, inlineIdx, 0], offset: 0 },
+                    };
+                  } else {
+                    // Non-collapsed selection — select all text inside the inline
+                    transformedSelection = {
+                      anchor: { path: [0, inlineIdx, 0], offset: 0 },
+                      focus: { path: [0, inlineIdx, 0], offset: textLen },
+                    };
+                  }
                 }
               }
             }
@@ -776,6 +810,7 @@
     window.mockParent = {
       getFormData: () => mockFormData,
       getBlocksConfig: () => mockBlocksConfig,
+      getFrontendBlockKeys: () => Array.from(frontendBlockKeys),
       getBlock: (blockId) => mockFormData.blocks[blockId],
       buildBlockPathMap: () => buildBlockPathMap(mockFormData, mockBlocksConfig),
       setTransformDelay: (delay) => { window.mockTransformDelay = delay; },

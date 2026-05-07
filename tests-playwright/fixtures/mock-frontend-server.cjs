@@ -2,7 +2,7 @@
  * Mock Frontend Server for testing Volto Hydra admin UI.
  * Serves the test frontend static files with hydra.js bridge.
  *
- * Run directly: node mock-frontend-server.js
+ * Run directly: node mock-frontend-server.cjs
  * Or started automatically by Playwright global setup
  */
 

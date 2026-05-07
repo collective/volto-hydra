@@ -168,7 +168,7 @@ test.describe('Multi-element blocks', () => {
 
     // Select the listing block
     await helper.clickBlockInIframe(listingBlockId);
-    await helper.waitForBlockSelected(listingBlockId);
+    await helper.waitForIframeBlockHandle(listingBlockId);
 
     // Get initial selection rect from the block outline
     const selectionOutline = page.locator('.volto-hydra-block-outline');
@@ -230,7 +230,7 @@ test.describe('Multi-element blocks', () => {
     await expect(toolbar).toBeVisible({ timeout: 5000 });
 
     // KEY ASSERTION: The listing block should be selected, not the grid
-    await helper.waitForBlockSelected('listing-in-grid');
+    await helper.waitForIframeBlockHandle('listing-in-grid');
 
     // Verify sidebar shows listing block selected (breadcrumb shows "« Listing")
     await helper.waitForSidebarOpen();
@@ -263,7 +263,7 @@ test.describe('Multi-element blocks', () => {
 
     // Click immediately — listing's Edit + QueryWidget mount in sidebar
     await listingItems.first().click();
-    await helper.waitForBlockSelected('listing-in-grid');
+    await helper.waitForIframeBlockHandle('listing-in-grid');
 
     // QueryWidget's .query-widget should render once indexes arrive
     const sidebar = page.locator('#sidebar');
@@ -315,8 +315,8 @@ test.describe('Multi-element blocks', () => {
 
     // --- Step 1: Select listing from sidebar (scrolls down to it) ---
     await listingItem.click();
-    await helper.waitForBlockSelected(listingBlockId);
-    await helper.waitForQuantaToolbar(listingBlockId);
+    await helper.waitForIframeBlockHandle(listingBlockId);
+    await helper.waitForBlockSelectedInAdmin(listingBlockId);
 
     const firstAfterDown = await getIframeRect(listingElements.first());
     console.log('After scroll down: first Y:', firstAfterDown.y, 'viewport:', iframeViewportHeight);
@@ -332,8 +332,8 @@ test.describe('Multi-element blocks', () => {
     };
     await goToPageLevel();
     await block1Item.click();
-    await helper.waitForBlockSelected('block-1-uuid');
-    await helper.waitForQuantaToolbar('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
+    await helper.waitForBlockSelectedInAdmin('block-1-uuid');
 
     // Listing should now be off-screen again
     const firstAfterUp = await getIframeRect(listingElements.first());
@@ -343,8 +343,8 @@ test.describe('Multi-element blocks', () => {
     // --- Step 3: Back to page level, select listing again (scrolls down) ---
     await goToPageLevel();
     await listingItem.click();
-    await helper.waitForBlockSelected(listingBlockId);
-    await helper.waitForQuantaToolbar(listingBlockId);
+    await helper.waitForIframeBlockHandle(listingBlockId);
+    await helper.waitForBlockSelectedInAdmin(listingBlockId);
 
     const firstAfterDown2 = await getIframeRect(listingElements.first());
     console.log('After second scroll down: first Y:', firstAfterDown2.y);
@@ -564,7 +564,7 @@ test.describe('Multi-element blocks', () => {
 
     // Select a top-level block to drag (avoid nested blocks which have sidebar nav issues)
     await helper.clickBlockInIframe('block-7-filled-teaser');
-    await helper.waitForBlockSelected('block-7-filled-teaser');
+    await helper.waitForIframeBlockHandle('block-7-filled-teaser');
 
     // Get the drag handle and target (second listing element - middle of multi-element block)
     const dragHandle = await helper.getDragHandle();

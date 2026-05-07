@@ -8,6 +8,7 @@ function SearchBlock({ block, blockId }) {
 
   return (
     <div data-block-uid={blockId} className="search-block">
+      {block.headline && <h2 data-edit-text="headline">{block.headline}</h2>}
       <input
         type="search"
         placeholder="Search..."
@@ -17,7 +18,7 @@ function SearchBlock({ block, blockId }) {
 
       {facets.length > 0 && (
         <div className="facets">
-          <h4>{block.facetsTitle || 'Filter'}</h4>
+          <h4 data-edit-text="facetsTitle">{block.facetsTitle || 'Filter'}</h4>
           {facets.map(facet => (
             <FacetRenderer key={facet['@id']} facet={facet} />
           ))}

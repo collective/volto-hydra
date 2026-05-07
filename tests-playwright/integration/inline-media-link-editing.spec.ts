@@ -152,7 +152,7 @@ test.describe('Inline image editing', () => {
 
     // Select the hero block and wait for block UI to settle
     await helper.clickBlockInIframe('block-4-hero');
-    await helper.waitForQuantaToolbar('block-4-hero');
+    await helper.waitForBlockSelectedInAdmin('block-4-hero');
 
     // Wait for the image clear button overlay to appear and click it
     const clearButton = page.locator('#clear-media-image');
@@ -249,7 +249,7 @@ test.describe('Inline link editing', () => {
     await heroButton.click();
 
     // Wait for toolbar to appear
-    await helper.waitForQuantaToolbar('block-4-hero');
+    await helper.waitForBlockSelectedInAdmin('block-4-hero');
 
     // Wait for link button in toolbar
     const toolbar = page.locator('.quanta-toolbar');
@@ -848,7 +848,7 @@ test.describe('Sidebar image upload and drag-drop', () => {
     await heroBlock.scrollIntoViewIfNeeded();
     await heroBlock.click();
     await helper.waitForSidebarOpen();
-    await helper.waitForQuantaToolbar('block-4-hero');
+    await helper.waitForBlockSelectedInAdmin('block-4-hero');
 
     // Get iframe image
     const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
@@ -862,7 +862,7 @@ test.describe('Sidebar image upload and drag-drop', () => {
     await sidebarClearButton.click();
 
     // Wait for block to resize after image cleared
-    await helper.waitForQuantaToolbar('block-4-hero');
+    await helper.waitForBlockSelectedInAdmin('block-4-hero');
 
     // Wait for URL input to be visible, then click to focus
     const urlInput = sidebar.locator('input[name="link"]');
@@ -1053,7 +1053,7 @@ test.describe('Slider image positioning', () => {
 
     // Click on an existing block to enable add button
     await helper.clickBlockInIframe('block-1-uuid');
-    await helper.waitForQuantaToolbar('block-1-uuid');
+    await helper.waitForBlockSelectedInAdmin('block-1-uuid');
 
     // Add a new image block
     await helper.clickAddBlockButton();

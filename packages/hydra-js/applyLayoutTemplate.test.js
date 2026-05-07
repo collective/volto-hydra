@@ -1,4 +1,4 @@
-import { expandTemplates, expandTemplatesSync } from './hydra.js';
+import { expandTemplates, expandTemplatesSync } from './hydra.src.js';
 import { mergeTemplatesIntoPage } from './mergeTemplates.js';
 
 // Wrapper to match old applyLayoutTemplate signature for existing tests

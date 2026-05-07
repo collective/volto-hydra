@@ -278,5 +278,8 @@
       "tpl-rendering-desc",
       "tpl-rendering"
     ]
-  }
+  },
+  "effective": "2025-01-01T00:00:00",
+  "modified": "2025-01-01T00:00:00+00:00",
+  "created": "2025-01-01T00:00:00+00:00"
 }

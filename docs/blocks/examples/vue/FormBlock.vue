@@ -43,7 +43,7 @@
       </template>
     </div>
 
-    <button type="submit">{{ block.submit_label || 'Submit' }}</button>
+    <button type="submit" data-edit-text="submit_label">{{ block.submit_label || 'Submit' }}</button>
   </form>
 </template>
 

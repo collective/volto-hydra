@@ -3,6 +3,13 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { initBridge } from "#utils/hydra";
 import BlocksList from "@/components/BlocksList";
+// Bundle the doc-blocks schema bundle so addNodeIdsToAllSlateFields can
+// see e.g. highlight.description as a slate widget — without this the
+// bridge skips assigning data-node-id to slate field nodes.
+import docPageDefinitions from "../../../../../docs/blocks/block-definitions.json";
+const docBlocksConfig = Object.fromEntries(
+  Object.values(docPageDefinitions).flatMap((page) => Object.entries(page.blocks)),
+);
 
 export default function PageClient({ initialData, apiUrl }) {
   const [data, setData] = useState(initialData);
@@ -17,6 +24,7 @@ export default function PageClient({ initialData, apiUrl }) {
           },
         },
       },
+      blocks: { ...docBlocksConfig },
       onEditChange: (updatedData) => {
         if (updatedData) {
           setData(updatedData);

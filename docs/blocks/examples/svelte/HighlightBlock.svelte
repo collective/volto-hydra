@@ -23,7 +23,7 @@
 >
   <div class="highlight-overlay" style="background:rgba(0,0,0,0.4);padding:30px;border-radius:8px">
     <h2 data-edit-text="title">{block.title}</h2>
-    <div class="highlight-body">
+    <div class="highlight-body" data-edit-text="description">
       {#each block.description || [] as node, i (i)}
         <SlateNode {node} />
       {/each}
