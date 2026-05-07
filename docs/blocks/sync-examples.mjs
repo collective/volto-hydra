@@ -576,6 +576,14 @@ function parseConceptsMd(mdContent) {
       continue;
     }
 
+    // Horizontal rule (---, ***, ___) → separator block
+    if (/^(\s*[-*_]\s*){3,}$/.test(line.trim()) && line.trim().length >= 3) {
+      const id = nextId('sep');
+      addBlock(id, { '@type': 'separator' });
+      i++;
+      continue;
+    }
+
     // H2/H3/H4 heading → slate h2/h3/h4 block
     const headingMatch = line.match(/^(#{2,4})\s+(.+)$/);
     if (headingMatch) {

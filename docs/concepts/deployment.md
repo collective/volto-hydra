@@ -2,6 +2,8 @@
 
 Hydra separates your production frontend from the editing experience. Here's how to deploy for different scenarios.
 
+---
+
 ## SPA/Hybrid — Full Visual Editing
 
 The simplest setup — your frontend handles both production and editing:

@@ -1,5 +1,7 @@
 # Visual Editing
 
+## HTML Annotations for Visual Editing
+
 Add data attributes to your rendered HTML to enable progressively richer visual editing:
 
 - **`data-block-uid="blockId"`** — Click-to-select blocks. Hydra.js adds click handlers and shows a blue outline and Quanta toolbar on selected blocks.

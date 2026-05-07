@@ -21,7 +21,10 @@
         }
       ]
     },
-    "h-2": {
+    "sep-2": {
+      "@type": "separator"
+    },
+    "h-3": {
       "@type": "slate",
       "plaintext": "SPA/Hybrid — Full Visual Editing",
       "value": [
@@ -35,7 +38,7 @@
         }
       ]
     },
-    "p-3": {
+    "p-4": {
       "@type": "slate",
       "plaintext": "The simplest setup — your frontend handles both production and editing:",
       "value": [
@@ -49,7 +52,7 @@
         }
       ]
     },
-    "ol-4": {
+    "ol-5": {
       "@type": "slate",
       "plaintext": "Deploy your frontend as SPA or Hybrid (SSR + client-side hydration) Deploy Hydra and the Plone API server Login to Hydra, go to user preferences, set your frontend URL",
       "value": [
@@ -84,7 +87,7 @@
         }
       ]
     },
-    "p-5": {
+    "p-6": {
       "@type": "slate",
       "plaintext": "This gives you all visual editing features including inline text editing, drag and drop, and realtime preview.",
       "value": [
@@ -98,7 +101,7 @@
         }
       ]
     },
-    "h-6": {
+    "h-7": {
       "@type": "slate",
       "plaintext": "SSG/SSR — Production Speed + Visual Editing",
       "value": [
@@ -112,7 +115,7 @@
         }
       ]
     },
-    "p-7": {
+    "p-8": {
       "@type": "slate",
       "plaintext": "Get the speed of static generation while keeping visual editing. Deploy two versions of the same frontend:",
       "value": [
@@ -126,7 +129,7 @@
         }
       ]
     },
-    "ol-8": {
+    "ol-9": {
       "@type": "slate",
       "plaintext": "Production — Deploy your frontend in SSG or SSR mode (fast, cacheable) Editing — Deploy the same frontend in SPA mode to a separate URL (used only in Hydra) Hydra + Plone — Only needs to run during editing, so scale-to-zero / serverless works SSG rebuild — For SSG, configure collective.webhook to trigger a rebuild on edit. SSR doesn't need this.",
       "value": [
@@ -199,7 +202,7 @@
         }
       ]
     },
-    "h-9": {
+    "h-10": {
       "@type": "slate",
       "plaintext": "Example: The Nuxt.js Demo",
       "value": [
@@ -213,7 +216,7 @@
         }
       ]
     },
-    "p-10": {
+    "p-11": {
       "@type": "slate",
       "plaintext": "The default Hydra demo uses exactly this pattern:",
       "value": [
@@ -227,7 +230,7 @@
         }
       ]
     },
-    "ul-11": {
+    "ul-12": {
       "@type": "slate",
       "plaintext": "Production — SSG on Netlify. All pages statically generated, images optimized, fast globally. Editing — Same Nuxt codebase deployed as SPA to a different Netlify URL. Only loaded inside Hydra's iframe. Hydra + Plone — Deployed to fly.io with scale-to-zero. Cost is free or minimal since it only runs during editing.",
       "value": [
@@ -302,7 +305,7 @@
         }
       ]
     },
-    "p-12": {
+    "p-13": {
       "@type": "slate",
       "plaintext": "For most frameworks switching between SSG/SSR and SPA is just a config toggle, so you get the best of both worlds with minimal effort.",
       "value": [
@@ -316,7 +319,7 @@
         }
       ]
     },
-    "h-13": {
+    "h-14": {
       "@type": "slate",
       "plaintext": "Without Hydra (Two-Window Editing)",
       "value": [
@@ -330,7 +333,7 @@
         }
       ]
     },
-    "p-14": {
+    "p-15": {
       "@type": "slate",
       "plaintext": "You can use Plone headless without Hydra — use Volto for editing and your custom frontend for viewing. But Volto's default theme won't match your frontend, so editors have to switch tabs to see the real result. For WYSIWYG editing, you'd need to recreate your design in Volto (duplicating work), or just use Hydra.",
       "value": [
@@ -349,19 +352,20 @@
     "items": [
       "title-1",
       "p-1",
-      "h-2",
-      "p-3",
-      "ol-4",
-      "p-5",
-      "h-6",
-      "p-7",
-      "ol-8",
-      "h-9",
-      "p-10",
-      "ul-11",
-      "p-12",
-      "h-13",
-      "p-14"
+      "sep-2",
+      "h-3",
+      "p-4",
+      "ol-5",
+      "p-6",
+      "h-7",
+      "p-8",
+      "ol-9",
+      "h-10",
+      "p-11",
+      "ul-12",
+      "p-13",
+      "h-14",
+      "p-15"
     ]
   },
   "contributors": [],

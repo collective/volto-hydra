@@ -21,7 +21,10 @@
         }
       ]
     },
-    "h-2": {
+    "sep-2": {
+      "@type": "separator"
+    },
+    "h-3": {
       "@type": "slate",
       "plaintext": "Architecture Overview",
       "value": [
@@ -35,7 +38,7 @@
         }
       ]
     },
-    "p-3": {
+    "p-4": {
       "@type": "slate",
       "plaintext": "You could think of it as splitting Volto into two parts, Rendering and CMS UI/Admin UI while keeping the same UI and then making the Rendering part easily replaceable with other implementations.",
       "value": [
@@ -49,18 +52,18 @@
         }
       ]
     },
-    "ce-4": {
+    "ce-5": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-4-bash-e34a53",
+          "@id": "ce-5-bash-56c4ae",
           "label": "Architecture",
           "language": "bash",
           "code": "                  Browser            RestAPI             Server\n\n              ┌──────────────┐                       ┌─────────────┐\n Anon/Editing │    Volto     │◄─────────────────────►│    Plone    │\n              └──────────────┘                       └─────────────┘\n\n──────────────────────────────────────────────────────────────────────────\n\n          │   ┌──────────────┐                       ┌─────────────┐\n          │   │   Frontend   │◄──────────────────────┤    Plone    │\n          │   └──hydra.js────┘                       └─────────────┘\n          │          ▲                                  ▲\n Editing UI          │ iFrame Bridge                    │\n          │          ▼                                  │\n          │   ┌──────────────┐                          │\n          │   │    Hydra     │◄─────────────────────────┘\n          │   └──────────────┘\n\n              ┌──────────────┐                       ┌─────────────┐\n Anon         │   Frontend   │◄──────────────────────┤    Plone    │\n              └──────────────┘                       └─────────────┘"
         }
       ]
     },
-    "h-5": {
+    "h-6": {
       "@type": "slate",
       "plaintext": "The iframe ↔ admin bridge",
       "value": [
@@ -74,7 +77,7 @@
         }
       ]
     },
-    "p-6": {
+    "p-7": {
       "@type": "slate",
       "plaintext": "During editing the frontend is loaded inside an iframe owned by Hydra's admin UI. The two communicate via `postMessage` over the iframe boundary:",
       "value": [
@@ -95,7 +98,7 @@
         }
       ]
     },
-    "ul-7": {
+    "ul-8": {
       "@type": "slate",
       "plaintext": "Admin → frontend: form-data updates, selection changes, route changes. Frontend → admin: which block was clicked (selection), which slate node holds the cursor, where blocks live in the rendered DOM, slate transform requests so the admin can compute the new value.",
       "value": [
@@ -130,7 +133,7 @@
         }
       ]
     },
-    "p-8": {
+    "p-9": {
       "@type": "slate",
       "plaintext": "This split lets the frontend stay 100% headless when not in admin (just renders content), while the admin gets full visual editing without the frontend having to know any React, any block-form widgets, or any sidebar UI.",
       "value": [
@@ -144,7 +147,7 @@
         }
       ]
     },
-    "h-9": {
+    "h-10": {
       "@type": "slate",
       "plaintext": "The chrome pattern",
       "value": [
@@ -158,7 +161,7 @@
         }
       ]
     },
-    "p-10": {
+    "p-11": {
       "@type": "slate",
       "plaintext": "Selection outlines, the Quanta toolbar, drag handles, edge handles, the empty-block \"+\" — none of these are rendered by the frontend. They're rendered in the admin (React) layered above the iframe. The frontend only:",
       "value": [
@@ -172,7 +175,7 @@
         }
       ]
     },
-    "ol-11": {
+    "ol-12": {
       "@type": "slate",
       "plaintext": "Adds the data attributes that mark editable elements (data-block-uid, data-edit-text, data-edit-link, data-edit-media, data-node-id). Captures pointer events through invisible elements so the admin's chrome stays interactive. Reports element rects on demand so the chrome can position itself.",
       "value": [
@@ -242,7 +245,7 @@
         }
       ]
     },
-    "p-12": {
+    "p-13": {
       "@type": "slate",
       "plaintext": "The benefit: a frontend's CSS can never break the editing UI, because the editing UI doesn't live in the frontend. Switching frontends mid-edit (Nuxt → Next → Astro) works because the bridge protocol is the same — only the rendered DOM changes.",
       "value": [
@@ -256,7 +259,7 @@
         }
       ]
     },
-    "h-13": {
+    "h-14": {
       "@type": "slate",
       "plaintext": "Slate (rich text) transforms",
       "value": [
@@ -270,7 +273,7 @@
         }
       ]
     },
-    "p-14": {
+    "p-15": {
       "@type": "slate",
       "plaintext": "When the editor types in a slate field, the frontend doesn't compute the new slate value itself — the admin does, by running the slate transform against the previous slate value. The frontend's job is to:",
       "value": [
@@ -284,7 +287,7 @@
         }
       ]
     },
-    "ol-15": {
+    "ol-16": {
       "@type": "slate",
       "plaintext": "Receive the new slate value via SLATE_TRANSFORM_RESULT and re-render. Send slate node data-node-id attributes back so the admin can place the cursor at the right node after re-render.",
       "value": [
@@ -325,7 +328,7 @@
         }
       ]
     },
-    "p-16": {
+    "p-17": {
       "@type": "slate",
       "plaintext": "This is why every slate node needs a `data-node-id` attribute on its rendered HTML — without one, the admin can't track the cursor across re-renders. See [Visual Editing › Renderer Node-ID Rules](visual-editing.md#renderer-node-id-rules).",
       "value": [
@@ -360,7 +363,7 @@
         }
       ]
     },
-    "h-17": {
+    "h-18": {
       "@type": "slate",
       "plaintext": "Building a frontend",
       "value": [
@@ -374,7 +377,7 @@
         }
       ]
     },
-    "p-18": {
+    "p-19": {
       "@type": "slate",
       "plaintext": "The steps for creating a Hydra-compatible frontend are the same across frameworks: catch-all route → fetch page from Plone REST API → render blocks recursively → add `data-block-uid` and `data-edit-*` attributes on editable elements → load `hydra.js` only inside the admin iframe.",
       "value": [
@@ -409,7 +412,7 @@
         }
       ]
     },
-    "p-19": {
+    "p-20": {
       "@type": "slate",
       "plaintext": "See [Building a Frontend for Headless Plone](../frontend-guide/index.md) for the full step-by-step guide, or the example frontends: [Nuxt.js](https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter), [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs), [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7).",
       "value": [
@@ -484,24 +487,25 @@
     "items": [
       "title-1",
       "p-1",
-      "h-2",
-      "p-3",
-      "ce-4",
-      "h-5",
-      "p-6",
-      "ul-7",
-      "p-8",
-      "h-9",
-      "p-10",
-      "ol-11",
-      "p-12",
-      "h-13",
-      "p-14",
-      "ol-15",
-      "p-16",
-      "h-17",
-      "p-18",
-      "p-19"
+      "sep-2",
+      "h-3",
+      "p-4",
+      "ce-5",
+      "h-6",
+      "p-7",
+      "ul-8",
+      "p-9",
+      "h-10",
+      "p-11",
+      "ol-12",
+      "p-13",
+      "h-14",
+      "p-15",
+      "ol-16",
+      "p-17",
+      "h-18",
+      "p-19",
+      "p-20"
     ]
   },
   "contributors": [],

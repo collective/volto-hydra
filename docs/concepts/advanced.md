@@ -2,6 +2,8 @@
 
 Advanced topics for optimising your Hydra integration: lazy loading the bridge, authentication, and preventing reloads.
 
+---
+
 ## Lazy Load the Bridge
 
 Detect the admin iframe and load the bridge only when needed. `window.name` is set by Hydra to indicate mode:

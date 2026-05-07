@@ -2,6 +2,8 @@
 
 To make your site editable with Hydra you load hydra.js in your frontend and call `initBridge()`. This sets up a two-way communication channel that handles authentication, page navigation, and live content updates.
 
+---
+
 ## Setting Up the Bridge
 
 Call `initBridge()` with an `onEditChange` callback to receive live content updates as the user edits. Your frontend re-renders in real time. Outside edit mode, fetch content from the API as normal.

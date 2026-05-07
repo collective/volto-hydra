@@ -2,6 +2,8 @@
 
 Container blocks hold other blocks inside them — sliders with slides, grids with columns, accordions with panels. Define them in your `blockSchema` using `blocks_layout` or `object_list` widgets.
 
+---
+
 ## blocks_layout: Typed Child Blocks
 
 Each child has its own `@type` and schema (from `blocks`). Children are stored in a shared `blocks` dict on the parent, with the field holding `{ items: [...] }` for ordering:

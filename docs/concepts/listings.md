@@ -17,6 +17,8 @@ const { items, paging } = await expandListingBlocks(layout, {
 // paging = { totalPages, totalItems, currentPage, prev, next, pages, seen }
 ```
 
+---
+
 ## Example: Mixing Listings, Blocks and Paging
 
 A grid can have a mix of listing and static blocks sharing a single paging. The `staticBlocks` helper wraps non-listing blocks so they participate in the shared page window. The listings use Suspense so they load client-side:
