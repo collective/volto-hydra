@@ -6,6 +6,7 @@ Learn about the key concepts behind Hydra's visual headless CMS architecture. Ea
 :maxdepth: 1
 
 architecture
+incremental-adoption
 live-preview
 custom-blocks
 container-blocks

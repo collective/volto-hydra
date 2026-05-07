@@ -481,6 +481,34 @@
           ]
         }
       ]
+    },
+    "p-21": {
+      "@type": "slate",
+      "plaintext": "You don't have to do all of this at once — see [Incremental adoption](incremental-adoption.md) for a layer-by-layer map of what each piece of integration unlocks for editors.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "You don't have to do all of this at once — see "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "incremental-adoption.md"
+              },
+              "children": [
+                {
+                  "text": "Incremental adoption"
+                }
+              ]
+            },
+            {
+              "text": " for a layer-by-layer map of what each piece of integration unlocks for editors."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
@@ -505,7 +533,8 @@
       "p-17",
       "h-18",
       "p-19",
-      "p-20"
+      "p-20",
+      "p-21"
     ]
   },
   "contributors": [],

@@ -188,3 +188,9 @@ Login to <https://hydra.pretagov.com/> and in personal preferences add your fron
 - [Nuxt.js](https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter)
 - [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs)
 - [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7)
+
+## Where to next
+
+- **Just want to use the editor?** See the [Editor Guide](../editor-guide/index.md).
+- **Building a frontend?** See [Building a Frontend for Headless Plone](../frontend-guide/index.md).
+- **Wondering how much integration to do?** See [Incremental adoption](../concepts/incremental-adoption.md) — what each layer of integration unlocks for editors, in order.

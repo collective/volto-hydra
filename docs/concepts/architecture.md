@@ -66,3 +66,5 @@ This is why every slate node needs a `data-node-id` attribute on its rendered HT
 The steps for creating a Hydra-compatible frontend are the same across frameworks: catch-all route → fetch page from Plone REST API → render blocks recursively → add `data-block-uid` and `data-edit-*` attributes on editable elements → load `hydra.js` only inside the admin iframe.
 
 See [Building a Frontend for Headless Plone](../frontend-guide/index.md) for the full step-by-step guide, or the example frontends: [Nuxt.js](https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter), [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs), [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7).
+
+You don't have to do all of this at once — see [Incremental adoption](incremental-adoption.md) for a layer-by-layer map of what each piece of integration unlocks for editors.
