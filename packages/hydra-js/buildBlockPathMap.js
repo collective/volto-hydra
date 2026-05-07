@@ -100,7 +100,6 @@ export function getBlockSchema(blockType, intl, blocksConfig, formData, pageForm
 
   const schemaSource = blockConfig.blockSchema || blockConfig.schema;
   let schema = null;
-
   const effectiveFormData = formData || {};
 
   if (schemaSource) {
@@ -417,7 +416,31 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
 
       const blockPath = [...parentPath, 'blocks', blockId];
       const blockType = block['@type'];
-      const blockSchema = getBlockSchema(blockType, intl, blocksConfig, block, formData);
+      // Pass 1 uses the cached, GENERIC type schema (formData={}, enhancer
+      // run with no instance context). One resolve per blockType — reused
+      // across every instance — so a page with 150 slate blocks does the
+      // slate schema work once rather than 150 times.
+      //
+      // Assumption: container-field metadata (widget: 'blocks_layout' /
+      // 'object_list', their allowedBlocks / maxLength / idField / typeField
+      // / dataPath / addMode) is STATIC per blockType — independent of the
+      // instance's formData and of enhancer runs. Pass 1 only reads container
+      // metadata; if an enhancer or a blockSchema factory varied container
+      // fields based on instance data, pass 1 would miss it. Volto's blocks
+      // honor this convention.
+      //
+      // Future optimization opportunities (left as TODOs since current cost
+      // is acceptable):
+      //   - Tag pathmap-aware enhancers (inheritSchemaFrom,
+      //     hideParentOwnedFields, fieldRules-with-../) and have pass 2 skip
+      //     untagged ones. Saves the per-block enhancer re-run for blocks
+      //     whose enhancer doesn't actually depend on blockId/blockPathMap
+      //     (e.g. slate's value-field enhancer).
+      //   - Sync `_hideFields` from parent → child during data sync so
+      //     hideParentOwnedFields becomes a pure formData enhancer with no
+      //     pathmap dependency. Combined with the tag above, would drop
+      //     pass 2 to a near-no-op.
+      const blockSchema = getBlockTypeSchema(blockType, intl, blocksConfig);
 
       // Check Volto's standard block properties
       const isFixed = block.fixed === true;        // Volto standard: position locked
@@ -581,9 +604,12 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         ? null // Schema comes from blocksConfig via getBlockSchema(itemBlockType)
         : itemSchema;
 
-      // Get block schema for typed items (for emptyRequiredFields check)
+      // Get block schema for typed items (for emptyRequiredFields check).
+      // Same as the blocks_layout path: cached generic schema for pass 1
+      // traversal; pass 2 below re-runs the enhancer with full args
+      // (blockId/blockPathMap/instance formData) for the canonical schema.
       const blockSchema = hasAllowedBlocks
-        ? getBlockSchema(itemBlockType, intl, blocksConfig, item, formData)
+        ? getBlockTypeSchema(itemBlockType, intl, blocksConfig)
         : itemSchema;
 
       // Compute available actions based on table mode
@@ -660,10 +686,12 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
   };
 
   // PASS 1: structural traversal
-  // Builds pathMap entries with parentId, path, blockType, allowedSiblingTypes,
-  // canInsertBefore/After, etc. _schemaRef is also set during pass 1 but with
-  // schemas computed without blockId/blockPathMap (since pathMap isn't fully
-  // built yet) — pass 2 will overwrite with fully-enhanced schemas.
+  // Walks the tree using the cached, GENERIC type schema (`getBlockTypeSchema`,
+  // formData={}) for every block. That's enough to find container fields and
+  // seed pathMap entries (parentId, path, blockType, allowedSiblingTypes,
+  // canInsertBefore/After, _schemaRef, emptyRequiredFields). Pass 2 below
+  // overwrites _schemaRef and emptyRequiredFields with instance-aware
+  // schemas for blocks that have a schemaEnhancer.
   processItem(formData, PAGE_BLOCK_UID, [], pageSchema);
 
   // PASS 2: re-enhance schemas with full blockId + blockPathMap context
