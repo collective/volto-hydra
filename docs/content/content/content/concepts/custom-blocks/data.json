@@ -207,7 +207,7 @@
     },
     "p-8": {
       "@type": "slate",
-      "plaintext": "**`fieldRules`**: Add, remove, or conditionally modify field definitions.",
+      "plaintext": "**`fieldRules`** — add, remove, or conditionally modify field definitions. The value for each rule key can be:",
       "value": [
         {
           "type": "p",
@@ -217,7 +217,7 @@
               "strong": true
             },
             {
-              "text": ": Add, remove, or conditionally modify field definitions."
+              "text": " — add, remove, or conditionally modify field definitions. The value for each rule key can be:"
             }
           ]
         }
@@ -225,7 +225,7 @@
     },
     "ul-9": {
       "@type": "slate",
-      "plaintext": "Condition operators: is, isNot, isSet, isNotSet, gt, gte, lt, lte Field paths: ../field for parent block, /field for root",
+      "plaintext": "false — always hide the field { set: { title: '...', widget: '...' } } — always add or replace the field definition { when: { fieldName: value }, else: false } — show only when condition met { when: { fieldName: { gte: 2 } }, set: { ... } } — conditional definition override [rule, rule, ...] — switch: first matching rule wins. A bare false in the array is a catch-all hide: [{ when: A }, { when: B }, false] shows on A or B, hides otherwise. 'parent.child': false — hide a field inside a widget's inner schema",
       "value": [
         {
           "type": "ul",
@@ -234,60 +234,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Condition operators: "
-                },
-                {
-                  "text": "is",
+                  "text": "false",
                   "code": true
                 },
                 {
-                  "text": ", "
-                },
-                {
-                  "text": "isNot",
-                  "code": true
-                },
-                {
-                  "text": ", "
-                },
-                {
-                  "text": "isSet",
-                  "code": true
-                },
-                {
-                  "text": ", "
-                },
-                {
-                  "text": "isNotSet",
-                  "code": true
-                },
-                {
-                  "text": ", "
-                },
-                {
-                  "text": "gt",
-                  "code": true
-                },
-                {
-                  "text": ", "
-                },
-                {
-                  "text": "gte",
-                  "code": true
-                },
-                {
-                  "text": ", "
-                },
-                {
-                  "text": "lt",
-                  "code": true
-                },
-                {
-                  "text": ", "
-                },
-                {
-                  "text": "lte",
-                  "code": true
+                  "text": " — always hide the field"
                 }
               ]
             },
@@ -295,21 +246,73 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Field paths: "
-                },
-                {
-                  "text": "../field",
+                  "text": "{ set: { title: '...', widget: '...' } }",
                   "code": true
                 },
                 {
-                  "text": " for parent block, "
-                },
+                  "text": " — always add or replace the field definition"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
                 {
-                  "text": "/field",
+                  "text": "{ when: { fieldName: value }, else: false }",
                   "code": true
                 },
                 {
-                  "text": " for root"
+                  "text": " — show only when condition met"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "{ when: { fieldName: { gte: 2 } }, set: { ... } }",
+                  "code": true
+                },
+                {
+                  "text": " — conditional definition override"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "[rule, rule, ...]",
+                  "code": true
+                },
+                {
+                  "text": " — switch: first matching rule wins. A bare "
+                },
+                {
+                  "text": "false",
+                  "code": true
+                },
+                {
+                  "text": " in the array is a catch-all hide: "
+                },
+                {
+                  "text": "[{ when: A }, { when: B }, false]",
+                  "code": true
+                },
+                {
+                  "text": " shows on A or B, hides otherwise."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "'parent.child': false",
+                  "code": true
+                },
+                {
+                  "text": " — hide a field inside a widget's inner schema"
                 }
               ]
             }
@@ -317,7 +320,105 @@
         }
       ]
     },
-    "h-10": {
+    "p-10": {
+      "@type": "slate",
+      "plaintext": "Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Condition operators: "
+            },
+            {
+              "text": "is",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "isNot",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "isSet",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "isNotSet",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "gt",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "gte",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "lt",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "lte",
+              "code": true
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    "p-11": {
+      "@type": "slate",
+      "plaintext": "Field paths: `../field` for the parent block's field, `/field` for a page metadata field.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Field paths: "
+            },
+            {
+              "text": "../field",
+              "code": true
+            },
+            {
+              "text": " for the parent block's field, "
+            },
+            {
+              "text": "/field",
+              "code": true
+            },
+            {
+              "text": " for a page metadata field."
+            }
+          ]
+        }
+      ]
+    },
+    "h-12": {
       "@type": "slate",
       "plaintext": "Block Conversion & fieldMappings",
       "value": [
@@ -331,7 +432,7 @@
         }
       ]
     },
-    "p-11": {
+    "p-13": {
       "@type": "slate",
       "plaintext": "`fieldMappings` (plural) on a block config defines how fields map between block types. This enables three things:",
       "value": [
@@ -349,7 +450,7 @@
         }
       ]
     },
-    "ul-12": {
+    "ul-14": {
       "@type": "slate",
       "plaintext": "\"Convert to...\" UI action — editors can convert a block to another type (e.g. teaser → image). Listing item types — query results are mapped to item blocks via @default (see Listings). Synchronised container children — a parent controls child type, all children convert together (see Container Blocks › Synchronised Block Types).",
       "value": [
@@ -431,7 +532,7 @@
         }
       ]
     },
-    "p-13": {
+    "p-15": {
       "@type": "slate",
       "plaintext": "Each key in `fieldMappings` is either a **specific block type name** or **`@default`**.",
       "value": [
@@ -466,7 +567,7 @@
         }
       ]
     },
-    "h-14": {
+    "h-16": {
       "@type": "slate",
       "plaintext": "@default — the canonical content shape",
       "value": [
@@ -484,7 +585,7 @@
         }
       ]
     },
-    "p-15": {
+    "p-17": {
       "@type": "slate",
       "plaintext": "`@default` is a virtual type representing canonical Plone content item fields: `@id`, `title`, `description`, `image`. These are the same fields that listing query results provide. A block with `fieldMappings['@default']` is saying \"I can be populated from standard content item fields.\" The keys in `@default` must only use these four canonical fields — using other keys (e.g. `label`, `field`, `required`) is invalid and produces a console warning.",
       "value": [
@@ -565,7 +666,7 @@
         }
       ]
     },
-    "h-16": {
+    "h-18": {
       "@type": "slate",
       "plaintext": "Explicit type-to-type mappings",
       "value": [
@@ -579,7 +680,7 @@
         }
       ]
     },
-    "p-17": {
+    "p-19": {
       "@type": "slate",
       "plaintext": "Use these when blocks share fields that aren't part of the `@default` set — for example, facet types sharing `{ title, field, hidden }` or form field types sharing `{ label, description, required }`.",
       "value": [
@@ -614,18 +715,18 @@
         }
       ]
     },
-    "ce-18": {
+    "ce-20": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-18-javascript-9b9a53",
+          "@id": "ce-20-javascript-ec555b",
           "label": "Javascript",
           "language": "javascript",
           "code": "// Content item types: use @default (canonical fields) + explicit cross-mappings\nteaser: {\n    fieldMappings: {\n        '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },\n        image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },\n    },\n},\nimage: {\n    fieldMappings: {\n        '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },\n        teaser: { 'href': 'href', 'title': 'alt', 'preview_image': 'url' },\n    },\n},\n\n// Non-content types: use explicit hub-type mappings (NOT @default).\n// All facet types map through checkboxFacet as a hub:\nselectFacet:  { fieldMappings: { checkboxFacet: { title: 'title', field: 'field', hidden: 'hidden' } } },\ncheckboxFacet: { fieldMappings: { selectFacet: { /* ... */ }, daterangeFacet: { /* ... */ } } },"
         }
       ]
     },
-    "h-19": {
+    "h-21": {
       "@type": "slate",
       "plaintext": "Conversion graph rules",
       "value": [
@@ -639,7 +740,7 @@
         }
       ]
     },
-    "ul-20": {
+    "ul-22": {
       "@type": "slate",
       "plaintext": "Explicit fieldMappings[typeName] always creates a conversion edge. @default only creates edges between types that both have valid @default mappings (keys from { @id, title, description, image }). Types with non-canonical @default keys are ignored. Types without fieldMappings never appear in the \"Convert to...\" menu. Transitive conversions use paths through intermediate types (e.g. hero → teaser → image). Unmapped fields are kept in the data so converting back restores them.",
       "value": [
@@ -729,7 +830,7 @@
         }
       ]
     },
-    "h-21": {
+    "h-23": {
       "@type": "slate",
       "plaintext": "Mapping value format",
       "value": [
@@ -743,7 +844,7 @@
         }
       ]
     },
-    "p-22": {
+    "p-24": {
       "@type": "slate",
       "plaintext": "A mapping value is either a string (simple field rename) or `{ field, type }` (rename with type conversion):",
       "value": [
@@ -764,18 +865,18 @@
         }
       ]
     },
-    "ce-23": {
+    "ce-25": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-23-json-431cb2",
+          "@id": "ce-25-json-91dabe",
           "label": "Json",
           "language": "json",
           "code": "{\n    \"@id\": { \"field\": \"href\", \"type\": \"link\" },\n    \"title\": \"title\",\n    \"description\": \"description\",\n    \"image\": \"preview_image\"\n}"
         }
       ]
     },
-    "p-24": {
+    "p-26": {
       "@type": "slate",
       "plaintext": "When `type` is specified, the value is converted at runtime:",
       "value": [
@@ -796,7 +897,7 @@
         }
       ]
     },
-    "tbl-25": {
+    "tbl-27": {
       "@type": "slateTable",
       "table": {
         "fixed": true,
@@ -807,10 +908,10 @@
         "striped": false,
         "rows": [
           {
-            "key": "tbl-25-r0",
+            "key": "tbl-27-r0",
             "cells": [
               {
-                "key": "tbl-25-r0c0",
+                "key": "tbl-27-r0c0",
                 "type": "header",
                 "value": [
                   {
@@ -824,7 +925,7 @@
                 ]
               },
               {
-                "key": "tbl-25-r0c1",
+                "key": "tbl-27-r0c1",
                 "type": "header",
                 "value": [
                   {
@@ -840,10 +941,10 @@
             ]
           },
           {
-            "key": "tbl-25-r1",
+            "key": "tbl-27-r1",
             "cells": [
               {
-                "key": "tbl-25-r1c0",
+                "key": "tbl-27-r1c0",
                 "type": "data",
                 "value": [
                   {
@@ -858,7 +959,7 @@
                 ]
               },
               {
-                "key": "tbl-25-r1c1",
+                "key": "tbl-27-r1c1",
                 "type": "data",
                 "value": [
                   {
@@ -881,10 +982,10 @@
             ]
           },
           {
-            "key": "tbl-25-r2",
+            "key": "tbl-27-r2",
             "cells": [
               {
-                "key": "tbl-25-r2c0",
+                "key": "tbl-27-r2c0",
                 "type": "data",
                 "value": [
                   {
@@ -899,7 +1000,7 @@
                 ]
               },
               {
-                "key": "tbl-25-r2c1",
+                "key": "tbl-27-r2c1",
                 "type": "data",
                 "value": [
                   {
@@ -922,10 +1023,10 @@
             ]
           },
           {
-            "key": "tbl-25-r3",
+            "key": "tbl-27-r3",
             "cells": [
               {
-                "key": "tbl-25-r3c0",
+                "key": "tbl-27-r3c0",
                 "type": "data",
                 "value": [
                   {
@@ -940,7 +1041,7 @@
                 ]
               },
               {
-                "key": "tbl-25-r3c1",
+                "key": "tbl-27-r3c1",
                 "type": "data",
                 "value": [
                   {
@@ -963,10 +1064,10 @@
             ]
           },
           {
-            "key": "tbl-25-r4",
+            "key": "tbl-27-r4",
             "cells": [
               {
-                "key": "tbl-25-r4c0",
+                "key": "tbl-27-r4c0",
                 "type": "data",
                 "value": [
                   {
@@ -981,7 +1082,7 @@
                 ]
               },
               {
-                "key": "tbl-25-r4c1",
+                "key": "tbl-27-r4c1",
                 "type": "data",
                 "value": [
                   {
@@ -1001,10 +1102,10 @@
             ]
           },
           {
-            "key": "tbl-25-r5",
+            "key": "tbl-27-r5",
             "cells": [
               {
-                "key": "tbl-25-r5c0",
+                "key": "tbl-27-r5c0",
                 "type": "data",
                 "value": [
                   {
@@ -1019,7 +1120,7 @@
                 ]
               },
               {
-                "key": "tbl-25-r5c1",
+                "key": "tbl-27-r5c1",
                 "type": "data",
                 "value": [
                   {
@@ -1037,7 +1138,7 @@
         ]
       }
     },
-    "h-26": {
+    "h-28": {
       "@type": "slate",
       "plaintext": "FieldMappingWidget",
       "value": [
@@ -1051,7 +1152,7 @@
         }
       ]
     },
-    "p-27": {
+    "p-29": {
       "@type": "slate",
       "plaintext": "When a parent block has `mappingField` set in its `inheritSchemaFrom` recipe, the admin sidebar shows a widget that lets editors configure field mappings visually:",
       "value": [
@@ -1079,7 +1180,7 @@
         }
       ]
     },
-    "ul-28": {
+    "ul-30": {
       "@type": "slate",
       "plaintext": "Shows the @default source fields (@id, title, description, image) on the left. For each source field, lets the editor pick a field from the selected child type's schema. Auto-detects the conversion type from the target field definition (e.g. object_browser with mode=link → type: \"link\"). Saves the result as fieldMapping (singular) on the block data.",
       "value": [
@@ -1192,7 +1293,7 @@
         }
       ]
     },
-    "p-29": {
+    "p-31": {
       "@type": "slate",
       "plaintext": "The saved `fieldMapping` is read at render time by `expandListingBlocks` — no block registry access needed at render time.",
       "value": [
@@ -1220,7 +1321,7 @@
         }
       ]
     },
-    "h-30": {
+    "h-32": {
       "@type": "slate",
       "plaintext": "HTML Paste Support (TODO)",
       "value": [
@@ -1234,7 +1335,7 @@
         }
       ]
     },
-    "p-31": {
+    "p-33": {
       "@type": "slate",
       "plaintext": "When the editor pastes rich HTML into the page, Hydra will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:",
       "value": [
@@ -1248,18 +1349,18 @@
         }
       ]
     },
-    "ce-32": {
+    "ce-34": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-32-javascript-adae5e",
+          "@id": "ce-34-javascript-0e6bda",
           "label": "Javascript",
           "language": "javascript",
           "code": "video: {\n    fieldMappings: {\n        'css:video': { 'src': 'url', 'caption[@class=\"alt\"]': 'alt' },\n    },\n}"
         }
       ]
     },
-    "p-33": {
+    "p-35": {
       "@type": "slate",
       "plaintext": "The `css:<selector>` key in `fieldMappings` matches a pasted HTML element; the value maps element attributes to block fields. Not yet implemented — open question on whether this should run via `htmlTagsToSlate` (bypassing slate conversion) or be encoded into slate so attributes/classes survive.",
       "value": [
@@ -1307,30 +1408,32 @@
       "ce-7",
       "p-8",
       "ul-9",
-      "h-10",
+      "p-10",
       "p-11",
-      "ul-12",
+      "h-12",
       "p-13",
-      "h-14",
+      "ul-14",
       "p-15",
       "h-16",
       "p-17",
-      "ce-18",
-      "h-19",
-      "ul-20",
+      "h-18",
+      "p-19",
+      "ce-20",
       "h-21",
-      "p-22",
-      "ce-23",
+      "ul-22",
+      "h-23",
       "p-24",
-      "tbl-25",
-      "h-26",
-      "p-27",
-      "ul-28",
+      "ce-25",
+      "p-26",
+      "tbl-27",
+      "h-28",
       "p-29",
-      "h-30",
+      "ul-30",
       "p-31",
-      "ce-32",
-      "p-33"
+      "h-32",
+      "p-33",
+      "ce-34",
+      "p-35"
     ]
   },
   "contributors": [],

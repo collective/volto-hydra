@@ -47,7 +47,7 @@ You can try out the editing experience now by logging into <https://hydra.pretag
 
 ```{note}
 The default is a Nuxt.js frontend, deployed as a [SSG](https://hydra-nuxt-flowbrite.netlify.app/)
-to demonstrate scale-to-zero editing (free hosting). See {doc}`../deployment/index` for details.
+to demonstrate scale-to-zero editing (free hosting). See [Deployment](../concepts/deployment.md) for details.
 ```
 
 ## Quick Start

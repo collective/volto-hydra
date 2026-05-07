@@ -7,7 +7,7 @@ Without this step, any edits in the sidebar won't result in the preview pane cha
 To enable realtime preview, first ensure the frontend used for editing is SPA or Hybrid (i.e., can re-render the whole page client-side).
 
 ```{tip}
-You can still use SSG or SSR for your production frontend by using a different build of your frontend with client-side rendering enabled. See {doc}`../deployment/index`.
+You can still use SSG or SSR for your production frontend by using a different build of your frontend with client-side rendering enabled. See [Deployment](../concepts/deployment.md).
 ```
 
 Register the `onEditChange` callback with the hydra.js bridge at initialisation. Your frontend can now disable loading content via the API in edit mode and instead rely on content sent over the bridge via the callback in exactly the same format as the [content API](https://6.docs.plone.org/volto/client/quick-start.html?highlight=data#query-or-mutation-options-factories).
@@ -30,5 +30,5 @@ In addition to the preview changing as you type in the sidebar:
 - **Remove a block** via the Quanta Toolbar dropdown
 - **Drag and drop** and cut, copy and paste on the preview
 - **Open or close** the block settings
-- Multiple block selection to move, delete, or copy in bulk (TODO)
-- And more (TODO)
+- Multiple block selection to move, delete, or copy in bulk ([TODO #104](https://github.com/collective/volto-hydra/issues/104))
+- And more ([TODO #4](https://github.com/collective/volto-hydra/issues/4))

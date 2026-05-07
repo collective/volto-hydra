@@ -10,7 +10,7 @@ During the initialisation you can have full control over the blocks that will be
     - Custom content types are created via "Site Setup > Content types"
 - `blocks`: Override settings of builtin blocks or add new block definitions
   - `blockSchema` > `properties`: field definitions for your block such as `title`, `type` or `widget`
-- `voltoConfig`: in the future will let you change other settings like slate formats or toolbar actions
+- `voltoConfig`: in the future will let you change other settings like slate formats ([TODO #109](https://github.com/collective/volto-hydra/issues/109)) or toolbar actions
 
 ## Example: Slider Block
 

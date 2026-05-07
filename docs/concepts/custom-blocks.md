@@ -91,10 +91,18 @@ const bridge = initBridge({
 });
 ```
 
-**`fieldRules`**: Add, remove, or conditionally modify field definitions.
+**`fieldRules`** — add, remove, or conditionally modify field definitions. The value for each rule key can be:
 
-- Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`
-- Field paths: `../field` for parent block, `/field` for root
+- `false` — always hide the field
+- `{ set: { title: '...', widget: '...' } }` — always add or replace the field definition
+- `{ when: { fieldName: value }, else: false }` — show only when condition met
+- `{ when: { fieldName: { gte: 2 } }, set: { ... } }` — conditional definition override
+- `[rule, rule, ...]` — switch: first matching rule wins. A bare `false` in the array is a catch-all hide: `[{ when: A }, { when: B }, false]` shows on A or B, hides otherwise.
+- `'parent.child': false` — hide a field inside a widget's inner schema
+
+Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`.
+
+Field paths: `../field` for the parent block's field, `/field` for a page metadata field.
 
 ## Block Conversion & fieldMappings
 

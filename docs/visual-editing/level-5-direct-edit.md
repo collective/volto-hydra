@@ -33,8 +33,9 @@ If the widget is `slate`, an editor can additionally:
 - Select text and apply character styles (currently **BOLD**, *ITALIC* & ~~STRIKETHROUGH~~)
 - Create or edit linked text
 - Apply paragraph formatting
-- Use markdown shortcuts like bullet and heading codes (TODO)
+- Use markdown shortcuts like bullet and heading codes ([TODO #105](https://github.com/collective/volto-hydra/issues/105))
 - Paste rich text from the clipboard (TODO)
+- And more ([TODO #5](https://github.com/collective/volto-hydra/issues/5))
 
 For rich text (slate), add `data-edit-text` to the HTML element that contains the rich text. Additionally, you will need to insert `data-node-id` on each formatting element in your rendered slate text. This lets hydra.js map your custom HTML to the internal data structure so formatting works as expected.
 
@@ -100,6 +101,8 @@ function renderSlate(nodes) {
   <!-- renderSlate(block.value) output goes here -->
 </div>
 ```
+
+Additionally your frontend can specify parts of the text that aren't editable by the user — useful for cases where the style includes text that needs to appear (TODO).
 
 ## Visual Media Uploading
 

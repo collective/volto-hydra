@@ -11,23 +11,26 @@ Templates:
 - Can be created from any blocks
 - Are always edited in-context in the current page (user can switch in and out of template edit mode)
 - Are saved alongside the page into normal content so editing template permissions can use content permissions
-- `allowedTemplates` and `allowedLayouts` in the blocks schema let the developer control which templates are available and how they are applied
+- `allowedTemplates` and `allowedLayouts` applied to the blocks schema let the developer control loading templates: which templates are available for use, which are automatically applied as layouts, and which the editor can switch between
+- During rendering, the frontend can use the provided helper (`expandTemplates` / `expandTemplatesSync`) to refresh templates found in the page content from the template content, and apply layouts based on rules (such as forcing a layout based on content type or metadata). Alternatively the frontend can write its own merge logic.
 
-Templates are analogous to blocks themselves but are made up of blocks with special properties:
+Templates are analogous to blocks themselves but are made up of blocks with special properties. Each block in a template can be one of:
 
-- **Fixed + ReadOnly**: Can't be edited or moved (e.g., branded headers/footers)
-- **Fixed**: Can be edited but not moved (e.g., required sections)
-- **Placeholder**: Named slots where editors can add their own blocks. The "default" placeholder receives leftover content.
+- **Fixed + ReadOnly** — can't be edited or moved (e.g. branded headers/footers). Similar to fixed hard-coded HTML in a block.
+- **Fixed** — can be edited but not moved (e.g. required sections). Similar to a block field.
+- **Slot** (`fixed: false` / unset) — a named region (`slotId`) where editors can add their own blocks. Similar to a block field. The `"default"` slot receives leftover content.
+
+The slot a block lives in is identified by its `slotId`. This is the field name used by `expandTemplates` / `expandTemplatesSync` and by the merge rules below — not `placeholder`.
 
 <!-- codeExample: json -->
 ```json
 {
   "blocks": {
     "header": { "@type": "slate", "fixed": true,
-               "readOnly": true, "placeholder": "header" },
-    "content": { "@type": "slate", "placeholder": "default" },
+               "readOnly": true, "slotId": "header" },
+    "content": { "@type": "slate", "slotId": "default" },
     "footer": { "@type": "slate", "fixed": true,
-               "readOnly": true, "placeholder": "footer" }
+               "readOnly": true, "slotId": "footer" }
   }
 }
 ```
@@ -111,16 +114,16 @@ Options:
 
 The merge algorithm follows these rules:
 
-1. Remove the blocks with the `templateId` to replace, storing any that aren't fixed and readOnly by placeholder name.
-2. Insert in their place the template content: if fixed and readOnly, just insert it; if fixed, copy block content (not including block fields) from a page block with the same placeholder name; if a placeholder, don't insert it, but insert the previous blocks with the same placeholder name.
+1. Remove the blocks with the `templateId` to replace, storing any that aren't fixed and readOnly by `slotId`.
+2. Insert in their place the template content: if fixed and readOnly, just insert it; if fixed, copy block content (not including block fields) from a page block with the same `slotId`; if a slot block, don't insert it, but insert the previous blocks with the same `slotId`.
 3. Recursively replace any block fields using the same rules.
-4. Any placeholder blocks left over are inserted at the end of a special placeholder called "default" if it exists, otherwise are dropped.
+4. Any slot blocks left over are inserted at the end of a special slot called `"default"` if it exists, otherwise are dropped.
 
-When a layout is applied, the rules are the same but applied across a whole blocks field. Content without a placeholder name ends up:
+When a layout is applied, the rules are the same but applied across a whole blocks field. Content without a `slotId` ends up:
 
-- In the "default" placeholder if it exists
-- In the bottom placeholder outside the last fixed template block
-- In the top placeholder outside the first fixed template block
+- In the `"default"` slot if it exists
+- In the bottom slot outside the last fixed template block
+- In the top slot outside the first fixed template block
 - Otherwise it is dropped
 
 <!-- codeExample: bash label="Diagram" -->

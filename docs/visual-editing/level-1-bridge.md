@@ -22,9 +22,9 @@ const bridge = initBridge({
 
 ## Detecting Hydra Mode
 
-To know you are being managed by Hydra, check if `window.name` starts with `hydra`. See {doc}`../advanced/index` for lazy loading patterns.
+To know you are being managed by Hydra, check if `window.name` starts with `hydra`. See [Advanced](../concepts/advanced.md) for lazy loading patterns.
 
-To see private content, you will need to change your authentication token (see {doc}`../advanced/index`).
+To see private content, you will need to change your authentication token (see [Advanced](../concepts/advanced.md)).
 
 ## Editor Capabilities at Level 1
 

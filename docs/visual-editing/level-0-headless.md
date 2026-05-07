@@ -37,6 +37,7 @@ At this point, an editor can:
   - Selecting, adding, editing and rearranging the block layout is all done via the sidebar
     - You will see more fields than normal Volto to make this possible
   - Only after you save will it reload the iframe and the changes will appear on your frontend
+  - (Later it should be possible to do live updates even with SSR via the REST API — TODO)
 - **Remove a page**
 - All other CMS features such as site setup, contents, workflow will work the same as Volto
-  - History won't show a visual diff
+  - History won't show a visual diff (TODO — explore if there is a way)
