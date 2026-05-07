@@ -9,20 +9,31 @@
     },
     "p-1": {
       "@type": "slate",
-      "plaintext": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. `expandListingBlocks(layout, options)` walks a layout, fetches results for each listing-type block, and returns `{ items, paging }` where `items` is an array of block objects with `@uid` and `@type`.",
+      "plaintext": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block, repeating each block once per result entry. This means a listing can be moved between containers and reuse normal blocks for what it repeats.",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. "
-            },
+              "text": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block, repeating each block once per result entry. This means a listing can be moved between containers and reuse normal blocks for what it repeats."
+            }
+          ]
+        }
+      ]
+    },
+    "p-2": {
+      "@type": "slate",
+      "plaintext": "`expandListingBlocks(layout, options)` is a helper in hydra.js that handles fetching, paging, and mapping results to block objects. It walks a layout, fetches results for each listing-type block, and returns `{ items, paging }` where `items` is an array of block objects with `@uid` and `@type`.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
             {
               "text": "expandListingBlocks(layout, options)",
               "code": true
             },
             {
-              "text": " walks a layout, fetches results for each listing-type block, and returns "
+              "text": " is a helper in hydra.js that handles fetching, paging, and mapping results to block objects. It walks a layout, fetches results for each listing-type block, and returns "
             },
             {
               "text": "{ items, paging }",
@@ -56,7 +67,7 @@
         }
       ]
     },
-    "p-2": {
+    "p-3": {
       "@type": "slate",
       "plaintext": "You tell it which block types need fetching via a `fetchItems` map — keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:",
       "value": [
@@ -77,21 +88,21 @@
         }
       ]
     },
-    "ce-3": {
+    "ce-4": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-3-javascript-e578a2",
+          "@id": "ce-4-javascript-17afd4",
           "label": "Javascript",
           "language": "javascript",
           "code": "const { items, paging } = await expandListingBlocks(layout, {\n  blocks,\n  paging: { start: 0, size: 6 },\n  fetchItems: {\n    listing: ploneFetchItems({ apiUrl, contextPath }),\n    rssFeed: myRSSFetcher,\n  },\n});\n// paging = { totalPages, totalItems, currentPage, prev, next, pages, seen }"
         }
       ]
     },
-    "sep-4": {
+    "sep-5": {
       "@type": "separator"
     },
-    "h-5": {
+    "h-6": {
       "@type": "slate",
       "plaintext": "Example: Mixing Listings, Blocks and Paging",
       "value": [
@@ -105,7 +116,7 @@
         }
       ]
     },
-    "p-6": {
+    "p-7": {
       "@type": "slate",
       "plaintext": "A grid can have a mix of listing and static blocks sharing a single paging. The `staticBlocks` helper wraps non-listing blocks so they participate in the shared page window. The listings use Suspense so they load client-side:",
       "value": [
@@ -126,18 +137,18 @@
         }
       ]
     },
-    "ce-7": {
+    "ce-8": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-7-jsx-849fe0",
+          "@id": "ce-8-jsx-37efcc",
           "label": "Jsx",
           "language": "jsx",
           "code": "import { Suspense, useState } from 'react';\nimport { staticBlocks, expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';\n\nfunction Grid({ blocks, blocks_layout, pageNum, apiUrl, contextPath }) {\n  const pagingInput = { start: pageNum * 6, size: 6 };\n  const fetchItems = { listing: ploneFetchItems({ apiUrl, contextPath }) };\n  const [gridPaging, setGridPaging] = useState({});\n\n  // Walk layout in order, chaining `seen` for position tracking\n  let seen = 0;\n  return (\n    <div className=\"grid\">\n      {blocks_layout.items.map(id => {\n        if (fetchItems[blocks[id]['@type']]) {\n          const mySeen = seen;\n          return (\n            <Suspense key={id} fallback={<div>Loading...</div>}>\n              <ListingItems id={id} blocks={blocks} paging={pagingInput}\n                seen={mySeen} fetchItems={fetchItems} onPaging={setGridPaging} />\n            </Suspense>\n          );\n        }\n        const result = staticBlocks([id], { blocks, paging: pagingInput, seen });\n        seen = result.paging.seen;\n        return result.items.map(item =>\n          <Block key={item['@uid']} block={item} />\n        );\n      })}\n      {gridPaging.totalPages > 1 && <Paging paging={gridPaging} />}\n    </div>\n  );\n}\n\nasync function ListingItems({ id, blocks, paging, seen, fetchItems, onPaging }) {\n  const result = await expandListingBlocks([id], {\n    blocks, paging, seen, fetchItems,\n  });\n  onPaging(result.paging);\n  return result.items.map(item => <Block key={item['@uid']} block={item} />);\n}"
         }
       ]
     },
-    "h-8": {
+    "h-9": {
       "@type": "slate",
       "plaintext": "expandListingBlocks Options",
       "value": [
@@ -151,7 +162,7 @@
         }
       ]
     },
-    "ul-9": {
+    "ul-10": {
       "@type": "slate",
       "plaintext": "blocks — Map of blockId to block data fetchItems — Required. Map of { blockType: async (block, { start, size }) => { items, total } }. Keys declare which block types to expand; values are fetcher functions. Use ploneFetchItems() for Plone backends. paging — Paging input { start, size } (not mutated). Computed values are returned in the response. seen — Number of items already seen by prior calls (default: 0). Chain paging.seen from one call to the next for grids. itemTypeField — Field on the listing block that holds the item type (default: 'itemType') defaultItemType — Fallback type when field is not set (default: 'summary')",
       "value": [
@@ -276,7 +287,7 @@
         }
       ]
     },
-    "h-10": {
+    "h-11": {
       "@type": "slate",
       "plaintext": "ploneFetchItems Helper",
       "value": [
@@ -290,7 +301,7 @@
         }
       ]
     },
-    "p-11": {
+    "p-12": {
       "@type": "slate",
       "plaintext": "`ploneFetchItems({ apiUrl, contextPath, extraCriteria })` creates a fetcher function for Plone's `@querystring-search` endpoint, suitable as a value in the `fetchItems` map.",
       "value": [
@@ -322,7 +333,7 @@
         }
       ]
     },
-    "tbl-12": {
+    "tbl-13": {
       "@type": "slateTable",
       "table": {
         "fixed": true,
@@ -333,10 +344,10 @@
         "striped": false,
         "rows": [
           {
-            "key": "tbl-12-r0",
+            "key": "tbl-13-r0",
             "cells": [
               {
-                "key": "tbl-12-r0c0",
+                "key": "tbl-13-r0c0",
                 "type": "header",
                 "value": [
                   {
@@ -350,7 +361,7 @@
                 ]
               },
               {
-                "key": "tbl-12-r0c1",
+                "key": "tbl-13-r0c1",
                 "type": "header",
                 "value": [
                   {
@@ -364,7 +375,7 @@
                 ]
               },
               {
-                "key": "tbl-12-r0c2",
+                "key": "tbl-13-r0c2",
                 "type": "header",
                 "value": [
                   {
@@ -380,10 +391,10 @@
             ]
           },
           {
-            "key": "tbl-12-r1",
+            "key": "tbl-13-r1",
             "cells": [
               {
-                "key": "tbl-12-r1c0",
+                "key": "tbl-13-r1c0",
                 "type": "data",
                 "value": [
                   {
@@ -398,7 +409,7 @@
                 ]
               },
               {
-                "key": "tbl-12-r1c1",
+                "key": "tbl-13-r1c1",
                 "type": "data",
                 "value": [
                   {
@@ -412,7 +423,7 @@
                 ]
               },
               {
-                "key": "tbl-12-r1c2",
+                "key": "tbl-13-r1c2",
                 "type": "data",
                 "value": [
                   {
@@ -435,10 +446,10 @@
             ]
           },
           {
-            "key": "tbl-12-r2",
+            "key": "tbl-13-r2",
             "cells": [
               {
-                "key": "tbl-12-r2c0",
+                "key": "tbl-13-r2c0",
                 "type": "data",
                 "value": [
                   {
@@ -453,7 +464,7 @@
                 ]
               },
               {
-                "key": "tbl-12-r2c1",
+                "key": "tbl-13-r2c1",
                 "type": "data",
                 "value": [
                   {
@@ -468,7 +479,7 @@
                 ]
               },
               {
-                "key": "tbl-12-r2c2",
+                "key": "tbl-13-r2c2",
                 "type": "data",
                 "value": [
                   {
@@ -484,10 +495,10 @@
             ]
           },
           {
-            "key": "tbl-12-r3",
+            "key": "tbl-13-r3",
             "cells": [
               {
-                "key": "tbl-12-r3c0",
+                "key": "tbl-13-r3c0",
                 "type": "data",
                 "value": [
                   {
@@ -502,7 +513,7 @@
                 ]
               },
               {
-                "key": "tbl-12-r3c1",
+                "key": "tbl-13-r3c1",
                 "type": "data",
                 "value": [
                   {
@@ -517,7 +528,7 @@
                 ]
               },
               {
-                "key": "tbl-12-r3c2",
+                "key": "tbl-13-r3c2",
                 "type": "data",
                 "value": [
                   {
@@ -563,7 +574,7 @@
         ]
       }
     },
-    "p-13": {
+    "p-14": {
       "@type": "slate",
       "plaintext": "A listing with no `querystring` defaults to showing the current folder's contents in folder order.",
       "value": [
@@ -584,7 +595,7 @@
         }
       ]
     },
-    "p-14": {
+    "p-15": {
       "@type": "slate",
       "plaintext": "`ploneFetchItems` also normalizes Plone's image data — packaging `image_field` + `image_scales` into a self-contained `image` object with `@id` duplicated inside (needed for URL resolution):",
       "value": [
@@ -630,18 +641,18 @@
         }
       ]
     },
-    "ce-15": {
+    "ce-16": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-15-json-53d2b5",
+          "@id": "ce-16-json-38bb3a",
           "label": "Json",
           "language": "json",
           "code": "// Plone search result:\n{ \"@id\": \"/news/article\", \"image_field\": \"image\", \"image_scales\": { \"image\": [{ \"...\": \"...\" }] } }\n\n// After normalization:\n{ \"@id\": \"/news/article\", \"image\": { \"@id\": \"/news/article\", \"image_field\": \"image\", \"image_scales\": { \"...\": \"...\" } } }"
         }
       ]
     },
-    "p-16": {
+    "p-17": {
       "@type": "slate",
       "plaintext": "This self-contained object has everything needed to resolve image URLs with scale support — see the Nuxt example's `composables/imageProps.js` for one approach.",
       "value": [
@@ -662,7 +673,7 @@
         }
       ]
     },
-    "p-17": {
+    "p-18": {
       "@type": "slate",
       "plaintext": "For non-Plone backends (RSS feeds, external APIs, etc.), write your own fetcher: `async (block, { start, size }) => ({ items, total })`. `start` is the zero-based offset, `size` is the number of items to return (or `0` for total-only), and `total` in the return value is the full count, not just this page.",
       "value": [
@@ -711,7 +722,7 @@
         }
       ]
     },
-    "h-18": {
+    "h-19": {
       "@type": "slate",
       "plaintext": "Field Mapping",
       "value": [
@@ -725,7 +736,7 @@
         }
       ]
     },
-    "p-19": {
+    "p-20": {
       "@type": "slate",
       "plaintext": "`fieldMapping` on a listing block controls which fields appear on expanded items — only mapped fields are included. Default: `{ @id → href, title → title, description → description, image → image }`. Values can be a string (rename) or `{ field, type }` for conversions:",
       "value": [
@@ -757,7 +768,7 @@
         }
       ]
     },
-    "p-20": {
+    "p-21": {
       "@type": "slate",
       "plaintext": "Built-in item types and the fields they expose:",
       "value": [
@@ -771,7 +782,7 @@
         }
       ]
     },
-    "tbl-21": {
+    "tbl-22": {
       "@type": "slateTable",
       "table": {
         "fixed": true,
@@ -782,10 +793,10 @@
         "striped": false,
         "rows": [
           {
-            "key": "tbl-21-r0",
+            "key": "tbl-22-r0",
             "cells": [
               {
-                "key": "tbl-21-r0c0",
+                "key": "tbl-22-r0c0",
                 "type": "header",
                 "value": [
                   {
@@ -799,7 +810,7 @@
                 ]
               },
               {
-                "key": "tbl-21-r0c1",
+                "key": "tbl-22-r0c1",
                 "type": "header",
                 "value": [
                   {
@@ -815,10 +826,10 @@
             ]
           },
           {
-            "key": "tbl-21-r1",
+            "key": "tbl-22-r1",
             "cells": [
               {
-                "key": "tbl-21-r1c0",
+                "key": "tbl-22-r1c0",
                 "type": "data",
                 "value": [
                   {
@@ -833,7 +844,7 @@
                 ]
               },
               {
-                "key": "tbl-21-r1c1",
+                "key": "tbl-22-r1c1",
                 "type": "data",
                 "value": [
                   {
@@ -864,10 +875,10 @@
             ]
           },
           {
-            "key": "tbl-21-r2",
+            "key": "tbl-22-r2",
             "cells": [
               {
-                "key": "tbl-21-r2c0",
+                "key": "tbl-22-r2c0",
                 "type": "data",
                 "value": [
                   {
@@ -882,7 +893,7 @@
                 ]
               },
               {
-                "key": "tbl-21-r2c1",
+                "key": "tbl-22-r2c1",
                 "type": "data",
                 "value": [
                   {
@@ -920,10 +931,10 @@
             ]
           },
           {
-            "key": "tbl-21-r3",
+            "key": "tbl-22-r3",
             "cells": [
               {
-                "key": "tbl-21-r3c0",
+                "key": "tbl-22-r3c0",
                 "type": "data",
                 "value": [
                   {
@@ -938,7 +949,7 @@
                 ]
               },
               {
-                "key": "tbl-21-r3c1",
+                "key": "tbl-22-r3c1",
                 "type": "data",
                 "value": [
                   {
@@ -978,18 +989,18 @@
         ]
       }
     },
-    "ce-22": {
+    "ce-23": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-22-json-5d4cee",
+          "@id": "ce-23-json-6d0894",
           "label": "Json",
           "language": "json",
           "code": "\"fieldMapping\": {\n  \"@id\": { \"field\": \"href\", \"type\": \"link\" },\n  \"title\": \"title\",\n  \"image\": { \"field\": \"preview_image\", \"type\": \"image\" },\n  \"Subject\": { \"field\": \"tags\", \"type\": \"string\" }\n}\n\nTypes: string (array→join, image→URL), link (→[{@id}]), image (pass through)"
         }
       ]
     },
-    "h-23": {
+    "h-24": {
       "@type": "slate",
       "plaintext": "Item Type Selection",
       "value": [
@@ -1003,7 +1014,7 @@
         }
       ]
     },
-    "p-24": {
+    "p-25": {
       "@type": "slate",
       "plaintext": "Use `variation` on the listing block to control what `@type` expanded items get. Listings reuse the same `inheritSchemaFrom` recipe as container blocks (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)) but differ in one structural way: there's no blocks field to declare `itemTypeField` on, since listing children are *virtual* (produced from query results at render time, not authored as page data). Instead, declare the typeField directly on the `inheritSchemaFrom` recipe:",
       "value": [
@@ -1073,18 +1084,18 @@
         }
       ]
     },
-    "ce-25": {
+    "ce-26": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-25-javascript-a92f14",
+          "@id": "ce-26-javascript-18000c",
           "label": "Javascript",
           "language": "javascript",
           "code": "listing: {\n    blockSchema: {\n        properties: {\n            variation: {\n                widget: 'blockTypeSelect',\n                filterConvertibleFrom: '@default',  // only offer types with @default mappings\n            },\n            // FieldMappingWidget is added at sidebar render time by\n            // inheritSchemaFrom (the enhancer reads `mappingField` below);\n            // declare an empty placeholder so it appears in the auto-generated\n            // default fieldset alongside `variation`.\n            fieldMapping: {},\n        },\n    },\n    schemaEnhancer: {\n        inheritSchemaFrom: {\n            typeField: 'variation',     // listing has no blocks field — declare here\n            mappingField: 'fieldMapping',\n        },\n    },\n}"
         }
       ]
     },
-    "p-26": {
+    "p-27": {
       "@type": "slate",
       "plaintext": "`filterConvertibleFrom: '@default'` restricts the dropdown to types that have a `fieldMappings['@default']` entry — i.e. types that can be populated from the canonical content fields (`@id`, `title`, `description`, `image`) that listing queries return. Each item type's `fieldMappings['@default']` (on its own block config) defines how those source fields land on its schema; that static mapping is enough to render listings. Adding `mappingField` to the enhancer exposes the `FieldMappingWidget` so the editor can override the mapping per listing instance.",
       "value": [
@@ -1158,7 +1169,7 @@
         }
       ]
     },
-    "p-27": {
+    "p-28": {
       "@type": "slate",
       "plaintext": "The widget saves its output as `fieldMapping` (singular) on the block data. `expandListingBlocks` reads that at render time to translate each query result into an item block.",
       "value": [
@@ -1186,7 +1197,7 @@
         }
       ]
     },
-    "h-28": {
+    "h-29": {
       "@type": "slate",
       "plaintext": "Combining Listings with Container Syncing",
       "value": [
@@ -1200,7 +1211,7 @@
         }
       ]
     },
-    "p-29": {
+    "p-30": {
       "@type": "slate",
       "plaintext": "A container (e.g. `gridBlock`) can mix **manual children** AND **a listing** as children. Add `'listing'` to the blocks field's `allowedBlocks`, and the parent's typeField propagates everywhere:",
       "value": [
@@ -1249,18 +1260,18 @@
         }
       ]
     },
-    "ce-30": {
+    "ce-31": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-30-javascript-5eec26",
+          "@id": "ce-31-javascript-e988b9",
           "label": "Javascript",
           "language": "javascript",
           "code": "gridBlock: {\n    blockSchema: {\n        properties: {\n            slides: {\n                widget: 'blocks_layout',\n                itemTypeField: 'variation',\n                allowedBlocks: ['teaser', 'image', 'listing'],  // manual items + listing\n            },\n            variation: {\n                widget: 'blockTypeSelect',\n                filterConvertibleFrom: '@default',  // keeps 'listing' out of the dropdown\n            },\n        },\n    },\n    schemaEnhancer: { inheritSchemaFrom: {} },\n}"
         }
       ]
     },
-    "p-31": {
+    "p-32": {
       "@type": "slate",
       "plaintext": "`filterConvertibleFrom: '@default'` keeps `'listing'` out of the dropdown (it's a structural container, not an item type, so it has no `fieldMappings['@default']`) but it stays in `allowedBlocks` so a listing block can still exist as a structural child. The editor sees \"Teaser / Image / Summary\" in the picker; the listing is a structural choice they don't have to think about.",
       "value": [
@@ -1299,7 +1310,7 @@
         }
       ]
     },
-    "p-32": {
+    "p-33": {
       "@type": "slate",
       "plaintext": "When the editor changes `gridBlock.variation` to e.g. `'summary'`:",
       "value": [
@@ -1327,7 +1338,7 @@
         }
       ]
     },
-    "ul-33": {
+    "ul-34": {
       "@type": "slate",
       "plaintext": "Manual children (a teaser, an image) get their @type converted via the destination type's fieldMappings — teaser becomes summary. Listing child keeps @type: 'listing' but its own variation field is set to 'summary', so the listing now renders summary items.",
       "value": [
@@ -1397,7 +1408,7 @@
         }
       ]
     },
-    "p-34": {
+    "p-35": {
       "@type": "slate",
       "plaintext": "The sync walks recursively — if the listing held nested containers with their own typeFields, those would update too. Net effect: ONE picker on the parent controls the rendered type for every descendant, regardless of whether descendants are authored manually or expanded from a query.",
       "value": [
@@ -1411,7 +1422,7 @@
         }
       ]
     },
-    "h-35": {
+    "h-36": {
       "@type": "slate",
       "plaintext": "Path Transformation (pathToApiPath)",
       "value": [
@@ -1425,7 +1436,7 @@
         }
       ]
     },
-    "p-36": {
+    "p-37": {
       "@type": "slate",
       "plaintext": "If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS.",
       "value": [
@@ -1439,18 +1450,18 @@
         }
       ]
     },
-    "ce-37": {
+    "ce-38": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-37-javascript-831cb5",
+          "@id": "ce-38-javascript-e44e5e",
           "label": "Javascript",
           "language": "javascript",
           "code": "const bridge = initBridge({\n    page: { ... },\n    // Transform frontend path to API path by stripping paging segments\n    // e.g., /test-page/@pg_block-8-grid_1 -> /test-page\n    pathToApiPath: (path) => path.replace(/\\/@pg_[^/]+_\\d+/, ''),\n});"
         }
       ]
     },
-    "p-38": {
+    "p-39": {
       "@type": "slate",
       "plaintext": "The `pathToApiPath` function is called whenever hydra.js sends a `PATH_CHANGE` message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state).",
       "value": [
@@ -1478,7 +1489,7 @@
         }
       ]
     },
-    "h-39": {
+    "h-40": {
       "@type": "slate",
       "plaintext": "Paging Values",
       "value": [
@@ -1492,7 +1503,7 @@
         }
       ]
     },
-    "p-40": {
+    "p-41": {
       "@type": "slate",
       "plaintext": "Both `expandListingBlocks` and `staticBlocks` return `{ items, paging }`. You pass `{ start, size }` as input (not mutated) and get back computed paging values:",
       "value": [
@@ -1534,7 +1545,7 @@
         }
       ]
     },
-    "ul-41": {
+    "ul-42": {
       "@type": "slate",
       "plaintext": "currentPage (number) — Zero-based current page index totalPages (number) — Total number of pages totalItems (number) — Total item count across all blocks prev (number | null) — Previous page index, or null on first page next (number | null) — Next page index, or null on last page pages (array) — Window of ~5 page objects: { start, page } where page is 1-based seen (number) — Running item count — pass to the next call's seen option for position tracking in grids",
       "value": [
@@ -1643,7 +1654,7 @@
         }
       ]
     },
-    "p-42": {
+    "p-43": {
       "@type": "slate",
       "plaintext": "Neither function mutates the input `paging` object — calling again with the same `{ start, size }` is safe.",
       "value": [
@@ -1671,7 +1682,7 @@
         }
       ]
     },
-    "p-43": {
+    "p-44": {
       "@type": "slate",
       "plaintext": "When multiple listings share a pager (e.g. a grid with several listings), `expandListingBlocks` walks them sequentially. Each fetch returns `{ items, total }`, so the total is learned from the response and used to compute where the next listing starts. One request per listing. Listings outside the page window are fetched with `size: 0` (total only, no items).",
       "value": [
@@ -1706,7 +1717,7 @@
         }
       ]
     },
-    "p-44": {
+    "p-45": {
       "@type": "slate",
       "plaintext": "When mixing listings with static blocks in a shared pager, use `staticBlocks(ids, { blocks, paging, seen })` for the non-listing blocks — it tracks their position in the paging window. Chain the returned `paging.seen` to the next call so each block knows its offset (see the React example above).",
       "value": [
@@ -1734,7 +1745,7 @@
         }
       ]
     },
-    "h-45": {
+    "h-46": {
       "@type": "slate",
       "plaintext": "Notes",
       "value": [
@@ -1748,7 +1759,7 @@
         }
       ]
     },
-    "p-46": {
+    "p-47": {
       "@type": "slate",
       "plaintext": "Expanded listing items share the listing block's `@uid`. Selecting any expanded item selects the parent listing block.",
       "value": [
@@ -1775,50 +1786,51 @@
       "title-1",
       "p-1",
       "p-2",
-      "ce-3",
-      "sep-4",
-      "h-5",
-      "p-6",
-      "ce-7",
-      "h-8",
-      "ul-9",
-      "h-10",
-      "p-11",
-      "tbl-12",
-      "p-13",
+      "p-3",
+      "ce-4",
+      "sep-5",
+      "h-6",
+      "p-7",
+      "ce-8",
+      "h-9",
+      "ul-10",
+      "h-11",
+      "p-12",
+      "tbl-13",
       "p-14",
-      "ce-15",
-      "p-16",
+      "p-15",
+      "ce-16",
       "p-17",
-      "h-18",
-      "p-19",
+      "p-18",
+      "h-19",
       "p-20",
-      "tbl-21",
-      "ce-22",
-      "h-23",
-      "p-24",
-      "ce-25",
-      "p-26",
+      "p-21",
+      "tbl-22",
+      "ce-23",
+      "h-24",
+      "p-25",
+      "ce-26",
       "p-27",
-      "h-28",
-      "p-29",
-      "ce-30",
-      "p-31",
+      "p-28",
+      "h-29",
+      "p-30",
+      "ce-31",
       "p-32",
-      "ul-33",
-      "p-34",
-      "h-35",
-      "p-36",
-      "ce-37",
-      "p-38",
-      "h-39",
-      "p-40",
-      "ul-41",
-      "p-42",
+      "p-33",
+      "ul-34",
+      "p-35",
+      "h-36",
+      "p-37",
+      "ce-38",
+      "p-39",
+      "h-40",
+      "p-41",
+      "ul-42",
       "p-43",
       "p-44",
-      "h-45",
-      "p-46"
+      "p-45",
+      "h-46",
+      "p-47"
     ]
   },
   "contributors": [],
