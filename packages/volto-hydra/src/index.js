@@ -118,9 +118,25 @@ const applyConfig = (config) => {
   // See README "Synchronised block types in a container".
   config.widgets.widget.blockTypeSelect = BlockTypeSelectWidget;
 
-  // Add the slate block in the sidebar with proper initialization
-  // blockSchema is used by applyBlockDefaults to set initial values for new blocks
-  // This is separate from schema (used for sidebar settings form)
+  // Add the slate block in the sidebar with proper initialization.
+  // blockSchema is used by applyBlockDefaults to set initial values for new blocks.
+  //
+  // We override `schema` to add the slate `value` field. Volto-slate registers
+  // this from ./TextBlockSchema.js — a Settings-tab schema with placeholder /
+  // instructions / fixed / disableNewBlocks / readOnly, and no `value` field.
+  // Without `value` in blocksConfig.slate.schema, buildBlockPathMap's
+  // pathMap._schemas for slate blocks doesn't reflect the slate body field,
+  // and hydra.js's addNodeIdsToAllSlateFields can't recognize it (so
+  // data-node-id never gets added in the iframe and slate selection sync
+  // breaks).
+  //
+  // The Block-tab sidebar form is rendered by Volto's DefaultTextBlockEditor,
+  // which imports a separate file (./schema.js) directly. We shadow that at
+  // customizations/@plone/volto-slate/blocks/Text/schema.js so the sidebar
+  // form also includes `value`. With both in place the schemaEnhancer is no
+  // longer needed — removing it eliminates ~150 redundant per-slate enhancer
+  // re-runs in buildBlockPathMap pass 2 on slate-heavy pages.
+  const _slateOriginalSchema = config.blocks.blocksConfig.slate.schema;
   config.blocks.blocksConfig.slate = {
     ...config.blocks.blocksConfig.slate,
     // initialValue is called by Volto's _applyBlockInitialValue when adding new blocks
@@ -129,20 +145,25 @@ const applyConfig = (config) => {
       ...value,
       value: value.value || config.settings.slate.defaultValue(),
     }),
-    schemaEnhancer: ({ formData, schema, intl }) => {
-      // NOTE: Do NOT use blockSchema with widget: 'richtext' - it causes Slate corruption
-      // because blockSchema runs during block registration, before proper isolation
-      // Use 'slate' widget (JSON format), NOT 'richtext' (HTML format)
-      schema.properties.value = {
-        title: 'Body',
-        widget: 'slate',
-        placeholder: intl.formatMessage(messages.typeText),
+    schema: (props) => {
+      const base = typeof _slateOriginalSchema === 'function'
+        ? _slateOriginalSchema(props)
+        : _slateOriginalSchema;
+      const baseFields = base?.fieldsets?.[0]?.fields || [];
+      return {
+        ...base,
+        fieldsets: [
+          {
+            ...(base?.fieldsets?.[0] || { id: 'default', title: 'Default' }),
+            fields: ['value', ...baseFields],
+          },
+          ...(base?.fieldsets?.slice(1) || []),
+        ],
+        properties: {
+          value: { title: 'Body', widget: 'slate' },
+          ...(base?.properties || {}),
+        },
       };
-      // Defensive check - fieldsets may not exist when called from applyBlockDefaultsWithContext
-      if (schema.fieldsets?.[0]?.fields) {
-        schema.fieldsets[0].fields.unshift('value');
-      }
-      return schema;
     },
     sidebarTab: 1,
     mostUsed: true,
