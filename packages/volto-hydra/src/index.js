@@ -41,7 +41,15 @@ import {
 import HiddenBlocksWidget from './components/Widgets/HiddenBlocksWidget';
 import HiddenObjectListWidget from './components/Widgets/HiddenObjectListWidget';
 import FieldMappingWidget from './components/Widgets/FieldMappingWidget';
+import BlockTypeSelectWidget from './components/Widgets/BlockTypeSelectWidget';
 import TableSchema, { TableBlockSchema } from '@plone/volto-slate/blocks/Table/schema';
+// Volto-slate ships TWO schemas for the slate block:
+//   ./schema.js          → "Block tab" form (override_toc / level / entry_text)
+//   ./TextBlockSchema.js → "Settings tab" form (placeholder / instructions /
+//                          fixed / disableNewBlocks / readOnly)
+// We merge both into one schema below so Volto Hydra's single sidebar
+// surface shows everything.
+import _slateBlockTabSchema from '@plone/volto-slate/blocks/Text/schema';
 import { ImageSchema } from '@plone/volto/components/manage/Blocks/Image/schema';
 import {
   QUERY_RESULT_FIELDS,
@@ -113,9 +121,29 @@ const applyConfig = (config) => {
   // Field mapping widget - for mapping source fields to target block fields
   config.widgets.widget.field_mapping = FieldMappingWidget;
 
-  // Add the slate block in the sidebar with proper initialization
-  // blockSchema is used by applyBlockDefaults to set initial values for new blocks
-  // This is separate from schema (used for sidebar settings form)
+  // Block-type select widget - choices computed from allowedBlocks at render time.
+  // See README "Synchronised block types in a container".
+  config.widgets.widget.blockTypeSelect = BlockTypeSelectWidget;
+
+  // Add the slate block in the sidebar with proper initialization.
+  // blockSchema is used by applyBlockDefaults to set initial values for new blocks.
+  //
+  // We override `schema` to add the slate `value` field. Volto-slate registers
+  // this from ./TextBlockSchema.js — a Settings-tab schema with placeholder /
+  // instructions / fixed / disableNewBlocks / readOnly, and no `value` field.
+  // Without `value` in blocksConfig.slate.schema, buildBlockPathMap's
+  // pathMap._schemas for slate blocks doesn't reflect the slate body field,
+  // and hydra.js's addNodeIdsToAllSlateFields can't recognize it (so
+  // data-node-id never gets added in the iframe and slate selection sync
+  // breaks).
+  //
+  // The Block-tab sidebar form is rendered by our shadowed
+  // customizations/@plone/volto-slate/blocks/Text/DefaultTextBlockEditor.jsx,
+  // which reads `blocksConfig.slate.schema` (this factory) directly so
+  // there's a SINGLE source of truth for slate's schema. The schemaEnhancer
+  // pattern (which used to add `value` at sidebar render via the variation
+  // HOC) is gone — eliminating ~150 redundant per-slate enhancer re-runs in
+  // buildBlockPathMap pass 2 on slate-heavy pages.
   config.blocks.blocksConfig.slate = {
     ...config.blocks.blocksConfig.slate,
     // initialValue is called by Volto's _applyBlockInitialValue when adding new blocks
@@ -124,20 +152,46 @@ const applyConfig = (config) => {
       ...value,
       value: value.value || config.settings.slate.defaultValue(),
     }),
-    schemaEnhancer: ({ formData, schema, intl }) => {
-      // NOTE: Do NOT use blockSchema with widget: 'richtext' - it causes Slate corruption
-      // because blockSchema runs during block registration, before proper isolation
-      // Use 'slate' widget (JSON format), NOT 'richtext' (HTML format)
-      schema.properties.value = {
-        title: 'Body',
-        widget: 'slate',
-        placeholder: intl.formatMessage(messages.typeText),
+    schema: (props) => {
+      // We expose only the Block-tab schema (./schema.js — TOC settings:
+      // override_toc / level / entry_text) plus the slate body field.
+      //
+      // We deliberately don't include Volto-slate's Settings-tab schema
+      // (./TextBlockSchema.js — placeholder / instructions / required /
+      // fixed / disableNewBlocks / readOnly):
+      //   - `fixed` and `readOnly` are surfaced separately by
+      //     ParentBlocksWidget's template-block-settings schema and would
+      //     duplicate in template-edit mode.
+      //   - `placeholder` / `instructions` are template-author-only fields
+      //     that the previous Volto Hydra slate sidebar didn't expose.
+      //   - These fields are still honored at runtime (block.fixed,
+      //     block.readOnly, etc. read straight from data).
+      const blockTab = typeof _slateBlockTabSchema === 'function'
+        ? _slateBlockTabSchema(props?.formData || props?.data || {})
+        : _slateBlockTabSchema;
+      const blockTabFields = blockTab?.fieldsets?.[0]?.fields || [];
+      // Placeholder text for the slate body. props.intl may not be passed
+      // (e.g. when called by buildBlockPathMap via getBlockTypeSchema with
+      // intl=undefined), so fall back to the i18n message default.
+      const placeholder = props?.intl?.formatMessage
+        ? props.intl.formatMessage(messages.typeText)
+        : messages.typeText.defaultMessage;
+      return {
+        title: blockTab?.title || 'Slate',
+        fieldsets: [
+          {
+            id: 'default',
+            title: 'Default',
+            fields: ['value', ...blockTabFields],
+          },
+          ...(blockTab?.fieldsets?.slice(1) || []),
+        ],
+        properties: {
+          value: { title: 'Body', widget: 'slate', placeholder },
+          ...(blockTab?.properties || {}),
+        },
+        required: blockTab?.required || [],
       };
-      // Defensive check - fieldsets may not exist when called from applyBlockDefaultsWithContext
-      if (schema.fieldsets?.[0]?.fields) {
-        schema.fieldsets[0].fields.unshift('value');
-      }
-      return schema;
     },
     sidebarTab: 1,
     mostUsed: true,
@@ -315,6 +369,21 @@ const applyConfig = (config) => {
     ...config.blocks.blocksConfig.listing,
     itemTypeField: 'variation',
     schemaEnhancer: listingSchemaEnhancer,
+    // Volto core ships listing with 3 template variations (default/imageGallery/summary)
+    // for its built-in render path. Hydra renders listing items via expandListingBlocks
+    // in the user's frontend, but Volto's admin-side ListingBody.jsx still mounts a
+    // template component, so we keep one passthrough entry. Critically, reducing the
+    // array to length === 1 stops Volto's withVariationSchemaEnhancer from
+    // wholesale-replacing the `variation` field definition (it only fires for
+    // variations.length > 1) — that's what would wipe our `widget: 'blockTypeSelect'`.
+    variations: [
+      {
+        id: 'default',
+        isDefault: true,
+        title: 'Default',
+        template: () => null,
+      },
+    ],
   };
 
   // Configure image block with blockSchema for schema inheritance

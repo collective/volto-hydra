@@ -54,9 +54,18 @@ export function getBlockTypeSchema(blockType, intl, blocksConfig) {
       required: [],
     };
   } else if (!schema.fieldsets) {
+    // Schema declares properties but no fieldsets — auto-create a default
+    // fieldset listing all property names. Without this, properties exist
+    // but Volto's form renderer (which iterates fieldsets[].fields) shows
+    // nothing. Authors who want explicit ordering / multiple fieldsets
+    // declare them themselves.
     schema = {
       ...schema,
-      fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+      fieldsets: [{
+        id: 'default',
+        title: 'Default',
+        fields: Object.keys(schema.properties || {}),
+      }],
     };
   }
 
@@ -86,9 +95,12 @@ export function getBlockTypeSchema(blockType, intl, blocksConfig) {
  * @param {Object} intl - The intl object from react-intl (optional; only needed for i18n schemas)
  * @param {Object} blocksConfig - The blocks config from registry
  * @param {Object} formData - Block instance data passed to schemaEnhancer
+ * @param {Object} [pageFormData] - Full page formData (passed to enhancer for ../field lookups etc.)
+ * @param {string} [blockId] - This block's ID (passed to enhancer so it can look itself up in blockPathMap)
+ * @param {Object} [blockPathMap] - Block path map (passed to enhancer for parent/sibling lookups)
  * @returns {Object|null} - The enhanced block schema or null
  */
-export function getBlockSchema(blockType, intl, blocksConfig, formData, pageFormData) {
+export function getBlockSchema(blockType, intl, blocksConfig, formData, pageFormData, blockId, blockPathMap) {
   if (!blockType) return null;
   if (!blocksConfig) throw new Error('getBlockSchema requires blocksConfig');
 
@@ -97,7 +109,6 @@ export function getBlockSchema(blockType, intl, blocksConfig, formData, pageForm
 
   const schemaSource = blockConfig.blockSchema || blockConfig.schema;
   let schema = null;
-
   const effectiveFormData = formData || {};
 
   if (schemaSource) {
@@ -113,9 +124,18 @@ export function getBlockSchema(blockType, intl, blocksConfig, formData, pageForm
       required: [],
     };
   } else if (!schema.fieldsets) {
+    // Schema declares properties but no fieldsets — auto-create a default
+    // fieldset listing all property names. Without this, properties exist
+    // but Volto's form renderer (which iterates fieldsets[].fields) shows
+    // nothing. Authors who want explicit ordering / multiple fieldsets
+    // declare them themselves.
     schema = {
       ...schema,
-      fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+      fieldsets: [{
+        id: 'default',
+        title: 'Default',
+        fields: Object.keys(schema.properties || {}),
+      }],
     };
   }
 
@@ -138,6 +158,8 @@ export function getBlockSchema(blockType, intl, blocksConfig, formData, pageForm
       formData: effectiveFormData,
       intl,
       pageFormData,
+      blockId,
+      blockPathMap,
     });
   }
 
@@ -385,6 +407,18 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
     const layout = parent[fieldName]?.items;
     if (!blocks || !layout) return;
 
+    // Container constraints (allowedBlocks, maxLength) can be declared either
+    // at the field level (`blockSchema.properties.blocks_layout.maxLength`) or
+    // at Volto's block level (`blockConfig.maxLength` — the existing
+    // convention for built-ins like gridBlock). Field-level wins; otherwise
+    // fall back to the block-level values so adding an explicit blockSchema
+    // doesn't silently drop the legacy block-level constraints.
+    const parentBlockConfig = blocksConfig?.[parent?.['@type']];
+    const effectiveAllowedBlocks =
+      fieldDef.allowedBlocks ?? parentBlockConfig?.allowedBlocks ?? null;
+    const effectiveMaxLength =
+      fieldDef.maxLength ?? parentBlockConfig?.maxLength ?? null;
+
     // First pass: collect fixed status for all blocks to determine insert restrictions
     const blockFixedStatus = {};
     layout.forEach(blockId => {
@@ -400,7 +434,31 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
 
       const blockPath = [...parentPath, 'blocks', blockId];
       const blockType = block['@type'];
-      const blockSchema = getBlockSchema(blockType, intl, blocksConfig, block, formData);
+      // Pass 1 uses the cached, GENERIC type schema (formData={}, enhancer
+      // run with no instance context). One resolve per blockType — reused
+      // across every instance — so a page with 150 slate blocks does the
+      // slate schema work once rather than 150 times.
+      //
+      // Assumption: container-field metadata (widget: 'blocks_layout' /
+      // 'object_list', their allowedBlocks / maxLength / idField / typeField
+      // / dataPath / addMode) is STATIC per blockType — independent of the
+      // instance's formData and of enhancer runs. Pass 1 only reads container
+      // metadata; if an enhancer or a blockSchema factory varied container
+      // fields based on instance data, pass 1 would miss it. Volto's blocks
+      // honor this convention.
+      //
+      // Future optimization opportunities (left as TODOs since current cost
+      // is acceptable):
+      //   - Tag pathmap-aware enhancers (inheritSchemaFrom,
+      //     hideParentOwnedFields, fieldRules-with-../) and have pass 2 skip
+      //     untagged ones. Saves the per-block enhancer re-run for blocks
+      //     whose enhancer doesn't actually depend on blockId/blockPathMap
+      //     (e.g. slate's value-field enhancer).
+      //   - Sync `_hideFields` from parent → child during data sync so
+      //     hideParentOwnedFields becomes a pure formData enhancer with no
+      //     pathmap dependency. Combined with the tag above, would drop
+      //     pass 2 to a near-no-op.
+      const blockSchema = getBlockTypeSchema(blockType, intl, blocksConfig);
 
       // Check Volto's standard block properties
       const isFixed = block.fixed === true;        // Volto standard: position locked
@@ -467,13 +525,13 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         containerField: fieldName,
         blockType, // Block type for uniform lookups (single source of truth)
         _schemaRef: storeSchema(blockSchema), // Deduplicated schema reference
-        allowedSiblingTypes: fieldDef.allowedBlocks
+        allowedSiblingTypes: effectiveAllowedBlocks
           ? (parentId === PAGE_BLOCK_UID
-            ? fieldDef.allowedBlocks.filter(t => defaultPageAllowedBlocks.includes(t))
-            : fieldDef.allowedBlocks)
+            ? effectiveAllowedBlocks.filter(t => defaultPageAllowedBlocks.includes(t))
+            : effectiveAllowedBlocks)
           : defaultPageAllowedBlocks,
         allowedTemplates: fieldDef.allowedTemplates || null,
-        maxSiblings: fieldDef.maxLength || null,
+        maxSiblings: effectiveMaxLength,
         siblingCount: layout.length, // Total siblings in this container
         emptyRequiredFields: getEmptyRequiredFields(block, blockSchema),
         ...(isFixed && { isFixed: true }), // Fixed template blocks can't be moved/deleted
@@ -564,9 +622,12 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         ? null // Schema comes from blocksConfig via getBlockSchema(itemBlockType)
         : itemSchema;
 
-      // Get block schema for typed items (for emptyRequiredFields check)
+      // Get block schema for typed items (for emptyRequiredFields check).
+      // Same as the blocks_layout path: cached generic schema for pass 1
+      // traversal; pass 2 below re-runs the enhancer with full args
+      // (blockId/blockPathMap/instance formData) for the canonical schema.
       const blockSchema = hasAllowedBlocks
-        ? getBlockSchema(itemBlockType, intl, blocksConfig, item, formData)
+        ? getBlockTypeSchema(itemBlockType, intl, blocksConfig)
         : itemSchema;
 
       // Compute available actions based on table mode
@@ -642,11 +703,58 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
     _schemaRef: storeSchema(pageSchema),
   };
 
-  // Start traversal with page as root container
-  // pageSchema was retrieved from blocksConfig['_page'] at the top of this function
-  // parentId=PAGE_BLOCK_UID means page-level blocks have the page as parent
-  // parentPath=[] means paths start with [fieldName, blockId]
+  // PASS 1: structural traversal
+  // Walks the tree using the cached, GENERIC type schema (`getBlockTypeSchema`,
+  // formData={}) for every block. That's enough to find container fields and
+  // seed pathMap entries (parentId, path, blockType, allowedSiblingTypes,
+  // canInsertBefore/After, _schemaRef, emptyRequiredFields). Pass 2 below
+  // overwrites _schemaRef and emptyRequiredFields with instance-aware
+  // schemas for blocks that have a schemaEnhancer.
   processItem(formData, PAGE_BLOCK_UID, [], pageSchema);
+
+  // PASS 2: re-enhance schemas with full blockId + blockPathMap context
+  // Now that pass 1 has built the structural pathMap, run each block's
+  // schemaEnhancer again with { blockId, blockPathMap, pageFormData } in args.
+  // This lets enhancers like inheritSchemaFrom and hideParentOwnedFields
+  // resolve parent/sibling state from the pathMap directly — without falling
+  // back to the global hydraContext singleton.
+  //
+  // Skip entries that don't have a real blocksConfig entry (template
+  // instances, virtual object_list types, _page) — pass 1's schema is
+  // authoritative for those.
+  for (const [blockId, pathInfo] of Object.entries(pathMap)) {
+    if (blockId === '_schemas') continue;
+    if (blockId === PAGE_BLOCK_UID) continue;
+    if (pathInfo.isTemplateInstance) continue;
+    if (!pathInfo.path) continue;
+
+    const { blockType } = pathInfo;
+    const blockConfig = blocksConfig?.[blockType];
+    // No config or no enhancer → nothing to re-do.
+    if (!blockConfig || typeof blockConfig.schemaEnhancer !== 'function') continue;
+
+    // Look up block data via path
+    let blockData = formData;
+    for (const key of pathInfo.path) {
+      if (blockData == null) break;
+      blockData = blockData[key];
+    }
+    if (!blockData) continue;
+
+    const enhancedSchema = getBlockSchema(
+      blockType,
+      intl,
+      blocksConfig,
+      blockData,
+      formData,      // pageFormData
+      blockId,       // NEW: blockId in enhancer args
+      pathMap,       // NEW: full pathMap in enhancer args
+    );
+    if (!enhancedSchema) continue;
+
+    pathInfo._schemaRef = storeSchema(enhancedSchema);
+    pathInfo.emptyRequiredFields = getEmptyRequiredFields(blockData, enhancedSchema);
+  }
 
   return pathMap;
 }

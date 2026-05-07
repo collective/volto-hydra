@@ -4,6 +4,33 @@
  * Helpers for blocks that reference other block types and inherit their schemas.
  * Used by listing blocks, grid blocks, and other containers that need to show
  * editable fields from a referenced block type.
+ *
+ * ## Two valid sources for blockId / blockPathMap
+ *
+ * Three enhancers in this file — `inheritSchemaFrom`, `hideParentOwnedFields`,
+ * and `resolveFieldPath` (used by `fieldRules`) — need to know which block
+ * they're enhancing and where it lives in the page tree. They get that from
+ * one of two sources, both first-class (NOT a fallback chain):
+ *
+ *   1. **`args.blockId` / `args.blockPathMap`** — passed explicitly by
+ *      `buildBlockPathMap` pass 2 in `packages/hydra-js/buildBlockPathMap.js`.
+ *      That code runs the enhancer outside any React tree to populate
+ *      `pathMap._schemas` with fully-enhanced schemas.
+ *
+ *   2. **`hydraContext`** (from `../context/HydraSchemaContext`) — set by
+ *      `HydraSchemaProvider` around the sidebar render in
+ *      `components/Sidebar/ParentBlocksWidget.jsx`. Volto core call sites
+ *      (`withVariationSchemaEnhancer` HOC wrapping `BlockDataForm`,
+ *      `applySchemaEnhancer` in `Form.jsx` validation, `Blocks.js`
+ *      schema-derived helpers, etc.) invoke block enhancers with only
+ *      `{ schema, formData, intl }` — no blockId. `hydraContext` is the
+ *      bridge that carries the currently-rendering block id from
+ *      `ParentBlocksWidget` down through Volto's HOCs to our enhancers.
+ *
+ * Each path is the canonical source for its caller; one is not a substitute
+ * for the other. If you ever shadow Volto's `withBlockSchemaEnhancer.jsx` to
+ * inject `blockId` into the args at every Volto call site, the `hydraContext`
+ * branch can be removed — until then, both branches are load-bearing.
  */
 import config from '@plone/volto/registry';
 import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds } from './blockPath';
@@ -12,6 +39,271 @@ import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '
 
 // Re-export getBlockTypeSchema from blockPath for convenience
 export { getBlockTypeSchema };
+
+/**
+ * Synthesize a schemaEnhancer that adds Volto's "variation" field to the
+ * schema for blocks that declare `variations` on their config.
+ *
+ * Volto adds this field at sidebar render time via `withVariationSchemaEnhancer`
+ * — but that means it's never present in pathmap-built schemas (`pathMap._schemas`),
+ * causing a split between what the sidebar sees and what hydra sees.
+ *
+ * Prepending this enhancer to a block's schemaEnhancer chain at INIT
+ * (see `installVariationFieldEnhancers` below) puts the variation field
+ * into the schema during pathmap-build, so the cached schema is a true
+ * superset of what Volto would render. Volto's own
+ * `withVariationSchemaEnhancer` is then redundant — it runs the same field
+ * add and overwrites with identical content (harmless), or we suppress
+ * it via `applySchemaEnhancers=false` on the sidebar form.
+ *
+ * Mirrors the field shape produced by Volto's `addExtensionFieldToSchema`
+ * so the resulting schema is identical regardless of which path produced it.
+ */
+function addVariationFieldEnhancer(variations) {
+  const fn = ({ schema, intl }) => {
+    if (!variations || variations.length <= 1) return schema;
+
+    const _ = (msg) =>
+      typeof intl?.formatMessage === 'function'
+        ? intl.formatMessage(typeof msg === 'string' ? { id: msg, defaultMessage: msg } : msg)
+        : (typeof msg === 'string' ? msg : msg?.defaultMessage || msg?.id || '');
+
+    const hasDefault = variations.findIndex(({ isDefault }) => isDefault) > -1;
+
+    const newSchema = {
+      ...schema,
+      properties: {
+        ...schema.properties,
+        variation: {
+          title: _('Variation'),
+          choices: variations.map(({ id, title }) => [id, _(title)]),
+          noValueOption: false,
+          default: hasDefault ? variations.find((v) => v.isDefault).id : null,
+        },
+      },
+      fieldsets: schema.fieldsets ? schema.fieldsets.map((fs) => ({ ...fs })) : [],
+    };
+
+    // Ensure 'variation' appears in the default fieldset (mirrors Volto's _addField).
+    const defaultFs = newSchema.fieldsets.find((fs) => fs.id === 'default');
+    if (defaultFs) {
+      if (!defaultFs.fields?.includes('variation')) {
+        defaultFs.fields = ['variation', ...(defaultFs.fields || [])];
+      }
+    } else {
+      newSchema.fieldsets.unshift({
+        id: 'default',
+        title: _('Default'),
+        fields: ['variation'],
+      });
+    }
+
+    return newSchema;
+  };
+  // Tag so installVariationFieldEnhancers can detect already-installed and avoid double-prepend.
+  fn._isVariationFieldEnhancer = true;
+  return fn;
+}
+
+/**
+ * Eager-populate the module-level `_typeSchemaCache` for every registered
+ * block type by calling `getBlockTypeSchema(type, intl, blocksConfig)`.
+ *
+ * Why: the cache was lazy and could be filled during a sidebar render
+ * (when `hydraContext.currentBlockId` is set to whatever's rendering),
+ * leaking instance context into a type-only lookup and producing
+ * filtered schemas that all later callers got. Filling at INIT — when no
+ * sidebar is rendering and `hydraContext` is null — guarantees the cached
+ * value reflects the type's intrinsic schema, not "image-as-it-appears-
+ * inside-the-grid-currently-being-rendered."
+ *
+ * Call after `installVariationFieldEnhancers` so cached schemas include
+ * the variation field for blocks that have one.
+ */
+export function populateTypeSchemaCache(blocksConfig, intl) {
+  if (!blocksConfig) return;
+  for (const blockType of Object.keys(blocksConfig)) {
+    // getBlockTypeSchema short-circuits on cache hit; first call fills.
+    getBlockTypeSchema(blockType, intl, blocksConfig);
+  }
+}
+
+/**
+ * Walk the registered blocksConfig and, for any block with
+ * `variations.length > 1`, prepend an `addVariationFieldEnhancer` to its
+ * schemaEnhancer chain. Idempotent — re-running is safe (already-installed
+ * enhancers are tagged and skipped).
+ *
+ * Call this once at INIT after blocksConfig is fully populated, so every
+ * code path that runs the schemaEnhancer chain (pathmap build, sidebar
+ * render, type-cache fill) sees the same fully-resolved schema.
+ */
+export function installVariationFieldEnhancers(blocksConfig) {
+  if (!blocksConfig) return;
+  for (const blockType of Object.keys(blocksConfig)) {
+    const cfg = blocksConfig[blockType];
+    if (!cfg || !Array.isArray(cfg.variations) || cfg.variations.length <= 1) continue;
+
+    const existing = cfg.schemaEnhancer;
+    // Detect already-installed (top of chain or via _parts):
+    if (typeof existing === 'function' && existing._isVariationFieldEnhancer) continue;
+    if (typeof existing === 'function' && Array.isArray(existing._parts)
+        && existing._parts[0]?._isVariationFieldEnhancer) continue;
+
+    const variationEnhancer = addVariationFieldEnhancer(cfg.variations);
+
+    let combined;
+    if (typeof existing === 'function') {
+      const parts = Array.isArray(existing._parts)
+        ? [variationEnhancer, ...existing._parts]
+        : [variationEnhancer, existing];
+      combined = (args) => parts.reduce((schema, fn) => fn({ ...args, schema }), args.schema);
+      combined.config = existing.config;
+      combined._parts = parts;
+    } else if (existing && typeof existing === 'object') {
+      // Recipe form (rare here — recipes are turned into functions by createSchemaEnhancerFromRecipe).
+      // Don't touch — the recipe processor will invoke its own composition; we'll be re-run after.
+      continue;
+    } else {
+      // No existing enhancer — set the variation enhancer as the sole one.
+      combined = variationEnhancer;
+    }
+
+    cfg.schemaEnhancer = combined;
+  }
+}
+
+/**
+ * Append a `hideParentOwnedFields()` enhancer to every block's schemaEnhancer
+ * chain. Idempotent (already-installed enhancers are tagged via
+ * `_isChildBlockEnhancer`).
+ *
+ * Why: in Volto Hydra, any block can be a child of a parent that uses
+ * schema inheritance (typeField + mappingField). Auto-installing the
+ * enhancer makes the default behavior correct: when a parent has a
+ * typeField selected and claims fields (via runtime fieldMapping or via
+ * `parentControlled[childType]`), those fields are hidden on the child
+ * sidebar form. Blocks don't need to opt in or remember any per-child
+ * configuration.
+ *
+ * Parent-side override: declare a `parentControlled: { childType: [...] }`
+ * map on the parent's `inheritSchemaFrom` config to claim ADDITIONAL
+ * fields beyond what runtime fieldMapping captures (e.g. styling fields
+ * that the parent always owns).
+ *
+ * Call this once at INIT, after blocksConfig is fully populated.
+ */
+export function installChildBlockEnhancers(blocksConfig) {
+  if (!blocksConfig) return;
+  for (const blockType of Object.keys(blocksConfig)) {
+    const cfg = blocksConfig[blockType];
+    if (!cfg || blockType === '_page') continue;
+
+    const existing = cfg.schemaEnhancer;
+    const isInstalled = (fn) => fn?._isChildBlockEnhancer === true;
+
+    if (typeof existing === 'function') {
+      if (isInstalled(existing)) continue;
+      if (Array.isArray(existing._parts) && existing._parts.some(isInstalled)) continue;
+    } else if (existing && typeof existing === 'object') {
+      // Recipe form — `createSchemaEnhancerFromRecipe` turns it into a
+      // function elsewhere. We can't rewrite the recipe here cleanly; the
+      // recipe processor will run its enhancers and we install ours later
+      // via the function-form branch above on a subsequent INIT pass.
+      continue;
+    }
+
+    const childEnhancer = hideParentOwnedFields();
+    childEnhancer._isChildBlockEnhancer = true;
+    childEnhancer._needsBlockPathMap = true;
+
+    let combined;
+    if (typeof existing === 'function') {
+      // Append after existing parts so other enhancers add their fields
+      // first; we hide last from the final schema.
+      const parts = Array.isArray(existing._parts)
+        ? [...existing._parts, childEnhancer]
+        : [existing, childEnhancer];
+      combined = (args) => parts.reduce((schema, fn) => fn({ ...args, schema }), args.schema);
+      combined.config = existing.config;
+      combined._parts = parts;
+    } else {
+      combined = childEnhancer;
+    }
+
+    cfg.schemaEnhancer = combined;
+  }
+}
+
+/**
+ * Resolve a block's blockSchema.properties, handling both static and
+ * factory-form blockSchemas. Returns null if no schema declared.
+ *
+ * @private
+ */
+function _resolveBlockSchemaProperties(blockConfig, intl) {
+  const schemaSource = blockConfig?.blockSchema || blockConfig?.schema;
+  if (!schemaSource) return null;
+  const schema = typeof schemaSource === 'function'
+    ? schemaSource({ formData: {}, data: {}, intl })
+    : schemaSource;
+  return schema?.properties || null;
+}
+
+/**
+ * Find the typeField name for a block.
+ *
+ * Lookup order:
+ *   1. inheritSchemaFrom recipe with explicit `typeField` (used by listings,
+ *    which have no blocks field to declare on).
+ *   2. Schema walk: first blocks field with `itemTypeField` declared on it
+ *    (used by container blocks).
+ *
+ * Returns null if no typeField is found.
+ *
+ * @param {Object} blockConfig - blocksConfig entry for the block type
+ * @param {Object} intl - react-intl object (for resolving factory schemas)
+ * @returns {string|null} The typeField name, or null
+ */
+export function findTypeField(blockConfig, intl) {
+  if (!blockConfig) return null;
+
+  // 1. Recipe-level typeField
+  const enhancerCfg = blockConfig.schemaEnhancer;
+  const recipeTypeField =
+    enhancerCfg?.inheritSchemaFrom?.typeField ||
+    enhancerCfg?.config?.typeField;
+  if (recipeTypeField) return recipeTypeField;
+
+  // 2. Schema walk for blocks field with itemTypeField declaration
+  const properties = _resolveBlockSchemaProperties(blockConfig, intl);
+  if (properties) {
+    for (const fieldDef of Object.values(properties)) {
+      if (fieldDef?.itemTypeField) return fieldDef.itemTypeField;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find which blocks field declares the given typeField (for sync scope).
+ * Returns the field name, or null if no declaration found.
+ *
+ * @param {Object} blockConfig - blocksConfig entry for the block type
+ * @param {string} typeField - the typeField name to look up
+ * @param {Object} intl - react-intl object (for resolving factory schemas)
+ * @returns {string|null} The blocks field name, or null
+ */
+export function findBlocksFieldForTypeField(blockConfig, typeField, intl) {
+  if (!blockConfig || !typeField) return null;
+  const properties = _resolveBlockSchemaProperties(blockConfig, intl);
+  if (!properties) return null;
+  for (const [fieldName, fieldDef] of Object.entries(properties)) {
+    if (fieldDef?.itemTypeField === typeField) return fieldName;
+  }
+  return null;
+}
 
 /**
  * Generate a unique slotId name based on block type.
@@ -262,7 +554,6 @@ export function applyBlockDefaultsWithContext(blockData, context) {
  * @param {Object} typeFieldOptions - Options for the typeField (optional)
  * @param {string} typeFieldOptions.title - Title for the typeField (default: 'Item Type')
  * @param {string} typeFieldOptions.filterConvertibleFrom - Only show types with fieldMappings[this]
- * @param {string[]} typeFieldOptions.allowedBlocks - Static list of allowed types
  * @param {string} typeFieldOptions.default - Default value for the typeField
  * @returns {Function} - A schemaEnhancer function
  *
@@ -279,22 +570,40 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
 
     const blocksConfig = config.blocks.blocksConfig;
 
-    // Read typeField from block-level config if not provided directly
+    // Read typeField from block-level config if not provided directly.
+    // Uses the standard lookup (recipe → schema walk).
     if (!typeField) {
-      typeField = blocksConfig[formData?.['@type']]?.itemTypeField;
+      typeField = findTypeField(blocksConfig[formData?.['@type']], intl);
       if (!typeField) return schema;
     }
 
-    // Get context for computing choices
+    // Resolve blockPathMap/blockId from one of two sources, depending on
+    // who is calling the enhancer. These are NOT a fallback chain — each
+    // is the canonical source for its respective code path:
+    //
+    //   - args.blockId / args.blockPathMap: set by buildBlockPathMap pass 2,
+    //     which runs the enhancer outside any React tree to populate
+    //     pathMap._schemas with fully-enhanced schemas.
+    //
+    //   - hydraContext: set by HydraSchemaProvider in ParentBlocksWidget
+    //     around the sidebar render. Volto core call sites (the variation
+    //     HOC, applySchemaEnhancer in Form.jsx validation, etc.) don't pass
+    //     blockId in args, so hydraContext is the only way to know which
+    //     block is currently rendering.
     const hydraContext = getHydraSchemaContext();
-    const blockPathMap = hydraContext?.blockPathMap;
-    const blockId = hydraContext?.currentBlockId;
+    const blockPathMap = args.blockPathMap || hydraContext?.blockPathMap;
+    const blockId = args.blockId ?? hydraContext?.currentBlockId;
+    // For getLiveBlockData calls below: pass current pageFormData + pathMap
+    // so a getBlockById lookup works when there is no React context (i.e.,
+    // the buildBlockPathMap pass 2 path). The React-render path goes
+    // through hydraContext.liveBlockDataRef inside getLiveBlockData itself.
+    const liveFallback = { formData: args.pageFormData, blockPathMap };
 
     // Create or update typeField with computed choices
-    const { filterConvertibleFrom, allowedBlocks, blocksField, title, default: defaultValue } = typeFieldOptions;
-    if (filterConvertibleFrom || allowedBlocks || blocksField) {
+    const { filterConvertibleFrom, blocksField, title, default: defaultValue } = typeFieldOptions;
+    if (filterConvertibleFrom || blocksField) {
       const choices = getBlockTypeChoices(
-        { filterConvertibleFrom, allowedBlocks, blocksField },
+        { filterConvertibleFrom, blocksField },
         blocksConfig,
         blockPathMap,
         blockId,
@@ -328,10 +637,10 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
       const pathInfo = blockPathMap[blockId];
       if (pathInfo?.parentId) {
         // Use getLiveBlockData to get fresh parent data from form internal state
-        const parentBlock = getLiveBlockData(pathInfo.parentId);
+        const parentBlock = getLiveBlockData(pathInfo.parentId, liveFallback);
         if (parentBlock) {
           const parentConfig = blocksConfig?.[parentBlock['@type']];
-          const parentTypeField = parentConfig?.itemTypeField;
+          const parentTypeField = findTypeField(parentConfig, intl);
           // If parent has a typeField AND has selected a value, it controls our type
           if (parentTypeField && parentBlock[parentTypeField]) {
             parentControlsType = true;
@@ -345,9 +654,9 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
     if (parentControlsType) {
       // Get the type from parent's selection (via getLiveBlockData)
       const pathInfo = blockPathMap[blockId];
-      const parentBlock = getLiveBlockData(pathInfo.parentId);
+      const parentBlock = getLiveBlockData(pathInfo.parentId, liveFallback);
       const parentConfig = blocksConfig?.[parentBlock?.['@type']];
-      const parentTypeField = parentConfig?.itemTypeField;
+      const parentTypeField = findTypeField(parentConfig, intl);
       const parentSelectedType = parentBlock?.[parentTypeField];
 
       // Use parent's selected type for computing fieldMapping
@@ -487,31 +796,21 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
       mappingField ? Object.values(effectiveMapping).map(getMappingTarget) : [],
     );
 
-    // Resolve which fields belong to the child (shared logic with hideParentOwnedFields)
+    // Use the same parent/child split that hideParentOwnedFields uses.
+    // Parent's "Item Defaults" fieldset = parent-claimed fields, MINUS the
+    // mapped ones (mapped values come from queried data, not defaults).
     const childConfig = blocksConfig[referencedType];
-    const childOwnFields = resolveChildOwnFields(childConfig);
-    const parentControlledFields = childConfig?.schemaEnhancer?.config?.parentControlledFields;
+    const claimCtx = {
+      mappedFields,
+      parentControlled: typeFieldOptions?.parentControlled?.[referencedType],
+      childOwnFields: resolveChildOwnFields(childConfig),
+    };
 
-    // Get non-mapped fields from referenced type, filtered by field control settings
-    // Use underscore separator for flat keys (Volto forms don't handle nested paths)
     const inheritedFields = Object.entries(referencedSchema.properties)
       .filter(([fieldName]) => {
-        // Skip the typeField itself - it's on the parent, not inherited
         if (fieldName === typeField) return false;
-
-        // Skip mapped fields
         if (mappedFields.has(fieldName)) return false;
-
-        // If parentControlledFields defined: only inherit those specific fields
-        if (parentControlledFields) {
-          return parentControlledFields.includes(fieldName);
-        }
-        // If child's own fields resolved: inherit everything NOT in that set
-        if (childOwnFields) {
-          return !childOwnFields.has(fieldName);
-        }
-        // Default: inherit all non-mapped fields
-        return true;
+        return isFieldParentClaimed(fieldName, claimCtx);
       })
       .map(([fieldName, fieldDef]) => ({
         name: `${defaultsField}_${fieldName}`,
@@ -578,41 +877,52 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
 }
 
 /**
- * Creates a schemaEnhancer that hides fields owned by parent container.
+ * Creates a schemaEnhancer that hides fields claimed by the parent container.
  *
- * Use this on child block types that can appear in containers with inherited defaults.
- * Specify either:
- * - editableFields: allowlist of fields that stay on child (everything else hidden)
- * - parentControlledFields: blocklist of fields that go to parent (only these hidden)
+ * Auto-applied to every block by `installChildBlockEnhancers()` at INIT —
+ * blocks don't need to declare it. The enhancer is a no-op unless the block
+ * is rendered as a child of a parent that uses schema inheritance (parent
+ * has a typeField with a selected value).
  *
- * @param {Object} options - Configuration options
- * @param {string[]} options.editableFields - Allowlist of fields to keep on child
- * @param {string[]} options.parentControlledFields - Blocklist of fields to hide from child
+ * What gets hidden:
+ *   1. Fields the parent's runtime `fieldMapping` widget targets — i.e.
+ *      whatever the user has explicitly mapped via `mappingField`.
+ *   2. Fields listed in the parent's `parentControlled[childType]` config —
+ *      additional fields the parent always claims for child blocks of a
+ *      given type (e.g. styling fields, alignment) that aren't typed-mapped.
+ *
+ * The parent declares both via its `inheritSchemaFrom` recipe:
+ *
+ *     schemaEnhancer: {
+ *       inheritSchemaFrom: {
+ *         mappingField: 'fieldMapping',
+ *         parentControlled: { teaser: ['styles'], image: ['caption'] },
+ *       },
+ *     }
+ *
  * @returns {Function} - A schemaEnhancer function
- *
- * @example
- * // In schemaEnhancer config (preferred format):
- * schemaEnhancer: {
- *   childBlockConfig: {
- *     editableFields: ['href', 'title', 'description']
- *   }
- * }
  */
-export function hideParentOwnedFields({ editableFields, parentControlledFields } = {}) {
+export function hideParentOwnedFields() {
 
   return (args) => {
-    const { schema, blockPathMap: passedBlockPathMap, blockId: passedBlockId } = args;
+    const { schema, intl, blockPathMap: passedBlockPathMap, blockId: passedBlockId } = args;
 
-    // Resolve blockPathMap/blockId. Volto's applySchemaEnhancer invokes
-    // block enhancers without passing these args, so we fall back on the
-    // HydraSchemaProvider context that wraps the sidebar render — the
-    // presence of currentBlockId there is the signal that we're in a
-    // specific-instance render path (not type inspection, which runs
-    // outside the provider).
+    // blockPathMap/blockId come from one of two sources, both first-class:
+    //
+    //   - args.blockId / args.blockPathMap: set by buildBlockPathMap pass 2
+    //     (no React context).
+    //
+    //   - hydraContext: set by HydraSchemaProvider around the sidebar
+    //     render. Volto's applySchemaEnhancer / variation HOC invoke block
+    //     enhancers without blockId in args, so hydraContext is how the
+    //     enhancer learns which specific instance is being edited.
     const hydraContext = getHydraSchemaContext();
     const blockPathMap = passedBlockPathMap || hydraContext?.blockPathMap;
     const blockId = passedBlockId ?? hydraContext?.currentBlockId;
-    const blocksConfig = hydraContext?.blocksConfig;
+    const blocksConfig = hydraContext?.blocksConfig || config.blocks.blocksConfig;
+    // For getLiveBlockData below: pageFormData + pathMap let getBlockById
+    // resolve siblings/parents during buildBlockPathMap pass 2 (no React).
+    const liveFallback = { formData: args.pageFormData, blockPathMap };
 
     if (!blockPathMap || !blockId) return schema;
 
@@ -623,10 +933,10 @@ export function hideParentOwnedFields({ editableFields, parentControlledFields }
     // Only filter fields if parent uses schema inheritance (has typeField configured)
     // AND has a type selected. Otherwise children keep all their fields.
     if (blocksConfig) {
-      const parentBlock = getLiveBlockData(pathInfo.parentId);
+      const parentBlock = getLiveBlockData(pathInfo.parentId, liveFallback);
       if (parentBlock) {
         const parentConfig = blocksConfig[parentBlock['@type']];
-        const typeField = parentConfig?.itemTypeField;
+        const typeField = findTypeField(parentConfig, intl);
         // If parent doesn't use schema inheritance (no typeField), or no type selected,
         // don't filter child fields - they're independent blocks
         if (!typeField || !parentBlock[typeField]) {
@@ -635,46 +945,26 @@ export function hideParentOwnedFields({ editableFields, parentControlledFields }
       }
     }
 
-    // Determine which fields to hide using the shared child/parent split logic
-    let fieldsToHide = new Set();
+    // Hide every field the parent claims (single source of truth via
+    // isFieldParentClaimed; same rule used by inheritSchemaFrom when it
+    // computes the parent's "Item Defaults" fieldset).
+    const childBlock = getLiveBlockData(blockId, liveFallback);
+    const childType = childBlock?.['@type'];
+    const childBlockConfig = childType ? blocksConfig?.[childType] : null;
+    const parentBlock = getLiveBlockData(pathInfo.parentId, liveFallback);
+    const parentConfig = parentBlock ? blocksConfig?.[parentBlock['@type']] : null;
 
-    if (editableFields) {
-      // Explicit param overrides config (backward compat for direct callers)
-      for (const fieldName of Object.keys(schema.properties || {})) {
-        if (!editableFields.includes(fieldName)) {
-          fieldsToHide.add(fieldName);
-        }
-      }
-    } else if (parentControlledFields) {
-      // Blocklist mode: hide only parentControlledFields
-      fieldsToHide = new Set(parentControlledFields);
-    } else if (blocksConfig) {
-      // Resolve from child config (editableFields → fieldMappings['@default'])
-      const childBlock = getLiveBlockData(blockId);
-      const childType = childBlock?.['@type'];
-      let childOwnFields = childType ? resolveChildOwnFields(blocksConfig[childType]) : null;
+    const claimCtx = {
+      mappedFields: _runtimeMappingTargets(parentConfig, parentBlock),
+      parentControlled:
+        parentConfig?.schemaEnhancer?.config?.parentControlled?.[childType],
+      childOwnFields: resolveChildOwnFields(childBlockConfig),
+    };
 
-      // Last resort: parent's runtime fieldMapping widget targets
-      if (!childOwnFields) {
-        const parentBlock = getLiveBlockData(pathInfo.parentId);
-        if (parentBlock) {
-          const parentConfig = blocksConfig[parentBlock['@type']];
-          const mappingField = parentConfig?.schemaEnhancer?.config?.mappingField;
-          const fieldMapping = mappingField ? parentBlock[mappingField] : null;
-          if (fieldMapping && Object.keys(fieldMapping).length > 0) {
-            childOwnFields = new Set(
-              Object.values(fieldMapping).map(getMappingTarget).filter(Boolean)
-            );
-          }
-        }
-      }
-
-      if (childOwnFields) {
-        for (const fieldName of Object.keys(schema.properties || {})) {
-          if (!childOwnFields.has(fieldName)) {
-            fieldsToHide.add(fieldName);
-          }
-        }
+    const fieldsToHide = new Set();
+    for (const fieldName of Object.keys(schema.properties || {})) {
+      if (isFieldParentClaimed(fieldName, claimCtx)) {
+        fieldsToHide.add(fieldName);
       }
     }
 
@@ -767,20 +1057,78 @@ export function getDefaultMappingTargets(blockConfig) {
 }
 
 /**
- * Resolve which fields belong to the child block (child-editable).
- * Used by both inheritSchemaFrom (to skip child fields) and hideParentOwnedFields
- * (to hide non-child fields) so the split is determined in one place.
+ * Set of field names targeted by a parent block's runtime `fieldMapping`
+ * widget value. These are the fields parent has explicitly mapped to
+ * source data — claimed regardless of any other rules.
  *
- * Fallback chain:
- *   1. Explicit editableFields from childBlockConfig recipe
- *   2. Child type's fieldMappings['@default'] targets
+ * @param {Object} parentConfig  blocksConfig entry for the parent block type
+ * @param {Object} parentBlockData  the parent block's runtime data (for
+ *   reading the mappingField value)
+ * @returns {Set<string>}
+ * @private
+ */
+function _runtimeMappingTargets(parentConfig, parentBlockData) {
+  const targets = new Set();
+  const mappingField = parentConfig?.schemaEnhancer?.config?.mappingField;
+  const fieldMapping = mappingField ? parentBlockData?.[mappingField] : null;
+  if (!fieldMapping) return targets;
+  for (const mapping of Object.values(fieldMapping)) {
+    const target = getMappingTarget(mapping);
+    if (target) targets.add(target);
+  }
+  return targets;
+}
+
+/**
+ * Resolve which fields belong to the child block (child-editable). Used
+ * by inheritSchemaFrom to skip child-owned fields when computing the
+ * parent's defaults fieldset. Returns the targets of the child type's
+ * fieldMappings['@default'], or null if none declared.
  *
- * Returns a Set of child-owned field names, or null if undetermined.
+ * @returns {Set<string>|null}
  */
 export function resolveChildOwnFields(childBlockConfig) {
-  const enhancerConfig = childBlockConfig?.schemaEnhancer?.config;
-  if (enhancerConfig?.editableFields) return new Set(enhancerConfig.editableFields);
   return getDefaultMappingTargets(childBlockConfig);
+}
+
+/**
+ * Single source of truth for the parent/child split.
+ *
+ * Given a parent and child config + the runtime context, decide whether a
+ * given field on the child is "parent-claimed" (i.e., parent owns it; hide
+ * on child sidebar; include in parent's itemDefaults / fieldMapping).
+ *
+ * Used by:
+ *   - hideParentOwnedFields: per-field, decides what to hide on the child.
+ *   - inheritSchemaFrom: per-field on the referenced child schema, decides
+ *     what goes into the parent's "Item Defaults" fieldset.
+ *
+ * Rules (in order):
+ *   1. If field is in parent's runtime fieldMapping targets → claimed
+ *      (parent's mappingField widget already drives the value from data).
+ *   2. If parent declares an explicit `parentControlled[childType]` list →
+ *      claimed iff in that list.
+ *   3. Else (no override): claimed iff NOT in child's
+ *      `fieldMappings['@default']` targets. Default split is "child owns
+ *      what its @default declares; parent owns the rest."
+ *   4. If child has no `fieldMappings['@default']` and no parent override →
+ *      nothing is claimed (block isn't opted into the inheritance system).
+ *
+ * @param {string} fieldName
+ * @param {Object} ctx
+ * @param {Set<string>} [ctx.mappedFields]    Targets of parent.fieldMapping
+ * @param {string[]}    [ctx.parentControlled] Parent's explicit per-childType list
+ * @param {Set<string>} [ctx.childOwnFields]   Child's fieldMappings['@default'] targets
+ * @returns {boolean}
+ */
+export function isFieldParentClaimed(
+  fieldName,
+  { mappedFields, parentControlled, childOwnFields } = {},
+) {
+  if (mappedFields?.has(fieldName)) return true;
+  if (Array.isArray(parentControlled)) return parentControlled.includes(fieldName);
+  if (childOwnFields && childOwnFields.size > 0) return !childOwnFields.has(fieldName);
+  return false;
 }
 
 export function computeSmartDefaults(sourceFields, targetSchema, declaredMappings) {
@@ -1128,8 +1476,7 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
  * Create a schemaEnhancer function from a declarative recipe.
  *
  * New format (supports combining multiple enhancers):
- *   { inheritSchemaFrom: { typeField, defaultsField, mappingField?, filterConvertibleFrom?, allowedBlocks?, title?, default? } }
- *   { childBlockConfig: { defaultsField, editableFields?, parentControlledFields? } }
+ *   { inheritSchemaFrom: { typeField, defaultsField, mappingField?, parentControlled?, filterConvertibleFrom?, blocksField?, title?, default? } }
  *   { fieldRules: { fieldName: false | { set, when?, else? } | [rule, ...] } }
  *
  * Combined example:
@@ -1180,7 +1527,7 @@ export function createSchemaEnhancerFromRecipe(recipe, existingEnhancer) {
   }
 
   // New format: { inheritSchemaFrom: {...}, fieldRules: {...}, childBlockConfig: {...}, ... }
-  const enhancerTypes = ['inheritSchemaFrom', 'childBlockConfig', 'fieldRules'];
+  const enhancerTypes = ['inheritSchemaFrom', 'fieldRules'];
 
   // If the existing enhancer has _parts, check each part for type overlap.
   // When the frontend sends a recipe matching an existing part's type,
@@ -1271,20 +1618,20 @@ function createEnhancerByType(type, config) {
 
   switch (type) {
     case 'inheritSchemaFrom': {
-      const { typeField, mappingField, defaultsField = 'itemDefaults', filterConvertibleFrom, allowedBlocks, blocksField, title, default: defaultValue } = config;
+      const { typeField, mappingField, defaultsField = 'itemDefaults', filterConvertibleFrom, blocksField, title, default: defaultValue, parentControlled } = config;
       // typeField is optional — if not in recipe, inheritSchemaFrom reads
-      // blocksConfig[blockType].itemTypeField at call time
-      const typeFieldOptions = (filterConvertibleFrom || allowedBlocks || blocksField || title || defaultValue)
-        ? { filterConvertibleFrom, allowedBlocks, blocksField, title, default: defaultValue }
+      // blocksConfig[blockType].itemTypeField at call time.
+      // parentControlled: { childType: ['fieldA', 'fieldB'] } — fields the
+      // parent always claims for child blocks of a given type, beyond what
+      // runtime fieldMapping captures. Read by hideParentOwnedFields (auto-
+      // applied to every block by installChildBlockEnhancers) and also by
+      // this enhancer's own inherited-fields filter so parentControlled
+      // fields appear in the parent's "Item Defaults" fieldset.
+      const typeFieldOptions = (filterConvertibleFrom || blocksField || title || defaultValue || parentControlled)
+        ? { filterConvertibleFrom, blocksField, title, default: defaultValue, parentControlled }
         : {};
       enhancer = inheritSchemaFrom(typeField || null, mappingField || null, defaultsField, typeFieldOptions);
       enhancer.config = { ...config, enhancerType: 'inheritSchemaFrom' };
-      break;
-    }
-    case 'childBlockConfig': {
-      const { editableFields, parentControlledFields } = config;
-      enhancer = hideParentOwnedFields({ editableFields, parentControlledFields });
-      enhancer.config = { ...config, enhancerType: 'childBlockConfig' };
       break;
     }
     case 'fieldRules': {
@@ -1578,20 +1925,27 @@ function resolveFieldPath(fieldPath, formData, args) {
   // Parent path: ../field
   if (fieldPath.startsWith('../')) {
     const parentField = fieldPath.slice(3);
-    // Get parent data from hydra context (live UI) or pageFormData (during buildBlockPathMap)
+    // Two valid sources for blockPathMap/blockId, see inheritSchemaFrom and
+    // hideParentOwnedFields for the full design note. Args drives the
+    // buildBlockPathMap pass 2 path; hydraContext drives sidebar render.
     const hydraContext = getHydraSchemaContext?.();
-    if (hydraContext?.blockPathMap && hydraContext?.currentBlockId) {
-      const pathInfo = hydraContext.blockPathMap[hydraContext.currentBlockId];
+    const blockPathMap = args?.blockPathMap || hydraContext?.blockPathMap;
+    const blockId = args?.blockId ?? hydraContext?.currentBlockId;
+    if (blockPathMap && blockId) {
+      const pathInfo = blockPathMap[blockId];
       if (pathInfo?.parentId && pathInfo.parentId !== PAGE_BLOCK_UID) {
         // Nested block - get parent block data
-        const parentBlock = getLiveBlockData?.(pathInfo.parentId);
+        const liveFallback = { formData: args?.pageFormData, blockPathMap };
+        const parentBlock = getLiveBlockData?.(pathInfo.parentId, liveFallback);
         return parentBlock?.[parentField];
       } else {
-        // Top-level block - parent is the page, use hydraContext.formData
-        return hydraContext.formData?.[parentField];
+        // Top-level block - parent is the page, use page-level formData
+        const pageFormData = args?.pageFormData || hydraContext?.formData;
+        return pageFormData?.[parentField];
       }
     }
-    // Fallback for schema builds outside live UI (e.g., buildBlockPathMap)
+    // Last resort: pageFormData was passed but pathmap/blockId weren't.
+    // Treat ../field as a page-level lookup.
     return args?.pageFormData?.[parentField];
   }
 
@@ -1617,14 +1971,12 @@ function createSingleEnhancerLegacy(recipe) {
  *
  * Used by inheritSchemaFrom to compute choices for the typeField.
  * Logic:
- * 1. Start with allowedBlocks (if provided)
- * 2. Or derive from blocksField (container's blocks field schema)
- * 3. Or fall back to parent's allowedSiblingTypes from pathMap
- * 4. Fall back to all non-restricted blocks (or all if filtering)
- * 5. Filter by filterConvertibleFrom (types with fieldMappings[source])
+ * 1. Derive from blocksField (container's blocks field schema, or auto-discovered)
+ * 2. Or fall back to parent's allowedSiblingTypes from pathMap
+ * 3. Fall back to all non-restricted blocks (or all if filtering)
+ * 4. Filter by filterConvertibleFrom (types with fieldMappings[source])
  *
  * @param {Object} options - Configuration options
- * @param {string[]} options.allowedBlocks - Static list of allowed types
  * @param {string} options.blocksField - Container field name to derive allowedBlocks from (e.g., 'blocks')
  * @param {string} options.filterConvertibleFrom - Source type to filter by (e.g., '@default')
  * @param {Object} blocksConfig - Block configuration registry
@@ -1652,10 +2004,7 @@ function getFirstBlocksField(blockId, blockPathMap) {
 export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId, formData, intl) {
   if (!blocksConfig) return [];
 
-  const { allowedBlocks, blocksField, filterConvertibleFrom } = options || {};
-
-  // Determine base types in order of precedence
-  let types = allowedBlocks;
+  const { blocksField, filterConvertibleFrom } = options || {};
 
   // Derive from container's blocks field schema
   // blocksField specifies which container field to get allowedBlocks from
@@ -1666,7 +2015,8 @@ export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId
     effectiveBlocksField = getFirstBlocksField(blockId, blockPathMap);
   }
 
-  if (!types && effectiveBlocksField) {
+  let types;
+  if (effectiveBlocksField) {
     if (effectiveBlocksField === '..') {
       // ".." means get sibling allowed types from parent container
       // This is available via blockPathMap[blockId].allowedSiblingTypes
@@ -2060,8 +2410,8 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
   const blockType = newBlockData['@type'];
   const blockConfig = blocksConfig?.[blockType];
 
-  // Check if block has itemTypeField configured
-  const typeField = blockConfig?.itemTypeField;
+  // Resolve typeField via the standard lookup (recipe → schema walk → legacy)
+  const typeField = findTypeField(blockConfig, intl);
   if (!typeField) return formData;
 
   // Check if typeField value changed
@@ -2084,11 +2434,11 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
     }
   }
 
-  // Determine which blocks field to sync
-  // Use configured blocksField from enhancer or default to first blocks field from pathMap
-  const enhancerConfig = blockConfig?.schemaEnhancer?.config;
-  const configuredBlocksField = enhancerConfig?.blocksField;
-  const effectiveBlocksField = configuredBlocksField ?? getFirstBlocksField(blockId, blockPathMap);
+  // Determine which blocks field to sync.
+  // 1. Schema declaration: blocks field with `itemTypeField: '<typeField>'`
+  // 2. Fallback: first blocks field discovered from pathMap (legacy)
+  const declaredBlocksField = findBlocksFieldForTypeField(blockConfig, typeField, intl);
+  const effectiveBlocksField = declaredBlocksField ?? getFirstBlocksField(blockId, blockPathMap);
 
   // Get child block IDs, filtered to the effective blocks field
   const allChildIds = getChildBlockIds(blockId, blockPathMap);
@@ -2105,7 +2455,7 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
 
     const childType = childBlock['@type'];
     const childConfig = blocksConfig?.[childType];
-    const childTypeField = childConfig?.itemTypeField;
+    const childTypeField = findTypeField(childConfig, intl);
 
     if (childTypeField) {
       // Child has its own inheritSchemaFrom - change its typeField, not @type

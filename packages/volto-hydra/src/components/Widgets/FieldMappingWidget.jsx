@@ -19,6 +19,7 @@ import {
   getBlockTypeSchema,
   computeSmartDefaults,
   getFieldType,
+  findTypeField,
 } from '../../utils/schemaInheritance';
 import { useHydraSchemaContext } from '../../context/HydraSchemaContext';
 import { getBlockById } from '../../utils/blockPath';
@@ -58,13 +59,16 @@ const FieldMappingWidget = (props) => {
     return getBlockById(hydraCtx.formData, hydraCtx.blockPathMap, block);
   })();
 
-  // Read itemTypeField from block-level config
-  const blockType = blockData?.['@type'];
-  const itemTypeField = config.blocks.blocksConfig[blockType]?.itemTypeField;
-  const targetType = blockData?.[itemTypeField];
-
   const intl = useIntl();
   const Select = reactSelect.default;
+
+  // Resolve typeField via the standard lookup (recipe → schema walk → legacy)
+  const blockType = blockData?.['@type'];
+  const itemTypeField = findTypeField(
+    config.blocks.blocksConfig[blockType],
+    intl,
+  );
+  const targetType = blockData?.[itemTypeField];
 
   // Get target schema and compute smart defaults
   const blocksConfig = config.blocks.blocksConfig;

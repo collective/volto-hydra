@@ -558,6 +558,63 @@ export class Bridge {
   }
 
   /**
+   * Compile a per-block list of editable fields, derived from the rendered DOM.
+   * Each block's user-frontend renders elements with `data-edit-text` (slate),
+   * `data-edit-link` (link), or `data-edit-media` (media) attributes — the
+   * authoritative declaration of "this field is end-user editable in the
+   * iframe." This is distinct from the block's full schema, which also
+   * includes settings fields (placeholder, instructions, fixed, etc.) that
+   * appear in the sidebar but aren't user content.
+   *
+   * Result shape: `{ blockId: [{ fieldName, type }, ...], ... }`
+   *   type ∈ 'slate' | 'link' | 'media'
+   *
+   * Sent with SLATE_TRANSFORM_REQUEST so the admin's merge / transform
+   * handlers can decide e.g. "is the previous block a single-slate-content
+   * block?" without schema-introspecting (which double-counts settings).
+   */
+  getEditableFieldsByBlock() {
+    const ATTR_TO_TYPE = {
+      'data-edit-text': 'slate',
+      'data-edit-link': 'link',
+      'data-edit-media': 'media',
+    };
+    const result = {};
+    if (!this.blockPathMap) return result;
+    for (const blockUid of Object.keys(this.blockPathMap)) {
+      if (blockUid === '_schemas' || blockUid === '_page') continue;
+      const elements = this.getAllBlockElements(blockUid);
+      if (!elements?.length) continue;
+      const fields = [];
+      const seen = new Set();
+      for (const el of elements) {
+        for (const [attr, type] of Object.entries(ATTR_TO_TYPE)) {
+          // Block element itself may carry the attribute (Nuxt pattern).
+          if (el.hasAttribute?.(attr)) {
+            const fieldName = el.getAttribute(attr);
+            const key = `${attr}:${fieldName}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              fields.push({ fieldName, type });
+            }
+          }
+          for (const node of el.querySelectorAll(`[${attr}]`)) {
+            if (!this.fieldBelongsToBlock(node, el)) continue;
+            const fieldName = node.getAttribute(attr);
+            const key = `${attr}:${fieldName}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              fields.push({ fieldName, type });
+            }
+          }
+        }
+      }
+      if (fields.length) result[blockUid] = fields;
+    }
+    return result;
+  }
+
+  /**
    * Get the first editable field that belongs directly to a block, excluding nested blocks' fields.
    * Also checks if the blockElement itself has data-edit-text (Nuxt pattern).
    *
@@ -10971,7 +11028,11 @@ export class Bridge {
     // Get current form data (includes any typed text since formData is updated immediately)
     const data = this.getFormDataWithoutNodeIds();
 
-    // Send the unified transform request with form data included
+    // Send the unified transform request with form data included.
+    // editableFieldsByBlock tells the admin what's user-editable per block
+    // (derived from data-edit-* attributes the user's frontend renders);
+    // admin's merge / transform handlers use it instead of schema-counting,
+    // which would over-count settings fields like placeholder/instructions.
     window.parent.postMessage({
       type: 'SLATE_TRANSFORM_REQUEST',
       transformType: transformType,
@@ -10980,6 +11041,7 @@ export class Bridge {
       data: data,
       selection: this.serializeSelection() || {},
       requestId: requestId,
+      editableFieldsByBlock: this.getEditableFieldsByBlock(),
       ...transformFields,
     }, this.adminOrigin);
 

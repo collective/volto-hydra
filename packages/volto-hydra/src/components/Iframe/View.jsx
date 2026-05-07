@@ -168,6 +168,9 @@ import {
   applySchemaDefaultsToFormData,
   applyBlockDefaultsWithContext,
   createSchemaEnhancerFromRecipe,
+  installVariationFieldEnhancers,
+  installChildBlockEnhancers,
+  populateTypeSchemaCache,
   syncChildBlockTypes,
   getConvertibleTypes,
   convertBlockType,
@@ -380,7 +383,57 @@ function _isObject(item) {
     !Array.isArray(item)
   );
 }
-function deepMerge(entry, newConfig) {
+
+/**
+ * Merge two `fieldsets` arrays — special-cased because plain replacement
+ * (deepMerge's default for arrays) silently drops every fieldset the base
+ * declared, which is almost never what an override author intends.
+ *
+ * Strategy:
+ *   - Match fieldsets by `id`. For matches, merge the two: union `fields`
+ *     (base order preserved, overrides appended; duplicates dropped),
+ *     other props (`title`, etc.) override-wins.
+ *   - Fieldsets in `over` with no match in `base` are appended.
+ *   - Fieldsets in `base` with no match in `over` are preserved.
+ *
+ * For the common author intent — "I want to add `variation` to listing's
+ * default fieldset" — this gives the right shape (Volto's fields stay,
+ * variation gets added) instead of nuking everything that was there.
+ *
+ * Note: this can't express *removing* a base field. If that's needed,
+ * the override author should produce the desired array directly via a
+ * function-form blockSchema, not a static override.
+ */
+function _mergeFieldsets(base, over) {
+  if (!Array.isArray(base)) return over;
+  if (!Array.isArray(over)) return base;
+  const byId = new Map();
+  const result = [];
+  for (const fs of base) {
+    const copy = { ...fs, fields: [...(fs.fields || [])] };
+    byId.set(fs.id, copy);
+    result.push(copy);
+  }
+  for (const fs of over) {
+    const target = byId.get(fs.id);
+    if (target) {
+      const merged = [...target.fields];
+      for (const f of fs.fields || []) {
+        if (!merged.includes(f)) merged.push(f);
+      }
+      Object.assign(target, fs, { fields: merged });
+    } else {
+      result.push({ ...fs, fields: [...(fs.fields || [])] });
+    }
+  }
+  return result;
+}
+
+function deepMerge(entry, newConfig, _key) {
+  // Special-case `fieldsets` arrays — see _mergeFieldsets above.
+  if (_key === 'fieldsets' && Array.isArray(entry) && Array.isArray(newConfig)) {
+    return _mergeFieldsets(entry, newConfig);
+  }
   let output = Object.assign({}, entry);
   if (_isObject(entry) && _isObject(newConfig)) {
     Object.keys(newConfig).forEach((key) => {
@@ -399,8 +452,11 @@ function deepMerge(entry, newConfig) {
             return deepMerge(result, overrides);
           };
         } else {
-          output[key] = deepMerge(entry[key], newConfig[key]);
+          output[key] = deepMerge(entry[key], newConfig[key], key);
         }
+      } else if (key === 'fieldsets' && Array.isArray(newConfig[key]) && Array.isArray(entry[key])) {
+        // fieldsets is an array (so _isObject returned false) — handle here too.
+        output[key] = _mergeFieldsets(entry[key], newConfig[key]);
       } else {
         Object.assign(output, { [key]: newConfig[key] });
       }
@@ -2215,18 +2271,22 @@ const Iframe = (props) => {
                 const prevValue = prevBlock?.[fieldName];
                 const currentValue = currentBlock?.[fieldName];
 
-                // Only merge single-text-field blocks (e.g. slate paragraphs)
-                // Multi-field blocks (hero, teaser) should not merge
-                const prevSchema = getResolvedSchema(prevPathInfo, mergeBpm);
-                const prevEditableFields = prevSchema?.properties
-                  ? Object.entries(prevSchema.properties).filter(([, def]) => {
-                      const ft = getFieldTypeString(def);
-                      return ft?.includes('slate') || ft === 'string' || ft === 'string:text' || ft === 'string:textarea';
-                    })
-                  : [];
-                const isSingleTextField = prevEditableFields.length === 1 && prevEditableFields[0][0] === fieldName;
+                // Only merge single-text-field blocks (e.g. slate paragraphs).
+                // Multi-field blocks (hero, teaser) should not merge.
+                //
+                // The iframe sends editableFieldsByBlock — derived from the
+                // rendered DOM's data-edit-text/link/media attributes —
+                // which is the authoritative "what fields are user-editable
+                // in this block?" answer. Schema-introspection here would
+                // over-count settings fields (placeholder, instructions,
+                // fixed, etc.) that exist in the sidebar form but aren't
+                // user content.
+                const prevEditableFields = event.data.editableFieldsByBlock?.[prevBlockId] || [];
+                const isSingleTextField = prevEditableFields.length === 1
+                  && prevEditableFields[0].fieldName === fieldName
+                  && prevEditableFields[0].type === 'slate';
 
-                log('unwrapBlock merge check:', { prevBlockId, prevType: prevBlock?.['@type'], fieldName, isSingleTextField, prevEditableFields: prevEditableFields.map(([n]) => n), hasPrevValue: Array.isArray(prevValue), hasCurrentValue: Array.isArray(currentValue) });
+                log('unwrapBlock merge check:', { prevBlockId, prevType: prevBlock?.['@type'], fieldName, isSingleTextField, prevEditableFields, hasPrevValue: Array.isArray(prevValue), hasCurrentValue: Array.isArray(currentValue) });
 
                 if (isSingleTextField && Array.isArray(prevValue) && Array.isArray(currentValue)) {
                   log('unwrapBlock merge: merging', mergeBlockId, 'into', prevBlockId);
@@ -2908,7 +2968,7 @@ const Iframe = (props) => {
             // When the frontend sends a recipe (e.g., { inheritSchemaFrom: {...} }),
             // chain it with any existing function enhancer from admin plugins (e.g., listing's
             // fieldMapping/b_size removal) rather than replacing it.
-            const recipeKeys = ['inheritSchemaFrom', 'childBlockConfig', 'fieldRules'];
+            const recipeKeys = ['inheritSchemaFrom', 'fieldRules'];
             for (const [blockType, blockConfig] of Object.entries(blocksConfig)) {
               const recipe = blockConfig.schemaEnhancer;
               // Check if it's a recipe (has known enhancer keys, type property, or is array)
@@ -2939,6 +2999,30 @@ const Iframe = (props) => {
           if (event.data.voltoConfig) {
             recurseUpdateVoltoConfig(event.data.voltoConfig);
           }
+
+          // 1d. Install variation field enhancers for blocks with `variations.length>1`.
+          // Volto would normally add the variation field at sidebar render via
+          // withVariationSchemaEnhancer, but that means the field is missing from
+          // pathmap-built schemas. Prepending the enhancer to each block's chain
+          // makes pathmap schemas a true superset of what Volto would render.
+          installVariationFieldEnhancers(config.blocks.blocksConfig);
+
+          // 1d.1. Auto-apply hideParentOwnedFields to every block. Any block can
+          // be a child of a parent that uses schema inheritance (typeField +
+          // mappingField); installing this enhancer for all blocks makes
+          // parent-owned fields automatically hide on the child sidebar form
+          // when the parent has a type selected. Blocks don't need to opt in
+          // or remember per-child-block configuration. Parents declare
+          // additional claimed fields per child type via
+          // `inheritSchemaFrom.parentControlled`.
+          installChildBlockEnhancers(config.blocks.blocksConfig);
+
+          // 1e. Eager-populate the type schema cache. Done now (before any sidebar
+          // rendering kicks off) so the cache is filled with no instance context
+          // present. Avoids the previous bug where the lazy fill happened during a
+          // sidebar render and inherited that render's instance identity, polluting
+          // the cached "type-level" schema.
+          populateTypeSchemaCache(config.blocks.blocksConfig, intl);
 
           // 2. Process page schema — page.schema.properties is an object keyed by fieldName
           // Default: { blocks_layout: { title: 'Blocks' } }

@@ -157,12 +157,9 @@ export const sharedBlocksConfig = {
         title: 'Slider',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="8" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/></svg>',
         group: 'common',
-        itemTypeField: 'variation',
         schemaEnhancer: {
             inheritSchemaFrom: {
                 defaultsField: 'itemDefaults',
-                blocksField: 'slides',
-                title: 'Item Type',
             },
         },
         blockSchema: {
@@ -170,16 +167,21 @@ export const sharedBlocksConfig = {
                 {
                     id: 'default',
                     title: 'Default',
-                    fields: ['slides', 'autoplayEnabled', 'autoplayDelay', 'autoplayJump'],
+                    fields: ['slides', 'variation', 'autoplayEnabled', 'autoplayDelay', 'autoplayJump'],
                 },
             ],
             properties: {
                 slides: {
                     title: 'Slides',
                     widget: 'object_list',
+                    itemTypeField: 'variation',  // sync trigger — names the sibling field
                     allowedBlocks: ['slide', 'image', 'listing', 'teaser'],
                     typeField: '@type',
                     defaultBlockType: 'slide',
+                },
+                variation: {
+                    title: 'Item Type',
+                    widget: 'blockTypeSelect',
                 },
                 autoplayEnabled: {
                     title: 'Autoplay Enabled',
@@ -213,12 +215,9 @@ export const sharedBlocksConfig = {
             '@default': { '@id': 'href', 'title': 'title', 'description': 'description', 'image': 'preview_image' },
             image: { 'href': 'href', 'alt': 'title', 'url': 'preview_image' },
         },
-        schemaEnhancer: {
-            childBlockConfig: {
-                defaultsField: 'itemDefaults',
-                editableFields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'],
-            },
-        },
+        // No childBlockConfig needed — installChildBlockEnhancers auto-applies
+        // hideParentOwnedFields. Parent (slider) has no mappingField and no
+        // parentControlled config, so nothing is hidden by default.
         blockSchema: {
             title: 'Slide',
             fieldsets: [{ id: 'default', title: 'Default', fields: ['head_title', 'title', 'description', 'preview_image', 'buttonText', 'hideButton'] }],
@@ -331,14 +330,31 @@ export const sharedBlocksConfig = {
     // filterConvertibleFrom: '@default' means only show types whose fieldMappings
     // include @default as a source (i.e., can convert from catalog brain fields)
     listing: {
-        itemTypeField: 'variation',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['variation', 'fieldMapping'] }],
+            properties: {
+                variation: {
+                    title: 'Item Type',
+                    widget: 'blockTypeSelect',
+                    filterConvertibleFrom: '@default',
+                    default: 'summary',
+                },
+                // fieldMapping field is rendered by inheritSchemaFrom via mappingField
+            },
+        },
         schemaEnhancer: {
             inheritSchemaFrom: {
+                typeField: 'variation',  // listing has no blocks field — declare on recipe
                 mappingField: 'fieldMapping',
                 defaultsField: 'itemDefaults',
-                filterConvertibleFrom: '@default',
-                title: 'Item Type',
-                default: 'summary',
+                // Override the default "hide everything not in @default":
+                // teaser has an `overwrite` meta-toggle that should remain
+                // editable per-child so the user can override auto-populated
+                // values for a specific teaser. Listing claims styling/link
+                // fields uniformly across items; not the override toggle.
+                parentControlled: {
+                    teaser: ['head_title', 'openLinkInNewTab', 'styles'],
+                },
             },
         },
     },
@@ -394,41 +410,48 @@ export const sharedBlocksConfig = {
     },
     gridBlock: {
         allowedBlocks: ['teaser', 'image'],
-        itemTypeField: 'variation',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['blocks_layout', 'variation'] }],
+            properties: {
+                blocks_layout: {
+                    widget: 'blocks_layout',
+                    itemTypeField: 'variation',  // sync trigger
+                    allowedBlocks: ['teaser', 'image'],
+                },
+                variation: {
+                    title: 'Item Type',
+                    widget: 'blockTypeSelect',
+                },
+            },
+        },
         schemaEnhancer: {
             inheritSchemaFrom: {
                 defaultsField: 'itemDefaults',
-                blocksField: 'blocks_layout',
-                title: 'Item Type',
+                // Same override as listing — keep teaser's `overwrite` toggle
+                // editable per-child even when grid has a type selected.
+                parentControlled: {
+                    teaser: ['head_title', 'openLinkInNewTab', 'styles'],
+                },
             },
         },
     },
     // Teaser block: use Volto's TeaserSchema (has href with object_browser)
     // fieldMappings come from volto-hydra index.js (merged via deepMerge)
+    // No childBlockConfig — installChildBlockEnhancers auto-applies
+    // hideParentOwnedFields. Parents declare what they additionally claim
+    // for teasers via inheritSchemaFrom.parentControlled.teaser.
     teaser: {
         id: 'teaser',
         title: 'Teaser',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>',
         group: 'common',
-        schemaEnhancer: {
-            childBlockConfig: {
-                defaultsField: 'itemDefaults',
-                editableFields: ['href', 'title', 'description', 'preview_image', 'overwrite'],
-            },
-        },
     },
-    // Image block: configure which fields are editable on child vs parent
+    // Image block: parents declare claims via inheritSchemaFrom.parentControlled.image.
     image: {
         id: 'image',
         title: 'Image',
         fieldMappings: {
             '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },
-        },
-        schemaEnhancer: {
-            childBlockConfig: {
-                defaultsField: 'itemDefaults',
-                editableFields: ['url', 'alt', 'href'],
-            },
         },
     },
     // Form block: uses typed object_list for field types (like search block facets)
