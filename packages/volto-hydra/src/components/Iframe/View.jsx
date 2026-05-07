@@ -169,6 +169,7 @@ import {
   applyBlockDefaultsWithContext,
   createSchemaEnhancerFromRecipe,
   installVariationFieldEnhancers,
+  installChildBlockEnhancers,
   populateTypeSchemaCache,
   syncChildBlockTypes,
   getConvertibleTypes,
@@ -2967,7 +2968,7 @@ const Iframe = (props) => {
             // When the frontend sends a recipe (e.g., { inheritSchemaFrom: {...} }),
             // chain it with any existing function enhancer from admin plugins (e.g., listing's
             // fieldMapping/b_size removal) rather than replacing it.
-            const recipeKeys = ['inheritSchemaFrom', 'childBlockConfig', 'fieldRules'];
+            const recipeKeys = ['inheritSchemaFrom', 'fieldRules'];
             for (const [blockType, blockConfig] of Object.entries(blocksConfig)) {
               const recipe = blockConfig.schemaEnhancer;
               // Check if it's a recipe (has known enhancer keys, type property, or is array)
@@ -3005,6 +3006,16 @@ const Iframe = (props) => {
           // pathmap-built schemas. Prepending the enhancer to each block's chain
           // makes pathmap schemas a true superset of what Volto would render.
           installVariationFieldEnhancers(config.blocks.blocksConfig);
+
+          // 1d.1. Auto-apply hideParentOwnedFields to every block. Any block can
+          // be a child of a parent that uses schema inheritance (typeField +
+          // mappingField); installing this enhancer for all blocks makes
+          // parent-owned fields automatically hide on the child sidebar form
+          // when the parent has a type selected. Blocks don't need to opt in
+          // or remember per-child-block configuration. Parents declare
+          // additional claimed fields per child type via
+          // `inheritSchemaFrom.parentControlled`.
+          installChildBlockEnhancers(config.blocks.blocksConfig);
 
           // 1e. Eager-populate the type schema cache. Done now (before any sidebar
           // rendering kicks off) so the cache is filled with no instance context

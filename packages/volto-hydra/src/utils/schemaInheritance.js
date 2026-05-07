@@ -174,6 +174,68 @@ export function installVariationFieldEnhancers(blocksConfig) {
 }
 
 /**
+ * Append a `hideParentOwnedFields()` enhancer to every block's schemaEnhancer
+ * chain. Idempotent (already-installed enhancers are tagged via
+ * `_isChildBlockEnhancer`).
+ *
+ * Why: in Volto Hydra, any block can be a child of a parent that uses
+ * schema inheritance (typeField + mappingField). Auto-installing the
+ * enhancer makes the default behavior correct: when a parent has a
+ * typeField selected and claims fields (via runtime fieldMapping or via
+ * `parentControlled[childType]`), those fields are hidden on the child
+ * sidebar form. Blocks don't need to opt in or remember any per-child
+ * configuration.
+ *
+ * Parent-side override: declare a `parentControlled: { childType: [...] }`
+ * map on the parent's `inheritSchemaFrom` config to claim ADDITIONAL
+ * fields beyond what runtime fieldMapping captures (e.g. styling fields
+ * that the parent always owns).
+ *
+ * Call this once at INIT, after blocksConfig is fully populated.
+ */
+export function installChildBlockEnhancers(blocksConfig) {
+  if (!blocksConfig) return;
+  for (const blockType of Object.keys(blocksConfig)) {
+    const cfg = blocksConfig[blockType];
+    if (!cfg || blockType === '_page') continue;
+
+    const existing = cfg.schemaEnhancer;
+    const isInstalled = (fn) => fn?._isChildBlockEnhancer === true;
+
+    if (typeof existing === 'function') {
+      if (isInstalled(existing)) continue;
+      if (Array.isArray(existing._parts) && existing._parts.some(isInstalled)) continue;
+    } else if (existing && typeof existing === 'object') {
+      // Recipe form — `createSchemaEnhancerFromRecipe` turns it into a
+      // function elsewhere. We can't rewrite the recipe here cleanly; the
+      // recipe processor will run its enhancers and we install ours later
+      // via the function-form branch above on a subsequent INIT pass.
+      continue;
+    }
+
+    const childEnhancer = hideParentOwnedFields();
+    childEnhancer._isChildBlockEnhancer = true;
+    childEnhancer._needsBlockPathMap = true;
+
+    let combined;
+    if (typeof existing === 'function') {
+      // Append after existing parts so other enhancers add their fields
+      // first; we hide last from the final schema.
+      const parts = Array.isArray(existing._parts)
+        ? [...existing._parts, childEnhancer]
+        : [existing, childEnhancer];
+      combined = (args) => parts.reduce((schema, fn) => fn({ ...args, schema }), args.schema);
+      combined.config = existing.config;
+      combined._parts = parts;
+    } else {
+      combined = childEnhancer;
+    }
+
+    cfg.schemaEnhancer = combined;
+  }
+}
+
+/**
  * Resolve a block's blockSchema.properties, handling both static and
  * factory-form blockSchemas. Returns null if no schema declared.
  *
@@ -734,31 +796,21 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
       mappingField ? Object.values(effectiveMapping).map(getMappingTarget) : [],
     );
 
-    // Resolve which fields belong to the child (shared logic with hideParentOwnedFields)
+    // Use the same parent/child split that hideParentOwnedFields uses.
+    // Parent's "Item Defaults" fieldset = parent-claimed fields, MINUS the
+    // mapped ones (mapped values come from queried data, not defaults).
     const childConfig = blocksConfig[referencedType];
-    const childOwnFields = resolveChildOwnFields(childConfig);
-    const parentControlledFields = childConfig?.schemaEnhancer?.config?.parentControlledFields;
+    const claimCtx = {
+      mappedFields,
+      parentControlled: typeFieldOptions?.parentControlled?.[referencedType],
+      childOwnFields: resolveChildOwnFields(childConfig),
+    };
 
-    // Get non-mapped fields from referenced type, filtered by field control settings
-    // Use underscore separator for flat keys (Volto forms don't handle nested paths)
     const inheritedFields = Object.entries(referencedSchema.properties)
       .filter(([fieldName]) => {
-        // Skip the typeField itself - it's on the parent, not inherited
         if (fieldName === typeField) return false;
-
-        // Skip mapped fields
         if (mappedFields.has(fieldName)) return false;
-
-        // If parentControlledFields defined: only inherit those specific fields
-        if (parentControlledFields) {
-          return parentControlledFields.includes(fieldName);
-        }
-        // If child's own fields resolved: inherit everything NOT in that set
-        if (childOwnFields) {
-          return !childOwnFields.has(fieldName);
-        }
-        // Default: inherit all non-mapped fields
-        return true;
+        return isFieldParentClaimed(fieldName, claimCtx);
       })
       .map(([fieldName, fieldDef]) => ({
         name: `${defaultsField}_${fieldName}`,
@@ -825,27 +877,32 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
 }
 
 /**
- * Creates a schemaEnhancer that hides fields owned by parent container.
+ * Creates a schemaEnhancer that hides fields claimed by the parent container.
  *
- * Use this on child block types that can appear in containers with inherited defaults.
- * Specify either:
- * - editableFields: allowlist of fields that stay on child (everything else hidden)
- * - parentControlledFields: blocklist of fields that go to parent (only these hidden)
+ * Auto-applied to every block by `installChildBlockEnhancers()` at INIT —
+ * blocks don't need to declare it. The enhancer is a no-op unless the block
+ * is rendered as a child of a parent that uses schema inheritance (parent
+ * has a typeField with a selected value).
  *
- * @param {Object} options - Configuration options
- * @param {string[]} options.editableFields - Allowlist of fields to keep on child
- * @param {string[]} options.parentControlledFields - Blocklist of fields to hide from child
+ * What gets hidden:
+ *   1. Fields the parent's runtime `fieldMapping` widget targets — i.e.
+ *      whatever the user has explicitly mapped via `mappingField`.
+ *   2. Fields listed in the parent's `parentControlled[childType]` config —
+ *      additional fields the parent always claims for child blocks of a
+ *      given type (e.g. styling fields, alignment) that aren't typed-mapped.
+ *
+ * The parent declares both via its `inheritSchemaFrom` recipe:
+ *
+ *     schemaEnhancer: {
+ *       inheritSchemaFrom: {
+ *         mappingField: 'fieldMapping',
+ *         parentControlled: { teaser: ['styles'], image: ['caption'] },
+ *       },
+ *     }
+ *
  * @returns {Function} - A schemaEnhancer function
- *
- * @example
- * // In schemaEnhancer config (preferred format):
- * schemaEnhancer: {
- *   childBlockConfig: {
- *     editableFields: ['href', 'title', 'description']
- *   }
- * }
  */
-export function hideParentOwnedFields({ editableFields, parentControlledFields } = {}) {
+export function hideParentOwnedFields() {
 
   return (args) => {
     const { schema, intl, blockPathMap: passedBlockPathMap, blockId: passedBlockId } = args;
@@ -888,46 +945,26 @@ export function hideParentOwnedFields({ editableFields, parentControlledFields }
       }
     }
 
-    // Determine which fields to hide using the shared child/parent split logic
-    let fieldsToHide = new Set();
+    // Hide every field the parent claims (single source of truth via
+    // isFieldParentClaimed; same rule used by inheritSchemaFrom when it
+    // computes the parent's "Item Defaults" fieldset).
+    const childBlock = getLiveBlockData(blockId, liveFallback);
+    const childType = childBlock?.['@type'];
+    const childBlockConfig = childType ? blocksConfig?.[childType] : null;
+    const parentBlock = getLiveBlockData(pathInfo.parentId, liveFallback);
+    const parentConfig = parentBlock ? blocksConfig?.[parentBlock['@type']] : null;
 
-    if (editableFields) {
-      // Explicit param overrides config (backward compat for direct callers)
-      for (const fieldName of Object.keys(schema.properties || {})) {
-        if (!editableFields.includes(fieldName)) {
-          fieldsToHide.add(fieldName);
-        }
-      }
-    } else if (parentControlledFields) {
-      // Blocklist mode: hide only parentControlledFields
-      fieldsToHide = new Set(parentControlledFields);
-    } else if (blocksConfig) {
-      // Resolve from child config (editableFields → fieldMappings['@default'])
-      const childBlock = getLiveBlockData(blockId, liveFallback);
-      const childType = childBlock?.['@type'];
-      let childOwnFields = childType ? resolveChildOwnFields(blocksConfig[childType]) : null;
+    const claimCtx = {
+      mappedFields: _runtimeMappingTargets(parentConfig, parentBlock),
+      parentControlled:
+        parentConfig?.schemaEnhancer?.config?.parentControlled?.[childType],
+      childOwnFields: resolveChildOwnFields(childBlockConfig),
+    };
 
-      // Last resort: parent's runtime fieldMapping widget targets
-      if (!childOwnFields) {
-        const parentBlock = getLiveBlockData(pathInfo.parentId, liveFallback);
-        if (parentBlock) {
-          const parentConfig = blocksConfig[parentBlock['@type']];
-          const mappingField = parentConfig?.schemaEnhancer?.config?.mappingField;
-          const fieldMapping = mappingField ? parentBlock[mappingField] : null;
-          if (fieldMapping && Object.keys(fieldMapping).length > 0) {
-            childOwnFields = new Set(
-              Object.values(fieldMapping).map(getMappingTarget).filter(Boolean)
-            );
-          }
-        }
-      }
-
-      if (childOwnFields) {
-        for (const fieldName of Object.keys(schema.properties || {})) {
-          if (!childOwnFields.has(fieldName)) {
-            fieldsToHide.add(fieldName);
-          }
-        }
+    const fieldsToHide = new Set();
+    for (const fieldName of Object.keys(schema.properties || {})) {
+      if (isFieldParentClaimed(fieldName, claimCtx)) {
+        fieldsToHide.add(fieldName);
       }
     }
 
@@ -1020,20 +1057,78 @@ export function getDefaultMappingTargets(blockConfig) {
 }
 
 /**
- * Resolve which fields belong to the child block (child-editable).
- * Used by both inheritSchemaFrom (to skip child fields) and hideParentOwnedFields
- * (to hide non-child fields) so the split is determined in one place.
+ * Set of field names targeted by a parent block's runtime `fieldMapping`
+ * widget value. These are the fields parent has explicitly mapped to
+ * source data — claimed regardless of any other rules.
  *
- * Fallback chain:
- *   1. Explicit editableFields from childBlockConfig recipe
- *   2. Child type's fieldMappings['@default'] targets
+ * @param {Object} parentConfig  blocksConfig entry for the parent block type
+ * @param {Object} parentBlockData  the parent block's runtime data (for
+ *   reading the mappingField value)
+ * @returns {Set<string>}
+ * @private
+ */
+function _runtimeMappingTargets(parentConfig, parentBlockData) {
+  const targets = new Set();
+  const mappingField = parentConfig?.schemaEnhancer?.config?.mappingField;
+  const fieldMapping = mappingField ? parentBlockData?.[mappingField] : null;
+  if (!fieldMapping) return targets;
+  for (const mapping of Object.values(fieldMapping)) {
+    const target = getMappingTarget(mapping);
+    if (target) targets.add(target);
+  }
+  return targets;
+}
+
+/**
+ * Resolve which fields belong to the child block (child-editable). Used
+ * by inheritSchemaFrom to skip child-owned fields when computing the
+ * parent's defaults fieldset. Returns the targets of the child type's
+ * fieldMappings['@default'], or null if none declared.
  *
- * Returns a Set of child-owned field names, or null if undetermined.
+ * @returns {Set<string>|null}
  */
 export function resolveChildOwnFields(childBlockConfig) {
-  const enhancerConfig = childBlockConfig?.schemaEnhancer?.config;
-  if (enhancerConfig?.editableFields) return new Set(enhancerConfig.editableFields);
   return getDefaultMappingTargets(childBlockConfig);
+}
+
+/**
+ * Single source of truth for the parent/child split.
+ *
+ * Given a parent and child config + the runtime context, decide whether a
+ * given field on the child is "parent-claimed" (i.e., parent owns it; hide
+ * on child sidebar; include in parent's itemDefaults / fieldMapping).
+ *
+ * Used by:
+ *   - hideParentOwnedFields: per-field, decides what to hide on the child.
+ *   - inheritSchemaFrom: per-field on the referenced child schema, decides
+ *     what goes into the parent's "Item Defaults" fieldset.
+ *
+ * Rules (in order):
+ *   1. If field is in parent's runtime fieldMapping targets → claimed
+ *      (parent's mappingField widget already drives the value from data).
+ *   2. If parent declares an explicit `parentControlled[childType]` list →
+ *      claimed iff in that list.
+ *   3. Else (no override): claimed iff NOT in child's
+ *      `fieldMappings['@default']` targets. Default split is "child owns
+ *      what its @default declares; parent owns the rest."
+ *   4. If child has no `fieldMappings['@default']` and no parent override →
+ *      nothing is claimed (block isn't opted into the inheritance system).
+ *
+ * @param {string} fieldName
+ * @param {Object} ctx
+ * @param {Set<string>} [ctx.mappedFields]    Targets of parent.fieldMapping
+ * @param {string[]}    [ctx.parentControlled] Parent's explicit per-childType list
+ * @param {Set<string>} [ctx.childOwnFields]   Child's fieldMappings['@default'] targets
+ * @returns {boolean}
+ */
+export function isFieldParentClaimed(
+  fieldName,
+  { mappedFields, parentControlled, childOwnFields } = {},
+) {
+  if (mappedFields?.has(fieldName)) return true;
+  if (Array.isArray(parentControlled)) return parentControlled.includes(fieldName);
+  if (childOwnFields && childOwnFields.size > 0) return !childOwnFields.has(fieldName);
+  return false;
 }
 
 export function computeSmartDefaults(sourceFields, targetSchema, declaredMappings) {
@@ -1381,8 +1476,7 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
  * Create a schemaEnhancer function from a declarative recipe.
  *
  * New format (supports combining multiple enhancers):
- *   { inheritSchemaFrom: { typeField, defaultsField, mappingField?, filterConvertibleFrom?, blocksField?, title?, default? } }
- *   { childBlockConfig: { defaultsField, editableFields?, parentControlledFields? } }
+ *   { inheritSchemaFrom: { typeField, defaultsField, mappingField?, parentControlled?, filterConvertibleFrom?, blocksField?, title?, default? } }
  *   { fieldRules: { fieldName: false | { set, when?, else? } | [rule, ...] } }
  *
  * Combined example:
@@ -1433,7 +1527,7 @@ export function createSchemaEnhancerFromRecipe(recipe, existingEnhancer) {
   }
 
   // New format: { inheritSchemaFrom: {...}, fieldRules: {...}, childBlockConfig: {...}, ... }
-  const enhancerTypes = ['inheritSchemaFrom', 'childBlockConfig', 'fieldRules'];
+  const enhancerTypes = ['inheritSchemaFrom', 'fieldRules'];
 
   // If the existing enhancer has _parts, check each part for type overlap.
   // When the frontend sends a recipe matching an existing part's type,
@@ -1524,20 +1618,20 @@ function createEnhancerByType(type, config) {
 
   switch (type) {
     case 'inheritSchemaFrom': {
-      const { typeField, mappingField, defaultsField = 'itemDefaults', filterConvertibleFrom, blocksField, title, default: defaultValue } = config;
+      const { typeField, mappingField, defaultsField = 'itemDefaults', filterConvertibleFrom, blocksField, title, default: defaultValue, parentControlled } = config;
       // typeField is optional — if not in recipe, inheritSchemaFrom reads
-      // blocksConfig[blockType].itemTypeField at call time
-      const typeFieldOptions = (filterConvertibleFrom || blocksField || title || defaultValue)
-        ? { filterConvertibleFrom, blocksField, title, default: defaultValue }
+      // blocksConfig[blockType].itemTypeField at call time.
+      // parentControlled: { childType: ['fieldA', 'fieldB'] } — fields the
+      // parent always claims for child blocks of a given type, beyond what
+      // runtime fieldMapping captures. Read by hideParentOwnedFields (auto-
+      // applied to every block by installChildBlockEnhancers) and also by
+      // this enhancer's own inherited-fields filter so parentControlled
+      // fields appear in the parent's "Item Defaults" fieldset.
+      const typeFieldOptions = (filterConvertibleFrom || blocksField || title || defaultValue || parentControlled)
+        ? { filterConvertibleFrom, blocksField, title, default: defaultValue, parentControlled }
         : {};
       enhancer = inheritSchemaFrom(typeField || null, mappingField || null, defaultsField, typeFieldOptions);
       enhancer.config = { ...config, enhancerType: 'inheritSchemaFrom' };
-      break;
-    }
-    case 'childBlockConfig': {
-      const { editableFields, parentControlledFields } = config;
-      enhancer = hideParentOwnedFields({ editableFields, parentControlledFields });
-      enhancer.config = { ...config, enhancerType: 'childBlockConfig' };
       break;
     }
     case 'fieldRules': {

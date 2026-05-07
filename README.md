@@ -800,12 +800,13 @@ The widget is *only* concerned with the dropdown UI. It doesn't drive sync — s
 
 ##### Field-value syncing (optional enhancement)
 
-On top of type syncing, you can also have certain field _values_ centrally controlled at the parent — the editor sets them once on the parent and they apply to every child. This needs two enhancers, one on each side:
+On top of type syncing, you can also have certain field _values_ centrally controlled at the parent — the editor sets them once on the parent and they apply to every child. This needs ONE enhancer on the parent:
 
-- On the parent: `schemaEnhancer.inheritSchemaFrom` — surfaces the relevant child fields on the parent's sidebar under a "Defaults" fieldset (prefixed with `defaultsField`, e.g., `itemDefaults_title`).
-- On the child: `schemaEnhancer.childBlockConfig` — hides those same fields from the child's own sidebar so the editor isn't editing the same value in two places.
+- `schemaEnhancer.inheritSchemaFrom` — surfaces the relevant child fields on the parent's sidebar under a "Defaults" fieldset (prefixed with `defaultsField`, e.g., `itemDefaults_title`).
 
-Leave one off and you get a half-broken result: parent enhancer alone → fields appear in both places (duplicated edit); child enhancer alone → fields disappear from child but never surface on parent (effectively lost).
+Children declare which fields they own via `fieldMappings['@default']` (single source of truth — same mapping that `expandListingBlocks` already reads). Volto Hydra auto-installs an enhancer on every block at INIT that hides parent-claimed fields from the child sidebar, so you don't need to opt in per child.
+
+The split is symmetric: parent's "Item Defaults" fieldset and the child's hidden fields are computed from the same rule (`isFieldParentClaimed`). Set the rule once on the parent, both sides stay in sync.
 
 ```js
 gridBlock: {
@@ -828,18 +829,40 @@ gridBlock: {
   },
 },
 teaser: {
+  // Just declare what the child owns. Everything else (alignment, link
+  // target, kicker text, etc.) is parent-claimed by default.
   fieldMappings: { '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' } },
-  schemaEnhancer: {
-    childBlockConfig: {},  // auto-derives editableFields from fieldMappings['@default']
-  },
 },
 image: {
   fieldMappings: { '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' } },
-  schemaEnhancer: { childBlockConfig: {} },
 },
 ```
 
-`inheritSchemaFrom` discovers the typeField by walking the schema for blocks fields with an `itemTypeField` declaration. Single concern: surface inherited defaults on the parent.
+By default: child editable fields = the targets of `child.fieldMappings['@default']`. Everything else on the child schema gets inherited up to the parent's "Item Defaults" fieldset, and is hidden from the child's own sidebar. This works for any container — `inheritSchemaFrom` discovers the typeField by walking the schema for blocks fields with an `itemTypeField` declaration.
+
+##### `parentControlled` — overriding the default split
+
+The default rule ("child owns @default targets, parent owns the rest") works for most cases. When it doesn't — e.g., the child has a meta-toggle field like teaser's `overwrite` that should remain editable per-child even when parent controls everything else — declare an explicit list on the parent's `inheritSchemaFrom`:
+
+```js
+listing: {
+  schemaEnhancer: {
+    inheritSchemaFrom: {
+      typeField: 'variation',
+      mappingField: 'fieldMapping',
+      defaultsField: 'itemDefaults',
+      // Explicit per-child-type list — replaces the default for that type.
+      // Only these fields are claimed by the listing for teaser children;
+      // the rest (including teaser's `overwrite` toggle) stay editable.
+      parentControlled: {
+        teaser: ['head_title', 'openLinkInNewTab', 'styles'],
+      },
+    },
+  },
+},
+```
+
+When `parentControlled[childType]` is set, it replaces the default-derived claim for that child type. Both the parent's "Item Defaults" fieldset and the child's hidden fields use this list.
 
 ##### Listings
 
@@ -897,7 +920,7 @@ Container blocks declare on the blocks field and let auto-discovery handle the r
 | `title`, `default` | The typeField in the schema | Standard JSON schema properties. |
 | `mappingField` | `schemaEnhancer.inheritSchemaFrom` | Names a field on the block where `FieldMappingWidget` saves its output. Optional — surfaces the widget. |
 | `defaultsField` | `schemaEnhancer.inheritSchemaFrom` | Where parent-stored child-field defaults live. Defaults to `'itemDefaults'`. |
-| `editableFields` / `parentControlledFields` | `schemaEnhancer.childBlockConfig` (on the *child* block type) | Allow/blocklist of fields that stay on the child's sidebar. Optional — auto-derived from `fieldMappings['@default']` if omitted. |
+| `parentControlled` | `schemaEnhancer.inheritSchemaFrom` (on the *parent* block type) | Per-child-type explicit list of fields the parent claims (`{ teaser: ['styles', ...], image: [...] }`). Replaces the default rule for that child type. Optional — without it, default is "child owns `fieldMappings['@default']` targets; parent owns the rest." |
 
 #### HTML Paste support (TODO)
 
