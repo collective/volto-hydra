@@ -900,12 +900,17 @@ gridBlock: {
         itemTypeField: 'variation',
         allowedBlocks: ['teaser', 'image', 'listing'],  // manual items + listing
       },
-      variation: { widget: 'blockTypeSelect' },
+      variation: {
+        widget: 'blockTypeSelect',
+        filterConvertibleFrom: '@default',  // keeps 'listing' out of the dropdown
+      },
     },
   },
   schemaEnhancer: { inheritSchemaFrom: {} },
 },
 ```
+
+`filterConvertibleFrom: '@default'` on the variation widget restricts the dropdown to types that have a `fieldMappings['@default']` entry. The listing block doesn't (it's a container, not an item type), so it's excluded from the dropdown — but it stays in `allowedBlocks` so a listing block can still exist as a structural child. The editor sees "Teaser / Image / Summary" in the picker; "listing" is a structural choice they don't have to think about.
 
 When the editor changes `gridBlock.variation` to e.g. `'summary'`:
 
