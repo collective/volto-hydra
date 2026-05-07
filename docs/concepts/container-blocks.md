@@ -151,35 +151,93 @@ You can override the look of the '+' button by rendering something inside the em
 
 ## Synchronised Block Types in a Container
 
-You might want one container type that holds different block types but constrains them to all be the same type with synchronised settings. A field on the parent lets the editor select the type and all blocks get converted using `fieldMappings`:
+You can have one container type whose children are all kept the same `@type`, with the editor picking that type once on the parent. When the type changes, every child is converted (using each child's `fieldMappings`); when a new child is added it gets the selected type.
+
+Declare `itemTypeField` on the *blocks field* — its value names a sibling field on the same schema whose value drives every child's `@type`. The sibling field is typically rendered with `widget: 'blockTypeSelect'`, which computes its `choices` from the blocks field's `allowedBlocks` at render time:
 
 <!-- codeExample: javascript -->
 ```javascript
 blocks: {
     gridBlock: {
-        allowedBlocks: ['teaser', 'image'],
-        schemaEnhancer: {
-            inheritSchemaFrom: {
-                typeField: 'variation',
+        blockSchema: {
+            properties: {
+                slides: {
+                    widget: 'blocks_layout',
+                    itemTypeField: 'variation',         // sync trigger
+                    allowedBlocks: ['teaser', 'image'],
+                },
+                variation: {
+                    widget: 'blockTypeSelect',          // dropdown
+                },
             },
         },
     },
     teaser: {
-        schemaEnhancer: {
-            childBlockConfig: {
-                editableFields: ['href', 'title', 'description'],
-            },
-        },
         fieldMappings: {
-            default: { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
+            '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },
+        },
+    },
+    image: {
+        fieldMappings: {
+            '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },
         },
     },
 }
 ```
 
-- **`inheritSchemaFrom`**: Parent inherits schema from selected child type. When the type field changes, child blocks sync to new type.
-- **`typeField`**: Field name for selecting child type (e.g., `'variation'`)
-- **`defaultsField`**: Field name for storing inherited defaults (e.g., `'itemDefaults'`)
-- **`blocksField`**: Which blocks field the sub-blocks are in. Set to `".."` to use the parent's `allowedBlocks`.
-- **`filterConvertibleFrom`**: Only allow selecting a block type which can convert from the specified type.
-- **`childBlockConfig`**: Child hides fields except `editableFields` when inside a parent with `inheritSchemaFrom`.
+The relationship is local: read the schema and you can see "the children of `slides` get their `@type` from `variation`" right next to the field declaration. Works the same for `widget: 'blocks_layout'` and `widget: 'object_list'` children.
+
+### Field-value syncing
+
+On top of type syncing you can also have field _values_ centrally controlled at the parent — set once on the parent, applied to every child. Add ONE enhancer on the parent:
+
+<!-- codeExample: javascript -->
+```javascript
+gridBlock: {
+    blockSchema: {
+        properties: {
+            slides: { widget: 'blocks_layout', itemTypeField: 'variation', allowedBlocks: ['teaser', 'image'] },
+            variation: { widget: 'blockTypeSelect' },
+        },
+    },
+    schemaEnhancer: { inheritSchemaFrom: {} },
+}
+```
+
+`inheritSchemaFrom` does two things automatically:
+
+1. Surfaces the **parent-claimed** fields on the parent's sidebar under an "Item Defaults" fieldset.
+2. Auto-hides the same fields on every child's sidebar (via a `hideParentOwnedFields` enhancer that's applied to every block at INIT — no per-child opt-in).
+
+The parent declares **what it claims** per child block type via `parentControlled`. If absent, the default is: parent claims everything _not_ listed in the child's `fieldMappings['@default']` mapping. The default works for typical cases; set `parentControlled` only when you want a different split (e.g. keep a meta-toggle field editable per-child):
+
+<!-- codeExample: javascript -->
+```javascript
+listing: {
+    schemaEnhancer: {
+        inheritSchemaFrom: {
+            typeField: 'variation',
+            mappingField: 'fieldMapping',
+            // Only these fields are claimed by listing for teaser children.
+            // The rest (including teaser's `overwrite` toggle) stay editable.
+            parentControlled: {
+                teaser: ['head_title', 'openLinkInNewTab', 'styles'],
+            },
+        },
+    },
+}
+```
+
+When `parentControlled[childType]` is set, it **replaces** the `@default` fallback for that child type. Both sides — the parent's "Item Defaults" fieldset and the child's hidden fields — are computed from the same single rule, so they can never get out of sync.
+
+### Recipe options
+
+- **`inheritSchemaFrom`** — schemaEnhancer recipe; surfaces parent-claimed fields on the parent and hides them on children.
+- **`itemTypeField`** — declared on a `blocks_layout`/`object_list` field; names the sibling field whose value drives every child's `@type`.
+- **`typeField`** — names the sibling field directly on `inheritSchemaFrom`. Use this when there is no blocks field to declare `itemTypeField` on (e.g. listings — see [Listings](listings.md)).
+- **`mappingField`** — name of the field where a per-block `fieldMapping` override is stored. Required for the `FieldMappingWidget` to appear.
+- **`parentControlled`** — `{ childType: [fieldName, ...] }` per-child-type override. Replaces the `fieldMappings['@default']` fallback.
+- **`defaultsField`** — prefix for the inherited fields on the parent's "Item Defaults" fieldset (default: `'itemDefaults'`).
+- **`blockTypeSelect`** widget options:
+  - **`blocksField`** — which sub-blocks field's `allowedBlocks` to use for the choices. Auto-discovers if omitted. Set to `'..'` when the choices should come from the *enclosing parent's* `allowedSiblingTypes`.
+  - **`filterConvertibleFrom`** — only offer types whose `fieldMappings` accept the named source. Typically `'@default'` for listings (every item type must be populatable from canonical content fields).

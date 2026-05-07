@@ -98,24 +98,69 @@ Types: string (array→join, image→URL), link (→[{@id}]), image (pass throug
 
 ## Item Type Selection
 
-Use `itemType` (or `variation`) on the listing block to control what `@type` expanded items get. Combined with `inheritSchemaFrom`, the listing's sidebar shows fields from the selected item type:
+Use `variation` on the listing block to control what `@type` expanded items get. Listings reuse the same `inheritSchemaFrom` recipe as container blocks (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)) but differ in one structural way: there's no blocks field to declare `itemTypeField` on, since listing children are *virtual* (produced from query results at render time, not authored as page data). Instead, declare the typeField directly on the `inheritSchemaFrom` recipe:
 
 <!-- codeExample: javascript -->
 ```javascript
 listing: {
-    schemaEnhancer: ({ schema }) => {
-        schema.properties.itemType = {
-            title: 'Display as',
-            choices: [['teaser', 'Teaser'], ['card', 'Card']],
-        };
-        return schema;
+    blockSchema: {
+        properties: {
+            variation: {
+                widget: 'blockTypeSelect',
+                filterConvertibleFrom: '@default',  // only offer types with @default mappings
+            },
+            // FieldMappingWidget is added at sidebar render time by
+            // inheritSchemaFrom (the enhancer reads `mappingField` below);
+            // declare an empty placeholder so it appears in the auto-generated
+            // default fieldset alongside `variation`.
+            fieldMapping: {},
+        },
     },
-    inheritSchemaFrom: {
-        typeField: 'itemType',
-        blocksField: null,
+    schemaEnhancer: {
+        inheritSchemaFrom: {
+            typeField: 'variation',     // listing has no blocks field — declare here
+            mappingField: 'fieldMapping',
+        },
     },
 }
 ```
+
+`filterConvertibleFrom: '@default'` restricts the dropdown to types that have a `fieldMappings['@default']` entry — i.e. types that can be populated from the canonical content fields (`@id`, `title`, `description`, `image`) that listing queries return. Each item type's `fieldMappings['@default']` (on its own block config) defines how those source fields land on its schema; that static mapping is enough to render listings. Adding `mappingField` to the enhancer exposes the `FieldMappingWidget` so the editor can override the mapping per listing instance.
+
+The widget saves its output as `fieldMapping` (singular) on the block data. `expandListingBlocks` reads that at render time to translate each query result into an item block.
+
+## Combining Listings with Container Syncing
+
+A container (e.g. `gridBlock`) can mix **manual children** AND **a listing** as children. Add `'listing'` to the blocks field's `allowedBlocks`, and the parent's typeField propagates everywhere:
+
+<!-- codeExample: javascript -->
+```javascript
+gridBlock: {
+    blockSchema: {
+        properties: {
+            slides: {
+                widget: 'blocks_layout',
+                itemTypeField: 'variation',
+                allowedBlocks: ['teaser', 'image', 'listing'],  // manual items + listing
+            },
+            variation: {
+                widget: 'blockTypeSelect',
+                filterConvertibleFrom: '@default',  // keeps 'listing' out of the dropdown
+            },
+        },
+    },
+    schemaEnhancer: { inheritSchemaFrom: {} },
+}
+```
+
+`filterConvertibleFrom: '@default'` keeps `'listing'` out of the dropdown (it's a structural container, not an item type, so it has no `fieldMappings['@default']`) but it stays in `allowedBlocks` so a listing block can still exist as a structural child. The editor sees "Teaser / Image / Summary" in the picker; the listing is a structural choice they don't have to think about.
+
+When the editor changes `gridBlock.variation` to e.g. `'summary'`:
+
+- **Manual children** (a teaser, an image) get their `@type` converted via the destination type's `fieldMappings` — teaser becomes summary.
+- **Listing child** keeps `@type: 'listing'` but its own `variation` field is set to `'summary'`, so the listing now renders summary items.
+
+The sync walks recursively — if the listing held nested containers with their own typeFields, those would update too. Net effect: ONE picker on the parent controls the rendered type for every descendant, regardless of whether descendants are authored manually or expanded from a query.
 
 ## Path Transformation (pathToApiPath)
 
