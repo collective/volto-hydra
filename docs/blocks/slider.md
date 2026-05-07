@@ -9,13 +9,8 @@ This is a **custom** block — register it via `initBridge`.
 ```json
 {
   "slider": {
-    "itemTypeField": "variation",
     "schemaEnhancer": {
-      "inheritSchemaFrom": {
-        "defaultsField": "itemDefaults",
-        "blocksField": "slides",
-        "title": "Item Type"
-      }
+      "inheritSchemaFrom": {}
     },
     "blockSchema": {
       "properties": {
@@ -29,7 +24,13 @@ This is a **custom** block — register it via `initBridge`.
             "teaser"
           ],
           "typeField": "@type",
+          "itemTypeField": "variation",
           "defaultBlockType": "slide"
+        },
+        "variation": {
+          "title": "Item Type",
+          "widget": "blockTypeSelect",
+          "filterConvertibleFrom": "@default"
         },
         "autoplayEnabled": {
           "title": "Autoplay Enabled",
@@ -56,19 +57,6 @@ This is a **custom** block — register it via `initBridge`.
         "title": "title",
         "description": "description",
         "image": "preview_image"
-      }
-    },
-    "schemaEnhancer": {
-      "childBlockConfig": {
-        "defaultsField": "itemDefaults",
-        "editableFields": [
-          "head_title",
-          "title",
-          "description",
-          "preview_image",
-          "buttonText",
-          "hideButton"
-        ]
       }
     },
     "blockSchema": {

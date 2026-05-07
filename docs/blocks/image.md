@@ -31,11 +31,6 @@ This is a **built-in** block.
           "mode": "link"
         }
       }
-    },
-    "schemaEnhancer": {
-      "childBlockConfig": {
-        "defaultsField": "itemDefaults"
-      }
     }
   }
 }

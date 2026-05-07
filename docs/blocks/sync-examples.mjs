@@ -494,16 +494,62 @@ const CONCEPTS_DIR = join(__dirname, '..', 'concepts');
 const CONCEPTS_CONTENT_DIR = join(CONTENT_DIR, 'concepts');
 
 /**
- * Convert plain text to a Slate paragraph value array.
+ * Parse markdown inline formatting into Slate leaf array.
+ * Handles `code`, **strong**, *em*, [text](url). Anything else stays as plain text.
+ * Returns an array of leaf objects (each `{ text, ...marks }` or `{ type: 'link', ... }`).
+ */
+function parseInline(text) {
+  const leaves = [];
+  let pos = 0;
+  // Combined matcher: link, strong, em, code — first match wins at each position.
+  const re = /\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|\*([^*\n]+)\*|`([^`]+)`/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > pos) leaves.push({ text: text.slice(pos, m.index) });
+    if (m[1] !== undefined) {
+      // Link: [text](url) — Volto-slate uses an inline element with `data` href
+      leaves.push({
+        type: 'link',
+        data: { url: m[2] },
+        children: [{ text: m[1] }],
+      });
+    } else if (m[3] !== undefined) {
+      leaves.push({ text: m[3], strong: true });
+    } else if (m[4] !== undefined) {
+      leaves.push({ text: m[4], em: true });
+    } else if (m[5] !== undefined) {
+      leaves.push({ text: m[5], code: true });
+    }
+    pos = m.index + m[0].length;
+  }
+  if (pos < text.length) leaves.push({ text: text.slice(pos) });
+  if (leaves.length === 0) leaves.push({ text: '' });
+  return leaves;
+}
+
+/**
+ * Plain text extraction from inline markdown (drop formatting markers).
+ */
+function inlineToPlaintext(text) {
+  return text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*\n]+)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1');
+}
+
+/**
+ * Convert plain text to a Slate paragraph value array, parsing inline marks.
  */
 function textToSlate(text) {
-  return [{ type: 'p', children: [{ text }] }];
+  return [{ type: 'p', children: parseInline(text) }];
 }
 
 /**
  * Parse a markdown file into a sequence of Plone blocks + layout items.
- * Handles: # title (skip — title block already in JSON), ## headings,
- * paragraphs, bullet/numbered lists, and <!-- codeExample: lang [label="..."] --> markers.
+ * Handles: # title (skip), ## ### #### headings, paragraphs (with inline
+ * `code`, **bold**, *em*, links), bullet/numbered lists, markdown tables,
+ * fenced code blocks, and <!-- codeExample: lang [label="..."] --> markers.
  */
 function parseConceptsMd(mdContent) {
   const blocks = {};
@@ -530,14 +576,16 @@ function parseConceptsMd(mdContent) {
       continue;
     }
 
-    // H2 heading → slate h2 block
-    if (line.startsWith('## ')) {
-      const text = line.slice(3).trim();
+    // H2/H3/H4 heading → slate h2/h3/h4 block
+    const headingMatch = line.match(/^(#{2,4})\s+(.+)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;  // 2, 3, or 4
+      const rawText = headingMatch[2].trim();
       const id = nextId('h');
       addBlock(id, {
         '@type': 'slate',
-        plaintext: text,
-        value: [{ type: 'h2', children: [{ text }] }],
+        plaintext: inlineToPlaintext(rawText),
+        value: [{ type: `h${level}`, children: parseInline(rawText) }],
       });
       i++;
       continue;
@@ -575,34 +623,72 @@ function parseConceptsMd(mdContent) {
 
     // Bullet list (lines starting with '- ')
     if (line.startsWith('- ') || line.startsWith('* ')) {
-      const listChildren = [];
+      const listItems = [];
+      const plainParts = [];
       while (i < lines.length && (lines[i].startsWith('- ') || lines[i].startsWith('* '))) {
-        listChildren.push({ type: 'li', children: [{ text: lines[i].slice(2).trim() }] });
+        const itemText = lines[i].slice(2).trim();
+        listItems.push({ type: 'li', children: parseInline(itemText) });
+        plainParts.push(inlineToPlaintext(itemText));
         i++;
       }
       const id = nextId('ul');
-      const plaintext = listChildren.map(c => c.children[0].text).join(' ');
       addBlock(id, {
         '@type': 'slate',
-        plaintext,
-        value: [{ type: 'ul', children: listChildren }],
+        plaintext: plainParts.join(' '),
+        value: [{ type: 'ul', children: listItems }],
       });
       continue;
     }
 
     // Numbered list (lines starting with '1. ', '2. ', etc.)
     if (/^\d+\.\s/.test(line)) {
-      const listChildren = [];
+      const listItems = [];
+      const plainParts = [];
       while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
-        listChildren.push({ type: 'li', children: [{ text: lines[i].replace(/^\d+\.\s/, '').trim() }] });
+        const itemText = lines[i].replace(/^\d+\.\s/, '').trim();
+        listItems.push({ type: 'li', children: parseInline(itemText) });
+        plainParts.push(inlineToPlaintext(itemText));
         i++;
       }
       const id = nextId('ol');
-      const plaintext = listChildren.map(c => c.children[0].text).join(' ');
       addBlock(id, {
         '@type': 'slate',
-        plaintext,
-        value: [{ type: 'ol', children: listChildren }],
+        plaintext: plainParts.join(' '),
+        value: [{ type: 'ol', children: listItems }],
+      });
+      continue;
+    }
+
+    // Markdown pipe table:
+    //   | a | b | c |
+    //   | - | - | - |
+    //   | 1 | 2 | 3 |
+    // → slateTable block. Stops at first non-pipe line.
+    if (line.startsWith('|') && i + 1 < lines.length && /^\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
+      const cellsFrom = (l) => l.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      const headerCells = cellsFrom(lines[i]);
+      i += 2; // skip header + separator
+      const bodyRows = [];
+      while (i < lines.length && lines[i].startsWith('|')) {
+        bodyRows.push(cellsFrom(lines[i]));
+        i++;
+      }
+      const id = nextId('tbl');
+      const mkCell = (text, isHeader, rIdx, cIdx) => ({
+        key: `${id}-r${rIdx}c${cIdx}`,
+        type: isHeader ? 'header' : 'data',
+        value: [{ type: 'p', children: parseInline(text) }],
+      });
+      const rows = [
+        { key: `${id}-r0`, cells: headerCells.map((c, cIdx) => mkCell(c, true, 0, cIdx)) },
+        ...bodyRows.map((r, rIdx) => ({
+          key: `${id}-r${rIdx + 1}`,
+          cells: r.map((c, cIdx) => mkCell(c, false, rIdx + 1, cIdx)),
+        })),
+      ];
+      addBlock(id, {
+        '@type': 'slateTable',
+        table: { fixed: true, compact: false, basic: false, celled: true, inverted: false, striped: false, rows },
       });
       continue;
     }
@@ -635,10 +721,11 @@ function parseConceptsMd(mdContent) {
     if (line.trim() !== '') {
       const paraLines = [];
       while (i < lines.length && lines[i].trim() !== '') {
-        // Stop if next line is a heading, list, or code fence
+        // Stop if next line is a heading, list, code fence, or table.
         if (lines[i].startsWith('#') || lines[i].startsWith('- ') ||
             lines[i].startsWith('* ') || /^\d+\.\s/.test(lines[i]) ||
-            lines[i].startsWith('```') || lines[i].startsWith('<!--')) {
+            lines[i].startsWith('```') || lines[i].startsWith('<!--') ||
+            lines[i].startsWith('|')) {
           break;
         }
         paraLines.push(lines[i]);

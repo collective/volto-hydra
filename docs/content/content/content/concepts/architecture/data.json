@@ -62,13 +62,13 @@
     },
     "h-5": {
       "@type": "slate",
-      "plaintext": "Building a Frontend for Headless Plone",
+      "plaintext": "The iframe ↔ admin bridge",
       "value": [
         {
           "type": "h2",
           "children": [
             {
-              "text": "Building a Frontend for Headless Plone"
+              "text": "The iframe ↔ admin bridge"
             }
           ]
         }
@@ -76,30 +76,41 @@
     },
     "p-6": {
       "@type": "slate",
-      "plaintext": "The steps involved in creating a frontend are roughly the same for all frameworks:",
+      "plaintext": "During editing the frontend is loaded inside an iframe owned by Hydra's admin UI. The two communicate via `postMessage` over the iframe boundary:",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "The steps involved in creating a frontend are roughly the same for all frameworks:"
+              "text": "During editing the frontend is loaded inside an iframe owned by Hydra's admin UI. The two communicate via "
+            },
+            {
+              "text": "postMessage",
+              "code": true
+            },
+            {
+              "text": " over the iframe boundary:"
             }
           ]
         }
       ]
     },
-    "ol-7": {
+    "ul-7": {
       "@type": "slate",
-      "plaintext": "Create a route for any path which goes to a single page (e.g., in Nuxt.js create `pages/[..slug].vue`) The page has a template with static parts of your theme like header and footer. Check content type to render each differently. On page setup, take the path and make a REST API call to the contents endpoint to get the JSON for this page. Fill title etc from the content metadata. For navigation, use `@expand` to return navigation data in the same call. Create a nav component using this JSON. For Blocks: create a Block component that takes id and block JSON, check `@type` to determine rendering, call recursively for containers, iterate `blocks_layout` to render. Create helpers: URL generation for links (convert API-relative URLs to frontend URLs), image URL generation (blocks have image data in many formats). Listing Blocks: Use the Listing Helpers (`staticBlocks`/`expandListingBlocks`) or make your own REST API query calls. Redirects: Handle REST API redirects as internal redirects in your framework. For SSG, query all redirects at generate time. Error Pages: Handle REST API errors with appropriate status codes. Search Blocks: Render facets/filters, build queries using the REST API querystring endpoint. Form Blocks: Render field types, produce compatible JSON submissions to the form-block endpoint, handle validation and thank you page.",
+      "plaintext": "Admin → frontend: form-data updates, selection changes, route changes. Frontend → admin: which block was clicked (selection), which slate node holds the cursor, where blocks live in the rendered DOM, slate transform requests so the admin can compute the new value.",
       "value": [
         {
-          "type": "ol",
+          "type": "ul",
           "children": [
             {
               "type": "li",
               "children": [
                 {
-                  "text": "Create a route for any path which goes to a single page (e.g., in Nuxt.js create `pages/[..slug].vue`)"
+                  "text": "Admin → frontend",
+                  "strong": true
+                },
+                {
+                  "text": ": form-data updates, selection changes, route changes."
                 }
               ]
             },
@@ -107,87 +118,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "The page has a template with static parts of your theme like header and footer. Check content type to render each differently."
-                }
-              ]
-            },
-            {
-              "type": "li",
-              "children": [
+                  "text": "Frontend → admin",
+                  "strong": true
+                },
                 {
-                  "text": "On page setup, take the path and make a REST API call to the contents endpoint to get the JSON for this page."
-                }
-              ]
-            },
-            {
-              "type": "li",
-              "children": [
-                {
-                  "text": "Fill title etc from the content metadata."
-                }
-              ]
-            },
-            {
-              "type": "li",
-              "children": [
-                {
-                  "text": "For navigation, use `@expand` to return navigation data in the same call. Create a nav component using this JSON."
-                }
-              ]
-            },
-            {
-              "type": "li",
-              "children": [
-                {
-                  "text": "For Blocks: create a Block component that takes id and block JSON, check `@type` to determine rendering, call recursively for containers, iterate `blocks_layout` to render."
-                }
-              ]
-            },
-            {
-              "type": "li",
-              "children": [
-                {
-                  "text": "Create helpers: URL generation for links (convert API-relative URLs to frontend URLs), image URL generation (blocks have image data in many formats)."
-                }
-              ]
-            },
-            {
-              "type": "li",
-              "children": [
-                {
-                  "text": "Listing Blocks: Use the Listing Helpers (`staticBlocks`/`expandListingBlocks`) or make your own REST API query calls."
-                }
-              ]
-            },
-            {
-              "type": "li",
-              "children": [
-                {
-                  "text": "Redirects: Handle REST API redirects as internal redirects in your framework. For SSG, query all redirects at generate time."
-                }
-              ]
-            },
-            {
-              "type": "li",
-              "children": [
-                {
-                  "text": "Error Pages: Handle REST API errors with appropriate status codes."
-                }
-              ]
-            },
-            {
-              "type": "li",
-              "children": [
-                {
-                  "text": "Search Blocks: Render facets/filters, build queries using the REST API querystring endpoint."
-                }
-              ]
-            },
-            {
-              "type": "li",
-              "children": [
-                {
-                  "text": "Form Blocks: Render field types, produce compatible JSON submissions to the form-block endpoint, handle validation and thank you page."
+                  "text": ": which block was clicked (selection), which slate node holds the cursor, where blocks live in the rendered DOM, slate transform requests so the admin can compute the new value."
                 }
               ]
             }
@@ -197,13 +132,348 @@
     },
     "p-8": {
       "@type": "slate",
-      "plaintext": "See the example frontends for reference implementations: [Nuxt.js](https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter), [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs), and [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7).",
+      "plaintext": "This split lets the frontend stay 100% headless when not in admin (just renders content), while the admin gets full visual editing without the frontend having to know any React, any block-form widgets, or any sidebar UI.",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "See the example frontends for reference implementations: [Nuxt.js](https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter), [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs), and [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7)."
+              "text": "This split lets the frontend stay 100% headless when not in admin (just renders content), while the admin gets full visual editing without the frontend having to know any React, any block-form widgets, or any sidebar UI."
+            }
+          ]
+        }
+      ]
+    },
+    "h-9": {
+      "@type": "slate",
+      "plaintext": "The chrome pattern",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "The chrome pattern"
+            }
+          ]
+        }
+      ]
+    },
+    "p-10": {
+      "@type": "slate",
+      "plaintext": "Selection outlines, the Quanta toolbar, drag handles, edge handles, the empty-block \"+\" — none of these are rendered by the frontend. They're rendered in the admin (React) layered above the iframe. The frontend only:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Selection outlines, the Quanta toolbar, drag handles, edge handles, the empty-block \"+\" — none of these are rendered by the frontend. They're rendered in the admin (React) layered above the iframe. The frontend only:"
+            }
+          ]
+        }
+      ]
+    },
+    "ol-11": {
+      "@type": "slate",
+      "plaintext": "Adds the data attributes that mark editable elements (data-block-uid, data-edit-text, data-edit-link, data-edit-media, data-node-id). Captures pointer events through invisible elements so the admin's chrome stays interactive. Reports element rects on demand so the chrome can position itself.",
+      "value": [
+        {
+          "type": "ol",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Adds the data attributes that mark editable elements ("
+                },
+                {
+                  "text": "data-block-uid",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "data-edit-text",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "data-edit-link",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "data-edit-media",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "data-node-id",
+                  "code": true
+                },
+                {
+                  "text": ")."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Captures pointer events through invisible elements so the admin's chrome stays interactive."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Reports element rects on demand so the chrome can position itself."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-12": {
+      "@type": "slate",
+      "plaintext": "The benefit: a frontend's CSS can never break the editing UI, because the editing UI doesn't live in the frontend. Switching frontends mid-edit (Nuxt → Next → Astro) works because the bridge protocol is the same — only the rendered DOM changes.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The benefit: a frontend's CSS can never break the editing UI, because the editing UI doesn't live in the frontend. Switching frontends mid-edit (Nuxt → Next → Astro) works because the bridge protocol is the same — only the rendered DOM changes."
+            }
+          ]
+        }
+      ]
+    },
+    "h-13": {
+      "@type": "slate",
+      "plaintext": "Slate (rich text) transforms",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Slate (rich text) transforms"
+            }
+          ]
+        }
+      ]
+    },
+    "p-14": {
+      "@type": "slate",
+      "plaintext": "When the editor types in a slate field, the frontend doesn't compute the new slate value itself — the admin does, by running the slate transform against the previous slate value. The frontend's job is to:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "When the editor types in a slate field, the frontend doesn't compute the new slate value itself — the admin does, by running the slate transform against the previous slate value. The frontend's job is to:"
+            }
+          ]
+        }
+      ]
+    },
+    "ol-15": {
+      "@type": "slate",
+      "plaintext": "Receive the new slate value via SLATE_TRANSFORM_RESULT and re-render. Send slate node data-node-id attributes back so the admin can place the cursor at the right node after re-render.",
+      "value": [
+        {
+          "type": "ol",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Receive the new slate value via "
+                },
+                {
+                  "text": "SLATE_TRANSFORM_RESULT",
+                  "code": true
+                },
+                {
+                  "text": " and re-render."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Send slate node "
+                },
+                {
+                  "text": "data-node-id",
+                  "code": true
+                },
+                {
+                  "text": " attributes back so the admin can place the cursor at the right node after re-render."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-16": {
+      "@type": "slate",
+      "plaintext": "This is why every slate node needs a `data-node-id` attribute on its rendered HTML — without one, the admin can't track the cursor across re-renders. See [Visual Editing › Renderer Node-ID Rules](visual-editing.md#renderer-node-id-rules).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This is why every slate node needs a "
+            },
+            {
+              "text": "data-node-id",
+              "code": true
+            },
+            {
+              "text": " attribute on its rendered HTML — without one, the admin can't track the cursor across re-renders. See "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "visual-editing.md#renderer-node-id-rules"
+              },
+              "children": [
+                {
+                  "text": "Visual Editing › Renderer Node-ID Rules"
+                }
+              ]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    "h-17": {
+      "@type": "slate",
+      "plaintext": "Building a frontend",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Building a frontend"
+            }
+          ]
+        }
+      ]
+    },
+    "p-18": {
+      "@type": "slate",
+      "plaintext": "The steps for creating a Hydra-compatible frontend are the same across frameworks: catch-all route → fetch page from Plone REST API → render blocks recursively → add `data-block-uid` and `data-edit-*` attributes on editable elements → load `hydra.js` only inside the admin iframe.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The steps for creating a Hydra-compatible frontend are the same across frameworks: catch-all route → fetch page from Plone REST API → render blocks recursively → add "
+            },
+            {
+              "text": "data-block-uid",
+              "code": true
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "data-edit-*",
+              "code": true
+            },
+            {
+              "text": " attributes on editable elements → load "
+            },
+            {
+              "text": "hydra.js",
+              "code": true
+            },
+            {
+              "text": " only inside the admin iframe."
+            }
+          ]
+        }
+      ]
+    },
+    "p-19": {
+      "@type": "slate",
+      "plaintext": "See [Building a Frontend for Headless Plone](../frontend-guide/index.md) for the full step-by-step guide, or the example frontends: [Nuxt.js](https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter), [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs), [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "See "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "../frontend-guide/index.md"
+              },
+              "children": [
+                {
+                  "text": "Building a Frontend for Headless Plone"
+                }
+              ]
+            },
+            {
+              "text": " for the full step-by-step guide, or the example frontends: "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter"
+              },
+              "children": [
+                {
+                  "text": "Nuxt.js"
+                }
+              ]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs"
+              },
+              "children": [
+                {
+                  "text": "Next.js"
+                }
+              ]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7"
+              },
+              "children": [
+                {
+                  "text": "F7-Vue"
+                }
+              ]
+            },
+            {
+              "text": "."
             }
           ]
         }
@@ -219,8 +489,19 @@
       "ce-4",
       "h-5",
       "p-6",
-      "ol-7",
-      "p-8"
+      "ul-7",
+      "p-8",
+      "h-9",
+      "p-10",
+      "ol-11",
+      "p-12",
+      "h-13",
+      "p-14",
+      "ol-15",
+      "p-16",
+      "h-17",
+      "p-18",
+      "p-19"
     ]
   },
   "contributors": [],

@@ -40,11 +40,6 @@ This is a **built-in** block.
           "type": "boolean"
         }
       }
-    },
-    "schemaEnhancer": {
-      "childBlockConfig": {
-        "defaultsField": "itemDefaults"
-      }
     }
   }
 }

@@ -119,3 +119,18 @@ blocks: {
 ```
 
 Transitive conversions are performed automatically by using paths through intermediate types (e.g., `hero -> teaser -> image`). Any fields that don't match will still be kept in the data so if the block is converted back that data will reappear.
+
+## HTML Paste Support (TODO)
+
+When the editor pastes rich HTML into the page, Hydra will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:
+
+<!-- codeExample: javascript -->
+```javascript
+video: {
+    fieldMappings: {
+        'css:video': { 'src': 'url', 'caption[@class="alt"]': 'alt' },
+    },
+}
+```
+
+The `css:<selector>` key in `fieldMappings` matches a pasted HTML element; the value maps element attributes to block fields. Not yet implemented — open question on whether this should run via `htmlTagsToSlate` (bypassing slate conversion) or be encoded into slate so attributes/classes survive.

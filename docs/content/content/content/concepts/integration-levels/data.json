@@ -15,7 +15,14 @@
           "type": "p",
           "children": [
             {
-              "text": "To make your site editable with Hydra you load hydra.js in your frontend and call `initBridge()`. This sets up a two-way communication channel that handles authentication, page navigation, and live content updates."
+              "text": "To make your site editable with Hydra you load hydra.js in your frontend and call "
+            },
+            {
+              "text": "initBridge()",
+              "code": true
+            },
+            {
+              "text": ". This sets up a two-way communication channel that handles authentication, page navigation, and live content updates."
             }
           ]
         }
@@ -43,7 +50,21 @@
           "type": "p",
           "children": [
             {
-              "text": "Call `initBridge()` with an `onEditChange` callback to receive live content updates as the user edits. Your frontend re-renders in real time. Outside edit mode, fetch content from the API as normal."
+              "text": "Call "
+            },
+            {
+              "text": "initBridge()",
+              "code": true
+            },
+            {
+              "text": " with an "
+            },
+            {
+              "text": "onEditChange",
+              "code": true
+            },
+            {
+              "text": " callback to receive live content updates as the user edits. Your frontend re-renders in real time. Outside edit mode, fetch content from the API as normal."
             }
           ]
         }
@@ -68,7 +89,21 @@
           "type": "p",
           "children": [
             {
-              "text": "The `formData` passed to `onEditChange` has the same structure as the Plone REST API response, so the same rendering code works for both live editing and normal page display."
+              "text": "The "
+            },
+            {
+              "text": "formData",
+              "code": true
+            },
+            {
+              "text": " passed to "
+            },
+            {
+              "text": "onEditChange",
+              "code": true
+            },
+            {
+              "text": " has the same structure as the Plone REST API response, so the same rendering code works for both live editing and normal page display."
             }
           ]
         }
@@ -96,7 +131,21 @@
           "type": "p",
           "children": [
             {
-              "text": "Iterate `blocks_layout.items` and render each block by type. Add `data-block-uid` so Hydra knows which block the user clicked."
+              "text": "Iterate "
+            },
+            {
+              "text": "blocks_layout.items",
+              "code": true
+            },
+            {
+              "text": " and render each block by type. Add "
+            },
+            {
+              "text": "data-block-uid",
+              "code": true
+            },
+            {
+              "text": " so Hydra knows which block the user clicked."
             }
           ]
         }

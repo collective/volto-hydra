@@ -15,7 +15,42 @@
           "type": "p",
           "children": [
             {
-              "text": "Define custom block types directly in your frontend configuration via the `blocks` option in `initBridge`. No Volto plugin deployment required. Each block type needs an `id`, `title`, and a `blockSchema` with its field properties."
+              "text": "Define custom block types directly in your frontend configuration via the "
+            },
+            {
+              "text": "blocks",
+              "code": true
+            },
+            {
+              "text": " option in "
+            },
+            {
+              "text": "initBridge",
+              "code": true
+            },
+            {
+              "text": ". No Volto plugin deployment required. Each block type needs an "
+            },
+            {
+              "text": "id",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "title",
+              "code": true
+            },
+            {
+              "text": ", and a "
+            },
+            {
+              "text": "blockSchema",
+              "code": true
+            },
+            {
+              "text": " with its field properties."
             }
           ]
         }
@@ -40,7 +75,21 @@
           "type": "p",
           "children": [
             {
-              "text": "Child block types (like `slide` above) must be defined at the top level of `blocks`. You can also:"
+              "text": "Child block types (like "
+            },
+            {
+              "text": "slide",
+              "code": true
+            },
+            {
+              "text": " above) must be defined at the top level of "
+            },
+            {
+              "text": "blocks",
+              "code": true
+            },
+            {
+              "text": ". You can also:"
             }
           ]
         }
@@ -48,7 +97,7 @@
     },
     "ul-4": {
       "@type": "slate",
-      "plaintext": "Set `restricted: true` to hide a block from the block chooser (only usable as child blocks) Set `mostUsed: true` to pin a block to the top of the chooser Set `disableCustomSidebarEditForm: true` to use only the schema form in the sidebar (no custom edit component) Use `fieldsets` in the schema to organize fields into tabs",
+      "plaintext": "Set restricted: true to hide a block from the block chooser (only usable as child blocks) Set mostUsed: true to pin a block to the top of the chooser Set disableCustomSidebarEditForm: true to use only the schema form in the sidebar (no custom edit component) Use fieldsets in the schema to organize fields into tabs",
       "value": [
         {
           "type": "ul",
@@ -57,7 +106,14 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Set `restricted: true` to hide a block from the block chooser (only usable as child blocks)"
+                  "text": "Set "
+                },
+                {
+                  "text": "restricted: true",
+                  "code": true
+                },
+                {
+                  "text": " to hide a block from the block chooser (only usable as child blocks)"
                 }
               ]
             },
@@ -65,7 +121,14 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Set `mostUsed: true` to pin a block to the top of the chooser"
+                  "text": "Set "
+                },
+                {
+                  "text": "mostUsed: true",
+                  "code": true
+                },
+                {
+                  "text": " to pin a block to the top of the chooser"
                 }
               ]
             },
@@ -73,7 +136,14 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Set `disableCustomSidebarEditForm: true` to use only the schema form in the sidebar (no custom edit component)"
+                  "text": "Set "
+                },
+                {
+                  "text": "disableCustomSidebarEditForm: true",
+                  "code": true
+                },
+                {
+                  "text": " to use only the schema form in the sidebar (no custom edit component)"
                 }
               ]
             },
@@ -81,7 +151,14 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Use `fieldsets` in the schema to organize fields into tabs"
+                  "text": "Use "
+                },
+                {
+                  "text": "fieldsets",
+                  "code": true
+                },
+                {
+                  "text": " in the schema to organize fields into tabs"
                 }
               ]
             }
@@ -91,6 +168,7 @@
     },
     "h-5": {
       "@type": "slate",
+      "plaintext": "Schema Enhancers",
       "value": [
         {
           "type": "h2",
@@ -135,7 +213,11 @@
           "type": "p",
           "children": [
             {
-              "text": "**`fieldRules`**: Add, remove, or conditionally modify field definitions."
+              "text": "`fieldRules`",
+              "strong": true
+            },
+            {
+              "text": ": Add, remove, or conditionally modify field definitions."
             }
           ]
         }
@@ -143,7 +225,7 @@
     },
     "ul-9": {
       "@type": "slate",
-      "plaintext": "Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte` Field paths: `../field` for parent block, `/field` for root",
+      "plaintext": "Condition operators: is, isNot, isSet, isNotSet, gt, gte, lt, lte Field paths: ../field for parent block, /field for root",
       "value": [
         {
           "type": "ul",
@@ -152,7 +234,60 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`"
+                  "text": "Condition operators: "
+                },
+                {
+                  "text": "is",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "isNot",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "isSet",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "isNotSet",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "gt",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "gte",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "lt",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "lte",
+                  "code": true
                 }
               ]
             },
@@ -160,7 +295,21 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Field paths: `../field` for parent block, `/field` for root"
+                  "text": "Field paths: "
+                },
+                {
+                  "text": "../field",
+                  "code": true
+                },
+                {
+                  "text": " for parent block, "
+                },
+                {
+                  "text": "/field",
+                  "code": true
+                },
+                {
+                  "text": " for root"
                 }
               ]
             }
@@ -190,7 +339,42 @@
           "type": "p",
           "children": [
             {
-              "text": "If a block type has a `fieldMappings` defined it will enable a \"Convert to...\" UI action. You specify either conversions to a specific type, or to a generic search result schema (`@id`, `title`, `preview-image`, `description`):"
+              "text": "If a block type has a "
+            },
+            {
+              "text": "fieldMappings",
+              "code": true
+            },
+            {
+              "text": " defined it will enable a \"Convert to...\" UI action. You specify either conversions to a specific type, or to a generic search result schema ("
+            },
+            {
+              "text": "@id",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "title",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "preview-image",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "description",
+              "code": true
+            },
+            {
+              "text": "):"
             }
           ]
         }
@@ -215,7 +399,88 @@
           "type": "p",
           "children": [
             {
-              "text": "Transitive conversions are performed automatically by using paths through intermediate types (e.g., `hero -> teaser -> image`). Any fields that don't match will still be kept in the data so if the block is converted back that data will reappear."
+              "text": "Transitive conversions are performed automatically by using paths through intermediate types (e.g., "
+            },
+            {
+              "text": "hero -> teaser -> image",
+              "code": true
+            },
+            {
+              "text": "). Any fields that don't match will still be kept in the data so if the block is converted back that data will reappear."
+            }
+          ]
+        }
+      ]
+    },
+    "h-14": {
+      "@type": "slate",
+      "plaintext": "HTML Paste Support (TODO)",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "HTML Paste Support (TODO)"
+            }
+          ]
+        }
+      ]
+    },
+    "p-15": {
+      "@type": "slate",
+      "plaintext": "When the editor pastes rich HTML into the page, Hydra will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "When the editor pastes rich HTML into the page, Hydra will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-16": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-16-javascript-f81ad2",
+          "label": "Javascript",
+          "language": "javascript",
+          "code": "video: {\n    fieldMappings: {\n        'css:video': { 'src': 'url', 'caption[@class=\"alt\"]': 'alt' },\n    },\n}"
+        }
+      ]
+    },
+    "p-17": {
+      "@type": "slate",
+      "plaintext": "The `css:<selector>` key in `fieldMappings` matches a pasted HTML element; the value maps element attributes to block fields. Not yet implemented — open question on whether this should run via `htmlTagsToSlate` (bypassing slate conversion) or be encoded into slate so attributes/classes survive.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The "
+            },
+            {
+              "text": "css:<selector>",
+              "code": true
+            },
+            {
+              "text": " key in "
+            },
+            {
+              "text": "fieldMappings",
+              "code": true
+            },
+            {
+              "text": " matches a pasted HTML element; the value maps element attributes to block fields. Not yet implemented — open question on whether this should run via "
+            },
+            {
+              "text": "htmlTagsToSlate",
+              "code": true
+            },
+            {
+              "text": " (bypassing slate conversion) or be encoded into slate so attributes/classes survive."
             }
           ]
         }
@@ -237,7 +502,11 @@
       "h-10",
       "p-11",
       "ce-12",
-      "p-13"
+      "p-13",
+      "h-14",
+      "p-15",
+      "ce-16",
+      "p-17"
     ]
   },
   "contributors": [],

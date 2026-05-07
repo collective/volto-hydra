@@ -51,7 +51,7 @@
     },
     "ul-4": {
       "@type": "slate",
-      "plaintext": "Can be created from any blocks Are always edited in-context in the current page (user can switch in and out of template edit mode) Are saved alongside the page into normal content so editing template permissions can use content permissions `allowedTemplates` and `allowedLayouts` in the blocks schema let the developer control which templates are available and how they are applied",
+      "plaintext": "Can be created from any blocks Are always edited in-context in the current page (user can switch in and out of template edit mode) Are saved alongside the page into normal content so editing template permissions can use content permissions allowedTemplates and allowedLayouts in the blocks schema let the developer control which templates are available and how they are applied",
       "value": [
         {
           "type": "ul",
@@ -84,7 +84,18 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`allowedTemplates` and `allowedLayouts` in the blocks schema let the developer control which templates are available and how they are applied"
+                  "text": "allowedTemplates",
+                  "code": true
+                },
+                {
+                  "text": " and "
+                },
+                {
+                  "text": "allowedLayouts",
+                  "code": true
+                },
+                {
+                  "text": " in the blocks schema let the developer control which templates are available and how they are applied"
                 }
               ]
             }
@@ -108,7 +119,7 @@
     },
     "ul-6": {
       "@type": "slate",
-      "plaintext": "**Fixed + ReadOnly**: Can't be edited or moved (e.g., branded headers/footers) **Fixed**: Can be edited but not moved (e.g., required sections) **Placeholder**: Named slots where editors can add their own blocks. The \"default\" placeholder receives leftover content.",
+      "plaintext": "Fixed + ReadOnly: Can't be edited or moved (e.g., branded headers/footers) Fixed: Can be edited but not moved (e.g., required sections) Placeholder: Named slots where editors can add their own blocks. The \"default\" placeholder receives leftover content.",
       "value": [
         {
           "type": "ul",
@@ -117,7 +128,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**Fixed + ReadOnly**: Can't be edited or moved (e.g., branded headers/footers)"
+                  "text": "Fixed + ReadOnly",
+                  "strong": true
+                },
+                {
+                  "text": ": Can't be edited or moved (e.g., branded headers/footers)"
                 }
               ]
             },
@@ -125,7 +140,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**Fixed**: Can be edited but not moved (e.g., required sections)"
+                  "text": "Fixed",
+                  "strong": true
+                },
+                {
+                  "text": ": Can be edited but not moved (e.g., required sections)"
                 }
               ]
             },
@@ -133,7 +152,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**Placeholder**: Named slots where editors can add their own blocks. The \"default\" placeholder receives leftover content."
+                  "text": "Placeholder",
+                  "strong": true
+                },
+                {
+                  "text": ": Named slots where editors can add their own blocks. The \"default\" placeholder receives leftover content."
                 }
               ]
             }
@@ -148,7 +171,7 @@
           "@id": "ce-7-json-a9738a",
           "label": "Json",
           "language": "json",
-          "code": "{\n  \"blocks\": {\n    \"header\": { \"@type\": \"slate\", \"fixed\": true,\n               \"readOnly\": true, \"slotId\": \"header\" },\n    \"content\": { \"@type\": \"slate\", \"slotId\": \"default\" },\n    \"footer\": { \"@type\": \"slate\", \"fixed\": true,\n               \"readOnly\": true, \"slotId\": \"footer\" }\n  }\n}"
+          "code": "{\n  \"blocks\": {\n    \"header\": { \"@type\": \"slate\", \"fixed\": true,\n               \"readOnly\": true, \"placeholder\": \"header\" },\n    \"content\": { \"@type\": \"slate\", \"placeholder\": \"default\" },\n    \"footer\": { \"@type\": \"slate\", \"fixed\": true,\n               \"readOnly\": true, \"placeholder\": \"footer\" }\n  }\n}"
         }
       ]
     },
@@ -174,7 +197,14 @@
           "type": "p",
           "children": [
             {
-              "text": "Configure templates in `page.schema.properties` on the blocks field:"
+              "text": "Configure templates in "
+            },
+            {
+              "text": "page.schema.properties",
+              "code": true
+            },
+            {
+              "text": " on the blocks field:"
             }
           ]
         }
@@ -193,7 +223,7 @@
     },
     "ul-11": {
       "@type": "slate",
-      "plaintext": "**`allowedTemplates`** — Templates shown in the BlockChooser's \"Templates\" group, inserted as blocks. **`allowedLayouts`** — Templates shown in the Layout dropdown. They replace/merge the entire container content. A value of `null` allows for a no-template option. If none of those templates are already set as the layout then during editing, the first is applied automatically.",
+      "plaintext": "allowedTemplates — Templates shown in the BlockChooser's \"Templates\" group, inserted as blocks. allowedLayouts — Templates shown in the Layout dropdown. They replace/merge the entire container content. A value of null allows for a no-template option. If none of those templates are already set as the layout then during editing, the first is applied automatically.",
       "value": [
         {
           "type": "ul",
@@ -202,7 +232,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`allowedTemplates`** — Templates shown in the BlockChooser's \"Templates\" group, inserted as blocks."
+                  "text": "`allowedTemplates`",
+                  "strong": true
+                },
+                {
+                  "text": " — Templates shown in the BlockChooser's \"Templates\" group, inserted as blocks."
                 }
               ]
             },
@@ -210,7 +244,18 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`allowedLayouts`** — Templates shown in the Layout dropdown. They replace/merge the entire container content. A value of `null` allows for a no-template option. If none of those templates are already set as the layout then during editing, the first is applied automatically."
+                  "text": "`allowedLayouts`",
+                  "strong": true
+                },
+                {
+                  "text": " — Templates shown in the Layout dropdown. They replace/merge the entire container content. A value of "
+                },
+                {
+                  "text": "null",
+                  "code": true
+                },
+                {
+                  "text": " allows for a no-template option. If none of those templates are already set as the layout then during editing, the first is applied automatically."
                 }
               ]
             }
@@ -240,7 +285,21 @@
           "type": "p",
           "children": [
             {
-              "text": "Use `expandTemplates` (async) or `expandTemplatesSync` (sync with pre-fetched templates) to merge template content during rendering."
+              "text": "Use "
+            },
+            {
+              "text": "expandTemplates",
+              "code": true
+            },
+            {
+              "text": " (async) or "
+            },
+            {
+              "text": "expandTemplatesSync",
+              "code": true
+            },
+            {
+              "text": " (sync with pre-fetched templates) to merge template content during rendering."
             }
           ]
         }
@@ -248,7 +307,7 @@
     },
     "ul-14": {
       "@type": "slate",
-      "plaintext": "**Edit Mode**: These functions auto-detect edit mode via `isEditMode()` and pass blocks through unchanged (just adding `@uid`). The admin handles template merging and adds `nodeId` attributes for inline editing. **SSR**: On SSR (no window), `isEditMode()` returns false so templates are expanded — this is correct since edit mode only exists in the browser iframe.",
+      "plaintext": "Edit Mode: These functions auto-detect edit mode via isEditMode() and pass blocks through unchanged (just adding @uid). The admin handles template merging and adds nodeId attributes for inline editing. SSR: On SSR (no window), isEditMode() returns false so templates are expanded — this is correct since edit mode only exists in the browser iframe.",
       "value": [
         {
           "type": "ul",
@@ -257,7 +316,32 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**Edit Mode**: These functions auto-detect edit mode via `isEditMode()` and pass blocks through unchanged (just adding `@uid`). The admin handles template merging and adds `nodeId` attributes for inline editing."
+                  "text": "Edit Mode",
+                  "strong": true
+                },
+                {
+                  "text": ": These functions auto-detect edit mode via "
+                },
+                {
+                  "text": "isEditMode()",
+                  "code": true
+                },
+                {
+                  "text": " and pass blocks through unchanged (just adding "
+                },
+                {
+                  "text": "@uid",
+                  "code": true
+                },
+                {
+                  "text": "). The admin handles template merging and adds "
+                },
+                {
+                  "text": "nodeId",
+                  "code": true
+                },
+                {
+                  "text": " attributes for inline editing."
                 }
               ]
             },
@@ -265,7 +349,18 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**SSR**: On SSR (no window), `isEditMode()` returns false so templates are expanded — this is correct since edit mode only exists in the browser iframe."
+                  "text": "SSR",
+                  "strong": true
+                },
+                {
+                  "text": ": On SSR (no window), "
+                },
+                {
+                  "text": "isEditMode()",
+                  "code": true
+                },
+                {
+                  "text": " returns false so templates are expanded — this is correct since edit mode only exists in the browser iframe."
                 }
               ]
             }
@@ -281,7 +376,11 @@
           "type": "p",
           "children": [
             {
-              "text": "**Sync vs Async**:"
+              "text": "Sync vs Async",
+              "strong": true
+            },
+            {
+              "text": ":"
             }
           ]
         }
@@ -289,7 +388,7 @@
     },
     "ul-16": {
       "@type": "slate",
-      "plaintext": "**`expandTemplatesSync`** — Use when templates are pre-fetched at page load. Better for Vue computed properties since it's synchronous. **`expandTemplates`** — Use when you need to lazy-load templates on demand. Handles on-demand loading of forced layouts not in page data.",
+      "plaintext": "expandTemplatesSync — Use when templates are pre-fetched at page load. Better for Vue computed properties since it's synchronous. expandTemplates — Use when you need to lazy-load templates on demand. Handles on-demand loading of forced layouts not in page data.",
       "value": [
         {
           "type": "ul",
@@ -298,7 +397,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`expandTemplatesSync`** — Use when templates are pre-fetched at page load. Better for Vue computed properties since it's synchronous."
+                  "text": "`expandTemplatesSync`",
+                  "strong": true
+                },
+                {
+                  "text": " — Use when templates are pre-fetched at page load. Better for Vue computed properties since it's synchronous."
                 }
               ]
             },
@@ -306,7 +409,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`expandTemplates`** — Use when you need to lazy-load templates on demand. Handles on-demand loading of forced layouts not in page data."
+                  "text": "`expandTemplates`",
+                  "strong": true
+                },
+                {
+                  "text": " — Use when you need to lazy-load templates on demand. Handles on-demand loading of forced layouts not in page data."
                 }
               ]
             }
@@ -336,7 +443,25 @@
           "type": "p",
           "children": [
             {
-              "text": "**`loadTemplates(data, loadTemplate)`** scans page data for `templateId` references and loads them all in parallel. It follows nested references (templates referencing other templates) and has a 5s per-template timeout. It only loads templates actually in the page data — `allowedLayouts` options are loaded on demand when a forced layout is applied."
+              "text": "`loadTemplates(data, loadTemplate)`",
+              "strong": true
+            },
+            {
+              "text": " scans page data for "
+            },
+            {
+              "text": "templateId",
+              "code": true
+            },
+            {
+              "text": " references and loads them all in parallel. It follows nested references (templates referencing other templates) and has a 5s per-template timeout. It only loads templates actually in the page data — "
+            },
+            {
+              "text": "allowedLayouts",
+              "code": true
+            },
+            {
+              "text": " options are loaded on demand when a forced layout is applied."
             }
           ]
         }
@@ -369,7 +494,7 @@
     },
     "ul-21": {
       "@type": "slate",
-      "plaintext": "**`blocks`**: Map of blockId -> block data **`templateState`**: Pass `{}` and share across calls — tracks state for nested containers **`templates`**: (sync only) Pre-fetched map of templateId -> template data **`loadTemplate(id)`**: (async only) Function to fetch template content **`allowedLayouts`**: Force a layout when container has no template applied",
+      "plaintext": "blocks: Map of blockId -> block data templateState: Pass {} and share across calls — tracks state for nested containers templates: (sync only) Pre-fetched map of templateId -> template data loadTemplate(id): (async only) Function to fetch template content allowedLayouts: Force a layout when container has no template applied",
       "value": [
         {
           "type": "ul",
@@ -378,7 +503,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`blocks`**: Map of blockId -> block data"
+                  "text": "`blocks`",
+                  "strong": true
+                },
+                {
+                  "text": ": Map of blockId -> block data"
                 }
               ]
             },
@@ -386,7 +515,18 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`templateState`**: Pass `{}` and share across calls — tracks state for nested containers"
+                  "text": "`templateState`",
+                  "strong": true
+                },
+                {
+                  "text": ": Pass "
+                },
+                {
+                  "text": "{}",
+                  "code": true
+                },
+                {
+                  "text": " and share across calls — tracks state for nested containers"
                 }
               ]
             },
@@ -394,7 +534,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`templates`**: (sync only) Pre-fetched map of templateId -> template data"
+                  "text": "`templates`",
+                  "strong": true
+                },
+                {
+                  "text": ": (sync only) Pre-fetched map of templateId -> template data"
                 }
               ]
             },
@@ -402,7 +546,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`loadTemplate(id)`**: (async only) Function to fetch template content"
+                  "text": "`loadTemplate(id)`",
+                  "strong": true
+                },
+                {
+                  "text": ": (async only) Function to fetch template content"
                 }
               ]
             },
@@ -410,7 +558,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`allowedLayouts`**: Force a layout when container has no template applied"
+                  "text": "`allowedLayouts`",
+                  "strong": true
+                },
+                {
+                  "text": ": Force a layout when container has no template applied"
                 }
               ]
             }
@@ -420,6 +572,7 @@
     },
     "h-22": {
       "@type": "slate",
+      "plaintext": "How the Merge Works",
       "value": [
         {
           "type": "h2",
@@ -447,7 +600,7 @@
     },
     "ol-24": {
       "@type": "slate",
-      "plaintext": "Remove the blocks with the `templateId` to replace, storing any that aren't fixed and readOnly by placeholder name. Insert in their place the template content: if fixed and readOnly, just insert it; if fixed, copy block content (not including block fields) from a page block with the same placeholder name; if a placeholder, don't insert it, but insert the previous blocks with the same placeholder name. Recursively replace any block fields using the same rules. Any placeholder blocks left over are inserted at the end of a special placeholder called \"default\" if it exists, otherwise are dropped.",
+      "plaintext": "Remove the blocks with the templateId to replace, storing any that aren't fixed and readOnly by placeholder name. Insert in their place the template content: if fixed and readOnly, just insert it; if fixed, copy block content (not including block fields) from a page block with the same placeholder name; if a placeholder, don't insert it, but insert the previous blocks with the same placeholder name. Recursively replace any block fields using the same rules. Any placeholder blocks left over are inserted at the end of a special placeholder called \"default\" if it exists, otherwise are dropped.",
       "value": [
         {
           "type": "ol",
@@ -456,7 +609,14 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Remove the blocks with the `templateId` to replace, storing any that aren't fixed and readOnly by placeholder name."
+                  "text": "Remove the blocks with the "
+                },
+                {
+                  "text": "templateId",
+                  "code": true
+                },
+                {
+                  "text": " to replace, storing any that aren't fixed and readOnly by placeholder name."
                 }
               ]
             },
@@ -464,7 +624,7 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Insert in their place the template content: if fixed and readOnly, just insert it; if fixed, copy block content (not including block fields) from a page block with the same slotId; if a slot block, don't insert it, but insert the previous blocks with the same slotId."
+                  "text": "Insert in their place the template content: if fixed and readOnly, just insert it; if fixed, copy block content (not including block fields) from a page block with the same placeholder name; if a placeholder, don't insert it, but insert the previous blocks with the same placeholder name."
                 }
               ]
             },
@@ -480,7 +640,7 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Any slot blocks left over are inserted at the end of a special slot called \"default\" if it exists, otherwise are dropped."
+                  "text": "Any placeholder blocks left over are inserted at the end of a special placeholder called \"default\" if it exists, otherwise are dropped."
                 }
               ]
             }
@@ -496,7 +656,7 @@
           "type": "p",
           "children": [
             {
-              "text": "When a layout is applied, the rules are the same but applied across a whole blocks field. Content without a slotId ends up:"
+              "text": "When a layout is applied, the rules are the same but applied across a whole blocks field. Content without a placeholder name ends up:"
             }
           ]
         }
@@ -513,7 +673,7 @@
               "type": "li",
               "children": [
                 {
-                  "text": "In the \"default\" slot if it exists"
+                  "text": "In the \"default\" placeholder if it exists"
                 }
               ]
             },
@@ -521,7 +681,7 @@
               "type": "li",
               "children": [
                 {
-                  "text": "In the bottom slot outside the last fixed template block"
+                  "text": "In the bottom placeholder outside the last fixed template block"
                 }
               ]
             },
@@ -529,7 +689,7 @@
               "type": "li",
               "children": [
                 {
-                  "text": "In the top slot outside the first fixed template block"
+                  "text": "In the top placeholder outside the first fixed template block"
                 }
               ]
             },
@@ -578,7 +738,14 @@
           "type": "p",
           "children": [
             {
-              "text": "Your frontend might want to force a layout to apply regardless of whether one is saved, for example to ensure a footer layout. Pass `allowedLayouts`:"
+              "text": "Your frontend might want to force a layout to apply regardless of whether one is saved, for example to ensure a footer layout. Pass "
+            },
+            {
+              "text": "allowedLayouts",
+              "code": true
+            },
+            {
+              "text": ":"
             }
           ]
         }
@@ -603,7 +770,21 @@
           "type": "p",
           "children": [
             {
-              "text": "Note: during editing the admin side will load the templates so in order to apply the same rules of forcing a layout you will need to set `allowedLayouts` in `page.schema.properties` to ensure the page loads with the right template."
+              "text": "Note: during editing the admin side will load the templates so in order to apply the same rules of forcing a layout you will need to set "
+            },
+            {
+              "text": "allowedLayouts",
+              "code": true
+            },
+            {
+              "text": " in "
+            },
+            {
+              "text": "page.schema.properties",
+              "code": true
+            },
+            {
+              "text": " to ensure the page loads with the right template."
             }
           ]
         }

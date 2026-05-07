@@ -15,7 +15,42 @@
           "type": "p",
           "children": [
             {
-              "text": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. `expandListingBlocks(layout, options)` walks a layout, fetches results for each listing-type block, and returns `{ items, paging }` where `items` is an array of block objects with `@uid` and `@type`."
+              "text": "A listing block fetches content from the server (e.g. latest news) and renders each result as a separate block. "
+            },
+            {
+              "text": "expandListingBlocks(layout, options)",
+              "code": true
+            },
+            {
+              "text": " walks a layout, fetches results for each listing-type block, and returns "
+            },
+            {
+              "text": "{ items, paging }",
+              "code": true
+            },
+            {
+              "text": " where "
+            },
+            {
+              "text": "items",
+              "code": true
+            },
+            {
+              "text": " is an array of block objects with "
+            },
+            {
+              "text": "@uid",
+              "code": true
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "@type",
+              "code": true
+            },
+            {
+              "text": "."
             }
           ]
         }
@@ -29,7 +64,14 @@
           "type": "p",
           "children": [
             {
-              "text": "You tell it which block types need fetching via a `fetchItems` map — keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:"
+              "text": "You tell it which block types need fetching via a "
+            },
+            {
+              "text": "fetchItems",
+              "code": true
+            },
+            {
+              "text": " map — keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:"
             }
           ]
         }
@@ -68,7 +110,14 @@
           "type": "p",
           "children": [
             {
-              "text": "A grid can have a mix of listing and static blocks sharing a single paging. The `staticBlocks` helper wraps non-listing blocks so they participate in the shared page window. The listings use Suspense so they load client-side:"
+              "text": "A grid can have a mix of listing and static blocks sharing a single paging. The "
+            },
+            {
+              "text": "staticBlocks",
+              "code": true
+            },
+            {
+              "text": " helper wraps non-listing blocks so they participate in the shared page window. The listings use Suspense so they load client-side:"
             }
           ]
         }
@@ -101,7 +150,7 @@
     },
     "ul-8": {
       "@type": "slate",
-      "plaintext": "**`blocks`** — Map of blockId to block data **`fetchItems`** — Required. Map of `{ blockType: async (block, { start, size }) => { items, total } }`. Keys declare which block types to expand; values are fetcher functions. Use `ploneFetchItems()` for Plone backends. **`paging`** — Paging input `{ start, size }` (not mutated). Computed values are returned in the response. **`seen`** — Number of items already seen by prior calls (default: 0). Chain `paging.seen` from one call to the next for grids. **`itemTypeField`** — Field on the listing block that holds the item type (default: `'itemType'`) **`defaultItemType`** — Fallback type when field is not set (default: `'summary'`)",
+      "plaintext": "blocks — Map of blockId to block data fetchItems — Required. Map of { blockType: async (block, { start, size }) => { items, total } }. Keys declare which block types to expand; values are fetcher functions. Use ploneFetchItems() for Plone backends. paging — Paging input { start, size } (not mutated). Computed values are returned in the response. seen — Number of items already seen by prior calls (default: 0). Chain paging.seen from one call to the next for grids. itemTypeField — Field on the listing block that holds the item type (default: 'itemType') defaultItemType — Fallback type when field is not set (default: 'summary')",
       "value": [
         {
           "type": "ul",
@@ -110,7 +159,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`blocks`** — Map of blockId to block data"
+                  "text": "`blocks`",
+                  "strong": true
+                },
+                {
+                  "text": " — Map of blockId to block data"
                 }
               ]
             },
@@ -118,7 +171,25 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`fetchItems`** — Required. Map of `{ blockType: async (block, { start, size }) => { items, total } }`. Keys declare which block types to expand; values are fetcher functions. Use `ploneFetchItems()` for Plone backends."
+                  "text": "`fetchItems`",
+                  "strong": true
+                },
+                {
+                  "text": " — Required. Map of "
+                },
+                {
+                  "text": "{ blockType: async (block, { start, size }) => { items, total } }",
+                  "code": true
+                },
+                {
+                  "text": ". Keys declare which block types to expand; values are fetcher functions. Use "
+                },
+                {
+                  "text": "ploneFetchItems()",
+                  "code": true
+                },
+                {
+                  "text": " for Plone backends."
                 }
               ]
             },
@@ -126,7 +197,18 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`paging`** — Paging input `{ start, size }` (not mutated). Computed values are returned in the response."
+                  "text": "`paging`",
+                  "strong": true
+                },
+                {
+                  "text": " — Paging input "
+                },
+                {
+                  "text": "{ start, size }",
+                  "code": true
+                },
+                {
+                  "text": " (not mutated). Computed values are returned in the response."
                 }
               ]
             },
@@ -134,7 +216,18 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`seen`** — Number of items already seen by prior calls (default: 0). Chain `paging.seen` from one call to the next for grids."
+                  "text": "`seen`",
+                  "strong": true
+                },
+                {
+                  "text": " — Number of items already seen by prior calls (default: 0). Chain "
+                },
+                {
+                  "text": "paging.seen",
+                  "code": true
+                },
+                {
+                  "text": " from one call to the next for grids."
                 }
               ]
             },
@@ -142,7 +235,18 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`itemTypeField`** — Field on the listing block that holds the item type (default: `'itemType'`)"
+                  "text": "`itemTypeField`",
+                  "strong": true
+                },
+                {
+                  "text": " — Field on the listing block that holds the item type (default: "
+                },
+                {
+                  "text": "'itemType'",
+                  "code": true
+                },
+                {
+                  "text": ")"
                 }
               ]
             },
@@ -150,7 +254,18 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`defaultItemType`** — Fallback type when field is not set (default: `'summary'`)"
+                  "text": "`defaultItemType`",
+                  "strong": true
+                },
+                {
+                  "text": " — Fallback type when field is not set (default: "
+                },
+                {
+                  "text": "'summary'",
+                  "code": true
+                },
+                {
+                  "text": ")"
                 }
               ]
             }
@@ -180,7 +295,39 @@
           "type": "p",
           "children": [
             {
-              "text": "**`ploneFetchItems({ apiUrl, contextPath, extraCriteria })`** — creates a fetcher function for Plone backends, suitable as a value in the `fetchItems` map. Normalizes results by packaging `image_field` + `image_scales` into a self-contained image object `{ @id, image_field, image_scales }`."
+              "text": "`ploneFetchItems({ apiUrl, contextPath, extraCriteria })`",
+              "strong": true
+            },
+            {
+              "text": " — creates a fetcher function for Plone backends, suitable as a value in the "
+            },
+            {
+              "text": "fetchItems",
+              "code": true
+            },
+            {
+              "text": " map. Normalizes results by packaging "
+            },
+            {
+              "text": "image_field",
+              "code": true
+            },
+            {
+              "text": " + "
+            },
+            {
+              "text": "image_scales",
+              "code": true
+            },
+            {
+              "text": " into a self-contained image object "
+            },
+            {
+              "text": "{ @id, image_field, image_scales }",
+              "code": true
+            },
+            {
+              "text": "."
             }
           ]
         }
@@ -194,7 +341,14 @@
           "type": "p",
           "children": [
             {
-              "text": "For non-Plone backends (RSS feeds, external APIs, etc.), write your own fetcher: `async (block, { start, size }) => { items, total }`."
+              "text": "For non-Plone backends (RSS feeds, external APIs, etc.), write your own fetcher: "
+            },
+            {
+              "text": "async (block, { start, size }) => { items, total }",
+              "code": true
+            },
+            {
+              "text": "."
             }
           ]
         }
@@ -222,24 +376,263 @@
           "type": "p",
           "children": [
             {
-              "text": "`fieldMapping` on a listing block controls which fields appear on expanded items — only mapped fields are included. Default: `{ @id → href, title → title, description → description, image → image }`. Values can be a string (rename) or `{ field, type }` for conversions:"
+              "text": "fieldMapping",
+              "code": true
+            },
+            {
+              "text": " on a listing block controls which fields appear on expanded items — only mapped fields are included. Default: "
+            },
+            {
+              "text": "{ @id → href, title → title, description → description, image → image }",
+              "code": true
+            },
+            {
+              "text": ". Values can be a string (rename) or "
+            },
+            {
+              "text": "{ field, type }",
+              "code": true
+            },
+            {
+              "text": " for conversions:"
             }
           ]
         }
       ]
     },
-    "ce-14": {
+    "p-14": {
+      "@type": "slate",
+      "plaintext": "Built-in item types and the fields they expose:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Built-in item types and the fields they expose:"
+            }
+          ]
+        }
+      ]
+    },
+    "tbl-15": {
+      "@type": "slateTable",
+      "table": {
+        "fixed": true,
+        "compact": false,
+        "basic": false,
+        "celled": true,
+        "inverted": false,
+        "striped": false,
+        "rows": [
+          {
+            "key": "tbl-15-r0",
+            "cells": [
+              {
+                "key": "tbl-15-r0c0",
+                "type": "header",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Type"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-15-r0c1",
+                "type": "header",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Fields"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-15-r1",
+            "cells": [
+              {
+                "key": "tbl-15-r1c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "default",
+                        "code": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-15-r1c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "title",
+                        "code": true
+                      },
+                      {
+                        "text": ", "
+                      },
+                      {
+                        "text": "description",
+                        "code": true
+                      },
+                      {
+                        "text": ", "
+                      },
+                      {
+                        "text": "href",
+                        "code": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-15-r2",
+            "cells": [
+              {
+                "key": "tbl-15-r2c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "summary",
+                        "code": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-15-r2c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "title",
+                        "code": true
+                      },
+                      {
+                        "text": ", "
+                      },
+                      {
+                        "text": "description",
+                        "code": true
+                      },
+                      {
+                        "text": ", "
+                      },
+                      {
+                        "text": "href",
+                        "code": true
+                      },
+                      {
+                        "text": ", "
+                      },
+                      {
+                        "text": "image",
+                        "code": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-15-r3",
+            "cells": [
+              {
+                "key": "tbl-15-r3c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "teaser",
+                        "code": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-15-r3c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "title",
+                        "code": true
+                      },
+                      {
+                        "text": ", "
+                      },
+                      {
+                        "text": "description",
+                        "code": true
+                      },
+                      {
+                        "text": ", "
+                      },
+                      {
+                        "text": "href",
+                        "code": true
+                      },
+                      {
+                        "text": ", "
+                      },
+                      {
+                        "text": "preview_image",
+                        "code": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "ce-16": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-14-json-15a7c6",
+          "@id": "ce-16-json-5a4196",
           "label": "Json",
           "language": "json",
           "code": "\"fieldMapping\": {\n  \"@id\": { \"field\": \"href\", \"type\": \"link\" },\n  \"title\": \"title\",\n  \"image\": { \"field\": \"preview_image\", \"type\": \"image\" },\n  \"Subject\": { \"field\": \"tags\", \"type\": \"string\" }\n}\n\nTypes: string (array→join, image→URL), link (→[{@id}]), image (pass through)"
         }
       ]
     },
-    "h-15": {
+    "h-17": {
       "@type": "slate",
       "plaintext": "Item Type Selection",
       "value": [
@@ -253,32 +646,415 @@
         }
       ]
     },
-    "p-16": {
+    "p-18": {
       "@type": "slate",
-      "plaintext": "Use `itemType` (or `variation`) on the listing block to control what `@type` expanded items get. Combined with `inheritSchemaFrom`, the listing's sidebar shows fields from the selected item type:",
+      "plaintext": "Use `variation` on the listing block to control what `@type` expanded items get. Listings reuse the same `inheritSchemaFrom` recipe as container blocks (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)) but differ in one structural way: there's no blocks field to declare `itemTypeField` on, since listing children are *virtual* (produced from query results at render time, not authored as page data). Instead, declare the typeField directly on the `inheritSchemaFrom` recipe:",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "Use `itemType` (or `variation`) on the listing block to control what `@type` expanded items get. Combined with `inheritSchemaFrom`, the listing's sidebar shows fields from the selected item type:"
+              "text": "Use "
+            },
+            {
+              "text": "variation",
+              "code": true
+            },
+            {
+              "text": " on the listing block to control what "
+            },
+            {
+              "text": "@type",
+              "code": true
+            },
+            {
+              "text": " expanded items get. Listings reuse the same "
+            },
+            {
+              "text": "inheritSchemaFrom",
+              "code": true
+            },
+            {
+              "text": " recipe as container blocks (see "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "container-blocks.md#synchronised-block-types-in-a-container"
+              },
+              "children": [
+                {
+                  "text": "Container Blocks › Synchronised Block Types"
+                }
+              ]
+            },
+            {
+              "text": ") but differ in one structural way: there's no blocks field to declare "
+            },
+            {
+              "text": "itemTypeField",
+              "code": true
+            },
+            {
+              "text": " on, since listing children are "
+            },
+            {
+              "text": "virtual",
+              "em": true
+            },
+            {
+              "text": " (produced from query results at render time, not authored as page data). Instead, declare the typeField directly on the "
+            },
+            {
+              "text": "inheritSchemaFrom",
+              "code": true
+            },
+            {
+              "text": " recipe:"
             }
           ]
         }
       ]
     },
-    "ce-17": {
+    "ce-19": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-17-javascript-f67eaa",
+          "@id": "ce-19-javascript-4a6a28",
           "label": "Javascript",
           "language": "javascript",
-          "code": "listing: {\n    schemaEnhancer: ({ schema }) => {\n        schema.properties.itemType = {\n            title: 'Display as',\n            choices: [['teaser', 'Teaser'], ['card', 'Card']],\n        };\n        return schema;\n    },\n    inheritSchemaFrom: {\n        typeField: 'itemType',\n        blocksField: null,\n    },\n}"
+          "code": "listing: {\n    blockSchema: {\n        properties: {\n            variation: {\n                widget: 'blockTypeSelect',\n                filterConvertibleFrom: '@default',  // only offer types with @default mappings\n            },\n            // FieldMappingWidget is added at sidebar render time by\n            // inheritSchemaFrom (the enhancer reads `mappingField` below);\n            // declare an empty placeholder so it appears in the auto-generated\n            // default fieldset alongside `variation`.\n            fieldMapping: {},\n        },\n    },\n    schemaEnhancer: {\n        inheritSchemaFrom: {\n            typeField: 'variation',     // listing has no blocks field — declare here\n            mappingField: 'fieldMapping',\n        },\n    },\n}"
         }
       ]
     },
-    "h-18": {
+    "p-20": {
+      "@type": "slate",
+      "plaintext": "`filterConvertibleFrom: '@default'` restricts the dropdown to types that have a `fieldMappings['@default']` entry — i.e. types that can be populated from the canonical content fields (`@id`, `title`, `description`, `image`) that listing queries return. Each item type's `fieldMappings['@default']` (on its own block config) defines how those source fields land on its schema; that static mapping is enough to render listings. Adding `mappingField` to the enhancer exposes the `FieldMappingWidget` so the editor can override the mapping per listing instance.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "filterConvertibleFrom: '@default'",
+              "code": true
+            },
+            {
+              "text": " restricts the dropdown to types that have a "
+            },
+            {
+              "text": "fieldMappings['@default']",
+              "code": true
+            },
+            {
+              "text": " entry — i.e. types that can be populated from the canonical content fields ("
+            },
+            {
+              "text": "@id",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "title",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "description",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "image",
+              "code": true
+            },
+            {
+              "text": ") that listing queries return. Each item type's "
+            },
+            {
+              "text": "fieldMappings['@default']",
+              "code": true
+            },
+            {
+              "text": " (on its own block config) defines how those source fields land on its schema; that static mapping is enough to render listings. Adding "
+            },
+            {
+              "text": "mappingField",
+              "code": true
+            },
+            {
+              "text": " to the enhancer exposes the "
+            },
+            {
+              "text": "FieldMappingWidget",
+              "code": true
+            },
+            {
+              "text": " so the editor can override the mapping per listing instance."
+            }
+          ]
+        }
+      ]
+    },
+    "p-21": {
+      "@type": "slate",
+      "plaintext": "The widget saves its output as `fieldMapping` (singular) on the block data. `expandListingBlocks` reads that at render time to translate each query result into an item block.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The widget saves its output as "
+            },
+            {
+              "text": "fieldMapping",
+              "code": true
+            },
+            {
+              "text": " (singular) on the block data. "
+            },
+            {
+              "text": "expandListingBlocks",
+              "code": true
+            },
+            {
+              "text": " reads that at render time to translate each query result into an item block."
+            }
+          ]
+        }
+      ]
+    },
+    "h-22": {
+      "@type": "slate",
+      "plaintext": "Combining Listings with Container Syncing",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Combining Listings with Container Syncing"
+            }
+          ]
+        }
+      ]
+    },
+    "p-23": {
+      "@type": "slate",
+      "plaintext": "A container (e.g. `gridBlock`) can mix **manual children** AND **a listing** as children. Add `'listing'` to the blocks field's `allowedBlocks`, and the parent's typeField propagates everywhere:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A container (e.g. "
+            },
+            {
+              "text": "gridBlock",
+              "code": true
+            },
+            {
+              "text": ") can mix "
+            },
+            {
+              "text": "manual children",
+              "strong": true
+            },
+            {
+              "text": " AND "
+            },
+            {
+              "text": "a listing",
+              "strong": true
+            },
+            {
+              "text": " as children. Add "
+            },
+            {
+              "text": "'listing'",
+              "code": true
+            },
+            {
+              "text": " to the blocks field's "
+            },
+            {
+              "text": "allowedBlocks",
+              "code": true
+            },
+            {
+              "text": ", and the parent's typeField propagates everywhere:"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-24": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-24-javascript-2e0580",
+          "label": "Javascript",
+          "language": "javascript",
+          "code": "gridBlock: {\n    blockSchema: {\n        properties: {\n            slides: {\n                widget: 'blocks_layout',\n                itemTypeField: 'variation',\n                allowedBlocks: ['teaser', 'image', 'listing'],  // manual items + listing\n            },\n            variation: {\n                widget: 'blockTypeSelect',\n                filterConvertibleFrom: '@default',  // keeps 'listing' out of the dropdown\n            },\n        },\n    },\n    schemaEnhancer: { inheritSchemaFrom: {} },\n}"
+        }
+      ]
+    },
+    "p-25": {
+      "@type": "slate",
+      "plaintext": "`filterConvertibleFrom: '@default'` keeps `'listing'` out of the dropdown (it's a structural container, not an item type, so it has no `fieldMappings['@default']`) but it stays in `allowedBlocks` so a listing block can still exist as a structural child. The editor sees \"Teaser / Image / Summary\" in the picker; the listing is a structural choice they don't have to think about.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "filterConvertibleFrom: '@default'",
+              "code": true
+            },
+            {
+              "text": " keeps "
+            },
+            {
+              "text": "'listing'",
+              "code": true
+            },
+            {
+              "text": " out of the dropdown (it's a structural container, not an item type, so it has no "
+            },
+            {
+              "text": "fieldMappings['@default']",
+              "code": true
+            },
+            {
+              "text": ") but it stays in "
+            },
+            {
+              "text": "allowedBlocks",
+              "code": true
+            },
+            {
+              "text": " so a listing block can still exist as a structural child. The editor sees \"Teaser / Image / Summary\" in the picker; the listing is a structural choice they don't have to think about."
+            }
+          ]
+        }
+      ]
+    },
+    "p-26": {
+      "@type": "slate",
+      "plaintext": "When the editor changes `gridBlock.variation` to e.g. `'summary'`:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "When the editor changes "
+            },
+            {
+              "text": "gridBlock.variation",
+              "code": true
+            },
+            {
+              "text": " to e.g. "
+            },
+            {
+              "text": "'summary'",
+              "code": true
+            },
+            {
+              "text": ":"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-27": {
+      "@type": "slate",
+      "plaintext": "Manual children (a teaser, an image) get their @type converted via the destination type's fieldMappings — teaser becomes summary. Listing child keeps @type: 'listing' but its own variation field is set to 'summary', so the listing now renders summary items.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Manual children",
+                  "strong": true
+                },
+                {
+                  "text": " (a teaser, an image) get their "
+                },
+                {
+                  "text": "@type",
+                  "code": true
+                },
+                {
+                  "text": " converted via the destination type's "
+                },
+                {
+                  "text": "fieldMappings",
+                  "code": true
+                },
+                {
+                  "text": " — teaser becomes summary."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Listing child",
+                  "strong": true
+                },
+                {
+                  "text": " keeps "
+                },
+                {
+                  "text": "@type: 'listing'",
+                  "code": true
+                },
+                {
+                  "text": " but its own "
+                },
+                {
+                  "text": "variation",
+                  "code": true
+                },
+                {
+                  "text": " field is set to "
+                },
+                {
+                  "text": "'summary'",
+                  "code": true
+                },
+                {
+                  "text": ", so the listing now renders summary items."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-28": {
+      "@type": "slate",
+      "plaintext": "The sync walks recursively — if the listing held nested containers with their own typeFields, those would update too. Net effect: ONE picker on the parent controls the rendered type for every descendant, regardless of whether descendants are authored manually or expanded from a query.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The sync walks recursively — if the listing held nested containers with their own typeFields, those would update too. Net effect: ONE picker on the parent controls the rendered type for every descendant, regardless of whether descendants are authored manually or expanded from a query."
+            }
+          ]
+        }
+      ]
+    },
+    "h-29": {
       "@type": "slate",
       "plaintext": "Path Transformation (pathToApiPath)",
       "value": [
@@ -292,7 +1068,7 @@
         }
       ]
     },
-    "p-19": {
+    "p-30": {
       "@type": "slate",
       "plaintext": "If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS.",
       "value": [
@@ -306,18 +1082,18 @@
         }
       ]
     },
-    "ce-20": {
+    "ce-31": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-20-javascript-161ac5",
+          "@id": "ce-31-javascript-d9b9d3",
           "label": "Javascript",
           "language": "javascript",
           "code": "const bridge = initBridge({\n    page: { ... },\n    // Transform frontend path to API path by stripping paging segments\n    // e.g., /test-page/@pg_block-8-grid_1 -> /test-page\n    pathToApiPath: (path) => path.replace(/\\/@pg_[^/]+_\\d+/, ''),\n});"
         }
       ]
     },
-    "p-21": {
+    "p-32": {
       "@type": "slate",
       "plaintext": "The `pathToApiPath` function is called whenever hydra.js sends a `PATH_CHANGE` message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state).",
       "value": [
@@ -325,13 +1101,27 @@
           "type": "p",
           "children": [
             {
-              "text": "The `pathToApiPath` function is called whenever hydra.js sends a `PATH_CHANGE` message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state)."
+              "text": "The "
+            },
+            {
+              "text": "pathToApiPath",
+              "code": true
+            },
+            {
+              "text": " function is called whenever hydra.js sends a "
+            },
+            {
+              "text": "PATH_CHANGE",
+              "code": true
+            },
+            {
+              "text": " message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state)."
             }
           ]
         }
       ]
     },
-    "h-22": {
+    "h-33": {
       "@type": "slate",
       "plaintext": "Paging Values",
       "value": [
@@ -345,7 +1135,7 @@
         }
       ]
     },
-    "p-23": {
+    "p-34": {
       "@type": "slate",
       "plaintext": "Both `expandListingBlocks` and `staticBlocks` return `{ items, paging }`. You pass `{ start, size }` as input (not mutated) and get back computed paging values:",
       "value": [
@@ -353,15 +1143,43 @@
           "type": "p",
           "children": [
             {
-              "text": "Both `expandListingBlocks` and `staticBlocks` return `{ items, paging }`. You pass `{ start, size }` as input (not mutated) and get back computed paging values:"
+              "text": "Both "
+            },
+            {
+              "text": "expandListingBlocks",
+              "code": true
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "staticBlocks",
+              "code": true
+            },
+            {
+              "text": " return "
+            },
+            {
+              "text": "{ items, paging }",
+              "code": true
+            },
+            {
+              "text": ". You pass "
+            },
+            {
+              "text": "{ start, size }",
+              "code": true
+            },
+            {
+              "text": " as input (not mutated) and get back computed paging values:"
             }
           ]
         }
       ]
     },
-    "ul-24": {
+    "ul-35": {
       "@type": "slate",
-      "plaintext": "**`currentPage`** (number) — Zero-based current page index **`totalPages`** (number) — Total number of pages **`totalItems`** (number) — Total item count across all blocks **`prev`** (number | null) — Previous page index, or null on first page **`next`** (number | null) — Next page index, or null on last page **`pages`** (array) — Window of ~5 page objects: `{ start, page }` where page is 1-based **`seen`** (number) — Running item count — pass to the next call's `seen` option for position tracking in grids",
+      "plaintext": "currentPage (number) — Zero-based current page index totalPages (number) — Total number of pages totalItems (number) — Total item count across all blocks prev (number | null) — Previous page index, or null on first page next (number | null) — Next page index, or null on last page pages (array) — Window of ~5 page objects: { start, page } where page is 1-based seen (number) — Running item count — pass to the next call's seen option for position tracking in grids",
       "value": [
         {
           "type": "ul",
@@ -370,7 +1188,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`currentPage`** (number) — Zero-based current page index"
+                  "text": "`currentPage`",
+                  "strong": true
+                },
+                {
+                  "text": " (number) — Zero-based current page index"
                 }
               ]
             },
@@ -378,7 +1200,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`totalPages`** (number) — Total number of pages"
+                  "text": "`totalPages`",
+                  "strong": true
+                },
+                {
+                  "text": " (number) — Total number of pages"
                 }
               ]
             },
@@ -386,7 +1212,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`totalItems`** (number) — Total item count across all blocks"
+                  "text": "`totalItems`",
+                  "strong": true
+                },
+                {
+                  "text": " (number) — Total item count across all blocks"
                 }
               ]
             },
@@ -394,7 +1224,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`prev`** (number | null) — Previous page index, or null on first page"
+                  "text": "`prev`",
+                  "strong": true
+                },
+                {
+                  "text": " (number | null) — Previous page index, or null on first page"
                 }
               ]
             },
@@ -402,7 +1236,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`next`** (number | null) — Next page index, or null on last page"
+                  "text": "`next`",
+                  "strong": true
+                },
+                {
+                  "text": " (number | null) — Next page index, or null on last page"
                 }
               ]
             },
@@ -410,7 +1248,18 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`pages`** (array) — Window of ~5 page objects: `{ start, page }` where page is 1-based"
+                  "text": "`pages`",
+                  "strong": true
+                },
+                {
+                  "text": " (array) — Window of ~5 page objects: "
+                },
+                {
+                  "text": "{ start, page }",
+                  "code": true
+                },
+                {
+                  "text": " where page is 1-based"
                 }
               ]
             },
@@ -418,7 +1267,18 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`seen`** (number) — Running item count — pass to the next call's `seen` option for position tracking in grids"
+                  "text": "`seen`",
+                  "strong": true
+                },
+                {
+                  "text": " (number) — Running item count — pass to the next call's "
+                },
+                {
+                  "text": "seen",
+                  "code": true
+                },
+                {
+                  "text": " option for position tracking in grids"
                 }
               ]
             }
@@ -426,7 +1286,7 @@
         }
       ]
     },
-    "h-25": {
+    "h-36": {
       "@type": "slate",
       "plaintext": "Notes",
       "value": [
@@ -440,7 +1300,7 @@
         }
       ]
     },
-    "p-26": {
+    "p-37": {
       "@type": "slate",
       "plaintext": "Expanded listing items share the listing block's `@uid`. Selecting any expanded item selects the parent listing block.",
       "value": [
@@ -448,7 +1308,14 @@
           "type": "p",
           "children": [
             {
-              "text": "Expanded listing items share the listing block's `@uid`. Selecting any expanded item selects the parent listing block."
+              "text": "Expanded listing items share the listing block's "
+            },
+            {
+              "text": "@uid",
+              "code": true
+            },
+            {
+              "text": ". Selecting any expanded item selects the parent listing block."
             }
           ]
         }
@@ -471,19 +1338,30 @@
       "p-11",
       "h-12",
       "p-13",
-      "ce-14",
-      "h-15",
-      "p-16",
-      "ce-17",
-      "h-18",
-      "p-19",
-      "ce-20",
+      "p-14",
+      "tbl-15",
+      "ce-16",
+      "h-17",
+      "p-18",
+      "ce-19",
+      "p-20",
       "p-21",
       "h-22",
       "p-23",
-      "ul-24",
-      "h-25",
-      "p-26"
+      "ce-24",
+      "p-25",
+      "p-26",
+      "ul-27",
+      "p-28",
+      "h-29",
+      "p-30",
+      "ce-31",
+      "p-32",
+      "h-33",
+      "p-34",
+      "ul-35",
+      "h-36",
+      "p-37"
     ]
   },
   "contributors": [],

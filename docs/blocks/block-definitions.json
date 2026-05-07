@@ -207,11 +207,6 @@
               "mode": "link"
             }
           }
-        },
-        "schemaEnhancer": {
-          "childBlockConfig": {
-            "defaultsField": "itemDefaults"
-          }
         }
       }
     },
@@ -261,11 +256,6 @@
               "title": "Overwrite target content",
               "type": "boolean"
             }
-          }
-        },
-        "schemaEnhancer": {
-          "childBlockConfig": {
-            "defaultsField": "itemDefaults"
           }
         }
       }
@@ -544,13 +534,8 @@
   "slider": {
     "blocks": {
       "slider": {
-        "itemTypeField": "variation",
         "schemaEnhancer": {
-          "inheritSchemaFrom": {
-            "defaultsField": "itemDefaults",
-            "blocksField": "slides",
-            "title": "Item Type"
-          }
+          "inheritSchemaFrom": {}
         },
         "blockSchema": {
           "properties": {
@@ -564,7 +549,13 @@
                 "teaser"
               ],
               "typeField": "@type",
+              "itemTypeField": "variation",
               "defaultBlockType": "slide"
+            },
+            "variation": {
+              "title": "Item Type",
+              "widget": "blockTypeSelect",
+              "filterConvertibleFrom": "@default"
             },
             "autoplayEnabled": {
               "title": "Autoplay Enabled",
@@ -591,19 +582,6 @@
             "title": "title",
             "description": "description",
             "image": "preview_image"
-          }
-        },
-        "schemaEnhancer": {
-          "childBlockConfig": {
-            "defaultsField": "itemDefaults",
-            "editableFields": [
-              "head_title",
-              "title",
-              "description",
-              "preview_image",
-              "buttonText",
-              "hideButton"
-            ]
           }
         },
         "blockSchema": {

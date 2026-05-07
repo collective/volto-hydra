@@ -8,6 +8,8 @@ A Visual Headless CMS using Plone as a server, providing true visual editing wit
 
 getting-started/index
 concepts/index
+visual-editing/index
+frontend-guide/index
 blocks/README
 ```
 

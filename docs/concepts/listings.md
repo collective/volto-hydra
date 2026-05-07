@@ -84,6 +84,15 @@ For non-Plone backends (RSS feeds, external APIs, etc.), write your own fetcher:
 
 `fieldMapping` on a listing block controls which fields appear on expanded items — only mapped fields are included. Default: `{ @id → href, title → title, description → description, image → image }`. Values can be a string (rename) or `{ field, type }` for conversions:
 
+Built-in item types and the fields they expose:
+
+| Type | Fields |
+|------|--------|
+| `default` | `title`, `description`, `href` |
+| `summary` | `title`, `description`, `href`, `image` |
+| `teaser` | `title`, `description`, `href`, `preview_image` |
+
+
 <!-- codeExample: json -->
 ```json
 "fieldMapping": {

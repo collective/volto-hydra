@@ -23,7 +23,7 @@
     },
     "ul-2": {
       "@type": "slate",
-      "plaintext": "**`data-block-uid=\"blockId\"`** — Click-to-select blocks. Hydra.js adds click handlers and shows a blue outline and Quanta toolbar on selected blocks. **`data-edit-text=\"fieldName\"`** — Inline text editing. For simple text, click and type directly. For rich text (slate widget), select text to apply formatting via the Quanta toolbar. **`data-edit-media=\"fieldName\"`** — Visual media uploading. Editors can upload, pick or drag-and-drop images directly onto the element. **`data-edit-link=\"fieldName\"`** — Link editing. Click behaviour is replaced with a link picker to select content, enter an external URL, or open the link.",
+      "plaintext": "data-block-uid=\"blockId\" — Click-to-select blocks. Hydra.js adds click handlers and shows a blue outline and Quanta toolbar on selected blocks. data-edit-text=\"fieldName\" — Inline text editing. For simple text, click and type directly. For rich text (slate widget), select text to apply formatting via the Quanta toolbar. data-edit-media=\"fieldName\" — Visual media uploading. Editors can upload, pick or drag-and-drop images directly onto the element. data-edit-link=\"fieldName\" — Link editing. Click behaviour is replaced with a link picker to select content, enter an external URL, or open the link.",
       "value": [
         {
           "type": "ul",
@@ -32,7 +32,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`data-block-uid=\"blockId\"`** — Click-to-select blocks. Hydra.js adds click handlers and shows a blue outline and Quanta toolbar on selected blocks."
+                  "text": "`data-block-uid=\"blockId\"`",
+                  "strong": true
+                },
+                {
+                  "text": " — Click-to-select blocks. Hydra.js adds click handlers and shows a blue outline and Quanta toolbar on selected blocks."
                 }
               ]
             },
@@ -40,7 +44,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`data-edit-text=\"fieldName\"`** — Inline text editing. For simple text, click and type directly. For rich text (slate widget), select text to apply formatting via the Quanta toolbar."
+                  "text": "`data-edit-text=\"fieldName\"`",
+                  "strong": true
+                },
+                {
+                  "text": " — Inline text editing. For simple text, click and type directly. For rich text (slate widget), select text to apply formatting via the Quanta toolbar."
                 }
               ]
             },
@@ -48,7 +56,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`data-edit-media=\"fieldName\"`** — Visual media uploading. Editors can upload, pick or drag-and-drop images directly onto the element."
+                  "text": "`data-edit-media=\"fieldName\"`",
+                  "strong": true
+                },
+                {
+                  "text": " — Visual media uploading. Editors can upload, pick or drag-and-drop images directly onto the element."
                 }
               ]
             },
@@ -56,7 +68,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`data-edit-link=\"fieldName\"`** — Link editing. Click behaviour is replaced with a link picker to select content, enter an external URL, or open the link."
+                  "text": "`data-edit-link=\"fieldName\"`",
+                  "strong": true
+                },
+                {
+                  "text": " — Link editing. Click behaviour is replaced with a link picker to select content, enter an external URL, or open the link."
                 }
               ]
             }
@@ -130,7 +146,7 @@
     },
     "ul-8": {
       "@type": "slate",
-      "plaintext": "Attributes without selectors apply to the root element: `block-uid=xxx` Attributes with selectors target child elements: `edit-text=title(.card-title)` Closing `<!-- /hydra -->` marks end of scope Self-closing `<!-- hydra block-uid=xxx /-->` applies only to next sibling element",
+      "plaintext": "Attributes without selectors apply to the root element: block-uid=xxx Attributes with selectors target child elements: edit-text=title(.card-title) Closing <!-- /hydra --> marks end of scope Self-closing <!-- hydra block-uid=xxx /--> applies only to next sibling element",
       "value": [
         {
           "type": "ul",
@@ -139,7 +155,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Attributes without selectors apply to the root element: `block-uid=xxx`"
+                  "text": "Attributes without selectors apply to the root element: "
+                },
+                {
+                  "text": "block-uid=xxx",
+                  "code": true
                 }
               ]
             },
@@ -147,7 +167,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Attributes with selectors target child elements: `edit-text=title(.card-title)`"
+                  "text": "Attributes with selectors target child elements: "
+                },
+                {
+                  "text": "edit-text=title(.card-title)",
+                  "code": true
                 }
               ]
             },
@@ -155,7 +179,14 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Closing `<!-- /hydra -->` marks end of scope"
+                  "text": "Closing "
+                },
+                {
+                  "text": "<!-- /hydra -->",
+                  "code": true
+                },
+                {
+                  "text": " marks end of scope"
                 }
               ]
             },
@@ -163,7 +194,14 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Self-closing `<!-- hydra block-uid=xxx /-->` applies only to next sibling element"
+                  "text": "Self-closing "
+                },
+                {
+                  "text": "<!-- hydra block-uid=xxx /-->",
+                  "code": true
+                },
+                {
+                  "text": " applies only to next sibling element"
                 }
               ]
             }
@@ -179,7 +217,46 @@
           "type": "p",
           "children": [
             {
-              "text": "Supported attributes: `block-uid`, `block-readonly`, `edit-text`, `edit-link`, `edit-media`, `block-add`"
+              "text": "Supported attributes: "
+            },
+            {
+              "text": "block-uid",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "block-readonly",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "edit-text",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "edit-link",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "edit-media",
+              "code": true
+            },
+            {
+              "text": ", "
+            },
+            {
+              "text": "block-add",
+              "code": true
             }
           ]
         }
@@ -207,7 +284,14 @@
           "type": "p",
           "children": [
             {
-              "text": "Add `data-linkable-allow` to elements that should navigate during edit mode (paging links, facet controls, etc.):"
+              "text": "Add "
+            },
+            {
+              "text": "data-linkable-allow",
+              "code": true
+            },
+            {
+              "text": " to elements that should navigate during edit mode (paging links, facet controls, etc.):"
             }
           ]
         }
@@ -246,7 +330,14 @@
           "type": "p",
           "children": [
             {
-              "text": "The `data-edit-text|edit-media|edit-link` attributes support Unix-style paths to edit fields outside the current block:"
+              "text": "The "
+            },
+            {
+              "text": "data-edit-text|edit-media|edit-link",
+              "code": true
+            },
+            {
+              "text": " attributes support Unix-style paths to edit fields outside the current block:"
             }
           ]
         }
@@ -254,7 +345,7 @@
     },
     "ul-15": {
       "@type": "slate",
-      "plaintext": "**`fieldName`** — edit the block's own field (default) **`../fieldName`** — edit the parent block's field **`../../fieldName`** — edit the grandparent's field **`/fieldName`** — edit the page metadata field",
+      "plaintext": "fieldName — edit the block's own field (default) ../fieldName — edit the parent block's field ../../fieldName — edit the grandparent's field /fieldName — edit the page metadata field",
       "value": [
         {
           "type": "ul",
@@ -263,7 +354,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`fieldName`** — edit the block's own field (default)"
+                  "text": "`fieldName`",
+                  "strong": true
+                },
+                {
+                  "text": " — edit the block's own field (default)"
                 }
               ]
             },
@@ -271,7 +366,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`../fieldName`** — edit the parent block's field"
+                  "text": "`../fieldName`",
+                  "strong": true
+                },
+                {
+                  "text": " — edit the parent block's field"
                 }
               ]
             },
@@ -279,7 +378,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`../../fieldName`** — edit the grandparent's field"
+                  "text": "`../../fieldName`",
+                  "strong": true
+                },
+                {
+                  "text": " — edit the grandparent's field"
                 }
               ]
             },
@@ -287,7 +390,11 @@
               "type": "li",
               "children": [
                 {
-                  "text": "**`/fieldName`** — edit the page metadata field"
+                  "text": "`/fieldName`",
+                  "strong": true
+                },
+                {
+                  "text": " — edit the page metadata field"
                 }
               ]
             }
@@ -342,7 +449,21 @@
           "type": "p",
           "children": [
             {
-              "text": "Add `data-block-readonly` (or `<!-- hydra block-readonly -->` comment) to disable inline editing for all fields inside an element:"
+              "text": "Add "
+            },
+            {
+              "text": "data-block-readonly",
+              "code": true
+            },
+            {
+              "text": " (or "
+            },
+            {
+              "text": "<!-- hydra block-readonly -->",
+              "code": true
+            },
+            {
+              "text": " comment) to disable inline editing for all fields inside an element:"
             }
           ]
         }
@@ -406,7 +527,14 @@
           "type": "p",
           "children": [
             {
-              "text": "When rendering Slate nodes to DOM, your renderer must follow these rules for `data-node-id`:"
+              "text": "When rendering Slate nodes to DOM, your renderer must follow these rules for "
+            },
+            {
+              "text": "data-node-id",
+              "code": true
+            },
+            {
+              "text": ":"
             }
           ]
         }
@@ -414,7 +542,7 @@
     },
     "ol-25": {
       "@type": "slate",
-      "plaintext": "Element nodes (`p`, `strong`, `em`, etc.) must have `data-node-id` matching the Slate node's `nodeId` Wrapper elements — If you add extra wrapper elements around a Slate node, ALL wrappers must have the same `data-node-id` as the inner element",
+      "plaintext": "Element nodes (p, strong, em, etc.) must have data-node-id matching the Slate node's nodeId Wrapper elements — If you add extra wrapper elements around a Slate node, ALL wrappers must have the same data-node-id as the inner element",
       "value": [
         {
           "type": "ol",
@@ -423,7 +551,39 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Element nodes (`p`, `strong`, `em`, etc.) must have `data-node-id` matching the Slate node's `nodeId`"
+                  "text": "Element nodes ("
+                },
+                {
+                  "text": "p",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "strong",
+                  "code": true
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "text": "em",
+                  "code": true
+                },
+                {
+                  "text": ", etc.) must have "
+                },
+                {
+                  "text": "data-node-id",
+                  "code": true
+                },
+                {
+                  "text": " matching the Slate node's "
+                },
+                {
+                  "text": "nodeId",
+                  "code": true
                 }
               ]
             },
@@ -431,7 +591,14 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Wrapper elements — If you add extra wrapper elements around a Slate node, ALL wrappers must have the same `data-node-id` as the inner element"
+                  "text": "Wrapper elements — If you add extra wrapper elements around a Slate node, ALL wrappers must have the same "
+                },
+                {
+                  "text": "data-node-id",
+                  "code": true
+                },
+                {
+                  "text": " as the inner element"
                 }
               ]
             }
