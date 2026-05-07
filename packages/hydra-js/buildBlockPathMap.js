@@ -54,9 +54,18 @@ export function getBlockTypeSchema(blockType, intl, blocksConfig) {
       required: [],
     };
   } else if (!schema.fieldsets) {
+    // Schema declares properties but no fieldsets — auto-create a default
+    // fieldset listing all property names. Without this, properties exist
+    // but Volto's form renderer (which iterates fieldsets[].fields) shows
+    // nothing. Authors who want explicit ordering / multiple fieldsets
+    // declare them themselves.
     schema = {
       ...schema,
-      fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+      fieldsets: [{
+        id: 'default',
+        title: 'Default',
+        fields: Object.keys(schema.properties || {}),
+      }],
     };
   }
 
@@ -115,9 +124,18 @@ export function getBlockSchema(blockType, intl, blocksConfig, formData, pageForm
       required: [],
     };
   } else if (!schema.fieldsets) {
+    // Schema declares properties but no fieldsets — auto-create a default
+    // fieldset listing all property names. Without this, properties exist
+    // but Volto's form renderer (which iterates fieldsets[].fields) shows
+    // nothing. Authors who want explicit ordering / multiple fieldsets
+    // declare them themselves.
     schema = {
       ...schema,
-      fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+      fieldsets: [{
+        id: 'default',
+        title: 'Default',
+        fields: Object.keys(schema.properties || {}),
+      }],
     };
   }
 
