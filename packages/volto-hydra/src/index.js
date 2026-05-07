@@ -43,6 +43,13 @@ import HiddenObjectListWidget from './components/Widgets/HiddenObjectListWidget'
 import FieldMappingWidget from './components/Widgets/FieldMappingWidget';
 import BlockTypeSelectWidget from './components/Widgets/BlockTypeSelectWidget';
 import TableSchema, { TableBlockSchema } from '@plone/volto-slate/blocks/Table/schema';
+// Volto-slate ships TWO schemas for the slate block:
+//   ./schema.js          → "Block tab" form (override_toc / level / entry_text)
+//   ./TextBlockSchema.js → "Settings tab" form (placeholder / instructions /
+//                          fixed / disableNewBlocks / readOnly)
+// We merge both into one schema below so Volto Hydra's single sidebar
+// surface shows everything.
+import _slateBlockTabSchema from '@plone/volto-slate/blocks/Text/schema';
 import { ImageSchema } from '@plone/volto/components/manage/Blocks/Image/schema';
 import {
   QUERY_RESULT_FIELDS,
@@ -130,12 +137,13 @@ const applyConfig = (config) => {
   // data-node-id never gets added in the iframe and slate selection sync
   // breaks).
   //
-  // The Block-tab sidebar form is rendered by Volto's DefaultTextBlockEditor,
-  // which imports a separate file (./schema.js) directly. We shadow that at
-  // customizations/@plone/volto-slate/blocks/Text/schema.js so the sidebar
-  // form also includes `value`. With both in place the schemaEnhancer is no
-  // longer needed — removing it eliminates ~150 redundant per-slate enhancer
-  // re-runs in buildBlockPathMap pass 2 on slate-heavy pages.
+  // The Block-tab sidebar form is rendered by our shadowed
+  // customizations/@plone/volto-slate/blocks/Text/DefaultTextBlockEditor.jsx,
+  // which reads `blocksConfig.slate.schema` (this factory) directly so
+  // there's a SINGLE source of truth for slate's schema. The schemaEnhancer
+  // pattern (which used to add `value` at sidebar render via the variation
+  // HOC) is gone — eliminating ~150 redundant per-slate enhancer re-runs in
+  // buildBlockPathMap pass 2 on slate-heavy pages.
   const _slateOriginalSchema = config.blocks.blocksConfig.slate.schema;
   config.blocks.blocksConfig.slate = {
     ...config.blocks.blocksConfig.slate,
@@ -146,23 +154,47 @@ const applyConfig = (config) => {
       value: value.value || config.settings.slate.defaultValue(),
     }),
     schema: (props) => {
-      const base = typeof _slateOriginalSchema === 'function'
+      // _slateOriginalSchema = blocksConfig.slate.schema set by Volto-slate =
+      //   the Settings-tab schema (./TextBlockSchema.js).
+      // _slateBlockTabSchema = the Block-tab schema (./schema.js) with the
+      //   TOC settings (override_toc / level / entry_text). Volto's
+      //   DefaultTextBlockEditor imports it directly; we merge it here so
+      //   we have a SINGLE source of truth that includes both.
+      const settings = typeof _slateOriginalSchema === 'function'
         ? _slateOriginalSchema(props)
         : _slateOriginalSchema;
-      const baseFields = base?.fieldsets?.[0]?.fields || [];
+      const blockTab = typeof _slateBlockTabSchema === 'function'
+        ? _slateBlockTabSchema(props?.formData || props?.data || {})
+        : _slateBlockTabSchema;
+      const settingsFields = settings?.fieldsets?.[0]?.fields || [];
+      const blockTabFields = blockTab?.fieldsets?.[0]?.fields || [];
+      // Placeholder text for the slate body. props.intl may not be passed
+      // (e.g. when called by buildBlockPathMap via getBlockTypeSchema with
+      // intl=undefined), so fall back to the i18n message default.
+      const placeholder = props?.intl?.formatMessage
+        ? props.intl.formatMessage(messages.typeText)
+        : messages.typeText.defaultMessage;
       return {
-        ...base,
+        title: settings?.title || blockTab?.title || 'Slate',
         fieldsets: [
           {
-            ...(base?.fieldsets?.[0] || { id: 'default', title: 'Default' }),
-            fields: ['value', ...baseFields],
+            id: 'default',
+            title: 'Default',
+            fields: ['value', ...blockTabFields, ...settingsFields],
           },
-          ...(base?.fieldsets?.slice(1) || []),
+          // Preserve any extra fieldsets either schema declared.
+          ...(settings?.fieldsets?.slice(1) || []),
+          ...(blockTab?.fieldsets?.slice(1) || []),
         ],
         properties: {
-          value: { title: 'Body', widget: 'slate' },
-          ...(base?.properties || {}),
+          value: { title: 'Body', widget: 'slate', placeholder },
+          ...(blockTab?.properties || {}),
+          ...(settings?.properties || {}),
         },
+        required: [
+          ...(settings?.required || []),
+          ...(blockTab?.required || []),
+        ],
       };
     },
     sidebarTab: 1,

@@ -2270,18 +2270,22 @@ const Iframe = (props) => {
                 const prevValue = prevBlock?.[fieldName];
                 const currentValue = currentBlock?.[fieldName];
 
-                // Only merge single-text-field blocks (e.g. slate paragraphs)
-                // Multi-field blocks (hero, teaser) should not merge
-                const prevSchema = getResolvedSchema(prevPathInfo, mergeBpm);
-                const prevEditableFields = prevSchema?.properties
-                  ? Object.entries(prevSchema.properties).filter(([, def]) => {
-                      const ft = getFieldTypeString(def);
-                      return ft?.includes('slate') || ft === 'string' || ft === 'string:text' || ft === 'string:textarea';
-                    })
-                  : [];
-                const isSingleTextField = prevEditableFields.length === 1 && prevEditableFields[0][0] === fieldName;
+                // Only merge single-text-field blocks (e.g. slate paragraphs).
+                // Multi-field blocks (hero, teaser) should not merge.
+                //
+                // The iframe sends editableFieldsByBlock — derived from the
+                // rendered DOM's data-edit-text/link/media attributes —
+                // which is the authoritative "what fields are user-editable
+                // in this block?" answer. Schema-introspection here would
+                // over-count settings fields (placeholder, instructions,
+                // fixed, etc.) that exist in the sidebar form but aren't
+                // user content.
+                const prevEditableFields = event.data.editableFieldsByBlock?.[prevBlockId] || [];
+                const isSingleTextField = prevEditableFields.length === 1
+                  && prevEditableFields[0].fieldName === fieldName
+                  && prevEditableFields[0].type === 'slate';
 
-                log('unwrapBlock merge check:', { prevBlockId, prevType: prevBlock?.['@type'], fieldName, isSingleTextField, prevEditableFields: prevEditableFields.map(([n]) => n), hasPrevValue: Array.isArray(prevValue), hasCurrentValue: Array.isArray(currentValue) });
+                log('unwrapBlock merge check:', { prevBlockId, prevType: prevBlock?.['@type'], fieldName, isSingleTextField, prevEditableFields, hasPrevValue: Array.isArray(prevValue), hasCurrentValue: Array.isArray(currentValue) });
 
                 if (isSingleTextField && Array.isArray(prevValue) && Array.isArray(currentValue)) {
                   log('unwrapBlock merge: merging', mergeBlockId, 'into', prevBlockId);
