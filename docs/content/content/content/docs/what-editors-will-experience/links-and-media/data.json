@@ -1,0 +1,495 @@
+{
+  "@id": "/docs/what-editors-will-experience/links-and-media",
+  "@type": "Document",
+  "UID": "docs-what-editors-will-experience-links-and-media-001",
+  "allow_discussion": false,
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "",
+  "effective": "2025-01-01T00:00:00",
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "links-and-media",
+  "is_folderish": false,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/docs/what-editors-will-experience",
+    "@type": "Document",
+    "UID": "docs-what-editors-will-experience-001",
+    "description": "This guide is for content editors using a Hydra-powered site. It covers how to use the editor — how to select things, edit text, add and move blocks, work with containers and templates — without assuming you know how the site was built.",
+    "title": "Editor Guide",
+    "type_title": "Page"
+  },
+  "preview_caption": null,
+  "preview_image": null,
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Links and media",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2025-01-01T00:00:00+00:00"
+      }
+    ]
+  },
+  "working_copy": null,
+  "working_copy_of": null,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "h-1": {
+      "@type": "slate",
+      "plaintext": "Editing a link",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Editing a link"
+            }
+          ]
+        }
+      ]
+    },
+    "p-2": {
+      "@type": "slate",
+      "plaintext": "When the frontend has wired up a link field as inline-editable, clicking the link in the preview doesn't navigate — it opens the **link picker** instead. From the picker you can:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "When the frontend has wired up a link field as inline-editable, clicking the link in the preview doesn't navigate — it opens the "
+            },
+            {
+              "text": "link picker",
+              "strong": true
+            },
+            {
+              "text": " instead. From the picker you can:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-3": {
+      "@type": "slate",
+      "plaintext": "Pick a CMS page by browsing the content tree. Type/paste an external URL. Open the URL in a new tab (toggle the \"Open in new tab\" option). Clear the link.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Pick a CMS page",
+                  "strong": true
+                },
+                {
+                  "text": " by browsing the content tree."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Type/paste an external URL.",
+                  "strong": true
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Open the URL in a new tab",
+                  "strong": true
+                },
+                {
+                  "text": " (toggle the \"Open in new tab\" option)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Clear the link.",
+                  "strong": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "img-4": {
+      "@type": "image",
+      "url": "/docs/_images/link-picker",
+      "alt": "Link picker on a slate link — URL field with /another-page, browse / clear / open-new-tab / submit icons.",
+      "align": "center",
+      "size": "l"
+    },
+    "p-5": {
+      "@type": "slate",
+      "plaintext": "The Quanta toolbar's link icon does the same thing and is available on slate text fields too — select some text, click the link icon, and the link picker opens for that text range.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The Quanta toolbar's link icon does the same thing and is available on slate text fields too — select some text, click the link icon, and the link picker opens for that text range."
+            }
+          ]
+        }
+      ]
+    },
+    "h-6": {
+      "@type": "slate",
+      "plaintext": "Uploading media",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Uploading media"
+            }
+          ]
+        }
+      ]
+    },
+    "p-7": {
+      "@type": "slate",
+      "plaintext": "When the frontend marks an image (or other media element) as inline-editable, you can:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "When the frontend marks an image (or other media element) as inline-editable, you can:"
+            }
+          ]
+        }
+      ]
+    },
+    "h-8": {
+      "@type": "slate",
+      "plaintext": "Empty media element",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Empty media element"
+            }
+          ]
+        }
+      ]
+    },
+    "p-9": {
+      "@type": "slate",
+      "plaintext": "You'll see an empty placeholder with a prompt to **upload, browse, or drag in** an image. Three ways:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "You'll see an empty placeholder with a prompt to "
+            },
+            {
+              "text": "upload, browse, or drag in",
+              "strong": true
+            },
+            {
+              "text": " an image. Three ways:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-10": {
+      "@type": "slate",
+      "plaintext": "Click the placeholder → the media picker opens. Pick from existing CMS images or upload a new one. Drag an image file from your desktop and drop it directly onto the placeholder. Drag an image from another tab / source if your browser supports it.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Click the placeholder → the media picker opens. Pick from existing CMS images or upload a new one."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Drag an image file from your desktop and drop it directly onto the placeholder."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Drag an image from another tab / source if your browser supports it."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "img-11": {
+      "@type": "image",
+      "url": "/docs/_images/media-empty-placeholder",
+      "alt": "Empty image block selected — placeholder with image icon, \"Browse the site, drop an image...\" input, sidebar showing \"NO IMAGE SELECTED\".",
+      "align": "center",
+      "size": "l"
+    },
+    "h-12": {
+      "@type": "slate",
+      "plaintext": "Replacing an existing media element",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Replacing an existing media element"
+            }
+          ]
+        }
+      ]
+    },
+    "p-13": {
+      "@type": "slate",
+      "plaintext": "Hover the image — controls appear. You can:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Hover the image — controls appear. You can:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-14": {
+      "@type": "slate",
+      "plaintext": "Replace — opens the media picker to pick or upload a different image. Remove — clears the field, returns to the empty placeholder state. Drag and drop a new image directly onto the existing one to replace it.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Replace",
+                  "strong": true
+                },
+                {
+                  "text": " — opens the media picker to pick or upload a different image."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Remove",
+                  "strong": true
+                },
+                {
+                  "text": " — clears the field, returns to the empty placeholder state."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Drag and drop a new image",
+                  "strong": true
+                },
+                {
+                  "text": " directly onto the existing one to replace it."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-15": {
+      "@type": "slate",
+      "plaintext": "The same actions are available from the sidebar field if you'd rather not click into the preview.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The same actions are available from the sidebar field if you'd rather not click into the preview."
+            }
+          ]
+        }
+      ]
+    },
+    "h-16": {
+      "@type": "slate",
+      "plaintext": "What gets stored",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "What gets stored"
+            }
+          ]
+        }
+      ]
+    },
+    "p-17": {
+      "@type": "slate",
+      "plaintext": "When you pick or upload an image, what gets stored on the block isn't a URL string — it's a small object containing the image's CMS path, the field name, and the available scales. The frontend resolves a specific scale at render time (so the same image data renders at thumbnail size in a listing and full size in a hero). You don't have to think about scales as an editor; they're a developer concern.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "When you pick or upload an image, what gets stored on the block isn't a URL string — it's a small object containing the image's CMS path, the field name, and the available scales. The frontend resolves a specific scale at render time (so the same image data renders at thumbnail size in a listing and full size in a hero). You don't have to think about scales as an editor; they're a developer concern."
+            }
+          ]
+        }
+      ]
+    },
+    "h-18": {
+      "@type": "slate",
+      "plaintext": "What's not (yet) inline-editable",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "What's not (yet) inline-editable"
+            }
+          ]
+        }
+      ]
+    },
+    "p-19": {
+      "@type": "slate",
+      "plaintext": "A few media types currently still require sidebar editing:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A few media types currently still require sidebar editing:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-20": {
+      "@type": "slate",
+      "plaintext": "File uploads (PDFs, downloads) — pickable from the sidebar but no drag-onto-preview support yet. Embedded video URLs — sidebar field; click-to-edit on the player isn't wired up.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "File uploads",
+                  "strong": true
+                },
+                {
+                  "text": " (PDFs, downloads) — pickable from the sidebar but no drag-onto-preview support yet."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Embedded video URLs",
+                  "strong": true
+                },
+                {
+                  "text": " — sidebar field; click-to-edit on the player isn't wired up."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-21": {
+      "@type": "slate",
+      "plaintext": "If your frontend doesn't expose a particular media field as inline-editable, you can always edit it from the sidebar — that's available for every field.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "If your frontend doesn't expose a particular media field as inline-editable, you can always edit it from the sidebar — that's available for every field."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "h-1",
+      "p-2",
+      "ul-3",
+      "img-4",
+      "p-5",
+      "h-6",
+      "p-7",
+      "h-8",
+      "p-9",
+      "ul-10",
+      "img-11",
+      "h-12",
+      "p-13",
+      "ul-14",
+      "p-15",
+      "h-16",
+      "p-17",
+      "h-18",
+      "p-19",
+      "ul-20",
+      "p-21"
+    ]
+  }
+}

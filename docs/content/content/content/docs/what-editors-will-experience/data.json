@@ -1,0 +1,544 @@
+{
+  "@id": "/docs/what-editors-will-experience",
+  "@type": "Document",
+  "UID": "docs-what-editors-will-experience-001",
+  "allow_discussion": false,
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "This guide is for content editors using a Hydra-powered site. It covers how to use the editor — how to select things, edit text, add and move blocks, work with containers and templates — without assuming you know how the site was built.",
+  "effective": "2025-01-01T00:00:00",
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "what-editors-will-experience",
+  "is_folderish": true,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/docs",
+    "@type": "Document",
+    "UID": "docs-folder-001",
+    "description": "Developer guide for Volto Hydra",
+    "title": "Docs",
+    "type_title": "Page"
+  },
+  "preview_caption": null,
+  "preview_image": null,
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Editor Guide",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2025-01-01T00:00:00+00:00"
+      }
+    ]
+  },
+  "working_copy": null,
+  "working_copy_of": null,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "p-1": {
+      "@type": "slate",
+      "plaintext": "This guide is for **content editors** using a Hydra-powered site. It covers how to use the editor — how to select things, edit text, add and move blocks, work with containers and templates — without assuming you know how the site was built.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This guide is for "
+            },
+            {
+              "text": "content editors",
+              "strong": true
+            },
+            {
+              "text": " using a Hydra-powered site. It covers how to use the editor — how to select things, edit text, add and move blocks, work with containers and templates — without assuming you know how the site was built."
+            }
+          ]
+        }
+      ]
+    },
+    "h-2": {
+      "@type": "slate",
+      "plaintext": "What you see",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "What you see"
+            }
+          ]
+        }
+      ]
+    },
+    "p-3": {
+      "@type": "slate",
+      "plaintext": "The editor screen has three regions:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The editor screen has three regions:"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-4": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-4-text-2da955",
+          "label": "Text",
+          "language": "text",
+          "code": "┌───────────┬──────────────────────────────────┬──────────────┐\n│           │                                  │              │\n│  Toolbar  │   Live preview (your frontend)   │   Sidebar    │\n│           │                                  │              │\n│  • Save   │                                  │   Page title │\n│  • Pages  │  Click anywhere here to edit.    │   Block list │\n│  • Site   │                                  │   Settings   │\n│           │                                  │              │\n└───────────┴──────────────────────────────────┴──────────────┘"
+        }
+      ]
+    },
+    "ul-5": {
+      "@type": "slate",
+      "plaintext": "Toolbar (left) — saving, navigating to other pages, site settings. Standard Volto, plus the Frontend switcher (see below). Live preview (centre) — your actual frontend, running inside an iframe. This is what readers will see. Click directly into the preview to edit. Sidebar (right) — when no block is selected, lists the page-level fields (title, description, blocks). When a block is selected, shows that block's settings, the chain of parent containers, and (for container blocks) the list of children. See Selecting blocks for the navigation patterns.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Toolbar (left)",
+                  "strong": true
+                },
+                {
+                  "text": " — saving, navigating to other pages, site settings. Standard Volto, plus the "
+                },
+                {
+                  "text": "Frontend switcher",
+                  "strong": true
+                },
+                {
+                  "text": " (see below)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Live preview (centre)",
+                  "strong": true
+                },
+                {
+                  "text": " — your actual frontend, running inside an iframe. This is what readers will see. Click directly into the preview to edit."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Sidebar (right)",
+                  "strong": true
+                },
+                {
+                  "text": " — when no block is selected, lists the page-level fields (title, description, blocks). When a block is selected, shows that block's settings, the chain of parent containers, and (for container blocks) the list of children. See "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "selecting-blocks.md"
+                  },
+                  "children": [
+                    {
+                      "text": "Selecting blocks"
+                    }
+                  ]
+                },
+                {
+                  "text": " for the navigation patterns."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "h-6": {
+      "@type": "slate",
+      "plaintext": "Frontend switcher",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Frontend switcher"
+            }
+          ]
+        }
+      ]
+    },
+    "p-7": {
+      "@type": "slate",
+      "plaintext": "A toolbar button opens the **Frontend switcher** panel with two sections:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A toolbar button opens the "
+            },
+            {
+              "text": "Frontend switcher",
+              "strong": true
+            },
+            {
+              "text": " panel with two sections:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-8": {
+      "@type": "slate",
+      "plaintext": "Viewport — preview the page at common screen sizes (desktop, tablet, mobile). Pure visual switch — no content change. Frontend — list of saved frontend URLs the editor can switch between. Picking one swaps the iframe to that frontend immediately. Same content, different rendering — a Hydra-defining feature: edit a page once, see it on the marketing site, the docs site, the mobile app's web version, and the email-renderer in turn without leaving the page.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Viewport",
+                  "strong": true
+                },
+                {
+                  "text": " — preview the page at common screen sizes (desktop, tablet, mobile). Pure visual switch — no content change."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Frontend",
+                  "strong": true
+                },
+                {
+                  "text": " — list of saved frontend URLs the editor can switch between. Picking one swaps the iframe to that frontend immediately. Same content, different rendering — a Hydra-defining feature: edit a page once, see it on the marketing site, the docs site, the mobile app's web version, and the email-renderer in turn without leaving the page."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-9": {
+      "@type": "slate",
+      "plaintext": "A **Settings** button at the bottom of the panel manages the saved URLs (add, remove, rename). The currently active frontend is highlighted in the list.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A "
+            },
+            {
+              "text": "Settings",
+              "strong": true
+            },
+            {
+              "text": " button at the bottom of the panel manages the saved URLs (add, remove, rename). The currently active frontend is highlighted in the list."
+            }
+          ]
+        }
+      ]
+    },
+    "img-10": {
+      "@type": "image",
+      "url": "/docs/_images/frontend-switcher",
+      "alt": "Frontend switcher panel — Viewport section with Mobile/Tablet/Desktop, Frontend section listing four saved frontends, Settings button at the bottom.",
+      "align": "center",
+      "size": "l"
+    },
+    "h-11": {
+      "@type": "slate",
+      "plaintext": "Two ways to edit any field",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Two ways to edit any field"
+            }
+          ]
+        }
+      ]
+    },
+    "p-12": {
+      "@type": "slate",
+      "plaintext": "Most fields can be edited from either side:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Most fields can be edited from either side:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-13": {
+      "@type": "slate",
+      "plaintext": "From the preview — click the rendered text/image/link directly and start typing or replacing media. From the sidebar — find the field in the block's settings panel and edit it there.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "From the preview",
+                  "strong": true
+                },
+                {
+                  "text": " — click the rendered text/image/link directly and start typing or replacing media."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "From the sidebar",
+                  "strong": true
+                },
+                {
+                  "text": " — find the field in the block's settings panel and edit it there."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-14": {
+      "@type": "slate",
+      "plaintext": "Sidebar editing is always available. Inline editing depends on the frontend supporting it for that field; some fields show a thin underline when hovered to signal they're inline-editable. Either way the result is the same — there's only one source of truth.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Sidebar editing is always available. Inline editing depends on the frontend supporting it for that field; some fields show a thin underline when hovered to signal they're inline-editable. Either way the result is the same — there's only one source of truth."
+            }
+          ]
+        }
+      ]
+    },
+    "h-15": {
+      "@type": "slate",
+      "plaintext": "What's a block?",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "What's a block?"
+            }
+          ]
+        }
+      ]
+    },
+    "p-16": {
+      "@type": "slate",
+      "plaintext": "A block is a discrete piece of page content with a type (slate, image, listing, slider, etc.), a schema (its fields), and a position. Blocks can be added, removed, moved, and configured. Some blocks contain other blocks — those are called **container blocks** (columns, accordion, slider, grids, sections).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A block is a discrete piece of page content with a type (slate, image, listing, slider, etc.), a schema (its fields), and a position. Blocks can be added, removed, moved, and configured. Some blocks contain other blocks — those are called "
+            },
+            {
+              "text": "container blocks",
+              "strong": true
+            },
+            {
+              "text": " (columns, accordion, slider, grids, sections)."
+            }
+          ]
+        }
+      ]
+    },
+    "p-17": {
+      "@type": "slate",
+      "plaintext": "The page itself is a list of blocks (sometimes split across multiple regions like header / content / footer). When you click into the preview, you're clicking on a block.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The page itself is a list of blocks (sometimes split across multiple regions like header / content / footer). When you click into the preview, you're clicking on a block."
+            }
+          ]
+        }
+      ]
+    },
+    "h-18": {
+      "@type": "slate",
+      "plaintext": "When in doubt — Escape",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "When in doubt — Escape"
+            }
+          ]
+        }
+      ]
+    },
+    "p-19": {
+      "@type": "slate",
+      "plaintext": "Pressing `Escape` is always safe. It progressively backs out:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Pressing "
+            },
+            {
+              "text": "Escape",
+              "code": true
+            },
+            {
+              "text": " is always safe. It progressively backs out:"
+            }
+          ]
+        }
+      ]
+    },
+    "ol-20": {
+      "@type": "slate",
+      "plaintext": "If you're typing in a text field → leaves text editing, the block stays selected. If a block is selected (block mode) → goes up to the parent container. If nothing is selected → no-op.",
+      "value": [
+        {
+          "type": "ol",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "If you're typing in a text field → leaves text editing, the block stays selected."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "If a block is selected (block mode) → goes up to the parent container."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "If nothing is selected → no-op."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-21": {
+      "@type": "slate",
+      "plaintext": "So `Escape` repeatedly takes you up one level at a time. See [Selecting blocks](selecting-blocks.md) for what selection looks like at each level.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "So "
+            },
+            {
+              "text": "Escape",
+              "code": true
+            },
+            {
+              "text": " repeatedly takes you up one level at a time. See "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "selecting-blocks.md"
+              },
+              "children": [
+                {
+                  "text": "Selecting blocks"
+                }
+              ]
+            },
+            {
+              "text": " for what selection looks like at each level."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "p-1",
+      "h-2",
+      "p-3",
+      "ce-4",
+      "ul-5",
+      "h-6",
+      "p-7",
+      "ul-8",
+      "p-9",
+      "img-10",
+      "h-11",
+      "p-12",
+      "ul-13",
+      "p-14",
+      "h-15",
+      "p-16",
+      "p-17",
+      "h-18",
+      "p-19",
+      "ol-20",
+      "p-21"
+    ]
+  }
+}

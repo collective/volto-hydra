@@ -1,0 +1,987 @@
+{
+  "@id": "/docs/what-editors-will-experience/adding-and-moving-blocks",
+  "@type": "Document",
+  "UID": "docs-what-editors-will-experience-adding-and-moving-blocks-001",
+  "allow_discussion": false,
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "",
+  "effective": "2025-01-01T00:00:00",
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "adding-and-moving-blocks",
+  "is_folderish": false,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/docs/what-editors-will-experience",
+    "@type": "Document",
+    "UID": "docs-what-editors-will-experience-001",
+    "description": "This guide is for content editors using a Hydra-powered site. It covers how to use the editor — how to select things, edit text, add and move blocks, work with containers and templates — without assuming you know how the site was built.",
+    "title": "Editor Guide",
+    "type_title": "Page"
+  },
+  "preview_caption": null,
+  "preview_image": null,
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Adding and moving blocks",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2025-01-01T00:00:00+00:00"
+      }
+    ]
+  },
+  "working_copy": null,
+  "working_copy_of": null,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "h-1": {
+      "@type": "slate",
+      "plaintext": "Adding a block",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Adding a block"
+            }
+          ]
+        }
+      ]
+    },
+    "p-2": {
+      "@type": "slate",
+      "plaintext": "Three ways:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Three ways:"
+            }
+          ]
+        }
+      ]
+    },
+    "h-3": {
+      "@type": "slate",
+      "plaintext": "\"+\" button in the preview",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "\"+\" button in the preview"
+            }
+          ]
+        }
+      ]
+    },
+    "p-4": {
+      "@type": "slate",
+      "plaintext": "Hover or select a block in the preview. A \"+\" button appears outside one corner of it (typically below for vertical layouts, to the right for horizontal). Click it to open the **block chooser** — a popup listing the block types allowed at that position.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Hover or select a block in the preview. A \"+\" button appears outside one corner of it (typically below for vertical layouts, to the right for horizontal). Click it to open the "
+            },
+            {
+              "text": "block chooser",
+              "strong": true
+            },
+            {
+              "text": " — a popup listing the block types allowed at that position."
+            }
+          ]
+        }
+      ]
+    },
+    "p-5": {
+      "@type": "slate",
+      "plaintext": "The chooser is filtered: it only shows block types that fit the surrounding container's `allowedBlocks`. Block types are grouped (Common, Site, Custom, Templates) and typically a \"Most used\" group is pinned to the top.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The chooser is filtered: it only shows block types that fit the surrounding container's "
+            },
+            {
+              "text": "allowedBlocks",
+              "code": true
+            },
+            {
+              "text": ". Block types are grouped (Common, Site, Custom, Templates) and typically a \"Most used\" group is pinned to the top."
+            }
+          ]
+        }
+      ]
+    },
+    "h-6": {
+      "@type": "slate",
+      "plaintext": "Slash menu (in an empty text block)",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Slash menu (in an empty text block)"
+            }
+          ]
+        }
+      ]
+    },
+    "p-7": {
+      "@type": "slate",
+      "plaintext": "Type `/` at the start of an empty text block (a fresh paragraph or a paragraph you've cleared). The slash menu opens with the list of block types you can convert to. Keep typing to filter; `Enter` picks; `Escape` dismisses.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Type "
+            },
+            {
+              "text": "/",
+              "code": true
+            },
+            {
+              "text": " at the start of an empty text block (a fresh paragraph or a paragraph you've cleared). The slash menu opens with the list of block types you can convert to. Keep typing to filter; "
+            },
+            {
+              "text": "Enter",
+              "code": true
+            },
+            {
+              "text": " picks; "
+            },
+            {
+              "text": "Escape",
+              "code": true
+            },
+            {
+              "text": " dismisses."
+            }
+          ]
+        }
+      ]
+    },
+    "p-8": {
+      "@type": "slate",
+      "plaintext": "This is the fastest way to add a heading, image, embed, or other block while you're already typing — no mouse needed.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This is the fastest way to add a heading, image, embed, or other block while you're already typing — no mouse needed."
+            }
+          ]
+        }
+      ]
+    },
+    "h-9": {
+      "@type": "slate",
+      "plaintext": "Enter from a selected block (block mode)",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Enter from a selected block (block mode)"
+            }
+          ]
+        }
+      ]
+    },
+    "p-10": {
+      "@type": "slate",
+      "plaintext": "Press `Escape` to enter block mode, then `Enter`. A new block is created **after** the current one, of the most appropriate default type (or the only type allowed in the current container if there's just one).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Press "
+            },
+            {
+              "text": "Escape",
+              "code": true
+            },
+            {
+              "text": " to enter block mode, then "
+            },
+            {
+              "text": "Enter",
+              "code": true
+            },
+            {
+              "text": ". A new block is created "
+            },
+            {
+              "text": "after",
+              "strong": true
+            },
+            {
+              "text": " the current one, of the most appropriate default type (or the only type allowed in the current container if there's just one)."
+            }
+          ]
+        }
+      ]
+    },
+    "p-11": {
+      "@type": "slate",
+      "plaintext": "If the current block is itself a container, `Enter` creates a new container of the same type and the cursor lands inside it on the first typeable leaf — so you can keep typing without aiming. Useful for sliders, columns, accordions: hit `Enter` once and you're already in the next slide / column / panel.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "If the current block is itself a container, "
+            },
+            {
+              "text": "Enter",
+              "code": true
+            },
+            {
+              "text": " creates a new container of the same type and the cursor lands inside it on the first typeable leaf — so you can keep typing without aiming. Useful for sliders, columns, accordions: hit "
+            },
+            {
+              "text": "Enter",
+              "code": true
+            },
+            {
+              "text": " once and you're already in the next slide / column / panel."
+            }
+          ]
+        }
+      ]
+    },
+    "h-12": {
+      "@type": "slate",
+      "plaintext": "Moving a block",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Moving a block"
+            }
+          ]
+        }
+      ]
+    },
+    "h-13": {
+      "@type": "slate",
+      "plaintext": "Drag and drop",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Drag and drop"
+            }
+          ]
+        }
+      ]
+    },
+    "p-14": {
+      "@type": "slate",
+      "plaintext": "Each selected block has a **drag handle** in the Quanta toolbar above it. Click and drag from there to move the block somewhere else. While dragging:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Each selected block has a "
+            },
+            {
+              "text": "drag handle",
+              "strong": true
+            },
+            {
+              "text": " in the Quanta toolbar above it. Click and drag from there to move the block somewhere else. While dragging:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-15": {
+      "@type": "slate",
+      "plaintext": "A line indicator shows where the block will land between siblings. A shaded overlay highlights the whole drop target when you hover over an empty container — dropping there places the block as the container's first child (replacing the empty placeholder rather than landing as a sibling). The page auto-scrolls when you drag near the top or bottom of the viewport.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "A "
+                },
+                {
+                  "text": "line indicator",
+                  "strong": true
+                },
+                {
+                  "text": " shows where the block will land between siblings."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "A "
+                },
+                {
+                  "text": "shaded overlay",
+                  "strong": true
+                },
+                {
+                  "text": " highlights the whole drop target when you hover over an empty container — dropping there places the block as the container's first child (replacing the empty placeholder rather than landing as a sibling)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "The page auto-scrolls when you drag near the top or bottom of the viewport."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-16": {
+      "@type": "slate",
+      "plaintext": "Drop targets are filtered by `allowedBlocks` — you can't drop into a region that doesn't accept this block type. The line/shade indicator only appears over valid drop targets.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Drop targets are filtered by "
+            },
+            {
+              "text": "allowedBlocks",
+              "code": true
+            },
+            {
+              "text": " — you can't drop into a region that doesn't accept this block type. The line/shade indicator only appears over valid drop targets."
+            }
+          ]
+        }
+      ]
+    },
+    "h-17": {
+      "@type": "slate",
+      "plaintext": "Reordering from the sidebar",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Reordering from the sidebar"
+            }
+          ]
+        }
+      ]
+    },
+    "p-18": {
+      "@type": "slate",
+      "plaintext": "The sidebar's children list (visible when a container block is selected) has a drag handle (`⋮⋮`) on each child row. Drag it up or down to reorder children **within** the same container. Useful when the children are paged (slides of a slider, panels of an accordion) and you can't drag in the preview because only one is visible at a time. See [Selecting blocks › The children list](selecting-blocks.md#the-children-list-going-down).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The sidebar's children list (visible when a container block is selected) has a drag handle ("
+            },
+            {
+              "text": "⋮⋮",
+              "code": true
+            },
+            {
+              "text": ") on each child row. Drag it up or down to reorder children "
+            },
+            {
+              "text": "within",
+              "strong": true
+            },
+            {
+              "text": " the same container. Useful when the children are paged (slides of a slider, panels of an accordion) and you can't drag in the preview because only one is visible at a time. See "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "selecting-blocks.md#the-children-list-going-down"
+              },
+              "children": [
+                {
+                  "text": "Selecting blocks › The children list"
+                }
+              ]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    "h-19": {
+      "@type": "slate",
+      "plaintext": "Cut / copy / paste",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Cut / copy / paste"
+            }
+          ]
+        }
+      ]
+    },
+    "p-20": {
+      "@type": "slate",
+      "plaintext": "Standard keyboard shortcuts work on the selected block(s):",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Standard keyboard shortcuts work on the selected block(s):"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-21": {
+      "@type": "slate",
+      "plaintext": "Cmd/Ctrl+C — copy Cmd/Ctrl+X — cut (block disappears from the original spot when you paste) Cmd/Ctrl+V — paste at the current selection",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Cmd/Ctrl+C",
+                  "code": true
+                },
+                {
+                  "text": " — copy"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Cmd/Ctrl+X",
+                  "code": true
+                },
+                {
+                  "text": " — cut (block disappears from the original spot when you paste)"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Cmd/Ctrl+V",
+                  "code": true
+                },
+                {
+                  "text": " — paste at the current selection"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-22": {
+      "@type": "slate",
+      "plaintext": "This works across pages — copy a block on one page, navigate to another, paste.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This works across pages — copy a block on one page, navigate to another, paste."
+            }
+          ]
+        }
+      ]
+    },
+    "h-23": {
+      "@type": "slate",
+      "plaintext": "Block-mode keyboard",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Block-mode keyboard"
+            }
+          ]
+        }
+      ]
+    },
+    "p-24": {
+      "@type": "slate",
+      "plaintext": "In block mode (after pressing `Escape`):",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "In block mode (after pressing "
+            },
+            {
+              "text": "Escape",
+              "code": true
+            },
+            {
+              "text": "):"
+            }
+          ]
+        }
+      ]
+    },
+    "tbl-25": {
+      "@type": "slateTable",
+      "table": {
+        "fixed": true,
+        "compact": false,
+        "basic": false,
+        "celled": true,
+        "inverted": false,
+        "striped": false,
+        "rows": [
+          {
+            "key": "tbl-25-r0",
+            "cells": [
+              {
+                "key": "tbl-25-r0c0",
+                "type": "header",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Key"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-25-r0c1",
+                "type": "header",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Effect"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-25-r1",
+            "cells": [
+              {
+                "key": "tbl-25-r1c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Arrow Up",
+                        "code": true
+                      },
+                      {
+                        "text": " / "
+                      },
+                      {
+                        "text": "Arrow Down",
+                        "code": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-25-r1c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Move selection to previous / next sibling"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-25-r2",
+            "cells": [
+              {
+                "key": "tbl-25-r2c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Enter",
+                        "code": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-25-r2c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Add a new block after this one"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-25-r3",
+            "cells": [
+              {
+                "key": "tbl-25-r3c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Delete",
+                        "code": true
+                      },
+                      {
+                        "text": " / "
+                      },
+                      {
+                        "text": "Backspace",
+                        "code": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-25-r3c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Remove the selected block(s)"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-25-r4",
+            "cells": [
+              {
+                "key": "tbl-25-r4c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Escape",
+                        "code": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-25-r4c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Go up to the parent container (or deselect)"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "p-26": {
+      "@type": "slate",
+      "plaintext": "`Arrow Up/Down` is **container-aware** — it walks across container boundaries. Pressing Down on the last block of a column jumps into the next column rather than getting stuck.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Arrow Up/Down",
+              "code": true
+            },
+            {
+              "text": " is "
+            },
+            {
+              "text": "container-aware",
+              "strong": true
+            },
+            {
+              "text": " — it walks across container boundaries. Pressing Down on the last block of a column jumps into the next column rather than getting stuck."
+            }
+          ]
+        }
+      ]
+    },
+    "h-27": {
+      "@type": "slate",
+      "plaintext": "Working with multiple blocks at once",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Working with multiple blocks at once"
+            }
+          ]
+        }
+      ]
+    },
+    "p-28": {
+      "@type": "slate",
+      "plaintext": "If you've selected multiple blocks (see [Selecting blocks](selecting-blocks.md)):",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "If you've selected multiple blocks (see "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "selecting-blocks.md"
+              },
+              "children": [
+                {
+                  "text": "Selecting blocks"
+                }
+              ]
+            },
+            {
+              "text": "):"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-29": {
+      "@type": "slate",
+      "plaintext": "Drag and drop — works on the whole group; line indicator shows where the group will land. Delete — removes all selected blocks. Wrap / Convert / Cut / Copy / Paste — all apply to the group. See Containers for wrap.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Drag and drop",
+                  "strong": true
+                },
+                {
+                  "text": " — works on the whole group; line indicator shows where the group will land."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Delete",
+                  "strong": true
+                },
+                {
+                  "text": " — removes all selected blocks."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Wrap / Convert / Cut / Copy / Paste",
+                  "strong": true
+                },
+                {
+                  "text": " — all apply to the group. See "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "containers.md"
+                  },
+                  "children": [
+                    {
+                      "text": "Containers"
+                    }
+                  ]
+                },
+                {
+                  "text": " for wrap."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "h-30": {
+      "@type": "slate",
+      "plaintext": "Empty containers",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Empty containers"
+            }
+          ]
+        }
+      ]
+    },
+    "p-31": {
+      "@type": "slate",
+      "plaintext": "Container blocks can never be truly empty — when the last child is deleted, the container shows a placeholder block in its place, with a \"+\" in the middle for adding the next block. The placeholder is stripped automatically when you save, so it never ends up in the saved page.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Container blocks can never be truly empty — when the last child is deleted, the container shows a placeholder block in its place, with a \"+\" in the middle for adding the next block. The placeholder is stripped automatically when you save, so it never ends up in the saved page."
+            }
+          ]
+        }
+      ]
+    },
+    "p-32": {
+      "@type": "slate",
+      "plaintext": "Drop a block onto an empty container and it replaces the placeholder rather than landing alongside it.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Drop a block onto an empty container and it replaces the placeholder rather than landing alongside it."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "h-1",
+      "p-2",
+      "h-3",
+      "p-4",
+      "p-5",
+      "h-6",
+      "p-7",
+      "p-8",
+      "h-9",
+      "p-10",
+      "p-11",
+      "h-12",
+      "h-13",
+      "p-14",
+      "ul-15",
+      "p-16",
+      "h-17",
+      "p-18",
+      "h-19",
+      "p-20",
+      "ul-21",
+      "p-22",
+      "h-23",
+      "p-24",
+      "tbl-25",
+      "p-26",
+      "h-27",
+      "p-28",
+      "ul-29",
+      "h-30",
+      "p-31",
+      "p-32"
+    ]
+  }
+}

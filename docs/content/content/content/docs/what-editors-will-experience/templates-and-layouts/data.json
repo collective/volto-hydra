@@ -1,0 +1,790 @@
+{
+  "@id": "/docs/what-editors-will-experience/templates-and-layouts",
+  "@type": "Document",
+  "UID": "docs-what-editors-will-experience-templates-and-layouts-001",
+  "allow_discussion": false,
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "A template is a piece of pre-built page structure that someone (often a developer or site admin) has saved separately. When you apply a template to a page, the page gets the template's structure overlaid: some blocks are fixed and can't be edited, some can be edited but not moved, and some are open slots where you fill in your own blocks.",
+  "effective": "2025-01-01T00:00:00",
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "templates-and-layouts",
+  "is_folderish": false,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/docs/what-editors-will-experience",
+    "@type": "Document",
+    "UID": "docs-what-editors-will-experience-001",
+    "description": "This guide is for content editors using a Hydra-powered site. It covers how to use the editor — how to select things, edit text, add and move blocks, work with containers and templates — without assuming you know how the site was built.",
+    "title": "Editor Guide",
+    "type_title": "Page"
+  },
+  "preview_caption": null,
+  "preview_image": null,
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Templates and layouts",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2025-01-01T00:00:00+00:00"
+      }
+    ]
+  },
+  "working_copy": null,
+  "working_copy_of": null,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "p-1": {
+      "@type": "slate",
+      "plaintext": "A **template** is a piece of pre-built page structure that someone (often a developer or site admin) has saved separately. When you apply a template to a page, the page gets the template's structure overlaid: some blocks are fixed and can't be edited, some can be edited but not moved, and some are open slots where you fill in your own blocks.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A "
+            },
+            {
+              "text": "template",
+              "strong": true
+            },
+            {
+              "text": " is a piece of pre-built page structure that someone (often a developer or site admin) has saved separately. When you apply a template to a page, the page gets the template's structure overlaid: some blocks are fixed and can't be edited, some can be edited but not moved, and some are open slots where you fill in your own blocks."
+            }
+          ]
+        }
+      ]
+    },
+    "p-2": {
+      "@type": "slate",
+      "plaintext": "Templates let editors reuse a layout consistently across many pages without copy-pasting structure each time. Two flavours:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Templates let editors reuse a layout consistently across many pages without copy-pasting structure each time. Two flavours:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-3": {
+      "@type": "slate",
+      "plaintext": "Block-level templates — a snippet you insert as a block (e.g. a \"feature row\" snippet you drop into the middle of a page). Configured per field as allowedTemplates; appears in the BlockChooser's Templates group. Page-level layouts — a full layout the whole page (or a region) is rendered through (e.g. an \"article layout\" with a fixed header / sidebar / footer). Configured as allowedLayouts; appears in the Layout dropdown.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Block-level templates",
+                  "strong": true
+                },
+                {
+                  "text": " — a snippet you insert as a block (e.g. a \"feature row\" snippet you drop into the middle of a page). Configured per field as "
+                },
+                {
+                  "text": "allowedTemplates",
+                  "code": true
+                },
+                {
+                  "text": "; appears in the BlockChooser's Templates group."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Page-level layouts",
+                  "strong": true
+                },
+                {
+                  "text": " — a full layout the whole page (or a region) is rendered through (e.g. an \"article layout\" with a fixed header / sidebar / footer). Configured as "
+                },
+                {
+                  "text": "allowedLayouts",
+                  "code": true
+                },
+                {
+                  "text": "; appears in the Layout dropdown."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-4": {
+      "@type": "slate",
+      "plaintext": "The two share the same merge rules; the difference is just where they're applied.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The two share the same merge rules; the difference is just where they're applied."
+            }
+          ]
+        }
+      ]
+    },
+    "h-5": {
+      "@type": "slate",
+      "plaintext": "What you'll see in the editor",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "What you'll see in the editor"
+            }
+          ]
+        }
+      ]
+    },
+    "p-6": {
+      "@type": "slate",
+      "plaintext": "When a template is applied to a page, blocks fall into three categories:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "When a template is applied to a page, blocks fall into three categories:"
+            }
+          ]
+        }
+      ]
+    },
+    "h-7": {
+      "@type": "slate",
+      "plaintext": "🔒 Locked (fixed + read-only)",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "🔒 Locked (fixed + read-only)"
+            }
+          ]
+        }
+      ]
+    },
+    "p-8": {
+      "@type": "slate",
+      "plaintext": "Shown with a **lock icon** in the sidebar block list. You can't:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Shown with a "
+            },
+            {
+              "text": "lock icon",
+              "strong": true
+            },
+            {
+              "text": " in the sidebar block list. You can't:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-9": {
+      "@type": "slate",
+      "plaintext": "Edit the text/media inside it. Move it (no drag handle in the Quanta toolbar). Delete it.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Edit the text/media inside it."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Move it (no drag handle in the Quanta toolbar)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Delete it."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-10": {
+      "@type": "slate",
+      "plaintext": "Typical use: branded headers, footers, legal disclaimers — content the template author wants identical across every page.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Typical use: branded headers, footers, legal disclaimers — content the template author wants identical across every page."
+            }
+          ]
+        }
+      ]
+    },
+    "h-11": {
+      "@type": "slate",
+      "plaintext": "Fixed (editable, not movable)",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Fixed (editable, not movable)"
+            }
+          ]
+        }
+      ]
+    },
+    "p-12": {
+      "@type": "slate",
+      "plaintext": "Shown without a lock but without a drag handle. You can:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Shown without a lock but without a drag handle. You can:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-13": {
+      "@type": "slate",
+      "plaintext": "Edit text, media, links inside it. Change its block-level settings.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Edit text, media, links inside it."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Change its block-level settings."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-14": {
+      "@type": "slate",
+      "plaintext": "You cannot:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "You cannot:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-15": {
+      "@type": "slate",
+      "plaintext": "Move it to a different position. Delete it.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Move it to a different position."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Delete it."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-16": {
+      "@type": "slate",
+      "plaintext": "Typical use: a \"callout\" block in the middle of a layout — every page has one, but the content varies.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Typical use: a \"callout\" block in the middle of a layout — every page has one, but the content varies."
+            }
+          ]
+        }
+      ]
+    },
+    "h-17": {
+      "@type": "slate",
+      "plaintext": "Slot (your content)",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Slot (your content)"
+            }
+          ]
+        }
+      ]
+    },
+    "p-18": {
+      "@type": "slate",
+      "plaintext": "Regular blocks where you can do anything — add, edit, move, delete. The template marks regions as slots (with a `slotId`) and your existing content is placed into the matching slots when the template merges.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Regular blocks where you can do anything — add, edit, move, delete. The template marks regions as slots (with a "
+            },
+            {
+              "text": "slotId",
+              "code": true
+            },
+            {
+              "text": ") and your existing content is placed into the matching slots when the template merges."
+            }
+          ]
+        }
+      ]
+    },
+    "img-19": {
+      "@type": "image",
+      "url": "/docs/_images/template-locked",
+      "alt": "A page with a snippet template applied. The \"Snippet Header\" block is selected, rendered in muted style as a locked block. The sidebar shows the template's settings (Template Name, Save Location).",
+      "align": "center",
+      "size": "l"
+    },
+    "h-20": {
+      "@type": "slate",
+      "plaintext": "Inserting between fixed blocks",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Inserting between fixed blocks"
+            }
+          ]
+        }
+      ]
+    },
+    "p-21": {
+      "@type": "slate",
+      "plaintext": "You **can't** insert a new block between two adjacent fixed/readonly template blocks — the \"+\" button is hidden in those positions and DnD is rejected. This is intentional: the template author put those fixed blocks side-by-side on purpose, and the editor inserting between them would break the layout's intent.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "You "
+            },
+            {
+              "text": "can't",
+              "strong": true
+            },
+            {
+              "text": " insert a new block between two adjacent fixed/readonly template blocks — the \"+\" button is hidden in those positions and DnD is rejected. This is intentional: the template author put those fixed blocks side-by-side on purpose, and the editor inserting between them would break the layout's intent."
+            }
+          ]
+        }
+      ]
+    },
+    "p-22": {
+      "@type": "slate",
+      "plaintext": "If you need to add content there, you may need to switch to a different layout (one whose structure has a slot in that position) or talk to whoever maintains the templates.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "If you need to add content there, you may need to switch to a different layout (one whose structure has a slot in that position) or talk to whoever maintains the templates."
+            }
+          ]
+        }
+      ]
+    },
+    "h-23": {
+      "@type": "slate",
+      "plaintext": "Switching the layout",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Switching the layout"
+            }
+          ]
+        }
+      ]
+    },
+    "p-24": {
+      "@type": "slate",
+      "plaintext": "When `allowedLayouts` is configured for a page (or a region), the sidebar shows a **Layout** dropdown. Pick a different layout and:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "When "
+            },
+            {
+              "text": "allowedLayouts",
+              "code": true
+            },
+            {
+              "text": " is configured for a page (or a region), the sidebar shows a "
+            },
+            {
+              "text": "Layout",
+              "strong": true
+            },
+            {
+              "text": " dropdown. Pick a different layout and:"
+            }
+          ]
+        }
+      ]
+    },
+    "ol-25": {
+      "@type": "slate",
+      "plaintext": "The new layout's structure replaces the old one. Your existing content is redistributed into the new layout's slots based on slotId:",
+      "value": [
+        {
+          "type": "ol",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "The new layout's structure replaces the old one."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Your existing content is "
+                },
+                {
+                  "text": "redistributed",
+                  "strong": true
+                },
+                {
+                  "text": " into the new layout's slots based on "
+                },
+                {
+                  "text": "slotId",
+                  "code": true
+                },
+                {
+                  "text": ":"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-26": {
+      "@type": "slate",
+      "plaintext": "- Content tagged with a slot name is placed into the matching slot in the new layout.    - Content with no slot tag falls into the `\"default\"` slot if the new layout has one; otherwise into the bottom or top slot, or is dropped.    - Fixed blocks with the same `slotId` get their editable content carried over (text, media); their structural settings come from the new layout.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "- Content tagged with a slot name is placed into the matching slot in the new layout.    - Content with no slot tag falls into the "
+            },
+            {
+              "text": "\"default\"",
+              "code": true
+            },
+            {
+              "text": " slot if the new layout has one; otherwise into the bottom or top slot, or is dropped.    - Fixed blocks with the same "
+            },
+            {
+              "text": "slotId",
+              "code": true
+            },
+            {
+              "text": " get their editable content carried over (text, media); their structural settings come from the new layout."
+            }
+          ]
+        }
+      ]
+    },
+    "p-27": {
+      "@type": "slate",
+      "plaintext": "The point of `slotId` is that two layouts can share the same set of region names — switch between them and your content lands in the right places automatically.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The point of "
+            },
+            {
+              "text": "slotId",
+              "code": true
+            },
+            {
+              "text": " is that two layouts can share the same set of region names — switch between them and your content lands in the right places automatically."
+            }
+          ]
+        }
+      ]
+    },
+    "h-28": {
+      "@type": "slate",
+      "plaintext": "Editing content inside a template",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Editing content inside a template"
+            }
+          ]
+        }
+      ]
+    },
+    "p-29": {
+      "@type": "slate",
+      "plaintext": "Editing inside a template block (one that came from the merged template) goes through a special **template edit mode**. While in template edit mode:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Editing inside a template block (one that came from the merged template) goes through a special "
+            },
+            {
+              "text": "template edit mode",
+              "strong": true
+            },
+            {
+              "text": ". While in template edit mode:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-30": {
+      "@type": "slate",
+      "plaintext": "Blocks inside the template instance become editable, including those marked readonly. Blocks outside the template instance become locked.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Blocks inside the template instance become editable, including those marked readonly."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Blocks outside the template instance become locked."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-31": {
+      "@type": "slate",
+      "plaintext": "This lets you edit the template's *definition* without leaving the page — the changes propagate back to the saved template, so any other page using it picks up the change. Switch out of template edit mode (typically a toolbar action labelled \"Edit template\" / \"Done\") to go back to editing this page's content.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This lets you edit the template's "
+            },
+            {
+              "text": "definition",
+              "em": true
+            },
+            {
+              "text": " without leaving the page — the changes propagate back to the saved template, so any other page using it picks up the change. Switch out of template edit mode (typically a toolbar action labelled \"Edit template\" / \"Done\") to go back to editing this page's content."
+            }
+          ]
+        }
+      ]
+    },
+    "h-32": {
+      "@type": "slate",
+      "plaintext": "Template instances in the sidebar",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Template instances in the sidebar"
+            }
+          ]
+        }
+      ]
+    },
+    "p-33": {
+      "@type": "slate",
+      "plaintext": "When a template is applied, the template's blocks are grouped under a single virtual entry in the sidebar block list — you'll see \"Template: Article Layout\" rather than each fixed/readonly block as a separate row. Expand it to see the structure inside.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "When a template is applied, the template's blocks are grouped under a single virtual entry in the sidebar block list — you'll see \"Template: Article Layout\" rather than each fixed/readonly block as a separate row. Expand it to see the structure inside."
+            }
+          ]
+        }
+      ]
+    },
+    "h-34": {
+      "@type": "slate",
+      "plaintext": "Inserting a template as a block",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Inserting a template as a block"
+            }
+          ]
+        }
+      ]
+    },
+    "p-35": {
+      "@type": "slate",
+      "plaintext": "When `allowedTemplates` is configured on a field, the BlockChooser's Templates group shows the list. Pick one and the template's content is inserted at the current position as a block (just like adding any other block). Editor-side this is the simpler case — once inserted, the template's blocks behave the same as if a layout had placed them (lock icons, fixed-but-editable, slots).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "When "
+            },
+            {
+              "text": "allowedTemplates",
+              "code": true
+            },
+            {
+              "text": " is configured on a field, the BlockChooser's Templates group shows the list. Pick one and the template's content is inserted at the current position as a block (just like adding any other block). Editor-side this is the simpler case — once inserted, the template's blocks behave the same as if a layout had placed them (lock icons, fixed-but-editable, slots)."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "p-1",
+      "p-2",
+      "ul-3",
+      "p-4",
+      "h-5",
+      "p-6",
+      "h-7",
+      "p-8",
+      "ul-9",
+      "p-10",
+      "h-11",
+      "p-12",
+      "ul-13",
+      "p-14",
+      "ul-15",
+      "p-16",
+      "h-17",
+      "p-18",
+      "img-19",
+      "h-20",
+      "p-21",
+      "p-22",
+      "h-23",
+      "p-24",
+      "ol-25",
+      "p-26",
+      "p-27",
+      "h-28",
+      "p-29",
+      "ul-30",
+      "p-31",
+      "h-32",
+      "p-33",
+      "h-34",
+      "p-35"
+    ]
+  }
+}

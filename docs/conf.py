@@ -41,14 +41,7 @@ exclude_patterns = [
     "**/fixtures",
     "**/*.mjs",
     "**/*.json",
-    "carousel-test-analysis.md",
-    "typing-sync-bug-investigation.md",
-    "GSoC_Final_Report_26_Aug_2024.md",
-    "superpowers/**",
     "content/**",
-    # docs/architecture.md is internal architecture notes, not user docs
-    # (the user-facing architecture concept is in concepts/architecture.md)
-    "architecture.md",
 ]
 
 # -- Options for HTML output -------------------------------------------------

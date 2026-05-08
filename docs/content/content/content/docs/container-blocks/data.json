@@ -1,0 +1,1211 @@
+{
+  "@id": "/docs/container-blocks",
+  "@type": "Document",
+  "UID": "docs-container-blocks-001",
+  "allow_discussion": false,
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "Container blocks hold other blocks inside them — sliders with slides, grids with columns, accordions with panels. Define them in your blockSchema using blocks_layout or object_list widgets.",
+  "effective": "2025-01-01T00:00:00",
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "container-blocks",
+  "is_folderish": false,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/docs",
+    "@type": "Document",
+    "UID": "docs-folder-001",
+    "description": "Developer guide for Volto Hydra",
+    "title": "Docs",
+    "type_title": "Page"
+  },
+  "preview_caption": null,
+  "preview_image": null,
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Container Blocks",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2025-01-01T00:00:00+00:00"
+      }
+    ]
+  },
+  "working_copy": null,
+  "working_copy_of": null,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "p-1": {
+      "@type": "slate",
+      "plaintext": "Container blocks hold other blocks inside them — sliders with slides, grids with columns, accordions with panels. Define them in your `blockSchema` using `blocks_layout` or `object_list` widgets.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Container blocks hold other blocks inside them — sliders with slides, grids with columns, accordions with panels. Define them in your "
+            },
+            {
+              "text": "blockSchema",
+              "code": true
+            },
+            {
+              "text": " using "
+            },
+            {
+              "text": "blocks_layout",
+              "code": true
+            },
+            {
+              "text": " or "
+            },
+            {
+              "text": "object_list",
+              "code": true
+            },
+            {
+              "text": " widgets."
+            }
+          ]
+        }
+      ]
+    },
+    "sep-2": {
+      "@type": "separator"
+    },
+    "h-3": {
+      "@type": "slate",
+      "plaintext": "blocks_layout: Typed Child Blocks",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "blocks_layout: Typed Child Blocks"
+            }
+          ]
+        }
+      ]
+    },
+    "p-4": {
+      "@type": "slate",
+      "plaintext": "Each child has its own `@type` and schema (from `blocks`). Children are stored in a shared `blocks` dict on the parent, with the field holding `{ items: [...] }` for ordering:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Each child has its own "
+            },
+            {
+              "text": "@type",
+              "code": true
+            },
+            {
+              "text": " and schema (from "
+            },
+            {
+              "text": "blocks",
+              "code": true
+            },
+            {
+              "text": "). Children are stored in a shared "
+            },
+            {
+              "text": "blocks",
+              "code": true
+            },
+            {
+              "text": " dict on the parent, with the field holding "
+            },
+            {
+              "text": "{ items: [...] }",
+              "code": true
+            },
+            {
+              "text": " for ordering:"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-5": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-5-javascript-3823ae",
+          "label": "Javascript",
+          "language": "javascript",
+          "code": "// Schema definition\nslides: {\n    title: 'Slides',\n    widget: 'blocks_layout',\n    allowedBlocks: ['slide', 'image'],\n    defaultBlockType: 'slide',\n    maxLength: 10,\n}\n\n// Resulting data\n{\n  \"@type\": \"slider\",\n  \"blocks\": {\n    \"slide-1\": { \"@type\": \"slide\", \"title\": \"First\" },\n    \"slide-2\": { \"@type\": \"image\", \"url\": \"...\" }\n  },\n  \"slides\": { \"items\": [\"slide-1\", \"slide-2\"] }\n}"
+        }
+      ]
+    },
+    "p-6": {
+      "@type": "slate",
+      "plaintext": "All `blocks_layout` fields on the same block share the same `blocks` dict. So a block can have multiple container fields (e.g., `header_blocks` and `footer_blocks`) whose children all live in the parent's `blocks`.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "All "
+            },
+            {
+              "text": "blocks_layout",
+              "code": true
+            },
+            {
+              "text": " fields on the same block share the same "
+            },
+            {
+              "text": "blocks",
+              "code": true
+            },
+            {
+              "text": " dict. So a block can have multiple container fields (e.g., "
+            },
+            {
+              "text": "header_blocks",
+              "code": true
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "footer_blocks",
+              "code": true
+            },
+            {
+              "text": ") whose children all live in the parent's "
+            },
+            {
+              "text": "blocks",
+              "code": true
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    "h-7": {
+      "@type": "slate",
+      "plaintext": "object_list: Items Sharing One Schema",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "object_list: Items Sharing One Schema"
+            }
+          ]
+        }
+      ]
+    },
+    "p-8": {
+      "@type": "slate",
+      "plaintext": "All items share one inline schema, stored as an array with an ID field. Use `dataPath` when the data is nested within the block:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "All items share one inline schema, stored as an array with an ID field. Use "
+            },
+            {
+              "text": "dataPath",
+              "code": true
+            },
+            {
+              "text": " when the data is nested within the block:"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-9": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-9-javascript-04d6f9",
+          "label": "Javascript",
+          "language": "javascript",
+          "code": "// Schema\nslides: {\n    title: 'Slides',\n    widget: 'object_list',\n    idField: '@id',\n    dataPath: ['data', 'rows'],  // optional path when data is nested\n    schema: {\n        properties: {\n            title: { title: 'Title' },\n            image: { title: 'Image', widget: 'image' },\n            description: { title: 'Description', widget: 'slate' },\n        }\n    }\n}\n\n// Resulting data (note: nested under dataPath)\n{\n  \"@type\": \"slider\",\n  \"data\": {\n    \"slides\": [\n      { \"@id\": \"slide-1\", \"title\": \"First\", \"image\": \"...\" },\n      { \"@id\": \"slide-2\", \"title\": \"Second\", \"image\": \"...\" }\n    ]\n  }\n}"
+        }
+      ]
+    },
+    "h-10": {
+      "@type": "slate",
+      "plaintext": "object_list with allowedBlocks: Typed Items",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "object_list with allowedBlocks: Typed Items"
+            }
+          ]
+        }
+      ]
+    },
+    "p-11": {
+      "@type": "slate",
+      "plaintext": "When `allowedBlocks` is set on an `object_list`, items can have different types (like `blocks_layout`) but are still stored as an array. Each item's type is stored in the field specified by `typeField` (defaults to `'@type'`) and its schema is looked up from `blocks`:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "When "
+            },
+            {
+              "text": "allowedBlocks",
+              "code": true
+            },
+            {
+              "text": " is set on an "
+            },
+            {
+              "text": "object_list",
+              "code": true
+            },
+            {
+              "text": ", items can have different types (like "
+            },
+            {
+              "text": "blocks_layout",
+              "code": true
+            },
+            {
+              "text": ") but are still stored as an array. Each item's type is stored in the field specified by "
+            },
+            {
+              "text": "typeField",
+              "code": true
+            },
+            {
+              "text": " (defaults to "
+            },
+            {
+              "text": "'@type'",
+              "code": true
+            },
+            {
+              "text": ") and its schema is looked up from "
+            },
+            {
+              "text": "blocks",
+              "code": true
+            },
+            {
+              "text": ":"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-12": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-12-javascript-c4771f",
+          "label": "Javascript",
+          "language": "javascript",
+          "code": "facets: {\n    title: 'Facets',\n    widget: 'object_list',\n    allowedBlocks: ['checkboxFacet', 'selectFacet'],\n    typeField: 'type',\n    defaultBlockType: 'checkboxFacet',\n}\n\n// Resulting data\n{\n  \"@type\": \"search\",\n  \"facets\": [\n    { \"@id\": \"facet-1\", \"type\": \"checkboxFacet\",\n      \"title\": \"Content Type\", \"field\": \"portal_type\" },\n    { \"@id\": \"facet-2\", \"type\": \"selectFacet\",\n      \"title\": \"Subject\", \"field\": \"Subject\" }\n  ]\n}"
+        }
+      ]
+    },
+    "p-13": {
+      "@type": "slate",
+      "plaintext": "Both `blocks_layout` and `object_list` look the same in the editing UI and blocks can be dragged between them — data is automatically adapted when moving between formats (ID fields added/stripped, type fields set appropriately).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Both "
+            },
+            {
+              "text": "blocks_layout",
+              "code": true
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "object_list",
+              "code": true
+            },
+            {
+              "text": " look the same in the editing UI and blocks can be dragged between them — data is automatically adapted when moving between formats (ID fields added/stripped, type fields set appropriately)."
+            }
+          ]
+        }
+      ]
+    },
+    "h-14": {
+      "@type": "slate",
+      "plaintext": "Rendering Containers in Your Frontend",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Rendering Containers in Your Frontend"
+            }
+          ]
+        }
+      ]
+    },
+    "p-15": {
+      "@type": "slate",
+      "plaintext": "Add `data-block-uid` to each child element. You don't need to mark the container element itself:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Add "
+            },
+            {
+              "text": "data-block-uid",
+              "code": true
+            },
+            {
+              "text": " to each child element. You don't need to mark the container element itself:"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-16": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-16-html-8bed70",
+          "label": "Html",
+          "language": "html",
+          "code": "<div class=\"slider\" data-block-uid=\"slider-1\">\n  <div class=\"slide\" data-block-uid=\"slide-1\"\n       data-block-add=\"right\">\n    <img src=\"/news.jpg\"/>\n    <h2>Big News</h2>\n  </div>\n  <div class=\"slide\" data-block-uid=\"slide-2\"\n       data-block-add=\"right\">\n    ...\n  </div>\n  <a data-block-selector=\"-1\">Prev</a>\n  <a data-block-selector=\"+1\">Next</a>\n</div>"
+        }
+      ]
+    },
+    "ul-17": {
+      "@type": "slate",
+      "plaintext": "data-block-add=\"bottom|right\" — Controls where the '+' button appears. By default it will be the opposite of its parent. Use \"bottom\" for vertical stacking, \"right\" for horizontal. data-block-selector=\"-1|+1|blockId\" — Tag paging buttons so sidebar selection can navigate paged containers",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`data-block-add=\"bottom|right\"`",
+                  "strong": true
+                },
+                {
+                  "text": " — Controls where the '+' button appears. By default it will be the opposite of its parent. Use \"bottom\" for vertical stacking, \"right\" for horizontal."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`data-block-selector=\"-1|+1|blockId\"`",
+                  "strong": true
+                },
+                {
+                  "text": " — Tag paging buttons so sidebar selection can navigate paged containers"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "h-18": {
+      "@type": "slate",
+      "plaintext": "Table Mode",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Table Mode"
+            }
+          ]
+        }
+      ]
+    },
+    "p-19": {
+      "@type": "slate",
+      "plaintext": "Set `addMode: 'table'` for table-like structures (rows containing cells). This lets users add and remove columns as easily as rows:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Set "
+            },
+            {
+              "text": "addMode: 'table'",
+              "code": true
+            },
+            {
+              "text": " for table-like structures (rows containing cells). This lets users add and remove columns as easily as rows:"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-20": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-20-javascript-7a9d64",
+          "label": "Javascript",
+          "language": "javascript",
+          "code": "rows: {\n    widget: 'object_list',\n    idField: 'key',\n    addMode: 'table',\n    dataPath: ['table', 'rows'],\n    schema: {\n        properties: {\n            cells: {\n                widget: 'object_list',\n                idField: 'key',\n                schema: {\n                    properties: {\n                        value: { title: 'Content',\n                                 widget: 'slate' }\n                    }\n                }\n            }\n        }\n    }\n}"
+        }
+      ]
+    },
+    "h-21": {
+      "@type": "slate",
+      "plaintext": "Empty Blocks",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Empty Blocks"
+            }
+          ]
+        }
+      ]
+    },
+    "p-22": {
+      "@type": "slate",
+      "plaintext": "A container can never be empty. When the last child is deleted, either the `defaultBlockType` is added, or a special block with `@type: \"empty\"` is inserted. Empty blocks are stripped before saving. Render them as empty space — Hydra puts a '+' button in the middle for the user to replace it.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A container can never be empty. When the last child is deleted, either the "
+            },
+            {
+              "text": "defaultBlockType",
+              "code": true
+            },
+            {
+              "text": " is added, or a special block with "
+            },
+            {
+              "text": "@type: \"empty\"",
+              "code": true
+            },
+            {
+              "text": " is inserted. Empty blocks are stripped before saving. Render them as empty space — Hydra puts a '+' button in the middle for the user to replace it."
+            }
+          ]
+        }
+      ]
+    },
+    "p-23": {
+      "@type": "slate",
+      "plaintext": "You can override the look of the '+' button by rendering something inside the empty block and adding `data-block-add=\"button\"` to it.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "You can override the look of the '+' button by rendering something inside the empty block and adding "
+            },
+            {
+              "text": "data-block-add=\"button\"",
+              "code": true
+            },
+            {
+              "text": " to it."
+            }
+          ]
+        }
+      ]
+    },
+    "h-24": {
+      "@type": "slate",
+      "plaintext": "Synchronised Block Types in a Container",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Synchronised Block Types in a Container"
+            }
+          ]
+        }
+      ]
+    },
+    "p-25": {
+      "@type": "slate",
+      "plaintext": "You can have one container type whose children are all kept the same `@type`, with the editor picking that type once on the parent. When the type changes, every child is converted (using each child's `fieldMappings`); when a new child is added it gets the selected type.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "You can have one container type whose children are all kept the same "
+            },
+            {
+              "text": "@type",
+              "code": true
+            },
+            {
+              "text": ", with the editor picking that type once on the parent. When the type changes, every child is converted (using each child's "
+            },
+            {
+              "text": "fieldMappings",
+              "code": true
+            },
+            {
+              "text": "); when a new child is added it gets the selected type."
+            }
+          ]
+        }
+      ]
+    },
+    "p-26": {
+      "@type": "slate",
+      "plaintext": "Declare `itemTypeField` on the *blocks field* — its value names a sibling field on the same schema whose value drives every child's `@type`. The sibling field is typically rendered with `widget: 'blockTypeSelect'`, which computes its `choices` from the blocks field's `allowedBlocks` at render time:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Declare "
+            },
+            {
+              "text": "itemTypeField",
+              "code": true
+            },
+            {
+              "text": " on the "
+            },
+            {
+              "text": "blocks field",
+              "em": true
+            },
+            {
+              "text": " — its value names a sibling field on the same schema whose value drives every child's "
+            },
+            {
+              "text": "@type",
+              "code": true
+            },
+            {
+              "text": ". The sibling field is typically rendered with "
+            },
+            {
+              "text": "widget: 'blockTypeSelect'",
+              "code": true
+            },
+            {
+              "text": ", which computes its "
+            },
+            {
+              "text": "choices",
+              "code": true
+            },
+            {
+              "text": " from the blocks field's "
+            },
+            {
+              "text": "allowedBlocks",
+              "code": true
+            },
+            {
+              "text": " at render time:"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-27": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-27-javascript-cf69cc",
+          "label": "Javascript",
+          "language": "javascript",
+          "code": "blocks: {\n    gridBlock: {\n        blockSchema: {\n            properties: {\n                slides: {\n                    widget: 'blocks_layout',\n                    itemTypeField: 'variation',         // sync trigger\n                    allowedBlocks: ['teaser', 'image'],\n                },\n                variation: {\n                    widget: 'blockTypeSelect',          // dropdown\n                },\n            },\n        },\n    },\n    teaser: {\n        fieldMappings: {\n            '@default': { '@id': 'href', 'title': 'title', 'image': 'preview_image' },\n        },\n    },\n    image: {\n        fieldMappings: {\n            '@default': { '@id': 'href', 'title': 'alt', 'image': 'url' },\n        },\n    },\n}"
+        }
+      ]
+    },
+    "p-28": {
+      "@type": "slate",
+      "plaintext": "The relationship is local: read the schema and you can see \"the children of `slides` get their `@type` from `variation`\" right next to the field declaration. Works the same for `widget: 'blocks_layout'` and `widget: 'object_list'` children.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The relationship is local: read the schema and you can see \"the children of "
+            },
+            {
+              "text": "slides",
+              "code": true
+            },
+            {
+              "text": " get their "
+            },
+            {
+              "text": "@type",
+              "code": true
+            },
+            {
+              "text": " from "
+            },
+            {
+              "text": "variation",
+              "code": true
+            },
+            {
+              "text": "\" right next to the field declaration. Works the same for "
+            },
+            {
+              "text": "widget: 'blocks_layout'",
+              "code": true
+            },
+            {
+              "text": " and "
+            },
+            {
+              "text": "widget: 'object_list'",
+              "code": true
+            },
+            {
+              "text": " children."
+            }
+          ]
+        }
+      ]
+    },
+    "h-29": {
+      "@type": "slate",
+      "plaintext": "Field-value syncing",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Field-value syncing"
+            }
+          ]
+        }
+      ]
+    },
+    "p-30": {
+      "@type": "slate",
+      "plaintext": "On top of type syncing you can also have field _values_ centrally controlled at the parent — set once on the parent, applied to every child. Add ONE enhancer on the parent:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "On top of type syncing you can also have field _values_ centrally controlled at the parent — set once on the parent, applied to every child. Add ONE enhancer on the parent:"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-31": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-31-javascript-8c04b0",
+          "label": "Javascript",
+          "language": "javascript",
+          "code": "gridBlock: {\n    blockSchema: {\n        properties: {\n            slides: { widget: 'blocks_layout', itemTypeField: 'variation', allowedBlocks: ['teaser', 'image'] },\n            variation: { widget: 'blockTypeSelect' },\n        },\n    },\n    schemaEnhancer: { inheritSchemaFrom: {} },\n}"
+        }
+      ]
+    },
+    "p-32": {
+      "@type": "slate",
+      "plaintext": "`inheritSchemaFrom` does two things automatically:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "inheritSchemaFrom",
+              "code": true
+            },
+            {
+              "text": " does two things automatically:"
+            }
+          ]
+        }
+      ]
+    },
+    "ol-33": {
+      "@type": "slate",
+      "plaintext": "Surfaces the parent-claimed fields on the parent's sidebar under an \"Item Defaults\" fieldset. Auto-hides the same fields on every child's sidebar (via a hideParentOwnedFields enhancer that's applied to every block at INIT — no per-child opt-in).",
+      "value": [
+        {
+          "type": "ol",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Surfaces the "
+                },
+                {
+                  "text": "parent-claimed",
+                  "strong": true
+                },
+                {
+                  "text": " fields on the parent's sidebar under an \"Item Defaults\" fieldset."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Auto-hides the same fields on every child's sidebar (via a "
+                },
+                {
+                  "text": "hideParentOwnedFields",
+                  "code": true
+                },
+                {
+                  "text": " enhancer that's applied to every block at INIT — no per-child opt-in)."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-34": {
+      "@type": "slate",
+      "plaintext": "The parent declares **what it claims** per child block type via `parentControlled`. If absent, the default is: parent claims everything _not_ listed in the child's `fieldMappings['@default']` mapping. The default works for typical cases; set `parentControlled` only when you want a different split (e.g. keep a meta-toggle field editable per-child):",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The parent declares "
+            },
+            {
+              "text": "what it claims",
+              "strong": true
+            },
+            {
+              "text": " per child block type via "
+            },
+            {
+              "text": "parentControlled",
+              "code": true
+            },
+            {
+              "text": ". If absent, the default is: parent claims everything _not_ listed in the child's "
+            },
+            {
+              "text": "fieldMappings['@default']",
+              "code": true
+            },
+            {
+              "text": " mapping. The default works for typical cases; set "
+            },
+            {
+              "text": "parentControlled",
+              "code": true
+            },
+            {
+              "text": " only when you want a different split (e.g. keep a meta-toggle field editable per-child):"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-35": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-35-javascript-83cc4f",
+          "label": "Javascript",
+          "language": "javascript",
+          "code": "listing: {\n    schemaEnhancer: {\n        inheritSchemaFrom: {\n            typeField: 'variation',\n            mappingField: 'fieldMapping',\n            // Only these fields are claimed by listing for teaser children.\n            // The rest (including teaser's `overwrite` toggle) stay editable.\n            parentControlled: {\n                teaser: ['head_title', 'openLinkInNewTab', 'styles'],\n            },\n        },\n    },\n}"
+        }
+      ]
+    },
+    "p-36": {
+      "@type": "slate",
+      "plaintext": "When `parentControlled[childType]` is set, it **replaces** the `@default` fallback for that child type. Both sides — the parent's \"Item Defaults\" fieldset and the child's hidden fields — are computed from the same single rule, so they can never get out of sync.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "When "
+            },
+            {
+              "text": "parentControlled[childType]",
+              "code": true
+            },
+            {
+              "text": " is set, it "
+            },
+            {
+              "text": "replaces",
+              "strong": true
+            },
+            {
+              "text": " the "
+            },
+            {
+              "text": "@default",
+              "code": true
+            },
+            {
+              "text": " fallback for that child type. Both sides — the parent's \"Item Defaults\" fieldset and the child's hidden fields — are computed from the same single rule, so they can never get out of sync."
+            }
+          ]
+        }
+      ]
+    },
+    "h-37": {
+      "@type": "slate",
+      "plaintext": "Recipe options",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Recipe options"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-38": {
+      "@type": "slate",
+      "plaintext": "inheritSchemaFrom — schemaEnhancer recipe; surfaces parent-claimed fields on the parent and hides them on children. itemTypeField — declared on a blocks_layout/object_list field; names the sibling field whose value drives every child's @type. typeField — names the sibling field directly on inheritSchemaFrom. Use this when there is no blocks field to declare itemTypeField on (e.g. listings — see Listings). mappingField — name of the field where a per-block fieldMapping override is stored. Required for the FieldMappingWidget to appear. parentControlled — { childType: [fieldName, ...] } per-child-type override. Replaces the fieldMappings['@default'] fallback. defaultsField — prefix for the inherited fields on the parent's \"Item Defaults\" fieldset (default: 'itemDefaults'). blockTypeSelect widget options:",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`inheritSchemaFrom`",
+                  "strong": true
+                },
+                {
+                  "text": " — schemaEnhancer recipe; surfaces parent-claimed fields on the parent and hides them on children."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`itemTypeField`",
+                  "strong": true
+                },
+                {
+                  "text": " — declared on a "
+                },
+                {
+                  "text": "blocks_layout",
+                  "code": true
+                },
+                {
+                  "text": "/"
+                },
+                {
+                  "text": "object_list",
+                  "code": true
+                },
+                {
+                  "text": " field; names the sibling field whose value drives every child's "
+                },
+                {
+                  "text": "@type",
+                  "code": true
+                },
+                {
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`typeField`",
+                  "strong": true
+                },
+                {
+                  "text": " — names the sibling field directly on "
+                },
+                {
+                  "text": "inheritSchemaFrom",
+                  "code": true
+                },
+                {
+                  "text": ". Use this when there is no blocks field to declare "
+                },
+                {
+                  "text": "itemTypeField",
+                  "code": true
+                },
+                {
+                  "text": " on (e.g. listings — see "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "listings.md"
+                  },
+                  "children": [
+                    {
+                      "text": "Listings"
+                    }
+                  ]
+                },
+                {
+                  "text": ")."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`mappingField`",
+                  "strong": true
+                },
+                {
+                  "text": " — name of the field where a per-block "
+                },
+                {
+                  "text": "fieldMapping",
+                  "code": true
+                },
+                {
+                  "text": " override is stored. Required for the "
+                },
+                {
+                  "text": "FieldMappingWidget",
+                  "code": true
+                },
+                {
+                  "text": " to appear."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`parentControlled`",
+                  "strong": true
+                },
+                {
+                  "text": " — "
+                },
+                {
+                  "text": "{ childType: [fieldName, ...] }",
+                  "code": true
+                },
+                {
+                  "text": " per-child-type override. Replaces the "
+                },
+                {
+                  "text": "fieldMappings['@default']",
+                  "code": true
+                },
+                {
+                  "text": " fallback."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`defaultsField`",
+                  "strong": true
+                },
+                {
+                  "text": " — prefix for the inherited fields on the parent's \"Item Defaults\" fieldset (default: "
+                },
+                {
+                  "text": "'itemDefaults'",
+                  "code": true
+                },
+                {
+                  "text": ")."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "`blockTypeSelect`",
+                  "strong": true
+                },
+                {
+                  "text": " widget options:"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-39": {
+      "@type": "slate",
+      "plaintext": "- **`blocksField`** — which sub-blocks field's `allowedBlocks` to use for the choices. Auto-discovers if omitted. Set to `'..'` when the choices should come from the *enclosing parent's* `allowedSiblingTypes`.   - **`filterConvertibleFrom`** — only offer types whose `fieldMappings` accept the named source. Typically `'@default'` for listings (every item type must be populatable from canonical content fields).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "- "
+            },
+            {
+              "text": "`blocksField`",
+              "strong": true
+            },
+            {
+              "text": " — which sub-blocks field's "
+            },
+            {
+              "text": "allowedBlocks",
+              "code": true
+            },
+            {
+              "text": " to use for the choices. Auto-discovers if omitted. Set to "
+            },
+            {
+              "text": "'..'",
+              "code": true
+            },
+            {
+              "text": " when the choices should come from the "
+            },
+            {
+              "text": "enclosing parent's",
+              "em": true
+            },
+            {
+              "text": " "
+            },
+            {
+              "text": "allowedSiblingTypes",
+              "code": true
+            },
+            {
+              "text": ".   - "
+            },
+            {
+              "text": "`filterConvertibleFrom`",
+              "strong": true
+            },
+            {
+              "text": " — only offer types whose "
+            },
+            {
+              "text": "fieldMappings",
+              "code": true
+            },
+            {
+              "text": " accept the named source. Typically "
+            },
+            {
+              "text": "'@default'",
+              "code": true
+            },
+            {
+              "text": " for listings (every item type must be populatable from canonical content fields)."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "p-1",
+      "sep-2",
+      "h-3",
+      "p-4",
+      "ce-5",
+      "p-6",
+      "h-7",
+      "p-8",
+      "ce-9",
+      "h-10",
+      "p-11",
+      "ce-12",
+      "p-13",
+      "h-14",
+      "p-15",
+      "ce-16",
+      "ul-17",
+      "h-18",
+      "p-19",
+      "ce-20",
+      "h-21",
+      "p-22",
+      "p-23",
+      "h-24",
+      "p-25",
+      "p-26",
+      "ce-27",
+      "p-28",
+      "h-29",
+      "p-30",
+      "ce-31",
+      "p-32",
+      "ol-33",
+      "p-34",
+      "ce-35",
+      "p-36",
+      "h-37",
+      "ul-38",
+      "p-39"
+    ]
+  }
+}

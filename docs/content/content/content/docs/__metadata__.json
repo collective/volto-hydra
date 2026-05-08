@@ -1,0 +1,14 @@
+{
+  "ordering": {
+    "docs-architecture-001": 0,
+    "docs-build-a-frontend-001": 1,
+    "docs-live-preview-001": 2,
+    "docs-custom-blocks-001": 3,
+    "docs-container-blocks-001": 4,
+    "docs-visual-editing-001": 5,
+    "docs-what-editors-will-experience-001": 6,
+    "docs-listings-001": 7,
+    "docs-templates-001": 8,
+    "docs-advanced-001": 9
+  }
+}

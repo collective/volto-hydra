@@ -79,16 +79,16 @@
     "e017bd4a0b3845aab26f6d855cc4ef14/data.json",
     "1efc7b73b28e4edeaf40040709299d69/data.json",
     "7950cae06c994276930f6d13151308c5/data.json",
-    "concepts/data.json",
-    "concepts/architecture/data.json",
-    "concepts/live-preview/data.json",
-    "concepts/visual-editing/data.json",
-    "concepts/custom-blocks/data.json",
-    "concepts/container-blocks/data.json",
-    "concepts/listings/data.json",
-    "concepts/templates/data.json",
-    "concepts/deployment/data.json",
-    "concepts/advanced/data.json",
+    "docs/data.json",
+    "docs/architecture/data.json",
+    "docs/live-preview/data.json",
+    "docs/visual-editing/data.json",
+    "docs/custom-blocks/data.json",
+    "docs/container-blocks/data.json",
+    "docs/listings/data.json",
+    "docs/templates/data.json",
+    "docs/deployment/data.json",
+    "docs/advanced/data.json",
     "search/data.json",
     "templates/data.json",
     "templates/block-reference-layout/data.json",
@@ -477,70 +477,70 @@
         ]
       }
     },
-    "concepts-folder-001": {
+    "docs-folder-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-architecture-001": {
+    "docs-architecture-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-live-preview-001": {
+    "docs-live-preview-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-visual-editing-001": {
+    "docs-visual-editing-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-custom-blocks-001": {
+    "docs-custom-blocks-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-container-blocks-001": {
+    "docs-container-blocks-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-listings-001": {
+    "docs-listings-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-templates-001": {
+    "docs-templates-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-deployment-001": {
+    "docs-deployment-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-advanced-001": {
+    "docs-advanced-001": {
       "local_roles": {
         "admin": [
           "Owner"
@@ -591,7 +591,7 @@
     }
   },
   "ordering": {
-    "concepts-folder-001": 0,
+    "docs-folder-001": 0,
     "00cef5f245a342958288ace545e3c097": 6,
     "05bace45294c45d5ab93de883e7ce702": 1,
     "0c351dd841c34c6da9c313b1bc551e34": 3,

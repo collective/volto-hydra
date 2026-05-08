@@ -14,12 +14,12 @@
  *        JSON / React / Vue / Svelte sections into the matching Plone content
  *        JSON's codeExample blocks (docs/content/.../<UID>/data.json).
  *
- *   2. Concept pages (docs/how-to-build/)
+ *   2. Topic pages (docs/*.md — architecture, custom-blocks, listings, …)
  *      - Each .md is parsed (parseConceptsMd) into Plone slate / codeExample /
  *        slateTable / separator blocks.
  *      - Synced into the matching Plone content JSON
- *        (docs/content/.../concepts/<page>/data.json today; will be moved
- *        under docs/how-to-build/ when the Plone restructure lands).
+ *        (docs/content/.../docs/<page>/data.json), mirroring the Sphinx
+ *        layout one-for-one.
  *      - Missing data.json files are auto-created from a metadata shell with
  *        the page's title + first paragraph as description.
  *      - Order of CONCEPTS_MD_TO_FOLDER drives the Plone folder's
@@ -30,8 +30,11 @@
  *   pnpm sync:docs:check      # exit non-zero if anything is out of sync (CI)
  */
 
-import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'fs';
-import { join, dirname, basename } from 'path';
+import {
+  readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync,
+  statSync, copyFileSync,
+} from 'fs';
+import { join, dirname, basename, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -40,11 +43,26 @@ const checkMode = process.argv.includes('--check');
 // Source-of-truth directory roots, all relative to this script's location at docs/sync.mjs.
 //   docs/examples/                 — block reference: per-block .md, block-definitions.json,
 //                                    examples/{react,vue,svelte}/ source snippets
-//   docs/how-to-build/             — concept-page authoring (was concepts/)
+//   docs/*.md                      — topic-page authoring (architecture, custom-blocks, …)
 //   docs/content/content/content/  — Plone-content tree the live site exports from
 const EXAMPLES_DIR = join(__dirname, 'examples');
-const HOW_TO_BUILD_DIR = join(__dirname, 'how-to-build');
+// How-to-build flattened up to docs root; the developer-authored topic
+// pages (architecture, custom-blocks, listings, …) sit alongside this
+// script. CONCEPTS_MD_TO_FOLDER below maps each .md filename to the Plone
+// folder it syncs into.
+// Markdown source roots used by the various sync phases below.
+const TOPICS_DIR = __dirname;
+const TOPICS_MD_ROOT = TOPICS_DIR;
 const CONTENT_DIR = join(__dirname, 'content', 'content', 'content');
+
+// Plone-side parent path for documentation pages and the screenshots
+// they reference. The whole tree lives under /docs/ in Plone, mirroring
+// the Sphinx layout one-for-one (docs/architecture.md → /docs/architecture).
+const DOCS_PARENT_PATH = '/docs';
+const DOCS_PARENT_UID = 'docs-folder-001';
+const IMAGES_PARENT_PATH = DOCS_PARENT_PATH;
+const IMAGES_PARENT_UID = DOCS_PARENT_UID;
+const IMAGES_FOLDER_UID = 'docs-images-folder-001';
 
 const docPageDefinitions = JSON.parse(
   readFileSync(join(EXAMPLES_DIR, 'block-definitions.json'), 'utf-8')
@@ -499,55 +517,131 @@ if (existsSync(examplesPath)) {
 
 // --- Phase 4: Sync concepts markdown into Plone content JSON ---
 
-// Map concepts markdown filename -> concepts content JSON folder name
+// Map docs markdown filename -> Plone folder path (relative to /docs/).
 // Order matters — drives __metadata__.json's ordering map below.
-const CONCEPTS_MD_TO_FOLDER = {
-  'architecture.md': 'architecture',
-  'incremental-adoption.md': 'incremental-adoption',
-  'live-preview.md': 'live-preview',
-  'container-blocks.md': 'container-blocks',
-  'custom-blocks.md': 'custom-blocks',
-  'visual-editing.md': 'visual-editing',
-  'listings.md': 'listings',
-  'templates.md': 'templates',
-  'deployment.md': 'deployment',
-  'advanced.md': 'advanced',
-};
+// Filename keys may include subdirs ('what-editors-will-experience/foo.md');
+// values may be nested paths ('what-editors-will-experience/foo'). The
+// root of the editor-experience subtree is its own folder page (index.md).
+// Discover docs pages by walking the Sphinx toctree tree, starting from
+// docs/index.md. Toctree order is the single source of truth for both the
+// rendered Sphinx site nav and Plone's __metadata__.json ordering — sync
+// can never drift from the docs nav because it reads the same input.
+//
+// Toctree entry forms supported:
+//   page-name              → leaf page, mdFile = page-name.md
+//   sub/page-name          → leaf page in a subfolder
+//   sub/index              → folder page; recurse into sub/index.md's toctree
+// The literal entry 'examples/README' is skipped — block reference pages
+// have a different sync path (Phases 0–3 above) and don't belong here.
+function discoverDocsPagesFromToctree() {
+  const entries = [];
+  function walk(parentMdRel, parentFolder) {
+    const mdAbs = join(TOPICS_MD_ROOT, parentMdRel);
+    if (!existsSync(mdAbs)) return;
+    const md = readFileSync(mdAbs, 'utf-8');
+    const m = md.match(/```\{toctree\}([\s\S]*?)```/);
+    if (!m) return;
+    const dirRel = dirname(parentMdRel);
+    const dirPrefix = (dirRel === '' || dirRel === '.') ? '' : `${dirRel}/`;
+    for (const rawLine of m[1].split('\n')) {
+      const t = rawLine.trim();
+      if (!t || t.startsWith(':')) continue;
+      if (t === 'examples/README') continue;
+      const isFolderIndex = t.endsWith('/index');
+      const slug = isFolderIndex ? t.slice(0, -'/index'.length) : t;
+      const mdRel = `${dirPrefix}${slug}${isFolderIndex ? '/index' : ''}.md`;
+      const leaf = slug.split('/').pop();
+      const folder = parentFolder ? `${parentFolder}/${leaf}` : slug;
+      entries.push([mdRel, folder]);
+      if (isFolderIndex) walk(mdRel, folder);
+    }
+  }
+  walk('index.md', '');
+  return Object.fromEntries(entries);
+}
+const CONCEPTS_MD_TO_FOLDER = discoverDocsPagesFromToctree();
 
 /**
- * Build a Plone-content data.json shell for a concept page that doesn't yet
+ * Pull H1 + first paragraph from a markdown source as title + description.
+ * Returns { title, description }.
+ */
+function extractTitleAndDescription(mdContent, folderFallback) {
+  const lines = mdContent.split('\n');
+  let title = folderFallback;
+  let description = '';
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].startsWith('# ')) continue;
+    title = lines[i].slice(2).trim();
+    for (let j = i + 1; j < lines.length; j++) {
+      const next = lines[j].trim();
+      if (!next) continue;
+      if (next.startsWith('#') || next.startsWith('-') || next.startsWith('*') ||
+          next.startsWith('|') || next.startsWith('```') || next.startsWith('<!--')) break;
+      description = next.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+                        .replace(/\*\*([^*]+)\*\*/g, '$1')
+                        .replace(/\*([^*\n]+)\*/g, '$1')
+                        .replace(/`([^`]+)`/g, '$1');
+      break;
+    }
+    break;
+  }
+  return { title, description };
+}
+
+// Pre-compute folder → { title, description, uid, isFolderish, parent }
+// from CONCEPTS_MD_TO_FOLDER. Lets buildConceptShell look up the parent's
+// real title/UID for nested children, and tells the metadata writer which
+// folders need their own __metadata__.json.
+function folderToUid(folder) {
+  return folder === '' ? DOCS_PARENT_UID : `docs-${folder.replace(/\//g, '-')}-001`;
+}
+function parentFolderOf(folder) {
+  if (!folder.includes('/')) return '';
+  return folder.split('/').slice(0, -1).join('/');
+}
+function hasChildren(folder) {
+  for (const f of Object.values(CONCEPTS_MD_TO_FOLDER)) {
+    if (f !== folder && (folder === '' || f.startsWith(folder + '/'))) return true;
+  }
+  return false;
+}
+
+const folderMeta = new Map();
+folderMeta.set('', {
+  title: 'Docs',
+  description: 'Developer guide for Volto Hydra',
+  uid: DOCS_PARENT_UID,
+});
+for (const [mdFile, folder] of Object.entries(CONCEPTS_MD_TO_FOLDER)) {
+  const mdPath = join(TOPICS_MD_ROOT, mdFile);
+  const fallback = folder.split('/').pop();
+  let title = fallback;
+  let description = '';
+  if (existsSync(mdPath)) {
+    const md = readFileSync(mdPath, 'utf-8');
+    ({ title, description } = extractTitleAndDescription(md, fallback));
+  }
+  folderMeta.set(folder, {
+    title,
+    description,
+    uid: folderToUid(folder),
+  });
+}
+
+/**
+ * Build a Plone-content data.json shell for a docs page that doesn't yet
  * have one. The blocks/blocks_layout fields are filled in by the regular
  * sync logic; this just provides the surrounding metadata Plone export needs.
  */
 function buildConceptShell(folder, mdContent) {
-  // First H1 → title; first paragraph after it → description.
-  const lines = mdContent.split('\n');
-  let title = folder;
-  let description = '';
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.startsWith('# ')) {
-      title = line.slice(2).trim();
-      // Find first non-empty, non-heading paragraph after H1.
-      for (let j = i + 1; j < lines.length; j++) {
-        const next = lines[j].trim();
-        if (!next) continue;
-        if (next.startsWith('#') || next.startsWith('-') || next.startsWith('*') ||
-            next.startsWith('|') || next.startsWith('```') || next.startsWith('<!--')) break;
-        // Strip inline markdown to get plain prose
-        description = next.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-                          .replace(/\*\*([^*]+)\*\*/g, '$1')
-                          .replace(/\*([^*\n]+)\*/g, '$1')
-                          .replace(/`([^`]+)`/g, '$1');
-        break;
-      }
-      break;
-    }
-  }
-  const uid = `concepts-${folder}-001`;
+  const { title, description } = extractTitleAndDescription(mdContent, folder);
+  const uid = folderToUid(folder);
+  const parentFolder = parentFolderOf(folder);
+  const parentInfo = folderMeta.get(parentFolder) || folderMeta.get('');
+  const isFolderish = hasChildren(folder);
   const date = '2025-01-01T00:00:00';
   return {
-    '@id': `/concepts/${folder}`,
+    '@id': `${DOCS_PARENT_PATH}/${folder}`,
     '@type': 'Document',
     UID: uid,
     allow_discussion: false,
@@ -561,18 +655,18 @@ function buildConceptShell(folder, mdContent) {
     'exportimport.constrains': {},
     'exportimport.conversation': [],
     'exportimport.versions': {},
-    id: folder,
-    is_folderish: false,
+    id: folder.split('/').pop(),
+    is_folderish: isFolderish,
     language: '##DEFAULT##',
     layout: 'document_view',
     lock: { locked: false, stealable: true },
     modified: `${date}+00:00`,
     parent: {
-      '@id': '/concepts',
+      '@id': parentFolder === '' ? DOCS_PARENT_PATH : `${DOCS_PARENT_PATH}/${parentFolder}`,
       '@type': 'Document',
-      UID: 'concepts-folder-001',
-      description: "Key concepts behind Hydra's visual headless CMS architecture",
-      title: 'Concepts',
+      UID: parentInfo.uid,
+      description: parentInfo.description,
+      title: parentInfo.title,
       type_title: 'Page',
     },
     preview_caption: null,
@@ -601,12 +695,11 @@ function buildConceptShell(folder, mdContent) {
   };
 }
 
-// Sphinx-side: how-to-build/*.md authored by developers.
-// Plone-side: still 'concepts/' for now — restructuring to docs/how-to-build/
-// is a follow-up commit (will involve folder renames + UID updates).
-// HOW_TO_BUILD_DIR is defined above near the script header.
-const CONCEPTS_DIR = HOW_TO_BUILD_DIR;
-const CONCEPTS_CONTENT_DIR = join(CONTENT_DIR, 'concepts');
+// Sphinx-side: developer topic pages live flat in docs/ (alongside this
+// script). Subdirs (what-editors-will-experience/) hold nested pages.
+// Plone-side: pages live under content/.../docs/<slug>/ and nested
+// content/.../docs/<parent>/<slug>/, mirroring the Sphinx tree.
+const DOCS_CONTENT_DIR = join(CONTENT_DIR, 'docs');
 
 /**
  * Parse markdown inline formatting into Slate leaf array.
@@ -695,6 +788,25 @@ function parseConceptsMd(mdContent) {
     if (/^(\s*[-*_]\s*){3,}$/.test(line.trim()) && line.trim().length >= 3) {
       const id = nextId('sep');
       addBlock(id, { '@type': 'separator' });
+      i++;
+      continue;
+    }
+
+    // Standalone image: ![alt](path/to/image.png) → image block.
+    // Matches Phase 5's slug rule: filename without extension.
+    const imgMatch = line.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (imgMatch) {
+      const alt = imgMatch[1];
+      const url = imgMatch[2];
+      const slug = basename(url).replace(/\.[^.]+$/, '');
+      const id = nextId('img');
+      addBlock(id, {
+        '@type': 'image',
+        url: `${IMAGES_PARENT_PATH}/_images/${slug}`,
+        alt,
+        align: 'center',
+        size: 'l',
+      });
       i++;
       continue;
     }
@@ -816,7 +928,12 @@ function parseConceptsMd(mdContent) {
       continue;
     }
 
-    // Fenced code block without a codeExample marker — wrap as codeExample
+    // Fenced code block without a codeExample marker — wrap as codeExample.
+    // Exception: MyST directive fences like ```{toctree}``` or ```{warning}```
+    // are Sphinx-only markup; the toctree is consumed elsewhere (drives sync
+    // ordering), and admonitions render natively. None of them should leak
+    // into Plone as a codeExample. If we ever want admonition text on the
+    // live site, add a directive-aware branch above.
     if (line.startsWith('```')) {
       const lang = line.slice(3).trim() || 'text';
       i++;
@@ -826,6 +943,7 @@ function parseConceptsMd(mdContent) {
         i++;
       }
       i++; // skip closing fence
+      if (lang.startsWith('{') && lang.endsWith('}')) continue;
       const id = nextId('ce');
       const label = lang.charAt(0).toUpperCase() + lang.slice(1);
       addBlock(id, {
@@ -872,50 +990,57 @@ function parseConceptsMd(mdContent) {
   return { blocks, items };
 }
 
-const conceptsMdFiles = Object.keys(CONCEPTS_MD_TO_FOLDER);
+const docsMdFiles = Object.keys(CONCEPTS_MD_TO_FOLDER);
 
-for (const mdFile of conceptsMdFiles) {
+for (const mdFile of docsMdFiles) {
   const folder = CONCEPTS_MD_TO_FOLDER[mdFile];
-  const folderPath = join(CONCEPTS_CONTENT_DIR, folder);
+  const folderPath = join(DOCS_CONTENT_DIR, folder);
   const jsonPath = join(folderPath, 'data.json');
 
-  const mdPath = join(CONCEPTS_DIR, mdFile);
+  const mdPath = join(TOPICS_MD_ROOT, mdFile);
   if (!existsSync(mdPath)) {
-    console.error(`WARNING: concepts markdown not found: ${mdPath}`);
+    console.error(`WARNING: docs markdown not found: ${mdPath}`);
     continue;
   }
   const mdContent = readFileSync(mdPath, 'utf-8');
   const { blocks: newBlocks, items: newItems } = parseConceptsMd(mdContent);
 
-  // Create data.json shell when it doesn't exist yet (new concept page).
-  let data;
+  // Build the shell every run — title, description, parent metadata, and
+  // is_folderish are derived from CONCEPTS_MD_TO_FOLDER + the markdown's H1
+  // and need to track those as they change. We keep the previously-written
+  // JSON in prevData only to preserve a couple of stable-across-run details
+  // (the title block id; codeExample tab UIDs).
   let originalJson = '';
-  if (!existsSync(jsonPath)) {
-    if (checkMode) {
-      outOfSync = true;
-      console.error(`OUT OF SYNC: concepts content JSON missing for ${mdFile}`);
-      continue;
-    }
-    if (!existsSync(folderPath)) mkdirSync(folderPath, { recursive: true });
-    data = buildConceptShell(folder, mdContent);
-    console.log(`Created concepts content JSON shell: concepts/${folder}/data.json`);
-  } else {
+  let prevData = null;
+  if (existsSync(jsonPath)) {
     originalJson = readFileSync(jsonPath, 'utf-8');
-    data = JSON.parse(originalJson);
+    prevData = JSON.parse(originalJson);
+  } else if (checkMode) {
+    outOfSync = true;
+    console.error(`OUT OF SYNC: docs content JSON missing for ${mdFile}`);
+    continue;
+  } else {
+    if (!existsSync(folderPath)) mkdirSync(folderPath, { recursive: true });
+    console.log(`Created docs content JSON shell: docs/${folder}/data.json`);
   }
+  const data = buildConceptShell(folder, mdContent);
 
-  // Preserve the title block and any non-generated metadata blocks
-  const titleBlock = Object.entries(data.blocks || {}).find(([, b]) => b['@type'] === 'title');
-  const titleId = titleBlock ? titleBlock[0] : 'title-1';
+  // Preserve title-block id from previous JSON (default: title-1).
+  const prevTitleEntry = prevData
+    ? Object.entries(prevData.blocks || {}).find(([, b]) => b['@type'] === 'title')
+    : null;
+  const titleId = prevTitleEntry ? prevTitleEntry[0] : 'title-1';
 
-  // Preserve existing tab @id values to keep JSON stable across runs
-  for (const [id, block] of Object.entries(newBlocks)) {
-    if (block['@type'] === 'codeExample' && data.blocks?.[id]?.tabs) {
-      block.tabs.forEach((tab, idx) => {
-        if (data.blocks[id].tabs[idx]?.['@id']) {
-          tab['@id'] = data.blocks[id].tabs[idx]['@id'];
-        }
-      });
+  // Preserve existing codeExample tab @id values to keep JSON stable across runs.
+  if (prevData) {
+    for (const [id, block] of Object.entries(newBlocks)) {
+      if (block['@type'] === 'codeExample' && prevData.blocks?.[id]?.tabs) {
+        block.tabs.forEach((tab, idx) => {
+          if (prevData.blocks[id].tabs[idx]?.['@id']) {
+            tab['@id'] = prevData.blocks[id].tabs[idx]['@id'];
+          }
+        });
+      }
     }
   }
 
@@ -932,42 +1057,342 @@ for (const mdFile of conceptsMdFiles) {
   if (updatedJson !== originalJson) {
     outOfSync = true;
     if (checkMode) {
-      console.error(`OUT OF SYNC: concepts content JSON for ${mdFile}`);
+      console.error(`OUT OF SYNC: docs content JSON for ${mdFile}`);
     } else {
       writeFileSync(jsonPath, updatedJson, 'utf-8');
-      console.log(`Updated concepts content JSON: ${mdFile} -> concepts/${folder}/data.json`);
+      console.log(`Updated docs content JSON: ${mdFile} -> docs/${folder}/data.json`);
     }
   }
 }
 
-// --- Phase 4b: Update concepts/__metadata__.json ordering ---
-// Order is driven by CONCEPTS_MD_TO_FOLDER's insertion order, so the .md
-// authoring decides how the live site's nav lists the pages.
+// --- Phase 4a-root: Sync docs/index.md content into the /docs landing page ---
+// The index.md is what Sphinx renders as the docs homepage; its toctree
+// drives sync ordering, and its body (Why Hydra, Try the demo, etc.) should
+// be the live /docs page on the Plone side. Shell metadata (parent =
+// Plone Site root, UID, layout) is preserved as-is — only blocks_layout
+// and blocks are regenerated. Any non-parser block already in the data.json
+// (e.g. a manually-added `listing` block showing children) is appended
+// after the parsed content so the live page keeps its child gallery.
+{
+  const indexMdPath = join(TOPICS_MD_ROOT, 'index.md');
+  const indexJsonPath = join(DOCS_CONTENT_DIR, 'data.json');
+  if (existsSync(indexMdPath) && existsSync(indexJsonPath)) {
+    const indexMd = readFileSync(indexMdPath, 'utf-8');
+    const { blocks: parsedBlocks, items: parsedItems } = parseConceptsMd(indexMd);
+    const originalRootJson = readFileSync(indexJsonPath, 'utf-8');
+    const rootData = JSON.parse(originalRootJson);
 
-const metadataPath = join(CONCEPTS_CONTENT_DIR, '__metadata__.json');
-const desiredOrdering = {};
-Object.values(CONCEPTS_MD_TO_FOLDER).forEach((folder, idx) => {
-  desiredOrdering[`concepts-${folder}-001`] = idx;
-});
+    // Preserve the existing title-block id (default: title-1).
+    const prevTitleEntry = Object.entries(rootData.blocks || {})
+      .find(([, b]) => b['@type'] === 'title');
+    const titleId = prevTitleEntry ? prevTitleEntry[0] : 'title-1';
 
-const desiredMetadata = { ordering: desiredOrdering };
-let originalMetadata = '';
-if (existsSync(metadataPath)) {
-  originalMetadata = readFileSync(metadataPath, 'utf-8');
+    // Preserve any non-parser block from the existing data.json (e.g. listing).
+    // Parser-produced types: title, slate, codeExample, slateTable, separator, image.
+    const PARSER_TYPES = new Set(['title', 'slate', 'codeExample', 'slateTable', 'separator', 'image']);
+    const preservedBlocks = {};
+    const preservedItems = [];
+    for (const [id, b] of Object.entries(rootData.blocks || {})) {
+      if (PARSER_TYPES.has(b['@type']) || id === titleId) continue;
+      preservedBlocks[id] = b;
+      preservedItems.push(id);
+    }
+
+    const updatedRoot = {
+      ...rootData,
+      title: 'Volto Hydra Documentation',
+      description: indexMd.split('\n').slice(1).find(l => l.trim() && !l.startsWith('#') && !l.startsWith('```')) || rootData.description,
+      blocks: { [titleId]: { '@type': 'title' }, ...parsedBlocks, ...preservedBlocks },
+      blocks_layout: { items: [titleId, ...parsedItems, ...preservedItems] },
+    };
+    const updatedRootJson = JSON.stringify(updatedRoot, null, 2) + '\n';
+    if (updatedRootJson !== originalRootJson) {
+      outOfSync = true;
+      if (checkMode) {
+        console.error(`OUT OF SYNC: docs/data.json (root from index.md)`);
+      } else {
+        writeFileSync(indexJsonPath, updatedRootJson, 'utf-8');
+        console.log(`Updated docs/data.json (root from index.md)`);
+      }
+    }
+  }
 }
-const updatedMetadata = JSON.stringify(desiredMetadata, null, 2) + '\n';
-if (updatedMetadata !== originalMetadata) {
-  outOfSync = true;
-  if (checkMode) {
-    console.error(`OUT OF SYNC: concepts/__metadata__.json (ordering)`);
-  } else {
-    writeFileSync(metadataPath, updatedMetadata, 'utf-8');
-    console.log(`Updated concepts/__metadata__.json (ordering)`);
+
+// --- Phase 4b: Update __metadata__.json ordering for every folder with children ---
+// Each folder (docs root + every parent like 'what-editors-will-experience')
+// gets its own __metadata__.json listing only its DIRECT children, in the order
+// CONCEPTS_MD_TO_FOLDER declares them. This is what lets Plone render the nav
+// hierarchy correctly — without it, nested pages either don't appear at all
+// or land at the wrong level.
+
+// Group entries by parent folder.
+const childrenByParent = new Map(); // parentFolder -> [folder, folder, ...]
+for (const folder of Object.values(CONCEPTS_MD_TO_FOLDER)) {
+  const parent = parentFolderOf(folder);
+  if (!childrenByParent.has(parent)) childrenByParent.set(parent, []);
+  childrenByParent.get(parent).push(folder);
+}
+
+for (const [parentFolder, children] of childrenByParent) {
+  const parentDirOnDisk = parentFolder === ''
+    ? DOCS_CONTENT_DIR
+    : join(DOCS_CONTENT_DIR, parentFolder);
+  const metadataPath = join(parentDirOnDisk, '__metadata__.json');
+  const ordering = {};
+  children.forEach((folder, idx) => {
+    ordering[folderToUid(folder)] = idx;
+  });
+  const desired = JSON.stringify({ ordering }, null, 2) + '\n';
+  const original = existsSync(metadataPath) ? readFileSync(metadataPath, 'utf-8') : '';
+  if (desired !== original) {
+    outOfSync = true;
+    const relLabel = parentFolder === '' ? 'docs/__metadata__.json' : `docs/${parentFolder}/__metadata__.json`;
+    if (checkMode) {
+      console.error(`OUT OF SYNC: ${relLabel} (ordering)`);
+    } else {
+      if (!existsSync(parentDirOnDisk)) mkdirSync(parentDirOnDisk, { recursive: true });
+      writeFileSync(metadataPath, desired, 'utf-8');
+      console.log(`Updated ${relLabel} (ordering)`);
+    }
+  }
+}
+
+// --- Phase 5: Sync screenshot images into Plone Image content ---
+// Walks docs/**/*.md (excluding generated/output trees), collects every
+// ![alt](relative/path.png) reference, and ensures a matching Plone Image
+// content exists at <IMAGES_PARENT_PATH>/_images/<slug> with the binary
+// copied into <UID>/image/<filename>. Pages produce `image` blocks whose
+// `url` points at the Plone @id (handled in parseConceptsMd above).
+
+const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+function readPngDimensions(filePath) {
+  const buf = readFileSync(filePath, { encoding: null }).slice(0, 24);
+  if (!buf.slice(0, 8).equals(PNG_SIG)) {
+    throw new Error(`Not a PNG (cannot read dimensions): ${filePath}`);
+  }
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+}
+
+function extToContentType(ext) {
+  if (ext === 'png') return 'image/png';
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+  if (ext === 'svg') return 'image/svg+xml';
+  if (ext === 'gif') return 'image/gif';
+  if (ext === 'webp') return 'image/webp';
+  throw new Error(`Unsupported image extension: .${ext}`);
+}
+
+function buildImageFolderContent() {
+  return {
+    '@id': `${IMAGES_PARENT_PATH}/_images`,
+    '@type': 'Document',
+    UID: IMAGES_FOLDER_UID,
+    allow_discussion: false,
+    blocks: { 'title-1': { '@type': 'title' } },
+    blocks_layout: { items: ['title-1'] },
+    contributors: [],
+    created: '2025-01-01T00:00:00+00:00',
+    creators: ['admin'],
+    description: 'Documentation screenshots referenced by editor-experience pages.',
+    effective: null,
+    exclude_from_nav: true,
+    expires: null,
+    'exportimport.constrains': {},
+    'exportimport.conversation': [],
+    'exportimport.versions': {},
+    id: '_images',
+    is_folderish: true,
+    language: '##DEFAULT##',
+    layout: 'document_view',
+    lock: {},
+    modified: '2025-01-01T00:00:00+00:00',
+    parent: {
+      '@id': IMAGES_PARENT_PATH,
+      '@type': 'Document',
+      UID: IMAGES_PARENT_UID,
+      description: '',
+      image_field: null,
+      image_scales: {},
+      review_state: 'published',
+      title: 'Docs',
+      type_title: 'Page',
+    },
+    review_state: 'published',
+    rights: '',
+    subjects: [],
+    title: 'Images',
+    type_title: 'Page',
+    version: 'current',
+    workflow_history: {},
+    working_copy: null,
+    working_copy_of: null,
+  };
+}
+
+function buildImageContent({ slug, filename, sourcePath, contentType }) {
+  const fileSize = statSync(sourcePath).size;
+  const dims = contentType === 'image/png'
+    ? readPngDimensions(sourcePath)
+    : { width: 0, height: 0 };
+  const uid = `docs-images-${slug}-001`;
+  return {
+    uid,
+    folderName: uid,
+    data: {
+      '@id': `${IMAGES_PARENT_PATH}/_images/${slug}`,
+      '@type': 'Image',
+      UID: uid,
+      allow_discussion: false,
+      contributors: [],
+      created: '2025-01-01T00:00:00+00:00',
+      creators: ['admin'],
+      description: '',
+      effective: null,
+      exclude_from_nav: true,
+      expires: null,
+      'exportimport.constrains': {},
+      'exportimport.conversation': [],
+      'exportimport.versions': {},
+      id: slug,
+      image: {
+        blob_path: `${uid}/image/${filename}`,
+        'content-type': contentType,
+        filename,
+        height: dims.height,
+        size: fileSize,
+        width: dims.width,
+      },
+      is_folderish: false,
+      language: '##DEFAULT##',
+      layout: 'image_view',
+      lock: {},
+      modified: '2025-01-01T00:00:00+00:00',
+      parent: {
+        '@id': `${IMAGES_PARENT_PATH}/_images`,
+        '@type': 'Document',
+        UID: IMAGES_FOLDER_UID,
+        description: 'Documentation screenshots referenced by editor-experience pages.',
+        image_field: null,
+        image_scales: {},
+        review_state: 'published',
+        title: 'Images',
+        type_title: 'Page',
+      },
+      review_state: null,
+      rights: '',
+      subjects: [],
+      title: filename,
+      type_title: 'Image',
+      version: 'current',
+      workflow_history: {},
+      working_copy: null,
+      working_copy_of: null,
+    },
+  };
+}
+
+// Walk docs/ recursively for image references.
+const SKIP_DIRS = new Set(['_build', 'node_modules', 'content', 'examples', 'static']);
+
+function discoverImageRefs() {
+  const refs = new Map();
+  function walk(dir) {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name.startsWith('.')) continue;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (SKIP_DIRS.has(entry.name)) continue;
+        walk(full);
+      } else if (entry.name.endsWith('.md')) {
+        const md = readFileSync(full, 'utf-8');
+        const re = /!\[([^\]]*)\]\(([^)]+)\)/g;
+        let m;
+        while ((m = re.exec(md)) !== null) {
+          const url = m[2];
+          if (/^https?:\/\//.test(url) || url.startsWith('/')) continue;
+          const sourcePath = resolve(dirname(full), url);
+          if (!existsSync(sourcePath)) {
+            console.error(`WARNING: image not found: ${url} (referenced from ${full})`);
+            continue;
+          }
+          const filename = basename(sourcePath);
+          const ext = (filename.match(/\.([^.]+)$/) || [, ''])[1].toLowerCase();
+          const slug = filename.replace(/\.[^.]+$/, '');
+          if (refs.has(slug)) {
+            const prev = refs.get(slug);
+            if (prev.sourcePath !== sourcePath) {
+              throw new Error(
+                `Image slug collision: '${slug}' resolves to both ${prev.sourcePath} and ${sourcePath}`
+              );
+            }
+            continue;
+          }
+          refs.set(slug, { sourcePath, filename, contentType: extToContentType(ext) });
+        }
+      }
+    }
+  }
+  walk(__dirname);
+  return refs;
+}
+
+const imageRefs = discoverImageRefs();
+
+if (imageRefs.size > 0) {
+  // Ensure _images parent folder content
+  const folderPath = join(CONTENT_DIR, IMAGES_FOLDER_UID);
+  const folderJsonPath = join(folderPath, 'data.json');
+  const desiredFolderJson = JSON.stringify(buildImageFolderContent(), null, 2) + '\n';
+  const originalFolderJson = existsSync(folderJsonPath)
+    ? readFileSync(folderJsonPath, 'utf-8')
+    : '';
+  if (desiredFolderJson !== originalFolderJson) {
+    outOfSync = true;
+    if (checkMode) {
+      console.error(`OUT OF SYNC: ${IMAGES_FOLDER_UID}/data.json (images folder)`);
+    } else {
+      if (!existsSync(folderPath)) mkdirSync(folderPath, { recursive: true });
+      writeFileSync(folderJsonPath, desiredFolderJson, 'utf-8');
+      console.log(`Updated images folder content: ${IMAGES_FOLDER_UID}/data.json`);
+    }
+  }
+
+  // Materialize each image
+  for (const [slug, ref] of [...imageRefs.entries()].sort()) {
+    const content = buildImageContent({ slug, ...ref });
+    const folderPath = join(CONTENT_DIR, content.folderName);
+    const dataPath = join(folderPath, 'data.json');
+    const blobDir = join(folderPath, 'image');
+    const blobPath = join(blobDir, ref.filename);
+
+    const desiredJson = JSON.stringify(content.data, null, 2) + '\n';
+    const originalJson = existsSync(dataPath) ? readFileSync(dataPath, 'utf-8') : '';
+    const blobMissing = !existsSync(blobPath);
+    const blobSizeMismatch = !blobMissing
+      && statSync(blobPath).size !== statSync(ref.sourcePath).size;
+    const blobNeedsCopy = blobMissing || blobSizeMismatch;
+
+    if (desiredJson !== originalJson || blobNeedsCopy) {
+      outOfSync = true;
+      const reasons = [];
+      if (desiredJson !== originalJson) reasons.push('metadata');
+      if (blobNeedsCopy) reasons.push('blob');
+      if (checkMode) {
+        console.error(`OUT OF SYNC: image '${slug}' (${reasons.join(', ')})`);
+      } else {
+        if (!existsSync(folderPath)) mkdirSync(folderPath, { recursive: true });
+        if (!existsSync(blobDir)) mkdirSync(blobDir, { recursive: true });
+        if (desiredJson !== originalJson) writeFileSync(dataPath, desiredJson, 'utf-8');
+        if (blobNeedsCopy) copyFileSync(ref.sourcePath, blobPath);
+        console.log(`Synced image: ${slug} (${reasons.join(', ')})`);
+      }
+    }
   }
 }
 
 if (checkMode && outOfSync) {
-  console.error('\nFiles are out of sync with example files. Run: node docs/blocks/sync-examples.mjs');
+  console.error('\nFiles are out of sync with example files. Run: node docs/sync.mjs');
   process.exit(1);
 }
 
