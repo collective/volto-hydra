@@ -38,6 +38,8 @@ Typical use: a "callout" block in the middle of a layout — every page has one,
 
 Regular blocks where you can do anything — add, edit, move, delete. The template marks regions as slots (with a `slotId`) and your existing content is placed into the matching slots when the template merges.
 
+![A page with a snippet template applied. The "Snippet Header" block is selected, rendered in muted style as a locked block. The sidebar shows the template's settings (Template Name, Save Location).](_images/template-locked.png)
+
 ## Inserting between fixed blocks
 
 You **can't** insert a new block between two adjacent fixed/readonly template blocks — the "+" button is hidden in those positions and DnD is rejected. This is intentional: the template author put those fixed blocks side-by-side on purpose, and the editor inserting between them would break the layout's intent.

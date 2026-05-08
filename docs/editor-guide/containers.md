@@ -34,6 +34,8 @@ When a container is selected (block mode), thin **edge handles** appear on the c
 
 Multiple blocks can cross in a single drag — keep dragging and a "ghost boundary" line shows where the new edge will land. Release to commit. Until release, the page DOM is unchanged; you can drag back across blocks to restore.
 
+![Container selected with edge handles visible. The bottom handle is being dragged toward the next sibling.](_images/edge-drag-ghost.png)
+
 This makes a container feel like a resizable divider: drag its edge to "grow" it across adjacent content rather than dragging blocks one at a time.
 
 ```{note}

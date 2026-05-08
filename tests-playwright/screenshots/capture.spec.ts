@@ -155,6 +155,66 @@ test.describe('Editor Guide screenshots', () => {
     await snap(page, 'link-picker');
   });
 
+  test('edge-drag-ghost — mid-drag, ghost boundary visible', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit(SHOWCASE_PATH);
+
+    const iframe = helper.getIframe();
+
+    // Select the columns container in block mode so its edge handles render.
+    await iframe.locator('[data-block-uid="columns-1"]').first().evaluate((el) => {
+      (window as any).bridge?.selectBlock(el);
+    });
+    await helper.waitForIframeBlockHandle('columns-1');
+
+    const bottomHandle = iframe.locator('.volto-hydra-edge-handle[data-edge="bottom"]');
+    await expect(bottomHandle).toBeVisible({ timeout: 5000 });
+
+    // after-columns is the next sibling at page level; drag the bottom edge
+    // halfway toward its midpoint so the ghost boundary line renders without
+    // crossing it (release won't actually absorb the paragraph).
+    const handleBox = await bottomHandle.boundingBox();
+    const afterRect = await iframe.locator('[data-block-uid="after-columns"]').boundingBox();
+    expect(handleBox).not.toBeNull();
+    expect(afterRect).not.toBeNull();
+    const startX = handleBox!.x + handleBox!.width / 2;
+    const startY = handleBox!.y + handleBox!.height / 2;
+    // Halfway between handle and after-columns top — well short of after-columns midpoint.
+    const dragY = startY + (afterRect!.y - startY) * 0.4;
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    for (let step = 1; step <= 6; step++) {
+      await page.mouse.move(startX, startY + (dragY - startY) * (step / 6));
+      await page.waitForTimeout(20);
+    }
+    // Hold mid-drag and snap before releasing.
+    await page.waitForTimeout(100);
+    await snap(page, 'edge-drag-ghost');
+    await page.mouse.up();
+  });
+
+  test('template-locked — fixed/readOnly template block shows lock', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    // inserted-template-test-page has a snippet template applied with one
+    // fixed+readOnly heading block (the lock case) plus an editable body slot.
+    await helper.navigateToEdit('/inserted-template-test-page');
+
+    // Select the fixed/readOnly template block. Use bridge.selectBlock
+    // because clicking a readOnly block doesn't enter text mode.
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="snippet-inst-header"]').first().evaluate((el) => {
+      (window as any).bridge?.selectBlock(el);
+    });
+    await helper.waitForIframeBlockHandle('snippet-inst-header');
+    // Allow the readonly chrome / sidebar lock indicator to render.
+    await page.waitForTimeout(300);
+
+    await snap(page, 'template-locked');
+  });
+
   test('container-convert — select a container, open Convert chooser', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
