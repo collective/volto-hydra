@@ -42,6 +42,8 @@ A toolbar button opens the **Frontend switcher** panel with two sections:
 
 A **Settings** button at the bottom of the panel manages the saved URLs (add, remove, rename). The currently active frontend is highlighted in the list.
 
+![Frontend switcher panel — Viewport section with Mobile/Tablet/Desktop, Frontend section listing four saved frontends, Settings button at the bottom.](_images/frontend-switcher.png)
+
 ## Two ways to edit any field
 
 Most fields can be edited from either side:

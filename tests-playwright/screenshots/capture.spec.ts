@@ -215,6 +215,71 @@ test.describe('Editor Guide screenshots', () => {
     await snap(page, 'template-locked');
   });
 
+  test('frontend-switcher — toolbar panel with viewport + frontends', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit(SHOWCASE_PATH);
+
+    await page.locator('#toolbar-frontend-switcher').click();
+    const panel = page.locator('.frontend-switcher-panel');
+    await expect(panel).toBeVisible({ timeout: 3000 });
+    await expect(panel.locator('.frontend-switcher-url-item').first()).toBeVisible({ timeout: 3000 });
+    // Wait for the toolbar-content "show" transition to settle so the panel
+    // sits cleanly on the toolbar, not faintly overlaid on the iframe.
+    await page.waitForTimeout(500);
+
+    // Force a solid background on the panel for the screenshot — Volto's
+    // toolbar panels rely on the surrounding pusher-puller layout to look
+    // opaque, but in headless capture they render translucent over the
+    // iframe.
+    await panel.evaluate((el) => {
+      (el as HTMLElement).style.backgroundColor = 'white';
+      (el as HTMLElement).style.boxShadow = '0 2px 12px rgba(0,0,0,0.15)';
+    });
+
+    const file = path.join(OUT_DIR, 'frontend-switcher.png');
+    await panel.screenshot({ path: file });
+    console.log(`[screenshot] frontend-switcher -> ${path.relative(process.cwd(), file)}`);
+  });
+
+  test('parent-chain — sidebar shows ancestor breadcrumb when nested block selected', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    // container-test-page has slate text inside column inside columns —
+    // three levels of nesting so the parent chain has multiple `‹` rows.
+    // Showcase's columns block renders its children as separate top-level
+    // data-block-uid elements via the column renderer, but only when the
+    // test frontend's column block actually renders them; container-test-page
+    // is the canonical fixture used in container tests for this shape.
+    await helper.navigateToEdit('/container-test-page');
+
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForBlockSelectedInAdmin('text-1a');
+
+    await snap(page, 'parent-chain');
+  });
+
+  test('children-list — sidebar shows container children with drag handles', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    // container-test-page has a columns container fully wired up (column
+    // sub-blocks with their own slate children). Selecting columns-1 surfaces
+    // the children list in the sidebar with drag handles + drill-in arrows.
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="columns-1"]').first().evaluate((el) => {
+      (window as any).bridge?.selectBlock(el);
+    });
+    // Wait for admin sidebar to actually re-render with columns-1's settings
+    // (waitForIframeBlockHandle only confirms the iframe-side handle, not the
+    // sidebar update — the children list lives in admin-side state).
+    await helper.waitForBlockSelectedInAdmin('columns-1');
+    await page.waitForTimeout(300);
+
+    await snap(page, 'children-list');
+  });
+
   test('container-convert — select a container, open Convert chooser', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();

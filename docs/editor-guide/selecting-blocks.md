@@ -71,6 +71,8 @@ When a block is selected, the sidebar shows the **chain of parent containers** f
 
 Click any `‹` arrow to **navigate up** to that level. This does the same thing as pressing `Escape` repeatedly, but visibly — you can see what each parent is named, jump several levels in one click, and edit the parent's own settings (alignment, padding, …) inline without leaving the current selection.
 
+![Sidebar showing parent chain for a slate inside a column inside columns. Three sections each with a `‹` arrow: Columns ("My Columns Section"), Column ("Left Column"), Text (current, body field shown).](_images/parent-chain.png)
+
 This works for any depth — nested columns, slider with templated children, accordion inside a section inside the page. The chain reflects the real DOM hierarchy.
 
 ### The children list (going down)
@@ -89,6 +91,8 @@ Slides                    [+]
 - **`[+]` add button** — opens the BlockChooser to add a new child to that field.
 
 If the container has multiple blocks fields (e.g. a header field and a body field), each appears as a separate section with its own children list and add button.
+
+![Sidebar with a columns container selected, showing two children-list sections — Top Images (with two Image rows) and Columns (with two Column rows). Each row has a `⋮⋮` drag handle and a `>` drill-in arrow; each section has a `+` add button.](_images/children-list.png)
 
 ### Picking from the outline (for paged containers)
 
