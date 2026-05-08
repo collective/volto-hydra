@@ -46,6 +46,8 @@ Press `Backspace` at the very start of a heading, list item, or blockquote and i
 
 Type `/` at the start of an empty text block to open a menu of block types you can convert to (heading, image, list, your custom blocks, …). Keep typing to filter (`/he` filters to heading); `Enter` picks the highlighted result; `Escape` dismisses without changing anything.
 
+![Empty paragraph showing the slash menu listing block types — Accordion, Columns, Description, etc.](_images/slash-menu.png)
+
 The slash menu changes the block's `@type`. If you wanted to add a *new* block, see [Adding and moving blocks](adding-and-moving-blocks.md) instead.
 
 ## Splitting and joining paragraphs

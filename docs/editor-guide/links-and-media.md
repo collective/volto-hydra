@@ -9,6 +9,8 @@ When the frontend has wired up a link field as inline-editable, clicking the lin
 - **Open the URL in a new tab** (toggle the "Open in new tab" option).
 - **Clear the link.**
 
+![Link picker on a slate link — URL field with /another-page, browse / clear / open-new-tab / submit icons.](_images/link-picker.png)
+
 The Quanta toolbar's link icon does the same thing and is available on slate text fields too — select some text, click the link icon, and the link picker opens for that text range.
 
 ```{tip}
@@ -26,6 +28,8 @@ You'll see an empty placeholder with a prompt to **upload, browse, or drag in** 
 - Click the placeholder → the media picker opens. Pick from existing CMS images or upload a new one.
 - Drag an image file from your desktop and drop it directly onto the placeholder.
 - Drag an image from another tab / source if your browser supports it.
+
+![Empty image block selected — placeholder with image icon, "Browse the site, drop an image..." input, sidebar showing "NO IMAGE SELECTED".](_images/media-empty-placeholder.png)
 
 ### Replacing an existing media element
 
