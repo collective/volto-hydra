@@ -81,7 +81,7 @@
     "7950cae06c994276930f6d13151308c5/data.json",
     "concepts/data.json",
     "concepts/architecture/data.json",
-    "concepts/integration-levels/data.json",
+    "concepts/live-preview/data.json",
     "concepts/visual-editing/data.json",
     "concepts/custom-blocks/data.json",
     "concepts/container-blocks/data.json",
@@ -491,7 +491,7 @@
         ]
       }
     },
-    "concepts-integration-levels-001": {
+    "concepts-live-preview-001": {
       "local_roles": {
         "admin": [
           "Owner"

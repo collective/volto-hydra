@@ -482,7 +482,7 @@ if (existsSync(examplesPath)) {
 const CONCEPTS_MD_TO_FOLDER = {
   'architecture.md': 'architecture',
   'incremental-adoption.md': 'incremental-adoption',
-  'live-preview.md': 'integration-levels',
+  'live-preview.md': 'live-preview',
   'container-blocks.md': 'container-blocks',
   'custom-blocks.md': 'custom-blocks',
   'visual-editing.md': 'visual-editing',

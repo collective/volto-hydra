@@ -1,7 +1,7 @@
 {
-  "@id": "/concepts/integration-levels",
+  "@id": "/concepts/live-preview",
   "@type": "Document",
-  "UID": "concepts-integration-levels-001",
+  "UID": "concepts-live-preview-001",
   "allow_discussion": false,
   "blocks": {
     "title-1": {
@@ -263,7 +263,7 @@
   "exportimport.constrains": {},
   "exportimport.conversation": [],
   "exportimport.versions": {},
-  "id": "integration-levels",
+  "id": "live-preview",
   "is_folderish": false,
   "language": "##DEFAULT##",
   "layout": "document_view",
