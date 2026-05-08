@@ -281,6 +281,20 @@ export default defineConfig({
         /nuxt-.*\.spec\.ts/,
       ],
     },
+    // Documentation screenshots — manual / on-demand only.
+    // Run with: pnpm exec playwright test --project=screenshots
+    // Captures images of the editor UI for the editor guide. Larger viewport
+    // (1440x900) than the default 1280x720 so screenshots have a bit more
+    // breathing room without scrollbars on common content.
+    {
+      name: 'screenshots',
+      testDir: 'tests-playwright/screenshots',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+      },
+    },
   ],
 
   /* Start mock API server and Volto dev server before running tests */

@@ -1,0 +1,136 @@
+{
+  "@id": "http://localhost:8888/showcase-page",
+  "@type": "Document",
+  "UID": "showcase-page-uid",
+  "id": "showcase-page",
+  "title": "Editor showcase",
+  "description": "Test fixture with a curated mix of block types for screenshot capture. Not deployed to the live site.",
+  "review_state": "published",
+  "parent": {
+    "@id": "http://localhost:8888",
+    "@type": "Plone Site",
+    "title": "Site"
+  },
+  "blocks": {
+    "title-block": {
+      "@type": "title"
+    },
+    "intro": {
+      "@type": "slate",
+      "plaintext": "This is the showcase page. Try clicking this link or use the data-edit-text attribute on your frontend.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            { "text": "This is the " },
+            { "type": "strong", "children": [{ "text": "showcase page" }] },
+            { "text": ". Try " },
+            {
+              "type": "link",
+              "data": { "url": "/another-page" },
+              "children": [{ "text": "clicking this link" }]
+            },
+            { "text": " or use the " },
+            { "text": "data-edit-text", "code": true },
+            { "text": " attribute on your frontend." }
+          ]
+        }
+      ]
+    },
+    "image-empty": {
+      "@type": "image",
+      "url": "",
+      "alt": ""
+    },
+    "columns-1": {
+      "@type": "columns",
+      "title": "Two columns",
+      "blocks": {
+        "col-1": {
+          "@type": "column",
+          "title": "Left",
+          "blocks": {
+            "left-text": {
+              "@type": "slate",
+              "plaintext": "Content in the left column.",
+              "value": [
+                {
+                  "type": "p",
+                  "children": [{ "text": "Content in the left column." }]
+                }
+              ]
+            }
+          },
+          "blocks_layout": { "items": ["left-text"] }
+        },
+        "col-2": {
+          "@type": "column",
+          "title": "Right",
+          "blocks": {
+            "right-text": {
+              "@type": "slate",
+              "plaintext": "Content in the right column.",
+              "value": [
+                {
+                  "type": "p",
+                  "children": [{ "text": "Content in the right column." }]
+                }
+              ]
+            }
+          },
+          "blocks_layout": { "items": ["right-text"] }
+        }
+      },
+      "blocks_layout": { "items": ["col-1", "col-2"] }
+    },
+    "after-columns": {
+      "@type": "slate",
+      "plaintext": "A paragraph after the columns — adjacent block, useful for edge-drag and multi-select demos.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A paragraph after the columns — adjacent block, useful for edge-drag and multi-select demos."
+            }
+          ]
+        }
+      ]
+    },
+    "another-paragraph": {
+      "@type": "slate",
+      "plaintext": "A second adjacent paragraph for range-selection screenshots.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A second adjacent paragraph for range-selection screenshots."
+            }
+          ]
+        }
+      ]
+    },
+    "empty-slate": {
+      "@type": "slate",
+      "plaintext": "",
+      "value": [
+        {
+          "type": "p",
+          "children": [{ "text": "" }]
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-block",
+      "intro",
+      "image-empty",
+      "columns-1",
+      "after-columns",
+      "another-paragraph",
+      "empty-slate"
+    ]
+  }
+}
