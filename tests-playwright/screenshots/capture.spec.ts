@@ -13,10 +13,12 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
-const OUT_DIR = path.join(__dirname, '..', '..', 'docs', 'editor-guide', '_images');
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const OUT_DIR = path.join(SCRIPT_DIR, '..', '..', 'docs', 'editor-guide', '_images');
 const SHOWCASE_PATH = '/showcase-page';
 
 // Make sure the output directory exists once at import time.
