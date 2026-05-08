@@ -1,11 +1,14 @@
 {
   "ordering": {
     "concepts-architecture-001": 0,
-    "concepts-integration-levels-001": 1,
-    "concepts-container-blocks-001": 2,
-    "concepts-listings-001": 3,
-    "concepts-templates-001": 4,
-    "concepts-deployment-001": 5,
-    "concepts-advanced-001": 6
+    "concepts-incremental-adoption-001": 1,
+    "concepts-integration-levels-001": 2,
+    "concepts-container-blocks-001": 3,
+    "concepts-custom-blocks-001": 4,
+    "concepts-visual-editing-001": 5,
+    "concepts-listings-001": 6,
+    "concepts-templates-001": 7,
+    "concepts-deployment-001": 8,
+    "concepts-advanced-001": 9
   }
 }

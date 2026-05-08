@@ -17,7 +17,7 @@
  *   node sync-examples.mjs --check  # exit non-zero if anything is out of sync
  */
 
-import { readFileSync, writeFileSync, readdirSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -478,17 +478,106 @@ if (existsSync(examplesPath)) {
 // --- Phase 4: Sync concepts markdown into Plone content JSON ---
 
 // Map concepts markdown filename -> concepts content JSON folder name
+// Order matters — drives __metadata__.json's ordering map below.
 const CONCEPTS_MD_TO_FOLDER = {
   'architecture.md': 'architecture',
+  'incremental-adoption.md': 'incremental-adoption',
   'live-preview.md': 'integration-levels',
-  'custom-blocks.md': 'custom-blocks',
   'container-blocks.md': 'container-blocks',
+  'custom-blocks.md': 'custom-blocks',
   'visual-editing.md': 'visual-editing',
   'listings.md': 'listings',
   'templates.md': 'templates',
   'deployment.md': 'deployment',
   'advanced.md': 'advanced',
 };
+
+/**
+ * Build a Plone-content data.json shell for a concept page that doesn't yet
+ * have one. The blocks/blocks_layout fields are filled in by the regular
+ * sync logic; this just provides the surrounding metadata Plone export needs.
+ */
+function buildConceptShell(folder, mdContent) {
+  // First H1 → title; first paragraph after it → description.
+  const lines = mdContent.split('\n');
+  let title = folder;
+  let description = '';
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.startsWith('# ')) {
+      title = line.slice(2).trim();
+      // Find first non-empty, non-heading paragraph after H1.
+      for (let j = i + 1; j < lines.length; j++) {
+        const next = lines[j].trim();
+        if (!next) continue;
+        if (next.startsWith('#') || next.startsWith('-') || next.startsWith('*') ||
+            next.startsWith('|') || next.startsWith('```') || next.startsWith('<!--')) break;
+        // Strip inline markdown to get plain prose
+        description = next.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+                          .replace(/\*\*([^*]+)\*\*/g, '$1')
+                          .replace(/\*([^*\n]+)\*/g, '$1')
+                          .replace(/`([^`]+)`/g, '$1');
+        break;
+      }
+      break;
+    }
+  }
+  const uid = `concepts-${folder}-001`;
+  const date = '2025-01-01T00:00:00';
+  return {
+    '@id': `/concepts/${folder}`,
+    '@type': 'Document',
+    UID: uid,
+    allow_discussion: false,
+    contributors: [],
+    created: `${date}+00:00`,
+    creators: ['admin'],
+    description,
+    effective: date,
+    exclude_from_nav: false,
+    expires: null,
+    'exportimport.constrains': {},
+    'exportimport.conversation': [],
+    'exportimport.versions': {},
+    id: folder,
+    is_folderish: false,
+    language: '##DEFAULT##',
+    layout: 'document_view',
+    lock: { locked: false, stealable: true },
+    modified: `${date}+00:00`,
+    parent: {
+      '@id': '/concepts',
+      '@type': 'Document',
+      UID: 'concepts-folder-001',
+      description: "Key concepts behind Hydra's visual headless CMS architecture",
+      title: 'Concepts',
+      type_title: 'Page',
+    },
+    preview_caption: null,
+    preview_image: null,
+    review_state: 'published',
+    rights: '',
+    subjects: [],
+    title,
+    type_title: 'Page',
+    version: 'current',
+    workflow_history: {
+      simple_publication_workflow: [
+        {
+          action: 'publish',
+          actor: 'admin',
+          comments: '',
+          review_state: 'published',
+          time: `${date}+00:00`,
+        },
+      ],
+    },
+    working_copy: null,
+    working_copy_of: null,
+    blocks: {},
+    blocks_layout: { items: [] },
+  };
+}
 
 const CONCEPTS_DIR = join(__dirname, '..', 'concepts');
 const CONCEPTS_CONTENT_DIR = join(CONTENT_DIR, 'concepts');
@@ -761,31 +850,41 @@ const conceptsMdFiles = Object.keys(CONCEPTS_MD_TO_FOLDER);
 
 for (const mdFile of conceptsMdFiles) {
   const folder = CONCEPTS_MD_TO_FOLDER[mdFile];
-  const jsonPath = join(CONCEPTS_CONTENT_DIR, folder, 'data.json');
-  if (!existsSync(jsonPath)) {
-    console.error(`WARNING: concepts content JSON not found for ${mdFile}: ${jsonPath}`);
-    continue;
-  }
+  const folderPath = join(CONCEPTS_CONTENT_DIR, folder);
+  const jsonPath = join(folderPath, 'data.json');
 
   const mdPath = join(CONCEPTS_DIR, mdFile);
   if (!existsSync(mdPath)) {
     console.error(`WARNING: concepts markdown not found: ${mdPath}`);
     continue;
   }
-
   const mdContent = readFileSync(mdPath, 'utf-8');
   const { blocks: newBlocks, items: newItems } = parseConceptsMd(mdContent);
 
-  const originalJson = readFileSync(jsonPath, 'utf-8');
-  const data = JSON.parse(originalJson);
+  // Create data.json shell when it doesn't exist yet (new concept page).
+  let data;
+  let originalJson = '';
+  if (!existsSync(jsonPath)) {
+    if (checkMode) {
+      outOfSync = true;
+      console.error(`OUT OF SYNC: concepts content JSON missing for ${mdFile}`);
+      continue;
+    }
+    if (!existsSync(folderPath)) mkdirSync(folderPath, { recursive: true });
+    data = buildConceptShell(folder, mdContent);
+    console.log(`Created concepts content JSON shell: concepts/${folder}/data.json`);
+  } else {
+    originalJson = readFileSync(jsonPath, 'utf-8');
+    data = JSON.parse(originalJson);
+  }
 
   // Preserve the title block and any non-generated metadata blocks
-  const titleBlock = Object.entries(data.blocks).find(([, b]) => b['@type'] === 'title');
+  const titleBlock = Object.entries(data.blocks || {}).find(([, b]) => b['@type'] === 'title');
   const titleId = titleBlock ? titleBlock[0] : 'title-1';
 
   // Preserve existing tab @id values to keep JSON stable across runs
   for (const [id, block] of Object.entries(newBlocks)) {
-    if (block['@type'] === 'codeExample' && data.blocks[id]?.tabs) {
+    if (block['@type'] === 'codeExample' && data.blocks?.[id]?.tabs) {
       block.tabs.forEach((tab, idx) => {
         if (data.blocks[id].tabs[idx]?.['@id']) {
           tab['@id'] = data.blocks[id].tabs[idx]['@id'];
@@ -812,6 +911,32 @@ for (const mdFile of conceptsMdFiles) {
       writeFileSync(jsonPath, updatedJson, 'utf-8');
       console.log(`Updated concepts content JSON: ${mdFile} -> concepts/${folder}/data.json`);
     }
+  }
+}
+
+// --- Phase 4b: Update concepts/__metadata__.json ordering ---
+// Order is driven by CONCEPTS_MD_TO_FOLDER's insertion order, so the .md
+// authoring decides how the live site's nav lists the pages.
+
+const metadataPath = join(CONCEPTS_CONTENT_DIR, '__metadata__.json');
+const desiredOrdering = {};
+Object.values(CONCEPTS_MD_TO_FOLDER).forEach((folder, idx) => {
+  desiredOrdering[`concepts-${folder}-001`] = idx;
+});
+
+const desiredMetadata = { ordering: desiredOrdering };
+let originalMetadata = '';
+if (existsSync(metadataPath)) {
+  originalMetadata = readFileSync(metadataPath, 'utf-8');
+}
+const updatedMetadata = JSON.stringify(desiredMetadata, null, 2) + '\n';
+if (updatedMetadata !== originalMetadata) {
+  outOfSync = true;
+  if (checkMode) {
+    console.error(`OUT OF SYNC: concepts/__metadata__.json (ordering)`);
+  } else {
+    writeFileSync(metadataPath, updatedMetadata, 'utf-8');
+    console.log(`Updated concepts/__metadata__.json (ordering)`);
   }
 }
 

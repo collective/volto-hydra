@@ -1,0 +1,1165 @@
+{
+  "@id": "/concepts/incremental-adoption",
+  "@type": "Document",
+  "UID": "concepts-incremental-adoption-001",
+  "allow_discussion": false,
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "Hydra is designed so each layer of integration is independent and additive. You can stop at any row in the table below and have a working setup; rows further down enhance the editing experience without breaking the rows above. There's no all-or-nothing commitment.",
+  "effective": "2025-01-01T00:00:00",
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "incremental-adoption",
+  "is_folderish": false,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/concepts",
+    "@type": "Document",
+    "UID": "concepts-folder-001",
+    "description": "Key concepts behind Hydra's visual headless CMS architecture",
+    "title": "Concepts",
+    "type_title": "Page"
+  },
+  "preview_caption": null,
+  "preview_image": null,
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Incremental adoption",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2025-01-01T00:00:00+00:00"
+      }
+    ]
+  },
+  "working_copy": null,
+  "working_copy_of": null,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "p-1": {
+      "@type": "slate",
+      "plaintext": "Hydra is designed so each layer of integration is **independent and additive**. You can stop at any row in the table below and have a working setup; rows further down enhance the editing experience without breaking the rows above. There's no all-or-nothing commitment.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Hydra is designed so each layer of integration is "
+            },
+            {
+              "text": "independent and additive",
+              "strong": true
+            },
+            {
+              "text": ". You can stop at any row in the table below and have a working setup; rows further down enhance the editing experience without breaking the rows above. There's no all-or-nothing commitment."
+            }
+          ]
+        }
+      ]
+    },
+    "p-2": {
+      "@type": "slate",
+      "plaintext": "This page is a map, not a how-to — each row links to the concept page where you find the actual setup details.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This page is a map, not a how-to — each row links to the concept page where you find the actual setup details."
+            }
+          ]
+        }
+      ]
+    },
+    "tbl-3": {
+      "@type": "slateTable",
+      "table": {
+        "fixed": true,
+        "compact": false,
+        "basic": false,
+        "celled": true,
+        "inverted": false,
+        "striped": false,
+        "rows": [
+          {
+            "key": "tbl-3-r0",
+            "cells": [
+              {
+                "key": "tbl-3-r0c0",
+                "type": "header",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Step"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r0c1",
+                "type": "header",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "What you wire up"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r0c2",
+                "type": "header",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "What editors get"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-3-r1",
+            "cells": [
+              {
+                "key": "tbl-3-r1c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Plain headless",
+                        "strong": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r1c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Frontend fetches the Plone REST API. No "
+                      },
+                      {
+                        "text": "hydra.js",
+                        "code": true
+                      },
+                      {
+                        "text": " involved."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r1c2",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Sidebar editing in Volto, frontend reloads on save. Equivalent to two-window editing — see "
+                      },
+                      {
+                        "type": "link",
+                        "data": {
+                          "url": "deployment.md#without-hydra-two-window-editing"
+                        },
+                        "children": [
+                          {
+                            "text": "Deployment › Without Hydra"
+                          }
+                        ]
+                      },
+                      {
+                        "text": "."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-3-r2",
+            "cells": [
+              {
+                "key": "tbl-3-r2c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Bridge installed",
+                        "strong": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r2c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Load "
+                      },
+                      {
+                        "text": "hydra.js",
+                        "code": true
+                      },
+                      {
+                        "text": ". Call "
+                      },
+                      {
+                        "text": "initBridge({ page: { schema: { properties: { ... } } } })",
+                        "code": true
+                      },
+                      {
+                        "text": ". See "
+                      },
+                      {
+                        "type": "link",
+                        "data": {
+                          "url": "live-preview.md#setting-up-the-bridge"
+                        },
+                        "children": [
+                          {
+                            "text": "Live Preview › Setting Up the Bridge"
+                          }
+                        ]
+                      },
+                      {
+                        "text": "."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r2c2",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Frontend follows admin navigation (and vice versa). Frontend renders private content via shared auth ("
+                      },
+                      {
+                        "type": "link",
+                        "data": {
+                          "url": "advanced.md#authentication"
+                        },
+                        "children": [
+                          {
+                            "text": "Authentication"
+                          }
+                        ]
+                      },
+                      {
+                        "text": "). Page metadata (title, description, etc.) is editable from the admin. Hashbang and normal paths both work."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-3-r3",
+            "cells": [
+              {
+                "key": "tbl-3-r3c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Custom block types",
+                        "strong": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r3c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Add a "
+                      },
+                      {
+                        "text": "blocks: { ... }",
+                        "code": true
+                      },
+                      {
+                        "text": " config to "
+                      },
+                      {
+                        "text": "initBridge",
+                        "code": true
+                      },
+                      {
+                        "text": ". See "
+                      },
+                      {
+                        "type": "link",
+                        "data": {
+                          "url": "custom-blocks.md#initbridge-reference"
+                        },
+                        "children": [
+                          {
+                            "text": "Custom Blocks › `initBridge()` Reference"
+                          }
+                        ]
+                      },
+                      {
+                        "text": " and "
+                      },
+                      {
+                        "type": "link",
+                        "data": {
+                          "url": "custom-blocks.md#defining-a-custom-block"
+                        },
+                        "children": [
+                          {
+                            "text": "Defining a custom block"
+                          }
+                        ]
+                      },
+                      {
+                        "text": "."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r3c2",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Editors can add, configure, and convert your custom block types — the schema renders in the sidebar without you touching Volto. Cross-block conversion ("
+                      },
+                      {
+                        "type": "link",
+                        "data": {
+                          "url": "custom-blocks.md#block-conversion--fieldmappings"
+                        },
+                        "children": [
+                          {
+                            "text": "fieldMappings"
+                          }
+                        ]
+                      },
+                      {
+                        "text": ") becomes possible."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-3-r4",
+            "cells": [
+              {
+                "key": "tbl-3-r4c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Block selection in preview",
+                        "strong": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r4c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Add "
+                      },
+                      {
+                        "text": "data-block-uid",
+                        "code": true
+                      },
+                      {
+                        "text": " to your rendered blocks. See "
+                      },
+                      {
+                        "type": "link",
+                        "data": {
+                          "url": "visual-editing.md#html-annotations-for-visual-editing"
+                        },
+                        "children": [
+                          {
+                            "text": "Visual Editing › HTML Annotations"
+                          }
+                        ]
+                      },
+                      {
+                        "text": "."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r4c2",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Click-to-select on the preview. The Quanta Toolbar appears above selected blocks. Sidebar selection scrolls the matching block into view. Multi-block selection becomes possible (Shift+Click, Ctrl/Cmd+Click) — see "
+                      },
+                      {
+                        "type": "link",
+                        "data": {
+                          "url": "../editor-guide/selecting-blocks.md"
+                        },
+                        "children": [
+                          {
+                            "text": "Editor Guide › Selecting blocks"
+                          }
+                        ]
+                      },
+                      {
+                        "text": "."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-3-r5",
+            "cells": [
+              {
+                "key": "tbl-3-r5c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Realtime preview",
+                        "strong": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r5c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Register "
+                      },
+                      {
+                        "text": "onEditChange",
+                        "code": true
+                      },
+                      {
+                        "text": " and render from the "
+                      },
+                      {
+                        "text": "formData",
+                        "code": true
+                      },
+                      {
+                        "text": " it gives you instead of from the API. See "
+                      },
+                      {
+                        "type": "link",
+                        "data": {
+                          "url": "live-preview.md#setting-up-the-bridge"
+                        },
+                        "children": [
+                          {
+                            "text": "Live Preview › Setting Up the Bridge"
+                          }
+                        ]
+                      },
+                      {
+                        "text": "."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r5c2",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Preview updates as the editor types. The full editor experience unlocks: drag-and-drop, multi-select operations, the slash menu, container operations (wrap, unwrap, edge-drag, convert) — see the "
+                      },
+                      {
+                        "type": "link",
+                        "data": {
+                          "url": "../editor-guide/index.md"
+                        },
+                        "children": [
+                          {
+                            "text": "Editor Guide"
+                          }
+                        ]
+                      },
+                      {
+                        "text": " for the full list."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-3-r6",
+            "cells": [
+              {
+                "key": "tbl-3-r6c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Direct field editing",
+                        "strong": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r6c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Add "
+                      },
+                      {
+                        "text": "data-edit-text",
+                        "code": true
+                      },
+                      {
+                        "text": ", "
+                      },
+                      {
+                        "text": "data-edit-link",
+                        "code": true
+                      },
+                      {
+                        "text": ", "
+                      },
+                      {
+                        "text": "data-edit-media",
+                        "code": true
+                      },
+                      {
+                        "text": " to specific elements. See "
+                      },
+                      {
+                        "type": "link",
+                        "data": {
+                          "url": "visual-editing.md#html-annotations-for-visual-editing"
+                        },
+                        "children": [
+                          {
+                            "text": "Visual Editing › HTML Annotations"
+                          }
+                        ]
+                      },
+                      {
+                        "text": "."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r6c2",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Click rendered text and start typing. Click an image to pick or upload a new one. Click a link to open the link picker. Markdown shortcuts ("
+                      },
+                      {
+                        "text": "## ",
+                        "code": true
+                      },
+                      {
+                        "text": ", "
+                      },
+                      {
+                        "text": "**bold**",
+                        "code": true
+                      },
+                      {
+                        "text": ", etc.) — see "
+                      },
+                      {
+                        "type": "link",
+                        "data": {
+                          "url": "../editor-guide/editing-text.md"
+                        },
+                        "children": [
+                          {
+                            "text": "Editor Guide › Editing text"
+                          }
+                        ]
+                      },
+                      {
+                        "text": "."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-3-r7",
+            "cells": [
+              {
+                "key": "tbl-3-r7c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Templates and layouts",
+                        "strong": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r7c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Configure "
+                      },
+                      {
+                        "text": "allowedTemplates",
+                        "code": true
+                      },
+                      {
+                        "text": " / "
+                      },
+                      {
+                        "text": "allowedLayouts",
+                        "code": true
+                      },
+                      {
+                        "text": " on a page region. Use "
+                      },
+                      {
+                        "text": "expandTemplates",
+                        "code": true
+                      },
+                      {
+                        "text": " / "
+                      },
+                      {
+                        "text": "expandTemplatesSync",
+                        "code": true
+                      },
+                      {
+                        "text": " at render time. See "
+                      },
+                      {
+                        "type": "link",
+                        "data": {
+                          "url": "templates.md"
+                        },
+                        "children": [
+                          {
+                            "text": "Templates"
+                          }
+                        ]
+                      },
+                      {
+                        "text": "."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r7c2",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Editors can pick layouts from a dropdown, insert template snippets via the BlockChooser, and recognise locked vs editable vs slot blocks. See "
+                      },
+                      {
+                        "type": "link",
+                        "data": {
+                          "url": "../editor-guide/templates-and-layouts.md"
+                        },
+                        "children": [
+                          {
+                            "text": "Editor Guide › Templates and layouts"
+                          }
+                        ]
+                      },
+                      {
+                        "text": "."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-3-r8",
+            "cells": [
+              {
+                "key": "tbl-3-r8c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Listings and dynamic content",
+                        "strong": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r8c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Configure listing block types and pass "
+                      },
+                      {
+                        "text": "fetchItems",
+                        "code": true
+                      },
+                      {
+                        "text": " to "
+                      },
+                      {
+                        "text": "expandListingBlocks",
+                        "code": true
+                      },
+                      {
+                        "text": ". See "
+                      },
+                      {
+                        "type": "link",
+                        "data": {
+                          "url": "listings.md"
+                        },
+                        "children": [
+                          {
+                            "text": "Listings"
+                          }
+                        ]
+                      },
+                      {
+                        "text": "."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r8c2",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Editors get a "
+                      },
+                      {
+                        "text": "fieldMapping",
+                        "code": true
+                      },
+                      {
+                        "text": " widget on listing blocks to map query results to item fields. Listings render as repeated blocks in the preview, editable per item type."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-3-r9",
+            "cells": [
+              {
+                "key": "tbl-3-r9c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Custom UI / advanced",
+                        "strong": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r9c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Override Volto components, or use the bridge's "
+                      },
+                      {
+                        "text": "sendBlockUpdate",
+                        "code": true
+                      },
+                      {
+                        "text": " / "
+                      },
+                      {
+                        "text": "sendBlockAction",
+                        "code": true
+                      },
+                      {
+                        "text": " API to drive frontend-side editing for blocks Hydra's defaults don't fit. See "
+                      },
+                      {
+                        "type": "link",
+                        "data": {
+                          "url": "advanced.md#custom-sidebar-and-cms-ui"
+                        },
+                        "children": [
+                          {
+                            "text": "Advanced › Custom Sidebar UI"
+                          }
+                        ]
+                      },
+                      {
+                        "text": "."
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-3-r9c2",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Editors can use bespoke widgets, custom block edit forms, and in-frontend interactions for things like a table block's column-count picker on first insert."
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "h-4": {
+      "@type": "slate",
+      "plaintext": "Why incremental?",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Why incremental?"
+            }
+          ]
+        }
+      ]
+    },
+    "p-5": {
+      "@type": "slate",
+      "plaintext": "The trade-off at each row is **complexity vs editor experience**. A frontend that only fetches the REST API has zero Hydra integration cost — no JS to ship, no attributes to add — and editors can still publish content via the standard Volto sidebar. Each row adds a specific concrete editor capability in exchange for a specific concrete piece of frontend code.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The trade-off at each row is "
+            },
+            {
+              "text": "complexity vs editor experience",
+              "strong": true
+            },
+            {
+              "text": ". A frontend that only fetches the REST API has zero Hydra integration cost — no JS to ship, no attributes to add — and editors can still publish content via the standard Volto sidebar. Each row adds a specific concrete editor capability in exchange for a specific concrete piece of frontend code."
+            }
+          ]
+        }
+      ]
+    },
+    "p-6": {
+      "@type": "slate",
+      "plaintext": "This means:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This means:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-7": {
+      "@type": "slate",
+      "plaintext": "You can ship before integration is \"done\" — wire up the bridge and ship realtime preview today, add direct field editing for the page title next week. Different parts of the same site can be at different rows — inline-editable headers and titles on the homepage, sidebar-only editing on a complex catalog page where direct manipulation would be confusing. Adoption can match team capacity — start with whichever rows produce the biggest editor wins for your team, defer the rest.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "You can ship before integration is \"done\"",
+                  "strong": true
+                },
+                {
+                  "text": " — wire up the bridge and ship realtime preview today, add direct field editing for the page title next week."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Different parts of the same site can be at different rows",
+                  "strong": true
+                },
+                {
+                  "text": " — inline-editable headers and titles on the homepage, sidebar-only editing on a complex catalog page where direct manipulation would be confusing."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Adoption can match team capacity",
+                  "strong": true
+                },
+                {
+                  "text": " — start with whichever rows produce the biggest editor wins for your team, defer the rest."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "h-8": {
+      "@type": "slate",
+      "plaintext": "What's still on the roadmap",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "What's still on the roadmap"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-9": {
+      "@type": "slate",
+      "plaintext": "Live updates with SSR via REST API — sidebar changes reflected in an SSR preview without a SPA build (TODO). Visual diff in version history — currently history shows JSON-level diffs only (TODO). Markdown autoformat for h4–h6 and additional inline patterns (TODO #105). sendBlockUpdate / disable Hydra default handling for specific interactions (TODO #4).",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Live updates with SSR via REST API — sidebar changes reflected in an SSR preview without a SPA build (TODO)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Visual diff in version history — currently history shows JSON-level diffs only (TODO)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Markdown autoformat for h4–h6 and additional inline patterns ("
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "https://github.com/collective/volto-hydra/issues/105"
+                  },
+                  "children": [
+                    {
+                      "text": "TODO #105"
+                    }
+                  ]
+                },
+                {
+                  "text": ")."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "sendBlockUpdate",
+                  "code": true
+                },
+                {
+                  "text": " / disable Hydra default handling for specific interactions ("
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "https://github.com/collective/volto-hydra/issues/4"
+                  },
+                  "children": [
+                    {
+                      "text": "TODO #4"
+                    }
+                  ]
+                },
+                {
+                  "text": ")."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "p-1",
+      "p-2",
+      "tbl-3",
+      "h-4",
+      "p-5",
+      "p-6",
+      "ul-7",
+      "h-8",
+      "ul-9"
+    ]
+  }
+}
