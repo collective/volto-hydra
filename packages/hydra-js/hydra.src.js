@@ -11706,12 +11706,14 @@ export class Bridge {
         [data-edit-text][data-placeholder][data-empty]:focus::before {
           display: none;
         }
-        /* Empty fields with placeholder: placeholder text provides the height */
-        [data-edit-text][data-placeholder][data-empty] {
+        /* Empty editable fields — reserve height so the field stays clickable
+           and the placeholder text (rendered via the absolutely-positioned
+           ::before above) doesn't overlap adjacent content. The pseudo-element
+           is out of the normal flow so the parent must explicitly reserve
+           space; without min-height, an empty field with a placeholder
+           collapses to 0px even though the placeholder appears to render. */
+        [data-edit-text][data-empty] {
           position: relative;
-        }
-        /* Empty fields without placeholder: min-height fallback so they stay clickable */
-        [data-edit-text][data-empty]:not([data-placeholder]) {
           min-height: 1.5em;
         }
         /* Linkable field hover styles - indicate clickable link areas */

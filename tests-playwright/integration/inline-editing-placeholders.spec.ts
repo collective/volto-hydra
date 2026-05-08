@@ -66,6 +66,84 @@ test.describe('Inline Editing - Placeholders', () => {
     await expect(headingField).toHaveAttribute('data-empty', '', { timeout: 5000 });
   });
 
+  test('slate block defined empty in fixture renders with non-zero height', async ({ page }) => {
+    // Reproduces the screenshot-capture failure: when a slate block is loaded
+    // with empty value from the fixture (never had content), the placeholder
+    // <div> can collapse to 0px height. The placeholder text shows visually
+    // (rendered via absolutely-positioned ::before pseudo-element) but the
+    // parent element has no measurable height — Playwright sees it as not
+    // visible and clicks land on whatever is rendered behind.
+    //
+    // Compared to the "clearing field text" path above, this exercises the
+    // initial-render path where applyPlaceholders sets data-empty from
+    // page-load form state, not from a user interaction.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/showcase-page');
+
+    const iframe = helper.getIframe();
+    const editField = iframe.locator(
+      '[data-block-uid="empty-slate"][data-edit-text="value"], [data-block-uid="empty-slate"] [data-edit-text="value"]',
+    ).first();
+
+    await expect(editField).toHaveAttribute('data-empty', '', { timeout: 5000 });
+    await expect(editField).toHaveAttribute('data-placeholder', 'Type text…');
+
+    const box = await editField.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.height).toBeGreaterThan(10);
+
+    await expect(editField).toBeVisible();
+  });
+
+  test('empty slate block with placeholder renders with non-zero height (clickable)', async ({ page }) => {
+    // The hydra CSS that displays the placeholder uses `::before { position: absolute }`,
+    // so the pseudo-element doesn't contribute to its parent's height. Without an
+    // explicit min-height on the parent, an empty slate block (a plain <div> wrapper
+    // with no inherent line-height) collapses to 0px tall when its content is empty —
+    // the placeholder text shows visually (the absolute pseudo-element overlaps
+    // whatever is below) but the field itself is unclickable and Playwright sees it
+    // as not visible.
+    //
+    // (A heading or paragraph element with line-height stays measurable even
+    // when empty; the bug only manifests on plain wrappers like the slate block.)
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+    const blockId = 'block-1-uuid'; // Slate block
+
+    await helper.clickBlockInIframe(blockId);
+
+    // data-edit-text may be on the same element as data-block-uid (Nuxt renders
+    // it on the slate-block div directly) or a descendant (mock frontend).
+    const editField = iframe.locator(
+      `[data-block-uid="${blockId}"][data-edit-text="value"], [data-block-uid="${blockId}"] [data-edit-text="value"]`,
+    ).first();
+    await expect(editField).toBeVisible();
+
+    // Clear the slate text and blur so applyPlaceholders sets data-empty.
+    await editField.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('Backspace');
+    await expect(editField).toHaveText('', { timeout: 3000 });
+    await helper.clickBlockInIframe('block-2-uuid');
+    await expect(editField).toHaveAttribute('data-empty', '', { timeout: 5000 });
+    await expect(editField).toHaveAttribute('data-placeholder', 'Type text…');
+
+    // The placeholder text is rendered via `::before` and absolutely positioned —
+    // the parent must reserve enough height that the placeholder is visible AND
+    // the field stays clickable. A single line is at least ~18px.
+    const box = await editField.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.height).toBeGreaterThan(10);
+
+    // And Playwright's own visibility check (which considers zero-bounding-box
+    // elements not visible) should agree.
+    await expect(editField).toBeVisible();
+  });
+
   test('typing text removes data-empty attribute', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
