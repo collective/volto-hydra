@@ -26,10 +26,9 @@ Full documentation is in the [`docs/`](./docs/) directory (built with Sphinx).
 | Topic | Where |
 | ----- | ----- |
 | What it is, quick start, run locally | [`docs/getting-started/`](./docs/getting-started/index.md) |
-| Architecture, container blocks, custom blocks, listings, templates, deployment, advanced topics | [`docs/concepts/`](./docs/concepts/) |
-| Visual editing levels 0–6 — how to progressively add visual editing | [`docs/visual-editing/`](./docs/visual-editing/index.md) |
-| Building a frontend for headless Plone | [`docs/frontend-guide/`](./docs/frontend-guide/index.md) |
-| Block reference (slate, image, teaser, listing, search, hero, columns, accordion, slider, form, …) | [`docs/blocks/`](./docs/blocks/README.md) |
+| What your editors will experience | [`docs/what-editors-will-experience/`](./docs/what-editors-will-experience/index.md) |
+| How to build (architecture, blocks, listings, templates, deployment, step-by-step) | [`docs/how-to-build/`](./docs/how-to-build/index.md) |
+| Block examples (slate, image, teaser, listing, search, hero, columns, accordion, slider, form, …) | [`docs/examples/`](./docs/examples/README.md) |
 
 ## Run locally for development
 
@@ -110,7 +109,7 @@ Editing and rendering are separated. During editing the frontend runs inside an 
               └──────────────┘                       └─────────────┘
 ```
 
-For the full architecture (chrome pattern, slate transforms, frontend integration steps), see [`docs/concepts/architecture.md`](./docs/concepts/architecture.md).
+For the full architecture (chrome pattern, slate transforms, frontend integration steps), see [`docs/how-to-build/architecture.md`](./docs/how-to-build/architecture.md).
 
 ## Project status & roadmap
 

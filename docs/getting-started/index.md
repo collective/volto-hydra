@@ -47,7 +47,7 @@ You can try out the editing experience now by logging into <https://hydra.pretag
 
 ```{note}
 The default is a Nuxt.js frontend, deployed as a [SSG](https://hydra-nuxt-flowbrite.netlify.app/)
-to demonstrate scale-to-zero editing (free hosting). See [Deployment](../concepts/deployment.md) for details.
+to demonstrate scale-to-zero editing (free hosting). See [Deployment](../how-to-build/deployment.md) for details.
 ```
 
 ## Quick Start
@@ -191,6 +191,6 @@ Login to <https://hydra.pretagov.com/> and in personal preferences add your fron
 
 ## Where to next
 
-- **Just want to use the editor?** See the [Editor Guide](../editor-guide/index.md).
-- **Building a frontend?** See [Building a Frontend for Headless Plone](../frontend-guide/index.md).
-- **Wondering how much integration to do?** See [Incremental adoption](../concepts/incremental-adoption.md) — what each layer of integration unlocks for editors, in order.
+- **Just want to use the editor?** See the [Editor Guide](../what-editors-will-experience/index.md).
+- **Building a frontend?** See [Building a Frontend for Headless Plone](../how-to-build/build-a-frontend.md).
+- **Wondering how much integration to do?** See [Incremental adoption](../how-to-build/incremental-adoption.md) — what each layer of integration unlocks for editors, in order.

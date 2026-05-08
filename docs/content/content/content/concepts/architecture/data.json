@@ -414,7 +414,7 @@
     },
     "p-20": {
       "@type": "slate",
-      "plaintext": "See [Building a Frontend for Headless Plone](../frontend-guide/index.md) for the full step-by-step guide, or the example frontends: [Nuxt.js](https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter), [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs), [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7).",
+      "plaintext": "See [Building a Frontend for Headless Plone](build-a-frontend.md) for the full step-by-step guide, or the example frontends: [Nuxt.js](https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter), [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs), [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7).",
       "value": [
         {
           "type": "p",
@@ -425,7 +425,7 @@
             {
               "type": "link",
               "data": {
-                "url": "../frontend-guide/index.md"
+                "url": "build-a-frontend.md"
               },
               "children": [
                 {

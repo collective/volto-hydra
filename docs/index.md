@@ -7,10 +7,9 @@ A Visual Headless CMS using Plone as a server, providing true visual editing wit
 :caption: Contents
 
 getting-started/index
-editor-guide/index
-concepts/index
-frontend-guide/index
-blocks/README
+what-editors-will-experience/index
+how-to-build/index
+examples/README
 ```
 
 ## Why Hydra?

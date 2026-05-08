@@ -579,7 +579,10 @@ function buildConceptShell(folder, mdContent) {
   };
 }
 
-const CONCEPTS_DIR = join(__dirname, '..', 'concepts');
+// Sphinx-side: how-to-build/*.md authored by developers.
+// Plone-side: still 'concepts/' for now — restructuring to docs/how-to-build/
+// is a follow-up commit (will involve folder renames + UID updates).
+const CONCEPTS_DIR = join(__dirname, '..', 'how-to-build');
 const CONCEPTS_CONTENT_DIR = join(CONTENT_DIR, 'concepts');
 
 /**

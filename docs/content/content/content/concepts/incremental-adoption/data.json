@@ -478,7 +478,7 @@
                       {
                         "type": "link",
                         "data": {
-                          "url": "../editor-guide/selecting-blocks.md"
+                          "url": "../what-editors-will-experience/selecting-blocks.md"
                         },
                         "children": [
                           {
@@ -568,7 +568,7 @@
                       {
                         "type": "link",
                         "data": {
-                          "url": "../editor-guide/index.md"
+                          "url": "../what-editors-will-experience/index.md"
                         },
                         "children": [
                           {
@@ -679,7 +679,7 @@
                       {
                         "type": "link",
                         "data": {
-                          "url": "../editor-guide/editing-text.md"
+                          "url": "../what-editors-will-experience/editing-text.md"
                         },
                         "children": [
                           {
@@ -783,7 +783,7 @@
                       {
                         "type": "link",
                         "data": {
-                          "url": "../editor-guide/templates-and-layouts.md"
+                          "url": "../what-editors-will-experience/templates-and-layouts.md"
                         },
                         "children": [
                           {

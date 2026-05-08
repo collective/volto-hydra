@@ -80,7 +80,7 @@ Per-block options (most are passed through to Volto's block config):
 - **`restricted`** — `true` hides the block from the chooser; can also be a function for conditional restrictions.
 - **`mostUsed`** — pin to the top of the chooser.
 - **`disableCustomSidebarEditForm`** — set `true` to use only the schema form in the sidebar (no custom edit component).
-- **`blockSchema`** — JSON-schema-style definition of the block's fields. See [Schema Enhancers](#schema-enhancers) below and the [Block reference](../blocks/README.md).
+- **`blockSchema`** — JSON-schema-style definition of the block's fields. See [Schema Enhancers](#schema-enhancers) below and the [Block reference](../examples/README.md).
 - **`fieldMappings`** — block-to-block conversion rules. See [Block Conversion & fieldMappings](#block-conversion--fieldmappings) below.
 - **`schemaEnhancer`** — recipe-based schema modifier; supports `fieldRules`, `inheritSchemaFrom`, etc. See [Schema Enhancers](#schema-enhancers).
 
