@@ -34,6 +34,10 @@ Each selected block has a **drag handle** in the Quanta toolbar above it. Click 
 
 Drop targets are filtered by `allowedBlocks` — you can't drop into a region that doesn't accept this block type. The line/shade indicator only appears over valid drop targets.
 
+### Reordering from the sidebar
+
+The sidebar's children list (visible when a container block is selected) has a drag handle (`⋮⋮`) on each child row. Drag it up or down to reorder children **within** the same container. Useful when the children are paged (slides of a slider, panels of an accordion) and you can't drag in the preview because only one is visible at a time. See [Selecting blocks › The children list](selecting-blocks.md#the-children-list-going-down).
+
 ### Cut / copy / paste
 
 Standard keyboard shortcuts work on the selected block(s):

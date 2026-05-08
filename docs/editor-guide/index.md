@@ -7,10 +7,10 @@ This guide is for **content editors** using a Hydra-powered site. It covers how 
 
 selecting-blocks
 editing-text
+links-and-media
 adding-and-moving-blocks
 containers
 templates-and-layouts
-links-and-media
 ```
 
 ## What you see
@@ -29,9 +29,18 @@ The editor screen has three regions:
 └───────────┴──────────────────────────────────┴──────────────┘
 ```
 
-- **Toolbar (left)** — saving, navigating to other pages, site settings. Standard Volto.
+- **Toolbar (left)** — saving, navigating to other pages, site settings. Standard Volto, plus the **Frontend switcher** (see below).
 - **Live preview (centre)** — your actual frontend, running inside an iframe. This is what readers will see. Click directly into the preview to edit.
-- **Sidebar (right)** — when no block is selected, lists the page-level fields (title, description, blocks). When a block is selected, shows that block's settings.
+- **Sidebar (right)** — when no block is selected, lists the page-level fields (title, description, blocks). When a block is selected, shows that block's settings, the chain of parent containers, and (for container blocks) the list of children. See [Selecting blocks](selecting-blocks.md) for the navigation patterns.
+
+### Frontend switcher
+
+A toolbar button opens the **Frontend switcher** panel with two sections:
+
+- **Viewport** — preview the page at common screen sizes (desktop, tablet, mobile). Pure visual switch — no content change.
+- **Frontend** — list of saved frontend URLs the editor can switch between. Picking one swaps the iframe to that frontend immediately. Same content, different rendering — a Hydra-defining feature: edit a page once, see it on the marketing site, the docs site, the mobile app's web version, and the email-renderer in turn without leaving the page.
+
+A **Settings** button at the bottom of the panel manages the saved URLs (add, remove, rename). The currently active frontend is highlighted in the list.
 
 ## Two ways to edit any field
 

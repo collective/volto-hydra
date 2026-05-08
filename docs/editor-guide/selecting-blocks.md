@@ -54,7 +54,45 @@ Ctrl/Cmd+Click works in either mode.
 
 ## Selecting from the sidebar
 
-The sidebar's block-list / outline is the other way to select. Click a block in the outline; the preview scrolls to it and selects it. Useful when the block you want is offscreen or buried inside a paged container (e.g. a specific slide of a slider).
+The sidebar is the other way to navigate selection — useful when the block you want is offscreen, buried inside a paged container (e.g. a specific slide of a slider), or you just prefer keyboard / pointer nav over hunting in the preview.
+
+### The parent chain (going up)
+
+When a block is selected, the sidebar shows the **chain of parent containers** from the root down to the block — one collapsible section per level. Each level has a `‹` arrow on the left.
+
+```text
+‹ Columns          ← click ‹ to deselect (go to page level)
+   [Columns settings]
+   ‹ Column        ← click ‹ to select Columns
+      [Column settings]
+      ‹ Text       ← current block, highlighted
+         [Text body, …]
+```
+
+Click any `‹` arrow to **navigate up** to that level. This does the same thing as pressing `Escape` repeatedly, but visibly — you can see what each parent is named, jump several levels in one click, and edit the parent's own settings (alignment, padding, …) inline without leaving the current selection.
+
+This works for any depth — nested columns, slider with templated children, accordion inside a section inside the page. The chain reflects the real DOM hierarchy.
+
+### The children list (going down)
+
+When a container block is selected, the sidebar shows that container's **children** as a list, one row per child:
+
+```text
+Slides                    [+]
+⋮⋮  Slide 1                >
+⋮⋮  Slide 2                >
+⋮⋮  Slide 3                >
+```
+
+- **`⋮⋮` drag handle** — drag to reorder children within the container.
+- **`>` drill-in arrow** — selects that child, scrolls the preview to it, switches the sidebar to its settings.
+- **`[+]` add button** — opens the BlockChooser to add a new child to that field.
+
+If the container has multiple blocks fields (e.g. a header field and a body field), each appears as a separate section with its own children list and add button.
+
+### Picking from the outline (for paged containers)
+
+Some containers paginate their children — a slider only renders the active slide; an accordion only the expanded panel. Use the children list to pick a slide / panel that's not currently visible — the preview scrolls and pages to it automatically.
 
 ## Selecting page-level fields
 
