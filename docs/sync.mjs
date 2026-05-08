@@ -1,39 +1,61 @@
 #!/usr/bin/env node
 /**
- * Syncs code examples from real component files into markdown documentation
- * AND into Plone content JSON files that power the Hydra docs site.
+ * Syncs the Sphinx documentation tree into the Plone content tree that powers
+ * the live docs site (hydra.pretagov.com).
  *
- * Source of truth: files in examples/{react,vue,svelte}/
- * The markdown uses <!-- file: path --> markers to indicate where file content
- * should be injected. The next fenced code block after each marker is replaced
- * with the file's content.
+ * Two source-of-truth flows:
  *
- * After updating the markdown, the script parses each markdown file and syncs
- * the schema, JSON, React, Vue, and Svelte code sections into codeExample
- * blocks in the corresponding Plone content JSON files in docs/content/.
+ *   1. Block reference (docs/examples/)
+ *      - block-definitions.json defines each block's schema + JSON example.
+ *      - examples/{react,vue,svelte}/ hold real component source files.
+ *      - The per-block markdown uses `<!-- file: path -->` markers to inject
+ *        component source into fenced code blocks.
+ *      - After authoring the markdown, the script syncs the rendered Schema /
+ *        JSON / React / Vue / Svelte sections into the matching Plone content
+ *        JSON's codeExample blocks (docs/content/.../<UID>/data.json).
+ *
+ *   2. Concept pages (docs/how-to-build/)
+ *      - Each .md is parsed (parseConceptsMd) into Plone slate / codeExample /
+ *        slateTable / separator blocks.
+ *      - Synced into the matching Plone content JSON
+ *        (docs/content/.../concepts/<page>/data.json today; will be moved
+ *        under docs/how-to-build/ when the Plone restructure lands).
+ *      - Missing data.json files are auto-created from a metadata shell with
+ *        the page's title + first paragraph as description.
+ *      - Order of CONCEPTS_MD_TO_FOLDER drives the Plone folder's
+ *        __metadata__.json ordering.
  *
  * Usage:
- *   node sync-examples.mjs          # update markdown and content JSON from files
- *   node sync-examples.mjs --check  # exit non-zero if anything is out of sync
+ *   pnpm sync:docs            # update everything in place
+ *   pnpm sync:docs:check      # exit non-zero if anything is out of sync (CI)
  */
 
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 
-const docPageDefinitions = JSON.parse(
-  readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'block-definitions.json'), 'utf-8')
-);
-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const checkMode = process.argv.includes('--check');
+
+// Source-of-truth directory roots, all relative to this script's location at docs/sync.mjs.
+//   docs/examples/                 — block reference: per-block .md, block-definitions.json,
+//                                    examples/{react,vue,svelte}/ source snippets
+//   docs/how-to-build/             — concept-page authoring (was concepts/)
+//   docs/content/content/content/  — Plone-content tree the live site exports from
+const EXAMPLES_DIR = join(__dirname, 'examples');
+const HOW_TO_BUILD_DIR = join(__dirname, 'how-to-build');
+const CONTENT_DIR = join(__dirname, 'content', 'content', 'content');
+
+const docPageDefinitions = JSON.parse(
+  readFileSync(join(EXAMPLES_DIR, 'block-definitions.json'), 'utf-8')
+);
 
 // Match <!-- file: path --> followed by a fenced code block
 const MARKER_RE = /^(<!-- file: (.+?) -->)\n```(\w+)\n([\s\S]*?)```/gm;
 
 let outOfSync = false;
 
-const mdFiles = readdirSync(__dirname).filter(f => f.endsWith('.md') && f !== 'README.md');
+const mdFiles = readdirSync(EXAMPLES_DIR).filter(f => f.endsWith('.md') && f !== 'README.md');
 
 // --- Phase 0: Generate Schema + JSON Block Data in markdown from block-definitions.json ---
 
@@ -42,7 +64,7 @@ for (const mdFile of mdFiles) {
   const pageDef = docPageDefinitions[pageName];
   if (!pageDef) continue;
 
-  const mdPath = join(__dirname, mdFile);
+  const mdPath = join(EXAMPLES_DIR, mdFile);
   let md = readFileSync(mdPath, 'utf-8');
 
   // Generate Schema section content — show the blocks config as JSON
@@ -82,12 +104,12 @@ for (const mdFile of mdFiles) {
 // --- Phase 1: Sync example files into markdown ---
 
 for (const mdFile of mdFiles) {
-  const mdPath = join(__dirname, mdFile);
+  const mdPath = join(EXAMPLES_DIR, mdFile);
   const original = readFileSync(mdPath, 'utf-8');
   let updated = original;
 
   updated = updated.replace(MARKER_RE, (match, marker, filePath, lang) => {
-    const absPath = join(__dirname, filePath);
+    const absPath = join(EXAMPLES_DIR, filePath);
     let content;
     try {
       content = readFileSync(absPath, 'utf-8').trimEnd();
@@ -133,7 +155,7 @@ const MD_TO_CONTENT_UID = {
   'video.md': '6d37dd19ef754344aaa254fa288e44b4',
 };
 
-const CONTENT_DIR = join(__dirname, '..', 'content', 'content', 'content');
+// CONTENT_DIR defined above near the script header.
 const TEMPLATE_ID = '/templates/block-reference-layout';
 
 /** Check if a block's templateId matches our template (handles resolveuid format too) */
@@ -296,7 +318,7 @@ for (const mdFile of mdFiles) {
     continue;
   }
 
-  const mdContent = readFileSync(join(__dirname, mdFile), 'utf-8');
+  const mdContent = readFileSync(join(EXAMPLES_DIR, mdFile), 'utf-8');
   const sections = extractMdSections(mdContent);
 
   const originalJson = readFileSync(jsonPath, 'utf-8');
@@ -457,7 +479,7 @@ function getExamplesContent() {
   };
 }
 
-const examplesPath = join(__dirname, '..', '..', 'tests-playwright', 'fixtures', 'test-frontend', 'examples.json');
+const examplesPath = join(__dirname, '..', 'tests-playwright', 'fixtures', 'test-frontend', 'examples.json');
 const examplesContent = JSON.stringify(getExamplesContent(), null, 2) + '\n';
 if (existsSync(examplesPath)) {
   const currentExamples = readFileSync(examplesPath, 'utf-8');
@@ -582,7 +604,8 @@ function buildConceptShell(folder, mdContent) {
 // Sphinx-side: how-to-build/*.md authored by developers.
 // Plone-side: still 'concepts/' for now — restructuring to docs/how-to-build/
 // is a follow-up commit (will involve folder renames + UID updates).
-const CONCEPTS_DIR = join(__dirname, '..', 'how-to-build');
+// HOW_TO_BUILD_DIR is defined above near the script header.
+const CONCEPTS_DIR = HOW_TO_BUILD_DIR;
 const CONCEPTS_CONTENT_DIR = join(CONTENT_DIR, 'concepts');
 
 /**
