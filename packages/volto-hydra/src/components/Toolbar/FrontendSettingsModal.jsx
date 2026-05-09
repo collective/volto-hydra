@@ -206,8 +206,9 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
               }}
               onKeyDown={handleKeyDown}
               placeholder="https://my-frontend.com"
-              className="frontend-settings-input"
+              className="frontend-settings-input frontend-settings-url-input"
               autoFocus
+              aria-label="URL"
             />
             <button
               className="frontend-settings-add-btn"

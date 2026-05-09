@@ -43,7 +43,7 @@ base.beforeEach(async ({}, testInfo) => {
 
 // Load block-definitions.json and flatten from page-grouped format to flat blocksConfig
 const blockDefs = JSON.parse(
-  fs.readFileSync(path.resolve(__dirname, '../../docs/blocks/block-definitions.json'), 'utf-8'),
+  fs.readFileSync(path.resolve(__dirname, '../../docs/examples/block-definitions.json'), 'utf-8'),
 );
 const flatBlocksConfig: Record<string, any> = {};
 for (const pageDef of Object.values(blockDefs) as Record<string, any>[]) {
