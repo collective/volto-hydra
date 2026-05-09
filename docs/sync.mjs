@@ -75,6 +75,80 @@ let outOfSync = false;
 
 const mdFiles = readdirSync(EXAMPLES_DIR).filter(f => f.endsWith('.md') && f !== 'README.md');
 
+// --- Phase 0a: Auto-create Plone shells for new examples pages ---
+// Adding a new docs/examples/<slug>.md should be enough; sync gives it
+// a Plone home at /docs/examples/<slug>/. The shell is the bare minimum
+// (Document type, parented to /docs/examples, title from H1) so the
+// markdown→codeExample sync in later phases has something to write into.
+// Existing pages with their template-based layout are left alone — the
+// `existsSync` guard skips them.
+const EXAMPLES_PARENT_PATH = '/docs/examples';
+const EXAMPLES_PARENT_UID = 'docs-examples-folder-001';
+
+function buildExampleShell(slug, mdContent) {
+  const { title, description } = extractTitleAndDescription(mdContent, slug);
+  const date = '2025-01-01T00:00:00';
+  const uid = `docs-examples-${slug}-001`;
+  return {
+    '@id': `${EXAMPLES_PARENT_PATH}/${slug}`,
+    '@type': 'Document',
+    UID: uid,
+    allow_discussion: false,
+    blocks: { 'title-1': { '@type': 'title' } },
+    blocks_layout: { items: ['title-1'] },
+    contributors: [],
+    created: `${date}+00:00`,
+    creators: ['admin'],
+    description,
+    effective: null,
+    exclude_from_nav: false,
+    expires: null,
+    'exportimport.constrains': {},
+    'exportimport.conversation': [],
+    'exportimport.versions': {},
+    id: slug,
+    is_folderish: false,
+    language: '##DEFAULT##',
+    layout: 'document_view',
+    lock: {},
+    modified: `${date}+00:00`,
+    parent: {
+      '@id': EXAMPLES_PARENT_PATH,
+      '@type': 'Document',
+      UID: EXAMPLES_PARENT_UID,
+      description: 'Block reference: schema, JSON, and rendered examples for every block type Volto Hydra ships.',
+      title: 'Examples',
+      type_title: 'Page',
+    },
+    review_state: 'published',
+    rights: '',
+    subjects: [],
+    title,
+    type_title: 'Page',
+    version: 'current',
+    workflow_history: {},
+    working_copy: null,
+    working_copy_of: null,
+  };
+}
+
+for (const mdFile of mdFiles) {
+  const slug = mdFile.replace(/\.md$/, '');
+  const folderPath = mdFileToContentDir(mdFile);
+  const jsonPath = join(folderPath, 'data.json');
+  if (existsSync(jsonPath)) continue;
+  const mdPath = join(EXAMPLES_DIR, mdFile);
+  const mdContent = readFileSync(mdPath, 'utf-8');
+  if (checkMode) {
+    outOfSync = true;
+    console.error(`OUT OF SYNC: docs/examples/${slug}/data.json missing (would auto-create from ${mdFile})`);
+    continue;
+  }
+  if (!existsSync(folderPath)) mkdirSync(folderPath, { recursive: true });
+  writeFileSync(jsonPath, JSON.stringify(buildExampleShell(slug, mdContent), null, 2) + '\n', 'utf-8');
+  console.log(`Created docs/examples/${slug}/data.json shell`);
+}
+
 // --- Phase 0: Generate Schema + JSON Block Data in markdown from block-definitions.json ---
 
 for (const mdFile of mdFiles) {
@@ -152,26 +226,15 @@ for (const mdFile of mdFiles) {
 
 // --- Phase 2: Sync markdown content into Plone content JSON ---
 
-// Map markdown filename -> content JSON UID directory
-const MD_TO_CONTENT_UID = {
-  'accordion.md': 'f8cd4a2d8d7c4703b4e41d2093b21aed',
-  'button.md': '405582582e70493c96a6c549444a1eaa',
-  'grid.md': '99c70917b6894af08dd306fdbc0eff6a',
-  'form.md': '13de82575e16493fbc54514e548a9f3c',
-  'heading.md': '2f69aa417e894fd3bf23d393287b369e',
-  'highlight.md': '8416628543f146ff9a18d281c03e2399',
-  'image.md': '40a436ad604f4f80aeafe0977806760a',
-  'introduction.md': '00cef5f245a342958288ace545e3c097',
-  'listing.md': '6bd32a3367ea4254b295db642655b9d3',
-  'search.md': '928010d84e5d4df2b2282f3e179d6b1a',
-  'separator.md': '546e82cce6c842d0a4046a0131539bd2',
-  'slate.md': '2508797173824f0e9f82bb2e7cfe922d',
-  'table.md': '102f648399914851951ffa3fefc8665c',
-  'teaser.md': 'bd2b39d2745847db82ed197a4eb1effc',
-  'toc.md': '3906609d0456404ca7146f6aa1f12f32',
-  'maps.md': 'e090d954d0a448bca81c1a646e673a12',
-  'video.md': '6d37dd19ef754344aaa254fa288e44b4',
-};
+// docs/examples/<slug>.md → docs/content/.../docs/examples/<slug>/data.json.
+// Filename-based mapping: every block reference page lives at the path
+// matching its markdown filename, no hand-maintained UID list. The few
+// markdown files that don't have a Plone counterpart (columns, hero,
+// slider) are skipped because the path simply won't exist on disk.
+function mdFileToContentDir(mdFile) {
+  const slug = mdFile.replace(/\.md$/, '');
+  return join(CONTENT_DIR, 'docs', 'examples', slug);
+}
 
 // CONTENT_DIR defined above near the script header.
 const TEMPLATE_ID = '/templates/block-reference-layout';
@@ -327,14 +390,10 @@ function updateCodeExampleTabs(block, tabUpdates) {
 }
 
 for (const mdFile of mdFiles) {
-  const uid = MD_TO_CONTENT_UID[mdFile];
-  if (!uid) continue; // No content JSON for this md file (e.g., hero.md, slider.md)
-
-  const jsonPath = join(CONTENT_DIR, uid, 'data.json');
-  if (!existsSync(jsonPath)) {
-    console.error(`WARNING: content JSON not found for ${mdFile}: ${jsonPath}`);
-    continue;
-  }
+  const jsonPath = join(mdFileToContentDir(mdFile), 'data.json');
+  // Skip markdown files with no corresponding Plone page (columns.md,
+  // hero.md, slider.md don't have one yet — the path just won't exist).
+  if (!existsSync(jsonPath)) continue;
 
   const mdContent = readFileSync(join(EXAMPLES_DIR, mdFile), 'utf-8');
   const sections = extractMdSections(mdContent);
@@ -466,7 +525,8 @@ for (const mdFile of mdFiles) {
         console.error(`OUT OF SYNC: content JSON for ${mdFile}`);
       } else {
         writeFileSync(jsonPath, updatedJson, 'utf-8');
-        console.log(`Updated content JSON: ${mdFile} -> ${uid}/data.json`);
+        const rel = jsonPath.slice(CONTENT_DIR.length + 1);
+        console.log(`Updated content JSON: ${mdFile} -> ${rel}`);
       }
     }
   }

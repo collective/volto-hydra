@@ -1,26 +1,16 @@
 {
   "__version__": "1.0.0",
   "_blob_files_": [
-    "00cef5f245a342958288ace545e3c097/preview_image/black-starry-night.jpg",
     "05bace45294c45d5ab93de883e7ce702/image/penguin2.jpg",
     "0c351dd841c34c6da9c313b1bc551e34/image/penguin4.jpg",
-    "102f648399914851951ffa3fefc8665c/preview_image/black-starry-night.jpg",
-    "2508797173824f0e9f82bb2e7cfe922d/preview_image/black-starry-night.jpg",
-    "3906609d0456404ca7146f6aa1f12f32/preview_image/black-starry-night.jpg",
-    "3ac4a2c6c4034a1686bc0ee2d2072fd6/preview_image/black-starry-night.jpg",
-    "40a436ad604f4f80aeafe0977806760a/preview_image/black-starry-night.jpg",
     "6cca02c5580d4f7c865af74835ceab9d/image/danielle-barnes-kGNaS3lYCso-unsplash.jpg",
     "7ab9c48ede33415fa2a66a99549c8f70/preview_image/black-starry-night.jpg",
     "7adc12f0e7604982a6cdcb9437bccf66/preview_image/event.svg",
     "7de78fea55354a29ad78b909efb07436/image/penguin3.jpg",
-    "8416628543f146ff9a18d281c03e2399/preview_image/black-starry-night.jpg",
-    "928010d84e5d4df2b2282f3e179d6b1a/preview_image/black-starry-night.jpg",
     "970ec24c76784c66a06d8c8d8b6522b2/image/black-starry-night.jpg",
-    "99c70917b6894af08dd306fdbc0eff6a/preview_image/black-starry-night.jpg",
     "9abc1a813bcf46388e565b277bd8c6bf/image/penguin1.jpg",
     "a5bf990b119747c4b2855fedc1ea0185/image/image.png",
     "af85ff98cd6446eebcba56305ed89fed/image/sergio-martinez-rhNJJ4eD2zk-unsplash.jpg",
-    "bd2b39d2745847db82ed197a4eb1effc/preview_image/black-starry-night.jpg",
     "docs-images-block-mode-001/image/block-mode.png",
     "docs-images-block-selected-001/image/block-selected.png",
     "docs-images-children-list-001/image/children-list.png",
@@ -34,6 +24,16 @@
     "docs-images-slash-menu-001/image/slash-menu.png",
     "docs-images-template-locked-001/image/template-locked.png",
     "docs-images-wrap-chooser-001/image/wrap-chooser.png",
+    "docs/examples/grid/listing/preview_image/black-starry-night.jpg",
+    "docs/examples/grid/preview_image/black-starry-night.jpg",
+    "docs/examples/highlight/preview_image/black-starry-night.jpg",
+    "docs/examples/image/preview_image/black-starry-night.jpg",
+    "docs/examples/introduction/preview_image/black-starry-night.jpg",
+    "docs/examples/search/preview_image/black-starry-night.jpg",
+    "docs/examples/slate/preview_image/black-starry-night.jpg",
+    "docs/examples/table/preview_image/black-starry-night.jpg",
+    "docs/examples/teaser/preview_image/black-starry-night.jpg",
+    "docs/examples/toc/preview_image/black-starry-night.jpg",
     "eec82559bf3242a6be4d43bc2096f399/image/image-light.jpg",
     "quadrant-svg/image/quadrant.svg"
   ],
@@ -64,7 +64,7 @@
     "docs/build-a-frontend/data.json",
     "docs/container-blocks/data.json",
     "docs/custom-blocks/data.json",
-    "docs-examples-folder-001/data.json",
+    "docs/examples/data.json",
     "docs-images-folder-001/data.json",
     "docs/listings/data.json",
     "docs/live-preview/data.json",
@@ -90,23 +90,26 @@
     "e017bd4a0b3845aab26f6d855cc4ef14/data.json",
     "1efc7b73b28e4edeaf40040709299d69/data.json",
     "7950cae06c994276930f6d13151308c5/data.json",
-    "f8cd4a2d8d7c4703b4e41d2093b21aed/data.json",
-    "405582582e70493c96a6c549444a1eaa/data.json",
-    "13de82575e16493fbc54514e548a9f3c/data.json",
-    "99c70917b6894af08dd306fdbc0eff6a/data.json",
-    "2f69aa417e894fd3bf23d393287b369e/data.json",
-    "8416628543f146ff9a18d281c03e2399/data.json",
-    "40a436ad604f4f80aeafe0977806760a/data.json",
-    "00cef5f245a342958288ace545e3c097/data.json",
-    "6bd32a3367ea4254b295db642655b9d3/data.json",
-    "e090d954d0a448bca81c1a646e673a12/data.json",
-    "928010d84e5d4df2b2282f3e179d6b1a/data.json",
-    "546e82cce6c842d0a4046a0131539bd2/data.json",
-    "2508797173824f0e9f82bb2e7cfe922d/data.json",
-    "102f648399914851951ffa3fefc8665c/data.json",
-    "bd2b39d2745847db82ed197a4eb1effc/data.json",
-    "3906609d0456404ca7146f6aa1f12f32/data.json",
-    "6d37dd19ef754344aaa254fa288e44b4/data.json",
+    "docs/examples/accordion/data.json",
+    "docs/examples/button/data.json",
+    "docs/examples/columns/data.json",
+    "docs/examples/form/data.json",
+    "docs/examples/grid/data.json",
+    "docs/examples/heading/data.json",
+    "docs/examples/hero/data.json",
+    "docs/examples/highlight/data.json",
+    "docs/examples/image/data.json",
+    "docs/examples/introduction/data.json",
+    "docs/examples/listing/data.json",
+    "docs/examples/maps/data.json",
+    "docs/examples/search/data.json",
+    "docs/examples/separator/data.json",
+    "docs/examples/slate/data.json",
+    "docs/examples/slider/data.json",
+    "docs/examples/table/data.json",
+    "docs/examples/teaser/data.json",
+    "docs/examples/toc/data.json",
+    "docs/examples/video/data.json",
     "docs-images-block-mode-001/data.json",
     "docs-images-block-selected-001/data.json",
     "docs-images-children-list-001/data.json",
@@ -126,10 +129,10 @@
     "docs/what-editors-will-experience/links-and-media/data.json",
     "docs/what-editors-will-experience/selecting-blocks/data.json",
     "docs/what-editors-will-experience/templates-and-layouts/data.json",
-    "28cc586c504d436aa26fd2aa12f16f84/data.json",
-    "3ac4a2c6c4034a1686bc0ee2d2072fd6/data.json",
-    "c2adb9f7b0824bd5a3e07048d887f48d/data.json",
-    "fb086a3d1d3d4a9ebf9bc864d2172e79/data.json"
+    "docs/examples/grid/grid-image/data.json",
+    "docs/examples/grid/listing/data.json",
+    "docs/examples/grid/teaser/data.json",
+    "docs/examples/grid/text/data.json"
   ],
   "default_page": {},
   "local_roles": {
@@ -771,6 +774,27 @@
       }
     },
     "docs-examples-folder-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-examples-columns-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-examples-hero-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-examples-slider-001": {
       "local_roles": {
         "admin": [
           "Owner"
