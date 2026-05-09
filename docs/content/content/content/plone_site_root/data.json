@@ -753,7 +753,11 @@
       "@type": "video",
       "url": "/docs/static/hydra-demo",
       "align": "center",
-      "styles": {}
+      "styles": {},
+      "autoplay": true,
+      "loop": true,
+      "muted": true,
+      "controls": false
     },
     "hero-cta": {
       "@type": "slate",
@@ -793,10 +797,42 @@
       "styles": {
         "backgroundColor": "grey"
       }
+    },
+    "hero-headline": {
+      "@type": "slate",
+      "plaintext": "Visual editing. Any frontend.",
+      "value": [
+        {
+          "type": "h1",
+          "children": [
+            {
+              "text": "Visual editing. Any frontend."
+            }
+          ]
+        }
+      ],
+      "styles": {}
+    },
+    "hero-subhead": {
+      "@type": "slate",
+      "plaintext": "A visual headless CMS using Plone \u2014 drag-and-drop blocks and inline text editing, with whichever frontend stack you choose.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A visual headless CMS using Plone \u2014 drag-and-drop blocks and inline text editing, with whichever frontend stack you choose."
+            }
+          ]
+        }
+      ],
+      "styles": {}
     }
   },
   "blocks_layout": {
     "items": [
+      "hero-headline",
+      "hero-subhead",
       "hero-cta",
       "video-hero-001",
       "why-hydra-heading",

@@ -208,7 +208,7 @@
           "@id": "ref-video-schema-javascript-104794",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  \"video\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"url\": {\n          \"title\": \"Video URL\"\n        }\n      }\n    }\n  }\n}"
+          "code": "{\n  \"video\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"url\": {\n          \"title\": \"Video URL\"\n        },\n        \"controls\": {\n          \"title\": \"Show controls\",\n          \"type\": \"boolean\",\n          \"default\": true\n        },\n        \"autoplay\": {\n          \"title\": \"Autoplay\",\n          \"type\": \"boolean\",\n          \"default\": false\n        },\n        \"loop\": {\n          \"title\": \"Loop\",\n          \"type\": \"boolean\",\n          \"default\": false\n        },\n        \"muted\": {\n          \"title\": \"Muted (required for autoplay)\",\n          \"type\": \"boolean\",\n          \"default\": false\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },

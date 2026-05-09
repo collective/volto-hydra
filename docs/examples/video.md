@@ -13,6 +13,26 @@ This is a **built-in** block.
       "properties": {
         "url": {
           "title": "Video URL"
+        },
+        "controls": {
+          "title": "Show controls",
+          "type": "boolean",
+          "default": true
+        },
+        "autoplay": {
+          "title": "Autoplay",
+          "type": "boolean",
+          "default": false
+        },
+        "loop": {
+          "title": "Loop",
+          "type": "boolean",
+          "default": false
+        },
+        "muted": {
+          "title": "Muted (required for autoplay)",
+          "type": "boolean",
+          "default": false
         }
       }
     }

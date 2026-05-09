@@ -525,8 +525,15 @@
           :src="`https://www.youtube.com/embed/${getYouTubeId(block.url)}`"
           frameborder="0" allowfullscreen></iframe>
     </div>
-    <video v-else-if="block.url" class="w-full h-auto max-w-full rounded-lg" controls>
-      <source :src="block.url" type="video/mp4">
+    <video v-else-if="block.url"
+           class="w-full h-auto max-w-full rounded-lg"
+           data-edit-media="url"
+           :controls="block.controls !== false"
+           :autoplay="!!block.autoplay"
+           :loop="!!block.loop"
+           :muted="!!block.muted || !!block.autoplay"
+           playsinline>
+      <source :src="getVideoSrc(block.url)" type="video/mp4">
     </video>
   </div>
 
@@ -1174,6 +1181,18 @@ const getYouTubeId = (url) => {
   if (!url) return null;
   const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&?/]+)/);
   return match?.[1] || null;
+};
+
+// Helper for the <video> src on Plone-hosted mp4s. A video block whose `url`
+// is a Plone @id (starts with `/`) needs the API base URL prepended and a
+// /@@download/file suffix to resolve to the actual binary; otherwise the
+// browser tries to fetch the @id off the frontend host and 404s.
+const getVideoSrc = (url) => {
+  if (!url) return '';
+  if (/^https?:\/\//.test(url)) return url;
+  const runtimeConfig = useRuntimeConfig();
+  const backendBaseUrl = runtimeConfig.public.backendBaseUrl;
+  return `${backendBaseUrl}${url}/@@download/file`;
 };
 
 // Helper to get image URL from various formats (string, array, or object with @id)
