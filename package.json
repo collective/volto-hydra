@@ -34,7 +34,7 @@
     "sync:docs": "node docs/sync.mjs",
     "sync:docs:check": "node docs/sync.mjs --check",
     "demo:capture": "playwright test --project=demo-video",
-    "demo:encode": "ffmpeg -y -i $(ls -t tests-playwright/demo-video/.recordings/**/*.webm | head -1) -vf 'fps=24,scale=1280:-2:flags=lanczos' -c:v libx264 -pix_fmt yuv420p -movflags +faststart -crf 22 docs/_static/hydra-demo.mp4 && cp docs/_static/hydra-demo.mp4 docs/content/content/content/docs/static/hydra-demo/file/hydra-demo.mp4 && echo wrote docs/_static/hydra-demo.mp4 + Plone export tree",
+    "demo:encode": "bash tests-playwright/demo-video/encode.sh",
     "lint": "eslint --max-warnings=0 'packages/**/src/**/*.{js,jsx,ts,tsx}'",
     "lint:fix": "eslint --fix 'packages/**/src/**/*.{js,jsx,ts,tsx}'",
     "prettier": "prettier --check 'packages/**/src/**/*.{js,jsx,ts,tsx}'",

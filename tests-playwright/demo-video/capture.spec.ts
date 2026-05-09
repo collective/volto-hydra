@@ -16,6 +16,7 @@
  * so a viewer can follow what happened. Resist the urge to make individual
  * actions fast — the storytelling cadence matters more than realism here.
  */
+import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { test } from '../fixtures';
@@ -24,6 +25,7 @@ import { AdminUIHelper } from '../helpers/AdminUIHelper';
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SHOWCASE_PATH = '/showcase-page';
 const BEAT_MS = 900;
+const TRIM_MARKER_FILE = path.join(SCRIPT_DIR, '.recordings', 'trim-ms.txt');
 
 async function beat(page: import('@playwright/test').Page, label: string) {
   // No-op marker that just paces the recording. `label` shows up in the
@@ -38,7 +40,22 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   const helper = new AdminUIHelper(page);
   await helper.login();
   await helper.navigateToEdit(SHOWCASE_PATH);
-  await beat(page, 'page loaded');
+
+  // Wait for a fully-settled editor before any beats — the recording
+  // includes login + iframe load, but those are visually noisy and
+  // shouldn't be in the published clip. Network idle + a small buffer
+  // gives the iframe time to finish layout/paint.
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(2_000);
+
+  // Stamp the timestamp where beats begin so encode can -ss-trim the
+  // loading prefix off the .webm. Playwright videos start at t=0 when
+  // the page is created; this performance.now() is "ms since page
+  // create" → "seconds to skip in ffmpeg".
+  const trimMs = await page.evaluate(() => performance.now());
+  fs.mkdirSync(path.dirname(TRIM_MARKER_FILE), { recursive: true });
+  fs.writeFileSync(TRIM_MARKER_FILE, String(trimMs));
+  console.log(`[demo-video] trim point: ${trimMs.toFixed(0)} ms`);
 
   const iframe = page.frameLocator('iframe');
 
