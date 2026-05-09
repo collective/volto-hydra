@@ -14,13 +14,6 @@ This is a **built-in** block.
         "title": {
           "title": "Title"
         },
-        "top_images": {
-          "title": "Top Images",
-          "widget": "blocks_layout",
-          "allowedBlocks": [
-            "image"
-          ]
-        },
         "columns": {
           "title": "Columns",
           "widget": "blocks_layout",
