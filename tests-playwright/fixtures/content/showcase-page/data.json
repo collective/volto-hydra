@@ -81,7 +81,7 @@
           "blocks_layout": { "items": ["right-text"] }
         }
       },
-      "blocks_layout": { "items": ["col-1", "col-2"] }
+      "columns": { "items": ["col-1", "col-2"] }
     },
     "after-columns": {
       "@type": "slate",

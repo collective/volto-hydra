@@ -1,8 +1,8 @@
-# Grid Block
+# Columns Block
 
-A responsive grid layout container. Each cell is a child block (teaser, slate, image, etc.) rendered inside the grid. This is the built-in Volto grid block (`gridBlock`).
+A horizontal multi-column container. The block has one slot — `columns` — restricted to `column` children, capped at four. Each `column` is itself a container holding any of its allowed inner block types (slate, image, …).
 
-This is a **built-in** block.
+This is a **custom** block — register it via `initBridge`.
 
 ## Schema
 
@@ -114,28 +114,37 @@ This is a **built-in** block.
 
 ## Rendering
 
-Container blocks render their children by iterating `blocks_layout.items` and looking up each block in the `blocks` dict.
+The columns slot uses the standard shared-blocks shape: child columns live in `block.blocks` and their order comes from `block.columns.items`. Each column is itself a container with its own `blocks_layout` for content.
 
 ### React
 
-<!-- file: examples/react/GridBlock.jsx -->
+<!-- file: examples/react/ColumnsBlock.jsx -->
 ```jsx
-function GridBlock({ block }) {
+function ColumnsBlock({ block }) {
+  const items = block.columns?.items || [];
   const blocks = block.blocks || {};
-  const items = block.blocks_layout?.items || [];
 
   return (
-    <div data-block-uid={block['@uid']} className="grid-block">
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }}>
-        {items.map(id => {
-          const child = { ...blocks[id], '@uid': id };
-          return (
-            <div key={id} className="grid-cell">
-              <BlockRenderer block={child} />
-            </div>
-          );
-        })}
+    <div data-block-uid={block['@uid']} className="columns-block">
+      <div style={{ display: 'flex', gap: '1rem' }}>
+        {items.map(id => (
+          <ColumnBlock key={id} block={{ ...blocks[id], '@uid': id }} />
+        ))}
       </div>
+    </div>
+  );
+}
+
+function ColumnBlock({ block }) {
+  const items = block.blocks_layout?.items || [];
+  const blocks = block.blocks || {};
+
+  return (
+    <div data-block-uid={block['@uid']} style={{ flex: 1 }}>
+      {block.title && <h4 data-edit-text="title">{block.title}</h4>}
+      {items.map(id => (
+        <BlockRenderer key={id} block={{ ...blocks[id], '@uid': id }} />
+      ))}
     </div>
   );
 }
@@ -143,43 +152,38 @@ function GridBlock({ block }) {
 
 ### Vue
 
-<!-- file: examples/vue/GridBlock.vue -->
+<!-- file: examples/vue/ColumnsBlock.vue -->
 ```vue
 <template>
-  <div :data-block-uid="block['@uid']" class="grid-block">
-    <div :style="{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }">
-      <div v-for="id in items" :key="id" class="grid-cell">
-        <BlockRenderer :block="{ ...block.blocks?.[id], '@uid': id }" />
-      </div>
+  <div :data-block-uid="block['@uid']" class="columns-block">
+    <div style="display: flex; gap: 1rem">
+      <ColumnBlock
+        v-for="id in block.columns?.items || []"
+        :key="id"
+        :block="{ ...block.blocks?.[id], '@uid': id }"
+      />
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue';
-import BlockRenderer from './BlockRenderer.vue';
-const props = defineProps({ block: Object });
-const items = computed(() => props.block.blocks_layout?.items || []);
+defineProps({ block: Object });
 </script>
 ```
 
 ### Svelte
 
-<!-- file: examples/svelte/GridBlock.svelte -->
+<!-- file: examples/svelte/ColumnsBlock.svelte -->
 ```svelte
 <script>
-  import BlockRenderer from './BlockRenderer.svelte';
+  import ColumnBlock from './ColumnBlock.svelte';
   export let block;
-  $: blocks = block.blocks || {};
-  $: items = block.blocks_layout?.items || [];
 </script>
 
-<div data-block-uid={block['@uid']} class="grid-block">
-  <div style="display: grid; grid-template-columns: repeat({items.length}, 1fr); gap: 1rem">
-    {#each items as id (id)}
-      <div class="grid-cell">
-        <BlockRenderer block={{ ...blocks[id], '@uid': id }} />
-      </div>
+<div data-block-uid={block['@uid']} class="columns-block">
+  <div style="display: flex; gap: 1rem">
+    {#each block.columns?.items || [] as id (id)}
+      <ColumnBlock block={{ ...block.blocks?.[id], '@uid': id }} />
     {/each}
   </div>
 </div>

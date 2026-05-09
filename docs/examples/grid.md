@@ -1,26 +1,19 @@
 # Grid Block
 
-A responsive grid layout container. Each column is a container that can hold any blocks inside it. Columns are defined as an `object_list` with an inline schema — each item has its own `blocks_layout` for nested content. No separate column block type is needed.
+A responsive grid that lays out child blocks in equal-width cells. The block uses Volto's standard shared-blocks shape — `blocks` is the dict of children, `blocks_layout.items` is their order — and constrains the allowed types via `allowedBlocks`.
 
 ## Schema
 
 ```json
 {
   "gridBlock": {
+    "allowedBlocks": ["teaser", "image", "slate"],
     "blockSchema": {
       "properties": {
-        "columns": {
-          "title": "Columns",
-          "widget": "object_list",
-          "schema": {
-            "properties": {
-              "blocks_layout": {
-                "title": "Content",
-                "widget": "blocks_layout",
-                "defaultBlockType": "slate"
-              }
-            }
-          }
+        "blocks_layout": {
+          "title": "Cells",
+          "widget": "blocks_layout",
+          "allowedBlocks": ["teaser", "image", "slate"]
         }
       }
     }
@@ -33,57 +26,34 @@ A responsive grid layout container. Each column is a container that can hold any
 ```json
 {
   "@type": "gridBlock",
-  "columns": [
-    {
-      "@id": "col-1",
-      "blocks": {
-        "heading-1": {
-          "@type": "slate",
-          "value": [{"type": "h3", "children": [{"text": "Design"}]}]
-        },
-        "text-1": {
-          "@type": "slate",
-          "value": [{"type": "p", "children": [{"text": "We craft beautiful interfaces that users love."}]}]
-        }
-      },
-      "blocks_layout": {
-        "items": ["heading-1", "text-1"]
-      }
+  "blocks": {
+    "cell-1": {
+      "@type": "teaser",
+      "title": "Design",
+      "description": "We craft beautiful interfaces that users love.",
+      "href": [{"@id": "/design"}]
     },
-    {
-      "@id": "col-2",
-      "blocks": {
-        "img-1": {
-          "@type": "image",
-          "url": "https://placehold.co/600x400",
-          "alt": "Placeholder"
-        }
-      },
-      "blocks_layout": {
-        "items": ["img-1"]
-      }
+    "cell-2": {
+      "@type": "image",
+      "url": "https://placehold.co/600x400",
+      "alt": "Placeholder"
     },
-    {
-      "@id": "col-3",
-      "blocks": {
-        "teaser-1": {
-          "@type": "teaser",
-          "title": "Learn More",
-          "description": "Explore the full documentation.",
-          "href": [{"@id": "/concepts/architecture"}]
-        }
-      },
-      "blocks_layout": {
-        "items": ["teaser-1"]
-      }
+    "cell-3": {
+      "@type": "teaser",
+      "title": "Learn More",
+      "description": "Explore the full documentation.",
+      "href": [{"@id": "/docs"}]
     }
-  ]
+  },
+  "blocks_layout": {
+    "items": ["cell-1", "cell-2", "cell-3"]
+  }
 }
 ```
 
 ## Rendering
 
-Each column in the `columns` array is a container with its own `blocks` and `blocks_layout`. Use `expandListingBlocks` to expand each column's nested blocks — this assigns `@uid` to each block for editing support.
+Iterate `blocks_layout.items` and look each child up in `block.blocks`. Spread the `@uid` into the child object so the renderer can attach `data-block-uid` for editing support.
 
 ### React
 

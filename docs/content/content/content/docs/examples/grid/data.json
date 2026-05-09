@@ -38,7 +38,7 @@
           "@id": "ref-grid-schema-javascript-af1095",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  \"gridBlock\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"columns\": {\n          \"title\": \"Columns\",\n          \"widget\": \"object_list\",\n          \"schema\": {\n            \"properties\": {\n              \"blocks_layout\": {\n                \"title\": \"Content\",\n                \"widget\": \"blocks_layout\",\n                \"defaultBlockType\": \"slate\"\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}"
+          "code": "{\n  \"gridBlock\": {\n    \"allowedBlocks\": [\"teaser\", \"image\", \"slate\"],\n    \"blockSchema\": {\n      \"properties\": {\n        \"blocks_layout\": {\n          \"title\": \"Cells\",\n          \"widget\": \"blocks_layout\",\n          \"allowedBlocks\": [\"teaser\", \"image\", \"slate\"]\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },
@@ -52,7 +52,7 @@
           "@id": "ref-grid-json-data-json-5ff79e",
           "label": "JSON Block Data",
           "language": "json",
-          "code": "{\n  \"@type\": \"gridBlock\",\n  \"columns\": [\n    {\n      \"@id\": \"col-1\",\n      \"blocks\": {\n        \"heading-1\": {\n          \"@type\": \"slate\",\n          \"value\": [{\"type\": \"h3\", \"children\": [{\"text\": \"Design\"}]}]\n        },\n        \"text-1\": {\n          \"@type\": \"slate\",\n          \"value\": [{\"type\": \"p\", \"children\": [{\"text\": \"We craft beautiful interfaces that users love.\"}]}]\n        }\n      },\n      \"blocks_layout\": {\n        \"items\": [\"heading-1\", \"text-1\"]\n      }\n    },\n    {\n      \"@id\": \"col-2\",\n      \"blocks\": {\n        \"img-1\": {\n          \"@type\": \"image\",\n          \"url\": \"https://placehold.co/600x400\",\n          \"alt\": \"Placeholder\"\n        }\n      },\n      \"blocks_layout\": {\n        \"items\": [\"img-1\"]\n      }\n    },\n    {\n      \"@id\": \"col-3\",\n      \"blocks\": {\n        \"teaser-1\": {\n          \"@type\": \"teaser\",\n          \"title\": \"Learn More\",\n          \"description\": \"Explore the full documentation.\",\n          \"href\": [{\"@id\": \"/concepts/architecture\"}]\n        }\n      },\n      \"blocks_layout\": {\n        \"items\": [\"teaser-1\"]\n      }\n    }\n  ]\n}"
+          "code": "{\n  \"@type\": \"gridBlock\",\n  \"blocks\": {\n    \"cell-1\": {\n      \"@type\": \"teaser\",\n      \"title\": \"Design\",\n      \"description\": \"We craft beautiful interfaces that users love.\",\n      \"href\": [{\"@id\": \"/design\"}]\n    },\n    \"cell-2\": {\n      \"@type\": \"image\",\n      \"url\": \"https://placehold.co/600x400\",\n      \"alt\": \"Placeholder\"\n    },\n    \"cell-3\": {\n      \"@type\": \"teaser\",\n      \"title\": \"Learn More\",\n      \"description\": \"Explore the full documentation.\",\n      \"href\": [{\"@id\": \"/docs\"}]\n    }\n  },\n  \"blocks_layout\": {\n    \"items\": [\"cell-1\", \"cell-2\", \"cell-3\"]\n  }\n}"
         }
       ]
     },

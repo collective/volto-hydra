@@ -45,19 +45,19 @@
           "@id": "ref-columns-rendering-jsx-a52cb0",
           "label": "React",
           "language": "jsx",
-          "code": "function GridBlock({ block }) {\n  const blocks = block.blocks || {};\n  const items = block.blocks_layout?.items || [];\n\n  return (\n    <div data-block-uid={block['@uid']} className=\"grid-block\">\n      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }}>\n        {items.map(id => {\n          const child = { ...blocks[id], '@uid': id };\n          return (\n            <div key={id} className=\"grid-cell\">\n              <BlockRenderer block={child} />\n            </div>\n          );\n        })}\n      </div>\n    </div>\n  );\n}"
+          "code": "function ColumnsBlock({ block }) {\n  const items = block.columns?.items || [];\n  const blocks = block.blocks || {};\n\n  return (\n    <div data-block-uid={block['@uid']} className=\"columns-block\">\n      <div style={{ display: 'flex', gap: '1rem' }}>\n        {items.map(id => (\n          <ColumnBlock key={id} block={{ ...blocks[id], '@uid': id }} />\n        ))}\n      </div>\n    </div>\n  );\n}\n\nfunction ColumnBlock({ block }) {\n  const items = block.blocks_layout?.items || [];\n  const blocks = block.blocks || {};\n\n  return (\n    <div data-block-uid={block['@uid']} style={{ flex: 1 }}>\n      {block.title && <h4 data-edit-text=\"title\">{block.title}</h4>}\n      {items.map(id => (\n        <BlockRenderer key={id} block={{ ...blocks[id], '@uid': id }} />\n      ))}\n    </div>\n  );\n}"
         },
         {
           "@id": "ref-columns-rendering-vue-526eec",
           "label": "Vue",
           "language": "vue",
-          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"grid-block\">\n    <div :style=\"{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '1rem' }\">\n      <div v-for=\"id in items\" :key=\"id\" class=\"grid-cell\">\n        <BlockRenderer :block=\"{ ...block.blocks?.[id], '@uid': id }\" />\n      </div>\n    </div>\n  </div>\n</template>\n\n<script setup>\nimport { computed } from 'vue';\nimport BlockRenderer from './BlockRenderer.vue';\nconst props = defineProps({ block: Object });\nconst items = computed(() => props.block.blocks_layout?.items || []);\n</script>"
+          "code": "<template>\n  <div :data-block-uid=\"block['@uid']\" class=\"columns-block\">\n    <div style=\"display: flex; gap: 1rem\">\n      <ColumnBlock\n        v-for=\"id in block.columns?.items || []\"\n        :key=\"id\"\n        :block=\"{ ...block.blocks?.[id], '@uid': id }\"\n      />\n    </div>\n  </div>\n</template>\n\n<script setup>\ndefineProps({ block: Object });\n</script>"
         },
         {
           "@id": "ref-columns-rendering-svelte-9b4eec",
           "label": "Svelte",
           "language": "svelte",
-          "code": "<script>\n  import BlockRenderer from './BlockRenderer.svelte';\n  export let block;\n  $: blocks = block.blocks || {};\n  $: items = block.blocks_layout?.items || [];\n</script>\n\n<div data-block-uid={block['@uid']} class=\"grid-block\">\n  <div style=\"display: grid; grid-template-columns: repeat({items.length}, 1fr); gap: 1rem\">\n    {#each items as id (id)}\n      <div class=\"grid-cell\">\n        <BlockRenderer block={{ ...blocks[id], '@uid': id }} />\n      </div>\n    {/each}\n  </div>\n</div>"
+          "code": "<script>\n  import ColumnBlock from './ColumnBlock.svelte';\n  export let block;\n</script>\n\n<div data-block-uid={block['@uid']} class=\"columns-block\">\n  <div style=\"display: flex; gap: 1rem\">\n    {#each block.columns?.items || [] as id (id)}\n      <ColumnBlock block={{ ...block.blocks?.[id], '@uid': id }} />\n    {/each}\n  </div>\n</div>"
         }
       ]
     }
