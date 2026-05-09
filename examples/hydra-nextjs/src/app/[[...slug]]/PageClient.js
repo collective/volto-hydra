@@ -6,7 +6,7 @@ import BlocksList from "@/components/BlocksList";
 // Bundle the doc-blocks schema bundle so addNodeIdsToAllSlateFields can
 // see e.g. highlight.description as a slate widget — without this the
 // bridge skips assigning data-node-id to slate field nodes.
-import docPageDefinitions from "../../../../../docs/blocks/block-definitions.json";
+import docPageDefinitions from "../../../../../docs/examples/block-definitions.json";
 const docBlocksConfig = Object.fromEntries(
   Object.values(docPageDefinitions).flatMap((page) => Object.entries(page.blocks)),
 );

@@ -802,7 +802,7 @@ function parseConceptsMd(mdContent) {
       const id = nextId('img');
       addBlock(id, {
         '@type': 'image',
-        url: `${IMAGES_PARENT_PATH}/_images/${slug}`,
+        url: `${IMAGES_PARENT_PATH}/images/${slug}`,
         alt,
         align: 'center',
         size: 'l',
@@ -1160,7 +1160,7 @@ for (const [parentFolder, children] of childrenByParent) {
 // --- Phase 5: Sync screenshot images into Plone Image content ---
 // Walks docs/**/*.md (excluding generated/output trees), collects every
 // ![alt](relative/path.png) reference, and ensures a matching Plone Image
-// content exists at <IMAGES_PARENT_PATH>/_images/<slug> with the binary
+// content exists at <IMAGES_PARENT_PATH>/images/<slug> with the binary
 // copied into <UID>/image/<filename>. Pages produce `image` blocks whose
 // `url` points at the Plone @id (handled in parseConceptsMd above).
 
@@ -1185,7 +1185,7 @@ function extToContentType(ext) {
 
 function buildImageFolderContent() {
   return {
-    '@id': `${IMAGES_PARENT_PATH}/_images`,
+    '@id': `${IMAGES_PARENT_PATH}/images`,
     '@type': 'Document',
     UID: IMAGES_FOLDER_UID,
     allow_discussion: false,
@@ -1201,7 +1201,7 @@ function buildImageFolderContent() {
     'exportimport.constrains': {},
     'exportimport.conversation': [],
     'exportimport.versions': {},
-    id: '_images',
+    id: 'images',
     is_folderish: true,
     language: '##DEFAULT##',
     layout: 'document_view',
@@ -1240,7 +1240,7 @@ function buildImageContent({ slug, filename, sourcePath, contentType }) {
     uid,
     folderName: uid,
     data: {
-      '@id': `${IMAGES_PARENT_PATH}/_images/${slug}`,
+      '@id': `${IMAGES_PARENT_PATH}/images/${slug}`,
       '@type': 'Image',
       UID: uid,
       allow_discussion: false,
@@ -1269,7 +1269,7 @@ function buildImageContent({ slug, filename, sourcePath, contentType }) {
       lock: {},
       modified: '2025-01-01T00:00:00+00:00',
       parent: {
-        '@id': `${IMAGES_PARENT_PATH}/_images`,
+        '@id': `${IMAGES_PARENT_PATH}/images`,
         '@type': 'Document',
         UID: IMAGES_FOLDER_UID,
         description: 'Documentation screenshots referenced by editor-experience pages.',
@@ -1388,6 +1388,111 @@ if (imageRefs.size > 0) {
         console.log(`Synced image: ${slug} (${reasons.join(', ')})`);
       }
     }
+  }
+}
+
+// --- Phase 6: Sync the global __metadata__.json ---
+// content/content/content/__metadata__.json is the export-import addon's
+// manifest: which data.json files exist, which blobs to import, and which
+// UIDs get which local roles. When new pages or images appear (Phase 4 +
+// Phase 5), the manifest needs to grow with them; when pages disappear
+// (e.g., we deleted /docs/deployment), the manifest needs to drop those
+// entries. Plone's importer reads this file and silently skips any data
+// not listed — so a stale manifest = pages that exist on disk but never
+// import. The deploy validator (deploy-all.sh Step 0) catches that drift.
+{
+  const globalPath = join(CONTENT_DIR, '__metadata__.json');
+  if (existsSync(globalPath)) {
+    const meta = JSON.parse(readFileSync(globalPath, 'utf-8'));
+    const originalGlobal = JSON.stringify(meta, null, 2) + '\n';
+
+    const dataFilesOnDisk = new Set();
+    const blobFilesOnDisk = new Set();
+    function walk(absDir, relDir) {
+      for (const entry of readdirSync(absDir, { withFileTypes: true })) {
+        if (entry.name.startsWith('.')) continue;
+        const abs = join(absDir, entry.name);
+        const rel = relDir ? `${relDir}/${entry.name}` : entry.name;
+        if (entry.isFile()) {
+          if (entry.name === 'data.json' && relDir !== '') {
+            dataFilesOnDisk.add(`${relDir}/data.json`);
+          }
+          if (/\.(png|jpg|jpeg|svg|gif|webp)$/i.test(entry.name)) {
+            blobFilesOnDisk.add(rel);
+          }
+        } else if (entry.isDirectory()) {
+          walk(abs, rel);
+        }
+      }
+    }
+    walk(CONTENT_DIR, '');
+
+    // Read each data.json once to extract @id + UID. Sort _data_files_
+    // by @id depth ascending — Plone's importer processes the list
+    // linearly and skips children whose parent doesn't yet exist
+    // (manifests as "Container /foo for /foo/bar not found" warnings),
+    // so parents must come first. The Plone-import schema's top-level
+    // key here is `local_roles` (NOT `content` — ExportImportMetadata
+    // rejects unknown kwargs at site creation time).
+    const dataFileEntries = [];
+    for (const f of dataFilesOnDisk) {
+      let d;
+      try {
+        d = JSON.parse(readFileSync(join(CONTENT_DIR, f), 'utf-8'));
+      } catch { continue; }
+      const atId = d['@id'] || '';
+      const depth = atId === '/' ? 0 : atId.split('/').filter(Boolean).length;
+      // plone_site_root is the Plone Site itself — implicit container for
+      // every top-level entry. Force it to position 0 regardless of @id.
+      const isPloneRoot = d.UID === 'plone_site_root';
+      dataFileEntries.push({ f, atId, depth, uid: d.UID, isPloneRoot });
+    }
+    dataFileEntries.sort((a, b) => {
+      if (a.isPloneRoot !== b.isPloneRoot) return a.isPloneRoot ? -1 : 1;
+      return a.depth - b.depth || a.atId.localeCompare(b.atId);
+    });
+    meta._data_files_ = dataFileEntries.map(e => e.f);
+    meta._blob_files_ = [...blobFilesOnDisk].sort();
+
+    const allUids = new Set(dataFileEntries.map(e => e.uid).filter(Boolean));
+    const localRoles = meta.local_roles || {};
+    for (const uid of allUids) {
+      if (!localRoles[uid]) localRoles[uid] = { local_roles: { admin: ['Owner'] } };
+    }
+    for (const uid of Object.keys(localRoles)) {
+      if (!allUids.has(uid)) delete localRoles[uid];
+    }
+    meta.local_roles = localRoles;
+    // Drop a stray `content` key in case an earlier (broken) sync run
+    // wrote one — Plone import will reject it as an unknown kwarg.
+    delete meta.content;
+
+    const updated = JSON.stringify(meta, null, 2) + '\n';
+    if (updated !== originalGlobal) {
+      outOfSync = true;
+      if (checkMode) {
+        console.error('OUT OF SYNC: __metadata__.json (_data_files_ / _blob_files_ / local_roles)');
+      } else {
+        writeFileSync(globalPath, updated, 'utf-8');
+        console.log('Updated global __metadata__.json (_data_files_ / _blob_files_ / local_roles)');
+      }
+    }
+  }
+}
+
+// --- Phase 7: Validate the resulting Plone tree ---
+// Same canonical validator the mock-api server uses at startup and the
+// deploy script calls in Step 0. Fails fast on the export-shape pitfalls
+// we've hit at site creation (underscore ids, child-before-parent in
+// _data_files_, top-level `content` key, missing local_roles).
+{
+  const { validate, formatReport } = await import(
+    '../tests-playwright/fixtures/plone-content-validator.cjs'
+  ).then(m => m.default);
+  const result = validate(CONTENT_DIR);
+  if (result.errors.length > 0) {
+    console.error(formatReport('validate', result));
+    process.exit(1);
   }
 }
 

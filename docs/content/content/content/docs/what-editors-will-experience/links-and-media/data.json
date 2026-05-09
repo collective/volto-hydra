@@ -147,7 +147,7 @@
     },
     "img-4": {
       "@type": "image",
-      "url": "/docs/_images/link-picker",
+      "url": "/docs/images/link-picker",
       "alt": "Link picker on a slate link — URL field with /another-page, browse / clear / open-new-tab / submit icons.",
       "align": "center",
       "size": "l"
@@ -266,7 +266,7 @@
     },
     "img-11": {
       "@type": "image",
-      "url": "/docs/_images/media-empty-placeholder",
+      "url": "/docs/images/media-empty-placeholder",
       "alt": "Empty image block selected — placeholder with image icon, \"Browse the site, drop an image...\" input, sidebar showing \"NO IMAGE SELECTED\".",
       "align": "center",
       "size": "l"

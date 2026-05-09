@@ -80,7 +80,7 @@
   // examples. Without registering blocks, addNodeIdsToAllSlateFields can't
   // identify slate fields like highlight.description, so the bridge skips
   // assigning data-node-id and slate round-trip checks fail.
-  import docPageDefinitions from '../../../../docs/blocks/block-definitions.json';
+  import docPageDefinitions from '../../../../docs/examples/block-definitions.json';
   const docBlocksConfig = Object.fromEntries(
     Object.values(docPageDefinitions).flatMap((page) => Object.entries(page.blocks)),
   );

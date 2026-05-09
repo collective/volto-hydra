@@ -278,7 +278,7 @@
     },
     "img-10": {
       "@type": "image",
-      "url": "/docs/_images/frontend-switcher",
+      "url": "/docs/images/frontend-switcher",
       "alt": "Frontend switcher panel — Viewport section with Mobile/Tablet/Desktop, Frontend section listing four saved frontends, Settings button at the bottom.",
       "align": "center",
       "size": "l"

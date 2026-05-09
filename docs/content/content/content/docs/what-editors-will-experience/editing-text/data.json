@@ -809,7 +809,7 @@
     },
     "img-17": {
       "@type": "image",
-      "url": "/docs/_images/slash-menu",
+      "url": "/docs/images/slash-menu",
       "alt": "Empty paragraph showing the slash menu listing block types — Accordion, Columns, Description, etc.",
       "align": "center",
       "size": "l"

@@ -158,7 +158,7 @@
     },
     "img-5": {
       "@type": "image",
-      "url": "/docs/_images/block-selected",
+      "url": "/docs/images/block-selected",
       "alt": "Slate paragraph in text mode — cursor in the field, sidebar showing block's settings.",
       "align": "center",
       "size": "l"
@@ -297,7 +297,7 @@
     },
     "img-11": {
       "@type": "image",
-      "url": "/docs/_images/block-mode",
+      "url": "/docs/images/block-mode",
       "alt": "Same paragraph in block mode — full blue border, no cursor.",
       "align": "center",
       "size": "l"
@@ -604,7 +604,7 @@
     },
     "img-17": {
       "@type": "image",
-      "url": "/docs/_images/multi-select",
+      "url": "/docs/images/multi-select",
       "alt": "Two adjacent paragraphs multi-selected — combined bounding box, sidebar shows \"2 selected\", toolbar shows count badge.",
       "align": "center",
       "size": "l"
@@ -727,7 +727,7 @@
     },
     "img-24": {
       "@type": "image",
-      "url": "/docs/_images/parent-chain",
+      "url": "/docs/images/parent-chain",
       "alt": "Sidebar showing parent chain for a slate inside a column inside columns. Three sections each with a `‹` arrow: Columns (\"My Columns Section\"), Column (\"Left Column\"), Text (current, body field shown).",
       "align": "center",
       "size": "l"
@@ -855,7 +855,7 @@
     },
     "img-31": {
       "@type": "image",
-      "url": "/docs/_images/children-list",
+      "url": "/docs/images/children-list",
       "alt": "Sidebar with a columns container selected, showing two children-list sections — Top Images (with two Image rows) and Columns (with two Column rows). Each row has a `⋮⋮` drag handle and a `>` drill-in arrow; each section has a `+` add button.",
       "align": "center",
       "size": "l"

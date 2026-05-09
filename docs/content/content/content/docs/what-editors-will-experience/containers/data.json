@@ -198,7 +198,7 @@
     },
     "img-7": {
       "@type": "image",
-      "url": "/docs/_images/wrap-chooser",
+      "url": "/docs/images/wrap-chooser",
       "alt": "Two adjacent paragraphs multi-selected, \"Wrap in...\" chooser open showing container types in Most Used / Common groups.",
       "align": "center",
       "size": "l"
@@ -394,7 +394,7 @@
     },
     "img-17": {
       "@type": "image",
-      "url": "/docs/_images/edge-drag-ghost",
+      "url": "/docs/images/edge-drag-ghost",
       "alt": "Container selected with edge handles visible. The bottom handle is being dragged toward the next sibling.",
       "align": "center",
       "size": "l"
@@ -534,7 +534,7 @@
     },
     "img-23": {
       "@type": "image",
-      "url": "/docs/_images/container-convert",
+      "url": "/docs/images/container-convert",
       "alt": "A grid container selected, \"Convert to...\" chooser open showing compatible target container types.",
       "align": "center",
       "size": "l"

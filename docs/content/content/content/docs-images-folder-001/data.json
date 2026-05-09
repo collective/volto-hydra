@@ -1,5 +1,5 @@
 {
-  "@id": "/docs/_images",
+  "@id": "/docs/images",
   "@type": "Document",
   "UID": "docs-images-folder-001",
   "allow_discussion": false,
@@ -25,7 +25,7 @@
   "exportimport.constrains": {},
   "exportimport.conversation": [],
   "exportimport.versions": {},
-  "id": "_images",
+  "id": "images",
   "is_folderish": true,
   "language": "##DEFAULT##",
   "layout": "document_view",

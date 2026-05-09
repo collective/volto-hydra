@@ -61,12 +61,12 @@
           "type": "p",
           "children": [
             {
-              "text": "Hydra — visual editing for headless Plone. © 2024-2026 Plone Foundation."
+              "text": "Hydra \u2014 visual editing for headless Plone. \u00a9 2024-2026 Plone Foundation."
             }
           ]
         }
       ],
-      "plaintext": "Hydra — visual editing for headless Plone. © 2024-2026 Plone Foundation."
+      "plaintext": "Hydra \u2014 visual editing for headless Plone. \u00a9 2024-2026 Plone Foundation."
     },
     "default-slot": {
       "@type": "slate",
@@ -121,5 +121,13 @@
   },
   "effective": "2025-01-01T00:00:00",
   "modified": "2025-01-01T00:00:00+00:00",
-  "created": "2025-01-01T00:00:00+00:00"
+  "created": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/templates",
+    "@type": "Folder",
+    "UID": "tpl-folder-001",
+    "description": "Layout and block templates",
+    "title": "Templates",
+    "type_title": "Page"
+  }
 }

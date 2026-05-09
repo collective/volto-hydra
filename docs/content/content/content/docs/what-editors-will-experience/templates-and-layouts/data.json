@@ -414,7 +414,7 @@
     },
     "img-19": {
       "@type": "image",
-      "url": "/docs/_images/template-locked",
+      "url": "/docs/images/template-locked",
       "alt": "A page with a snippet template applied. The \"Snippet Header\" block is selected, rendered in muted style as a locked block. The sidebar shows the template's settings (Template Name, Save Location).",
       "align": "center",
       "size": "l"
