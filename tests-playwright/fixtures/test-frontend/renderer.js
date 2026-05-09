@@ -1054,15 +1054,14 @@ function attachFormValidation(formEl, block) {
 
 /**
  * Render a columns container block.
- * Has TWO container fields: top_images and columns (tests multi-field routing)
+ * One blocks_layout slot (`columns`) restricted to `column` children.
  * Calls window._expandListingBlocks for nested listings in columns.
- * @param {Object} block - Columns block data with shared blocks dict + top_images/columns layout fields
+ * @param {Object} block - Columns block data with shared blocks dict + columns layout field
  * @returns {Promise<string>} HTML string
  */
 async function renderColumnsBlock(block) {
     // Support both flat (block.blocks) and nested (block.columns.blocks) formats
     const blocks = block.blocks || block.columns?.blocks || {};
-    const topImagesItems = block.top_images?.items || [];
     const columnsItems = block.columns?.items || [];
     const title = block.title || '';
 
@@ -1071,24 +1070,6 @@ async function renderColumnsBlock(block) {
     // Render editable title for columns block
     if (title) {
         html += `<h3 data-edit-text="title" class="columns-title" style="margin-bottom: 10px;">${title}</h3>`;
-    }
-
-    // Render top_images container field (images go right)
-    if (topImagesItems.length > 0) {
-        html += '<div class="top-images-row" style="display: flex; gap: 10px; margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 4px;">';
-        html += '<div class="field-label" style="font-weight: bold; color: #666; font-size: 12px; writing-mode: vertical-rl; text-orientation: mixed;">TOP IMAGES</div>';
-
-        for (const imgId of topImagesItems) {
-            const img = blocks[imgId];
-            if (!img) continue;
-
-            // Render image as a nested block with data-block-uid and data-block-add="right"
-            html += `<div data-block-uid="${imgId}" data-block-add="right" class="top-image" style="flex: 0 0 auto;">`;
-            html += renderImageBlock(img);
-            html += '</div>';
-        }
-
-        html += '</div>';
     }
 
     // Render columns container (columns go right)

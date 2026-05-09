@@ -85,8 +85,10 @@ export const sharedBlocksConfig = {
             },
         },
     },
-    // Container block: columns contains column children AND top_images
-    // Tests multi-container field routing
+    // Container block: columns contains column children. The columns
+    // slot has allowedBlocks: ['column'] with no defaultBlockType — this
+    // is the single-allowedBlock-fallback path that the
+    // "Enter in container with single allowedBlock" test exercises.
     columns: {
         id: 'columns',
         title: 'Columns',
@@ -97,18 +99,13 @@ export const sharedBlocksConfig = {
                 {
                     id: 'default',
                     title: 'Default',
-                    fields: ['title', 'top_images', 'columns'],
+                    fields: ['title', 'columns'],
                 },
             ],
             properties: {
                 title: {
                     title: 'Title',
                     type: 'string',
-                },
-                top_images: {
-                    title: 'Top Images',
-                    widget: 'blocks_layout',
-                    allowedBlocks: ['image'],
                 },
                 columns: {
                     title: 'Columns',
