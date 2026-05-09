@@ -13,6 +13,15 @@ containers
 templates-and-layouts
 ```
 
+## Hydra mechanics vs your site's design system
+
+Two layers are stacked on the editor screen:
+
+- **Hydra's mechanics** — the toolbar, sidebar, selection borders, Quanta toolbar, slash menu, link picker, image picker, container operations. These look and behave the same on every Hydra-powered site, and this guide covers them.
+- **Your site's design system** — what block types exist, how they render, which fields are inline-editable, the names you see in menus. The live preview comes straight from your frontend, so a "paragraph" might be called "Lead paragraph", an image block might have a caption your developers added, the slash-menu list of available block types reflects what your site registered. The mechanics are the same; only the labels and visuals change.
+
+If something in this guide doesn't match what you see, it's almost always because your design system named or styled it differently — the underlying interaction is still the same.
+
 ## What you see
 
 The editor screen has three regions:

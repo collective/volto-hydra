@@ -8,7 +8,7 @@
   "creators": [
     "admin"
   ],
-  "description": "",
+  "description": "The link picker, image picker, and upload dialog are part of Hydra's chrome — they look the same on every site. What varies by design system is which links and images are click-to-edit in the preview: a site might wire up every link inline, or only a few \"primary\" links, with everything else editable from the sidebar. Same applies to images.",
   "effective": "2025-01-01T00:00:00",
   "exclude_from_nav": false,
   "expires": null,
@@ -57,7 +57,28 @@
     "title-1": {
       "@type": "title"
     },
-    "h-1": {
+    "p-1": {
+      "@type": "slate",
+      "plaintext": "The link picker, image picker, and upload dialog are part of Hydra's chrome — they look the same on every site. What varies by design system is **which** links and images are click-to-edit in the preview: a site might wire up every link inline, or only a few \"primary\" links, with everything else editable from the sidebar. Same applies to images.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The link picker, image picker, and upload dialog are part of Hydra's chrome — they look the same on every site. What varies by design system is "
+            },
+            {
+              "text": "which",
+              "strong": true
+            },
+            {
+              "text": " links and images are click-to-edit in the preview: a site might wire up every link inline, or only a few \"primary\" links, with everything else editable from the sidebar. Same applies to images."
+            }
+          ]
+        }
+      ]
+    },
+    "h-2": {
       "@type": "slate",
       "plaintext": "Editing a link",
       "value": [
@@ -71,7 +92,7 @@
         }
       ]
     },
-    "p-2": {
+    "p-3": {
       "@type": "slate",
       "plaintext": "When the frontend has wired up a link field as inline-editable, clicking the link in the preview doesn't navigate — it opens the **link picker** instead. From the picker you can:",
       "value": [
@@ -92,7 +113,7 @@
         }
       ]
     },
-    "ul-3": {
+    "ul-4": {
       "@type": "slate",
       "plaintext": "Pick a CMS page by browsing the content tree. Type/paste an external URL. Open the URL in a new tab (toggle the \"Open in new tab\" option). Clear the link.",
       "value": [
@@ -145,14 +166,14 @@
         }
       ]
     },
-    "img-4": {
+    "img-5": {
       "@type": "image",
       "url": "/docs/images/link-picker",
       "alt": "Link picker on a slate link — URL field with /another-page, browse / clear / open-new-tab / submit icons.",
       "align": "center",
       "size": "l"
     },
-    "p-5": {
+    "p-6": {
       "@type": "slate",
       "plaintext": "The Quanta toolbar's link icon does the same thing and is available on slate text fields too — select some text, click the link icon, and the link picker opens for that text range.",
       "value": [
@@ -166,7 +187,7 @@
         }
       ]
     },
-    "h-6": {
+    "h-7": {
       "@type": "slate",
       "plaintext": "Uploading media",
       "value": [
@@ -180,7 +201,7 @@
         }
       ]
     },
-    "p-7": {
+    "p-8": {
       "@type": "slate",
       "plaintext": "When the frontend marks an image (or other media element) as inline-editable, you can:",
       "value": [
@@ -194,7 +215,7 @@
         }
       ]
     },
-    "h-8": {
+    "h-9": {
       "@type": "slate",
       "plaintext": "Empty media element",
       "value": [
@@ -208,7 +229,7 @@
         }
       ]
     },
-    "p-9": {
+    "p-10": {
       "@type": "slate",
       "plaintext": "You'll see an empty placeholder with a prompt to **upload, browse, or drag in** an image. Three ways:",
       "value": [
@@ -229,7 +250,7 @@
         }
       ]
     },
-    "ul-10": {
+    "ul-11": {
       "@type": "slate",
       "plaintext": "Click the placeholder → the media picker opens. Pick from existing CMS images or upload a new one. Drag an image file from your desktop and drop it directly onto the placeholder. Drag an image from another tab / source if your browser supports it.",
       "value": [
@@ -264,14 +285,14 @@
         }
       ]
     },
-    "img-11": {
+    "img-12": {
       "@type": "image",
       "url": "/docs/images/media-empty-placeholder",
       "alt": "Empty image block selected — placeholder with image icon, \"Browse the site, drop an image...\" input, sidebar showing \"NO IMAGE SELECTED\".",
       "align": "center",
       "size": "l"
     },
-    "h-12": {
+    "h-13": {
       "@type": "slate",
       "plaintext": "Replacing an existing media element",
       "value": [
@@ -285,7 +306,7 @@
         }
       ]
     },
-    "p-13": {
+    "p-14": {
       "@type": "slate",
       "plaintext": "Hover the image — controls appear. You can:",
       "value": [
@@ -299,7 +320,7 @@
         }
       ]
     },
-    "ul-14": {
+    "ul-15": {
       "@type": "slate",
       "plaintext": "Replace — opens the media picker to pick or upload a different image. Remove — clears the field, returns to the empty placeholder state. Drag and drop a new image directly onto the existing one to replace it.",
       "value": [
@@ -346,7 +367,7 @@
         }
       ]
     },
-    "p-15": {
+    "p-16": {
       "@type": "slate",
       "plaintext": "The same actions are available from the sidebar field if you'd rather not click into the preview.",
       "value": [
@@ -360,7 +381,7 @@
         }
       ]
     },
-    "h-16": {
+    "h-17": {
       "@type": "slate",
       "plaintext": "What gets stored",
       "value": [
@@ -374,7 +395,7 @@
         }
       ]
     },
-    "p-17": {
+    "p-18": {
       "@type": "slate",
       "plaintext": "When you pick or upload an image, what gets stored on the block isn't a URL string — it's a small object containing the image's CMS path, the field name, and the available scales. The frontend resolves a specific scale at render time (so the same image data renders at thumbnail size in a listing and full size in a hero). You don't have to think about scales as an editor; they're a developer concern.",
       "value": [
@@ -388,7 +409,7 @@
         }
       ]
     },
-    "h-18": {
+    "h-19": {
       "@type": "slate",
       "plaintext": "What's not (yet) inline-editable",
       "value": [
@@ -402,7 +423,7 @@
         }
       ]
     },
-    "p-19": {
+    "p-20": {
       "@type": "slate",
       "plaintext": "A few media types currently still require sidebar editing:",
       "value": [
@@ -416,7 +437,7 @@
         }
       ]
     },
-    "ul-20": {
+    "ul-21": {
       "@type": "slate",
       "plaintext": "File uploads (PDFs, downloads) — pickable from the sidebar but no drag-onto-preview support yet. Embedded video URLs — sidebar field; click-to-edit on the player isn't wired up.",
       "value": [
@@ -451,7 +472,7 @@
         }
       ]
     },
-    "p-21": {
+    "p-22": {
       "@type": "slate",
       "plaintext": "If your frontend doesn't expose a particular media field as inline-editable, you can always edit it from the sidebar — that's available for every field.",
       "value": [
@@ -469,27 +490,28 @@
   "blocks_layout": {
     "items": [
       "title-1",
-      "h-1",
-      "p-2",
-      "ul-3",
-      "img-4",
-      "p-5",
-      "h-6",
-      "p-7",
-      "h-8",
-      "p-9",
-      "ul-10",
-      "img-11",
-      "h-12",
-      "p-13",
-      "ul-14",
-      "p-15",
-      "h-16",
-      "p-17",
-      "h-18",
-      "p-19",
-      "ul-20",
-      "p-21"
+      "p-1",
+      "h-2",
+      "p-3",
+      "ul-4",
+      "img-5",
+      "p-6",
+      "h-7",
+      "p-8",
+      "h-9",
+      "p-10",
+      "ul-11",
+      "img-12",
+      "h-13",
+      "p-14",
+      "ul-15",
+      "p-16",
+      "h-17",
+      "p-18",
+      "h-19",
+      "p-20",
+      "ul-21",
+      "p-22"
     ]
   }
 }

@@ -9,6 +9,10 @@ Templates let editors reuse a layout consistently across many pages without copy
 
 The two share the same merge rules; the difference is just where they're applied.
 
+```{note}
+Whether your site has any templates or layouts at all is a design-system choice. A site can perfectly well skip them and let editors build pages freely; another might lock most pages into a small set of fixed layouts. The mechanics on this page apply when they're configured.
+```
+
 ## What you'll see in the editor
 
 When a template is applied to a page, blocks fall into three categories:

@@ -80,6 +80,83 @@
     },
     "h-2": {
       "@type": "slate",
+      "plaintext": "Hydra mechanics vs your site's design system",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Hydra mechanics vs your site's design system"
+            }
+          ]
+        }
+      ]
+    },
+    "p-3": {
+      "@type": "slate",
+      "plaintext": "Two layers are stacked on the editor screen:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Two layers are stacked on the editor screen:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-4": {
+      "@type": "slate",
+      "plaintext": "Hydra's mechanics — the toolbar, sidebar, selection borders, Quanta toolbar, slash menu, link picker, image picker, container operations. These look and behave the same on every Hydra-powered site, and this guide covers them. Your site's design system — what block types exist, how they render, which fields are inline-editable, the names you see in menus. The live preview comes straight from your frontend, so a \"paragraph\" might be called \"Lead paragraph\", an image block might have a caption your developers added, the slash-menu list of available block types reflects what your site registered. The mechanics are the same; only the labels and visuals change.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Hydra's mechanics",
+                  "strong": true
+                },
+                {
+                  "text": " — the toolbar, sidebar, selection borders, Quanta toolbar, slash menu, link picker, image picker, container operations. These look and behave the same on every Hydra-powered site, and this guide covers them."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Your site's design system",
+                  "strong": true
+                },
+                {
+                  "text": " — what block types exist, how they render, which fields are inline-editable, the names you see in menus. The live preview comes straight from your frontend, so a \"paragraph\" might be called \"Lead paragraph\", an image block might have a caption your developers added, the slash-menu list of available block types reflects what your site registered. The mechanics are the same; only the labels and visuals change."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-5": {
+      "@type": "slate",
+      "plaintext": "If something in this guide doesn't match what you see, it's almost always because your design system named or styled it differently — the underlying interaction is still the same.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "If something in this guide doesn't match what you see, it's almost always because your design system named or styled it differently — the underlying interaction is still the same."
+            }
+          ]
+        }
+      ]
+    },
+    "h-6": {
+      "@type": "slate",
       "plaintext": "What you see",
       "value": [
         {
@@ -92,7 +169,7 @@
         }
       ]
     },
-    "p-3": {
+    "p-7": {
       "@type": "slate",
       "plaintext": "The editor screen has three regions:",
       "value": [
@@ -106,18 +183,18 @@
         }
       ]
     },
-    "ce-4": {
+    "ce-8": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-4-text-2da955",
+          "@id": "ce-8-text-6b4738",
           "label": "Text",
           "language": "text",
           "code": "┌───────────┬──────────────────────────────────┬──────────────┐\n│           │                                  │              │\n│  Toolbar  │   Live preview (your frontend)   │   Sidebar    │\n│           │                                  │              │\n│  • Save   │                                  │   Page title │\n│  • Pages  │  Click anywhere here to edit.    │   Block list │\n│  • Site   │                                  │   Settings   │\n│           │                                  │              │\n└───────────┴──────────────────────────────────┴──────────────┘"
         }
       ]
     },
-    "ul-5": {
+    "ul-9": {
       "@type": "slate",
       "plaintext": "Toolbar (left) — saving, navigating to other pages, site settings. Standard Volto, plus the Frontend switcher (see below). Live preview (centre) — your actual frontend, running inside an iframe. This is what readers will see. Click directly into the preview to edit. Sidebar (right) — when no block is selected, lists the page-level fields (title, description, blocks). When a block is selected, shows that block's settings, the chain of parent containers, and (for container blocks) the list of children. See Selecting blocks for the navigation patterns.",
       "value": [
@@ -185,7 +262,7 @@
         }
       ]
     },
-    "h-6": {
+    "h-10": {
       "@type": "slate",
       "plaintext": "Frontend switcher",
       "value": [
@@ -199,7 +276,7 @@
         }
       ]
     },
-    "p-7": {
+    "p-11": {
       "@type": "slate",
       "plaintext": "A toolbar button opens the **Frontend switcher** panel with two sections:",
       "value": [
@@ -220,7 +297,7 @@
         }
       ]
     },
-    "ul-8": {
+    "ul-12": {
       "@type": "slate",
       "plaintext": "Viewport — preview the page at common screen sizes (desktop, tablet, mobile). Pure visual switch — no content change. Frontend — list of saved frontend URLs the editor can switch between. Picking one swaps the iframe to that frontend immediately. Same content, different rendering — a Hydra-defining feature: edit a page once, see it on the marketing site, the docs site, the mobile app's web version, and the email-renderer in turn without leaving the page.",
       "value": [
@@ -255,7 +332,7 @@
         }
       ]
     },
-    "p-9": {
+    "p-13": {
       "@type": "slate",
       "plaintext": "A **Settings** button at the bottom of the panel manages the saved URLs (add, remove, rename). The currently active frontend is highlighted in the list.",
       "value": [
@@ -276,14 +353,14 @@
         }
       ]
     },
-    "img-10": {
+    "img-14": {
       "@type": "image",
       "url": "/docs/images/frontend-switcher",
       "alt": "Frontend switcher panel — Viewport section with Mobile/Tablet/Desktop, Frontend section listing four saved frontends, Settings button at the bottom.",
       "align": "center",
       "size": "l"
     },
-    "h-11": {
+    "h-15": {
       "@type": "slate",
       "plaintext": "Two ways to edit any field",
       "value": [
@@ -297,7 +374,7 @@
         }
       ]
     },
-    "p-12": {
+    "p-16": {
       "@type": "slate",
       "plaintext": "Most fields can be edited from either side:",
       "value": [
@@ -311,7 +388,7 @@
         }
       ]
     },
-    "ul-13": {
+    "ul-17": {
       "@type": "slate",
       "plaintext": "From the preview — click the rendered text/image/link directly and start typing or replacing media. From the sidebar — find the field in the block's settings panel and edit it there.",
       "value": [
@@ -346,7 +423,7 @@
         }
       ]
     },
-    "p-14": {
+    "p-18": {
       "@type": "slate",
       "plaintext": "Sidebar editing is always available. Inline editing depends on the frontend supporting it for that field; some fields show a thin underline when hovered to signal they're inline-editable. Either way the result is the same — there's only one source of truth.",
       "value": [
@@ -360,7 +437,7 @@
         }
       ]
     },
-    "h-15": {
+    "h-19": {
       "@type": "slate",
       "plaintext": "What's a block?",
       "value": [
@@ -374,7 +451,7 @@
         }
       ]
     },
-    "p-16": {
+    "p-20": {
       "@type": "slate",
       "plaintext": "A block is a discrete piece of page content with a type (slate, image, listing, slider, etc.), a schema (its fields), and a position. Blocks can be added, removed, moved, and configured. Some blocks contain other blocks — those are called **container blocks** (columns, accordion, slider, grids, sections).",
       "value": [
@@ -395,7 +472,7 @@
         }
       ]
     },
-    "p-17": {
+    "p-21": {
       "@type": "slate",
       "plaintext": "The page itself is a list of blocks (sometimes split across multiple regions like header / content / footer). When you click into the preview, you're clicking on a block.",
       "value": [
@@ -409,7 +486,7 @@
         }
       ]
     },
-    "h-18": {
+    "h-22": {
       "@type": "slate",
       "plaintext": "When in doubt — Escape",
       "value": [
@@ -423,7 +500,7 @@
         }
       ]
     },
-    "p-19": {
+    "p-23": {
       "@type": "slate",
       "plaintext": "Pressing `Escape` is always safe. It progressively backs out:",
       "value": [
@@ -444,7 +521,7 @@
         }
       ]
     },
-    "ol-20": {
+    "ol-24": {
       "@type": "slate",
       "plaintext": "If you're typing in a text field → leaves text editing, the block stays selected. If a block is selected (block mode) → goes up to the parent container. If nothing is selected → no-op.",
       "value": [
@@ -479,7 +556,7 @@
         }
       ]
     },
-    "p-21": {
+    "p-25": {
       "@type": "slate",
       "plaintext": "So `Escape` repeatedly takes you up one level at a time. See [Selecting blocks](selecting-blocks.md) for what selection looks like at each level.",
       "value": [
@@ -521,24 +598,28 @@
       "p-1",
       "h-2",
       "p-3",
-      "ce-4",
-      "ul-5",
+      "ul-4",
+      "p-5",
       "h-6",
       "p-7",
-      "ul-8",
-      "p-9",
-      "img-10",
-      "h-11",
-      "p-12",
-      "ul-13",
-      "p-14",
+      "ce-8",
+      "ul-9",
+      "h-10",
+      "p-11",
+      "ul-12",
+      "p-13",
+      "img-14",
       "h-15",
       "p-16",
-      "p-17",
-      "h-18",
-      "p-19",
-      "ol-20",
-      "p-21"
+      "ul-17",
+      "p-18",
+      "h-19",
+      "p-20",
+      "p-21",
+      "h-22",
+      "p-23",
+      "ol-24",
+      "p-25"
     ]
   }
 }

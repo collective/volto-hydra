@@ -2,6 +2,10 @@
 
 Click into any text in the preview that's marked inline-editable and start typing. There are two kinds of text fields: **simple text** (like a title) and **slate** (rich text — the body of a paragraph block, descriptions, etc.).
 
+```{note}
+Which fields are inline-editable depends on your design system. Some sites mark every visible text field as inline-editable; others only mark the "main" text and route everything else through the sidebar. The toolbar and cursor behaviour below is the same either way — but if a field doesn't enter edit mode on click, that's a design-system choice, not a bug. Use the sidebar.
+```
+
 ## Simple text
 
 Click and type. `Enter` splits the field into two text blocks (when supported); `Backspace` at the start joins back. That's it.

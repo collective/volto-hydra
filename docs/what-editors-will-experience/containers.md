@@ -4,6 +4,10 @@ A **container block** holds other blocks inside it — sliders, columns, accordi
 
 This page covers operations that change container structure: wrap a selection, unwrap a container, drag the edge of a container to absorb or expel adjacent blocks, and convert a container's type while keeping the children.
 
+```{note}
+Which container types are available depends on your design system. A site might offer columns, accordions, sliders, and generic sections; another might only have a single "section" container with style variants. The wrap / unwrap / edge-drag / convert mechanics work the same regardless — the chooser just shows whatever your site registered.
+```
+
 ## Wrap
 
 Select one or more blocks (see [Selecting blocks](selecting-blocks.md)), then choose **Wrap in...** from the Quanta toolbar dropdown (or sidebar block actions). A popup shows container types that:
