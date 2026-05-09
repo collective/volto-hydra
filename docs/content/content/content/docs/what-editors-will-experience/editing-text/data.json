@@ -68,15 +68,23 @@
               "text": "Click into any text in the preview that's marked inline-editable and start typing. There are two kinds of text fields: "
             },
             {
-              "text": "simple text",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "simple text"
+                }
+              ]
             },
             {
               "text": " (like a title) and "
             },
             {
-              "text": "slate",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "slate"
+                }
+              ]
             },
             {
               "text": " (rich text — the body of a paragraph block, descriptions, etc.)."
@@ -110,15 +118,23 @@
               "text": "Click and type. "
             },
             {
-              "text": "Enter",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Enter"
+                }
+              ]
             },
             {
               "text": " splits the field into two text blocks (when supported); "
             },
             {
-              "text": "Backspace",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Backspace"
+                }
+              ]
             },
             {
               "text": " at the start joins back. That's it."
@@ -177,15 +193,23 @@
                   "text": "Apply marks: "
                 },
                 {
-                  "text": "Bold",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Bold"
+                    }
+                  ]
                 },
                 {
                   "text": ", "
                 },
                 {
-                  "text": "Italic",
-                  "em": true
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": "Italic"
+                    }
+                  ]
                 },
                 {
                   "text": ", ~~Strikethrough~~ via toolbar buttons or keyboard shortcuts."
@@ -308,8 +332,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "## ",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "## "
+                          }
+                        ]
                       }
                     ]
                   }
@@ -342,8 +370,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "### ",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "### "
+                          }
+                        ]
                       }
                     ]
                   }
@@ -376,8 +408,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "> ",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "> "
+                          }
+                        ]
                       }
                     ]
                   }
@@ -410,22 +446,34 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "- ",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "- "
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "+ ",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "+ "
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "* ",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "* "
+                          }
+                        ]
                       }
                     ]
                   }
@@ -458,15 +506,23 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "1. ",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "1. "
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "1) ",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "1) "
+                          }
+                        ]
                       }
                     ]
                   }
@@ -562,15 +618,23 @@
                         "text": "`"
                       },
                       {
-                        "text": " ",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": " "
+                          }
+                        ]
                       },
                       {
                         "text": "code"
                       },
                       {
-                        "text": " ",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": " "
+                          }
+                        ]
                       },
                       {
                         "text": "`"
@@ -606,15 +670,23 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "**bold**",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "**bold**"
+                          }
+                        ]
                       },
                       {
                         "text": " or "
                       },
                       {
-                        "text": "__bold__",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "__bold__"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -628,8 +700,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "bold",
-                        "strong": true
+                        "type": "strong",
+                        "children": [
+                          {
+                            "text": "bold"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -648,15 +724,23 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "*italic*",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "*italic*"
+                          }
+                        ]
                       },
                       {
                         "text": " or "
                       },
                       {
-                        "text": "_italic_",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "_italic_"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -670,8 +754,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "italic",
-                        "em": true
+                        "type": "em",
+                        "children": [
+                          {
+                            "text": "italic"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -690,8 +778,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "~~strikethrough~~",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "~~strikethrough~~"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -741,8 +833,12 @@
               "text": "Press "
             },
             {
-              "text": "Backspace",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Backspace"
+                }
+              ]
             },
             {
               "text": " at the very start of a heading, list item, or blockquote and it converts back to a plain paragraph. Use this when a markdown shortcut grabbed you a heading you didn't actually want."
@@ -776,29 +872,45 @@
               "text": "Type "
             },
             {
-              "text": "/",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "/"
+                }
+              ]
             },
             {
               "text": " at the start of an empty text block to open a menu of block types you can convert to (heading, image, list, your custom blocks, …). Keep typing to filter ("
             },
             {
-              "text": "/he",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "/he"
+                }
+              ]
             },
             {
               "text": " filters to heading); "
             },
             {
-              "text": "Enter",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Enter"
+                }
+              ]
             },
             {
               "text": " picks the highlighted result; "
             },
             {
-              "text": "Escape",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Escape"
+                }
+              ]
             },
             {
               "text": " dismisses without changing anything."
@@ -825,15 +937,23 @@
               "text": "The slash menu changes the block's "
             },
             {
-              "text": "@type",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@type"
+                }
+              ]
             },
             {
               "text": ". If you wanted to add a "
             },
             {
-              "text": "new",
-              "em": true
+              "type": "em",
+              "children": [
+                {
+                  "text": "new"
+                }
+              ]
             },
             {
               "text": " block, see "
@@ -895,8 +1015,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Enter",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "Enter"
+                    }
+                  ]
                 },
                 {
                   "text": " splits at the cursor — the part after the cursor becomes a new block of the same type."
@@ -907,8 +1031,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Backspace",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "Backspace"
+                    }
+                  ]
                 },
                 {
                   "text": " at the start of a block joins it with the previous block (text merges, cursor lands at the join point)."
@@ -958,8 +1086,12 @@
               "text": "There's no \"save\" inside a field — every keystroke is reflected in the page state, and changes are saved when you click the toolbar's "
             },
             {
-              "text": "Save",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Save"
+                }
+              ]
             },
             {
               "text": " button. Until you save, the green-dot/save indicator shows there are unsaved changes."
@@ -1004,8 +1136,12 @@
                   "text": "A few markdown shortcuts ("
                 },
                 {
-                  "text": "#### ",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "#### "
+                    }
+                  ]
                 },
                 {
                   "text": " for h4 etc.) aren't wired up; the supported set is the table above."

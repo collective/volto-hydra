@@ -68,8 +68,12 @@
               "text": "This guide is for "
             },
             {
-              "text": "content editors",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "content editors"
+                }
+              ]
             },
             {
               "text": " using a Hydra-powered site. It covers how to use the editor — how to select things, edit text, add and move blocks, work with containers and templates — without assuming you know how the site was built."
@@ -117,8 +121,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Hydra's mechanics",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Hydra's mechanics"
+                    }
+                  ]
                 },
                 {
                   "text": " — the toolbar, sidebar, selection borders, Quanta toolbar, slash menu, link picker, image picker, container operations. These look and behave the same on every Hydra-powered site, and this guide covers them."
@@ -129,8 +137,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Your site's design system",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Your site's design system"
+                    }
+                  ]
                 },
                 {
                   "text": " — what block types exist, how they render, which fields are inline-editable, the names you see in menus. The live preview comes straight from your frontend, so a \"paragraph\" might be called \"Lead paragraph\", an image block might have a caption your developers added, the slash-menu list of available block types reflects what your site registered. The mechanics are the same; only the labels and visuals change."
@@ -205,15 +217,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Toolbar (left)",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Toolbar (left)"
+                    }
+                  ]
                 },
                 {
                   "text": " — saving, navigating to other pages, site settings. Standard Volto, plus the "
                 },
                 {
-                  "text": "Frontend switcher",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Frontend switcher"
+                    }
+                  ]
                 },
                 {
                   "text": " (see below)."
@@ -224,8 +244,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Live preview (centre)",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Live preview (centre)"
+                    }
+                  ]
                 },
                 {
                   "text": " — your actual frontend, running inside an iframe. This is what readers will see. Click directly into the preview to edit."
@@ -236,8 +260,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Sidebar (right)",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Sidebar (right)"
+                    }
+                  ]
                 },
                 {
                   "text": " — when no block is selected, lists the page-level fields (title, description, blocks). When a block is selected, shows that block's settings, the chain of parent containers, and (for container blocks) the list of children. See "
@@ -287,8 +315,12 @@
               "text": "A toolbar button opens the "
             },
             {
-              "text": "Frontend switcher",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Frontend switcher"
+                }
+              ]
             },
             {
               "text": " panel with two sections:"
@@ -308,8 +340,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Viewport",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Viewport"
+                    }
+                  ]
                 },
                 {
                   "text": " — preview the page at common screen sizes (desktop, tablet, mobile). Pure visual switch — no content change."
@@ -320,8 +356,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Frontend",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Frontend"
+                    }
+                  ]
                 },
                 {
                   "text": " — list of saved frontend URLs the editor can switch between. Picking one swaps the iframe to that frontend immediately. Same content, different rendering — a Hydra-defining feature: edit a page once, see it on the marketing site, the docs site, the mobile app's web version, and the email-renderer in turn without leaving the page."
@@ -343,8 +383,12 @@
               "text": "A "
             },
             {
-              "text": "Settings",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Settings"
+                }
+              ]
             },
             {
               "text": " button at the bottom of the panel manages the saved URLs (add, remove, rename). The currently active frontend is highlighted in the list."
@@ -399,8 +443,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "From the preview",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "From the preview"
+                    }
+                  ]
                 },
                 {
                   "text": " — click the rendered text/image/link directly and start typing or replacing media."
@@ -411,8 +459,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "From the sidebar",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "From the sidebar"
+                    }
+                  ]
                 },
                 {
                   "text": " — find the field in the block's settings panel and edit it there."
@@ -462,8 +514,12 @@
               "text": "A block is a discrete piece of page content with a type (slate, image, listing, slider, etc.), a schema (its fields), and a position. Blocks can be added, removed, moved, and configured. Some blocks contain other blocks — those are called "
             },
             {
-              "text": "container blocks",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "container blocks"
+                }
+              ]
             },
             {
               "text": " (columns, accordion, slider, grids, sections)."
@@ -511,8 +567,12 @@
               "text": "Pressing "
             },
             {
-              "text": "Escape",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Escape"
+                }
+              ]
             },
             {
               "text": " is always safe. It progressively backs out:"
@@ -567,8 +627,12 @@
               "text": "So "
             },
             {
-              "text": "Escape",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Escape"
+                }
+              ]
             },
             {
               "text": " repeatedly takes you up one level at a time. See "

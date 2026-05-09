@@ -99,8 +99,12 @@
               "text": "Detect the admin iframe and load the bridge only when needed. "
             },
             {
-              "text": "window.name",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "window.name"
+                }
+              ]
             },
             {
               "text": " is set by Hydra to indicate mode:"
@@ -120,15 +124,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`hydra-edit:<origin>`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`hydra-edit:<origin>`"
+                    }
+                  ]
                 },
                 {
                   "text": " — edit mode (e.g., "
                 },
                 {
-                  "text": "hydra-edit:http://localhost:3001",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "hydra-edit:http://localhost:3001"
+                    }
+                  ]
                 },
                 {
                   "text": ")"
@@ -139,15 +151,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`hydra-view:<origin>`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`hydra-view:<origin>`"
+                    }
+                  ]
                 },
                 {
                   "text": " — view mode (e.g., "
                 },
                 {
-                  "text": "hydra-view:http://localhost:3001",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "hydra-view:http://localhost:3001"
+                    }
+                  ]
                 },
                 {
                   "text": ")"
@@ -169,8 +189,12 @@
               "text": "This persists across SPA navigation within the iframe, allowing your frontend to detect it's in the admin even after client-side route changes. In view mode, render from your API immediately but still load the bridge for navigation tracking. In edit mode, wait for "
             },
             {
-              "text": "onEditChange",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "onEditChange"
+                }
+              ]
             },
             {
               "text": " before rendering."
@@ -229,29 +253,45 @@
               "text": "The "
             },
             {
-              "text": "access_token",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "access_token"
+                }
+              ]
             },
             {
               "text": " is passed as a URL parameter on initial load and automatically stored in "
             },
             {
-              "text": "sessionStorage",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "sessionStorage"
+                }
+              ]
             },
             {
               "text": " by hydra.js. On SPA navigation, the URL param is gone but the token persists in "
             },
             {
-              "text": "sessionStorage",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "sessionStorage"
+                }
+              ]
             },
             {
               "text": ". Use the "
             },
             {
-              "text": "getAccessToken()",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "getAccessToken()"
+                }
+              ]
             },
             {
               "text": " helper:"
@@ -321,8 +361,12 @@
               "text": "If you wish to make the editing experience smoother you can register for "
             },
             {
-              "text": "onRoute",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "onRoute"
+                }
+              ]
             },
             {
               "text": " callbacks to prevent the frontend being forced to reload at certain times using the hydra editor. (TODO)"
@@ -425,8 +469,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`sendBlockUpdate`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`sendBlockUpdate`"
+                    }
+                  ]
                 },
                 {
                   "text": " — send an updated version of the block back to the admin after frontend-side changes (TODO)."
@@ -437,8 +485,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`sendBlockAction`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`sendBlockAction`"
+                    }
+                  ]
                 },
                 {
                   "text": " — perform actions like select, add, move, copy or remove blocks, or invoke custom actions on the Volto block edit component."

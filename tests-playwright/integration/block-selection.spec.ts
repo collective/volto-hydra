@@ -742,19 +742,25 @@ test.describe('Block Mode (Escape state machine)', () => {
     await helper.clickBlockInIframe('text-1a');
     await helper.waitForIframeBlockHandle('text-1a');
 
-    // Press 1: text in field. Press 2: block mode. Press 3: siblings in col-1.
+    // Press 1: text in field. Press 2: block mode. Press 3: siblings in
+    // col-1 (text-1a, text-1b, col1-img-1 = 3 blocks).
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.press('ControlOrMeta+a');
-    await helper.waitForMultiSelectOutlines(2);
+    await helper.waitForMultiSelectOutlines(3);
     const level3Count = await page.locator('.selected-block-path').count();
-    expect(level3Count).toBe(2);
+    expect(level3Count).toBe(3);
 
-    // Press 4: escalate to siblings of col-1 (inside columns-1). Should include col-2 at minimum.
+    // Press 4: escalate to siblings of col-1 (inside columns-1). The test
+    // signal is that a "Column" entry (col-2) becomes selected — counts
+    // alone aren't a clean signal because col-1's child count (3) can
+    // exceed columns-1's child count (2 columns).
     await page.keyboard.press('ControlOrMeta+a');
-    await expect.poll(async () => page.locator('.selected-block-path').count(), {
-      timeout: 3000,
-    }).toBeGreaterThan(level3Count);
+    await expect.poll(async () => {
+      const rows = page.locator('.selected-block-path');
+      const texts = await rows.allTextContents();
+      return texts.some((t) => t.includes('Column')) ? texts.length : null;
+    }, { timeout: 3000 }).not.toBeNull();
     const level4Count = await page.locator('.selected-block-path').count();
 
     // Press 5: escalate to columns-1's siblings (page level). Page has title + columns-1 + text-after + grid-1.
@@ -1020,8 +1026,8 @@ test.describe('Multi-Block Selection', () => {
 
     // Ctrl+Click first item (text-1a)
     await blockList.locator('.child-block-item').first().click({ modifiers: ['ControlOrMeta'] });
-    // Ctrl+Click second item (text-1b)
-    await blockList.locator('.child-block-item').last().click({ modifiers: ['ControlOrMeta'] });
+    // Ctrl+Click second item (text-1b — col-1 has text-1a, text-1b, col1-img-1)
+    await blockList.locator('.child-block-item').nth(1).click({ modifiers: ['ControlOrMeta'] });
 
     // Both items should be highlighted in the block list
     await expect(blockList.locator('.child-block-item.selected'))
@@ -1036,7 +1042,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Sidebar view should NOT have changed — still showing col-1's children
     // (Ctrl+Click toggles selection, doesn't navigate to the clicked block)
-    await expect(blockList.locator('.child-block-item')).toHaveCount(2);
+    await expect(blockList.locator('.child-block-item')).toHaveCount(3);
   });
 
   test('Shift+Click in sidebar block list selects range and highlights', async ({ page }) => {

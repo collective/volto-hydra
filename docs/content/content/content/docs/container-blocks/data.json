@@ -68,22 +68,34 @@
               "text": "Container blocks hold other blocks inside them — sliders with slides, grids with columns, accordions with panels. Define them in your "
             },
             {
-              "text": "blockSchema",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blockSchema"
+                }
+              ]
             },
             {
               "text": " using "
             },
             {
-              "text": "blocks_layout",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks_layout"
+                }
+              ]
             },
             {
               "text": " or "
             },
             {
-              "text": "object_list",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "object_list"
+                }
+              ]
             },
             {
               "text": " widgets."
@@ -120,29 +132,45 @@
               "text": "Each child has its own "
             },
             {
-              "text": "@type",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@type"
+                }
+              ]
             },
             {
               "text": " and schema (from "
             },
             {
-              "text": "blocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks"
+                }
+              ]
             },
             {
               "text": "). Children are stored in a shared "
             },
             {
-              "text": "blocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks"
+                }
+              ]
             },
             {
               "text": " dict on the parent, with the field holding "
             },
             {
-              "text": "{ items: [...] }",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "{ items: [...] }"
+                }
+              ]
             },
             {
               "text": " for ordering:"
@@ -173,36 +201,56 @@
               "text": "All "
             },
             {
-              "text": "blocks_layout",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks_layout"
+                }
+              ]
             },
             {
               "text": " fields on the same block share the same "
             },
             {
-              "text": "blocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks"
+                }
+              ]
             },
             {
               "text": " dict. So a block can have multiple container fields (e.g., "
             },
             {
-              "text": "header_blocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "header_blocks"
+                }
+              ]
             },
             {
               "text": " and "
             },
             {
-              "text": "footer_blocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "footer_blocks"
+                }
+              ]
             },
             {
               "text": ") whose children all live in the parent's "
             },
             {
-              "text": "blocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks"
+                }
+              ]
             },
             {
               "text": "."
@@ -236,8 +284,12 @@
               "text": "All items share one inline schema, stored as an array with an ID field. Use "
             },
             {
-              "text": "dataPath",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "dataPath"
+                }
+              ]
             },
             {
               "text": " when the data is nested within the block:"
@@ -282,43 +334,67 @@
               "text": "When "
             },
             {
-              "text": "allowedBlocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedBlocks"
+                }
+              ]
             },
             {
               "text": " is set on an "
             },
             {
-              "text": "object_list",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "object_list"
+                }
+              ]
             },
             {
               "text": ", items can have different types (like "
             },
             {
-              "text": "blocks_layout",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks_layout"
+                }
+              ]
             },
             {
               "text": ") but are still stored as an array. Each item's type is stored in the field specified by "
             },
             {
-              "text": "typeField",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "typeField"
+                }
+              ]
             },
             {
               "text": " (defaults to "
             },
             {
-              "text": "'@type'",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "'@type'"
+                }
+              ]
             },
             {
               "text": ") and its schema is looked up from "
             },
             {
-              "text": "blocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks"
+                }
+              ]
             },
             {
               "text": ":"
@@ -349,15 +425,23 @@
               "text": "Both "
             },
             {
-              "text": "blocks_layout",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks_layout"
+                }
+              ]
             },
             {
               "text": " and "
             },
             {
-              "text": "object_list",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "object_list"
+                }
+              ]
             },
             {
               "text": " look the same in the editing UI and blocks can be dragged between them — data is automatically adapted when moving between formats (ID fields added/stripped, type fields set appropriately)."
@@ -391,8 +475,12 @@
               "text": "Add "
             },
             {
-              "text": "data-block-uid",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-block-uid"
+                }
+              ]
             },
             {
               "text": " to each child element. You don't need to mark the container element itself:"
@@ -423,8 +511,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`data-block-add=\"bottom|right\"`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`data-block-add=\"bottom|right\"`"
+                    }
+                  ]
                 },
                 {
                   "text": " — Controls where the '+' button appears. By default it will be the opposite of its parent. Use \"bottom\" for vertical stacking, \"right\" for horizontal."
@@ -435,8 +527,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`data-block-selector=\"-1|+1|blockId\"`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`data-block-selector=\"-1|+1|blockId\"`"
+                    }
+                  ]
                 },
                 {
                   "text": " — Tag paging buttons so sidebar selection can navigate paged containers"
@@ -472,8 +568,12 @@
               "text": "Set "
             },
             {
-              "text": "addMode: 'table'",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "addMode: 'table'"
+                }
+              ]
             },
             {
               "text": " for table-like structures (rows containing cells). This lets users add and remove columns as easily as rows:"
@@ -518,15 +618,23 @@
               "text": "A container can never be empty. When the last child is deleted, either the "
             },
             {
-              "text": "defaultBlockType",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "defaultBlockType"
+                }
+              ]
             },
             {
               "text": " is added, or a special block with "
             },
             {
-              "text": "@type: \"empty\"",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@type: \"empty\""
+                }
+              ]
             },
             {
               "text": " is inserted. Empty blocks are stripped before saving. Render them as empty space — Hydra puts a '+' button in the middle for the user to replace it."
@@ -546,8 +654,12 @@
               "text": "You can override the look of the '+' button by rendering something inside the empty block and adding "
             },
             {
-              "text": "data-block-add=\"button\"",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-block-add=\"button\""
+                }
+              ]
             },
             {
               "text": " to it."
@@ -581,15 +693,23 @@
               "text": "You can have one container type whose children are all kept the same "
             },
             {
-              "text": "@type",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@type"
+                }
+              ]
             },
             {
               "text": ", with the editor picking that type once on the parent. When the type changes, every child is converted (using each child's "
             },
             {
-              "text": "fieldMappings",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "fieldMappings"
+                }
+              ]
             },
             {
               "text": "); when a new child is added it gets the selected type."
@@ -609,43 +729,67 @@
               "text": "Declare "
             },
             {
-              "text": "itemTypeField",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "itemTypeField"
+                }
+              ]
             },
             {
               "text": " on the "
             },
             {
-              "text": "blocks field",
-              "em": true
+              "type": "em",
+              "children": [
+                {
+                  "text": "blocks field"
+                }
+              ]
             },
             {
               "text": " — its value names a sibling field on the same schema whose value drives every child's "
             },
             {
-              "text": "@type",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@type"
+                }
+              ]
             },
             {
               "text": ". The sibling field is typically rendered with "
             },
             {
-              "text": "widget: 'blockTypeSelect'",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "widget: 'blockTypeSelect'"
+                }
+              ]
             },
             {
               "text": ", which computes its "
             },
             {
-              "text": "choices",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "choices"
+                }
+              ]
             },
             {
               "text": " from the blocks field's "
             },
             {
-              "text": "allowedBlocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedBlocks"
+                }
+              ]
             },
             {
               "text": " at render time:"
@@ -676,36 +820,56 @@
               "text": "The relationship is local: read the schema and you can see \"the children of "
             },
             {
-              "text": "slides",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "slides"
+                }
+              ]
             },
             {
               "text": " get their "
             },
             {
-              "text": "@type",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@type"
+                }
+              ]
             },
             {
               "text": " from "
             },
             {
-              "text": "variation",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "variation"
+                }
+              ]
             },
             {
               "text": "\" right next to the field declaration. Works the same for "
             },
             {
-              "text": "widget: 'blocks_layout'",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "widget: 'blocks_layout'"
+                }
+              ]
             },
             {
               "text": " and "
             },
             {
-              "text": "widget: 'object_list'",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "widget: 'object_list'"
+                }
+              ]
             },
             {
               "text": " children."
@@ -761,8 +925,12 @@
           "type": "p",
           "children": [
             {
-              "text": "inheritSchemaFrom",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "inheritSchemaFrom"
+                }
+              ]
             },
             {
               "text": " does two things automatically:"
@@ -785,8 +953,12 @@
                   "text": "Surfaces the "
                 },
                 {
-                  "text": "parent-claimed",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "parent-claimed"
+                    }
+                  ]
                 },
                 {
                   "text": " fields on the parent's sidebar under an \"Item Defaults\" fieldset."
@@ -800,8 +972,12 @@
                   "text": "Auto-hides the same fields on every child's sidebar (via a "
                 },
                 {
-                  "text": "hideParentOwnedFields",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "hideParentOwnedFields"
+                    }
+                  ]
                 },
                 {
                   "text": " enhancer that's applied to every block at INIT — no per-child opt-in)."
@@ -823,29 +999,45 @@
               "text": "The parent declares "
             },
             {
-              "text": "what it claims",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "what it claims"
+                }
+              ]
             },
             {
               "text": " per child block type via "
             },
             {
-              "text": "parentControlled",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "parentControlled"
+                }
+              ]
             },
             {
               "text": ". If absent, the default is: parent claims everything _not_ listed in the child's "
             },
             {
-              "text": "fieldMappings['@default']",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "fieldMappings['@default']"
+                }
+              ]
             },
             {
               "text": " mapping. The default works for typical cases; set "
             },
             {
-              "text": "parentControlled",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "parentControlled"
+                }
+              ]
             },
             {
               "text": " only when you want a different split (e.g. keep a meta-toggle field editable per-child):"
@@ -876,22 +1068,34 @@
               "text": "When "
             },
             {
-              "text": "parentControlled[childType]",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "parentControlled[childType]"
+                }
+              ]
             },
             {
               "text": " is set, it "
             },
             {
-              "text": "replaces",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "replaces"
+                }
+              ]
             },
             {
               "text": " the "
             },
             {
-              "text": "@default",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@default"
+                }
+              ]
             },
             {
               "text": " fallback for that child type. Both sides — the parent's \"Item Defaults\" fieldset and the child's hidden fields — are computed from the same single rule, so they can never get out of sync."
@@ -925,8 +1129,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`inheritSchemaFrom`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`inheritSchemaFrom`"
+                    }
+                  ]
                 },
                 {
                   "text": " — schemaEnhancer recipe; surfaces parent-claimed fields on the parent and hides them on children."
@@ -937,29 +1145,45 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`itemTypeField`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`itemTypeField`"
+                    }
+                  ]
                 },
                 {
                   "text": " — declared on a "
                 },
                 {
-                  "text": "blocks_layout",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "blocks_layout"
+                    }
+                  ]
                 },
                 {
                   "text": "/"
                 },
                 {
-                  "text": "object_list",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "object_list"
+                    }
+                  ]
                 },
                 {
                   "text": " field; names the sibling field whose value drives every child's "
                 },
                 {
-                  "text": "@type",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "@type"
+                    }
+                  ]
                 },
                 {
                   "text": "."
@@ -970,22 +1194,34 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`typeField`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`typeField`"
+                    }
+                  ]
                 },
                 {
                   "text": " — names the sibling field directly on "
                 },
                 {
-                  "text": "inheritSchemaFrom",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "inheritSchemaFrom"
+                    }
+                  ]
                 },
                 {
                   "text": ". Use this when there is no blocks field to declare "
                 },
                 {
-                  "text": "itemTypeField",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "itemTypeField"
+                    }
+                  ]
                 },
                 {
                   "text": " on (e.g. listings — see "
@@ -1010,22 +1246,34 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`mappingField`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`mappingField`"
+                    }
+                  ]
                 },
                 {
                   "text": " — name of the field where a per-block "
                 },
                 {
-                  "text": "fieldMapping",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "fieldMapping"
+                    }
+                  ]
                 },
                 {
                   "text": " override is stored. Required for the "
                 },
                 {
-                  "text": "FieldMappingWidget",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "FieldMappingWidget"
+                    }
+                  ]
                 },
                 {
                   "text": " to appear."
@@ -1036,22 +1284,34 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`parentControlled`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`parentControlled`"
+                    }
+                  ]
                 },
                 {
                   "text": " — "
                 },
                 {
-                  "text": "{ childType: [fieldName, ...] }",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "{ childType: [fieldName, ...] }"
+                    }
+                  ]
                 },
                 {
                   "text": " per-child-type override. Replaces the "
                 },
                 {
-                  "text": "fieldMappings['@default']",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "fieldMappings['@default']"
+                    }
+                  ]
                 },
                 {
                   "text": " fallback."
@@ -1062,15 +1322,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`defaultsField`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`defaultsField`"
+                    }
+                  ]
                 },
                 {
                   "text": " — prefix for the inherited fields on the parent's \"Item Defaults\" fieldset (default: "
                 },
                 {
-                  "text": "'itemDefaults'",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "'itemDefaults'"
+                    }
+                  ]
                 },
                 {
                   "text": ")."
@@ -1081,8 +1349,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`blockTypeSelect`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`blockTypeSelect`"
+                    }
+                  ]
                 },
                 {
                   "text": " widget options:"
@@ -1104,57 +1376,89 @@
               "text": "- "
             },
             {
-              "text": "`blocksField`",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "`blocksField`"
+                }
+              ]
             },
             {
               "text": " — which sub-blocks field's "
             },
             {
-              "text": "allowedBlocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedBlocks"
+                }
+              ]
             },
             {
               "text": " to use for the choices. Auto-discovers if omitted. Set to "
             },
             {
-              "text": "'..'",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "'..'"
+                }
+              ]
             },
             {
               "text": " when the choices should come from the "
             },
             {
-              "text": "enclosing parent's",
-              "em": true
+              "type": "em",
+              "children": [
+                {
+                  "text": "enclosing parent's"
+                }
+              ]
             },
             {
               "text": " "
             },
             {
-              "text": "allowedSiblingTypes",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedSiblingTypes"
+                }
+              ]
             },
             {
               "text": ".   - "
             },
             {
-              "text": "`filterConvertibleFrom`",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "`filterConvertibleFrom`"
+                }
+              ]
             },
             {
               "text": " — only offer types whose "
             },
             {
-              "text": "fieldMappings",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "fieldMappings"
+                }
+              ]
             },
             {
               "text": " accept the named source. Typically "
             },
             {
-              "text": "'@default'",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "'@default'"
+                }
+              ]
             },
             {
               "text": " for listings (every item type must be populatable from canonical content fields)."

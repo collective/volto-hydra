@@ -68,15 +68,23 @@
               "text": "The editor has two modes when a block is selected: "
             },
             {
-              "text": "text mode",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "text mode"
+                }
+              ]
             },
             {
               "text": " (you're editing inside the block) and "
             },
             {
-              "text": "block mode",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "block mode"
+                }
+              ]
             },
             {
               "text": " (the whole block is selected as a unit)."
@@ -188,8 +196,12 @@
               "text": "Press "
             },
             {
-              "text": "Escape",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Escape"
+                }
+              ]
             },
             {
               "text": " to leave text editing. The block stays selected, but you're no longer inside any specific field."
@@ -236,22 +248,34 @@
               "text": "- "
             },
             {
-              "text": "Arrow Up / Down",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Arrow Up / Down"
+                }
+              ]
             },
             {
               "text": " — move selection to the previous / next sibling block (container-aware: jumps into and out of containers).   - "
             },
             {
-              "text": "Enter",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Enter"
+                }
+              ]
             },
             {
               "text": " — add a new block after this one.   - "
             },
             {
-              "text": "Delete / Backspace",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Delete / Backspace"
+                }
+              ]
             },
             {
               "text": " — remove the selected block."
@@ -271,22 +295,34 @@
               "text": "Press "
             },
             {
-              "text": "Escape",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Escape"
+                }
+              ]
             },
             {
               "text": " again to "
             },
             {
-              "text": "deselect",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "deselect"
+                }
+              ]
             },
             {
               "text": " (or go up to the parent container if this block is inside one). Each "
             },
             {
-              "text": "Escape",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Escape"
+                }
+              ]
             },
             {
               "text": " walks one step up the hierarchy."
@@ -384,8 +420,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "Shift+Click",
-                        "strong": true
+                        "type": "strong",
+                        "children": [
+                          {
+                            "text": "Shift+Click"
+                          }
+                        ]
                       },
                       {
                         "text": " (in block mode)"
@@ -421,8 +461,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "Ctrl+Click / Cmd+Click",
-                        "strong": true
+                        "type": "strong",
+                        "children": [
+                          {
+                            "text": "Ctrl+Click / Cmd+Click"
+                          }
+                        ]
                       },
                       {
                         "text": " (any mode)"
@@ -458,8 +502,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "Shift+Arrow Up/Down",
-                        "strong": true
+                        "type": "strong",
+                        "children": [
+                          {
+                            "text": "Shift+Arrow Up/Down"
+                          }
+                        ]
                       },
                       {
                         "text": " (block mode)"
@@ -553,15 +601,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Delete",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "Delete"
+                    }
+                  ]
                 },
                 {
                   "text": " / "
                 },
                 {
-                  "text": "Backspace",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "Backspace"
+                    }
+                  ]
                 },
                 {
                   "text": " removes all of them."
@@ -662,15 +718,23 @@
               "text": "When a block is selected, the sidebar shows the "
             },
             {
-              "text": "chain of parent containers",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "chain of parent containers"
+                }
+              ]
             },
             {
               "text": " from the root down to the block — one collapsible section per level. Each level has a "
             },
             {
-              "text": "‹",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "‹"
+                }
+              ]
             },
             {
               "text": " arrow on the left."
@@ -701,22 +765,34 @@
               "text": "Click any "
             },
             {
-              "text": "‹",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "‹"
+                }
+              ]
             },
             {
               "text": " arrow to "
             },
             {
-              "text": "navigate up",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "navigate up"
+                }
+              ]
             },
             {
               "text": " to that level. This does the same thing as pressing "
             },
             {
-              "text": "Escape",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Escape"
+                }
+              ]
             },
             {
               "text": " repeatedly, but visibly — you can see what each parent is named, jump several levels in one click, and edit the parent's own settings (alignment, padding, …) inline without leaving the current selection."
@@ -771,8 +847,12 @@
               "text": "When a container block is selected, the sidebar shows that container's "
             },
             {
-              "text": "children",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "children"
+                }
+              ]
             },
             {
               "text": " as a list, one row per child:"
@@ -803,8 +883,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`⋮⋮` drag handle",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`⋮⋮` drag handle"
+                    }
+                  ]
                 },
                 {
                   "text": " — drag to reorder children within the container."
@@ -815,8 +899,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`>` drill-in arrow",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`>` drill-in arrow"
+                    }
+                  ]
                 },
                 {
                   "text": " — selects that child, scrolls the preview to it, switches the sidebar to its settings."
@@ -827,8 +915,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`[+]` add button",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`[+]` add button"
+                    }
+                  ]
                 },
                 {
                   "text": " — opens the BlockChooser to add a new child to that field."
@@ -913,8 +1005,12 @@
               "text": "The page itself has metadata fields (title, description, preview image). Some are inline-editable in the preview (e.g. clicking the rendered "
             },
             {
-              "text": "<h1>",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "<h1>"
+                }
+              ]
             },
             {
               "text": " to edit the page title); all are editable from the sidebar when no block is selected."

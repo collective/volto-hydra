@@ -68,15 +68,23 @@
               "text": "A "
             },
             {
-              "text": "container block",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "container block"
+                }
+              ]
             },
             {
               "text": " holds other blocks inside it — sliders, columns, accordions, grids, generic sections. The blocks inside are called its "
             },
             {
-              "text": "children",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "children"
+                }
+              ]
             },
             {
               "text": ". Containers can be nested (a column inside a row inside a section)."
@@ -138,8 +146,12 @@
               "text": "), then choose "
             },
             {
-              "text": "Wrap in...",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Wrap in..."
+                }
+              ]
             },
             {
               "text": " from the Quanta toolbar dropdown (or sidebar block actions). A popup shows container types that:"
@@ -162,8 +174,12 @@
                   "text": "Accept every selected block type (their "
                 },
                 {
-                  "text": "allowedBlocks",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "allowedBlocks"
+                    }
+                  ]
                 },
                 {
                   "text": " covers the selection)."
@@ -242,8 +258,12 @@
               "text": "Select a container in block mode (one Escape from text mode). Choose "
             },
             {
-              "text": "Unwrap container",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Unwrap container"
+                }
+              ]
             },
             {
               "text": " from the Quanta toolbar dropdown."
@@ -277,15 +297,23 @@
               "text": "Unwrap is "
             },
             {
-              "text": "disabled",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "disabled"
+                }
+              ]
             },
             {
               "text": " when the parent wouldn't accept some of the children — for example, if the children are columns and the parent's "
             },
             {
-              "text": "allowedBlocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedBlocks"
+                }
+              ]
             },
             {
               "text": " doesn't include columns. Hover the disabled action for the reason."
@@ -319,8 +347,12 @@
               "text": "When a container is selected (block mode), thin "
             },
             {
-              "text": "edge handles",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "edge handles"
+                }
+              ]
             },
             {
               "text": " appear on the container's borders. Drag a handle:"
@@ -340,15 +372,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Outward",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Outward"
+                    }
+                  ]
                 },
                 {
                   "text": " — the adjacent block(s) on that side get "
                 },
                 {
-                  "text": "absorbed",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "absorbed"
+                    }
+                  ]
                 },
                 {
                   "text": " into the container as new children."
@@ -359,15 +399,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Inward",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Inward"
+                    }
+                  ]
                 },
                 {
                   "text": " — the edge-most child blocks of the container get "
                 },
                 {
-                  "text": "expelled",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "expelled"
+                    }
+                  ]
                 },
                 {
                   "text": " to the parent at the container's position."
@@ -452,8 +500,12 @@
               "text": "In the Quanta toolbar dropdown, "
             },
             {
-              "text": "Convert to...",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Convert to..."
+                }
+              ]
             },
             {
               "text": " lists block types this block can be converted to. For containers, conversion preserves the children:"
@@ -473,22 +525,34 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Layout shape conversion",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Layout shape conversion"
+                    }
+                  ]
                 },
                 {
                   "text": " — children move into the new container's layout field automatically (whether the source uses "
                 },
                 {
-                  "text": "blocks_layout",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "blocks_layout"
+                    }
+                  ]
                 },
                 {
                   "text": " or "
                 },
                 {
-                  "text": "object_list",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "object_list"
+                    }
+                  ]
                 },
                 {
                   "text": ")."
@@ -499,29 +563,45 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Recursive child conversion",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Recursive child conversion"
+                    }
+                  ]
                 },
                 {
                   "text": " — if some children's "
                 },
                 {
-                  "text": "@type",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "@type"
+                    }
+                  ]
                 },
                 {
                   "text": " isn't in the target's "
                 },
                 {
-                  "text": "allowedBlocks",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "allowedBlocks"
+                    }
+                  ]
                 },
                 {
                   "text": ", those children are themselves converted (using their "
                 },
                 {
-                  "text": "fieldMappings",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "fieldMappings"
+                    }
+                  ]
                 },
                 {
                   "text": ") so they fit. If no path exists, the conversion target is shown disabled with a tooltip."
@@ -564,8 +644,12 @@
               "text": "The "
             },
             {
-              "text": "section",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "section"
+                }
+              ]
             },
             {
               "text": " block"
@@ -582,15 +666,23 @@
           "type": "p",
           "children": [
             {
-              "text": "section",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "section"
+                }
+              ]
             },
             {
               "text": " is a generic container that accepts any child block type. It's useful when you don't have a more specific container for what you're building — a \"marketing section\", a \"case study block\", a \"page break with anything inside\". Frontends typically render it as a "
             },
             {
-              "text": "<section>",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "<section>"
+                }
+              ]
             },
             {
               "text": " element with optional styling."
@@ -627,15 +719,23 @@
                   "text": "A container with "
                 },
                 {
-                  "text": "fixed",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "fixed"
+                    }
+                  ]
                 },
                 {
                   "text": " or "
                 },
                 {
-                  "text": "readOnly: true",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "readOnly: true"
+                    }
+                  ]
                 },
                 {
                   "text": " (typically inherited from a template) can't be unwrapped or have its children rearranged via edge-drag. You can still edit child blocks if the children themselves aren't readonly."
@@ -649,8 +749,12 @@
                   "text": "A container's "
                 },
                 {
-                  "text": "maxLength",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "maxLength"
+                    }
+                  ]
                 },
                 {
                   "text": " caps how many children it can hold — wrap and edge-drag respect this. The action shows disabled with a tooltip if respecting it would mean refusing the operation."
@@ -664,22 +768,34 @@
                   "text": "When dragging children "
                 },
                 {
-                  "text": "between",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "between"
+                    }
+                  ]
                 },
                 {
                   "text": " containers via edge-drag, the destination's "
                 },
                 {
-                  "text": "allowedBlocks",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "allowedBlocks"
+                    }
+                  ]
                 },
                 {
                   "text": " filter still applies. A block that's not in the target's "
                 },
                 {
-                  "text": "allowedBlocks",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "allowedBlocks"
+                    }
+                  ]
                 },
                 {
                   "text": " is skipped from the absorb plan."
@@ -715,8 +831,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Split",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Split"
+                    }
+                  ]
                 },
                 {
                   "text": " — drag a container's edge outward through itself to create a sibling container of the same type with the children divided between them."
@@ -727,8 +847,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Merge",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Merge"
+                    }
+                  ]
                 },
                 {
                   "text": " — combine two adjacent same-type containers into one."
@@ -739,8 +863,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Tab / Shift+Tab",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Tab / Shift+Tab"
+                    }
+                  ]
                 },
                 {
                   "text": " — keyboard nest / unnest from inside a container."
@@ -751,8 +879,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Sidebar drag-to-reparent",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Sidebar drag-to-reparent"
+                    }
+                  ]
                 },
                 {
                   "text": " — drag a block in the sidebar outline to move it under a different parent."

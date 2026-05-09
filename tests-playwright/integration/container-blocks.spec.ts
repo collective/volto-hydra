@@ -225,11 +225,11 @@ test.describe('Adding Blocks to Containers', () => {
 
     const iframe = helper.getIframe();
 
-    // Count initial blocks in col-1 (should be 2: text-1a, text-1b)
+    // Count initial blocks in col-1 (text-1a, text-1b, col1-img-1)
     const initialCol1Blocks = await iframe
       .locator('[data-block-uid="col-1"] > [data-block-uid]')
       .count();
-    expect(initialCol1Blocks).toBe(2);
+    expect(initialCol1Blocks).toBe(3);
 
     // Count initial page-level blocks
     const initialPageBlocks = await iframe
@@ -241,11 +241,11 @@ test.describe('Adding Blocks to Containers', () => {
     await helper.clickAddBlockButton();
     await helper.selectBlockType('slate');
 
-    // col-1 should now have 3 blocks
+    // col-1 should now have one more block (the new slate)
     const finalCol1Blocks = await iframe
       .locator('[data-block-uid="col-1"] > [data-block-uid]')
       .count();
-    expect(finalCol1Blocks).toBe(3);
+    expect(finalCol1Blocks).toBe(initialCol1Blocks + 1);
 
     // Page-level blocks should be unchanged
     const finalPageBlocks = await iframe

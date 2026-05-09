@@ -68,8 +68,12 @@
               "text": "To make your site editable with Hydra you load hydra.js in your frontend and call "
             },
             {
-              "text": "initBridge()",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "initBridge()"
+                }
+              ]
             },
             {
               "text": ". This sets up a two-way communication channel that handles authentication, page navigation, and live content updates."
@@ -106,15 +110,23 @@
               "text": "Call "
             },
             {
-              "text": "initBridge()",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "initBridge()"
+                }
+              ]
             },
             {
               "text": " with an "
             },
             {
-              "text": "onEditChange",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "onEditChange"
+                }
+              ]
             },
             {
               "text": " callback to receive live content updates as the user edits. Your frontend re-renders in real time. Outside edit mode, fetch content from the API as normal."
@@ -145,15 +157,23 @@
               "text": "The "
             },
             {
-              "text": "formData",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "formData"
+                }
+              ]
             },
             {
               "text": " passed to "
             },
             {
-              "text": "onEditChange",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "onEditChange"
+                }
+              ]
             },
             {
               "text": " has the same structure as the Plone REST API response, so the same rendering code works for both live editing and normal page display."
@@ -173,15 +193,23 @@
               "text": "Either hashbang ("
             },
             {
-              "text": "/#!/path",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "/#!/path"
+                }
+              ]
             },
             {
               "text": ") or normal ("
             },
             {
-              "text": "/path",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "/path"
+                }
+              ]
             },
             {
               "text": ") style paths are supported."
@@ -215,15 +243,23 @@
               "text": "Iterate "
             },
             {
-              "text": "blocks_layout.items",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks_layout.items"
+                }
+              ]
             },
             {
               "text": " and render each block by type. Add "
             },
             {
-              "text": "data-block-uid",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-block-uid"
+                }
+              ]
             },
             {
               "text": " so Hydra knows which block the user clicked."

@@ -124,8 +124,12 @@
               "text": "Hover or select a block in the preview. A \"+\" button appears outside one corner of it (typically below for vertical layouts, to the right for horizontal). Click it to open the "
             },
             {
-              "text": "block chooser",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "block chooser"
+                }
+              ]
             },
             {
               "text": " — a popup listing the block types allowed at that position."
@@ -145,8 +149,12 @@
               "text": "The chooser is filtered: it only shows block types that fit the surrounding container's "
             },
             {
-              "text": "allowedBlocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedBlocks"
+                }
+              ]
             },
             {
               "text": ". Block types are grouped (Common, Site, Custom, Templates) and typically a \"Most used\" group is pinned to the top."
@@ -180,22 +188,34 @@
               "text": "Type "
             },
             {
-              "text": "/",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "/"
+                }
+              ]
             },
             {
               "text": " at the start of an empty text block (a fresh paragraph or a paragraph you've cleared). The slash menu opens with the list of block types you can convert to. Keep typing to filter; "
             },
             {
-              "text": "Enter",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Enter"
+                }
+              ]
             },
             {
               "text": " picks; "
             },
             {
-              "text": "Escape",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Escape"
+                }
+              ]
             },
             {
               "text": " dismisses."
@@ -243,22 +263,34 @@
               "text": "Press "
             },
             {
-              "text": "Escape",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Escape"
+                }
+              ]
             },
             {
               "text": " to enter block mode, then "
             },
             {
-              "text": "Enter",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Enter"
+                }
+              ]
             },
             {
               "text": ". A new block is created "
             },
             {
-              "text": "after",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "after"
+                }
+              ]
             },
             {
               "text": " the current one, of the most appropriate default type (or the only type allowed in the current container if there's just one)."
@@ -278,15 +310,23 @@
               "text": "If the current block is itself a container, "
             },
             {
-              "text": "Enter",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Enter"
+                }
+              ]
             },
             {
               "text": " creates a new container of the same type and the cursor lands inside it on the first typeable leaf — so you can keep typing without aiming. Useful for sliders, columns, accordions: hit "
             },
             {
-              "text": "Enter",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Enter"
+                }
+              ]
             },
             {
               "text": " once and you're already in the next slide / column / panel."
@@ -334,8 +374,12 @@
               "text": "Each selected block has a "
             },
             {
-              "text": "drag handle",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "drag handle"
+                }
+              ]
             },
             {
               "text": " in the Quanta toolbar above it. Click and drag from there to move the block somewhere else. While dragging:"
@@ -358,8 +402,12 @@
                   "text": "A "
                 },
                 {
-                  "text": "line indicator",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "line indicator"
+                    }
+                  ]
                 },
                 {
                   "text": " shows where the block will land between siblings."
@@ -373,8 +421,12 @@
                   "text": "A "
                 },
                 {
-                  "text": "shaded overlay",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "shaded overlay"
+                    }
+                  ]
                 },
                 {
                   "text": " highlights the whole drop target when you hover over an empty container — dropping there places the block as the container's first child (replacing the empty placeholder rather than landing as a sibling)."
@@ -404,8 +456,12 @@
               "text": "Drop targets are filtered by "
             },
             {
-              "text": "allowedBlocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedBlocks"
+                }
+              ]
             },
             {
               "text": " — you can't drop into a region that doesn't accept this block type. The line/shade indicator only appears over valid drop targets."
@@ -439,15 +495,23 @@
               "text": "The sidebar's children list (visible when a container block is selected) has a drag handle ("
             },
             {
-              "text": "⋮⋮",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "⋮⋮"
+                }
+              ]
             },
             {
               "text": ") on each child row. Drag it up or down to reorder children "
             },
             {
-              "text": "within",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "within"
+                }
+              ]
             },
             {
               "text": " the same container. Useful when the children are paged (slides of a slider, panels of an accordion) and you can't drag in the preview because only one is visible at a time. See "
@@ -509,8 +573,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Cmd/Ctrl+C",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "Cmd/Ctrl+C"
+                    }
+                  ]
                 },
                 {
                   "text": " — copy"
@@ -521,8 +589,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Cmd/Ctrl+X",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "Cmd/Ctrl+X"
+                    }
+                  ]
                 },
                 {
                   "text": " — cut (block disappears from the original spot when you paste)"
@@ -533,8 +605,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Cmd/Ctrl+V",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "Cmd/Ctrl+V"
+                    }
+                  ]
                 },
                 {
                   "text": " — paste at the current selection"
@@ -584,8 +660,12 @@
               "text": "In block mode (after pressing "
             },
             {
-              "text": "Escape",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Escape"
+                }
+              ]
             },
             {
               "text": "):"
@@ -648,15 +728,23 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "Arrow Up",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "Arrow Up"
+                          }
+                        ]
                       },
                       {
                         "text": " / "
                       },
                       {
-                        "text": "Arrow Down",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "Arrow Down"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -689,8 +777,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "Enter",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "Enter"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -723,15 +815,23 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "Delete",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "Delete"
+                          }
+                        ]
                       },
                       {
                         "text": " / "
                       },
                       {
-                        "text": "Backspace",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "Backspace"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -764,8 +864,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "Escape",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "Escape"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -798,15 +902,23 @@
           "type": "p",
           "children": [
             {
-              "text": "Arrow Up/Down",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Arrow Up/Down"
+                }
+              ]
             },
             {
               "text": " is "
             },
             {
-              "text": "container-aware",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "container-aware"
+                }
+              ]
             },
             {
               "text": " — it walks across container boundaries. Pressing Down on the last block of a column jumps into the next column rather than getting stuck."
@@ -868,8 +980,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Drag and drop",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Drag and drop"
+                    }
+                  ]
                 },
                 {
                   "text": " — works on the whole group; line indicator shows where the group will land."
@@ -880,8 +996,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Delete",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Delete"
+                    }
+                  ]
                 },
                 {
                   "text": " — removes all selected blocks."
@@ -892,8 +1012,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Wrap / Convert / Cut / Copy / Paste",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Wrap / Convert / Cut / Copy / Paste"
+                    }
+                  ]
                 },
                 {
                   "text": " — all apply to the group. See "

@@ -68,8 +68,12 @@
               "text": "A "
             },
             {
-              "text": "template",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "template"
+                }
+              ]
             },
             {
               "text": " is a piece of pre-built page structure that someone (often a developer or site admin) has saved separately. When you apply a template to a page, the page gets the template's structure overlaid: some blocks are fixed and can't be edited, some can be edited but not moved, and some are open slots where you fill in your own blocks."
@@ -103,15 +107,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Block-level templates",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Block-level templates"
+                    }
+                  ]
                 },
                 {
                   "text": " — a snippet you insert as a block (e.g. a \"feature row\" snippet you drop into the middle of a page). Configured per field as "
                 },
                 {
-                  "text": "allowedTemplates",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "allowedTemplates"
+                    }
+                  ]
                 },
                 {
                   "text": "; appears in the BlockChooser's Templates group."
@@ -122,15 +134,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Page-level layouts",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Page-level layouts"
+                    }
+                  ]
                 },
                 {
                   "text": " — a full layout the whole page (or a region) is rendered through (e.g. an \"article layout\" with a fixed header / sidebar / footer). Configured as "
                 },
                 {
-                  "text": "allowedLayouts",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "allowedLayouts"
+                    }
+                  ]
                 },
                 {
                   "text": "; appears in the Layout dropdown."
@@ -208,8 +228,12 @@
               "text": "Shown with a "
             },
             {
-              "text": "lock icon",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "lock icon"
+                }
+              ]
             },
             {
               "text": " in the sidebar block list. You can't:"
@@ -402,8 +426,12 @@
               "text": "Regular blocks where you can do anything — add, edit, move, delete. The template marks regions as slots (with a "
             },
             {
-              "text": "slotId",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "slotId"
+                }
+              ]
             },
             {
               "text": ") and your existing content is placed into the matching slots when the template merges."
@@ -444,8 +472,12 @@
               "text": "You "
             },
             {
-              "text": "can't",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "can't"
+                }
+              ]
             },
             {
               "text": " insert a new block between two adjacent fixed/readonly template blocks — the \"+\" button is hidden in those positions and DnD is rejected. This is intentional: the template author put those fixed blocks side-by-side on purpose, and the editor inserting between them would break the layout's intent."
@@ -493,15 +525,23 @@
               "text": "When "
             },
             {
-              "text": "allowedLayouts",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedLayouts"
+                }
+              ]
             },
             {
               "text": " is configured for a page (or a region), the sidebar shows a "
             },
             {
-              "text": "Layout",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Layout"
+                }
+              ]
             },
             {
               "text": " dropdown. Pick a different layout and:"
@@ -532,15 +572,23 @@
                   "text": "Your existing content is "
                 },
                 {
-                  "text": "redistributed",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "redistributed"
+                    }
+                  ]
                 },
                 {
                   "text": " into the new layout's slots based on "
                 },
                 {
-                  "text": "slotId",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "slotId"
+                    }
+                  ]
                 },
                 {
                   "text": ":"
@@ -562,15 +610,23 @@
               "text": "- Content tagged with a slot name is placed into the matching slot in the new layout.    - Content with no slot tag falls into the "
             },
             {
-              "text": "\"default\"",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "\"default\""
+                }
+              ]
             },
             {
               "text": " slot if the new layout has one; otherwise into the bottom or top slot, or is dropped.    - Fixed blocks with the same "
             },
             {
-              "text": "slotId",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "slotId"
+                }
+              ]
             },
             {
               "text": " get their editable content carried over (text, media); their structural settings come from the new layout."
@@ -590,8 +646,12 @@
               "text": "The point of "
             },
             {
-              "text": "slotId",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "slotId"
+                }
+              ]
             },
             {
               "text": " is that two layouts can share the same set of region names — switch between them and your content lands in the right places automatically."
@@ -625,8 +685,12 @@
               "text": "Editing inside a template block (one that came from the merged template) goes through a special "
             },
             {
-              "text": "template edit mode",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "template edit mode"
+                }
+              ]
             },
             {
               "text": ". While in template edit mode:"
@@ -673,8 +737,12 @@
               "text": "This lets you edit the template's "
             },
             {
-              "text": "definition",
-              "em": true
+              "type": "em",
+              "children": [
+                {
+                  "text": "definition"
+                }
+              ]
             },
             {
               "text": " without leaving the page — the changes propagate back to the saved template, so any other page using it picks up the change. Switch out of template edit mode (typically a toolbar action labelled \"Edit template\" / \"Done\") to go back to editing this page's content."
@@ -736,8 +804,12 @@
               "text": "When "
             },
             {
-              "text": "allowedTemplates",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedTemplates"
+                }
+              ]
             },
             {
               "text": " is configured on a field, the BlockChooser's Templates group shows the list. Pick one and the template's content is inserted at the current position as a block (just like adding any other block). Editor-side this is the simpler case — once inserted, the template's blocks behave the same as if a layout had placed them (lock icons, fixed-but-editable, slots)."

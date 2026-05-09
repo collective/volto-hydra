@@ -137,15 +137,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "allowedTemplates",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "allowedTemplates"
+                    }
+                  ]
                 },
                 {
                   "text": " and "
                 },
                 {
-                  "text": "allowedLayouts",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "allowedLayouts"
+                    }
+                  ]
                 },
                 {
                   "text": " applied to the blocks schema let the developer control loading templates: which templates are available for use, which are automatically applied as layouts, and which the editor can switch between"
@@ -159,15 +167,23 @@
                   "text": "During rendering, the frontend can use the provided helper ("
                 },
                 {
-                  "text": "expandTemplates",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "expandTemplates"
+                    }
+                  ]
                 },
                 {
                   "text": " / "
                 },
                 {
-                  "text": "expandTemplatesSync",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "expandTemplatesSync"
+                    }
+                  ]
                 },
                 {
                   "text": ") to refresh templates found in the page content from the template content, and apply layouts based on rules (such as forcing a layout based on content type or metadata). Alternatively the frontend can write its own merge logic."
@@ -203,8 +219,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Fixed + ReadOnly",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Fixed + ReadOnly"
+                    }
+                  ]
                 },
                 {
                   "text": " — can't be edited or moved (e.g. branded headers/footers). Similar to fixed hard-coded HTML in a block."
@@ -215,8 +235,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Fixed",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Fixed"
+                    }
+                  ]
                 },
                 {
                   "text": " — can be edited but not moved (e.g. required sections). Similar to a block field."
@@ -227,29 +251,45 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Slot",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Slot"
+                    }
+                  ]
                 },
                 {
                   "text": " ("
                 },
                 {
-                  "text": "fixed: false",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "fixed: false"
+                    }
+                  ]
                 },
                 {
                   "text": " / unset) — a named region ("
                 },
                 {
-                  "text": "slotId",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "slotId"
+                    }
+                  ]
                 },
                 {
                   "text": ") where editors can add their own blocks. Similar to a block field. The "
                 },
                 {
-                  "text": "\"default\"",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "\"default\""
+                    }
+                  ]
                 },
                 {
                   "text": " slot receives leftover content."
@@ -271,29 +311,45 @@
               "text": "The slot a block lives in is identified by its "
             },
             {
-              "text": "slotId",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "slotId"
+                }
+              ]
             },
             {
               "text": ". This is the field name used by "
             },
             {
-              "text": "expandTemplates",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "expandTemplates"
+                }
+              ]
             },
             {
               "text": " / "
             },
             {
-              "text": "expandTemplatesSync",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "expandTemplatesSync"
+                }
+              ]
             },
             {
               "text": " and by the merge rules below — not "
             },
             {
-              "text": "placeholder",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "placeholder"
+                }
+              ]
             },
             {
               "text": "."
@@ -338,8 +394,12 @@
               "text": "Configure templates in "
             },
             {
-              "text": "page.schema.properties",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "page.schema.properties"
+                }
+              ]
             },
             {
               "text": " on the blocks field:"
@@ -370,8 +430,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`allowedTemplates`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`allowedTemplates`"
+                    }
+                  ]
                 },
                 {
                   "text": " — Templates shown in the BlockChooser's \"Templates\" group, inserted as blocks."
@@ -382,15 +446,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`allowedLayouts`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`allowedLayouts`"
+                    }
+                  ]
                 },
                 {
                   "text": " — Templates shown in the Layout dropdown. They replace/merge the entire container content. A value of "
                 },
                 {
-                  "text": "null",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "null"
+                    }
+                  ]
                 },
                 {
                   "text": " allows for a no-template option. If none of those templates are already set as the layout then during editing, the first is applied automatically."
@@ -426,15 +498,23 @@
               "text": "Use "
             },
             {
-              "text": "expandTemplates",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "expandTemplates"
+                }
+              ]
             },
             {
               "text": " (async) or "
             },
             {
-              "text": "expandTemplatesSync",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "expandTemplatesSync"
+                }
+              ]
             },
             {
               "text": " (sync with pre-fetched templates) to merge template content during rendering."
@@ -454,29 +534,45 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Edit Mode",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Edit Mode"
+                    }
+                  ]
                 },
                 {
                   "text": ": These functions auto-detect edit mode via "
                 },
                 {
-                  "text": "isEditMode()",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "isEditMode()"
+                    }
+                  ]
                 },
                 {
                   "text": " and pass blocks through unchanged (just adding "
                 },
                 {
-                  "text": "@uid",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "@uid"
+                    }
+                  ]
                 },
                 {
                   "text": "). The admin handles template merging and adds "
                 },
                 {
-                  "text": "nodeId",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "nodeId"
+                    }
+                  ]
                 },
                 {
                   "text": " attributes for inline editing."
@@ -487,15 +583,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "SSR",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "SSR"
+                    }
+                  ]
                 },
                 {
                   "text": ": On SSR (no window), "
                 },
                 {
-                  "text": "isEditMode()",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "isEditMode()"
+                    }
+                  ]
                 },
                 {
                   "text": " returns false so templates are expanded — this is correct since edit mode only exists in the browser iframe."
@@ -514,8 +618,12 @@
           "type": "p",
           "children": [
             {
-              "text": "Sync vs Async",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Sync vs Async"
+                }
+              ]
             },
             {
               "text": ":"
@@ -535,8 +643,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`expandTemplatesSync`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`expandTemplatesSync`"
+                    }
+                  ]
                 },
                 {
                   "text": " — Use when templates are pre-fetched at page load. Better for Vue computed properties since it's synchronous."
@@ -547,8 +659,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`expandTemplates`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`expandTemplates`"
+                    }
+                  ]
                 },
                 {
                   "text": " — Use when you need to lazy-load templates on demand. Handles on-demand loading of forced layouts not in page data."
@@ -581,22 +697,34 @@
           "type": "p",
           "children": [
             {
-              "text": "`loadTemplates(data, loadTemplate)`",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "`loadTemplates(data, loadTemplate)`"
+                }
+              ]
             },
             {
               "text": " scans page data for "
             },
             {
-              "text": "templateId",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "templateId"
+                }
+              ]
             },
             {
               "text": " references and loads them all in parallel. It follows nested references (templates referencing other templates) and has a 5s per-template timeout. It only loads templates actually in the page data — "
             },
             {
-              "text": "allowedLayouts",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedLayouts"
+                }
+              ]
             },
             {
               "text": " options are loaded on demand when a forced layout is applied."
@@ -641,8 +769,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`blocks`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`blocks`"
+                    }
+                  ]
                 },
                 {
                   "text": ": Map of blockId -> block data"
@@ -653,15 +785,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`templateState`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`templateState`"
+                    }
+                  ]
                 },
                 {
                   "text": ": Pass "
                 },
                 {
-                  "text": "{}",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "{}"
+                    }
+                  ]
                 },
                 {
                   "text": " and share across calls — tracks state for nested containers"
@@ -672,8 +812,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`templates`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`templates`"
+                    }
+                  ]
                 },
                 {
                   "text": ": (sync only) Pre-fetched map of templateId -> template data"
@@ -684,8 +828,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`loadTemplate(id)`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`loadTemplate(id)`"
+                    }
+                  ]
                 },
                 {
                   "text": ": (async only) Function to fetch template content"
@@ -696,8 +844,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`allowedLayouts`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`allowedLayouts`"
+                    }
+                  ]
                 },
                 {
                   "text": ": Force a layout when container has no template applied"
@@ -750,15 +902,23 @@
                   "text": "Remove the blocks with the "
                 },
                 {
-                  "text": "templateId",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "templateId"
+                    }
+                  ]
                 },
                 {
                   "text": " to replace, storing any that aren't fixed and readOnly by "
                 },
                 {
-                  "text": "slotId",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "slotId"
+                    }
+                  ]
                 },
                 {
                   "text": "."
@@ -772,15 +932,23 @@
                   "text": "Insert in their place the template content: if fixed and readOnly, just insert it; if fixed, copy block content (not including block fields) from a page block with the same "
                 },
                 {
-                  "text": "slotId",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "slotId"
+                    }
+                  ]
                 },
                 {
                   "text": "; if a slot block, don't insert it, but insert the previous blocks with the same "
                 },
                 {
-                  "text": "slotId",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "slotId"
+                    }
+                  ]
                 },
                 {
                   "text": "."
@@ -802,8 +970,12 @@
                   "text": "Any slot blocks left over are inserted at the end of a special slot called "
                 },
                 {
-                  "text": "\"default\"",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "\"default\""
+                    }
+                  ]
                 },
                 {
                   "text": " if it exists, otherwise are dropped."
@@ -825,8 +997,12 @@
               "text": "When a layout is applied, the rules are the same but applied across a whole blocks field. Content without a "
             },
             {
-              "text": "slotId",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "slotId"
+                }
+              ]
             },
             {
               "text": " ends up:"
@@ -849,8 +1025,12 @@
                   "text": "In the "
                 },
                 {
-                  "text": "\"default\"",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "\"default\""
+                    }
+                  ]
                 },
                 {
                   "text": " slot if it exists"
@@ -921,8 +1101,12 @@
               "text": "Your frontend might want to force a layout to apply regardless of whether one is saved, for example to ensure a footer layout. Pass "
             },
             {
-              "text": "allowedLayouts",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedLayouts"
+                }
+              ]
             },
             {
               "text": ":"
@@ -953,15 +1137,23 @@
               "text": "Note: during editing the admin side will load the templates so in order to apply the same rules of forcing a layout you will need to set "
             },
             {
-              "text": "allowedLayouts",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedLayouts"
+                }
+              ]
             },
             {
               "text": " in "
             },
             {
-              "text": "page.schema.properties",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "page.schema.properties"
+                }
+              ]
             },
             {
               "text": " to ensure the page loads with the right template."

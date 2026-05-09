@@ -68,36 +68,56 @@
               "text": "Define custom block types directly in your frontend configuration via the "
             },
             {
-              "text": "blocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks"
+                }
+              ]
             },
             {
               "text": " option in "
             },
             {
-              "text": "initBridge",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "initBridge"
+                }
+              ]
             },
             {
               "text": ". No Volto plugin deployment required. Each block type needs an "
             },
             {
-              "text": "id",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "id"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "title",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "title"
+                }
+              ]
             },
             {
               "text": ", and a "
             },
             {
-              "text": "blockSchema",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blockSchema"
+                }
+              ]
             },
             {
               "text": " with its field properties."
@@ -114,8 +134,12 @@
           "type": "h2",
           "children": [
             {
-              "text": "initBridge()",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "initBridge()"
+                }
+              ]
             },
             {
               "text": " Reference"
@@ -132,8 +156,12 @@
           "type": "p",
           "children": [
             {
-              "text": "initBridge(options)",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "initBridge(options)"
+                }
+              ]
             },
             {
               "text": " opens the iframe bridge and registers your frontend's page and block configuration with the admin. Call it once during page setup when running inside the admin iframe."
@@ -161,8 +189,12 @@
           "type": "h3",
           "children": [
             {
-              "text": "page",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "page"
+                }
+              ]
             },
             {
               "text": " — page-level blocks fields"
@@ -182,15 +214,23 @@
               "text": "Defines the "
             },
             {
-              "text": "regions of a page",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "regions of a page"
+                }
+              ]
             },
             {
               "text": " where blocks can live. "
             },
             {
-              "text": "page.schema.properties",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "page.schema.properties"
+                }
+              ]
             },
             {
               "text": " is keyed by field name; each entry is one region."
@@ -235,8 +275,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`title`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`title`"
+                    }
+                  ]
                 },
                 {
                   "text": " — sidebar section title (defaults to the field name)."
@@ -247,8 +291,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`allowedBlocks`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`allowedBlocks`"
+                    }
+                  ]
                 },
                 {
                   "text": " — array of block-type names this region accepts. Acts as a per-region filter on top of the registry."
@@ -259,8 +307,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`allowedTemplates`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`allowedTemplates`"
+                    }
+                  ]
                 },
                 {
                   "text": " — array of template URLs shown in the BlockChooser's \"Templates\" group for this field. See "
@@ -285,8 +337,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`allowedLayouts`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`allowedLayouts`"
+                    }
+                  ]
                 },
                 {
                   "text": " — array of template URLs shown in the Layout dropdown for this field."
@@ -297,8 +353,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`maxLength`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`maxLength`"
+                    }
+                  ]
                 },
                 {
                   "text": " — maximum number of blocks in the field."
@@ -337,15 +397,23 @@
                   "text": "If you don't include "
                 },
                 {
-                  "text": "blocks_layout",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "blocks_layout"
+                    }
+                  ]
                 },
                 {
                   "text": ", it's auto-added with "
                 },
                 {
-                  "text": "{ title: 'Blocks' }",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "{ title: 'Blocks' }"
+                    }
+                  ]
                 },
                 {
                   "text": "."
@@ -364,43 +432,67 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Auto-restrict",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Auto-restrict"
+                    }
+                  ]
                 },
                 {
                   "text": ": any block type that's not in "
                 },
                 {
-                  "text": "any",
-                  "em": true
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": "any"
+                    }
+                  ]
                 },
                 {
                   "text": " field's "
                 },
                 {
-                  "text": "allowedBlocks",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "allowedBlocks"
+                    }
+                  ]
                 },
                 {
                   "text": " is auto-restricted (hidden from the BlockChooser globally). To bypass, set the block's "
                 },
                 {
-                  "text": "restricted",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "restricted"
+                    }
+                  ]
                 },
                 {
                   "text": " to a function instead of "
                 },
                 {
-                  "text": "true",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "true"
+                    }
+                  ]
                 },
                 {
                   "text": "/"
                 },
                 {
-                  "text": "false",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "false"
+                    }
+                  ]
                 },
                 {
                   "text": "."
@@ -414,8 +506,12 @@
                   "text": "Fields not present in saved page data are auto-initialised with "
                 },
                 {
-                  "text": "{ items: [] }",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "{ items: [] }"
+                    }
+                  ]
                 },
                 {
                   "text": " on load."
@@ -442,8 +538,12 @@
           "type": "h3",
           "children": [
             {
-              "text": "blocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks"
+                }
+              ]
             },
             {
               "text": " — block type registry"
@@ -463,15 +563,23 @@
               "text": "Defines or overrides individual block types. Each key is the block type name (matching what appears in "
             },
             {
-              "text": "allowedBlocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedBlocks"
+                }
+              ]
             },
             {
               "text": " and "
             },
             {
-              "text": "@type",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@type"
+                }
+              ]
             },
             {
               "text": " on saved blocks)."
@@ -516,8 +624,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`id`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`id`"
+                    }
+                  ]
                 },
                 {
                   "text": " — block type identifier (matches the key)."
@@ -528,8 +640,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`title`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`title`"
+                    }
+                  ]
                 },
                 {
                   "text": " — display name in the BlockChooser."
@@ -540,8 +656,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`icon`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`icon`"
+                    }
+                  ]
                 },
                 {
                   "text": " — icon shown in the BlockChooser (data URL or SVG component)."
@@ -552,15 +672,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`group`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`group`"
+                    }
+                  ]
                 },
                 {
                   "text": " — chooser group (e.g. "
                 },
                 {
-                  "text": "'common'",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "'common'"
+                    }
+                  ]
                 },
                 {
                   "text": ")."
@@ -571,15 +699,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`restricted`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`restricted`"
+                    }
+                  ]
                 },
                 {
                   "text": " — "
                 },
                 {
-                  "text": "true",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "true"
+                    }
+                  ]
                 },
                 {
                   "text": " hides the block from the chooser; can also be a function for conditional restrictions."
@@ -590,8 +726,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`mostUsed`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`mostUsed`"
+                    }
+                  ]
                 },
                 {
                   "text": " — pin to the top of the chooser."
@@ -602,15 +742,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`disableCustomSidebarEditForm`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`disableCustomSidebarEditForm`"
+                    }
+                  ]
                 },
                 {
                   "text": " — set "
                 },
                 {
-                  "text": "true",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "true"
+                    }
+                  ]
                 },
                 {
                   "text": " to use only the schema form in the sidebar (no custom edit component)."
@@ -621,8 +769,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`blockSchema`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`blockSchema`"
+                    }
+                  ]
                 },
                 {
                   "text": " — JSON-schema-style definition of the block's fields. See "
@@ -661,8 +813,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`fieldMappings`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`fieldMappings`"
+                    }
+                  ]
                 },
                 {
                   "text": " — block-to-block conversion rules. See "
@@ -687,22 +843,34 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`schemaEnhancer`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`schemaEnhancer`"
+                    }
+                  ]
                 },
                 {
                   "text": " — recipe-based schema modifier; supports "
                 },
                 {
-                  "text": "fieldRules",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "fieldRules"
+                    }
+                  ]
                 },
                 {
                   "text": ", "
                 },
                 {
-                  "text": "inheritSchemaFrom",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "inheritSchemaFrom"
+                    }
+                  ]
                 },
                 {
                   "text": ", etc. See "
@@ -735,50 +903,78 @@
           "type": "p",
           "children": [
             {
-              "text": "page",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "page"
+                }
+              ]
             },
             {
               "text": " and "
             },
             {
-              "text": "blocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks"
+                }
+              ]
             },
             {
               "text": " interact via name lookup: a region's "
             },
             {
-              "text": "allowedBlocks: ['slate', 'slider']",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedBlocks: ['slate', 'slider']"
+                }
+              ]
             },
             {
               "text": " references keys of the "
             },
             {
-              "text": "blocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks"
+                }
+              ]
             },
             {
               "text": " registry. You can use one without the other — "
             },
             {
-              "text": "page",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "page"
+                }
+              ]
             },
             {
               "text": " alone restricts placement of built-in blocks; "
             },
             {
-              "text": "blocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks"
+                }
+              ]
             },
             {
               "text": " alone registers custom types and gets a default "
             },
             {
-              "text": "blocks_layout",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks_layout"
+                }
+              ]
             },
             {
               "text": " region accepting everything."
@@ -812,8 +1008,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`onEditChange(formData)`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`onEditChange(formData)`"
+                    }
+                  ]
                 },
                 {
                   "text": " — callback invoked with the new form data whenever the editor changes anything. See "
@@ -838,15 +1038,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`pathToApiPath(path)`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`pathToApiPath(path)`"
+                    }
+                  ]
                 },
                 {
                   "text": " — function transforming a frontend path to the API/admin path on "
                 },
                 {
-                  "text": "PATH_CHANGE",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "PATH_CHANGE"
+                    }
+                  ]
                 },
                 {
                   "text": " messages. Use when your frontend embeds state (paging, filters) in URL segments that don't exist on the CMS side. See "
@@ -871,8 +1079,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`voltoConfig`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`voltoConfig`"
+                    }
+                  ]
                 },
                 {
                   "text": " — passes additional Volto config (non-block settings) through to the admin. Future home for things like slate formats ("
@@ -897,22 +1109,34 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`debug`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`debug`"
+                    }
+                  ]
                 },
                 {
                   "text": " — "
                 },
                 {
-                  "text": "true",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "true"
+                    }
+                  ]
                 },
                 {
                   "text": " enables verbose console logging in the bridge. Default "
                 },
                 {
-                  "text": "false",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "false"
+                    }
+                  ]
                 },
                 {
                   "text": "."
@@ -948,29 +1172,45 @@
               "text": "The "
             },
             {
-              "text": "Bridge",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "Bridge"
+                }
+              ]
             },
             {
               "text": " instance, which exposes additional API methods you can call from the frontend (e.g. "
             },
             {
-              "text": "getAccessToken()",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "getAccessToken()"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "sendBlockUpdate()",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "sendBlockUpdate()"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "sendBlockAction()",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "sendBlockAction()"
+                }
+              ]
             },
             {
               "text": "). See "
@@ -1029,15 +1269,23 @@
               "text": "Child block types (like "
             },
             {
-              "text": "slide",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "slide"
+                }
+              ]
             },
             {
               "text": " above) must be defined at the top level of "
             },
             {
-              "text": "blocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks"
+                }
+              ]
             },
             {
               "text": ". You can also:"
@@ -1060,8 +1308,12 @@
                   "text": "Set "
                 },
                 {
-                  "text": "restricted: true",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "restricted: true"
+                    }
+                  ]
                 },
                 {
                   "text": " to hide a block from the block chooser (only usable as child blocks)"
@@ -1075,8 +1327,12 @@
                   "text": "Set "
                 },
                 {
-                  "text": "mostUsed: true",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "mostUsed: true"
+                    }
+                  ]
                 },
                 {
                   "text": " to pin a block to the top of the chooser"
@@ -1090,8 +1346,12 @@
                   "text": "Set "
                 },
                 {
-                  "text": "disableCustomSidebarEditForm: true",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "disableCustomSidebarEditForm: true"
+                    }
+                  ]
                 },
                 {
                   "text": " to use only the schema form in the sidebar (no custom edit component)"
@@ -1105,8 +1365,12 @@
                   "text": "Use "
                 },
                 {
-                  "text": "fieldsets",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "fieldsets"
+                    }
+                  ]
                 },
                 {
                   "text": " in the schema to organize fields into tabs"
@@ -1164,8 +1428,12 @@
           "type": "p",
           "children": [
             {
-              "text": "`fieldRules`",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "`fieldRules`"
+                }
+              ]
             },
             {
               "text": " — add, remove, or conditionally modify field definitions. The value for each rule key can be:"
@@ -1185,8 +1453,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "false",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "false"
+                    }
+                  ]
                 },
                 {
                   "text": " — always hide the field"
@@ -1197,8 +1469,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "{ set: { title: '...', widget: '...' } }",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "{ set: { title: '...', widget: '...' } }"
+                    }
+                  ]
                 },
                 {
                   "text": " — always add or replace the field definition"
@@ -1209,8 +1485,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "{ when: { fieldName: value }, else: false }",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "{ when: { fieldName: value }, else: false }"
+                    }
+                  ]
                 },
                 {
                   "text": " — show only when condition met"
@@ -1221,8 +1501,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "{ when: { fieldName: { gte: 2 } }, set: { ... } }",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "{ when: { fieldName: { gte: 2 } }, set: { ... } }"
+                    }
+                  ]
                 },
                 {
                   "text": " — conditional definition override"
@@ -1233,22 +1517,34 @@
               "type": "li",
               "children": [
                 {
-                  "text": "[rule, rule, ...]",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "[rule, rule, ...]"
+                    }
+                  ]
                 },
                 {
                   "text": " — switch: first matching rule wins. A bare "
                 },
                 {
-                  "text": "false",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "false"
+                    }
+                  ]
                 },
                 {
                   "text": " in the array is a catch-all hide: "
                 },
                 {
-                  "text": "[{ when: A }, { when: B }, false]",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "[{ when: A }, { when: B }, false]"
+                    }
+                  ]
                 },
                 {
                   "text": " shows on A or B, hides otherwise."
@@ -1259,8 +1555,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "'parent.child': false",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "'parent.child': false"
+                    }
+                  ]
                 },
                 {
                   "text": " — hide a field inside a widget's inner schema"
@@ -1282,57 +1582,89 @@
               "text": "Condition operators: "
             },
             {
-              "text": "is",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "is"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "isNot",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "isNot"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "isSet",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "isSet"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "isNotSet",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "isNotSet"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "gt",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "gt"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "gte",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "gte"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "lt",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "lt"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "lte",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "lte"
+                }
+              ]
             },
             {
               "text": "."
@@ -1352,15 +1684,23 @@
               "text": "Field paths: "
             },
             {
-              "text": "../field",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "../field"
+                }
+              ]
             },
             {
               "text": " for the parent block's field, "
             },
             {
-              "text": "/field",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "/field"
+                }
+              ]
             },
             {
               "text": " for a page metadata field."
@@ -1391,8 +1731,12 @@
           "type": "p",
           "children": [
             {
-              "text": "fieldMappings",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "fieldMappings"
+                }
+              ]
             },
             {
               "text": " (plural) on a block config defines how fields map between block types. This enables three things:"
@@ -1412,8 +1756,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "\"Convert to...\" UI action",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "\"Convert to...\" UI action"
+                    }
+                  ]
                 },
                 {
                   "text": " — editors can convert a block to another type (e.g. teaser → image)."
@@ -1424,15 +1772,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Listing item types",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Listing item types"
+                    }
+                  ]
                 },
                 {
                   "text": " — query results are mapped to item blocks via "
                 },
                 {
-                  "text": "@default",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "@default"
+                    }
+                  ]
                 },
                 {
                   "text": " (see "
@@ -1457,8 +1813,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Synchronised container children",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Synchronised container children"
+                    }
+                  ]
                 },
                 {
                   "text": " — a parent controls child type, all children convert together (see "
@@ -1494,22 +1854,34 @@
               "text": "Each key in "
             },
             {
-              "text": "fieldMappings",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "fieldMappings"
+                }
+              ]
             },
             {
               "text": " is either a "
             },
             {
-              "text": "specific block type name",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "specific block type name"
+                }
+              ]
             },
             {
               "text": " or "
             },
             {
-              "text": "`@default`",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "`@default`"
+                }
+              ]
             },
             {
               "text": "."
@@ -1526,8 +1898,12 @@
           "type": "h3",
           "children": [
             {
-              "text": "@default",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@default"
+                }
+              ]
             },
             {
               "text": " — the canonical content shape"
@@ -1544,71 +1920,111 @@
           "type": "p",
           "children": [
             {
-              "text": "@default",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@default"
+                }
+              ]
             },
             {
               "text": " is a virtual type representing canonical Plone content item fields: "
             },
             {
-              "text": "@id",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@id"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "title",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "title"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "description",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "description"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "image",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "image"
+                }
+              ]
             },
             {
               "text": ". These are the same fields that listing query results provide. A block with "
             },
             {
-              "text": "fieldMappings['@default']",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "fieldMappings['@default']"
+                }
+              ]
             },
             {
               "text": " is saying \"I can be populated from standard content item fields.\" The keys in "
             },
             {
-              "text": "@default",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@default"
+                }
+              ]
             },
             {
               "text": " must only use these four canonical fields — using other keys (e.g. "
             },
             {
-              "text": "label",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "label"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "field",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "field"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "required",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "required"
+                }
+              ]
             },
             {
               "text": ") is invalid and produces a console warning."
@@ -1642,22 +2058,34 @@
               "text": "Use these when blocks share fields that aren't part of the "
             },
             {
-              "text": "@default",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@default"
+                }
+              ]
             },
             {
               "text": " set — for example, facet types sharing "
             },
             {
-              "text": "{ title, field, hidden }",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "{ title, field, hidden }"
+                }
+              ]
             },
             {
               "text": " or form field types sharing "
             },
             {
-              "text": "{ label, description, required }",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "{ label, description, required }"
+                }
+              ]
             },
             {
               "text": "."
@@ -1705,8 +2133,12 @@
                   "text": "Explicit "
                 },
                 {
-                  "text": "fieldMappings[typeName]",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "fieldMappings[typeName]"
+                    }
+                  ]
                 },
                 {
                   "text": " always creates a conversion edge."
@@ -1717,29 +2149,45 @@
               "type": "li",
               "children": [
                 {
-                  "text": "@default",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "@default"
+                    }
+                  ]
                 },
                 {
                   "text": " only creates edges between types that both have valid "
                 },
                 {
-                  "text": "@default",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "@default"
+                    }
+                  ]
                 },
                 {
                   "text": " mappings (keys from "
                 },
                 {
-                  "text": "{ @id, title, description, image }",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "{ @id, title, description, image }"
+                    }
+                  ]
                 },
                 {
                   "text": "). Types with non-canonical "
                 },
                 {
-                  "text": "@default",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "@default"
+                    }
+                  ]
                 },
                 {
                   "text": " keys are ignored."
@@ -1753,8 +2201,12 @@
                   "text": "Types without "
                 },
                 {
-                  "text": "fieldMappings",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "fieldMappings"
+                    }
+                  ]
                 },
                 {
                   "text": " never appear in the \"Convert to...\" menu."
@@ -1806,8 +2258,12 @@
               "text": "A mapping value is either a string (simple field rename) or "
             },
             {
-              "text": "{ field, type }",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "{ field, type }"
+                }
+              ]
             },
             {
               "text": " (rename with type conversion):"
@@ -1838,8 +2294,12 @@
               "text": "When "
             },
             {
-              "text": "type",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "type"
+                }
+              ]
             },
             {
               "text": " is specified, the value is converted at runtime:"
@@ -1902,8 +2362,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "string",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "string"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -1920,8 +2384,12 @@
                         "text": "Arrays joined with "
                       },
                       {
-                        "text": "\", \"",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "\", \""
+                          }
+                        ]
                       },
                       {
                         "text": "; image objects resolved to URL string"
@@ -1943,8 +2411,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "link",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "link"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -1961,8 +2433,12 @@
                         "text": "String wrapped as "
                       },
                       {
-                        "text": "[{ \"@id\": value }]",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "[{ \"@id\": value }]"
+                          }
+                        ]
                       },
                       {
                         "text": " (Volto link format)"
@@ -1984,8 +2460,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "image",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "image"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -2002,8 +2482,12 @@
                         "text": "Pass through (expects "
                       },
                       {
-                        "text": "{ \"@id\", image_field, image_scales }",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "{ \"@id\", image_field, image_scales }"
+                          }
+                        ]
                       },
                       {
                         "text": ")"
@@ -2025,8 +2509,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "array",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "array"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -2043,8 +2531,12 @@
                         "text": "Non-arrays wrapped in "
                       },
                       {
-                        "text": "[value]",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "[value]"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -2063,8 +2555,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "(none)",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "(none)"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -2114,15 +2610,23 @@
               "text": "When a parent block has "
             },
             {
-              "text": "mappingField",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "mappingField"
+                }
+              ]
             },
             {
               "text": " set in its "
             },
             {
-              "text": "inheritSchemaFrom",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "inheritSchemaFrom"
+                }
+              ]
             },
             {
               "text": " recipe, the admin sidebar shows a widget that lets editors configure field mappings visually:"
@@ -2145,36 +2649,56 @@
                   "text": "Shows the "
                 },
                 {
-                  "text": "@default",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "@default"
+                    }
+                  ]
                 },
                 {
                   "text": " source fields ("
                 },
                 {
-                  "text": "@id",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "@id"
+                    }
+                  ]
                 },
                 {
                   "text": ", "
                 },
                 {
-                  "text": "title",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "title"
+                    }
+                  ]
                 },
                 {
                   "text": ", "
                 },
                 {
-                  "text": "description",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "description"
+                    }
+                  ]
                 },
                 {
                   "text": ", "
                 },
                 {
-                  "text": "image",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "image"
+                    }
+                  ]
                 },
                 {
                   "text": ") on the left."
@@ -2196,29 +2720,45 @@
                   "text": "Auto-detects the conversion "
                 },
                 {
-                  "text": "type",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "type"
+                    }
+                  ]
                 },
                 {
                   "text": " from the target field definition (e.g. "
                 },
                 {
-                  "text": "object_browser",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "object_browser"
+                    }
+                  ]
                 },
                 {
                   "text": " with "
                 },
                 {
-                  "text": "mode=link",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "mode=link"
+                    }
+                  ]
                 },
                 {
                   "text": " → "
                 },
                 {
-                  "text": "type: \"link\"",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "type: \"link\""
+                    }
+                  ]
                 },
                 {
                   "text": ")."
@@ -2232,8 +2772,12 @@
                   "text": "Saves the result as "
                 },
                 {
-                  "text": "fieldMapping",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "fieldMapping"
+                    }
+                  ]
                 },
                 {
                   "text": " (singular) on the block data."
@@ -2255,15 +2799,23 @@
               "text": "The saved "
             },
             {
-              "text": "fieldMapping",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "fieldMapping"
+                }
+              ]
             },
             {
               "text": " is read at render time by "
             },
             {
-              "text": "expandListingBlocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "expandListingBlocks"
+                }
+              ]
             },
             {
               "text": " — no block registry access needed at render time."
@@ -2322,22 +2874,34 @@
               "text": "The "
             },
             {
-              "text": "css:<selector>",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "css:<selector>"
+                }
+              ]
             },
             {
               "text": " key in "
             },
             {
-              "text": "fieldMappings",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "fieldMappings"
+                }
+              ]
             },
             {
               "text": " matches a pasted HTML element; the value maps element attributes to block fields. Not yet implemented — open question on whether this should run via "
             },
             {
-              "text": "htmlTagsToSlate",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "htmlTagsToSlate"
+                }
+              ]
             },
             {
               "text": " (bypassing slate conversion) or be encoded into slate so attributes/classes survive."

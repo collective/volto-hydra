@@ -183,8 +183,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Blocks layout",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Blocks layout"
+                    }
+                  ]
                 },
                 {
                   "text": " — areas of the page that contain a list of blocks that make up your page content."
@@ -195,8 +199,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Blocks",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Blocks"
+                    }
+                  ]
                 },
                 {
                   "text": " — discrete visual elements with a schema and settings that can be moved and edited."
@@ -218,15 +226,23 @@
               "text": "- Type, title, icon etc. so the user can pick from a menu.   - Fields: string, image, link etc. each with their own sidebar widget.     - "
             },
             {
-              "text": "slate",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "slate"
+                }
+              ]
             },
             {
               "text": " is a special field that contains JSON for a paragraph, heading etc.     - "
             },
             {
-              "text": "blocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks"
+                }
+              ]
             },
             {
               "text": " fields let a block hold other blocks."
@@ -296,15 +312,23 @@
               "text": "Then you augment the rendered HTML with "
             },
             {
-              "text": "data-",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-"
+                }
+              ]
             },
             {
               "text": " attributes (or "
             },
             {
-              "text": "<!-- hydra ... -->",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "<!-- hydra ... -->"
+                }
+              ]
             },
             {
               "text": " comments) so Hydra can find your blocks and editable fields:"
@@ -391,8 +415,12 @@
               "text": "For example, in Nuxt.js you create a file "
             },
             {
-              "text": "pages/[..slug].vue",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "pages/[..slug].vue"
+                }
+              ]
             },
             {
               "text": "."
@@ -485,8 +513,12 @@
                   "text": "You can use "
                 },
                 {
-                  "text": "@plone/client",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "@plone/client"
+                    }
+                  ]
                 },
                 {
                   "text": " for this"
@@ -663,8 +695,12 @@
                   "text": "Create a "
                 },
                 {
-                  "text": "Block",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "Block"
+                    }
+                  ]
                 },
                 {
                   "text": " component that takes the id and block JSON as arguments"
@@ -686,8 +722,12 @@
                   "text": "If the block is a container, call the "
                 },
                 {
-                  "text": "Block",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "Block"
+                    }
+                  ]
                 },
                 {
                   "text": " component recursively"
@@ -701,15 +741,23 @@
                   "text": "In your page, iterate down the "
                 },
                 {
-                  "text": "blocks_layout",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "blocks_layout"
+                    }
+                  ]
                 },
                 {
                   "text": " list and render a "
                 },
                 {
-                  "text": "Block",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "Block"
+                    }
+                  ]
                 },
                 {
                   "text": " component for each"
@@ -767,8 +815,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Generating a URL for links",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Generating a URL for links"
+                    }
+                  ]
                 },
                 {
                   "text": " — all REST API URLs are relative to the API URL, so you need to convert these to the right frontend URL"
@@ -779,8 +831,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Generating a URL for an image",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Generating a URL for an image"
+                    }
+                  ]
                 },
                 {
                   "text": " — blocks have image data in many formats so a helper function is useful"
@@ -1265,8 +1321,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Production",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Production"
+                    }
+                  ]
                 },
                 {
                   "text": " — deploy your frontend in SSG or SSR mode (fast, cacheable)."
@@ -1277,8 +1337,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Editing",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Editing"
+                    }
+                  ]
                 },
                 {
                   "text": " — deploy the same frontend in SPA mode to a separate URL (used only inside Hydra)."
@@ -1289,8 +1353,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Hydra + Plone",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Hydra + Plone"
+                    }
+                  ]
                 },
                 {
                   "text": " — only needs to run during editing, so scale-to-zero / serverless works."
@@ -1301,8 +1369,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "SSG rebuild",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "SSG rebuild"
+                    }
+                  ]
                 },
                 {
                   "text": " — for SSG, configure "
@@ -1366,8 +1438,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Production",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Production"
+                    }
+                  ]
                 },
                 {
                   "text": " — "
@@ -1392,8 +1468,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Editing",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Editing"
+                    }
+                  ]
                 },
                 {
                   "text": " — same Nuxt codebase deployed as SPA to a different Netlify URL. Only loaded inside Hydra's iframe."
@@ -1404,8 +1484,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Hydra + Plone",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Hydra + Plone"
+                    }
+                  ]
                 },
                 {
                   "text": " — deployed to "

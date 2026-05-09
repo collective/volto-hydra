@@ -79,36 +79,56 @@
           "type": "p",
           "children": [
             {
-              "text": "expandListingBlocks(layout, options)",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "expandListingBlocks(layout, options)"
+                }
+              ]
             },
             {
               "text": " is a helper in hydra.js that handles fetching, paging, and mapping results to block objects. It walks a layout, fetches results for each listing-type block, and returns "
             },
             {
-              "text": "{ items, paging }",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "{ items, paging }"
+                }
+              ]
             },
             {
               "text": " where "
             },
             {
-              "text": "items",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "items"
+                }
+              ]
             },
             {
               "text": " is an array of block objects with "
             },
             {
-              "text": "@uid",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@uid"
+                }
+              ]
             },
             {
               "text": " and "
             },
             {
-              "text": "@type",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@type"
+                }
+              ]
             },
             {
               "text": "."
@@ -128,8 +148,12 @@
               "text": "You tell it which block types need fetching via a "
             },
             {
-              "text": "fetchItems",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "fetchItems"
+                }
+              ]
             },
             {
               "text": " map — keys are block types, values are fetcher functions. This means you can have different kinds of listings (Plone queries, RSS feeds, etc.) each with their own fetcher:"
@@ -177,8 +201,12 @@
               "text": "A grid can have a mix of listing and static blocks sharing a single paging. The "
             },
             {
-              "text": "staticBlocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "staticBlocks"
+                }
+              ]
             },
             {
               "text": " helper wraps non-listing blocks so they participate in the shared page window. The listings use Suspense so they load client-side:"
@@ -223,8 +251,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`blocks`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`blocks`"
+                    }
+                  ]
                 },
                 {
                   "text": " — Map of blockId to block data"
@@ -235,22 +267,34 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`fetchItems`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`fetchItems`"
+                    }
+                  ]
                 },
                 {
                   "text": " — Required. Map of "
                 },
                 {
-                  "text": "{ blockType: async (block, { start, size }) => { items, total } }",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "{ blockType: async (block, { start, size }) => { items, total } }"
+                    }
+                  ]
                 },
                 {
                   "text": ". Keys declare which block types to expand; values are fetcher functions. Use "
                 },
                 {
-                  "text": "ploneFetchItems()",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "ploneFetchItems()"
+                    }
+                  ]
                 },
                 {
                   "text": " for Plone backends."
@@ -261,15 +305,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`paging`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`paging`"
+                    }
+                  ]
                 },
                 {
                   "text": " — Paging input "
                 },
                 {
-                  "text": "{ start, size }",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "{ start, size }"
+                    }
+                  ]
                 },
                 {
                   "text": " (not mutated). Computed values are returned in the response."
@@ -280,15 +332,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`seen`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`seen`"
+                    }
+                  ]
                 },
                 {
                   "text": " — Number of items already seen by prior calls (default: 0). Chain "
                 },
                 {
-                  "text": "paging.seen",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "paging.seen"
+                    }
+                  ]
                 },
                 {
                   "text": " from one call to the next for grids."
@@ -299,15 +359,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`itemTypeField`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`itemTypeField`"
+                    }
+                  ]
                 },
                 {
                   "text": " — Field on the listing block that holds the item type (default: "
                 },
                 {
-                  "text": "'itemType'",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "'itemType'"
+                    }
+                  ]
                 },
                 {
                   "text": ")"
@@ -318,15 +386,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`defaultItemType`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`defaultItemType`"
+                    }
+                  ]
                 },
                 {
                   "text": " — Fallback type when field is not set (default: "
                 },
                 {
-                  "text": "'summary'",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "'summary'"
+                    }
+                  ]
                 },
                 {
                   "text": ")"
@@ -359,22 +435,34 @@
           "type": "p",
           "children": [
             {
-              "text": "ploneFetchItems({ apiUrl, contextPath, extraCriteria })",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "ploneFetchItems({ apiUrl, contextPath, extraCriteria })"
+                }
+              ]
             },
             {
               "text": " creates a fetcher function for Plone's "
             },
             {
-              "text": "@querystring-search",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@querystring-search"
+                }
+              ]
             },
             {
               "text": " endpoint, suitable as a value in the "
             },
             {
-              "text": "fetchItems",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "fetchItems"
+                }
+              ]
             },
             {
               "text": " map."
@@ -451,8 +539,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "apiUrl",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "apiUrl"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -483,8 +575,12 @@
                         "text": "Plone site URL (e.g. "
                       },
                       {
-                        "text": "'http://localhost:8080/Plone'",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "'http://localhost:8080/Plone'"
+                          }
+                        ]
                       },
                       {
                         "text": ")"
@@ -506,8 +602,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "contextPath",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "contextPath"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -521,8 +621,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "'/'",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "'/'"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -555,8 +659,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "extraCriteria",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "extraCriteria"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -570,8 +678,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "{}",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "{}"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -588,29 +700,45 @@
                         "text": "Additional query params — "
                       },
                       {
-                        "text": "SearchableText",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "SearchableText"
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "sort_on",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "sort_on"
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "sort_order",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "sort_order"
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "facet.*",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "facet.*"
+                          }
+                        ]
                       },
                       {
                         "text": " keys"
@@ -635,8 +763,12 @@
               "text": "A listing with no "
             },
             {
-              "text": "querystring",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "querystring"
+                }
+              ]
             },
             {
               "text": " defaults to showing the current folder's contents in folder order."
@@ -653,36 +785,56 @@
           "type": "p",
           "children": [
             {
-              "text": "ploneFetchItems",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "ploneFetchItems"
+                }
+              ]
             },
             {
               "text": " also normalizes Plone's image data — packaging "
             },
             {
-              "text": "image_field",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "image_field"
+                }
+              ]
             },
             {
               "text": " + "
             },
             {
-              "text": "image_scales",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "image_scales"
+                }
+              ]
             },
             {
               "text": " into a self-contained "
             },
             {
-              "text": "image",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "image"
+                }
+              ]
             },
             {
               "text": " object with "
             },
             {
-              "text": "@id",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@id"
+                }
+              ]
             },
             {
               "text": " duplicated inside (needed for URL resolution):"
@@ -713,8 +865,12 @@
               "text": "This self-contained object has everything needed to resolve image URLs with scale support — see the Nuxt example's "
             },
             {
-              "text": "composables/imageProps.js",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "composables/imageProps.js"
+                }
+              ]
             },
             {
               "text": " for one approach."
@@ -734,36 +890,56 @@
               "text": "For non-Plone backends (RSS feeds, external APIs, etc.), write your own fetcher: "
             },
             {
-              "text": "async (block, { start, size }) => ({ items, total })",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "async (block, { start, size }) => ({ items, total })"
+                }
+              ]
             },
             {
               "text": ". "
             },
             {
-              "text": "start",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "start"
+                }
+              ]
             },
             {
               "text": " is the zero-based offset, "
             },
             {
-              "text": "size",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "size"
+                }
+              ]
             },
             {
               "text": " is the number of items to return (or "
             },
             {
-              "text": "0",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "0"
+                }
+              ]
             },
             {
               "text": " for total-only), and "
             },
             {
-              "text": "total",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "total"
+                }
+              ]
             },
             {
               "text": " in the return value is the full count, not just this page."
@@ -794,22 +970,34 @@
           "type": "p",
           "children": [
             {
-              "text": "fieldMapping",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "fieldMapping"
+                }
+              ]
             },
             {
               "text": " on a listing block controls which fields appear on expanded items — only mapped fields are included. Default: "
             },
             {
-              "text": "{ @id → href, title → title, description → description, image → image }",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "{ @id → href, title → title, description → description, image → image }"
+                }
+              ]
             },
             {
               "text": ". Values can be a string (rename) or "
             },
             {
-              "text": "{ field, type }",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "{ field, type }"
+                }
+              ]
             },
             {
               "text": " for conversions:"
@@ -886,8 +1074,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "default",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "default"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -901,22 +1093,34 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "title",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "title"
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "description",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "description"
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "href",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "href"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -935,8 +1139,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "summary",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "summary"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -950,29 +1158,45 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "title",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "title"
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "description",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "description"
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "href",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "href"
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "image",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "image"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -991,8 +1215,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "teaser",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "teaser"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -1006,29 +1234,45 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "title",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "title"
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "description",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "description"
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "href",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "href"
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "preview_image",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "preview_image"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -1075,22 +1319,34 @@
               "text": "Use "
             },
             {
-              "text": "variation",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "variation"
+                }
+              ]
             },
             {
               "text": " on the listing block to control what "
             },
             {
-              "text": "@type",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@type"
+                }
+              ]
             },
             {
               "text": " expanded items get. Listings reuse the same "
             },
             {
-              "text": "inheritSchemaFrom",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "inheritSchemaFrom"
+                }
+              ]
             },
             {
               "text": " recipe as container blocks (see "
@@ -1110,22 +1366,34 @@
               "text": ") but differ in one structural way: there's no blocks field to declare "
             },
             {
-              "text": "itemTypeField",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "itemTypeField"
+                }
+              ]
             },
             {
               "text": " on, since listing children are "
             },
             {
-              "text": "virtual",
-              "em": true
+              "type": "em",
+              "children": [
+                {
+                  "text": "virtual"
+                }
+              ]
             },
             {
               "text": " (produced from query results at render time, not authored as page data). Instead, declare the typeField directly on the "
             },
             {
-              "text": "inheritSchemaFrom",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "inheritSchemaFrom"
+                }
+              ]
             },
             {
               "text": " recipe:"
@@ -1153,64 +1421,100 @@
           "type": "p",
           "children": [
             {
-              "text": "filterConvertibleFrom: '@default'",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "filterConvertibleFrom: '@default'"
+                }
+              ]
             },
             {
               "text": " restricts the dropdown to types that have a "
             },
             {
-              "text": "fieldMappings['@default']",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "fieldMappings['@default']"
+                }
+              ]
             },
             {
               "text": " entry — i.e. types that can be populated from the canonical content fields ("
             },
             {
-              "text": "@id",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@id"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "title",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "title"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "description",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "description"
+                }
+              ]
             },
             {
               "text": ", "
             },
             {
-              "text": "image",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "image"
+                }
+              ]
             },
             {
               "text": ") that listing queries return. Each item type's "
             },
             {
-              "text": "fieldMappings['@default']",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "fieldMappings['@default']"
+                }
+              ]
             },
             {
               "text": " (on its own block config) defines how those source fields land on its schema; that static mapping is enough to render listings. Adding "
             },
             {
-              "text": "mappingField",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "mappingField"
+                }
+              ]
             },
             {
               "text": " to the enhancer exposes the "
             },
             {
-              "text": "FieldMappingWidget",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "FieldMappingWidget"
+                }
+              ]
             },
             {
               "text": " so the editor can override the mapping per listing instance."
@@ -1230,15 +1534,23 @@
               "text": "The widget saves its output as "
             },
             {
-              "text": "fieldMapping",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "fieldMapping"
+                }
+              ]
             },
             {
               "text": " (singular) on the block data. "
             },
             {
-              "text": "expandListingBlocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "expandListingBlocks"
+                }
+              ]
             },
             {
               "text": " reads that at render time to translate each query result into an item block."
@@ -1272,36 +1584,56 @@
               "text": "A container (e.g. "
             },
             {
-              "text": "gridBlock",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "gridBlock"
+                }
+              ]
             },
             {
               "text": ") can mix "
             },
             {
-              "text": "manual children",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "manual children"
+                }
+              ]
             },
             {
               "text": " AND "
             },
             {
-              "text": "a listing",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "a listing"
+                }
+              ]
             },
             {
               "text": " as children. Add "
             },
             {
-              "text": "'listing'",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "'listing'"
+                }
+              ]
             },
             {
               "text": " to the blocks field's "
             },
             {
-              "text": "allowedBlocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedBlocks"
+                }
+              ]
             },
             {
               "text": ", and the parent's typeField propagates everywhere:"
@@ -1329,29 +1661,45 @@
           "type": "p",
           "children": [
             {
-              "text": "filterConvertibleFrom: '@default'",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "filterConvertibleFrom: '@default'"
+                }
+              ]
             },
             {
               "text": " keeps "
             },
             {
-              "text": "'listing'",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "'listing'"
+                }
+              ]
             },
             {
               "text": " out of the dropdown (it's a structural container, not an item type, so it has no "
             },
             {
-              "text": "fieldMappings['@default']",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "fieldMappings['@default']"
+                }
+              ]
             },
             {
               "text": ") but it stays in "
             },
             {
-              "text": "allowedBlocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedBlocks"
+                }
+              ]
             },
             {
               "text": " so a listing block can still exist as a structural child. The editor sees \"Teaser / Image / Summary\" in the picker; the listing is a structural choice they don't have to think about."
@@ -1371,15 +1719,23 @@
               "text": "When the editor changes "
             },
             {
-              "text": "gridBlock.variation",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "gridBlock.variation"
+                }
+              ]
             },
             {
               "text": " to e.g. "
             },
             {
-              "text": "'summary'",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "'summary'"
+                }
+              ]
             },
             {
               "text": ":"
@@ -1399,22 +1755,34 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Manual children",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Manual children"
+                    }
+                  ]
                 },
                 {
                   "text": " (a teaser, an image) get their "
                 },
                 {
-                  "text": "@type",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "@type"
+                    }
+                  ]
                 },
                 {
                   "text": " converted via the destination type's "
                 },
                 {
-                  "text": "fieldMappings",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "fieldMappings"
+                    }
+                  ]
                 },
                 {
                   "text": " — teaser becomes summary."
@@ -1425,29 +1793,45 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Listing child",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Listing child"
+                    }
+                  ]
                 },
                 {
                   "text": " keeps "
                 },
                 {
-                  "text": "@type: 'listing'",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "@type: 'listing'"
+                    }
+                  ]
                 },
                 {
                   "text": " but its own "
                 },
                 {
-                  "text": "variation",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "variation"
+                    }
+                  ]
                 },
                 {
                   "text": " field is set to "
                 },
                 {
-                  "text": "'summary'",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "'summary'"
+                    }
+                  ]
                 },
                 {
                   "text": ", so the listing now renders summary items."
@@ -1522,15 +1906,23 @@
               "text": "The "
             },
             {
-              "text": "pathToApiPath",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "pathToApiPath"
+                }
+              ]
             },
             {
               "text": " function is called whenever hydra.js sends a "
             },
             {
-              "text": "PATH_CHANGE",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "PATH_CHANGE"
+                }
+              ]
             },
             {
               "text": " message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state)."
@@ -1564,29 +1956,45 @@
               "text": "Both "
             },
             {
-              "text": "expandListingBlocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "expandListingBlocks"
+                }
+              ]
             },
             {
               "text": " and "
             },
             {
-              "text": "staticBlocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "staticBlocks"
+                }
+              ]
             },
             {
               "text": " return "
             },
             {
-              "text": "{ items, paging }",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "{ items, paging }"
+                }
+              ]
             },
             {
               "text": ". You pass "
             },
             {
-              "text": "{ start, size }",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "{ start, size }"
+                }
+              ]
             },
             {
               "text": " as input (not mutated) and get back computed paging values:"
@@ -1606,8 +2014,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`currentPage`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`currentPage`"
+                    }
+                  ]
                 },
                 {
                   "text": " (number) — Zero-based current page index"
@@ -1618,8 +2030,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`totalPages`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`totalPages`"
+                    }
+                  ]
                 },
                 {
                   "text": " (number) — Total number of pages"
@@ -1630,8 +2046,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`totalItems`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`totalItems`"
+                    }
+                  ]
                 },
                 {
                   "text": " (number) — Total item count across all blocks"
@@ -1642,8 +2062,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`prev`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`prev`"
+                    }
+                  ]
                 },
                 {
                   "text": " (number | null) — Previous page index, or null on first page"
@@ -1654,8 +2078,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`next`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`next`"
+                    }
+                  ]
                 },
                 {
                   "text": " (number | null) — Next page index, or null on last page"
@@ -1666,15 +2094,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`pages`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`pages`"
+                    }
+                  ]
                 },
                 {
                   "text": " (array) — Window of ~5 page objects: "
                 },
                 {
-                  "text": "{ start, page }",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "{ start, page }"
+                    }
+                  ]
                 },
                 {
                   "text": " where page is 1-based"
@@ -1685,15 +2121,23 @@
               "type": "li",
               "children": [
                 {
-                  "text": "`seen`",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`seen`"
+                    }
+                  ]
                 },
                 {
                   "text": " (number) — Running item count — pass to the next call's "
                 },
                 {
-                  "text": "seen",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "seen"
+                    }
+                  ]
                 },
                 {
                   "text": " option for position tracking in grids"
@@ -1715,15 +2159,23 @@
               "text": "Neither function mutates the input "
             },
             {
-              "text": "paging",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "paging"
+                }
+              ]
             },
             {
               "text": " object — calling again with the same "
             },
             {
-              "text": "{ start, size }",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "{ start, size }"
+                }
+              ]
             },
             {
               "text": " is safe."
@@ -1743,22 +2195,34 @@
               "text": "When multiple listings share a pager (e.g. a grid with several listings), "
             },
             {
-              "text": "expandListingBlocks",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "expandListingBlocks"
+                }
+              ]
             },
             {
               "text": " walks them sequentially. Each fetch returns "
             },
             {
-              "text": "{ items, total }",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "{ items, total }"
+                }
+              ]
             },
             {
               "text": ", so the total is learned from the response and used to compute where the next listing starts. One request per listing. Listings outside the page window are fetched with "
             },
             {
-              "text": "size: 0",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "size: 0"
+                }
+              ]
             },
             {
               "text": " (total only, no items)."
@@ -1778,15 +2242,23 @@
               "text": "When mixing listings with static blocks in a shared pager, use "
             },
             {
-              "text": "staticBlocks(ids, { blocks, paging, seen })",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "staticBlocks(ids, { blocks, paging, seen })"
+                }
+              ]
             },
             {
               "text": " for the non-listing blocks — it tracks their position in the paging window. Chain the returned "
             },
             {
-              "text": "paging.seen",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "paging.seen"
+                }
+              ]
             },
             {
               "text": " to the next call so each block knows its offset (see the React example above)."
@@ -1820,8 +2292,12 @@
               "text": "Expanded listing items share the listing block's "
             },
             {
-              "text": "@uid",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "@uid"
+                }
+              ]
             },
             {
               "text": ". Selecting any expanded item selects the parent listing block."

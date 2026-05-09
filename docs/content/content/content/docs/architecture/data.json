@@ -138,8 +138,12 @@
               "text": "During editing the frontend is loaded inside an iframe owned by Hydra's admin UI. The two communicate via "
             },
             {
-              "text": "postMessage",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "postMessage"
+                }
+              ]
             },
             {
               "text": " over the iframe boundary:"
@@ -159,8 +163,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Admin → frontend",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Admin → frontend"
+                    }
+                  ]
                 },
                 {
                   "text": ": form-data updates, selection changes, route changes."
@@ -171,8 +179,12 @@
               "type": "li",
               "children": [
                 {
-                  "text": "Frontend → admin",
-                  "strong": true
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Frontend → admin"
+                    }
+                  ]
                 },
                 {
                   "text": ": which block was clicked (selection), which slate node holds the cursor, where blocks live in the rendered DOM, slate transform requests so the admin can compute the new value."
@@ -239,36 +251,56 @@
                   "text": "Adds the data attributes that mark editable elements ("
                 },
                 {
-                  "text": "data-block-uid",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "data-block-uid"
+                    }
+                  ]
                 },
                 {
                   "text": ", "
                 },
                 {
-                  "text": "data-edit-text",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "data-edit-text"
+                    }
+                  ]
                 },
                 {
                   "text": ", "
                 },
                 {
-                  "text": "data-edit-link",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "data-edit-link"
+                    }
+                  ]
                 },
                 {
                   "text": ", "
                 },
                 {
-                  "text": "data-edit-media",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "data-edit-media"
+                    }
+                  ]
                 },
                 {
                   "text": ", "
                 },
                 {
-                  "text": "data-node-id",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "data-node-id"
+                    }
+                  ]
                 },
                 {
                   "text": ")."
@@ -351,8 +383,12 @@
                   "text": "Receive the new slate value via "
                 },
                 {
-                  "text": "SLATE_TRANSFORM_RESULT",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "SLATE_TRANSFORM_RESULT"
+                    }
+                  ]
                 },
                 {
                   "text": " and re-render."
@@ -366,8 +402,12 @@
                   "text": "Send slate node "
                 },
                 {
-                  "text": "data-node-id",
-                  "code": true
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "data-node-id"
+                    }
+                  ]
                 },
                 {
                   "text": " attributes back so the admin can place the cursor at the right node after re-render."
@@ -389,8 +429,12 @@
               "text": "This is why every slate node needs a "
             },
             {
-              "text": "data-node-id",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-node-id"
+                }
+              ]
             },
             {
               "text": " attribute on its rendered HTML — without one, the admin can't track the cursor across re-renders. See "
@@ -438,22 +482,34 @@
               "text": "The steps for creating a Hydra-compatible frontend are the same across frameworks: catch-all route → fetch page from Plone REST API → render blocks recursively → add "
             },
             {
-              "text": "data-block-uid",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-block-uid"
+                }
+              ]
             },
             {
               "text": " and "
             },
             {
-              "text": "data-edit-*",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-edit-*"
+                }
+              ]
             },
             {
               "text": " attributes on editable elements → load "
             },
             {
-              "text": "hydra.js",
-              "code": true
+              "type": "code",
+              "children": [
+                {
+                  "text": "hydra.js"
+                }
+              ]
             },
             {
               "text": " only inside the admin iframe."
@@ -557,8 +613,12 @@
               "text": "Hydra is "
             },
             {
-              "text": "additive",
-              "strong": true
+              "type": "strong",
+              "children": [
+                {
+                  "text": "additive"
+                }
+              ]
             },
             {
               "text": ": each layer below works on its own, and each next row enhances editing without breaking what came before. You can ship at any row, mix rows on the same site, and add the next layer when you're ready."
@@ -635,8 +695,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "Plain headless",
-                        "strong": true
+                        "type": "strong",
+                        "children": [
+                          {
+                            "text": "Plain headless"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -653,8 +717,12 @@
                         "text": "Frontend fetches the Plone REST API. No "
                       },
                       {
-                        "text": "hydra.js",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "hydra.js"
+                          }
+                        ]
                       },
                       {
                         "text": " involved."
@@ -690,8 +758,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "Bridge installed",
-                        "strong": true
+                        "type": "strong",
+                        "children": [
+                          {
+                            "text": "Bridge installed"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -708,15 +780,23 @@
                         "text": "Load "
                       },
                       {
-                        "text": "hydra.js",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "hydra.js"
+                          }
+                        ]
                       },
                       {
                         "text": ", call "
                       },
                       {
-                        "text": "initBridge({ page: { schema: { properties: { ... } } } })",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "initBridge({ page: { schema: { properties: { ... } } } })"
+                          }
+                        ]
                       },
                       {
                         "text": ". See "
@@ -780,8 +860,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "Custom block types",
-                        "strong": true
+                        "type": "strong",
+                        "children": [
+                          {
+                            "text": "Custom block types"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -798,15 +882,23 @@
                         "text": "Add a "
                       },
                       {
-                        "text": "blocks: { ... }",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "blocks: { ... }"
+                          }
+                        ]
                       },
                       {
                         "text": " config to "
                       },
                       {
-                        "text": "initBridge",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "initBridge"
+                          }
+                        ]
                       },
                       {
                         "text": ". See "
@@ -870,8 +962,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "Block selection in preview",
-                        "strong": true
+                        "type": "strong",
+                        "children": [
+                          {
+                            "text": "Block selection in preview"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -888,8 +984,12 @@
                         "text": "Add "
                       },
                       {
-                        "text": "data-block-uid",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "data-block-uid"
+                          }
+                        ]
                       },
                       {
                         "text": " to your rendered blocks. See "
@@ -939,8 +1039,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "Realtime preview",
-                        "strong": true
+                        "type": "strong",
+                        "children": [
+                          {
+                            "text": "Realtime preview"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -957,15 +1061,23 @@
                         "text": "Register "
                       },
                       {
-                        "text": "onEditChange",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "onEditChange"
+                          }
+                        ]
                       },
                       {
                         "text": " and render from the "
                       },
                       {
-                        "text": "formData",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "formData"
+                          }
+                        ]
                       },
                       {
                         "text": " it gives you instead of from the API."
@@ -1015,8 +1127,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "Direct field editing",
-                        "strong": true
+                        "type": "strong",
+                        "children": [
+                          {
+                            "text": "Direct field editing"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -1033,22 +1149,34 @@
                         "text": "Add "
                       },
                       {
-                        "text": "data-edit-text",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "data-edit-text"
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "data-edit-link",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "data-edit-link"
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "data-edit-media",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "data-edit-media"
+                          }
+                        ]
                       },
                       {
                         "text": " to specific elements."
@@ -1068,15 +1196,23 @@
                         "text": "Click rendered text and start typing. Click an image to pick or upload. Click a link to open the link picker. Markdown shortcuts ("
                       },
                       {
-                        "text": "##",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "##"
+                          }
+                        ]
                       },
                       {
                         "text": ", "
                       },
                       {
-                        "text": "**bold**",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "**bold**"
+                          }
+                        ]
                       },
                       {
                         "text": ", etc.)."
@@ -1098,8 +1234,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "Templates and layouts",
-                        "strong": true
+                        "type": "strong",
+                        "children": [
+                          {
+                            "text": "Templates and layouts"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -1116,22 +1256,34 @@
                         "text": "Configure "
                       },
                       {
-                        "text": "allowedTemplates",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "allowedTemplates"
+                          }
+                        ]
                       },
                       {
                         "text": " / "
                       },
                       {
-                        "text": "allowedLayouts",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "allowedLayouts"
+                          }
+                        ]
                       },
                       {
                         "text": " on a region; use "
                       },
                       {
-                        "text": "expandTemplates",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "expandTemplates"
+                          }
+                        ]
                       },
                       {
                         "text": " at render time. See "
@@ -1181,8 +1333,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "Listings and dynamic content",
-                        "strong": true
+                        "type": "strong",
+                        "children": [
+                          {
+                            "text": "Listings and dynamic content"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -1199,15 +1355,23 @@
                         "text": "Configure listing block types and pass "
                       },
                       {
-                        "text": "fetchItems",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "fetchItems"
+                          }
+                        ]
                       },
                       {
                         "text": " to "
                       },
                       {
-                        "text": "expandListingBlocks",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "expandListingBlocks"
+                          }
+                        ]
                       },
                       {
                         "text": ". See "
@@ -1241,8 +1405,12 @@
                         "text": "A "
                       },
                       {
-                        "text": "fieldMapping",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "fieldMapping"
+                          }
+                        ]
                       },
                       {
                         "text": " widget on listing blocks maps query results to item fields. Listings render as repeated blocks, editable per item."
@@ -1264,8 +1432,12 @@
                     "type": "p",
                     "children": [
                       {
-                        "text": "Custom UI / advanced",
-                        "strong": true
+                        "type": "strong",
+                        "children": [
+                          {
+                            "text": "Custom UI / advanced"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -1282,15 +1454,23 @@
                         "text": "Override Volto components, or drive frontend-side editing via "
                       },
                       {
-                        "text": "sendBlockUpdate",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "sendBlockUpdate"
+                          }
+                        ]
                       },
                       {
                         "text": " / "
                       },
                       {
-                        "text": "sendBlockAction",
-                        "code": true
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "sendBlockAction"
+                          }
+                        ]
                       },
                       {
                         "text": ". See "

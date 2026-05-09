@@ -795,11 +795,15 @@ function parseInline(text) {
         children: [{ text: m[1] }],
       });
     } else if (m[3] !== undefined) {
-      leaves.push({ text: m[3], strong: true });
+      // **bold** → inline element { type: 'strong', children: [{text}] }
+      // (the documented slate node type — see docs/examples/slate.md).
+      // Mark form { text, strong: true } is non-canonical and isn't
+      // round-trippable through the renderer.
+      leaves.push({ type: 'strong', children: [{ text: m[3] }] });
     } else if (m[4] !== undefined) {
-      leaves.push({ text: m[4], em: true });
+      leaves.push({ type: 'em', children: [{ text: m[4] }] });
     } else if (m[5] !== undefined) {
-      leaves.push({ text: m[5], code: true });
+      leaves.push({ type: 'code', children: [{ text: m[5] }] });
     }
     pos = m.index + m[0].length;
   }
