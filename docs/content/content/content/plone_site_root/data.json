@@ -94,7 +94,7 @@
       "blocks": {
         "box-visual": {
           "@type": "slate",
-          "plaintext": "Visual Editing. True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes.",
+          "plaintext": "Visual Editing. True WYSIWYG with drag-and-drop blocks. No special frontend framework required \u2014 just HTML attributes.",
           "value": [
             {
               "children": [
@@ -112,7 +112,7 @@
             {
               "children": [
                 {
-                  "text": "True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes."
+                  "text": "True WYSIWYG with drag-and-drop blocks. No special frontend framework required \u2014 just HTML attributes."
                 }
               ],
               "type": "p"
@@ -240,7 +240,7 @@
                 {
                   "children": [
                     {
-                      "text": "Hydra on GitHub — source code, issues, and documentation"
+                      "text": "Hydra on GitHub \u2014 source code, issues, and documentation"
                     }
                   ],
                   "data": {
@@ -748,10 +748,57 @@
         ]
       },
       "styles": {}
+    },
+    "video-hero-001": {
+      "@type": "video",
+      "url": "/docs/static/hydra-demo",
+      "align": "center",
+      "styles": {}
+    },
+    "hero-cta": {
+      "@type": "slate",
+      "plaintext": "Try the demo  \u00b7  Source on GitHub",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "type": "link",
+              "data": {
+                "url": "/login?return_url=/"
+              },
+              "children": [
+                {
+                  "text": "Try the demo"
+                }
+              ]
+            },
+            {
+              "text": "  \u00b7  "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "https://github.com/collective/volto-hydra"
+              },
+              "children": [
+                {
+                  "text": "Source on GitHub"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "styles": {
+        "backgroundColor": "grey"
+      }
     }
   },
   "blocks_layout": {
     "items": [
+      "hero-cta",
+      "video-hero-001",
       "why-hydra-heading",
       "why-hydra-tagline",
       "why-hydra-quadrant",
@@ -771,7 +818,7 @@
   "creators": [
     "admin"
   ],
-  "description": "A Visual Headless CMS — true visual editing with drag and drop blocks using any frontend stack",
+  "description": "A Visual Headless CMS \u2014 true visual editing with drag and drop blocks using any frontend stack",
   "effective": null,
   "exclude_from_nav": false,
   "expires": null,
