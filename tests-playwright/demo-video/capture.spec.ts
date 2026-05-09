@@ -55,21 +55,25 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   await page.keyboard.press('Meta+B');
   await beat(page, 'format');
 
-  // Beat 3 — drop into block mode, drag the block down past a sibling.
+  // Beat 3 — drop into block mode, drag the intro paragraph past the
+  // adjacent column block to show DnD reflow.
   await helper.escapeFromEditing();
   await beat(page, 'block mode');
+  await helper.dragBlockAfter('intro', 'after-columns');
+  await beat(page, 'dnd');
 
-  // (Drag handle interactions are flow-dependent on the helper API; left as
-  // a placeholder — fill in with the project's preferred drag helper.)
-
-  // Beat 4 — click into the columns container, show the children list.
+  // Beat 4 — click into the columns container, show the children list +
+  // selection outline shifting up the hierarchy.
   await helper.clickBlockInIframe('columns-1');
   await helper.waitForBlockSelectedInAdmin('columns-1');
   await beat(page, 'container selected');
 
-  // Beat 5 — open the frontend switcher (admin toolbar), preview-only beat.
-  // Concrete locator depends on the toolbar's data-test attribute; use the
-  // closest stable selector from AdminUIHelper here.
-  // await helper.openFrontendSwitcher();
-  // await beat(page, 'frontend switch');
+  // Beat 5 — open the frontend switcher panel, hover one of the saved
+  // frontends so viewers see the omni-channel feature without the iframe
+  // actually swapping (would interrupt the recording).
+  await page.locator('#toolbar-frontend-switcher').click();
+  const panel = page.locator('.frontend-switcher-panel');
+  await panel.waitFor({ state: 'visible' });
+  await panel.locator('.frontend-switcher-url-item').first().hover();
+  await beat(page, 'frontend switcher');
 });

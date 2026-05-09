@@ -283,11 +283,18 @@
         "description": "description",
         "image": "image"
       }
+    },
+    "video-hero-001": {
+      "@type": "video",
+      "url": "/docs/static/hydra-demo",
+      "align": "full",
+      "styles": {}
     }
   },
   "blocks_layout": {
     "items": [
       "title-1",
+      "video-hero-001",
       "p-1",
       "h-2",
       "ul-3",

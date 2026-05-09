@@ -1149,15 +1149,40 @@ for (const mdFile of docsMdFiles) {
       .find(([, b]) => b['@type'] === 'title');
     const titleId = prevTitleEntry ? prevTitleEntry[0] : 'title-1';
 
-    // Preserve any non-parser block from the existing data.json (e.g. listing).
-    // Parser-produced types: title, slate, codeExample, slateTable, separator, image.
+    // Preserve any non-parser block from the existing data.json (e.g. listing,
+    // video). Parser-produced types: title, slate, codeExample, slateTable,
+    // separator, image — anything else is hand-authored or migration-injected
+    // and should survive a sync run.
     const PARSER_TYPES = new Set(['title', 'slate', 'codeExample', 'slateTable', 'separator', 'image']);
     const preservedBlocks = {};
-    const preservedItems = [];
+    const preservedIds = new Set([titleId]);
     for (const [id, b] of Object.entries(rootData.blocks || {})) {
       if (PARSER_TYPES.has(b['@type']) || id === titleId) continue;
       preservedBlocks[id] = b;
-      preservedItems.push(id);
+      preservedIds.add(id);
+    }
+
+    // Build the new blocks_layout by walking the PREVIOUS layout: keep
+    // preserved IDs at their old positions, replace the first parser-type
+    // run with the freshly-parsed items, drop subsequent parser types.
+    // Falls back to "title + parsed + preserved" if there's no previous
+    // layout to anchor against (first sync after creation).
+    const prevLayout = rootData.blocks_layout?.items || [];
+    const newLayout = [];
+    let parsedInserted = false;
+    for (const id of prevLayout) {
+      if (preservedIds.has(id)) {
+        newLayout.push(id);
+      } else if (!parsedInserted) {
+        newLayout.push(...parsedItems);
+        parsedInserted = true;
+      }
+    }
+    if (!parsedInserted) newLayout.push(...parsedItems);
+    if (!newLayout.includes(titleId)) newLayout.unshift(titleId);
+    // Surface any preserved block that didn't appear in prevLayout (rare).
+    for (const id of Object.keys(preservedBlocks)) {
+      if (!newLayout.includes(id)) newLayout.push(id);
     }
 
     const updatedRoot = {
@@ -1165,7 +1190,7 @@ for (const mdFile of docsMdFiles) {
       title: 'Volto Hydra Documentation',
       description: indexMd.split('\n').slice(1).find(l => l.trim() && !l.startsWith('#') && !l.startsWith('```')) || rootData.description,
       blocks: { [titleId]: { '@type': 'title' }, ...parsedBlocks, ...preservedBlocks },
-      blocks_layout: { items: [titleId, ...parsedItems, ...preservedItems] },
+      blocks_layout: { items: newLayout },
     };
     const updatedRootJson = JSON.stringify(updatedRoot, null, 2) + '\n';
     if (updatedRootJson !== originalRootJson) {
