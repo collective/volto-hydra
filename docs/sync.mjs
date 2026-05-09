@@ -455,6 +455,19 @@ for (const mdFile of mdFiles) {
     }
   }
 
+  // Scrub cross-prefix orphans: any `ref-<other>-*` block left over
+  // from a previous page's content (e.g., when a markdown file was
+  // renamed or its content moved). The template instance ID is the
+  // authoritative marker — only blocks pointing at *this* page's
+  // instanceId should remain.
+  for (const [blockId, block] of Object.entries(data.blocks)) {
+    if (!blockId.startsWith('ref-')) continue;
+    if (blockId.startsWith(`${prefix}-`)) continue;
+    // Foreign ref-* block that isn't ours; drop it.
+    delete data.blocks[blockId];
+    contentChanged = true;
+  }
+
   // Ensure the 3 codeExample blocks exist
   const schemaId = `${prefix}-schema`;
   if (!data.blocks[schemaId] || data.blocks[schemaId]['@type'] !== 'codeExample') {

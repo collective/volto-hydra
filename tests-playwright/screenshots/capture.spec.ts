@@ -18,7 +18,7 @@ import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const OUT_DIR = path.join(SCRIPT_DIR, '..', '..', 'docs', 'editor-guide', '_images');
+const OUT_DIR = path.join(SCRIPT_DIR, '..', '..', 'docs', 'what-editors-will-experience', '_images');
 const SHOWCASE_PATH = '/showcase-page';
 
 // Make sure the output directory exists once at import time.
@@ -262,20 +262,31 @@ test.describe('Editor Guide screenshots', () => {
   test('children-list — sidebar shows container children with drag handles', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
-    // container-test-page has a columns container fully wired up (column
-    // sub-blocks with their own slate children). Selecting columns-1 surfaces
-    // the children list in the sidebar with drag handles + drill-in arrows.
-    await helper.navigateToEdit('/container-test-page');
+    // search-test-page has a search block with TWO container fields:
+    // `facets` (object_list, "Facets" section) and `listing` (blocks_layout,
+    // "Results Listing" section). Selecting search-block-1 surfaces both
+    // sections in the children-list widget with drag handles + drill-in
+    // arrows — illustrates the multi-slot case the doc text describes.
+    await helper.navigateToEdit('/search-test-page');
 
     const iframe = helper.getIframe();
-    await iframe.locator('[data-block-uid="columns-1"]').first().evaluate((el) => {
+    await iframe.locator('[data-block-uid="search-block-1"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    // Wait for admin sidebar to actually re-render with columns-1's settings
-    // (waitForIframeBlockHandle only confirms the iframe-side handle, not the
-    // sidebar update — the children list lives in admin-side state).
-    await helper.waitForBlockSelectedInAdmin('columns-1');
+    await helper.waitForBlockSelectedInAdmin('search-block-1');
     await page.waitForTimeout(300);
+
+    // Scroll the sidebar so the multi-slot ChildBlocksWidget — which
+    // renders below the search block's form fields — is in view. The
+    // screenshot's whole point is to show those two sections side by
+    // side; the form fields above are incidental. Scroll the *last*
+    // child-block-item into view so both the Facets section and the
+    // Results Listing section land in the viewport.
+    const lastChildItem = page
+      .locator('.sidebar-container .container-field-section .child-block-item')
+      .last();
+    await lastChildItem.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
 
     await snap(page, 'children-list');
   });

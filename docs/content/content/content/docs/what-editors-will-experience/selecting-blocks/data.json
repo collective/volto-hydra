@@ -856,7 +856,7 @@
     "img-31": {
       "@type": "image",
       "url": "/docs/images/children-list",
-      "alt": "Sidebar with a columns container selected, showing two children-list sections — Top Images (with two Image rows) and Columns (with two Column rows). Each row has a `⋮⋮` drag handle and a `>` drill-in arrow; each section has a `+` add button.",
+      "alt": "Sidebar with a search container selected, showing two children-list sections — Facets (with three facet rows) and Results Listing (with one Listing row). Each row has a `⋮⋮` drag handle and a `>` drill-in arrow; each section has a `+` add button.",
       "align": "center",
       "size": "l"
     },

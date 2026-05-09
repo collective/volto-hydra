@@ -92,7 +92,7 @@ Slides                    [+]
 
 If the container has multiple blocks fields (e.g. a header field and a body field), each appears as a separate section with its own children list and add button.
 
-![Sidebar with a columns container selected, showing two children-list sections — Top Images (with two Image rows) and Columns (with two Column rows). Each row has a `⋮⋮` drag handle and a `>` drill-in arrow; each section has a `+` add button.](_images/children-list.png)
+![Sidebar with a search container selected, showing two children-list sections — Facets (with three facet rows) and Results Listing (with one Listing row). Each row has a `⋮⋮` drag handle and a `>` drill-in arrow; each section has a `+` add button.](_images/children-list.png)
 
 ### Picking from the outline (for paged containers)
 
