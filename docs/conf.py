@@ -62,6 +62,10 @@ html_title = "Volto Hydra Documentation"
 html_logo = None
 html_favicon = None
 
+# Static asset directory — anything in docs/_static/ ships as-is in the
+# built site under /_static/. Used for the homepage demo video.
+html_static_path = ["_static"]
+
 # -- Options for copybutton --------------------------------------------------
 
 copybutton_prompt_text = r">>> |\.\.\. |\$ "

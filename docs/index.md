@@ -2,6 +2,15 @@
 
 A Visual Headless CMS using Plone as a server, providing true visual editing with drag-and-drop blocks and editable text — with any frontend stack you choose.
 
+```{raw} html
+<video src="_static/hydra-demo.mp4"
+       autoplay loop muted playsinline
+       style="width:100%;max-width:960px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.15);margin:1.5em 0;"
+       aria-label="Hydra editor demo: live edits, formatting, drag-and-drop, container ops, frontend switching">
+  Your browser doesn't support inline video — see <a href="https://hydra.pretagov.com">the live demo</a>.
+</video>
+```
+
 ```{toctree}
 :maxdepth: 2
 :caption: Contents

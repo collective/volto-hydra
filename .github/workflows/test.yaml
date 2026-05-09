@@ -96,9 +96,9 @@ jobs:
         run: |
           node tests-playwright/fixtures/mock-api-server.cjs &
           npx vite --config tests-playwright/fixtures/test-frontend/vite.config.js &
-          cd docs/blocks/test-react && npx vite --port 3004 --strictPort &
-          cd docs/blocks/test-svelte && npx vite --port 3005 --strictPort &
-          cd docs/blocks/test-vue && npx vite --port 3006 --strictPort &
+          cd docs/examples/test-react && npx vite --port 3004 --strictPort &
+          cd docs/examples/test-svelte && npx vite --port 3005 --strictPort &
+          cd docs/examples/test-vue && npx vite --port 3006 --strictPort &
           sleep 3
       - name: Wait for servers
         run: |

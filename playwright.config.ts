@@ -302,6 +302,26 @@ export default defineConfig({
         storageState: 'tests-playwright/fixtures/storage-nuxt.json',
       },
     },
+    // Homepage hero demo video — manual / on-demand.
+    // Run with: pnpm demo:capture (then pnpm demo:encode)
+    // Records a single deterministic edit session and writes the .webm to
+    // tests-playwright/demo-video/.recordings/. The encode step muxes that
+    // into docs/_static/hydra-demo.mp4 which docs/index.md embeds.
+    {
+      name: 'demo-video',
+      testDir: 'tests-playwright/demo-video',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-nuxt.json',
+        video: {
+          mode: 'on',
+          size: { width: 1280, height: 720 },
+        },
+      },
+      outputDir: 'tests-playwright/demo-video/.recordings',
+    },
   ],
 
   /* Start mock API server and Volto dev server before running tests */
