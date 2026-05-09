@@ -1,5 +1,5 @@
 {
-  "@id": "/block/grid-block/listing",
+  "@id": "/docs/examples/grid/listing",
   "@type": "Document",
   "UID": "3ac4a2c6c4034a1686bc0ee2d2072fd6",
   "allow_discussion": false,
@@ -16,7 +16,7 @@
               {
                 "i": "path",
                 "o": "plone.app.querystring.operation.string.absolutePath",
-                "v": "/block/grid-block"
+                "v": "/docs/examples/grid"
               }
             ],
             "sort_on": "getId",
@@ -35,7 +35,7 @@
               {
                 "i": "path",
                 "o": "plone.app.querystring.operation.string.absolutePath",
-                "v": "/block/grid-block"
+                "v": "/docs/examples/grid"
               }
             ],
             "sort_order": "ascending"
@@ -84,7 +84,7 @@
   },
   "modified": "2023-09-27T08:36:08+00:00",
   "parent": {
-    "@id": "/block/grid-block",
+    "@id": "/docs/examples/grid",
     "@type": "Document",
     "UID": "99c70917b6894af08dd306fdbc0eff6a",
     "description": " The Grid block allows adding multi-column blocks. A grid block can contain between one and four columns of different blocks. Teasers and images can be added in a grid block.",

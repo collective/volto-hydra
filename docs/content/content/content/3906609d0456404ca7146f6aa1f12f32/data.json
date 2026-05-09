@@ -1,5 +1,5 @@
 {
-  "@id": "/block/toc-block",
+  "@id": "/docs/examples/toc",
   "@type": "Document",
   "UID": "3906609d0456404ca7146f6aa1f12f32",
   "allow_discussion": false,
@@ -55,7 +55,7 @@
                 }
               ],
               "data": {
-                "url": "/block/heading-block"
+                "url": "/docs/examples/heading"
               },
               "type": "link"
             },
@@ -421,7 +421,7 @@
   "exportimport.constrains": {},
   "exportimport.conversation": [],
   "exportimport.versions": {},
-  "id": "toc-block",
+  "id": "toc",
   "is_folderish": true,
   "language": "##DEFAULT##",
   "layout": "document_view",
@@ -431,14 +431,11 @@
   },
   "modified": "2023-09-22T15:12:56+00:00",
   "parent": {
-    "@id": "/block",
+    "@id": "/docs/examples",
     "@type": "Document",
-    "UID": "425695d2b7cb47e69374d6f211f17e38",
-    "description": "",
-    "image_field": null,
-    "image_scales": {},
-    "review_state": "published",
-    "title": "Blocks",
+    "UID": "docs-examples-folder-001",
+    "description": "Block reference: schema, JSON, and rendered examples for every block type Volto Hydra ships.",
+    "title": "Examples",
     "type_title": "Page"
   },
   "preview_caption": null,

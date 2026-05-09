@@ -391,7 +391,7 @@
           "hideButton": false,
           "href": [
             {
-              "@id": "/block",
+              "@id": "/docs/examples",
               "@type": "Document",
               "Description": "",
               "Title": "Blocks",

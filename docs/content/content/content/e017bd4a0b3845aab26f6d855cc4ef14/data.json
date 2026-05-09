@@ -150,7 +150,7 @@
           {
             "i": "path",
             "o": "plone.app.querystring.operation.string.absolutePath",
-            "v": "/block"
+            "v": "/docs/examples"
           }
         ],
         "sort_order": "ascending"

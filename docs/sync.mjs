@@ -943,7 +943,9 @@ function parseConceptsMd(mdContent) {
         i++;
       }
       i++; // skip closing fence
-      if (lang.startsWith('{') && lang.endsWith('}')) continue;
+      // MyST directive fences: ```{toctree}, ```{warning}, ```{raw} html, etc.
+      // The language token always starts with `{` for these.
+      if (lang.startsWith('{')) continue;
       const id = nextId('ce');
       const label = lang.charAt(0).toUpperCase() + lang.slice(1);
       addBlock(id, {

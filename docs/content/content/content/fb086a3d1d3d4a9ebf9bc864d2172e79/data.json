@@ -1,5 +1,5 @@
 {
-  "@id": "/block/grid-block/text",
+  "@id": "/docs/examples/grid/text",
   "@type": "Document",
   "UID": "fb086a3d1d3d4a9ebf9bc864d2172e79",
   "allow_discussion": false,
@@ -601,7 +601,7 @@
   },
   "modified": "2023-09-22T14:39:53+00:00",
   "parent": {
-    "@id": "/block/grid-block",
+    "@id": "/docs/examples/grid",
     "@type": "Document",
     "UID": "99c70917b6894af08dd306fdbc0eff6a",
     "description": " The Grid block allows adding multi-column blocks. A grid block can contain between one and four columns of different blocks. Teasers and images can be added in a grid block.",

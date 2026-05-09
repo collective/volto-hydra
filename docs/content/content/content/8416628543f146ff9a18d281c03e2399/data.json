@@ -1,5 +1,5 @@
 {
-  "@id": "/block/highlight-block",
+  "@id": "/docs/examples/highlight",
   "@type": "Document",
   "UID": "8416628543f146ff9a18d281c03e2399",
   "allow_discussion": false,
@@ -23,7 +23,7 @@
                 }
               ],
               "data": {
-                "url": "/block/button-block"
+                "url": "/docs/examples/button"
               },
               "type": "link"
             },
@@ -61,7 +61,7 @@
                 }
               ],
               "data": {
-                "url": "/block/button-block"
+                "url": "/docs/examples/button"
               },
               "type": "link"
             },
@@ -99,7 +99,7 @@
                 }
               ],
               "data": {
-                "url": "/block/button-block"
+                "url": "/docs/examples/button"
               },
               "type": "link"
             },
@@ -137,7 +137,7 @@
                 }
               ],
               "data": {
-                "url": "/block/button-block"
+                "url": "/docs/examples/button"
               },
               "type": "link"
             },
@@ -175,7 +175,7 @@
                 }
               ],
               "data": {
-                "url": "/block/button-block"
+                "url": "/docs/examples/button"
               },
               "type": "link"
             },
@@ -277,7 +277,7 @@
   "exportimport.constrains": {},
   "exportimport.conversation": [],
   "exportimport.versions": {},
-  "id": "highlight-block",
+  "id": "highlight",
   "is_folderish": true,
   "language": "##DEFAULT##",
   "layout": "document_view",
@@ -287,14 +287,11 @@
   },
   "modified": "2024-03-08T14:27:13+00:00",
   "parent": {
-    "@id": "/block",
+    "@id": "/docs/examples",
     "@type": "Document",
-    "UID": "425695d2b7cb47e69374d6f211f17e38",
-    "description": "",
-    "image_field": null,
-    "image_scales": {},
-    "review_state": "published",
-    "title": "Blocks",
+    "UID": "docs-examples-folder-001",
+    "description": "Block reference: schema, JSON, and rendered examples for every block type Volto Hydra ships.",
+    "title": "Examples",
     "type_title": "Page"
   },
   "preview_caption": null,
