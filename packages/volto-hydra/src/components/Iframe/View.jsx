@@ -662,7 +662,7 @@ const Iframe = (props) => {
   const u =
     useSelector((state) => state.frontendPreviewUrl.url) ||
     Cookies.get(getIframeUrlCookieName()) ||
-    urlFromEnv[0];
+    urlFromEnv[0]?.url;
 
   // Track last SELECT_BLOCK sent to avoid redundant sends during pending selection
   const lastSentSelectBlockRef = useRef(null);

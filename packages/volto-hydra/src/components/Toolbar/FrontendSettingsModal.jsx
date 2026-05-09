@@ -6,7 +6,7 @@ import { Icon } from '@plone/volto/components';
 import clearSVG from '@plone/volto/icons/clear.svg';
 import deleteSVG from '@plone/volto/icons/delete.svg';
 import addSVG from '@plone/volto/icons/add.svg';
-import { getURlsFromEnv } from '../../utils/getSavedURLs';
+import { getURlsFromEnv, serialiseEntries } from '../../utils/getSavedURLs';
 import getSavedURLs from '../../utils/getSavedURLs';
 import isValidUrl from '../../utils/isValidUrl';
 import { getSavedUrlsCookieName } from '../../utils/cookieNames';
@@ -23,7 +23,8 @@ import { setViewportWidths } from '../../actions';
 const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
   const dispatch = useDispatch();
   const overlayRef = useRef(null);
-  const [urls, setUrls] = useState(() => getSavedURLs());
+  const [entries, setEntries] = useState(() => getSavedURLs());
+  const [newName, setNewName] = useState('');
   const [newUrl, setNewUrl] = useState('');
   const [error, setError] = useState('');
 
@@ -41,32 +42,30 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
     return () => document.removeEventListener('mousedown', stop, true);
   }, []);
 
-  // Environment URLs can't be removed
-  const envUrls = new Set(getURlsFromEnv());
+  // Environment entries can't be removed (renaming is allowed — the
+  // user-edited name takes precedence via cookie merge in getSavedURLs).
+  const envUrls = new Set(getURlsFromEnv().map((e) => e.url));
 
-  const saveUrls = (updatedUrls) => {
-    const customUrls = updatedUrls.filter((u) => !envUrls.has(u));
-    const allEnvUrls = getURlsFromEnv();
-    const cookieUrls = [...new Set([...customUrls, ...allEnvUrls])];
-    Cookies.set(getSavedUrlsCookieName(), cookieUrls.join(','), {
+  const saveEntries = (updatedEntries) => {
+    Cookies.set(getSavedUrlsCookieName(), serialiseEntries(updatedEntries), {
       expires: 7,
     });
-    setUrls(updatedUrls);
+    setEntries(updatedEntries);
     onUrlsChanged();
   };
 
   const handleAdd = () => {
-    const trimmed = newUrl.trim();
-    if (!trimmed) return;
+    const trimmedUrl = newUrl.trim();
+    if (!trimmedUrl) return;
 
-    if (!isValidUrl(trimmed)) {
+    if (!isValidUrl(trimmedUrl)) {
       setError('Invalid URL');
       return;
     }
 
-    let normalized = trimmed;
+    let normalized = trimmedUrl;
     try {
-      const urlObj = new URL(trimmed);
+      const urlObj = new URL(trimmedUrl);
       if (!urlObj.hash) {
         urlObj.pathname = urlObj.pathname.replace(/\/$/, '') || '/';
       }
@@ -75,18 +74,27 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
       // Use as-is if URL parsing fails
     }
 
-    if (urls.includes(normalized)) {
+    if (entries.some((e) => e.url === normalized)) {
       setError('URL already exists');
       return;
     }
 
     setError('');
+    const trimmedName = newName.trim();
+    setNewName('');
     setNewUrl('');
-    saveUrls([...urls, normalized]);
+    saveEntries([
+      ...entries,
+      { url: normalized, name: trimmedName || normalized.replace(/^https?:\/\//, '') },
+    ]);
   };
 
   const handleRemove = (url) => {
-    saveUrls(urls.filter((u) => u !== url));
+    saveEntries(entries.filter((e) => e.url !== url));
+  };
+
+  const handleRename = (url, newNameValue) => {
+    saveEntries(entries.map((e) => (e.url === url ? { ...e, name: newNameValue } : e)));
   };
 
   const handleKeyDown = (e) => {
@@ -137,16 +145,26 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
           {/* Frontend URLs */}
           <div className="frontend-settings-section-label">Frontend URLs</div>
           <div className="frontend-settings-list">
-            {urls.map((url) => {
+            {entries.map(({ url, name }) => {
               const isEnv = envUrls.has(url);
               return (
                 <div key={url} className="frontend-settings-item">
                   <span className="frontend-switcher-url-icon">
                     {getDomainInitials(url)}
                   </span>
-                  <span className="frontend-settings-item-url">
-                    {url.replace(/^https?:\/\//, '')}
-                  </span>
+                  <div className="frontend-settings-item-text">
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => handleRename(url, e.target.value)}
+                      placeholder={url.replace(/^https?:\/\//, '')}
+                      className="frontend-settings-name-input"
+                      aria-label={`Name for ${url}`}
+                    />
+                    <span className="frontend-settings-item-url">
+                      {url.replace(/^https?:\/\//, '')}
+                    </span>
+                  </div>
                   {!isEnv && (
                     <button
                       className="frontend-settings-remove"
@@ -167,6 +185,18 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
 
           {/* Add new URL */}
           <div className="frontend-settings-add">
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => {
+                setNewName(e.target.value);
+                setError('');
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="Name (optional)"
+              className="frontend-settings-input frontend-settings-name-input"
+              aria-label="Name"
+            />
             <input
               type="text"
               value={newUrl}

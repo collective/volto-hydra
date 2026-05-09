@@ -37,11 +37,11 @@ const FrontendSwitcherPanel = ({
     (state) => state.frontendPreviewUrl?.url,
   );
   // Resolve effective URL same as View.jsx: Redux → cookie → first env URL
-  const activeUrl = reduxUrl || Cookies.get(getIframeUrlCookieName()) || getURlsFromEnv()[0];
+  const activeUrl = reduxUrl || Cookies.get(getIframeUrlCookieName()) || getURlsFromEnv()[0]?.url;
   const [showSettings, setShowSettings] = useState(false);
-  const [urls, setUrls] = useState(() => getSavedURLs());
+  const [entries, setEntries] = useState(() => getSavedURLs());
 
-  const refreshUrls = () => setUrls(getSavedURLs());
+  const refreshUrls = () => setEntries(getSavedURLs());
 
   return (
     <div className="pastanaga-menu frontend-switcher-panel">
@@ -72,7 +72,7 @@ const FrontendSwitcherPanel = ({
       </header>
       <div className="pastanaga-menu-list">
         <ul>
-          {urls.map((url) => {
+          {entries.map(({ url, name }) => {
             const isActive = activeUrl === url;
             return (
               <li key={url}>
@@ -87,9 +87,7 @@ const FrontendSwitcherPanel = ({
                   <span className="frontend-switcher-url-icon">
                     {getDomainInitials(url)}
                   </span>
-                  <span className="pastanaga-menu-label">
-                    {url.replace(/^https?:\/\//, '')}
-                  </span>
+                  <span className="pastanaga-menu-label">{name}</span>
                 </button>
               </li>
             );
