@@ -37,10 +37,10 @@
       "cta_title": "Button",
       "cta_link": [
         {
-          "@id": "/content-types/page"
+          "@id": "/docs/examples/content-types/page"
         }
       ],
-      "image": "/content-types/image/@@images/image"
+      "image": "/docs/examples/content-types/image/@@images/image"
     },
     "417e7343-af04-4da4-96bf-29321a3e0fc6": {
       "@type": "highlight",
@@ -75,10 +75,10 @@
       "cta_title": "Button",
       "cta_link": [
         {
-          "@id": "/content-types/page"
+          "@id": "/docs/examples/content-types/page"
         }
       ],
-      "image": "/content-types/image/@@images/image"
+      "image": "/docs/examples/content-types/image/@@images/image"
     },
     "67a6a73a-5ae7-4e14-a11b-bd0139e56513": {
       "@type": "highlight",
@@ -113,10 +113,10 @@
       "cta_title": "Button",
       "cta_link": [
         {
-          "@id": "/content-types/page"
+          "@id": "/docs/examples/content-types/page"
         }
       ],
-      "image": "/content-types/image/@@images/image"
+      "image": "/docs/examples/content-types/image/@@images/image"
     },
     "8d932379-1247-4281-bd30-dfecd5b3c378": {
       "@type": "highlight",
@@ -151,10 +151,10 @@
       "cta_title": "Button",
       "cta_link": [
         {
-          "@id": "/content-types/page"
+          "@id": "/docs/examples/content-types/page"
         }
       ],
-      "image": "/content-types/image/@@images/image"
+      "image": "/docs/examples/content-types/image/@@images/image"
     },
     "94655cc3-817d-48ba-bc20-6e9f7796dc46": {
       "@type": "highlight",
@@ -189,10 +189,10 @@
       "cta_title": "Button",
       "cta_link": [
         {
-          "@id": "/content-types/page"
+          "@id": "/docs/examples/content-types/page"
         }
       ],
-      "image": "/content-types/image/@@images/image"
+      "image": "/docs/examples/content-types/image/@@images/image"
     },
     "af3c704a-1f80-48c8-843b-dc29368d43d9": {
       "@type": "title"

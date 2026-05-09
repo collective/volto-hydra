@@ -33,7 +33,7 @@
           "head_title": null,
           "href": [
             {
-              "@id": "/content-types/page",
+              "@id": "/docs/examples/content-types/page",
               "@type": "Document",
               "Description": "The Page content type can be used to display content on a single page of the website. Pages can be structured using text, images and blocks.",
               "Title": "Page",

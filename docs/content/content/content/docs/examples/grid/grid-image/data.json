@@ -15,7 +15,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image-dark"
+          "url": "/docs/examples/content-types/image-dark"
         },
         "b1015ec4-9ddf-4e59-b6bf-214fc12c3a3d": {
           "@type": "image",
@@ -25,7 +25,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image-dark"
+          "url": "/docs/examples/content-types/image-dark"
         },
         "e800de8b-25f2-4a40-a3c6-189bec399a45": {
           "@type": "image",
@@ -35,7 +35,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image-dark"
+          "url": "/docs/examples/content-types/image-dark"
         }
       },
       "blocks_layout": {
@@ -60,7 +60,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image - Light",
-          "url": "/content-types/image-light"
+          "url": "/docs/examples/content-types/image-light"
         },
         "abd3504f-b4dd-48a9-97e2-923f2e63a957": {
           "@type": "image",
@@ -70,7 +70,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image-dark"
+          "url": "/docs/examples/content-types/image-dark"
         }
       },
       "blocks_layout": {
@@ -94,7 +94,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image - Light",
-          "url": "/content-types/image-light"
+          "url": "/docs/examples/content-types/image-light"
         },
         "df0eac4f-de62-444e-9ee0-9a30cf53bce3": {
           "@type": "image",
@@ -104,7 +104,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image-dark"
+          "url": "/docs/examples/content-types/image-dark"
         }
       },
       "blocks_layout": {
@@ -126,7 +126,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image-dark"
+          "url": "/docs/examples/content-types/image-dark"
         }
       },
       "blocks_layout": {
@@ -153,7 +153,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image - Light",
-          "url": "/content-types/image-light"
+          "url": "/docs/examples/content-types/image-light"
         },
         "ab3542da-d0d1-450e-abf3-a5f9e6f3eb97": {
           "@type": "image",
@@ -163,7 +163,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image-dark"
+          "url": "/docs/examples/content-types/image-dark"
         },
         "d8ed659a-020b-4688-9d72-42c518677d4a": {
           "@type": "image",
@@ -173,7 +173,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image - Light",
-          "url": "/content-types/image-light"
+          "url": "/docs/examples/content-types/image-light"
         },
         "f4117857-1464-41c6-8e74-70f82f393891": {
           "@type": "image",
@@ -183,7 +183,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image-dark"
+          "url": "/docs/examples/content-types/image-dark"
         }
       },
       "blocks_layout": {
@@ -209,7 +209,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image-dark"
+          "url": "/docs/examples/content-types/image-dark"
         },
         "eaa34549-1998-45a4-957e-2ea5d7cf41c4": {
           "@type": "image",
@@ -219,7 +219,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image - Light",
-          "url": "/content-types/image-light"
+          "url": "/docs/examples/content-types/image-light"
         },
         "f6af399c-afa2-4f21-8cd8-0c7fd1178d89": {
           "@type": "image",
@@ -229,7 +229,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image-dark"
+          "url": "/docs/examples/content-types/image-dark"
         }
       },
       "blocks_layout": {
@@ -252,7 +252,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image-dark"
+          "url": "/docs/examples/content-types/image-dark"
         }
       },
       "blocks_layout": {
@@ -274,7 +274,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image - Light",
-          "url": "/content-types/image-light"
+          "url": "/docs/examples/content-types/image-light"
         },
         "5026c16c-7ed3-4c0d-9417-1d242980a9c0": {
           "@type": "image",
@@ -284,7 +284,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image - Light",
-          "url": "/content-types/image-light"
+          "url": "/docs/examples/content-types/image-light"
         },
         "b6bc575a-f53b-4ce6-8a83-1340aa5bddb7": {
           "@type": "image",
@@ -294,7 +294,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image-dark"
+          "url": "/docs/examples/content-types/image-dark"
         },
         "da85c8f3-5de2-4d66-822d-a177e42821ff": {
           "@type": "image",
@@ -304,7 +304,7 @@
           "image_field": "image",
           "size": "l",
           "title": "Image",
-          "url": "/content-types/image-dark"
+          "url": "/docs/examples/content-types/image-dark"
         }
       },
       "blocks_layout": {
