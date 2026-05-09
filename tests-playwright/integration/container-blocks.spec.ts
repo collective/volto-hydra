@@ -3227,10 +3227,11 @@ test.describe('Slider with listing expansion', () => {
     const slider = iframe.locator('[data-block-uid="gallery-slider"]');
     await expect(slider).toBeVisible();
 
-    // The listing should have expanded into image slides (all 11 mock images).
+    // The listing should expand the gallery's images (scoped to /images/
+    // by path filter so docs screenshots don't bleed into the test count).
     // All listing items share the listing block's @uid ("gallery-listing").
     const gallerySlides = iframe.locator('[data-block-uid="gallery-listing"]');
-    await expect(gallerySlides).toHaveCount(11, { timeout: 10000 });
+    await expect(gallerySlides).toHaveCount(5, { timeout: 10000 });
 
     // Verify image slides are rendered as image blocks (have img or data-edit-media)
     const firstGallerySlide = gallerySlides.first();
@@ -3246,25 +3247,27 @@ test.describe('Slider with listing expansion', () => {
 
     const iframe = helper.getIframe();
 
-    // Wait for listing expansion (11 listing + 1 manual image = 12 total slides)
-    await expect(iframe.locator('[data-block-uid="gallery-listing"]')).toHaveCount(11, { timeout: 10000 });
+    // Wait for listing expansion (5 listing + 1 manual image = 6 total slides;
+    // the listing query is path-scoped to /images/ so the count is stable
+    // even as docs sync adds new Image content elsewhere in the tree).
+    await expect(iframe.locator('[data-block-uid="gallery-listing"]')).toHaveCount(5, { timeout: 10000 });
 
     // First visible slide is a listing slide — click it
     await helper.clickBlockInIframe('gallery-listing');
     await helper.waitForBlockSelectedInAdmin('gallery-listing');
 
-    // Navigate +1 through all 11 listing slides to reach manual-image-1
+    // Navigate +1 through all 5 listing slides to reach manual-image-1
     const nextButton = iframe.locator('[data-block-selector="+1"]');
     await expect(nextButton).toBeVisible();
 
-    for (let i = 0; i < 11; i++) {
+    for (let i = 0; i < 5; i++) {
       await nextButton.click();
-      if (i < 10) {
+      if (i < 4) {
         await helper.waitForBlockSelectedInAdmin('gallery-listing');
       }
     }
 
-    // After 11 clicks we should be on the manual image slide
+    // After 5 clicks we should be on the manual image slide
     await helper.waitForBlockSelectedInAdmin('manual-image-1');
   });
 
@@ -3277,8 +3280,8 @@ test.describe('Slider with listing expansion', () => {
 
     const iframe = helper.getIframe();
 
-    // Wait for listing expansion
-    await expect(iframe.locator('[data-block-uid="gallery-listing"]')).toHaveCount(11, { timeout: 10000 });
+    // Wait for listing expansion (path-scoped to /images/ — see test above)
+    await expect(iframe.locator('[data-block-uid="gallery-listing"]')).toHaveCount(5, { timeout: 10000 });
 
     // Select gallery-listing (first visible slide), navigate up to slider, then select manual-image-1
     await helper.clickBlockInIframe('gallery-listing');

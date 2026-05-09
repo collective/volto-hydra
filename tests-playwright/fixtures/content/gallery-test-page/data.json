@@ -34,6 +34,11 @@
                 "i": "portal_type",
                 "o": "plone.app.querystring.operation.selection.any",
                 "v": ["Image"]
+              },
+              {
+                "i": "path",
+                "o": "plone.app.querystring.operation.string.absolutePath",
+                "v": "/images"
               }
             ],
             "sort_on": "sortable_title",
