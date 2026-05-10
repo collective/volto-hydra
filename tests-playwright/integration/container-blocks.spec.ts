@@ -1784,10 +1784,10 @@ test.describe('Container Block Drag and Drop', () => {
 
     const iframe = helper.getIframe();
 
-    // Get initial order of blocks in col-1 (has text-1a, text-1b)
+    // Get initial order of blocks in col-1 (text-1a, text-1b, col1-img-1)
     const col1 = iframe.locator('[data-block-uid="col-1"]');
     const initialBlocks = await col1.locator(':scope > [data-block-uid]').all();
-    expect(initialBlocks.length).toBe(2);
+    expect(initialBlocks.length).toBe(3);
 
     const firstBlockUid = await initialBlocks[0].getAttribute('data-block-uid');
     const secondBlockUid = await initialBlocks[1].getAttribute('data-block-uid');
@@ -1833,7 +1833,7 @@ test.describe('Container Block Drag and Drop', () => {
       .locator(':scope > [data-block-uid]')
       .count();
 
-    expect(col1InitialCount).toBe(2); // text-1a, text-1b
+    expect(col1InitialCount).toBe(3); // text-1a, text-1b, col1-img-1
     expect(col2InitialCount).toBe(1); // text-2a
 
     // Select text-1a from col-1
@@ -1846,8 +1846,10 @@ test.describe('Container Block Drag and Drop', () => {
     await helper.dragBlockWithMouse(dragHandle, targetBlock, true); // Insert after
 
     // Wait for block to move between containers (React re-render may be async)
-    await expect(col1.locator(':scope > [data-block-uid]')).toHaveCount(1, { timeout: 5000 }); // Only text-1b left
-    await expect(col2.locator(':scope > [data-block-uid]')).toHaveCount(2, { timeout: 5000 }); // text-2a + text-1a
+    await expect(col1.locator(':scope > [data-block-uid]'))
+      .toHaveCount(col1InitialCount - 1, { timeout: 5000 });
+    await expect(col2.locator(':scope > [data-block-uid]'))
+      .toHaveCount(col2InitialCount + 1, { timeout: 5000 });
   });
 
   test('can drag block from container to page level', async ({ page }) => {
@@ -1864,8 +1866,8 @@ test.describe('Container Block Drag and Drop', () => {
       .locator(':scope > [data-block-uid]')
       .count();
 
-    // Verify text-1a starts inside col-1
-    expect(col1InitialCount).toBe(2);
+    // Verify col-1 starts with text-1a, text-1b, col1-img-1
+    expect(col1InitialCount).toBe(3);
 
     // Select text-1a from col-1 and wait for toolbar
     await helper.clickBlockInIframe('text-1a');
@@ -2553,7 +2555,7 @@ test.describe('Container Block Drag and Drop', () => {
     expect(text2aInCol2).toBe(0);
 
     const col1NewCount = await col1.locator(':scope > [data-block-uid]').count();
-    expect(col1NewCount).toBe(3); // text-1a, text-1b, text-2a
+    expect(col1NewCount).toBe(4); // text-1a, text-1b, col1-img-1, text-2a
 
     // Verify text-2a is now in col-1
     const text2aInCol1 = await col1
