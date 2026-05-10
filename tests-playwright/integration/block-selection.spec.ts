@@ -1011,6 +1011,53 @@ test.describe('Multi-Block Selection', () => {
     await expect(page.locator('.volto-hydra-block-outline')).not.toBeVisible({ timeout: 3000 });
   });
 
+  // Regression: ChildBlocksWidget's onClick handler used to close over
+  // useSelector's `multiSelected`. Two ctrl+clicks fired back-to-back (no
+  // React re-render between them) both saw the pre-first-click value, so
+  // the second dispatch overwrote the first instead of appending —
+  // multiSelected ended up containing only the second item. This is hard
+  // to surface from the existing 'Ctrl+Click in sidebar block list…'
+  // test because the failure depends on click timing relative to React
+  // render commits. This test forces the race by issuing both clicks
+  // via dispatchEvent in a single page.evaluate (zero React render time
+  // between them) and asserts both ids end up in multiSelected.
+  test('two rapid ctrl+clicks in ChildBlocksWidget both multi-select (no stale-closure overwrite)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Navigate the sidebar so col-1 is current and its child rows render.
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
+    await helper.escapeToParent();
+    await helper.waitForIframeBlockHandle('col-1');
+
+    const blockList = page.locator('.child-blocks-widget');
+    await expect(blockList.locator('.child-block-item')).toHaveCount(3);
+
+    // Fire both ctrl+click events synchronously via JS — no awaits, no
+    // React render commit between them. The pre-fix code would overwrite
+    // the first dispatch with the second; the fix reads fresh state from
+    // the store at click time so both append.
+    await page.evaluate(() => {
+      const rows = document.querySelectorAll(
+        '.child-blocks-widget .child-block-item',
+      );
+      const fire = (el: Element) => {
+        const ev = new MouseEvent('click', {
+          bubbles: true, cancelable: true, ctrlKey: true, metaKey: true,
+        });
+        el.dispatchEvent(ev);
+      };
+      fire(rows[0]);
+      fire(rows[1]);
+    });
+
+    // Both rows should end up with .selected class.
+    await expect(blockList.locator('.child-block-item.selected'))
+      .toHaveCount(2, { timeout: 5_000 });
+  });
+
   test('Ctrl+Click in sidebar block list multi-selects and highlights blocks', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
