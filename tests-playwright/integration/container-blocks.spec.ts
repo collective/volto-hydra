@@ -311,11 +311,11 @@ test.describe('Adding Blocks to Containers', () => {
 
     const iframe = helper.getIframe();
 
-    // Count initial blocks in col-1 (should be 2: text-1a, text-1b)
+    // Count initial blocks in col-1 (text-1a, text-1b, col1-img-1)
     const initialCol1Blocks = await iframe
       .locator('[data-block-uid="col-1"] > [data-block-uid]')
       .count();
-    expect(initialCol1Blocks).toBe(2);
+    expect(initialCol1Blocks).toBe(3);
 
     // Count initial page-level blocks
     const initialPageBlocks = await iframe
@@ -329,11 +329,11 @@ test.describe('Adding Blocks to Containers', () => {
     await helper.moveCursorToEnd(editor);
     await page.keyboard.press('Enter');
 
-    // Wait for col-1 to have 3 blocks (text-1a was split, creating a new block)
+    // Wait for col-1 to have one more block (text-1a was split, new block added)
     const col1BlocksLocator = iframe.locator(
       '[data-block-uid="col-1"] > [data-block-uid]',
     );
-    await expect(col1BlocksLocator).toHaveCount(3);
+    await expect(col1BlocksLocator).toHaveCount(initialCol1Blocks + 1);
 
     // Page-level blocks should be unchanged - the new block should be in the container
     const finalPageBlocks = await iframe
@@ -561,11 +561,11 @@ test.describe('Deleting Blocks from Containers', () => {
 
     const iframe = helper.getIframe();
 
-    // Count initial blocks in col-1 (should be 2: text-1a, text-1b)
+    // Count initial blocks in col-1 (text-1a, text-1b, col1-img-1)
     const initialCol1Blocks = await iframe
       .locator('[data-block-uid="col-1"] > [data-block-uid]')
       .count();
-    expect(initialCol1Blocks).toBe(2);
+    expect(initialCol1Blocks).toBe(3);
 
     // Count initial page-level blocks
     const initialPageBlocks = await iframe
@@ -578,11 +578,11 @@ test.describe('Deleting Blocks from Containers', () => {
     await helper.clickQuantaToolbarMenuOption('text-1b', 'Remove');
     await helper.waitForBlockToDisappear('text-1b');
 
-    // col-1 should now have 1 block
+    // col-1 should now have one fewer block
     const finalCol1Blocks = await iframe
       .locator('[data-block-uid="col-1"] > [data-block-uid]')
       .count();
-    expect(finalCol1Blocks).toBe(1);
+    expect(finalCol1Blocks).toBe(initialCol1Blocks - 1);
 
     // Page-level blocks should be unchanged
     const finalPageBlocks = await iframe
@@ -3962,8 +3962,10 @@ test.describe('Multi-Container Field Operations', () => {
     const iframe = helper.getIframe();
     await iframe.locator('[data-block-uid="columns-1"]').waitFor();
 
-    // First select the columns block to see its child blocks in sidebar
-    await helper.clickBlockInIframe('columns-1');
+    // Select the columns block via its title heading (clicking the
+    // bbox center would land inside col-1's slate, since columns-1
+    // has no top-level row above its column children).
+    await helper.clickBlockInIframe('columns-1', { selector: 'h3' });
 
     // Wait for sidebar to show columns block with child blocks widget
     const sidebar = page.locator('.sidebar-container');

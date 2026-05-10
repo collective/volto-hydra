@@ -683,14 +683,15 @@ test.describe('Block Mode (Escape state machine)', () => {
     await expect(page.locator('.volto-hydra-block-outline[data-outline-style="border"]'))
       .toBeVisible({ timeout: 3000 });
 
-    // Third Cmd+A: selects all sibling blocks (multi-selection)
+    // Third Cmd+A: selects all sibling blocks (multi-selection).
+    // col-1 has 3 children: text-1a, text-1b, col1-img-1.
     await page.keyboard.press('ControlOrMeta+a');
 
-    await helper.waitForMultiSelectOutlines(2);
+    await helper.waitForMultiSelectOutlines(3);
 
-    // Sidebar should show "2 selected" summary bar
+    // Sidebar should show "3 selected" summary bar
     await expect(page.locator('.multi-select-bar'))
-      .toContainText('2 selected', { timeout: 3000 });
+      .toContainText('3 selected', { timeout: 3000 });
   });
 
   test('Cmd+A in block mode selects all sibling blocks', async ({ page }) => {
@@ -751,10 +752,10 @@ test.describe('Block Mode (Escape state machine)', () => {
     const level3Count = await page.locator('.selected-block-path').count();
     expect(level3Count).toBe(3);
 
-    // Press 4: escalate to siblings of col-1 (inside columns-1). The test
-    // signal is that a "Column" entry (col-2) becomes selected — counts
-    // alone aren't a clean signal because col-1's child count (3) can
-    // exceed columns-1's child count (2 columns).
+    // Press 4: escalate to siblings of col-1 (inside columns-1). The
+    // signal is that a Column entry (col-2) shows up in the selection —
+    // counts alone aren't enough since columns-1 has only 2 columns,
+    // matching col-1's 2 children.
     await page.keyboard.press('ControlOrMeta+a');
     await expect.poll(async () => {
       const rows = page.locator('.selected-block-path');
