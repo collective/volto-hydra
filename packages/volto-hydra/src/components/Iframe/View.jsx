@@ -2755,8 +2755,14 @@ const Iframe = (props) => {
           }
 
           // --- Single-block selection from here on ---
-          // Clear multiSelected unless we're in selection mode (preserve during navigation)
-          if (onSetMultiSelected && !selectionMode) onSetMultiSelected([]);
+          // Clear multiSelected unless we're in selection mode (preserve
+          // during navigation). Skip the clear for position-only updates
+          // (scroll/resize) — those aren't real selection changes and
+          // would otherwise wipe a multi-select that was just initiated
+          // from the sidebar before selectionMode flips to true.
+          if (onSetMultiSelected && !selectionMode && !isPositionUpdateOnly) {
+            onSetMultiSelected([]);
+          }
           if (isNewBlock) {
             log('BLOCK_SELECTED calling onSelectBlock:', event.data.blockUid);
             onSelectBlock(event.data.blockUid);

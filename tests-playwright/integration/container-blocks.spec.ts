@@ -761,9 +761,9 @@ test.describe('Hierarchical Sidebar', () => {
     const childBlocksWidget = page.locator('#sidebar-order .child-blocks-widget');
     await expect(childBlocksWidget).toBeVisible();
 
-    // Should show the child blocks (text-1a, text-1b)
+    // Should show col-1's child blocks (text-1a, text-1b, col1-img-1)
     const childItems = page.locator('#sidebar-order .child-block-item');
-    await expect(childItems).toHaveCount(2);
+    await expect(childItems).toHaveCount(3);
   });
 
   test('clicking arrow on headers navigates up to parent', async ({
@@ -1037,7 +1037,12 @@ test.describe('Empty Block Behavior', () => {
     // The column block has defaultBlock: 'slate', so when we delete all blocks,
     // it should create a slate block, not an empty block.
 
-    // First delete text-1b from col-1
+    // col-1 starts with text-1a, text-1b, col1-img-1 — delete all three
+    await helper.clickBlockInIframe('col1-img-1');
+    await helper.openQuantaToolbarMenu('col1-img-1');
+    await helper.clickQuantaToolbarMenuOption('col1-img-1', 'Remove');
+    await helper.waitForBlockToDisappear('col1-img-1');
+
     await helper.clickBlockInIframe('text-1b');
     await helper.openQuantaToolbarMenu('text-1b');
     await helper.clickQuantaToolbarMenuOption('text-1b', 'Remove');
@@ -1567,7 +1572,7 @@ test.describe('Single Allowed Block Auto-Insert', () => {
     const initialColumnCount = await iframe
       .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
       .count();
-    expect(initialBlocksInCol1).toBe(2); // text-1a and text-1b
+    expect(initialBlocksInCol1).toBe(3); // text-1a, text-1b, col1-img-1
     expect(initialColumnCount).toBe(2); // col-1 and col-2
 
     // Select col-1 (a column that allows slate and image)
@@ -1577,9 +1582,9 @@ test.describe('Single Allowed Block Auto-Insert', () => {
     // Note: the column's container field is titled "Content" in its blockSchema
     await helper.addBlockViaSidebar('Content', 'Text');
 
-    // Verify: col-1 should now have 3 children (new block added INSIDE)
+    // Verify: col-1 should have one more child (new block added INSIDE)
     const col1Blocks = iframe.locator('[data-block-uid="col-1"] > [data-block-uid]');
-    await expect(col1Blocks).toHaveCount(3); // was 2, now 3
+    await expect(col1Blocks).toHaveCount(initialBlocksInCol1 + 1);
 
     // Verify: columns-1 should still have 2 columns (NO sibling added)
     const newColumnCount = await iframe

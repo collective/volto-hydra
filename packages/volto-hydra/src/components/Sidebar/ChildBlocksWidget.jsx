@@ -16,7 +16,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
 import { defineMessages, useIntl } from 'react-intl';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import { Icon } from '@plone/volto/components';
 import { setUIState } from '@plone/volto/actions';
 import rightArrowSVG from '@plone/volto/icons/right-key.svg';
@@ -207,8 +207,16 @@ const ContainerFieldSection = ({
 }) => {
   const intl = useIntl();
   const dispatch = useDispatch();
+  const store = useStore();
   const selected = useSelector((state) => state.form.ui.selected);
   const multiSelected = useSelector((state) => state.form.ui.multiSelected) || [];
+  // Read fresh multiSelected from the store at click time. Two ctrl+clicks
+  // fired in quick succession would otherwise both close over the
+  // pre-first-click `multiSelected` value (React hasn't committed the
+  // re-render between Playwright clicks), and the second dispatch would
+  // overwrite the first instead of appending.
+  const getCurrentMultiSelected = () =>
+    store.getState().form.ui.multiSelected || [];
 
   // Convert childBlocks to format expected by DragDropList: [[id, data], ...]
   const childList = childBlocks.map((child) => [child.id, child]);
@@ -263,11 +271,14 @@ const ContainerFieldSection = ({
                 className={`child-block-item${multiSelected.includes(child.id) ? ' selected' : ''}`}
                 style={multiSelected.includes(child.id) ? { background: '#e8f4fd' } : undefined}
                 onClick={(e) => {
+                  // Read the latest multiSelected from the store rather
+                  // than the closure — see getCurrentMultiSelected above.
+                  const current = getCurrentMultiSelected();
                   if (e.shiftKey) {
                     // Shift+Click: select range from anchor to clicked
                     const siblingIds = childBlocks.map(c => c.id);
-                    const anchor = multiSelected.length > 0
-                      ? multiSelected[0]
+                    const anchor = current.length > 0
+                      ? current[0]
                       : selected;
                     const anchorIdx = siblingIds.indexOf(anchor);
                     const focusIdx = siblingIds.indexOf(child.id);
@@ -278,19 +289,19 @@ const ContainerFieldSection = ({
                     }
                   } else if (e.ctrlKey || e.metaKey) {
                     // Ctrl/Cmd+Click: toggle in/out of multi-selection
-                    if (multiSelected.includes(child.id)) {
-                      dispatch(setUIState({ multiSelected: multiSelected.filter(uid => uid !== child.id) }));
+                    if (current.includes(child.id)) {
+                      dispatch(setUIState({ multiSelected: current.filter(uid => uid !== child.id) }));
                     } else {
-                      dispatch(setUIState({ multiSelected: [...multiSelected, child.id] }));
+                      dispatch(setUIState({ multiSelected: [...current, child.id] }));
                     }
                     // Enter selection mode — iframe shows checkboxes
                     document.dispatchEvent(new CustomEvent('hydra-enter-selection-mode'));
-                  } else if (multiSelected.length > 0) {
+                  } else if (current.length > 0) {
                     // Selection mode: plain click toggles (don't navigate)
-                    if (multiSelected.includes(child.id)) {
-                      dispatch(setUIState({ multiSelected: multiSelected.filter(uid => uid !== child.id) }));
+                    if (current.includes(child.id)) {
+                      dispatch(setUIState({ multiSelected: current.filter(uid => uid !== child.id) }));
                     } else {
-                      dispatch(setUIState({ multiSelected: [...multiSelected, child.id] }));
+                      dispatch(setUIState({ multiSelected: [...current, child.id] }));
                     }
                   } else {
                     onSelectBlock(child.id);
