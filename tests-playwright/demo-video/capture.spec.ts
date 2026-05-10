@@ -122,19 +122,32 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   await helper.waitForBlockSelectedInAdmin('columns-1');
   await beat(page, 'container selected');
 
-  // Beat 5 — open the frontend switcher panel and click F7 Mobile.
-  // The iframe swaps to the F7 frontend showing the same content
-  // through a different design system — the omni-channel feature in
-  // action. Requires the F7 dev frontend to be running on :3008
-  // (pnpm --filter hydra-vue-f7 run dev:test) and the start:test env
-  // var to map "F7 Mobile" to that URL.
-  // Assert: the iframe src changes to a localhost:3008 URL after click.
+  // Beat 5 — open the frontend switcher panel, switch to mobile
+  // viewport, then click F7 Mobile. The iframe swaps to the F7
+  // frontend at mobile width showing the same content through a
+  // different design system — the omni-channel feature in action.
+  // Requires the F7 dev frontend on :3008 (pnpm --filter hydra-vue-f7
+  // run dev:test) and the start:test env var to map "F7 Mobile" to
+  // that URL.
+  // The pauses around the panel are deliberately slow so a viewer can
+  // read the entry names (each frontend has a label like "Nuxt blog"
+  // or "F7 Mobile") and see the mobile-width transition land before
+  // the F7 frontend loads.
   await page.locator('#toolbar-frontend-switcher').click();
   const panel = page.locator('.frontend-switcher-panel');
   await panel.waitFor({ state: 'visible' });
+  // Long pause so viewers can read the frontend names in the panel.
+  await page.waitForTimeout(2_500);
+
+  // Switch to mobile viewport first so the F7 frontend lands at the
+  // intended phone width rather than full-bleed desktop.
+  await panel.getByLabel('Mobile').click();
+  // Allow the iframe-max-width transition to finish visibly.
+  await page.waitForTimeout(1_500);
+
   const f7Item = panel.locator('.frontend-switcher-url-item', { hasText: 'F7 Mobile' });
   await f7Item.waitFor({ state: 'visible', timeout: 5_000 });
-  await beat(page, 'switcher open');
+  await page.waitForTimeout(1_000);
   await f7Item.click();
   await expect(async () => {
     const src = await page.locator('#previewIframe').getAttribute('src');
@@ -142,5 +155,5 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   }).toPass({ timeout: 5_000 });
   // Let the F7 frontend finish loading inside the iframe so the swap
   // is visibly captured (not just the URL change).
-  await page.waitForTimeout(2_500);
+  await page.waitForTimeout(3_000);
 });
