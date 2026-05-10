@@ -924,13 +924,15 @@ test.describe('Add button and image overlay conflict', () => {
   test('add button does not overlap with image clear button when add is right-aligned', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await helper.navigateToEdit('/container-test-page'); // Page with images in horizontal container
+    await helper.navigateToEdit('/container-test-page');
 
     const iframe = helper.getIframe();
 
-    // Find an image block on the RIGHT side of the container (no space to the right)
-    // top-img-2 is the rightmost image, so add button will be constrained inside
-    const imageBlock = iframe.locator('[data-block-uid="top-img-2"]');
+    // col1-img-1 is an image inside col-1 — a column with limited
+    // horizontal space, so the add button gets constrained inside the
+    // block instead of floating to the right (the conflict scenario
+    // this test guards). Was top-img-2 before top_images removal.
+    const imageBlock = iframe.locator('[data-block-uid="col1-img-1"]');
     await expect(imageBlock).toBeVisible({ timeout: 10000 });
 
     // Click to select the image block

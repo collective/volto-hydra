@@ -2634,37 +2634,40 @@ test.describe('Sidebar Child Blocks Reordering', () => {
 
     const iframe = helper.getIframe();
 
-    // Select col-1 (a container with 2 child blocks: text-1a, text-1b)
+    // Select col-1 (col-1 has text-1a, text-1b, col1-img-1)
     await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
     await helper.waitForSidebarCurrentBlock('Column');
 
-    // Verify initial order in iframe: text-1a comes before text-1b
+    // Verify initial order in iframe.
     const col1 = iframe.locator('[data-block-uid="col-1"]');
     const initialOrder = await col1
       .locator(':scope > [data-block-uid]')
       .evaluateAll((els) => els.map((el) => el.getAttribute('data-block-uid')));
-    expect(initialOrder).toEqual(['text-1a', 'text-1b']);
+    expect(initialOrder).toEqual(['text-1a', 'text-1b', 'col1-img-1']);
 
     // Find the child blocks widget in sidebar (Order tab)
     await helper.openSidebarTab('Order');
     const childBlocksWidget = page.locator('.child-blocks-widget');
     await expect(childBlocksWidget).toBeVisible();
 
-    // Find the drag handles for the two child blocks
+    // Find the drag handles for the three child blocks
     const dragHandles = childBlocksWidget.locator('.child-block-item .drag-handle');
-    await expect(dragHandles).toHaveCount(2);
+    await expect(dragHandles).toHaveCount(3);
 
-    // Drag text-1a below text-1b to reorder
-    // Must drag from the drag handle for react-beautiful-dnd to work
+    // Drag text-1a below text-1b (the second item) to reorder text-1a.
+    // Must drag from the drag handle for react-beautiful-dnd to work.
     const firstDragHandle = dragHandles.first();
-    const secondItem = childBlocksWidget.locator('.child-block-item').last();
+    const secondItem = childBlocksWidget.locator('.child-block-item').nth(1);
 
     const firstHandleBox = await firstDragHandle.boundingBox();
     const secondBox = await secondItem.boundingBox();
     expect(firstHandleBox).not.toBeNull();
     expect(secondBox).not.toBeNull();
 
-    // Drag from first item's drag handle to below second item
+    // Drag from first item's drag handle to below second item, but
+    // stop short of any third item's centre — col-1 has 3 children
+    // (text-1a, text-1b, col1-img-1), so an aggressive y+height+10
+    // would land inside col1-img-1's row and reorder past it.
     await page.mouse.move(
       firstHandleBox!.x + firstHandleBox!.width / 2,
       firstHandleBox!.y + firstHandleBox!.height / 2,
@@ -2672,18 +2675,21 @@ test.describe('Sidebar Child Blocks Reordering', () => {
     await page.mouse.down();
     await page.mouse.move(
       secondBox!.x + secondBox!.width / 2,
-      secondBox!.y + secondBox!.height + 10,
+      // Land in the lower half of text-1b — react-beautiful-dnd reads
+      // that as "place after text-1b" without crossing into col1-img-1.
+      secondBox!.y + secondBox!.height * 0.75,
       { steps: 10 },
     );
     await page.waitForTimeout(100); // Small delay for drag library to register position
     await page.mouse.up();
 
     // Verify order changed in iframe: text-1b now comes before text-1a
+    // (col1-img-1 stays in its original third position).
     await expect(async () => {
       const newOrder = await col1
         .locator(':scope > [data-block-uid]')
         .evaluateAll((els) => els.map((el) => el.getAttribute('data-block-uid')));
-      expect(newOrder).toEqual(['text-1b', 'text-1a']);
+      expect(newOrder).toEqual(['text-1b', 'text-1a', 'col1-img-1']);
     }).toPass({ timeout: 5000 });
   });
 
