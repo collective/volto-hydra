@@ -52,7 +52,10 @@ test.describe('Container UX: Edge-drag', () => {
     });
     await helper.waitForIframeBlockHandle('col-1');
     const adminEdges = page.locator('.volto-hydra-edge-handle-visual');
-    expect(await adminEdges.count()).toBeGreaterThan(0); // sanity: container does show edges
+    // Edge handles render in the admin after a canResize round-trip
+    // from the iframe — wait for the first one rather than racing the
+    // count check (synchronous count was flaky on the slower nuxt path).
+    await expect(adminEdges.first()).toBeVisible({ timeout: 5000 });
 
     // 2. Select text-1a (a slate inside col-1 — leaf, no children).
     await iframe.locator('[data-block-uid="text-1a"]').first().evaluate((el) => {
