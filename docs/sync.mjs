@@ -149,6 +149,148 @@ for (const mdFile of mdFiles) {
   console.log(`Created docs/examples/${slug}/data.json shell`);
 }
 
+// Regenerate the docs/examples/README.md tables (Built-in / Custom) and the
+// hidden toctree from the actual mdFiles. Hand-maintained tables drift —
+// new example pages were getting added with their own .md file and Plone
+// shell but never appeared in the README. Driving both tables from the
+// filesystem keeps "what files exist" and "what the docs index lists" in
+// lock-step. The intro/closing prose between tables is preserved.
+{
+  const readmePath = join(EXAMPLES_DIR, 'README.md');
+  if (existsSync(readmePath)) {
+    const original = readFileSync(readmePath, 'utf-8');
+
+    // For each example, classify built-in vs custom from the intro line.
+    // Falls back to "custom" if not stated. Description comes from the
+    // first non-heading prose line (skipping the "This is a … block"
+    // classifier line itself).
+    const entries = mdFiles.map((mdFile) => {
+      const slug = mdFile.replace(/\.md$/, '');
+      const md = readFileSync(join(EXAMPLES_DIR, mdFile), 'utf-8');
+      const lines = md.split('\n');
+      const h1 = (lines.find((l) => l.startsWith('# ')) || `# ${slug}`)
+        .slice(2).trim();
+      const intro = lines.find(
+        (l) => l.startsWith('This is a **'),
+      ) || '';
+      const kind = intro.includes('**built-in**') ? 'built-in' : 'custom';
+      // First prose line that isn't the intro classifier line.
+      const desc = lines.find((l) => {
+        const t = l.trim();
+        if (!t || t.startsWith('#') || t.startsWith('```')) return false;
+        if (t.startsWith('This is a **')) return false;
+        return true;
+      }) || '';
+      return { slug, title: h1, kind, desc: desc.trim() };
+    }).sort((a, b) => a.slug.localeCompare(b.slug));
+
+    const renderRow = ({ slug, title, desc }) =>
+      `| [${title}](./${slug}.md) | ${desc} |`;
+    const builtinRows = entries.filter((e) => e.kind === 'built-in').map(renderRow);
+    const customRows = entries.filter((e) => e.kind === 'custom').map(renderRow);
+
+    const builtinSection = [
+      '## Built-in Blocks',
+      '',
+      'These blocks are available by default — no schema registration required.',
+      '',
+      '| Block | Description |',
+      '|-------|-------------|',
+      ...builtinRows,
+      '',
+    ].join('\n');
+
+    const customSection = [
+      '## Custom Block Examples',
+      '',
+      'These blocks demonstrate common patterns. Register them via `initBridge({ blocks: { ... } })`.',
+      '',
+      '| Block | Description |',
+      '|-------|-------------|',
+      ...customRows,
+      '',
+    ].join('\n');
+
+    const toctree = [
+      '```{toctree}',
+      ':hidden:',
+      '',
+      ...entries.map((e) => e.slug),
+      '```',
+    ].join('\n');
+
+    // Splice each generated region back into the README, preserving the
+    // intro before "## Built-in Blocks" and the static reference tables
+    // ("Page Structure", "Data Attributes…", "Widget Reference") between
+    // "## Custom Block Examples" and the toctree.
+    let updated = original.replace(
+      /## Built-in Blocks[\s\S]*?(?=## Custom Block Examples)/,
+      builtinSection,
+    );
+    updated = updated.replace(
+      /## Custom Block Examples[\s\S]*?(?=## Page Structure)/,
+      customSection,
+    );
+    updated = updated.replace(
+      /```\{toctree\}[\s\S]*?```\n*$/m,
+      toctree + '\n',
+    );
+
+    if (updated !== original) {
+      outOfSync = true;
+      if (checkMode) {
+        console.error('OUT OF SYNC: docs/examples/README.md');
+      } else {
+        writeFileSync(readmePath, updated, 'utf-8');
+        console.log('Updated docs/examples/README.md (tables + toctree)');
+      }
+    }
+  }
+}
+
+// Ensure the /docs/examples landing page has a listing block that surfaces
+// every child example. Without it, the page renders as just a title and
+// columns/etc. exist only by URL — undiscoverable from the live site.
+// Idempotent: only writes if the listing block isn't already in the layout.
+{
+  const examplesIndexJsonPath = join(
+    CONTENT_DIR, 'docs', 'examples', 'data.json',
+  );
+  if (existsSync(examplesIndexJsonPath)) {
+    const original = readFileSync(examplesIndexJsonPath, 'utf-8');
+    const data = JSON.parse(original);
+    const layout = data.blocks_layout?.items || [];
+    if (!layout.includes('examples-listing')) {
+      data.blocks = {
+        ...data.blocks,
+        'examples-listing': {
+          '@type': 'listing',
+          headlineTag: 'h2',
+          styles: {},
+          variation: 'summary',
+          fieldMapping: {
+            '@id': 'href',
+            title: 'title',
+            description: 'description',
+            image: 'image',
+          },
+        },
+      };
+      data.blocks_layout = { items: [...layout, 'examples-listing'] };
+      const updated = JSON.stringify(data, null, 2) + '\n';
+      if (updated !== original) {
+        outOfSync = true;
+        if (checkMode) {
+          console.error('OUT OF SYNC: /docs/examples needs a listing block');
+        } else {
+          writeFileSync(examplesIndexJsonPath, updated, 'utf-8');
+          console.log('Added listing block to docs/examples/data.json');
+        }
+      }
+    }
+  }
+}
+
 // --- Phase 0: Generate Schema + JSON Block Data in markdown from block-definitions.json ---
 
 for (const mdFile of mdFiles) {

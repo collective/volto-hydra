@@ -8,25 +8,32 @@ These blocks are available by default — no schema registration required.
 
 | Block | Description |
 |-------|-------------|
-| [Slate (Text)](./slate.md) | Rich text with headings, lists, links, and inline formatting |
-| [Image](./image.md) | Image display with optional link |
-| [Teaser](./teaser.md) | Content preview card linked to a target page |
-| [Table](./table.md) | Table with rich text (Slate) cells |
-| [Listing](./listing.md) | Query-driven content list with configurable item types |
-| [Search](./search.md) | Search with faceted filtering and listing results |
-
+| [Button Block](./button.md) | A call-to-action button with editable label and link. The block type is `__button` (double-underscore prefix indicates a Volto built-in). |
+| [Grid Block](./grid.md) | A responsive grid that lays out child blocks in equal-width cells. The block uses Volto's standard shared-blocks shape — `blocks` is the dict of children, `blocks_layout.items` is their order — and constrains the allowed types via `allowedBlocks`. |
+| [Heading Block](./heading.md) | A standalone heading block that renders as h1–h6 based on a configurable `tag` field. Unlike headings inside a slate block, this is a dedicated block type with its own `heading` text field. |
+| [Image Block](./image.md) | Displays an image with optional alt text and link. Supports the image picker widget for selecting images from the Plone content tree or uploading new ones. |
+| [Introduction Block](./introduction.md) | Displays the page's title and description as a styled header. The introduction block has no content of its own — it reads `title` and `description` from the page metadata. |
+| [Listing Block](./listing.md) | Displays a list of content items from a query. The listing block fetches items from the Plone catalog based on a querystring and renders each item using a configurable item type (variation). Built-in item types are `default` (title + description) and `summary` (title + description + image). |
+| [Maps Block](./maps.md) | Embeds a map from a URL (Google Maps, OpenStreetMap, etc.) using an iframe. The `url` field should contain the embed URL, and `title` provides an accessible label. |
+| [Search Block](./search.md) | A search interface with faceted filtering. Contains a child listing block for results and typed facets (checkbox, select, date range, toggle) for filtering. |
+| [Separator Block](./separator.md) | A horizontal rule used to visually divide sections of content. Supports an alignment style property. |
+| [Slate (Text) Block](./slate.md) | Rich text block powered by the Slate editor. Supports paragraphs, headings, lists, blockquotes, and inline formatting (bold, italic, strikethrough, underline, code, links). |
+| [Table Block](./table.md) | A table with rich text (Slate) content in each cell. Supports adding/removing rows and columns via toolbar actions. |
+| [Teaser Block](./teaser.md) | A content preview card that links to another page. Selecting a target page via the object browser auto-fills the title, description, and preview image from that page. Editors can toggle "overwrite" to customize these values. |
+| [Table of Contents Block](./toc.md) | Renders a table of contents generated from heading blocks on the current page. It scans sibling blocks for headings and builds a navigation list. |
+| [Video Block](./video.md) | Embeds a video from a URL. Detects YouTube links and renders an iframe embed; otherwise falls back to an HTML5 `<video>` element. |
 ## Custom Block Examples
 
 These blocks demonstrate common patterns. Register them via `initBridge({ blocks: { ... } })`.
 
-| Block | Pattern |
-|-------|---------|
-| [Hero](./hero.md) | Multiple field types: string, textarea, slate, image, object_browser |
-| [Columns](./columns.md) | Container block with nested children (`blocks_layout` widget) |
-| [Accordion](./accordion.md) | Container block with header + content areas |
-| [Slider](./slider.md) | Array of items (`object_list` widget) |
-| [Form](./form.md) | Typed `object_list` with field type sub-blocks |
-
+| Block | Description |
+|-------|-------------|
+| [Accordion Block](./accordion.md) | A collapsible panel group. Each panel is an `object_list` item with a title and a content area that holds child blocks. |
+| [Columns Block](./columns.md) | A horizontal multi-column container. The block has one slot — `columns` — restricted to `column` children, capped at four. Each `column` is itself a container holding any of its allowed inner block types (slate, image, …). |
+| [Form Block](./form.md) | A multi-field form with configurable field types, validation, and email submission. Fields are stored as a typed `object_list` — each field has a `field_type` that maps to a sub-block schema. |
+| [Hero Block](./hero.md) | A full-width hero section with heading, subheading, image, rich text description, and a call-to-action button. Demonstrates multiple field types in a single block: `string`, `textarea`, `slate`, `image`, and `object_browser`. |
+| [Highlight Block](./highlight.md) | A prominent content section with a background image, overlay, title, rich text body, and an optional call-to-action link. Used for feature callouts and banners. |
+| [Slider Block](./slider.md) | A carousel/slider that cycles through slides. Slides are stored as an `object_list` — each slide has a title, description, image, and optional button. |
 ## Page Structure
 
 Each block doc page follows this template:
@@ -69,24 +76,24 @@ Common `widget` values used in block schemas:
 ```{toctree}
 :hidden:
 
-slate
-image
-teaser
-table
-listing
-search
-hero
-columns
 accordion
-slider
-form
-introduction
-heading
-highlight
-maps
-separator
 button
+columns
+form
+grid
+heading
+hero
+highlight
+image
+introduction
+listing
+maps
+search
+separator
+slate
+slider
+table
+teaser
 toc
 video
 ```
-

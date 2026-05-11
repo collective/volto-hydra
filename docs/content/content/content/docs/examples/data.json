@@ -6,11 +6,24 @@
   "blocks": {
     "title-1": {
       "@type": "title"
+    },
+    "examples-listing": {
+      "@type": "listing",
+      "headlineTag": "h2",
+      "styles": {},
+      "variation": "summary",
+      "fieldMapping": {
+        "@id": "href",
+        "title": "title",
+        "description": "description",
+        "image": "image"
+      }
     }
   },
   "blocks_layout": {
     "items": [
-      "title-1"
+      "title-1",
+      "examples-listing"
     ]
   },
   "contributors": [],
