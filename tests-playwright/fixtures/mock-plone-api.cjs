@@ -1654,8 +1654,24 @@ app.post('*/@querystring-search', (req, res) => {
   const contextPath = req.path.replace('/++api++/@querystring-search', '').replace('/@querystring-search', '');
   const baseUrl = `http://localhost:${PORT}`;
 
-  const { query = [], sort_on, sort_order, b_start = 0, b_size = 10, limit } = req.body;
-  console.log('[MOCK-API] @querystring-search query:', JSON.stringify(query));
+  const { query = [], sort_on, sort_order, b_start = 0, b_size = 10, limit, depth } = req.body;
+  console.log('[MOCK-API] @querystring-search query:', JSON.stringify(query), depth !== undefined ? `depth=${depth}` : '');
+
+  // Extract the "root" path from the path criteria so depth (below) can
+  // compute "how far below root is this item". Real Plone applies depth
+  // relative to each path criterion; for our use we only support one path
+  // criterion at a time — which matches sectionNav's listing config.
+  let depthRoot = null;
+  for (const cond of query) {
+    if (cond.i !== 'path') continue;
+    if (cond.o.includes('absolutePath')) {
+      depthRoot = cond.v;
+    } else if (cond.o.includes('relativePath')) {
+      let rel = cond.v || '';
+      if (rel === '.' || rel === '') rel = '';
+      depthRoot = (contextPath + (rel ? '/' + rel : '')).replace(/\/+/g, '/');
+    }
+  }
 
   // Get all content items using raw content (no enrichment needed for search).
   // loadContentFromDisk enriches every item (resolveuid, image scales, components)
@@ -1741,6 +1757,20 @@ app.post('*/@querystring-search', (req, res) => {
         });
       }
     }
+  }
+
+  // Apply depth limit. Plone's @querystring-search accepts a top-level
+  // `depth` field that constrains results to N levels below the path
+  // criterion's root. Used by sectionNav's listing config so a depth=2
+  // query under /docs returns /docs/foo and /docs/foo/bar but not
+  // /docs/foo/bar/baz.
+  if (typeof depth === 'number' && depthRoot !== null) {
+    const rootSegments = depthRoot.split('/').filter(Boolean).length;
+    const maxSegments = rootSegments + depth;
+    allItems = allItems.filter((item) => {
+      const itemSegments = new URL(item['@id']).pathname.split('/').filter(Boolean).length;
+      return itemSegments <= maxSegments;
+    });
   }
 
   // Sort items

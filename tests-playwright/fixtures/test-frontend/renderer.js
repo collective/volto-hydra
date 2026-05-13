@@ -230,6 +230,13 @@ async function renderBlock(blockId, block) {
         case 'navItem':
             wrapper.innerHTML = renderNavItemBlock(block);
             break;
+        case 'nav':
+            // Synthesised by listing's `nav` variation: each search-result
+            // item arrives with @type 'nav', `@id`, `title`, `description`.
+            // Reuse the navItem renderer — it accepts both manual-author
+            // {label, href[array]} and listing {title, @id} shapes.
+            wrapper.innerHTML = renderNavItemBlock(block);
+            break;
         case 'gridBlock':
             wrapper.innerHTML = await renderGridBlock(block, blockId);
             break;
@@ -1242,14 +1249,24 @@ async function renderSectionNavBlock(block) {
 }
 
 /**
- * Render a single navItem (a labelled link with optional indent level).
- * Computes active state from window.location.pathname; CSS picks up
- * .current / .in-path / .level-N to style the row.
+ * Render a single navItem-style row. Accepts two shapes:
+ *
+ *   1. Manual navItem from author: { label, href: [{ '@id': '...' }], level }
+ *   2. Listing-synthesised nav item: { title, '@id': '...' }     (variation='nav')
+ *
+ * Both produce the same HTML — a labelled link with active/in-path/level
+ * classes derived at render time from item href vs current location.
  */
 function renderNavItemBlock(block) {
-    const label = block.label || '';
+    const label = block.label || block.title || '';
     const level = Math.max(1, Math.min(3, block.level || 1));
-    const hrefRaw = Array.isArray(block.href) ? block.href[0]?.['@id'] : block.href;
+    // Manual: href is object_browser array [{ '@id', ... }]
+    // Listing-synth: href is the @id string (after fieldMapping) OR
+    // we can fall back to block['@id'] which the listing always sets.
+    let hrefRaw = block.href;
+    if (Array.isArray(hrefRaw)) hrefRaw = hrefRaw[0]?.['@id'];
+    if (!hrefRaw) hrefRaw = block['@id'];
+
     const itemPath = hrefRaw ? new URL(hrefRaw, window.location.origin).pathname : '#';
     const currentPath = window.location.pathname.replace(/\/edit$/, '');
     const active = itemPath === currentPath;

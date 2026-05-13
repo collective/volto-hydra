@@ -176,13 +176,14 @@
 
   <!-- Restricted child of sectionNav.items: a labelled link. Active
        state computed from current route; CSS picks up .current /
-       .in-path / .level-N. -->
-  <a v-else-if="block['@type'] == 'navItem'"
+       .in-path / .level-N. Also handles 'nav' (listing's nav variation
+       synthesises items with @type=nav and {title, @id} shape). -->
+  <a v-else-if="block['@type'] == 'navItem' || block['@type'] == 'nav'"
      :href="navItemPath(block)"
      :data-block-uid="block_uid"
      :class="navItemClasses(block)"
      :aria-current="navItemIsActive(block) ? 'page' : null">
-    <span data-edit-text="label">{{ block.label }}</span>
+    <span data-edit-text="label">{{ block.label || block.title }}</span>
   </a>
 
   <div v-else-if="block['@type'] == 'teaser'"
@@ -1021,8 +1022,13 @@ const sectionNavOpen = reactive({});
 // navItem helpers — keep them inline (small enough that a separate
 // composable isn't worth the indirection). Resolve href to a path,
 // match against the current route, and emit class string.
+//
+// Accepts both shapes:
+//   - manual navItem: href = [{ '@id': '...' }]  (object_browser)
+//   - listing nav-variation item: block['@id'] = '...'  (from search result)
 function navItemPath(navBlock) {
-  const raw = Array.isArray(navBlock.href) ? navBlock.href[0]?.['@id'] : navBlock.href;
+  let raw = Array.isArray(navBlock.href) ? navBlock.href[0]?.['@id'] : navBlock.href;
+  if (!raw) raw = navBlock['@id'];
   if (!raw) return '#';
   try {
     return new URL(raw, 'http://placeholder').pathname;
