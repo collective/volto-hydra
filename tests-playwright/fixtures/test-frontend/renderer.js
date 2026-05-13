@@ -223,20 +223,34 @@ async function renderBlock(blockId, block) {
         case 'section':
             wrapper.innerHTML = await renderSectionBlock(block);
             break;
-        case 'sectionNav':
-            wrapper.classList.add('section-nav-wrapper');
-            wrapper.innerHTML = await renderSectionNavBlock(block);
-            break;
-        case 'navItem':
-            wrapper.innerHTML = renderNavItemBlock(block);
-            break;
-        case 'nav':
+        case 'sectionNav': {
+            // Return the <nav> directly so aria-label / class /
+            // data-block-uid all live on the same element. The default
+            // wrapper would put data-block-uid on a generic div and bury
+            // <nav> a level deeper — a11y checks (and the test contract)
+            // expect them co-located.
+            const navEl = document.createElement('div');
+            navEl.innerHTML = await renderSectionNavBlock(block, blockId);
+            return navEl.firstElementChild;
+        }
+        case 'navItem': {
+            // Return the <a> as the outer element so data-block-uid lives
+            // alongside the link semantics (matches sectionNav putting
+            // data-block-uid on the <nav>). The default wrapper would
+            // bury the <a> under a <div>.
+            const itemEl = document.createElement('div');
+            itemEl.innerHTML = renderNavItemBlock(block, blockId);
+            return itemEl.firstElementChild;
+        }
+        case 'nav': {
             // Synthesised by listing's `nav` variation: each search-result
             // item arrives with @type 'nav', `@id`, `title`, `description`.
             // Reuse the navItem renderer — it accepts both manual-author
             // {label, href[array]} and listing {title, @id} shapes.
-            wrapper.innerHTML = renderNavItemBlock(block);
-            break;
+            const itemEl = document.createElement('div');
+            itemEl.innerHTML = renderNavItemBlock(block, blockId);
+            return itemEl.firstElementChild;
+        }
         case 'gridBlock':
             wrapper.innerHTML = await renderGridBlock(block, blockId);
             break;
@@ -1219,14 +1233,14 @@ async function renderSectionBlock(block) {
  * in-path classes are computed inside renderNavItemBlock from each link's
  * href vs window.location.pathname.
  */
-async function renderSectionNavBlock(block) {
+async function renderSectionNavBlock(block, blockId) {
     const ariaLabel = block.ariaLabel || 'Section navigation';
     const placement = block.placement || 'sidebar';
     const blocks = block.blocks || {};
     const items = block.items?.items || [];
-    const uid = block['@uid'] || `snav-${Math.random().toString(36).slice(2, 8)}`;
+    const uid = blockId || block['@uid'] || `snav-${Math.random().toString(36).slice(2, 8)}`;
 
-    let html = `<nav aria-label="${escapeHtml(ariaLabel)}" class="section-nav section-nav-${placement}">`;
+    let html = `<nav data-block-uid="${escapeAttr(uid)}" aria-label="${escapeHtml(ariaLabel)}" class="section-nav section-nav-${placement}">`;
     html += `<button class="section-nav-toggle" aria-expanded="true" aria-controls="${uid}-list" type="button">Menu</button>`;
     html += `<ul role="list" id="${uid}-list" class="section-nav-list">`;
     for (const childId of items) {
@@ -1257,9 +1271,10 @@ async function renderSectionNavBlock(block) {
  * Both produce the same HTML — a labelled link with active/in-path/level
  * classes derived at render time from item href vs current location.
  */
-function renderNavItemBlock(block) {
+function renderNavItemBlock(block, blockId) {
     const label = block.label || block.title || '';
     const level = Math.max(1, Math.min(3, block.level || 1));
+    const uid = blockId || block['@uid'] || '';
     // Manual: href is object_browser array [{ '@id', ... }]
     // Listing-synth: href is the @id string (after fieldMapping) OR
     // we can fall back to block['@id'] which the listing always sets.
@@ -1281,7 +1296,8 @@ function renderNavItemBlock(block) {
     ].filter(Boolean).join(' ');
     const ariaCurrent = active ? ' aria-current="page"' : '';
 
-    return `<a href="${escapeAttr(itemPath)}" class="${classes}"${ariaCurrent}>` +
+    const uidAttr = uid ? ` data-block-uid="${escapeAttr(uid)}"` : '';
+    return `<a href="${escapeAttr(itemPath)}"${uidAttr} class="${classes}"${ariaCurrent}>` +
         `<span data-edit-text="label">${escapeHtml(label)}</span>` +
         `</a>`;
 }

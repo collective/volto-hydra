@@ -12329,6 +12329,14 @@ export function buildQuerystringSearchBody(queryConfig, paging = {}, extraCriter
     metadata_fields: '_all',
   };
 
+  // Add depth if specified — Plone catalog supports a top-level depth
+  // field that limits results to N levels under each path criterion.
+  // Used by sectionNav's listing config so a path+depth combo returns
+  // only the right tree slice.
+  if (queryConfig?.depth !== undefined) {
+    body.depth = queryConfig.depth;
+  }
+
   // Add limit if specified (0 or undefined means no limit)
   if (queryConfig?.limit && queryConfig.limit > 0) {
     body.limit = queryConfig.limit;
