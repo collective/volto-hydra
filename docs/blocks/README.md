@@ -26,6 +26,7 @@ These blocks demonstrate common patterns. Register them via `initBridge({ blocks
 | [Accordion](./accordion.md) | Container block with header + content areas |
 | [Slider](./slider.md) | Array of items (`object_list` widget) |
 | [Form](./form.md) | Typed `object_list` with field type sub-blocks |
+| [Section Navigation](./sectionNav.md) | Sidebar / top nav for grouped pages — manual links + auto path-driven listing |
 
 ## Page Structure
 
