@@ -449,6 +449,78 @@ const applyConfig = (config) => {
     }),
   };
 
+  // Section-navigation block: a left-sidebar / mobile-disclosure nav for
+  // grouped pages. Children are navItem (hand-added) and/or listing
+  // (auto-populated via path/depth query). Active state and visual indent
+  // are derived at render time from item @id paths vs window.location.
+  config.blocks.blocksConfig.sectionNav = {
+    ...config.blocks.blocksConfig.sectionNav,
+    id: 'sectionNav',
+    title: 'Section Navigation',
+    icon: config.blocks.blocksConfig.slate?.icon,
+    group: 'common',
+    blockSchema: () => ({
+      title: 'Section Navigation',
+      fieldsets: [
+        { id: 'default', title: 'Default', fields: ['ariaLabel', 'placement', 'items'] },
+      ],
+      properties: {
+        ariaLabel: {
+          title: 'Aria label',
+          type: 'string',
+          default: 'Section navigation',
+        },
+        placement: {
+          title: 'Placement',
+          widget: 'select',
+          choices: [
+            ['sidebar', 'Sidebar (top on mobile)'],
+            ['top', 'Top of content'],
+          ],
+          default: 'sidebar',
+        },
+        items: {
+          title: 'Items',
+          widget: 'blocks_layout',
+          allowedBlocks: ['navItem', 'listing'],
+        },
+      },
+      required: [],
+    }),
+  };
+
+  // Restricted child of sectionNav.items: a single labelled link with an
+  // optional indent level. `restricted: true` keeps it off the page-level
+  // block chooser — only reachable as a child of sectionNav.
+  config.blocks.blocksConfig.navItem = {
+    ...config.blocks.blocksConfig.navItem,
+    id: 'navItem',
+    title: 'Nav link',
+    icon: config.blocks.blocksConfig.slate?.icon,
+    group: 'common',
+    restricted: true,
+    blockSchema: () => ({
+      title: 'Nav link',
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['label', 'href', 'level'] }],
+      properties: {
+        label: { title: 'Label', type: 'string' },
+        href: {
+          title: 'Link',
+          widget: 'object_browser',
+          mode: 'link',
+          allowExternals: true,
+        },
+        level: {
+          title: 'Indent level',
+          type: 'integer',
+          default: 1,
+          choices: [[1, '1'], [2, '2'], [3, '3']],
+        },
+      },
+      required: ['label'],
+    }),
+  };
+
   // Default result item for listings (simple title + description)
   // Matches Volto's DefaultResultItem variation
   config.blocks.blocksConfig.default = {
