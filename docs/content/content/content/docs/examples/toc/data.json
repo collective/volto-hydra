@@ -416,7 +416,7 @@
   ],
   "description": "The table of contents block automatically generates a table of contents with links to the corresponding positions on the page from the headings used.",
   "effective": "2023-07-06T18:35:00",
-  "exclude_from_nav": false,
+  "exclude_from_nav": true,
   "expires": null,
   "exportimport.constrains": {},
   "exportimport.conversation": [],

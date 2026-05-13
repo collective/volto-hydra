@@ -291,7 +291,7 @@
   ],
   "description": "The maps block can have embeded a Map (Google Maps, OpenMaps, etc).",
   "effective": "2023-09-22T16:09:00",
-  "exclude_from_nav": false,
+  "exclude_from_nav": true,
   "expires": null,
   "exportimport.constrains": {},
   "exportimport.conversation": [],

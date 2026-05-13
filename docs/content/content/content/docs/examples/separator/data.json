@@ -311,7 +311,7 @@
   ],
   "description": "\nThe separator block allows blocks or groups of blocks to be visually separated by a horizontal line.",
   "effective": "2023-07-06T18:35:00",
-  "exclude_from_nav": false,
+  "exclude_from_nav": true,
   "expires": null,
   "exportimport.constrains": {},
   "exportimport.conversation": [],

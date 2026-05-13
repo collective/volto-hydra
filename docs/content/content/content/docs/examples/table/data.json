@@ -5241,7 +5241,7 @@
   ],
   "description": "The Table block allows you to add a table to a page.",
   "effective": "2023-07-06T18:35:00",
-  "exclude_from_nav": false,
+  "exclude_from_nav": true,
   "expires": null,
   "exportimport.constrains": {},
   "exportimport.conversation": [],

@@ -77,7 +77,7 @@
   ],
   "description": "A carousel/slider that cycles through slides. Slides are stored as an object_list — each slide has a title, description, image, and optional button.",
   "effective": null,
-  "exclude_from_nav": false,
+  "exclude_from_nav": true,
   "expires": null,
   "exportimport.constrains": {},
   "exportimport.conversation": [],

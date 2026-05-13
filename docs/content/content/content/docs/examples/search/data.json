@@ -187,7 +187,7 @@
   ],
   "description": "The search block allows the content of the website to be listed. Users can use so-called facets to select certain properties of the listed content in order to filter them (e.g. filtering the news of 2022).",
   "effective": "2023-07-06T18:35:00",
-  "exclude_from_nav": false,
+  "exclude_from_nav": true,
   "expires": null,
   "exportimport.constrains": {},
   "exportimport.conversation": [],

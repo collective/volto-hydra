@@ -141,7 +141,7 @@
   ],
   "description": "A form block can be used to create forms",
   "effective": "2024-03-08T12:40:00",
-  "exclude_from_nav": false,
+  "exclude_from_nav": true,
   "expires": null,
   "exportimport.constrains": {},
   "exportimport.conversation": [],

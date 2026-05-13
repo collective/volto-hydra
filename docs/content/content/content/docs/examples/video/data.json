@@ -285,7 +285,7 @@
   ],
   "description": "\nThe video block can contain videos from YouTube.",
   "effective": "2023-07-06T18:35:00",
-  "exclude_from_nav": false,
+  "exclude_from_nav": true,
   "expires": null,
   "exportimport.constrains": {},
   "exportimport.conversation": [],

@@ -77,7 +77,7 @@
   ],
   "description": "A responsive grid layout container. Each cell is a child block (teaser, slate, image, etc.) rendered inside the grid. This is the built-in Volto grid block (gridBlock).",
   "effective": null,
-  "exclude_from_nav": false,
+  "exclude_from_nav": true,
   "expires": null,
   "exportimport.constrains": {},
   "exportimport.conversation": [],

@@ -101,7 +101,10 @@ function buildExampleShell(slug, mdContent) {
     creators: ['admin'],
     description,
     effective: null,
-    exclude_from_nav: false,
+    // Block-reference pages are accessed via the listing block on the
+    // /docs/examples landing page, not the global Plone nav portlet.
+    // Excluding them from nav keeps the top-level docs nav uncluttered.
+    exclude_from_nav: true,
     expires: null,
     'exportimport.constrains': {},
     'exportimport.conversation': [],
@@ -147,6 +150,29 @@ for (const mdFile of mdFiles) {
   if (!existsSync(folderPath)) mkdirSync(folderPath, { recursive: true });
   writeFileSync(jsonPath, JSON.stringify(buildExampleShell(slug, mdContent), null, 2) + '\n', 'utf-8');
   console.log(`Created docs/examples/${slug}/data.json shell`);
+}
+
+// Backfill exclude_from_nav: true on every example page. Existing shells
+// were created with `false`; the policy decision (examples reachable via
+// the /docs/examples listing block, not the global nav) is set in
+// buildExampleShell going forward — this loop catches existing pages.
+for (const mdFile of mdFiles) {
+  const slug = mdFile.replace(/\.md$/, '');
+  const jsonPath = join(mdFileToContentDir(mdFile), 'data.json');
+  if (!existsSync(jsonPath)) continue;
+  const original = readFileSync(jsonPath, 'utf-8');
+  const data = JSON.parse(original);
+  if (data.exclude_from_nav === true) continue;
+  data.exclude_from_nav = true;
+  const updated = JSON.stringify(data, null, 2) + '\n';
+  if (updated === original) continue;
+  if (checkMode) {
+    outOfSync = true;
+    console.error(`OUT OF SYNC: ${jsonPath} (exclude_from_nav)`);
+  } else {
+    writeFileSync(jsonPath, updated, 'utf-8');
+    console.log(`Updated exclude_from_nav=true: docs/examples/${slug}/data.json`);
+  }
 }
 
 // Regenerate the docs/examples/README.md tables (Built-in / Custom) and the
