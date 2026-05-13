@@ -150,6 +150,41 @@
     </div>
   </div>
 
+  <!-- Section navigation container. Renders <nav><ul> with manual navItem
+       children + optional listing children. CSS in main.css picks placement
+       (sidebar/top) and the mobile disclosure behaviour. -->
+  <nav v-else-if="block['@type'] == 'sectionNav'"
+       :data-block-uid="block_uid"
+       :aria-label="block.ariaLabel || 'Section navigation'"
+       :class="['section-nav', `section-nav-${block.placement || 'sidebar'}`]">
+    <button type="button"
+            class="section-nav-toggle"
+            :aria-expanded="sectionNavOpen[block_uid] !== false ? 'true' : 'false'"
+            :aria-controls="`${block_uid}-list`"
+            @click="sectionNavOpen[block_uid] = !(sectionNavOpen[block_uid] !== false)">
+      Menu
+    </button>
+    <ul role="list" :id="`${block_uid}-list`" class="section-nav-list">
+      <li v-for="childId in (block.items?.items || [])" :key="childId">
+        <Block :block_uid="childId"
+               :block="block.blocks?.[childId]"
+               :data="data"
+               :contained="true" />
+      </li>
+    </ul>
+  </nav>
+
+  <!-- Restricted child of sectionNav.items: a labelled link. Active
+       state computed from current route; CSS picks up .current /
+       .in-path / .level-N. -->
+  <a v-else-if="block['@type'] == 'navItem'"
+     :href="navItemPath(block)"
+     :data-block-uid="block_uid"
+     :class="navItemClasses(block)"
+     :aria-current="navItemIsActive(block) ? 'page' : null">
+    <span data-edit-text="label">{{ block.label }}</span>
+  </a>
+
   <div v-else-if="block['@type'] == 'teaser'"
     class="teaser-block max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
     :data-block-uid="block._blockUid || block_uid"
@@ -977,6 +1012,43 @@ const gridPageFromUrl = computed(() => {
   return pages[block_uid.value] || 0;
 });
 const gridPaging = reactive({ start: 0, size: GRID_PAGE_SIZE });
+
+// sectionNav: per-block disclosure state (mobile). Keyed by block uid so
+// nested or multiple navs on the same page don't share toggle state.
+// `undefined` and `true` both mean expanded; `false` means collapsed.
+const sectionNavOpen = reactive({});
+
+// navItem helpers — keep them inline (small enough that a separate
+// composable isn't worth the indirection). Resolve href to a path,
+// match against the current route, and emit class string.
+function navItemPath(navBlock) {
+  const raw = Array.isArray(navBlock.href) ? navBlock.href[0]?.['@id'] : navBlock.href;
+  if (!raw) return '#';
+  try {
+    return new URL(raw, 'http://placeholder').pathname;
+  } catch {
+    return raw;
+  }
+}
+function navItemIsActive(navBlock) {
+  const itemPath = navItemPath(navBlock);
+  if (itemPath === '#') return false;
+  const here = route.path.replace(/\/$/, '');
+  return here === itemPath.replace(/\/$/, '');
+}
+function navItemClasses(navBlock) {
+  const level = Math.max(1, Math.min(3, navBlock.level || 1));
+  const itemPath = navItemPath(navBlock).replace(/\/$/, '');
+  const here = route.path.replace(/\/$/, '');
+  const active = here === itemPath && itemPath !== '#';
+  const inPath = !active && itemPath !== '#' && here.startsWith(itemPath + '/');
+  return [
+    'nav-item',
+    `level-${level}`,
+    active ? 'current' : '',
+    inPath ? 'in-path' : '',
+  ].filter(Boolean);
+}
 const gridBuildPagingUrl = (page) => {
   if (page === 0) return effectiveContextPath.value;
   return `${effectiveContextPath.value}/@pg_${block_uid.value}_${page}`;

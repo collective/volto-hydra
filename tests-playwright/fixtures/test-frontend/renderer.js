@@ -223,6 +223,13 @@ async function renderBlock(blockId, block) {
         case 'section':
             wrapper.innerHTML = await renderSectionBlock(block);
             break;
+        case 'sectionNav':
+            wrapper.classList.add('section-nav-wrapper');
+            wrapper.innerHTML = await renderSectionNavBlock(block);
+            break;
+        case 'navItem':
+            wrapper.innerHTML = renderNavItemBlock(block);
+            break;
         case 'gridBlock':
             wrapper.innerHTML = await renderGridBlock(block, blockId);
             break;
@@ -1196,6 +1203,78 @@ async function renderSectionBlock(block) {
     }
     html += '</div>';
     return html;
+}
+
+/**
+ * Render a sectionNav block. Wraps its `items` children in <nav><ul>
+ * with a mobile disclosure <button>. Children (navItem + listing) render
+ * themselves; the wrapping <ul> provides the list semantics. Active /
+ * in-path classes are computed inside renderNavItemBlock from each link's
+ * href vs window.location.pathname.
+ */
+async function renderSectionNavBlock(block) {
+    const ariaLabel = block.ariaLabel || 'Section navigation';
+    const placement = block.placement || 'sidebar';
+    const blocks = block.blocks || {};
+    const items = block.items?.items || [];
+    const uid = block['@uid'] || `snav-${Math.random().toString(36).slice(2, 8)}`;
+
+    let html = `<nav aria-label="${escapeHtml(ariaLabel)}" class="section-nav section-nav-${placement}">`;
+    html += `<button class="section-nav-toggle" aria-expanded="true" aria-controls="${uid}-list" type="button">Menu</button>`;
+    html += `<ul role="list" id="${uid}-list" class="section-nav-list">`;
+    for (const childId of items) {
+        const child = blocks[childId];
+        if (!child) continue;
+        const rendered = await renderBlock(childId, child);
+        if (!rendered) continue;
+        // Wrap each child in <li>. renderBlock returns a div with
+        // data-block-uid already set — preserve it inside the <li>.
+        if (rendered instanceof DocumentFragment) {
+            const container = document.createElement('div');
+            container.appendChild(rendered);
+            html += `<li>${container.innerHTML}</li>`;
+        } else {
+            html += `<li>${rendered.outerHTML}</li>`;
+        }
+    }
+    html += '</ul></nav>';
+    return html;
+}
+
+/**
+ * Render a single navItem (a labelled link with optional indent level).
+ * Computes active state from window.location.pathname; CSS picks up
+ * .current / .in-path / .level-N to style the row.
+ */
+function renderNavItemBlock(block) {
+    const label = block.label || '';
+    const level = Math.max(1, Math.min(3, block.level || 1));
+    const hrefRaw = Array.isArray(block.href) ? block.href[0]?.['@id'] : block.href;
+    const itemPath = hrefRaw ? new URL(hrefRaw, window.location.origin).pathname : '#';
+    const currentPath = window.location.pathname.replace(/\/edit$/, '');
+    const active = itemPath === currentPath;
+    const inPath = !active && itemPath !== '#'
+        && currentPath.startsWith(itemPath.replace(/\/$/, '') + '/');
+
+    const classes = [
+        'nav-item',
+        `level-${level}`,
+        active ? 'current' : '',
+        inPath ? 'in-path' : '',
+    ].filter(Boolean).join(' ');
+    const ariaCurrent = active ? ' aria-current="page"' : '';
+
+    return `<a href="${escapeAttr(itemPath)}" class="${classes}"${ariaCurrent}>` +
+        `<span data-edit-text="label">${escapeHtml(label)}</span>` +
+        `</a>`;
+}
+
+// Minimal HTML escapers — renderer.js doesn't ship a helper module.
+function escapeHtml(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function escapeAttr(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 }
 
 /**
