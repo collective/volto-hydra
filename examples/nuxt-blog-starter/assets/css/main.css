@@ -84,3 +84,62 @@ h2, h3, h4, h5, .image-align-center, .image-align-wide, .image-align-full { clea
 
 /* Slate paragraph spacing */
 .slate-block p + p { margin-top: 1em; }
+
+/* sectionNav — vertical nav with mobile disclosure. Class names match
+   the test-frontend's CSS so cross-renderer tests share selectors. */
+.section-nav { margin: 0 0 1.5rem 0; }
+.section-nav-list { list-style: none; padding: 0; margin: 0; }
+.section-nav-list li { margin: 0; padding: 0; }
+
+.nav-item {
+    display: block;
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    color: inherit;
+    text-decoration: none;
+}
+.nav-item:hover { background: #eef; }
+.nav-item.level-1 { padding-left: 0.6rem; }
+.nav-item.level-2 { padding-left: 1.6rem; }
+.nav-item.level-3 { padding-left: 2.6rem; }
+.nav-item.current,
+.nav-item[aria-current="page"] {
+    font-weight: 600;
+    background: #def;
+}
+.nav-item.in-path { color: #036; }
+
+/* Sidebar variant: floats left on desktop, disclosure on mobile. */
+@media (min-width: 768px) {
+    .section-nav-sidebar {
+        float: left;
+        width: 240px;
+        margin-right: 1.5rem;
+    }
+    .section-nav-sidebar .section-nav-toggle { display: none; }
+}
+@media (max-width: 767px) {
+    .section-nav-sidebar .section-nav-toggle {
+        display: block;
+        background: #f3f4f6;
+        border: 1px solid #d1d5db;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-bottom: 0.5rem;
+        width: 100%;
+        text-align: left;
+    }
+    .section-nav-sidebar .section-nav-toggle[aria-expanded="false"] + .section-nav-list {
+        display: none;
+    }
+}
+
+/* Top variant: always inline, never collapses. */
+.section-nav-top .section-nav-toggle { display: none; }
+.section-nav-top .section-nav-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+}
+.section-nav-top .nav-item { padding: 0.25rem 0.5rem; }

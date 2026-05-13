@@ -44,6 +44,78 @@
         nav a:hover {
             text-decoration: underline;
         }
+
+        /* sectionNav styling — same class names used by Nuxt block.vue
+           so cross-renderer tests can assert against the same selectors.
+           Production frontends override; this is the reference. */
+        .section-nav {
+            background: transparent;
+            padding: 0;
+            margin: 0 0 1rem 0;
+        }
+        .section-nav-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .section-nav-list li {
+            margin: 0;
+            padding: 0;
+            border: none;          /* override generic [data-block-uid] border */
+            background: transparent;
+            cursor: default;
+        }
+        .nav-item {
+            display: block;
+            padding: 0.35rem 0.5rem;
+            margin: 0;
+            text-decoration: none;
+            color: inherit;
+            border: none;
+        }
+        .nav-item:hover { background: #eef; }
+        .nav-item.level-1 { padding-left: 0.5rem; }
+        .nav-item.level-2 { padding-left: 1.5rem; }
+        .nav-item.level-3 { padding-left: 2.5rem; }
+        .nav-item.current,
+        .nav-item[aria-current="page"] {
+            font-weight: 600;
+            background: #def;
+        }
+        .nav-item.in-path { color: #036; }
+
+        /* Sidebar variant: float left on desktop, full-width disclosure on mobile */
+        @media (min-width: 768px) {
+            .section-nav-sidebar {
+                float: left;
+                width: 220px;
+                margin-right: 1.5rem;
+            }
+            .section-nav-toggle { display: none; }
+        }
+        @media (max-width: 767px) {
+            .section-nav-toggle {
+                display: block;
+                background: #f0f0f0;
+                border: 1px solid #ddd;
+                padding: 0.5rem 1rem;
+                cursor: pointer;
+                margin-bottom: 0.5rem;
+            }
+            .section-nav-sidebar .section-nav-toggle[aria-expanded="false"] + .section-nav-list {
+                display: none;
+            }
+        }
+
+        /* Top variant: full-width inline, never collapses */
+        .section-nav-top { display: block; }
+        .section-nav-top .section-nav-toggle { display: none; }
+        .section-nav-top .section-nav-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem 1rem;
+        }
+        .section-nav-top .nav-item { padding: 0.25rem 0.5rem; }
     </style>
 </head>
 <body>
