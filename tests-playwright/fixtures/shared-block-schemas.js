@@ -150,6 +150,29 @@ export const sharedBlocksConfig = {
             required: [],
         },
     },
+    // Generic section container — accepts any block type. Used by the
+    // container UX feature tests (wrap, unwrap, edge-drag, convert) and
+    // as a reference shape for consumers who want a "section" block.
+    // No allowedBlocks/defaultBlockType: getAllContainerFields cascades
+    // both from the page (allowedBlocks → page's allowed list,
+    // defaultBlockType → config.settings.defaultBlockType), so a fresh
+    // empty section auto-fills with a typeable child of the page's
+    // default type and "Enter on a section" lands the cursor inside.
+    section: {
+        id: 'section',
+        title: 'Section',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [
+                { id: 'default', title: 'Default', fields: [] },
+            ],
+            properties: {
+                blocks_layout: { widget: 'blocks_layout' },
+            },
+            required: [],
+        },
+    },
     // Section navigation container: renders a list of links as a sidebar
     // (desktop) / disclosure (mobile). Children are navItem blocks (hand-
     // added) and/or listing blocks (auto-populated via path/depth query).
