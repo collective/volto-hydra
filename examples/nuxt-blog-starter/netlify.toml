@@ -1,14 +1,15 @@
 [build]
-  # Netlify's GitHub integration auto-triggers a build on every push and
-  # PR. We don't want that — production deploys happen via the project's
-  # `deploy-all.sh` script (which calls `netlify deploy --prod
-  # --dir=.output/public` with a pre-built directory). Any Netlify-side
-  # rebuild would race with `deploy-all.sh` and burn CI on every PR.
-  #
-  # `netlify deploy --prod --dir=...` from the CLI uploads the pre-built
-  # tree directly and ignores this command, so the deploy script keeps
-  # working unchanged.
-  command = "mkdir -p .output/public && echo 'Netlify auto-build disabled — production deploys go via deploy-all.sh' > .output/public/index.html"
+  # `ignore` is checked before every Netlify-triggered build (push, PR).
+  # Exit 0 → Netlify skips the build entirely, no new deploy created,
+  # the previously published deploy stays as production. This is the
+  # Netlify-native way to say "I'll handle deploys myself" — we ship
+  # production via deploy-all.sh's `netlify deploy --prod --dir=…`,
+  # which uploads a pre-built directory directly and is unaffected
+  # by `ignore`.
+  ignore = "/bin/true"
+  # Left in place so a manual `netlify build` still works if anyone
+  # ever needs it.
+  command = "bash scripts/netlify-build.sh"
   publish = ".output/public"
 
 [[headers]]
