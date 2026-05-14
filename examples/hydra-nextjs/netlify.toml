@@ -1,5 +1,11 @@
 [build]
-  command = "pnpm run build"
+  # See nuxt-blog-starter/netlify.toml for the rationale. Production
+  # deploys go through `deploy-all.sh` (which runs `pnpm run build`,
+  # `netlify build --offline`, then `netlify deploy --prod --no-build
+  # --dir .netlify/static --functions .netlify/functions-internal`) —
+  # this no-op disables the auto-rebuild Netlify would otherwise run
+  # on every push and PR.
+  command = "mkdir -p .next && echo 'Netlify auto-build disabled — production deploys go via deploy-all.sh' > .next/index.html"
   publish = ".next"
 
 [[headers]]
