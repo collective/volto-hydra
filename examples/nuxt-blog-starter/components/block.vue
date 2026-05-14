@@ -182,7 +182,8 @@
      :href="navItemPath(block)"
      :data-block-uid="block_uid"
      :class="navItemClasses(block)"
-     :aria-current="navItemIsActive(block) ? 'page' : null">
+     :aria-current="navItemIsActive(block) ? 'page' : null"
+     data-linkable-allow>
     <span data-edit-text="label">{{ block.label || block.title }}</span>
   </a>
 

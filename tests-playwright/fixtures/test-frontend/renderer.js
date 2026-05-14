@@ -1297,7 +1297,11 @@ function renderNavItemBlock(block, blockId) {
     const ariaCurrent = active ? ' aria-current="page"' : '';
 
     const uidAttr = uid ? ` data-block-uid="${escapeAttr(uid)}"` : '';
-    return `<a href="${escapeAttr(itemPath)}"${uidAttr} class="${classes}"${ariaCurrent}>` +
+    // data-linkable-allow: this <a> is a navigation link, not an editable
+    // href field — clicking should navigate (in edit mode too). The href
+    // itself is edited via the sidebar's object_browser widget on the
+    // navItem block, not inline.
+    return `<a href="${escapeAttr(itemPath)}"${uidAttr} class="${classes}"${ariaCurrent} data-linkable-allow>` +
         `<span data-edit-text="label">${escapeHtml(label)}</span>` +
         `</a>`;
 }
