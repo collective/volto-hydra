@@ -274,9 +274,11 @@ onMounted(() => {
                         properties: {
                             blocks_layout: {
                                 title: 'Blocks',
-                                allowedBlocks: [...new Set(['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', 'summary', 'default', 'section', ...pageLevelBlocks])],
+                                allowedBlocks: [...new Set(['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', 'summary', 'default', 'section', 'contextNavigation', ...pageLevelBlocks])],
                                 allowedTemplates: ['/_test_data/templates/test-layout'],
-                                allowedLayouts: CONTENT_TYPE_LAYOUTS[pageType] || [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
+                                allowedLayouts: CONTENT_TYPE_LAYOUTS[pageType]
+                                    || contextNavLayoutForced.value
+                                    || [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
                             },
                             footer_blocks: {
                                 title: 'Footer',
@@ -319,6 +321,16 @@ const footerAllowedLayouts = computed(() => {
     return ['/templates/site-footer'];
 });
 
+// Force context-navigation-layout on every 2nd-level page (and deeper).
+// Same rule used by both edit-mode initBridge schema (below) and SSR
+// view-mode expandTemplatesSync via mainBlocksAllowedLayouts. Mirrors the
+// footer's path-based force; just keyed on URL depth.
+const contextNavLayoutForced = computed(() =>
+    route.path.split('/').filter(Boolean).length >= 2
+        ? ['/_test_data/templates/context-navigation-layout']
+        : null,
+);
+
 // Main blocks allowedLayouts for expandTemplatesSync (view mode / SSR)
 // Content-type pages use null — their blocks_layout already contains the right blocks.
 // The CONTENT_TYPE_LAYOUTS templates are enforced in edit mode via initBridge only.
@@ -327,6 +339,7 @@ const mainBlocksAllowedLayouts = computed(() => {
     if (CONTENT_TYPE_LAYOUTS[pageType]) {
         return null;  // Use page's own blocks_layout directly
     }
+    if (contextNavLayoutForced.value) return contextNavLayoutForced.value;
     return [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'];
 });
 
@@ -334,6 +347,7 @@ const mainBlocksAllowedLayouts = computed(() => {
 const preloadTemplates = [
     '/templates/site-footer',
     ...(footerAllowedLayouts.value || []).filter(Boolean),
+    ...(contextNavLayoutForced.value || []).filter(Boolean),
     // Content-type forced layouts (not referenced in page data but applied by expandTemplatesSync)
     ...Object.values(CONTENT_TYPE_LAYOUTS).flat(),
 ];

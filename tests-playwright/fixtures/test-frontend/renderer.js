@@ -1232,6 +1232,7 @@ async function renderContextNavigationBlock(block, blockId) {
     const items = block.items.items;
     const uid = blockId;
 
+
     // First pass: walk children and collect a flat list of {block, blockId}
     // entries. listing children are expanded inline so all their items
     // join the same flat list. b_size is large so nav listings never
@@ -1258,23 +1259,71 @@ async function renderContextNavigationBlock(block, blockId) {
     }
 
     // Second pass: compute level = depth(href) - minDepth + 1, clamped to 1..3.
-    const pathDepth = (entry) =>
+    const pathSegsOf = (entry) =>
         new URL(entry.block.href[0]['@id'], window.location.origin)
-            .pathname.split('/').filter(Boolean).length;
-    const depths = flat.map(pathDepth);
+            .pathname.split('/').filter(Boolean);
+    const allSegs = flat.map(pathSegsOf);
+    const depths = allSegs.map((s) => s.length);
     const minDepth = Math.min(...depths);
     flat.forEach((entry, i) => {
         entry.block._level = Math.max(1, Math.min(3, depths[i] - minDepth + 1));
     });
 
+    // Third pass: optional smart-expansion filter — drop entries that are
+    // descendants of unrelated siblings (typical docs sidebar UX). An
+    // entry survives if it sits on the ancestor chain of the current page,
+    // is a sibling along that chain, or is a descendant of the current
+    // page. `expandCurrentOnly` defaults true (schema default).
+    const expandCurrentOnly = block.expandCurrentOnly !== false;
+    const visible = expandCurrentOnly
+        ? filterByCurrentPath(flat, allSegs, minDepth)
+        : flat;
+
     let html = `<nav data-block-uid="${escapeAttr(uid)}" aria-label="${escapeHtml(ariaLabel)}" class="context-navigation">`;
     html += `<button class="context-navigation-toggle" aria-expanded="true" aria-controls="${uid}-list" type="button">Menu</button>`;
     html += `<ul role="list" id="${uid}-list" class="context-navigation-list">`;
-    for (const entry of flat) {
+    for (const entry of visible) {
         html += `<li>${renderNavItemBlock(entry.block, entry.blockId)}</li>`;
     }
     html += '</ul></nav>';
     return html;
+}
+
+/**
+ * Smart-expansion filter for contextNavigation entries. Keeps:
+ *   - any entry whose path is on the ancestor chain of the current page
+ *   - any entry that's a sibling at some ancestor level (parent on chain)
+ *   - any entry that's a descendant of the current page
+ * Drops descendants of unrelated siblings.
+ *
+ * Comparison starts at `minDepth - 1` — the segment index where the
+ * shallowest sibling sits — so the "section root" inferred from the
+ * listing's path filter is treated as the shared common prefix.
+ */
+function filterByCurrentPath(flat, allSegs, minDepth) {
+    const currSegs = window.location.pathname
+        .replace(/\/edit$/, '')
+        .split('/').filter(Boolean);
+    const startIdx = minDepth - 1;
+
+    return flat.filter((_entry, idx) => {
+        const itemSegs = allSegs[idx];
+        const lastItemIdx = itemSegs.length - 1;
+        for (let i = startIdx; i < itemSegs.length; i++) {
+            if (i >= currSegs.length) {
+                // Item is deeper than current; previous segments matched,
+                // so the item is a descendant of the current page.
+                return true;
+            }
+            if (itemSegs[i] !== currSegs[i]) {
+                // Divergence — survive only if it's the last segment
+                // (sibling at an ancestor level).
+                return i === lastItemIdx;
+            }
+        }
+        // All matched up to item's length: item is current or an ancestor.
+        return true;
+    });
 }
 
 /**

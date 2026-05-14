@@ -291,6 +291,16 @@
                     }
                 }
 
+                // Force context-navigation-layout on every 2nd-level page
+                // (and deeper). The rule lives in one place; both the
+                // view-mode expand below and the edit-mode bridge schema
+                // read this same value. Same idea as the footer's
+                // forceFooterLayout flag, just keyed off URL depth.
+                const contextNavLayoutForced =
+                    contentPath.split('/').filter(Boolean).length >= 2
+                        ? ['/_test_data/templates/context-navigation-layout']
+                        : null;
+
                 // Check if hydra bridge should be loaded
                 // - window.name starts with "hydra-edit:" or "hydra-view:" (persists across navigation in admin iframe)
                 // - OR _edit param exists (true for edit mode, false for view mode)
@@ -338,17 +348,6 @@
                     return res.json();
                 };
 
-                // Force context-navigation layout on 3rd-level pages (and any descendant).
-                // The pattern mirrors footer-layout (line ~228): a single-entry
-                // allowedLayouts list forces that template at expand time.
-                // Real docs would key off URL depth (`pagePath.split('/').filter(Boolean).length >= 3`);
-                // for fixtures we match the dedicated context-navigation-forced-folder subtree.
-                const forceContextNavOnPath = (p) =>
-                    p.startsWith('/_test_data/context-navigation-forced-folder/');
-                const mainAllowedLayouts = forceContextNavOnPath(contentPath)
-                    ? ['/_test_data/templates/context-navigation-layout']
-                    : undefined;
-
                 // Expand templates in main blocks field
                 const templateState = {};
                 const expandedItems = await expandTemplates(
@@ -357,7 +356,7 @@
                         blocks: content.blocks || {},
                         templateState,
                         loadTemplate,
-                        ...(mainAllowedLayouts ? { allowedLayouts: mainAllowedLayouts } : {}),
+                        ...(contextNavLayoutForced ? { allowedLayouts: contextNavLayoutForced } : {}),
                     }
                 );
                 // Merge expanded blocks back (preserve blocks from other fields like footer_blocks)
@@ -407,7 +406,6 @@
                     // Determine if we should force footer layout based on page path
                     const pagePath = window.location.pathname.replace(/\/edit$/, '');
                     const forceFooterLayout = pagePath === '/_test_data/another-page';
-                    const forceContextNavLayout = pagePath.startsWith('/_test_data/context-navigation-forced-folder/');
 
                     // Listen for changes from the admin UI and update blocks
                     // Return promise from async render so hydra.js can wait for DOM updates
@@ -421,9 +419,8 @@
                                         title: 'Blocks',
                                         allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest', 'title', 'description', 'section', 'contextNavigation'],
                                         allowedTemplates: ['/_test_data/templates/test-layout'],
-                                        allowedLayouts: forceContextNavLayout
-                                            ? ['/_test_data/templates/context-navigation-layout']
-                                            : [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
+                                        allowedLayouts: contextNavLayoutForced
+                                            || [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
                                     },
                                     footer_blocks: {
                                         title: 'Footer',

@@ -35,7 +35,9 @@
 //
 // Wrapped in <Suspense> from block.vue because the listing expansion is
 // async (fetches via the Plone REST API).
-import { ref, useRoute } from '#imports';
+// `ref` from vue; `useRoute` is a Nuxt auto-import composable so no explicit
+// import is needed for it (same pattern as ListingBlock.vue).
+import { ref } from 'vue';
 import { expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';
 
 const props = defineProps({
@@ -79,19 +81,37 @@ async function expandChildren() {
   const here = route.path.replace(/\/$/, '');
   const pathOf = (entry) =>
     new URL(entry.block.href[0]['@id'], 'http://placeholder').pathname;
-  const depthOf = (p) => p.split('/').filter(Boolean).length;
+  const segsOf = (p) => p.split('/').filter(Boolean);
 
   const paths = flat.map(pathOf);
-  const depths = paths.map(depthOf);
+  const segs = paths.map(segsOf);
+  const depths = segs.map((s) => s.length);
   const minDepth = Math.min(...depths);
 
-  return flat.map((entry, i) => {
+  // Smart-expansion filter (default true): drop entries that are
+  // descendants of unrelated siblings — typical docs sidebar UX.
+  // Mirrors filterByCurrentPath in renderer.js.
+  const expandCurrentOnly = props.block.expandCurrentOnly !== false;
+  const currSegs = here.split('/').filter(Boolean);
+  const startIdx = minDepth - 1;
+  const passes = (itemSegs) => {
+    if (!expandCurrentOnly) return true;
+    const lastItemIdx = itemSegs.length - 1;
+    for (let i = startIdx; i < itemSegs.length; i++) {
+      if (i >= currSegs.length) return true; // descendant of current
+      if (itemSegs[i] !== currSegs[i]) return i === lastItemIdx; // sibling at ancestor level
+    }
+    return true; // ancestor of current (or current)
+  };
+
+  return flat.flatMap((entry, i) => {
+    if (!passes(segs[i])) return [];
     const itemPath = paths[i];
     const stripped = itemPath.replace(/\/$/, '');
     const active = stripped === here;
     const inPath = !active && here.startsWith(stripped + '/');
     const level = Math.max(1, Math.min(3, depths[i] - minDepth + 1));
-    return {
+    return [{
       block: entry.block,
       blockId: entry.blockId,
       itemPath,
@@ -102,7 +122,7 @@ async function expandChildren() {
         active ? 'current' : '',
         inPath ? 'in-path' : '',
       ].filter(Boolean),
-    };
+    }];
   });
 }
 

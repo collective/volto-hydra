@@ -189,7 +189,7 @@ export const sharedBlocksConfig = {
                 {
                     id: 'default',
                     title: 'Default',
-                    fields: ['ariaLabel', 'items'],
+                    fields: ['ariaLabel', 'expandCurrentOnly', 'items'],
                 },
             ],
             properties: {
@@ -197,6 +197,15 @@ export const sharedBlocksConfig = {
                     title: 'Aria label',
                     type: 'string',
                     default: 'Section navigation',
+                },
+                expandCurrentOnly: {
+                    // Smart-expansion: when true, only show items whose
+                    // URL is on the path to (or within) the current page.
+                    // Descendants of unrelated siblings are hidden. Matches
+                    // the typical docs sidebar UX (Sphinx, Docusaurus, etc.).
+                    title: 'Expand current section only',
+                    type: 'boolean',
+                    default: true,
                 },
                 items: {
                     title: 'Items',

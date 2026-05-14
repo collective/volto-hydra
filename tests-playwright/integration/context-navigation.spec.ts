@@ -118,22 +118,7 @@ test.describe('contextNavigation block', () => {
     await expect(iframe.getByText('Body of page A.')).toBeVisible();
   });
 
-  test('context-navigation-layout NOT forced on top-level page in same subtree', async ({ page }) => {
-    // The parent folder itself (depth 2) is not forced — only descendants.
-    // This guards against an over-eager startsWith match.
-    const helper = new AdminUIHelper(page);
-    await helper.login();
-    await helper.navigateToEdit('/context-navigation-forced-folder');
-
-    const iframe = helper.getIframe();
-    await expect(iframe.getByText('Top-level page in this section')).toBeVisible({ timeout: 10_000 });
-
-    // No "In this section" nav should appear on the folder page itself.
-    const forcedNav = iframe.locator('nav[aria-label="In this section"]');
-    await expect(forcedNav).toHaveCount(0);
-  });
-
-  test('listing-derived level: depth=2 listing renders mixed levels', async ({ page }) => {
+test('listing-derived level: depth=2 listing renders mixed levels', async ({ page }) => {
     // nav-4 fetches /context-navigation-forced-folder with depth=2 →
     //   page-a, page-b (depth 3 = 3 path segs)     → minDepth → level-1
     //   page-a/deep-1   (depth 4)                   → level-2

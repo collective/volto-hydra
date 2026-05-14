@@ -20,6 +20,9 @@
           "variation": "navItem",
           "fixed": true,
           "readOnly": true,
+          "templateId": "/templates/context-navigation-layout",
+          "templateInstanceId": "context-navigation-layout-def-instance",
+          "slotId": "context-navigation-listing",
           "fieldMapping": {
             "@id": { "field": "href", "type": "link" },
             "title": { "field": "label" }
@@ -33,7 +36,7 @@
               }
             ],
             "sort_on": "getObjPositionInParent",
-            "depth": 1
+            "depth": 4
           }
         }
       },
