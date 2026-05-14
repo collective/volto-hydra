@@ -173,13 +173,15 @@ export const sharedBlocksConfig = {
             required: [],
         },
     },
-    // Section navigation container: renders a list of links as a sidebar
+    // Context navigation container: renders a list of links as a sidebar
     // (desktop) / disclosure (mobile). Children are navItem blocks (hand-
     // added) and/or listing blocks (auto-populated via path/depth query).
-    // The active link is detected at render time from URL match.
-    sectionNav: {
-        id: 'sectionNav',
-        title: 'Section Navigation',
+    // The active link is detected at render time from URL match. Named
+    // after Plone's @contextnavigation endpoint, which serves the same
+    // purpose (sibling/child links scoped to the current context).
+    contextNavigation: {
+        id: 'contextNavigation',
+        title: 'Context Navigation',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h14M3 12h10M3 18h14"/></svg>',
         group: 'common',
         blockSchema: {
@@ -187,7 +189,7 @@ export const sharedBlocksConfig = {
                 {
                     id: 'default',
                     title: 'Default',
-                    fields: ['ariaLabel', 'placement', 'items'],
+                    fields: ['ariaLabel', 'items'],
                 },
             ],
             properties: {
@@ -195,15 +197,6 @@ export const sharedBlocksConfig = {
                     title: 'Aria label',
                     type: 'string',
                     default: 'Section navigation',
-                },
-                placement: {
-                    title: 'Placement',
-                    widget: 'select',
-                    choices: [
-                        ['sidebar', 'Sidebar (top on mobile)'],
-                        ['top', 'Top of content'],
-                    ],
-                    default: 'sidebar',
                 },
                 items: {
                     title: 'Items',
@@ -215,10 +208,12 @@ export const sharedBlocksConfig = {
             required: [],
         },
     },
-    // Restricted nav-item child: a single link with optional indent level.
-    // Only valid inside sectionNav.items (enforced by sectionNav's
-    // allowedBlocks). Listing's `nav` variation feeds items through the
-    // same shape so manual + auto children render identically.
+    // Restricted nav-item child: a single link. Only valid inside
+    // contextNavigation.items. Also used as a listing item type — when
+    // the listing's variation is "navItem", query results are mapped
+    // via fieldMappings.@default so href / label come out in the same
+    // shape as manual authoring (object_browser array for href, string
+    // for label). Indent level is derived at render time from URL depth.
     navItem: {
         id: 'navItem',
         title: 'Nav link',
@@ -230,7 +225,7 @@ export const sharedBlocksConfig = {
                 {
                     id: 'default',
                     title: 'Default',
-                    fields: ['label', 'href', 'level'],
+                    fields: ['label', 'href'],
                 },
             ],
             properties: {
@@ -241,14 +236,17 @@ export const sharedBlocksConfig = {
                     mode: 'link',
                     allowExternals: true,
                 },
-                level: {
-                    title: 'Indent level',
-                    type: 'integer',
-                    default: 1,
-                    choices: [[1, '1'], [2, '2'], [3, '3']],
-                },
             },
             required: ['label'],
+        },
+        fieldMappings: {
+            // Query result → navItem fields. `link` type wraps the @id
+            // string as `[{ '@id': string }]` to match the object_browser
+            // shape produced by manual authoring.
+            '@default': {
+                '@id': { field: 'href', type: 'link' },
+                'title': 'label',
+            },
         },
     },
     // Slider container: uses object_list widget (volto-slider-block format)

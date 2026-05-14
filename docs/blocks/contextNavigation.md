@@ -1,6 +1,6 @@
-# Section Navigation Block
+# Context Navigation Block
 
-A vertical navigation list for grouped pages — typically a left sidebar on desktop and a top-of-page collapsible disclosure on mobile. Each row is a `navItem` (hand-added link) and/or a `listing` (auto-populated from a path query). The active link is detected from the current URL and gets `aria-current="page"` plus a `.current` class.
+A vertical navigation list for grouped pages — a left sidebar on desktop and a collapsible disclosure at the top on mobile. Each row is a `navItem` (hand-added link) and/or a `listing` (auto-populated from a path query). The active link is detected from the current URL and gets `aria-current="page"` plus a `.current` class. Named after Plone's `@contextnavigation` endpoint, which serves the same purpose.
 
 This is a **custom** block — register it via `initBridge`. Pair it with `navItem` (a restricted child block).
 
@@ -8,21 +8,12 @@ This is a **custom** block — register it via `initBridge`. Pair it with `navIt
 
 ```json
 {
-  "sectionNav": {
+  "contextNavigation": {
     "blockSchema": {
       "properties": {
         "ariaLabel": {
           "title": "Aria label",
           "default": "Section navigation"
-        },
-        "placement": {
-          "title": "Placement",
-          "widget": "select",
-          "choices": [
-            ["sidebar", "Sidebar (top on mobile)"],
-            ["top", "Top of content"]
-          ],
-          "default": "sidebar"
         },
         "items": {
           "title": "Items",
@@ -35,42 +26,39 @@ This is a **custom** block — register it via `initBridge`. Pair it with `navIt
   "navItem": {
     "blockSchema": {
       "properties": {
-        "label":  { "title": "Label" },
-        "href":   { "title": "Link", "widget": "object_browser", "mode": "link" },
-        "level":  { "title": "Indent level", "default": 1, "choices": [[1, "1"], [2, "2"], [3, "3"]] }
+        "label": { "title": "Label" },
+        "href":  { "title": "Link", "widget": "object_browser", "mode": "link" }
       }
     }
   }
 }
 ```
 
+Indent level is not a field. The renderer derives it from each link's URL path depth relative to the shallowest sibling in the nav.
+
 ## JSON Block Data
 
-A hand-built nav with five labelled links at two indent levels:
+A hand-built nav. Two of the links share a URL depth and render at the same indent; the third points one segment deeper and renders one level in.
 
 ```json
 {
-  "@type": "sectionNav",
+  "@type": "contextNavigation",
   "ariaLabel": "Section navigation",
-  "placement": "sidebar",
   "blocks": {
     "nav-1": {
       "@type": "navItem",
       "label": "Introduction",
-      "href": [{ "@id": "/docs/introduction" }],
-      "level": 1
+      "href": [{ "@id": "/docs/introduction" }]
     },
     "nav-2": {
       "@type": "navItem",
       "label": "Custom blocks",
-      "href": [{ "@id": "/docs/custom-blocks" }],
-      "level": 1
+      "href": [{ "@id": "/docs/custom-blocks" }]
     },
     "nav-2a": {
       "@type": "navItem",
       "label": "Schema",
-      "href": [{ "@id": "/docs/custom-blocks/schema" }],
-      "level": 2
+      "href": [{ "@id": "/docs/custom-blocks/schema" }]
     }
   },
   "items": {
@@ -85,10 +73,10 @@ Replace the manual `navItem` children with a single `listing` child configured t
 
 ```json
 {
-  "@type": "sectionNav",
-  "items": { "items": ["snav-listing"] },
+  "@type": "contextNavigation",
+  "items": { "items": ["cnav-listing"] },
   "blocks": {
-    "snav-listing": {
+    "cnav-listing": {
       "@type": "listing",
       "variation": "nav",
       "querystring": {
@@ -111,17 +99,17 @@ The block wraps its children in `<nav><ul>`. Each `navItem` (or listing-synthesi
 
 ### React
 
-<!-- file: examples/react/SectionNavBlock.jsx -->
+<!-- file: examples/react/ContextNavigationBlock.jsx -->
 ```jsx
-function SectionNavBlock({ block, blocks }) {
+function ContextNavigationBlock({ block, blocks }) {
   const items = block.items?.items || [];
   return (
     <nav
       data-block-uid={block['@uid']}
       aria-label={block.ariaLabel || 'Section navigation'}
-      className={`section-nav section-nav-${block.placement || 'sidebar'}`}
+      className="context-navigation"
     >
-      <ul role="list" className="section-nav-list">
+      <ul role="list" className="context-navigation-list">
         {items.map(id => {
           const child = blocks[id];
           if (!child) return null;
@@ -136,21 +124,25 @@ function SectionNavBlock({ block, blocks }) {
 }
 
 function NavItem({ block }) {
+  // Both manual and listing-synth items share shape: `href` is the
+  // object_browser array `[{ '@id': string }]` (the listing variation's
+  // fieldMappings.@default maps `@id` → `href` via type='link'). `label`
+  // is a string. `_level` is set by the parent ContextNavigationBlock
+  // after computing minDepth across all sibling hrefs.
   const here = window.location.pathname.replace(/\/edit$/, '');
-  const href = Array.isArray(block.href) ? block.href[0]?.['@id'] : block.href || block['@id'];
-  const itemPath = href ? new URL(href, window.location.origin).pathname : '#';
+  const itemPath = new URL(block.href[0]['@id'], window.location.origin).pathname;
   const active = itemPath === here;
   const inPath = !active && here.startsWith(itemPath + '/');
-  const level = Math.max(1, Math.min(3, block.level || 1));
   return (
     <li>
       <a
         href={itemPath}
         data-block-uid={block['@uid']}
-        className={`nav-item level-${level} ${active ? 'current' : ''} ${inPath ? 'in-path' : ''}`}
+        data-edit-link="href"
+        className={`nav-item level-${block._level} ${active ? 'current' : ''} ${inPath ? 'in-path' : ''}`}
         aria-current={active ? 'page' : undefined}
       >
-        <span data-edit-text="label">{block.label || block.title}</span>
+        <span data-edit-text="label">{block.label}</span>
       </a>
     </li>
   );
@@ -159,15 +151,15 @@ function NavItem({ block }) {
 
 ### Vue
 
-<!-- file: examples/vue/SectionNavBlock.vue -->
+<!-- file: examples/vue/ContextNavigationBlock.vue -->
 ```vue
 <template>
   <nav
     :data-block-uid="block['@uid']"
     :aria-label="block.ariaLabel || 'Section navigation'"
-    :class="['section-nav', `section-nav-${block.placement || 'sidebar'}`]"
+    class="context-navigation"
   >
-    <ul role="list" class="section-nav-list">
+    <ul role="list" class="context-navigation-list">
       <li v-for="id in (block.items?.items || [])" :key="id">
         <NavItem :block="{ ...blocks[id], '@uid': id }" />
       </li>
@@ -176,7 +168,6 @@ function NavItem({ block }) {
 </template>
 
 <script setup>
-import { useRoute } from 'vue-router';
 import NavItem from './NavItem.vue';
 defineProps({ block: Object, blocks: Object });
 </script>
@@ -184,7 +175,7 @@ defineProps({ block: Object, blocks: Object });
 
 ### Svelte
 
-<!-- file: examples/svelte/SectionNavBlock.svelte -->
+<!-- file: examples/svelte/ContextNavigationBlock.svelte -->
 ```svelte
 <script>
   import NavItem from './NavItem.svelte';
@@ -196,9 +187,9 @@ defineProps({ block: Object, blocks: Object });
 <nav
   data-block-uid={block['@uid']}
   aria-label={block.ariaLabel || 'Section navigation'}
-  class="section-nav section-nav-{block.placement || 'sidebar'}"
+  class="context-navigation"
 >
-  <ul role="list" class="section-nav-list">
+  <ul role="list" class="context-navigation-list">
     {#each items as id (id)}
       <li>
         <NavItem block={{ ...blocks[id], '@uid': id }} />
@@ -216,4 +207,4 @@ defineProps({ block: Object, blocks: Object });
 - Tab order follows DOM order; no focus traps.
 - Expand/collapse animation respects `prefers-reduced-motion`.
 
-The shipped CSS is intentionally minimal — production frontends override. The structural class names (`.section-nav`, `.nav-item`, `.level-1/2/3`, `.current`, `.in-path`) are stable; only the visual rules vary.
+The shipped CSS is intentionally minimal — production frontends override. The structural class names (`.context-navigation`, `.nav-item`, `.level-1/2/3`, `.current`, `.in-path`) are stable; only the visual rules vary.

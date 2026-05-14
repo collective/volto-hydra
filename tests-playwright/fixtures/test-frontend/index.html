@@ -45,20 +45,20 @@
             text-decoration: underline;
         }
 
-        /* sectionNav styling — same class names used by Nuxt block.vue
-           so cross-renderer tests can assert against the same selectors.
-           Production frontends override; this is the reference. */
-        .section-nav {
+        /* contextNavigation styling — same class names used by Nuxt
+           block.vue so cross-renderer tests can assert against the same
+           selectors. Production frontends override; this is the reference. */
+        .context-navigation {
             background: transparent;
             padding: 0;
             margin: 0 0 1rem 0;
         }
-        .section-nav-list {
+        .context-navigation-list {
             list-style: none;
             padding: 0;
             margin: 0;
         }
-        .section-nav-list li {
+        .context-navigation-list li {
             margin: 0;
             padding: 0;
             border: none;          /* override generic [data-block-uid] border */
@@ -84,17 +84,17 @@
         }
         .nav-item.in-path { color: #036; }
 
-        /* Sidebar variant: float left on desktop, full-width disclosure on mobile */
+        /* Sidebar on desktop, full-width disclosure on mobile */
         @media (min-width: 768px) {
-            .section-nav-sidebar {
+            .context-navigation {
                 float: left;
                 width: 220px;
                 margin-right: 1.5rem;
             }
-            .section-nav-toggle { display: none; }
+            .context-navigation-toggle { display: none; }
         }
         @media (max-width: 767px) {
-            .section-nav-toggle {
+            .context-navigation-toggle {
                 display: block;
                 background: #f0f0f0;
                 border: 1px solid #ddd;
@@ -102,20 +102,10 @@
                 cursor: pointer;
                 margin-bottom: 0.5rem;
             }
-            .section-nav-sidebar .section-nav-toggle[aria-expanded="false"] + .section-nav-list {
+            .context-navigation .context-navigation-toggle[aria-expanded="false"] + .context-navigation-list {
                 display: none;
             }
         }
-
-        /* Top variant: full-width inline, never collapses */
-        .section-nav-top { display: block; }
-        .section-nav-top .section-nav-toggle { display: none; }
-        .section-nav-top .section-nav-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem 1rem;
-        }
-        .section-nav-top .nav-item { padding: 0.25rem 0.5rem; }
     </style>
 </head>
 <body>
@@ -348,11 +338,27 @@
                     return res.json();
                 };
 
+                // Force context-navigation layout on 3rd-level pages (and any descendant).
+                // The pattern mirrors footer-layout (line ~228): a single-entry
+                // allowedLayouts list forces that template at expand time.
+                // Real docs would key off URL depth (`pagePath.split('/').filter(Boolean).length >= 3`);
+                // for fixtures we match the dedicated context-navigation-forced-folder subtree.
+                const forceContextNavOnPath = (p) =>
+                    p.startsWith('/_test_data/context-navigation-forced-folder/');
+                const mainAllowedLayouts = forceContextNavOnPath(contentPath)
+                    ? ['/_test_data/templates/context-navigation-layout']
+                    : undefined;
+
                 // Expand templates in main blocks field
                 const templateState = {};
                 const expandedItems = await expandTemplates(
                     content.blocks_layout?.items || [],
-                    { blocks: content.blocks || {}, templateState, loadTemplate }
+                    {
+                        blocks: content.blocks || {},
+                        templateState,
+                        loadTemplate,
+                        ...(mainAllowedLayouts ? { allowedLayouts: mainAllowedLayouts } : {}),
+                    }
                 );
                 // Merge expanded blocks back (preserve blocks from other fields like footer_blocks)
                 const expandedBlocksMap = Object.fromEntries(expandedItems.map(item => [item['@uid'], item]));
@@ -401,6 +407,7 @@
                     // Determine if we should force footer layout based on page path
                     const pagePath = window.location.pathname.replace(/\/edit$/, '');
                     const forceFooterLayout = pagePath === '/_test_data/another-page';
+                    const forceContextNavLayout = pagePath.startsWith('/_test_data/context-navigation-forced-folder/');
 
                     // Listen for changes from the admin UI and update blocks
                     // Return promise from async render so hydra.js can wait for DOM updates
@@ -412,9 +419,11 @@
                                 properties: {
                                     blocks_layout: {
                                         title: 'Blocks',
-                                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest', 'title', 'description', 'section', 'sectionNav'],
+                                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest', 'title', 'description', 'section', 'contextNavigation'],
                                         allowedTemplates: ['/_test_data/templates/test-layout'],
-                                        allowedLayouts: [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
+                                        allowedLayouts: forceContextNavLayout
+                                            ? ['/_test_data/templates/context-navigation-layout']
+                                            : [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
                                     },
                                     footer_blocks: {
                                         title: 'Footer',

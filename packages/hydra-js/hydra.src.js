@@ -12331,8 +12331,8 @@ export function buildQuerystringSearchBody(queryConfig, paging = {}, extraCriter
 
   // Add depth if specified — Plone catalog supports a top-level depth
   // field that limits results to N levels under each path criterion.
-  // Used by sectionNav's listing config so a path+depth combo returns
-  // only the right tree slice.
+  // Used by contextNavigation's listing config so a path+depth combo
+  // returns only the right tree slice.
   if (queryConfig?.depth !== undefined) {
     body.depth = queryConfig.depth;
   }
@@ -12838,6 +12838,15 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
   }
 
   return async function fetchItems(block, { start, size }) {
+    // Navigation-shaped queries (one path criterion + sort by
+    // getObjPositionInParent) hit @navigation instead of
+    // @querystring-search. The frontend still derives visual indent from
+    // each item's @id path depth — this helper is just about how the data
+    // is fetched, not how it's rendered.
+    if (isNavigationQuery(block.querystring)) {
+      return fetchNavigation(apiUrl, contextPath, block.querystring);
+    }
+
     const body = buildQuerystringSearchBody(block.querystring, {
       b_start: start,
       b_size: size,
@@ -12875,6 +12884,72 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
       total: response.items_total ?? rawItems.length,
     };
   };
+}
+
+/**
+ * A listing whose intent is to render a navigation tree of pages — sibling
+ * or descendant order under some root, in folder order. Recognised by:
+ * exactly one path criterion + sort_on=getObjPositionInParent. When both
+ * hold, ploneFetchItems calls @navigation instead of @querystring-search.
+ * Real Plone catalog supports getObjPositionInParent as a sort key, but
+ * @navigation is the purpose-built endpoint and is cheaper.
+ */
+function isNavigationQuery(querystring) {
+  if (!querystring) return false;
+  if (querystring.sort_on !== 'getObjPositionInParent') return false;
+  const pathCriteria = (querystring.query || []).filter((c) => c.i === 'path');
+  return pathCriteria.length === 1;
+}
+
+async function fetchNavigation(apiUrl, contextPath, querystring) {
+  const cond = querystring.query.find((c) => c.i === 'path');
+  let rootPath;
+  if (cond.o.includes('absolutePath')) {
+    rootPath = cond.v;
+  } else if (cond.o.includes('relativePath')) {
+    rootPath = resolveRelativePath(contextPath, cond.v);
+  } else {
+    throw new Error(`ploneFetchItems: unsupported path operator "${cond.o}" for navigation query`);
+  }
+
+  const depth = querystring.depth ?? 1;
+  const headers = getAuthHeaders();
+  const url =
+    `${apiUrl}${contextPath}/++api++/@navigation` +
+    `?expand.navigation.root_path=${encodeURIComponent(rootPath)}` +
+    `&expand.navigation.depth=${depth}`;
+  const res = await fetch(url, { headers });
+  const response = await res.json();
+
+  // Flatten the tree depth-first. Each navigation node has nested `items`;
+  // strip that field after flattening so the result matches the flat shape
+  // @querystring-search would have returned (and so listing fieldMapping
+  // doesn't accidentally try to render the tree).
+  const flat = flattenNavigationTree(response.items || []);
+  return { items: flat, total: flat.length };
+}
+
+function resolveRelativePath(base, rel) {
+  const segs = (base + '/' + (rel || '')).split('/').filter(Boolean);
+  const stack = [];
+  for (const seg of segs) {
+    if (seg === '.') continue;
+    if (seg === '..') stack.pop();
+    else stack.push(seg);
+  }
+  return '/' + stack.join('/');
+}
+
+function flattenNavigationTree(treeItems) {
+  const out = [];
+  for (const node of treeItems) {
+    const { items: children, ...rest } = node;
+    out.push(rest);
+    if (children && children.length) {
+      out.push(...flattenNavigationTree(children));
+    }
+  }
+  return out;
 }
 
 // ============================================================================

@@ -78,6 +78,24 @@ export async function checkEditAnnotations(
   );
   expect(linksWithout, 'All content links should have data-edit-link or data-linkable-allow').toEqual([]);
 
+  // data-linkable-allow says "let click navigate" — which means clicks never
+  // reach a nested data-edit-* annotation. Any editable annotation under a
+  // linkable-allow ancestor is unreachable by design, so it's a contradiction.
+  const trappedAnnotations = await block.locator('[data-linkable-allow] [data-edit-text], [data-linkable-allow] [data-edit-link], [data-linkable-allow] [data-edit-media]').evaluateAll(
+    (els: Element[]) => els.map((el) => {
+      const which =
+        (el.hasAttribute('data-edit-text') && 'data-edit-text') ||
+        (el.hasAttribute('data-edit-link') && 'data-edit-link') ||
+        'data-edit-media';
+      const field = el.getAttribute(which) || '';
+      return `${which}="${field}" on <${el.tagName.toLowerCase()}>`;
+    }),
+  );
+  expect(
+    trappedAnnotations,
+    'Editable annotations (data-edit-text/link/media) cannot live inside [data-linkable-allow] — the link navigation steals the click before editing can happen',
+  ).toEqual([]);
+
   // Links must point to the same origin as the page, or be relative.
   // Catches links that accidentally point to the API instead of the frontend.
   const offSiteLinks = await block.locator('a[href]').evaluateAll(

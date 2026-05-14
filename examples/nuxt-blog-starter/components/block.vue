@@ -150,42 +150,21 @@
     </div>
   </div>
 
-  <!-- Section navigation container. Renders <nav><ul> with manual navItem
-       children + optional listing children. CSS in main.css picks placement
-       (sidebar/top) and the mobile disclosure behaviour. -->
-  <nav v-else-if="block['@type'] == 'sectionNav'"
-       :data-block-uid="block_uid"
-       :aria-label="block.ariaLabel || 'Section navigation'"
-       :class="['section-nav', `section-nav-${block.placement || 'sidebar'}`]">
-    <button type="button"
-            class="section-nav-toggle"
-            :aria-expanded="sectionNavOpen[block_uid] !== false ? 'true' : 'false'"
-            :aria-controls="`${block_uid}-list`"
-            @click="sectionNavOpen[block_uid] = !(sectionNavOpen[block_uid] !== false)">
-      Menu
-    </button>
-    <ul role="list" :id="`${block_uid}-list`" class="section-nav-list">
-      <li v-for="childId in (block.items?.items || [])" :key="childId">
-        <Block :block_uid="childId"
-               :block="block.blocks?.[childId]"
-               :data="data"
-               :contained="true" />
-      </li>
-    </ul>
-  </nav>
-
-  <!-- Restricted child of sectionNav.items: a labelled link. Active
-       state computed from current route; CSS picks up .current /
-       .in-path / .level-N. Also handles 'nav' (listing's nav variation
-       synthesises items with @type=nav and {title, @id} shape). -->
-  <a v-else-if="block['@type'] == 'navItem' || block['@type'] == 'nav'"
-     :href="navItemPath(block)"
-     :data-block-uid="block_uid"
-     :class="navItemClasses(block)"
-     :aria-current="navItemIsActive(block) ? 'page' : null"
-     data-linkable-allow>
-    <span data-edit-text="label">{{ block.label || block.title }}</span>
-  </a>
+  <!-- Context navigation: delegates to ContextNavigationBlock which does
+       the async listing-child expansion + level-from-URL-depth derivation
+       inline (no recursive Block render for navItems). Wrapped in
+       <Suspense> because expandListingBlocks fetches asynchronously. -->
+  <Suspense v-else-if="block['@type'] == 'contextNavigation'">
+    <ContextNavigationBlock :block-id="block_uid"
+                            :block="block"
+                            :api-url="effectiveApiUrl"
+                            :context-path="effectiveContextPath" />
+    <template #fallback>
+      <nav :data-block-uid="block_uid" class="context-navigation">
+        <ul role="list" class="context-navigation-list"></ul>
+      </nav>
+    </template>
+  </Suspense>
 
   <div v-else-if="block['@type'] == 'teaser'"
     class="teaser-block max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
@@ -1015,10 +994,10 @@ const gridPageFromUrl = computed(() => {
 });
 const gridPaging = reactive({ start: 0, size: GRID_PAGE_SIZE });
 
-// sectionNav: per-block disclosure state (mobile). Keyed by block uid so
-// nested or multiple navs on the same page don't share toggle state.
+// contextNavigation: per-block disclosure state (mobile). Keyed by block
+// uid so nested or multiple navs on the same page don't share toggle state.
 // `undefined` and `true` both mean expanded; `false` means collapsed.
-const sectionNavOpen = reactive({});
+const contextNavOpen = reactive({});
 
 // navItem helpers — keep them inline (small enough that a separate
 // composable isn't worth the indirection). Resolve href to a path,

@@ -1875,23 +1875,14 @@
       }
     }
   },
-  "sectionNav": {
+  "contextNavigation": {
     "blocks": {
-      "sectionNav": {
+      "contextNavigation": {
         "blockSchema": {
           "properties": {
             "ariaLabel": {
               "title": "Aria label",
               "default": "Section navigation"
-            },
-            "placement": {
-              "title": "Placement",
-              "widget": "select",
-              "choices": [
-                ["sidebar", "Sidebar (top on mobile)"],
-                ["top", "Top of content"]
-              ],
-              "default": "sidebar"
             },
             "items": {
               "title": "Items",
@@ -1911,51 +1902,40 @@
               "title": "Link",
               "widget": "object_browser",
               "mode": "link"
-            },
-            "level": {
-              "title": "Indent level",
-              "default": 1,
-              "choices": [[1, "1"], [2, "2"], [3, "3"]]
             }
           }
         }
       }
     },
     "examples": {
-      "ex-sectionnav": {
-        "@type": "sectionNav",
+      "ex-contextnav": {
+        "@type": "contextNavigation",
         "ariaLabel": "Section navigation",
-        "placement": "sidebar",
         "blocks": {
           "nav-1": {
             "@type": "navItem",
             "label": "Introduction",
-            "href": [{ "@id": "/docs/introduction" }],
-            "level": 1
+            "href": [{ "@id": "/docs/introduction" }]
           },
           "nav-2": {
             "@type": "navItem",
             "label": "Custom blocks",
-            "href": [{ "@id": "/docs/custom-blocks" }],
-            "level": 1
+            "href": [{ "@id": "/docs/custom-blocks" }]
           },
           "nav-2a": {
             "@type": "navItem",
             "label": "Schema",
-            "href": [{ "@id": "/docs/custom-blocks/schema" }],
-            "level": 2
+            "href": [{ "@id": "/docs/custom-blocks/schema" }]
           },
           "nav-2b": {
             "@type": "navItem",
             "label": "Rendering",
-            "href": [{ "@id": "/docs/custom-blocks/rendering" }],
-            "level": 2
+            "href": [{ "@id": "/docs/custom-blocks/rendering" }]
           },
           "nav-3": {
             "@type": "navItem",
             "label": "Listings",
-            "href": [{ "@id": "/docs/listings" }],
-            "level": 1
+            "href": [{ "@id": "/docs/listings" }]
           }
         },
         "items": {

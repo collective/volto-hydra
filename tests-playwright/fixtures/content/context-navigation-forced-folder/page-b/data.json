@@ -1,0 +1,18 @@
+{
+  "@id": "/_test_data/context-navigation-forced-folder/page-b",
+  "@type": "Document",
+  "UID": "context-navigation-forced-folder-page-b-uid",
+  "id": "page-b",
+  "title": "Page B",
+  "description": "Sibling of Page A — context navigation should list both.",
+  "review_state": "published",
+  "blocks": {
+    "title-block": { "@type": "title" },
+    "body": {
+      "@type": "slate",
+      "value": [{ "type": "p", "children": [{ "text": "Body of page B." }] }],
+      "plaintext": "Body of page B."
+    }
+  },
+  "blocks_layout": { "items": ["title-block", "body"] }
+}

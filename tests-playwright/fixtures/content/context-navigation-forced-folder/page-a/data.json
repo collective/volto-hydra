@@ -1,0 +1,18 @@
+{
+  "@id": "/_test_data/context-navigation-forced-folder/page-a",
+  "@type": "Document",
+  "UID": "context-navigation-forced-folder-page-a-uid",
+  "id": "page-a",
+  "title": "Page A",
+  "description": "Third-level page — should get contextNavigation forced via context-navigation-layout.",
+  "review_state": "published",
+  "blocks": {
+    "title-block": { "@type": "title" },
+    "body": {
+      "@type": "slate",
+      "value": [{ "type": "p", "children": [{ "text": "Body of page A. The contextNavigation should appear above this." }] }],
+      "plaintext": "Body of page A. The contextNavigation should appear above this."
+    }
+  },
+  "blocks_layout": { "items": ["title-block", "body"] }
+}

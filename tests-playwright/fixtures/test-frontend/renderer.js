@@ -223,30 +223,23 @@ async function renderBlock(blockId, block) {
         case 'section':
             wrapper.innerHTML = await renderSectionBlock(block);
             break;
-        case 'sectionNav': {
+        case 'contextNavigation': {
             // Return the <nav> directly so aria-label / class /
             // data-block-uid all live on the same element. The default
             // wrapper would put data-block-uid on a generic div and bury
             // <nav> a level deeper — a11y checks (and the test contract)
             // expect them co-located.
             const navEl = document.createElement('div');
-            navEl.innerHTML = await renderSectionNavBlock(block, blockId);
+            navEl.innerHTML = await renderContextNavigationBlock(block, blockId);
             return navEl.firstElementChild;
         }
         case 'navItem': {
             // Return the <a> as the outer element so data-block-uid lives
-            // alongside the link semantics (matches sectionNav putting
-            // data-block-uid on the <nav>). The default wrapper would
-            // bury the <a> under a <div>.
-            const itemEl = document.createElement('div');
-            itemEl.innerHTML = renderNavItemBlock(block, blockId);
-            return itemEl.firstElementChild;
-        }
-        case 'nav': {
-            // Synthesised by listing's `nav` variation: each search-result
-            // item arrives with @type 'nav', `@id`, `title`, `description`.
-            // Reuse the navItem renderer — it accepts both manual-author
-            // {label, href[array]} and listing {title, @id} shapes.
+            // alongside the link semantics (matches contextNavigation
+            // putting data-block-uid on the <nav>). The default wrapper
+            // would bury the <a> under a <div>. Manual + listing-synth
+            // navItems share the same shape (listing's fieldMappings
+            // converts @id → href via the `link` type), so one path.
             const itemEl = document.createElement('div');
             itemEl.innerHTML = renderNavItemBlock(block, blockId);
             return itemEl.firstElementChild;
@@ -1227,66 +1220,81 @@ async function renderSectionBlock(block) {
 }
 
 /**
- * Render a sectionNav block. Wraps its `items` children in <nav><ul>
+ * Render a contextNavigation block. Wraps its `items` children in <nav><ul>
  * with a mobile disclosure <button>. Children (navItem + listing) render
  * themselves; the wrapping <ul> provides the list semantics. Active /
  * in-path classes are computed inside renderNavItemBlock from each link's
  * href vs window.location.pathname.
  */
-async function renderSectionNavBlock(block, blockId) {
-    const ariaLabel = block.ariaLabel || 'Section navigation';
-    const placement = block.placement || 'sidebar';
-    const blocks = block.blocks || {};
-    const items = block.items?.items || [];
-    const uid = blockId || block['@uid'] || `snav-${Math.random().toString(36).slice(2, 8)}`;
+async function renderContextNavigationBlock(block, blockId) {
+    const ariaLabel = block.ariaLabel;
+    const blocks = block.blocks;
+    const items = block.items.items;
+    const uid = blockId;
 
-    let html = `<nav data-block-uid="${escapeAttr(uid)}" aria-label="${escapeHtml(ariaLabel)}" class="section-nav section-nav-${placement}">`;
-    html += `<button class="section-nav-toggle" aria-expanded="true" aria-controls="${uid}-list" type="button">Menu</button>`;
-    html += `<ul role="list" id="${uid}-list" class="section-nav-list">`;
+    // First pass: walk children and collect a flat list of {block, blockId}
+    // entries. listing children are expanded inline so all their items
+    // join the same flat list. b_size is large so nav listings never
+    // paginate — paging in a sectionNav makes no UX sense.
+    const NAV_LISTING_SIZE = 1000;
+    const flat = [];
     for (const childId of items) {
         const child = blocks[childId];
-        if (!child) continue;
-        const rendered = await renderBlock(childId, child);
-        if (!rendered) continue;
-        // Wrap each child in <li>. renderBlock returns a div with
-        // data-block-uid already set — preserve it inside the <li>.
-        if (rendered instanceof DocumentFragment) {
-            const container = document.createElement('div');
-            container.appendChild(rendered);
-            html += `<li>${container.innerHTML}</li>`;
+        if (child['@type'] === 'navItem') {
+            flat.push({ block: child, blockId: childId });
+        } else if (child['@type'] === 'listing') {
+            const { items: expanded } = await window._expandListingBlocks(
+                { [childId]: child },
+                [childId],
+                childId,
+                { start: 0, size: NAV_LISTING_SIZE },
+            );
+            for (const item of expanded) {
+                flat.push({ block: item, blockId: item['@uid'] });
+            }
         } else {
-            html += `<li>${rendered.outerHTML}</li>`;
+            throw new Error(`contextNavigation child of @type "${child['@type']}" is not allowed (expected navItem or listing)`);
         }
+    }
+
+    // Second pass: compute level = depth(href) - minDepth + 1, clamped to 1..3.
+    const pathDepth = (entry) =>
+        new URL(entry.block.href[0]['@id'], window.location.origin)
+            .pathname.split('/').filter(Boolean).length;
+    const depths = flat.map(pathDepth);
+    const minDepth = Math.min(...depths);
+    flat.forEach((entry, i) => {
+        entry.block._level = Math.max(1, Math.min(3, depths[i] - minDepth + 1));
+    });
+
+    let html = `<nav data-block-uid="${escapeAttr(uid)}" aria-label="${escapeHtml(ariaLabel)}" class="context-navigation">`;
+    html += `<button class="context-navigation-toggle" aria-expanded="true" aria-controls="${uid}-list" type="button">Menu</button>`;
+    html += `<ul role="list" id="${uid}-list" class="context-navigation-list">`;
+    for (const entry of flat) {
+        html += `<li>${renderNavItemBlock(entry.block, entry.blockId)}</li>`;
     }
     html += '</ul></nav>';
     return html;
 }
 
 /**
- * Render a single navItem-style row. Accepts two shapes:
- *
- *   1. Manual navItem from author: { label, href: [{ '@id': '...' }], level }
- *   2. Listing-synthesised nav item: { title, '@id': '...' }     (variation='nav')
- *
- * Both produce the same HTML — a labelled link with active/in-path/level
- * classes derived at render time from item href vs current location.
+ * Render a single navItem row. The block always has shape:
+ *   { label: string, href: [{ '@id': string }] }
+ * Manual authoring uses object_browser (produces that shape), listing-synth
+ * uses fieldMappings with type='link' on @id (produces the same shape).
+ * Level is auto-derived elsewhere and passed via block._level (set by
+ * renderContextNavigationBlock after collecting all sibling depths).
  */
 function renderNavItemBlock(block, blockId) {
-    const label = block.label || block.title || '';
-    const level = Math.max(1, Math.min(3, block.level || 1));
-    const uid = blockId || block['@uid'] || '';
-    // Manual: href is object_browser array [{ '@id', ... }]
-    // Listing-synth: href is the @id string (after fieldMapping) OR
-    // we can fall back to block['@id'] which the listing always sets.
-    let hrefRaw = block.href;
-    if (Array.isArray(hrefRaw)) hrefRaw = hrefRaw[0]?.['@id'];
-    if (!hrefRaw) hrefRaw = block['@id'];
+    const label = block.label;
+    const href = block.href[0]['@id'];
+    const level = block._level;
+    const uid = blockId;
 
-    const itemPath = hrefRaw ? new URL(hrefRaw, window.location.origin).pathname : '#';
+    const itemPath = new URL(href, window.location.origin).pathname;
     const currentPath = window.location.pathname.replace(/\/edit$/, '');
     const active = itemPath === currentPath;
-    const inPath = !active && itemPath !== '#'
-        && currentPath.startsWith(itemPath.replace(/\/$/, '') + '/');
+    const inPath = !active && currentPath.startsWith(itemPath.replace(/\/$/, '') + '/');
 
     const classes = [
         'nav-item',
@@ -1296,12 +1304,13 @@ function renderNavItemBlock(block, blockId) {
     ].filter(Boolean).join(' ');
     const ariaCurrent = active ? ' aria-current="page"' : '';
 
-    const uidAttr = uid ? ` data-block-uid="${escapeAttr(uid)}"` : '';
-    // data-linkable-allow: this <a> is a navigation link, not an editable
-    // href field — clicking should navigate (in edit mode too). The href
-    // itself is edited via the sidebar's object_browser widget on the
-    // navItem block, not inline.
-    return `<a href="${escapeAttr(itemPath)}"${uidAttr} class="${classes}"${ariaCurrent} data-linkable-allow>` +
+    // Both annotations live here in edit mode:
+    //   data-edit-link="href"   — clicking the link opens the picker for
+    //                              navItem.href (the object_browser field)
+    //   data-edit-text="label"  — clicking the label text inline-edits it
+    // No data-linkable-allow: that would steal the click before either edit
+    // annotation could fire — block-sanity flags that contradiction.
+    return `<a href="${escapeAttr(itemPath)}" data-block-uid="${escapeAttr(uid)}" class="${classes}"${ariaCurrent} data-edit-link="href">` +
         `<span data-edit-text="label">${escapeHtml(label)}</span>` +
         `</a>`;
 }

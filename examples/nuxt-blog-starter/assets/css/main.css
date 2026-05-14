@@ -85,11 +85,11 @@ h2, h3, h4, h5, .image-align-center, .image-align-wide, .image-align-full { clea
 /* Slate paragraph spacing */
 .slate-block p + p { margin-top: 1em; }
 
-/* sectionNav — vertical nav with mobile disclosure. Class names match
-   the test-frontend's CSS so cross-renderer tests share selectors. */
-.section-nav { margin: 0 0 1.5rem 0; }
-.section-nav-list { list-style: none; padding: 0; margin: 0; }
-.section-nav-list li { margin: 0; padding: 0; }
+/* contextNavigation — vertical nav with mobile disclosure. Class names
+   match the test-frontend's CSS so cross-renderer tests share selectors. */
+.context-navigation { margin: 0 0 1.5rem 0; }
+.context-navigation-list { list-style: none; padding: 0; margin: 0; }
+.context-navigation-list li { margin: 0; padding: 0; }
 
 .nav-item {
     display: block;
@@ -109,17 +109,17 @@ h2, h3, h4, h5, .image-align-center, .image-align-wide, .image-align-full { clea
 }
 .nav-item.in-path { color: #036; }
 
-/* Sidebar variant: floats left on desktop, disclosure on mobile. */
+/* Sidebar on desktop, disclosure on mobile. */
 @media (min-width: 768px) {
-    .section-nav-sidebar {
+    .context-navigation {
         float: left;
         width: 240px;
         margin-right: 1.5rem;
     }
-    .section-nav-sidebar .section-nav-toggle { display: none; }
+    .context-navigation .context-navigation-toggle { display: none; }
 }
 @media (max-width: 767px) {
-    .section-nav-sidebar .section-nav-toggle {
+    .context-navigation .context-navigation-toggle {
         display: block;
         background: #f3f4f6;
         border: 1px solid #d1d5db;
@@ -130,16 +130,7 @@ h2, h3, h4, h5, .image-align-center, .image-align-wide, .image-align-full { clea
         width: 100%;
         text-align: left;
     }
-    .section-nav-sidebar .section-nav-toggle[aria-expanded="false"] + .section-nav-list {
+    .context-navigation .context-navigation-toggle[aria-expanded="false"] + .context-navigation-list {
         display: none;
     }
 }
-
-/* Top variant: always inline, never collapses. */
-.section-nav-top .section-nav-toggle { display: none; }
-.section-nav-top .section-nav-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem 1rem;
-}
-.section-nav-top .nav-item { padding: 0.25rem 0.5rem; }
