@@ -189,7 +189,7 @@ export const sharedBlocksConfig = {
                 {
                     id: 'default',
                     title: 'Default',
-                    fields: ['ariaLabel', 'expandCurrentOnly', 'items'],
+                    fields: ['ariaLabel', 'expandCurrentOnly', 'includeTop', 'items'],
                 },
             ],
             properties: {
@@ -206,6 +206,14 @@ export const sharedBlocksConfig = {
                     title: 'Expand current section only',
                     type: 'boolean',
                     default: true,
+                },
+                includeTop: {
+                    // Include the section root as the first item in the
+                    // nav (e.g. show /concepts itself above /concepts/x).
+                    // Matches Volto's `includeTop` contextnavigation param.
+                    title: 'Include section root',
+                    type: 'boolean',
+                    default: false,
                 },
                 items: {
                     title: 'Items',

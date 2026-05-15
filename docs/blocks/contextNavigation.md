@@ -15,6 +15,16 @@ This is a **custom** block — register it via `initBridge`. Pair it with `navIt
           "title": "Aria label",
           "default": "Section navigation"
         },
+        "expandCurrentOnly": {
+          "title": "Expand current section only",
+          "type": "boolean",
+          "default": true
+        },
+        "includeTop": {
+          "title": "Include section root",
+          "type": "boolean",
+          "default": false
+        },
         "items": {
           "title": "Items",
           "widget": "blocks_layout",
@@ -35,6 +45,10 @@ This is a **custom** block — register it via `initBridge`. Pair it with `navIt
 ```
 
 Indent level is not a field. The renderer derives it from each link's URL path depth relative to the shallowest sibling in the nav.
+
+`expandCurrentOnly` (default `true`) controls smart-expansion: the renderer hides items that are descendants of unrelated siblings. An item survives when it sits on the ancestor chain of the current page, is a sibling at any ancestor level, is the current page itself, or is a descendant of the current page. Matches Sphinx / Docusaurus / Read-the-Docs sidebar behaviour. Set `false` to render every item the listing returns (useful for hand-built navs that link to unrelated paths).
+
+`includeTop` (default `false`) prepends the section root itself as the first nav item — e.g. on `/concepts/visual-editing` with a listing anchored at `/concepts`, set `includeTop: true` to show `/concepts` (linked to the section root) above the per-page links. Matches Volto's `includeTop` portlet parameter.
 
 ## JSON Block Data
 

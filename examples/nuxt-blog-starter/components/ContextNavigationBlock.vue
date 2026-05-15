@@ -78,11 +78,35 @@ async function expandChildren() {
     }
   }
 
-  const here = route.path.replace(/\/$/, '');
   const pathOf = (entry) =>
     new URL(entry.block.href[0]['@id'], 'http://placeholder').pathname;
   const segsOf = (p) => p.split('/').filter(Boolean);
 
+  // Optional: prepend the section root (Volto's `includeTop`). Derived
+  // from the shallowest item's parent — listings anchored on one path
+  // share that parent. One small fetch for the root's title.
+  if (props.block.includeTop && flat.length > 0) {
+    const minDepthForRoot = Math.min(...flat.map((e) => segsOf(pathOf(e)).length));
+    const shallowSegs = segsOf(pathOf(flat.find((e) => segsOf(pathOf(e)).length === minDepthForRoot)));
+    const rootSegs = shallowSegs.slice(0, -1);
+    if (rootSegs.length > 0) {
+      const rootPath = '/' + rootSegs.join('/');
+      const res = await fetch(`${props.apiUrl}/++api++${rootPath}`, {
+        headers: { Accept: 'application/json' },
+      });
+      const rootData = await res.json();
+      flat.unshift({
+        block: {
+          '@type': 'navItem',
+          label: rootData.title,
+          href: [{ '@id': rootData['@id'] }],
+        },
+        blockId: `${props.blockId}-top`,
+      });
+    }
+  }
+
+  const here = route.path.replace(/\/$/, '');
   const paths = flat.map(pathOf);
   const segs = paths.map(segsOf);
   const depths = segs.map((s) => s.length);

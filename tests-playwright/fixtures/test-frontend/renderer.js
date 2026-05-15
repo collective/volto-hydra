@@ -1258,6 +1258,37 @@ async function renderContextNavigationBlock(block, blockId) {
         }
     }
 
+    // Optional: prepend the section root itself (Volto's `includeTop`).
+    // The section root is the parent of any shallowest item — listings
+    // anchored on a single path always share that parent. We fetch the
+    // root's basic data (just for label) and prepend before level/filter
+    // passes so it gets level-1 and is treated as "current path ancestor"
+    // by the smart-expansion filter.
+    if (block.includeTop && flat.length > 0) {
+        const pathSegsOf2 = (entry) =>
+            new URL(entry.block.href[0]['@id'], window.location.origin)
+                .pathname.split('/').filter(Boolean);
+        const segsList = flat.map(pathSegsOf2);
+        const minDepthForRoot = Math.min(...segsList.map((s) => s.length));
+        const shallow = segsList.find((s) => s.length === minDepthForRoot);
+        const rootSegs = shallow.slice(0, -1);
+        if (rootSegs.length > 0) {
+            const rootPath = '/' + rootSegs.join('/');
+            const res = await fetch(`${window._apiOrigin}/++api++${rootPath}`, {
+                headers: { 'Accept': 'application/json' },
+            });
+            const rootData = await res.json();
+            flat.unshift({
+                block: {
+                    '@type': 'navItem',
+                    label: rootData.title,
+                    href: [{ '@id': rootData['@id'] }],
+                },
+                blockId: `${uid}-top`,
+            });
+        }
+    }
+
     // Second pass: compute level = depth(href) - minDepth + 1, clamped to 1..3.
     const pathSegsOf = (entry) =>
         new URL(entry.block.href[0]['@id'], window.location.origin)

@@ -1884,6 +1884,16 @@
               "title": "Aria label",
               "default": "Section navigation"
             },
+            "expandCurrentOnly": {
+              "title": "Expand current section only",
+              "type": "boolean",
+              "default": true
+            },
+            "includeTop": {
+              "title": "Include section root",
+              "type": "boolean",
+              "default": false
+            },
             "items": {
               "title": "Items",
               "widget": "blocks_layout",
