@@ -349,6 +349,16 @@ function formatSearchItem(content, baseUrl) {
     'hasPreviewImage': hasPreviewImage,
     'effective': content.effective || content.created || null,
     'created': content.created || null,
+    // Catalog brain attributes that nav-shaped listings rely on:
+    // - getObjPositionInParent: position within immediate parent folder
+    //   (from __metadata__.json ordering). The hierarchical post-sort
+    //   in ploneFetchItems uses this to assemble parent-then-children.
+    // - exclude_from_nav: whether the item is hidden from navigation —
+    //   authors filter on this via a querystring criterion.
+    'getObjPositionInParent': content.UID && uidPositionMap[content.UID] !== undefined
+      ? uidPositionMap[content.UID]
+      : null,
+    'exclude_from_nav': content.exclude_from_nav === true,
   };
 
   // Match real Plone: always include image_field and image_scales.
@@ -1801,6 +1811,14 @@ app.post('*/@querystring-search', (req, res) => {
           return title.includes(searchTerm) || description.includes(searchTerm) || id.includes(searchTerm);
         });
       }
+    } else if (index === 'exclude_from_nav' && operation.includes('boolean')) {
+      // Nav listings filter out items marked exclude_from_nav: true.
+      // Mirrors Plone's plone.app.querystring.operation.boolean.{isFalse,isTrue}.
+      const wantTrue = operation.includes('isTrue');
+      allItems = allItems.filter((item) => {
+        const flag = item.exclude_from_nav === true;
+        return wantTrue ? flag : !flag;
+      });
     } else if (index === 'review_state' && operation.includes('selection')) {
       // Filter by review state
       const states = Array.isArray(value) ? value : [value];

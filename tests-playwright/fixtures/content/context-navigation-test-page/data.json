@@ -53,6 +53,11 @@
                 "i": "path",
                 "o": "plone.app.querystring.operation.string.absolutePath",
                 "v": "/_test_data"
+              },
+              {
+                "i": "exclude_from_nav",
+                "o": "plone.app.querystring.operation.boolean.isFalse",
+                "v": ""
               }
             ],
             "sort_on": "getObjPositionInParent",
@@ -81,6 +86,11 @@
                 "i": "path",
                 "o": "plone.app.querystring.operation.string.absolutePath",
                 "v": "/_test_data/context-navigation-forced-folder"
+              },
+              {
+                "i": "exclude_from_nav",
+                "o": "plone.app.querystring.operation.boolean.isFalse",
+                "v": ""
               }
             ],
             "sort_on": "getObjPositionInParent",

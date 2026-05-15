@@ -118,12 +118,18 @@ test.describe('contextNavigation block', () => {
     await expect(iframe.getByText('Body of page A.')).toBeVisible();
   });
 
-test('listing-derived level: depth=2 listing renders mixed levels', async ({ page }) => {
+test('listing-derived level + hierarchical sort: depth=2 listing renders mixed levels in parent-then-children order', async ({ page }) => {
     // nav-4 fetches /context-navigation-forced-folder with depth=2 →
     //   page-a, page-b (depth 3 = 3 path segs)     → minDepth → level-1
     //   page-a/deep-1   (depth 4)                   → level-2
-    // Level is auto-derived in the renderer from each href's URL depth;
-    // there is no manual `level` field on navItem.
+    //
+    // The fixture's __metadata__.json sets page-b at position 0 and
+    // page-a at position 1 — so a flat sort by getObjPositionInParent
+    // alone (without the hierarchical post-sort in ploneFetchItems)
+    // would slot deep-1 (position 0 inside page-a) between page-b (0)
+    // and page-a (1), giving [page-b, deep-1, page-a]. The post-sort
+    // restores hierarchical order: [page-b, page-a, deep-1] —
+    // parent-then-its-subtree-then-next-parent.
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/context-navigation-test-page');
@@ -140,6 +146,22 @@ test('listing-derived level: depth=2 listing renders mixed levels', async ({ pag
     await expect(linkA).toHaveClass(/\blevel-1\b/);
     await expect(linkB).toHaveClass(/\blevel-1\b/);
     await expect(linkDeep).toHaveClass(/\blevel-2\b/);
+
+    // Hierarchical order: page-b (pos 0), then page-a (pos 1) and its
+    // subtree (deep-1). deep-1 must appear AFTER page-a, never sandwiched
+    // between page-b and page-a — that's the failure mode without the
+    // post-sort.
+    const hrefs = await nav.locator('a.nav-item').evaluateAll((els) =>
+      els.map((el) => el.getAttribute('href')),
+    );
+    const pageBIdx = hrefs.indexOf('/_test_data/context-navigation-forced-folder/page-b');
+    const pageAIdx = hrefs.indexOf('/_test_data/context-navigation-forced-folder/page-a');
+    const deepIdx = hrefs.indexOf('/_test_data/context-navigation-forced-folder/page-a/deep-1');
+    expect(pageBIdx, 'page-b present').toBeGreaterThanOrEqual(0);
+    expect(pageAIdx, 'page-a present').toBeGreaterThanOrEqual(0);
+    expect(deepIdx, 'deep-1 present').toBeGreaterThanOrEqual(0);
+    expect(pageBIdx, 'page-b before page-a (position-0 first)').toBeLessThan(pageAIdx);
+    expect(pageAIdx, 'page-a before its child deep-1 (hierarchical)').toBeLessThan(deepIdx);
   });
 
   test('listing child with depth=1 returns direct children only', async ({ page }) => {

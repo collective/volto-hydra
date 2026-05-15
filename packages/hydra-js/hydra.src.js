@@ -12838,15 +12838,6 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
   }
 
   return async function fetchItems(block, { start, size }) {
-    // Navigation-shaped queries (one path criterion + sort by
-    // getObjPositionInParent) hit @navigation instead of
-    // @querystring-search. The frontend still derives visual indent from
-    // each item's @id path depth — this helper is just about how the data
-    // is fetched, not how it's rendered.
-    if (isNavigationQuery(block.querystring)) {
-      return fetchNavigation(apiUrl, contextPath, block.querystring);
-    }
-
     const body = buildQuerystringSearchBody(block.querystring, {
       b_start: start,
       b_size: size,
@@ -12866,7 +12857,7 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
     const rawItems = response.items || [];
     // Normalize: package image_field + image_scales into self-contained image object
     // with @id duplicated inside (imageProps needs it as base URL for relative paths)
-    const items = rawItems.map(item => {
+    let items = rawItems.map(item => {
       if (!item.image_scales || !item.image_field) return item;
       const normalized = { ...item };
       normalized.image = {
@@ -12879,6 +12870,18 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
       return normalized;
     });
 
+    // `getObjPositionInParent` is the catalog's position-within-immediate-parent
+    // index. The catalog returns items in flat position-sorted order — but
+    // for a query that spans multiple folders (e.g. a recursive path query
+    // for a nav listing) that flat order isn't hierarchical: parents and
+    // children interleave by position number rather than appearing as
+    // parent-then-its-subtree-then-next-parent. Post-sort to reconstruct
+    // hierarchical order; level-N rendering and ancestor-aware filters
+    // assume it.
+    if (block.querystring?.sort_on === 'getObjPositionInParent' && items.length > 1) {
+      items = hierarchicalSortByPosition(items);
+    }
+
     return {
       items,
       total: response.items_total ?? rawItems.length,
@@ -12887,68 +12890,52 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
 }
 
 /**
- * A listing whose intent is to render a navigation tree of pages — sibling
- * or descendant order under some root, in folder order. Recognised by:
- * exactly one path criterion + sort_on=getObjPositionInParent. When both
- * hold, ploneFetchItems calls @navigation instead of @querystring-search.
- * Real Plone catalog supports getObjPositionInParent as a sort key, but
- * @navigation is the purpose-built endpoint and is cheaper.
+ * Re-order a flat result set into parent-before-children, position-sorted
+ * within each parent. Each item must have `@id` (used to derive path +
+ * parent) and `getObjPositionInParent` (numeric; missing values treated
+ * as Infinity so they sort to the end).
+ *
+ * Roots (items whose parent isn't in the result set) are sorted by
+ * position among themselves; each subtree is then walked depth-first.
  */
-function isNavigationQuery(querystring) {
-  if (!querystring) return false;
-  if (querystring.sort_on !== 'getObjPositionInParent') return false;
-  const pathCriteria = (querystring.query || []).filter((c) => c.i === 'path');
-  return pathCriteria.length === 1;
-}
+function hierarchicalSortByPosition(items) {
+  const pathOf = (item) => {
+    try { return new URL(item['@id']).pathname; }
+    catch { return item['@id']; }
+  };
+  const parentOf = (path) => path.replace(/\/[^/]+\/?$/, '') || '/';
+  const positionOf = (item) =>
+    typeof item.getObjPositionInParent === 'number'
+      ? item.getObjPositionInParent
+      : Infinity;
 
-async function fetchNavigation(apiUrl, contextPath, querystring) {
-  const cond = querystring.query.find((c) => c.i === 'path');
-  let rootPath;
-  if (cond.o.includes('absolutePath')) {
-    rootPath = cond.v;
-  } else if (cond.o.includes('relativePath')) {
-    rootPath = resolveRelativePath(contextPath, cond.v);
-  } else {
-    throw new Error(`ploneFetchItems: unsupported path operator "${cond.o}" for navigation query`);
-  }
+  const itemPaths = new Set(items.map(pathOf));
+  const childrenByParent = new Map();
+  const roots = [];
 
-  const depth = querystring.depth ?? 1;
-  const headers = getAuthHeaders();
-  const url =
-    `${apiUrl}${contextPath}/++api++/@navigation` +
-    `?expand.navigation.root_path=${encodeURIComponent(rootPath)}` +
-    `&expand.navigation.depth=${depth}`;
-  const res = await fetch(url, { headers });
-  const response = await res.json();
-
-  // Flatten the tree depth-first. Each navigation node has nested `items`;
-  // strip that field after flattening so the result matches the flat shape
-  // @querystring-search would have returned (and so listing fieldMapping
-  // doesn't accidentally try to render the tree).
-  const flat = flattenNavigationTree(response.items || []);
-  return { items: flat, total: flat.length };
-}
-
-function resolveRelativePath(base, rel) {
-  const segs = (base + '/' + (rel || '')).split('/').filter(Boolean);
-  const stack = [];
-  for (const seg of segs) {
-    if (seg === '.') continue;
-    if (seg === '..') stack.pop();
-    else stack.push(seg);
-  }
-  return '/' + stack.join('/');
-}
-
-function flattenNavigationTree(treeItems) {
-  const out = [];
-  for (const node of treeItems) {
-    const { items: children, ...rest } = node;
-    out.push(rest);
-    if (children && children.length) {
-      out.push(...flattenNavigationTree(children));
+  for (const item of items) {
+    const parent = parentOf(pathOf(item));
+    if (itemPaths.has(parent)) {
+      const bucket = childrenByParent.get(parent) || [];
+      bucket.push(item);
+      childrenByParent.set(parent, bucket);
+    } else {
+      roots.push(item);
     }
   }
+
+  for (const bucket of childrenByParent.values()) {
+    bucket.sort((a, b) => positionOf(a) - positionOf(b));
+  }
+  roots.sort((a, b) => positionOf(a) - positionOf(b));
+
+  const out = [];
+  const visit = (item) => {
+    out.push(item);
+    const kids = childrenByParent.get(pathOf(item)) || [];
+    for (const k of kids) visit(k);
+  };
+  for (const r of roots) visit(r);
   return out;
 }
 

@@ -83,7 +83,7 @@ A hand-built nav. Two of the links share a URL depth and render at the same inde
 
 ### Auto-populated alternative
 
-Replace the manual `navItem` children with a single `listing` child configured to fetch from a path. The listing's `querystring.depth` constrains how deep the tree goes; the renderer derives the indent level from each result's `@id` path depth.
+Replace the manual `navItem` children with a single `listing` child configured to fetch from a path. The listing's `querystring.depth` constrains how deep the tree goes; the renderer derives the indent level from each result's `@id` path depth. Add an `exclude_from_nav: isFalse` criterion so pages hidden from navigation (e.g. example or scratch pages) don't appear in the nav.
 
 ```json
 {
@@ -92,12 +92,15 @@ Replace the manual `navItem` children with a single `listing` child configured t
   "blocks": {
     "cnav-listing": {
       "@type": "listing",
-      "variation": "nav",
+      "variation": "navItem",
       "querystring": {
         "query": [
           { "i": "path",
             "o": "plone.app.querystring.operation.string.relativePath",
-            "v": "." }
+            "v": "." },
+          { "i": "exclude_from_nav",
+            "o": "plone.app.querystring.operation.boolean.isFalse",
+            "v": "" }
         ],
         "sort_on": "getObjPositionInParent",
         "depth": 2
@@ -106,6 +109,8 @@ Replace the manual `navItem` children with a single `listing` child configured t
   }
 }
 ```
+
+`ploneFetchItems` always calls `@querystring-search`; when `sort_on === 'getObjPositionInParent'` it post-sorts the flat result into a parent-then-children hierarchical order. There is no special-case routing to `@navigation` — frontends are free to swap endpoints, but the default pipeline is "search + post-sort".
 
 ## Rendering
 
