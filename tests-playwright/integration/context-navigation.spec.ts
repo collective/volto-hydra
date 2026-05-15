@@ -118,6 +118,56 @@ test.describe('contextNavigation block', () => {
     await expect(iframe.getByText('Body of page A.')).toBeVisible();
   });
 
+  test('expandCurrentOnly hides descendants of unrelated siblings', async ({ page }) => {
+    // Fixture tree under context-navigation-forced-folder (depth 4 listing):
+    //   page-a
+    //   page-a/deep-1
+    //   page-b
+    //   page-b/under-b   ← descendant of an unrelated sibling
+    //
+    // When viewing page-a, the smart-expansion filter (expandCurrentOnly
+    // default true on the forced contextNavigation) should hide
+    // /page-b/under-b — it sits under page-b, which isn't on the
+    // ancestor chain of the current page. page-b itself (sibling of
+    // current) stays.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/context-navigation-forced-folder/page-a');
+
+    const iframe = helper.getIframe();
+    const forcedNav = iframe.locator('nav[aria-label="In this section"]');
+    await expect(forcedNav.locator('a.nav-item').first()).toBeVisible({ timeout: 10_000 });
+
+    const hrefs = await forcedNav.locator('a.nav-item').evaluateAll((els) =>
+      els.map((el) => el.getAttribute('href')),
+    );
+    expect(hrefs).toContain('/_test_data/context-navigation-forced-folder/page-a');
+    expect(hrefs).toContain('/_test_data/context-navigation-forced-folder/page-b');
+    expect(hrefs).toContain('/_test_data/context-navigation-forced-folder/page-a/deep-1');
+    // Filtered out: descendant of unrelated sibling page-b.
+    expect(hrefs).not.toContain('/_test_data/context-navigation-forced-folder/page-b/under-b');
+  });
+
+  test('includeTop prepends the section root as the first nav item', async ({ page }) => {
+    // nav-5 (on context-navigation-test-page) sets includeTop:true. The
+    // listing fetches /_test_data/context-navigation-forced-folder/* —
+    // the renderer derives the section root from the shallowest items'
+    // parent (/_test_data/context-navigation-forced-folder) and
+    // prepends it as the first <a>.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/context-navigation-test-page');
+
+    const iframe = helper.getIframe();
+    const nav = iframe.locator('[data-block-uid="nav-5"]');
+    await expect(nav).toBeVisible({ timeout: 10_000 });
+
+    const links = nav.locator('a.nav-item');
+    await expect(links.first()).toBeVisible({ timeout: 10_000 });
+    const firstHref = await links.first().getAttribute('href');
+    expect(firstHref).toBe('/_test_data/context-navigation-forced-folder');
+  });
+
 test('listing-derived level + hierarchical sort: depth=2 listing renders mixed levels in parent-then-children order', async ({ page }) => {
     // nav-4 fetches /context-navigation-forced-folder with depth=2 →
     //   page-a, page-b (depth 3 = 3 path segs)     → minDepth → level-1

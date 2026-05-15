@@ -101,10 +101,45 @@
       "items": {
         "items": ["snav-4-listing"]
       }
+    },
+    "nav-5": {
+      "@type": "contextNavigation",
+      "ariaLabel": "Section nav with top",
+      "includeTop": true,
+      "expandCurrentOnly": false,
+      "blocks": {
+        "snav-5-listing": {
+          "@type": "listing",
+          "variation": "navItem",
+          "fieldMapping": {
+            "@id": { "field": "href", "type": "link" },
+            "title": { "field": "label" }
+          },
+          "querystring": {
+            "query": [
+              {
+                "i": "path",
+                "o": "plone.app.querystring.operation.string.absolutePath",
+                "v": "/_test_data/context-navigation-forced-folder"
+              },
+              {
+                "i": "exclude_from_nav",
+                "o": "plone.app.querystring.operation.boolean.isFalse",
+                "v": ""
+              }
+            ],
+            "sort_on": "getObjPositionInParent",
+            "depth": 1
+          }
+        }
+      },
+      "items": {
+        "items": ["snav-5-listing"]
+      }
     }
   },
   "blocks_layout": {
-    "items": ["title-block", "nav-1", "nav-2", "nav-4"]
+    "items": ["title-block", "nav-1", "nav-2", "nav-4", "nav-5"]
   },
   "allow_discussion": false,
   "exclude_from_nav": false,

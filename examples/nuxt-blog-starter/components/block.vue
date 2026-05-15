@@ -994,47 +994,6 @@ const gridPageFromUrl = computed(() => {
 });
 const gridPaging = reactive({ start: 0, size: GRID_PAGE_SIZE });
 
-// contextNavigation: per-block disclosure state (mobile). Keyed by block
-// uid so nested or multiple navs on the same page don't share toggle state.
-// `undefined` and `true` both mean expanded; `false` means collapsed.
-const contextNavOpen = reactive({});
-
-// navItem helpers — keep them inline (small enough that a separate
-// composable isn't worth the indirection). Resolve href to a path,
-// match against the current route, and emit class string.
-//
-// Accepts both shapes:
-//   - manual navItem: href = [{ '@id': '...' }]  (object_browser)
-//   - listing nav-variation item: block['@id'] = '...'  (from search result)
-function navItemPath(navBlock) {
-  let raw = Array.isArray(navBlock.href) ? navBlock.href[0]?.['@id'] : navBlock.href;
-  if (!raw) raw = navBlock['@id'];
-  if (!raw) return '#';
-  try {
-    return new URL(raw, 'http://placeholder').pathname;
-  } catch {
-    return raw;
-  }
-}
-function navItemIsActive(navBlock) {
-  const itemPath = navItemPath(navBlock);
-  if (itemPath === '#') return false;
-  const here = route.path.replace(/\/$/, '');
-  return here === itemPath.replace(/\/$/, '');
-}
-function navItemClasses(navBlock) {
-  const level = Math.max(1, Math.min(3, navBlock.level || 1));
-  const itemPath = navItemPath(navBlock).replace(/\/$/, '');
-  const here = route.path.replace(/\/$/, '');
-  const active = here === itemPath && itemPath !== '#';
-  const inPath = !active && itemPath !== '#' && here.startsWith(itemPath + '/');
-  return [
-    'nav-item',
-    `level-${level}`,
-    active ? 'current' : '',
-    inPath ? 'in-path' : '',
-  ].filter(Boolean);
-}
 const gridBuildPagingUrl = (page) => {
   if (page === 0) return effectiveContextPath.value;
   return `${effectiveContextPath.value}/@pg_${block_uid.value}_${page}`;
