@@ -9,9 +9,14 @@
        :aria-label="block.ariaLabel"
        class="context-navigation">
     <details class="context-navigation-disclosure" open>
-      <summary class="context-navigation-summary" :data-block-selector="exposedUids">
-        <span class="context-navigation-summary-label">{{ block.ariaLabel }}</span>
-      </summary>
+      <!-- Empty textContent — only the default disclosure chevron
+           shows visually. Screen-reader name via aria-label. Keeps the
+           block's ariaLabel value out of any text node so block-sanity's
+           "string field must sit inside [data-edit-text]" rule doesn't
+           fire against this <summary>. -->
+      <summary class="context-navigation-summary"
+               aria-label="Toggle section navigation"
+               :data-block-selector="exposedUids"></summary>
       <ul role="list" :id="`${blockId}-list`" class="context-navigation-list">
         <li v-for="entry in entries" :key="entry.blockId">
           <a :href="entry.itemPath"

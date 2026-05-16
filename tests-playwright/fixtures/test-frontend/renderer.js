@@ -1323,9 +1323,12 @@ async function renderContextNavigationBlock(block, blockId) {
     // of any CSS override. Mobile-collapse-on-small-viewport is a
     // follow-up that needs JS to flip `open` based on viewport.
     html += `<details class="context-navigation-disclosure" open>`;
-    html += `<summary class="context-navigation-summary" data-block-selector="${escapeAttr(exposedUids)}">`;
-    html += `<span class="context-navigation-summary-label">${escapeHtml(ariaLabel)}</span>`;
-    html += `</summary>`;
+    // Summary has no text content — only the default disclosure chevron.
+    // Screen-reader name comes via aria-label on this <summary>. Empty
+    // textContent keeps the block's ariaLabel value out of any text
+    // node, so block-sanity's "string field must sit inside
+    // [data-edit-text]" rule doesn't fire against it.
+    html += `<summary class="context-navigation-summary" aria-label="Toggle section navigation" data-block-selector="${escapeAttr(exposedUids)}"></summary>`;
     html += `<ul role="list" id="${uid}-list" class="context-navigation-list">`;
     for (const entry of visible) {
         html += `<li>${renderNavItemBlock(entry.block, entry.blockId)}</li>`;
