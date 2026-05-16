@@ -1310,13 +1310,27 @@ async function renderContextNavigationBlock(block, blockId) {
         ? filterByCurrentPath(flat, allSegs, minDepth)
         : flat;
 
+    // `data-block-selector` carries the contextNavigation's uid + every
+    // exposed child id (manual navItem ids and the listing block id
+    // whose synthesised items share that uid). Word-list match in
+    // the bridge means selecting any of those uids opens the disclosure.
+    const exposedUids = [uid, ...items].join(' ');
+
     let html = `<nav data-block-uid="${escapeAttr(uid)}" aria-label="${escapeHtml(ariaLabel)}" class="context-navigation">`;
-    html += `<button class="context-navigation-toggle" aria-expanded="true" aria-controls="${uid}-list" type="button">Menu</button>`;
+    // Always rendered open. Native <details> hides its non-summary
+    // content via the [open] state, and Playwright's visibility heuristic
+    // (and screen readers) treat closed <details> as hidden regardless
+    // of any CSS override. Mobile-collapse-on-small-viewport is a
+    // follow-up that needs JS to flip `open` based on viewport.
+    html += `<details class="context-navigation-disclosure" open>`;
+    html += `<summary class="context-navigation-summary" data-block-selector="${escapeAttr(exposedUids)}">`;
+    html += `<span class="context-navigation-summary-label">${escapeHtml(ariaLabel)}</span>`;
+    html += `</summary>`;
     html += `<ul role="list" id="${uid}-list" class="context-navigation-list">`;
     for (const entry of visible) {
         html += `<li>${renderNavItemBlock(entry.block, entry.blockId)}</li>`;
     }
-    html += '</ul></nav>';
+    html += '</ul></details></nav>';
     return html;
 }
 

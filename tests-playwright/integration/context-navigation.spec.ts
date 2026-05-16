@@ -67,18 +67,21 @@ test.describe('contextNavigation block', () => {
     const nav = iframe.locator('[data-block-uid="nav-1"]');
     await expect(nav).toBeVisible({ timeout: 10_000 });
 
-    // The toggle <button> is always in the DOM; CSS hides it on desktop.
-    const toggle = nav.locator('button.context-navigation-toggle');
-    await expect(toggle).toBeAttached();
-    await expect(toggle).toHaveAttribute('aria-controls', /nav-1-list$/);
+    // The disclosure summary is always in the DOM (as <details><summary>);
+    // CSS hides it on desktop and shows it on mobile.
+    const summary = nav.locator('summary.context-navigation-summary');
+    await expect(summary).toBeAttached();
 
-    // At the default viewport (≥768) the toggle isn't visible. We check
-    // computed style rather than .isVisible() because Playwright's
-    // visible heuristic considers offset/opacity but not display.
-    const isHidden = await toggle.evaluate(
+    // At the default viewport (≥768) the summary isn't visible. The list
+    // IS visible — the CSS forces `details > :not(summary)` open even
+    // when the <details> itself has no `open` attribute.
+    const summaryHidden = await summary.evaluate(
       (el) => window.getComputedStyle(el).display === 'none',
     );
-    expect(isHidden).toBe(true);
+    expect(summaryHidden, 'summary hidden on desktop').toBe(true);
+
+    const list = nav.locator('ul.context-navigation-list');
+    await expect(list).toBeVisible();
   });
 
   test('context-navigation-layout forces contextNavigation onto 3rd-level pages', async ({ page }) => {

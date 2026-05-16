@@ -9885,9 +9885,12 @@ export class Bridge {
     log(`tryMakeBlockVisible: ${targetUid}`);
     // Set flag to prevent handleBlockSelector from interfering
     this._navigatingToBlock = targetUid;
-    // First, try direct selector: data-block-selector="{targetUid}"
+    // Word-list match (`~=`) lets a single trigger element expose many
+    // descendants — `data-block-selector="uid-a uid-b uid-c"` matches
+    // any listed uid. Used by collapsible containers like a
+    // contextNavigation `<summary>` that carries every child's uid.
     const directSelector = document.querySelector(
-      `[data-block-selector="${targetUid}"]`,
+      `[data-block-selector~="${targetUid}"]`,
     );
     // Click the appropriate selector to navigate toward the target block.
     // For direct selectors (data-block-selector="{uid}"), one click suffices.
@@ -9979,9 +9982,21 @@ export class Bridge {
       log(`tryMakeBlockVisible: clicking ${direction}, expecting ${nextUid} to become visible`);
     }
 
-    // Click the selector and wait for nextUid to become visible
-    clickedSelector.click();
-    log(`tryMakeBlockVisible: click() called`);
+    // For a `<summary>` we set `details.open = true` directly instead of
+    // clicking — clicking would TOGGLE, which closes an already-open
+    // disclosure. Setting the attribute is idempotent and lets the same
+    // path work whether the summary is already open or not.
+    const summaryDetails =
+      clickedSelector.tagName === 'SUMMARY'
+        ? clickedSelector.closest('details')
+        : null;
+    if (summaryDetails) {
+      summaryDetails.open = true;
+      log(`tryMakeBlockVisible: opened <details> via summary`);
+    } else {
+      clickedSelector.click();
+      log(`tryMakeBlockVisible: click() called`);
+    }
 
     const startTime = performance.now();
     const MAX_WAIT_MS = 2000;

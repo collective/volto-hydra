@@ -84,25 +84,29 @@
         }
         .nav-item.in-path { color: #036; }
 
-        /* Sidebar on desktop, full-width disclosure on mobile */
+        /* Mobile (default): native <details> collapsed. Summary is the
+           tap target. */
+        .context-navigation-summary {
+            cursor: pointer;
+            padding: 0.5rem 0.75rem;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            list-style: revert;
+            user-select: none;
+        }
+        /* Desktop: force content visible regardless of [open], hide
+           summary (no toggle UI needed — the sidebar IS the nav). */
         @media (min-width: 768px) {
             .context-navigation {
                 float: left;
                 width: 220px;
                 margin-right: 1.5rem;
             }
-            .context-navigation-toggle { display: none; }
-        }
-        @media (max-width: 767px) {
-            .context-navigation-toggle {
-                display: block;
-                background: #f0f0f0;
-                border: 1px solid #ddd;
-                padding: 0.5rem 1rem;
-                cursor: pointer;
-                margin-bottom: 0.5rem;
+            .context-navigation-disclosure > :not(summary) {
+                display: block !important;
             }
-            .context-navigation .context-navigation-toggle[aria-expanded="false"] + .context-navigation-list {
+            .context-navigation-summary {
                 display: none;
             }
         }

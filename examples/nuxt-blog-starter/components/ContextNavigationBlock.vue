@@ -1,25 +1,29 @@
 <template>
+  <!-- Mobile-first: native `<details>` collapsed by default; CSS forces
+       it open at ≥768px and hides the summary. `data-block-selector` on
+       summary carries this contextNavigation's uid + every child's uid,
+       so the bridge can match any of them via the `~=` word-list match
+       and set `details.open = true` to expose the selected block during
+       admin editing. -->
   <nav :data-block-uid="blockId"
        :aria-label="block.ariaLabel"
        class="context-navigation">
-    <button type="button"
-            class="context-navigation-toggle"
-            :aria-expanded="open ? 'true' : 'false'"
-            :aria-controls="`${blockId}-list`"
-            @click="open = !open">
-      Menu
-    </button>
-    <ul role="list" :id="`${blockId}-list`" class="context-navigation-list">
-      <li v-for="entry in entries" :key="entry.blockId">
-        <a :href="entry.itemPath"
-           :data-block-uid="entry.blockId"
-           :class="entry.classes"
-           :aria-current="entry.active ? 'page' : null"
-           data-edit-link="href">
-          <span data-edit-text="label">{{ entry.block.label }}</span>
-        </a>
-      </li>
-    </ul>
+    <details class="context-navigation-disclosure" open>
+      <summary class="context-navigation-summary" :data-block-selector="exposedUids">
+        <span class="context-navigation-summary-label">{{ block.ariaLabel }}</span>
+      </summary>
+      <ul role="list" :id="`${blockId}-list`" class="context-navigation-list">
+        <li v-for="entry in entries" :key="entry.blockId">
+          <a :href="entry.itemPath"
+             :data-block-uid="entry.blockId"
+             :class="entry.classes"
+             :aria-current="entry.active ? 'page' : null"
+             data-edit-link="href">
+            <span data-edit-text="label">{{ entry.block.label }}</span>
+          </a>
+        </li>
+      </ul>
+    </details>
   </nav>
 </template>
 
@@ -37,7 +41,7 @@
 // async (fetches via the Plone REST API).
 // `ref` from vue; `useRoute` is a Nuxt auto-import composable so no explicit
 // import is needed for it (same pattern as ListingBlock.vue).
-import { ref } from 'vue';
+import { computed } from 'vue';
 import { expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';
 
 const props = defineProps({
@@ -47,10 +51,18 @@ const props = defineProps({
   contextPath: { type: String, required: true },
 });
 
-const open = ref(true);
 const route = useRoute();
 
 const NAV_LISTING_SIZE = 1000;
+
+// space-separated list of uids the disclosure exposes — own uid + every
+// direct child block id (manual navItems + listing block ids). Used by
+// the bridge's data-block-selector `~=` word-list match to open the
+// disclosure when admin selects any of these blocks.
+const exposedUids = computed(() => {
+  const childIds = props.block.items?.items || [];
+  return [props.blockId, ...childIds].join(' ');
+});
 
 async function expandChildren() {
   const flat = [];

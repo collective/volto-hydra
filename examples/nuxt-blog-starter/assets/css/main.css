@@ -109,28 +109,29 @@ h2, h3, h4, h5, .image-align-center, .image-align-wide, .image-align-full { clea
 }
 .nav-item.in-path { color: #036; }
 
-/* Sidebar on desktop, disclosure on mobile. */
+/* Mobile (default): native <details> collapsed; summary is the tap target. */
+.context-navigation-summary {
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    width: 100%;
+    user-select: none;
+}
+
+/* Desktop (≥768px): force content visible regardless of [open], hide
+   summary (sidebar IS the nav — no toggle UI needed). */
 @media (min-width: 768px) {
     .context-navigation {
         float: left;
         width: 240px;
         margin-right: 1.5rem;
     }
-    .context-navigation .context-navigation-toggle { display: none; }
-}
-@media (max-width: 767px) {
-    .context-navigation .context-navigation-toggle {
-        display: block;
-        background: #f3f4f6;
-        border: 1px solid #d1d5db;
-        padding: 0.5rem 1rem;
-        border-radius: 4px;
-        cursor: pointer;
-        margin-bottom: 0.5rem;
-        width: 100%;
-        text-align: left;
+    .context-navigation-disclosure > :not(summary) {
+        display: block !important;
     }
-    .context-navigation .context-navigation-toggle[aria-expanded="false"] + .context-navigation-list {
+    .context-navigation-summary {
         display: none;
     }
 }
