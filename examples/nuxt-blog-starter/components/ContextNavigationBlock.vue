@@ -1,14 +1,16 @@
 <template>
-  <!-- Mobile-first: native `<details>` collapsed by default; CSS forces
-       it open at ≥768px and hides the summary. `data-block-selector` on
-       summary carries this contextNavigation's uid + every child's uid,
-       so the bridge can match any of them via the `~=` word-list match
-       and set `details.open = true` to expose the selected block during
-       admin editing. -->
+  <!-- Mobile-first: native `<details>` open at ≥768px, collapsed below.
+       Open state is driven by a matchMedia listener on mount so the
+       disclosure has real mobile UX (tap summary to expand) while desktop
+       readers see the list directly. `data-block-selector` on summary
+       carries this contextNavigation's uid + every child's uid, so the
+       bridge can match any of them via the `~=` word-list match and set
+       `details.open = true` to expose the selected block during admin
+       editing. -->
   <nav :data-block-uid="blockId"
        :aria-label="block.ariaLabel"
        class="context-navigation">
-    <details class="context-navigation-disclosure" open>
+    <details ref="detailsRef" class="context-navigation-disclosure">
       <!-- Empty textContent — only the default disclosure chevron
            shows visually. Screen-reader name via aria-label. Keeps the
            block's ariaLabel value out of any text node so block-sanity's
@@ -46,7 +48,7 @@
 // async (fetches via the Plone REST API).
 // `ref` from vue; `useRoute` is a Nuxt auto-import composable so no explicit
 // import is needed for it (same pattern as ListingBlock.vue).
-import { computed } from 'vue';
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import { expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';
 
 const props = defineProps({
@@ -57,6 +59,26 @@ const props = defineProps({
 });
 
 const route = useRoute();
+
+// Mobile-first: open above 768px, closed below. matchMedia listener
+// re-evaluates on viewport changes so resize works without reload.
+// User toggling the summary still overrides until the next matchMedia
+// change — that's standard <details> behavior.
+const detailsRef = ref(null);
+const DESKTOP_QUERY = '(min-width: 768px)';
+let mql = null;
+const onMediaChange = (e) => {
+  if (detailsRef.value) detailsRef.value.open = e.matches;
+};
+onMounted(() => {
+  if (typeof window === 'undefined') return;
+  mql = window.matchMedia(DESKTOP_QUERY);
+  if (detailsRef.value) detailsRef.value.open = mql.matches;
+  mql.addEventListener('change', onMediaChange);
+});
+onBeforeUnmount(() => {
+  if (mql) mql.removeEventListener('change', onMediaChange);
+});
 
 const NAV_LISTING_SIZE = 1000;
 

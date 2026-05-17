@@ -120,16 +120,13 @@ h2, h3, h4, h5, .image-align-center, .image-align-wide, .image-align-full { clea
     user-select: none;
 }
 
-/* Desktop (≥768px): force content visible regardless of [open], hide
-   summary (sidebar IS the nav — no toggle UI needed). */
+/* Desktop (≥768px): sidebar layout + hide summary (matchMedia opens
+   [details] at this breakpoint so the toggle is redundant). */
 @media (min-width: 768px) {
     .context-navigation {
         float: left;
         width: 240px;
         margin-right: 1.5rem;
-    }
-    .context-navigation-disclosure > :not(summary) {
-        display: block !important;
     }
     .context-navigation-summary {
         display: none;

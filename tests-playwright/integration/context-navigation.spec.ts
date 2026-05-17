@@ -217,6 +217,64 @@ test('listing-derived level + hierarchical sort: depth=2 listing renders mixed l
     expect(pageAIdx, 'page-a before its child deep-1 (hierarchical)').toBeLessThan(deepIdx);
   });
 
+  test('bridge expose: at mobile viewport, selecting hidden navItem opens the disclosure', async ({ page }) => {
+    // Companion to the carousel test in container-blocks.spec.ts:
+    //   'clicking hidden slide in sidebar ChildBlocksWidget selects it'
+    // — but for the contextNavigation's <details>/<summary> disclosure.
+    // Exercises the bridge's word-list `data-block-selector~=` match +
+    // the SUMMARY special-case that flips `details.open = true`.
+    //
+    // Load the admin at its default desktop viewport so the layout
+    // renders normally; the cnav's `<details>` opens at desktop width
+    // via matchMedia. THEN we narrow the viewport below the 768px
+    // breakpoint — the iframe's matchMedia('change') listener fires
+    // and closes the disclosure, matching what a user crossing the
+    // breakpoint via devtools / resize would see. The bridge expose
+    // path then runs against a genuinely closed disclosure.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/context-navigation-test-page');
+
+    const iframe = helper.getIframe();
+    const cnav = iframe.locator('[data-block-uid="nav-1"]');
+    await expect(cnav).toBeAttached({ timeout: 10_000 });
+
+    // Now shrink to mobile — the iframe's matchMedia listener flips
+    // `details.open = false` because the (min-width: 768px) media query
+    // no longer matches.
+    await page.setViewportSize({ width: 375, height: 800 });
+
+    const details = cnav.locator('details');
+    await expect(details).toBeAttached();
+    await expect.poll(
+      async () => details.evaluate((d: HTMLDetailsElement) => d.open),
+      { timeout: 5000, message: 'matchMedia should close <details> at mobile viewport' },
+    ).toBe(false);
+
+    const childLink = cnav.locator('a.nav-item').first();
+    await expect(childLink).toBeAttached();
+    const childUid = await childLink.getAttribute('data-block-uid');
+    expect(childUid).toBeTruthy();
+    await expect(childLink).toBeHidden();
+
+    // Drive selection of the hidden navItem the same way the admin would —
+    // postMessage SELECT_BLOCK to the iframe. The bridge's selectBlock
+    // handler will see the target is not visible, find the <summary>
+    // whose `data-block-selector` word-list contains childUid, and
+    // flip `details.open = true`.
+    await page.evaluate((uid) => {
+      const iframeEl = document.querySelector('iframe');
+      iframeEl.contentWindow.postMessage({ type: 'SELECT_BLOCK', uid }, '*');
+    }, childUid);
+
+    // Bridge expose: <details> is now open and the navItem visible.
+    await expect.poll(
+      async () => details.evaluate((d: HTMLDetailsElement) => d.open),
+      { timeout: 5000 },
+    ).toBe(true);
+    await expect(childLink).toBeVisible();
+  });
+
   test('listing child with depth=1 returns direct children only', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();

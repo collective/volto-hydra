@@ -95,16 +95,13 @@
             list-style: revert;
             user-select: none;
         }
-        /* Desktop: force content visible regardless of [open], hide
-           summary (no toggle UI needed — the sidebar IS the nav). */
+        /* Desktop: sidebar layout + hide summary (the matchMedia JS
+           opens [details] at this breakpoint so the toggle is redundant). */
         @media (min-width: 768px) {
             .context-navigation {
                 float: left;
                 width: 220px;
                 margin-right: 1.5rem;
-            }
-            .context-navigation-disclosure > :not(summary) {
-                display: block !important;
             }
             .context-navigation-summary {
                 display: none;

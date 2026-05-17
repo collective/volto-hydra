@@ -4,10 +4,17 @@
          :data-block-uid="panel['@uid']"
          class="border border-gray-200 dark:border-gray-700">
       <h2>
+        <!-- data-block-selector lists this panel's uid + every child uid
+             inside it. When the admin selects a hidden child, the bridge's
+             tryMakeBlockVisible() finds this button via the `~=` word-list
+             match and clicks it — the click handler runs toggle() which
+             opens the panel. Idempotency: the bridge skips the click if
+             aria-expanded is already "true". -->
         <button type="button"
           class="flex items-center justify-between w-full p-5 font-medium rtl:text-right text-gray-500 focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-800 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 gap-3"
           :class="{ 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white': openPanels[panel['@uid']] }"
           :aria-expanded="openPanels[panel['@uid']] ? 'true' : 'false'"
+          :data-block-selector="panelSelector(panel)"
           @click="toggle(panel['@uid'])">
           <span data-edit-text="title">{{ panel.title }}</span>
           <svg class="w-3 h-3 shrink-0 transition-transform" :class="{ 'rotate-180': !openPanels[panel['@uid']] }"
@@ -55,5 +62,16 @@ if (panels.length > 0) {
 
 function toggle(id) {
   openPanels[id] = !openPanels[id];
+}
+
+// Word-list of uids the bridge's tryMakeBlockVisible() can match
+// against — own panel uid + every direct child block uid in that
+// panel. Listing-block children are flattened by expand() at render
+// time and aren't known here, but their parent listing block IS in
+// the layout, so its uid joins the list. The bridge then opens this
+// panel whenever any of those uids is selected from the admin.
+function panelSelector(panel) {
+  const childIds = panel.blocks_layout?.items || [];
+  return [panel['@uid'], ...childIds].join(' ');
 }
 </script>

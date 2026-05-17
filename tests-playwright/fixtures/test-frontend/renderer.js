@@ -161,6 +161,23 @@ async function renderContent(content, containerId = 'content', renderGeneration)
     tfLog('renderContent: SWAP gen=' + renderGeneration + ' t=' + performance.now().toFixed(0));
     container.innerHTML = '';
     container.appendChild(fragment);
+
+    // Mobile-first cnav: sync newly-rendered <details> to the current
+    // viewport. Global listener (below) covers resize after this point.
+    syncCnavOpenState();
+}
+
+/**
+ * Sync contextNavigation <details> open state to viewport. Open at
+ * ≥768px, closed below. Called after every render + on viewport change.
+ * Idempotent — setting `open` to the same value is a no-op.
+ */
+function syncCnavOpenState() {
+    if (typeof window === 'undefined') return;
+    const desktop = window.matchMedia('(min-width: 768px)').matches;
+    document
+        .querySelectorAll('details.context-navigation-disclosure')
+        .forEach((d) => { d.open = desktop; });
 }
 
 /**
@@ -1317,12 +1334,13 @@ async function renderContextNavigationBlock(block, blockId) {
     const exposedUids = [uid, ...items].join(' ');
 
     let html = `<nav data-block-uid="${escapeAttr(uid)}" aria-label="${escapeHtml(ariaLabel)}" class="context-navigation">`;
-    // Always rendered open. Native <details> hides its non-summary
-    // content via the [open] state, and Playwright's visibility heuristic
-    // (and screen readers) treat closed <details> as hidden regardless
-    // of any CSS override. Mobile-collapse-on-small-viewport is a
-    // follow-up that needs JS to flip `open` based on viewport.
-    html += `<details class="context-navigation-disclosure" open>`;
+    // Mobile-first: rendered without `[open]`. syncCnavOpenState() runs
+    // after every render and a global matchMedia listener resyncs on
+    // resize. Below 768px the disclosure is naturally collapsed; at or
+    // above, the bridge / matchMedia opens it. Native <details>
+    // visibility semantics drive Playwright + screen readers, so the
+    // `open` attribute is the single source of truth — not CSS.
+    html += `<details class="context-navigation-disclosure">`;
     // Summary has no text content — only the default disclosure chevron.
     // Screen-reader name comes via aria-label on this <summary>. Empty
     // textContent keeps the block's ariaLabel value out of any text
@@ -2367,4 +2385,11 @@ if (document.readyState === 'loading') {
     initCarouselNavigation();
     initSearchFormHandling();
     initFacetHandling();
+}
+
+// Global cnav viewport listener — resyncs all contextNavigation
+// disclosures when crossing the 768px breakpoint. Per-render sync is
+// in renderContent(); this covers user resize + devtools toggle.
+if (typeof window !== 'undefined' && window.matchMedia) {
+    window.matchMedia('(min-width: 768px)').addEventListener('change', syncCnavOpenState);
 }

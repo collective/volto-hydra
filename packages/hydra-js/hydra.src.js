@@ -9828,20 +9828,29 @@ export class Bridge {
    */
   isElementHidden(el) {
     if (!el) return true;
-    const style = window.getComputedStyle(el);
-    if (style.display === 'none' || style.visibility === 'hidden') {
-      return true;
+    // Platform API: covers every hiding mechanism the browser knows
+    // about — display:none, visibility:hidden, content-visibility:auto,
+    // AND the closed <details> internal-slot case that computed style
+    // and getBoundingClientRect both miss. Same primitive Playwright
+    // uses for its own visibility checks.
+    if (typeof el.checkVisibility === 'function') {
+      if (!el.checkVisibility({ checkVisibilityCSS: true })) return true;
+    } else {
+      // Fallback for older runtimes (shouldn't fire on current evergreen
+      // browsers — Chromium 105+, Safari 17.4+, Firefox 125+).
+      const style = window.getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden') return true;
+      const rect0 = el.getBoundingClientRect();
+      if (rect0.width === 0 && rect0.height === 0) return true;
     }
+    // checkVisibility() doesn't catch off-screen translates (e.g. Flowbite
+    // carousel uses translate-x-full to hide slides while keeping them
+    // rendered). Element is hidden if it's completely outside its
+    // [data-block-uid] container's horizontal bounds.
     const rect = el.getBoundingClientRect();
-    if (rect.width === 0 && rect.height === 0) {
-      return true;
-    }
-    // Check if element is translated/positioned outside its container
-    // (e.g., Flowbite carousel uses translate-x-full to hide slides)
     const container = el.parentElement?.closest('[data-block-uid]');
     if (container) {
       const containerRect = container.getBoundingClientRect();
-      // Element is hidden if it's completely outside the container bounds
       if (rect.right <= containerRect.left || rect.left >= containerRect.right) {
         return true;
       }
@@ -9982,17 +9991,25 @@ export class Bridge {
       log(`tryMakeBlockVisible: clicking ${direction}, expecting ${nextUid} to become visible`);
     }
 
-    // For a `<summary>` we set `details.open = true` directly instead of
-    // clicking — clicking would TOGGLE, which closes an already-open
-    // disclosure. Setting the attribute is idempotent and lets the same
-    // path work whether the summary is already open or not.
+    // Idempotency: clicking a toggle that's already in the "open" state
+    // would CLOSE it — the opposite of "make visible". For each container
+    // pattern we know about, skip the toggle when it's already open.
+    //
+    //   <summary>  — read `details.open` directly; setting `open = true`
+    //                is idempotent (no-op when already true).
+    //   accordion  — the toggle button carries `aria-expanded`; if it's
+    //                already "true" the panel is open, skip the click.
+    //   carousel/slider — no aria-expanded; one click always moves it.
     const summaryDetails =
       clickedSelector.tagName === 'SUMMARY'
         ? clickedSelector.closest('details')
         : null;
+    const expandedAttr = clickedSelector.getAttribute('aria-expanded');
     if (summaryDetails) {
       summaryDetails.open = true;
       log(`tryMakeBlockVisible: opened <details> via summary`);
+    } else if (expandedAttr === 'true') {
+      log(`tryMakeBlockVisible: target trigger already expanded, skipping click`);
     } else {
       clickedSelector.click();
       log(`tryMakeBlockVisible: click() called`);
