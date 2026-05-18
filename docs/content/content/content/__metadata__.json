@@ -70,6 +70,7 @@
     "docs/examples/button/data.json",
     "docs/examples/columns/data.json",
     "docs/examples/content-types/data.json",
+    "docs/examples/contextNavigation/data.json",
     "docs/examples/form/data.json",
     "docs/examples/grid/data.json",
     "docs/examples/heading/data.json",
@@ -723,6 +724,13 @@
       }
     },
     "docs-static-hydra-demo-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-examples-contextNavigation-001": {
       "local_roles": {
         "admin": [
           "Owner"

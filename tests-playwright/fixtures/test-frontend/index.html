@@ -85,7 +85,7 @@
         .nav-item.in-path { color: #036; }
 
         /* Mobile (default): native <details> collapsed. Summary is the
-           tap target. */
+           tap target — styled as a clickable pill. */
         .context-navigation-summary {
             cursor: pointer;
             padding: 0.5rem 0.75rem;
@@ -94,18 +94,29 @@
             border-radius: 4px;
             list-style: revert;
             user-select: none;
+            font-weight: 600;
         }
-        /* Desktop: sidebar layout + hide summary (the matchMedia JS
-           opens [details] at this breakpoint so the toggle is redundant). */
+        /* Desktop: nav stays at top of the content. matchMedia opens
+           [details]; summary becomes a section-label header (small caps,
+           muted) à la Stripe/MDN/Primer. Drop the chevron + pill since
+           there's no interactive toggling happening visually. */
         @media (min-width: 768px) {
-            .context-navigation {
-                float: left;
-                width: 220px;
-                margin-right: 1.5rem;
-            }
             .context-navigation-summary {
-                display: none;
+                cursor: default;
+                padding: 0 0 0.25rem 0;
+                background: transparent;
+                border: none;
+                border-bottom: 1px solid #e5e7eb;
+                border-radius: 0;
+                margin-bottom: 0.5rem;
+                font-size: 0.75rem;
+                font-weight: 600;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                color: #6b7280;
+                list-style: none;
             }
+            .context-navigation-summary::-webkit-details-marker { display: none; }
         }
     </style>
 </head>

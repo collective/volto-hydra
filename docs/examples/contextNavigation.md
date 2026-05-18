@@ -28,7 +28,10 @@ This is a **custom** block — register it via `initBridge`. Pair it with `navIt
         "items": {
           "title": "Items",
           "widget": "blocks_layout",
-          "allowedBlocks": ["navItem", "listing"]
+          "allowedBlocks": [
+            "navItem",
+            "listing"
+          ]
         }
       }
     }
@@ -36,19 +39,20 @@ This is a **custom** block — register it via `initBridge`. Pair it with `navIt
   "navItem": {
     "blockSchema": {
       "properties": {
-        "label": { "title": "Label" },
-        "href":  { "title": "Link", "widget": "object_browser", "mode": "link" }
+        "label": {
+          "title": "Label"
+        },
+        "href": {
+          "title": "Link",
+          "widget": "object_browser",
+          "mode": "link"
+        }
       }
     }
   }
 }
 ```
 
-Indent level is not a field. The renderer derives it from each link's URL path depth relative to the shallowest sibling in the nav.
-
-`expandCurrentOnly` (default `true`) controls smart-expansion: the renderer hides items that are descendants of unrelated siblings. An item survives when it sits on the ancestor chain of the current page, is a sibling at any ancestor level, is the current page itself, or is a descendant of the current page. Matches Sphinx / Docusaurus / Read-the-Docs sidebar behaviour. Set `false` to render every item the listing returns (useful for hand-built navs that link to unrelated paths).
-
-`includeTop` (default `false`) prepends the section root itself as the first nav item — e.g. on `/concepts/visual-editing` with a listing anchored at `/concepts`, set `includeTop: true` to show `/concepts` (linked to the section root) above the per-page links. Matches Volto's `includeTop` portlet parameter.
 
 ## JSON Block Data
 
@@ -62,21 +66,57 @@ A hand-built nav. Two of the links share a URL depth and render at the same inde
     "nav-1": {
       "@type": "navItem",
       "label": "Introduction",
-      "href": [{ "@id": "/docs/introduction" }]
+      "href": [
+        {
+          "@id": "/docs/introduction"
+        }
+      ]
     },
     "nav-2": {
       "@type": "navItem",
       "label": "Custom blocks",
-      "href": [{ "@id": "/docs/custom-blocks" }]
+      "href": [
+        {
+          "@id": "/docs/custom-blocks"
+        }
+      ]
     },
     "nav-2a": {
       "@type": "navItem",
       "label": "Schema",
-      "href": [{ "@id": "/docs/custom-blocks/schema" }]
+      "href": [
+        {
+          "@id": "/docs/custom-blocks/schema"
+        }
+      ]
+    },
+    "nav-2b": {
+      "@type": "navItem",
+      "label": "Rendering",
+      "href": [
+        {
+          "@id": "/docs/custom-blocks/rendering"
+        }
+      ]
+    },
+    "nav-3": {
+      "@type": "navItem",
+      "label": "Listings",
+      "href": [
+        {
+          "@id": "/docs/listings"
+        }
+      ]
     }
   },
   "items": {
-    "items": ["nav-1", "nav-2", "nav-2a"]
+    "items": [
+      "nav-1",
+      "nav-2",
+      "nav-2a",
+      "nav-2b",
+      "nav-3"
+    ]
   }
 }
 ```

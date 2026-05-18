@@ -109,7 +109,8 @@ h2, h3, h4, h5, .image-align-center, .image-align-wide, .image-align-full { clea
 }
 .nav-item.in-path { color: #036; }
 
-/* Mobile (default): native <details> collapsed; summary is the tap target. */
+/* Mobile (default): native <details> collapsed; summary is the tap target.
+   Pill background so it reads as an interactive disclosure. */
 .context-navigation-summary {
     cursor: pointer;
     padding: 0.5rem 1rem;
@@ -118,17 +119,28 @@ h2, h3, h4, h5, .image-align-center, .image-align-wide, .image-align-full { clea
     border-radius: 4px;
     width: 100%;
     user-select: none;
+    font-weight: 600;
 }
 
-/* Desktop (≥768px): sidebar layout + hide summary (matchMedia opens
-   [details] at this breakpoint so the toggle is redundant). */
+/* Desktop (≥768px): nav stays at top of the content. matchMedia opens
+   [details]; the summary becomes a section-label header (small caps,
+   muted, à la Stripe/MDN/Primer). Drop the chevron + pill since
+   there's no interactive toggling happening visually. */
 @media (min-width: 768px) {
-    .context-navigation {
-        float: left;
-        width: 240px;
-        margin-right: 1.5rem;
-    }
     .context-navigation-summary {
-        display: none;
+        cursor: default;
+        padding: 0 0 0.25rem 0;
+        background: transparent;
+        border: none;
+        border-bottom: 1px solid #e5e7eb;
+        border-radius: 0;
+        margin-bottom: 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #6b7280;
+        list-style: none;
     }
+    .context-navigation-summary::-webkit-details-marker { display: none; }
 }

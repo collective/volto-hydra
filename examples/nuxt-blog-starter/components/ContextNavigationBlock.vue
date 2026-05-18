@@ -11,14 +11,15 @@
        :aria-label="block.ariaLabel"
        class="context-navigation">
     <details ref="detailsRef" class="context-navigation-disclosure">
-      <!-- Empty textContent — only the default disclosure chevron
-           shows visually. Screen-reader name via aria-label. Keeps the
-           block's ariaLabel value out of any text node so block-sanity's
-           "string field must sit inside [data-edit-text]" rule doesn't
-           fire against this <summary>. -->
+      <!-- Static "In this section" header text — visible on both
+           mobile (also the tap target for the disclosure) and desktop
+           (styled as a small section label, à la Stripe/MDN/Primer).
+           Hardcoded string, not pulled from block data, so the
+           block.ariaLabel field value (used on the outer <nav>) doesn't
+           land in any text node — keeps block-sanity's "string field
+           must sit inside [data-edit-text]" rule happy. -->
       <summary class="context-navigation-summary"
-               aria-label="Toggle section navigation"
-               :data-block-selector="exposedUids"></summary>
+               :data-block-selector="exposedUids">In this section</summary>
       <ul role="list" :id="`${blockId}-list`" class="context-navigation-list">
         <li v-for="entry in entries" :key="entry.blockId">
           <a :href="entry.itemPath"
