@@ -4,12 +4,15 @@
   "UID": "context-navigation-forced-folder-page-a-uid",
   "id": "page-a",
   "title": "Page A",
-  "description": "Third-level page — should get contextNavigation forced via context-navigation-layout.",
+  "description": "Third-level page with the context-navigation-layout template inserted — exercises template-merge for a container block whose layout field is `items` (not `blocks_layout`), so findBlocksLayoutField has to find it by shape.",
   "review_state": "published",
   "blocks": {
     "title-block": { "@type": "title" },
     "body": {
       "@type": "slate",
+      "templateId": "resolveuid/context-navigation-layout-uid",
+      "templateInstanceId": "page-a-cnav-instance",
+      "slotId": "default",
       "value": [{ "type": "p", "children": [{ "text": "Body of page A. The contextNavigation should appear above this." }] }],
       "plaintext": "Body of page A. The contextNavigation should appear above this."
     }

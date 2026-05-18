@@ -14,8 +14,12 @@
  *    children come back, no grand-children — and that listing items
  *    render via the same navItem template.
  *
- *  - The context-navigation-layout template (a forced layout) injects
- *    a contextNavigation onto any page under /context-navigation-forced-folder/.
+ *  - The context-navigation-layout template, inserted via standard
+ *    template-instance markers (templateId + templateInstanceId +
+ *    slotId) on the pages under /context-navigation-forced-folder/.
+ *    Exercises the template-merge path with a container block whose
+ *    layout field is `items`, not `blocks_layout` — picked up by
+ *    findBlocksLayoutField rather than a hardcoded field name.
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
@@ -84,16 +88,18 @@ test.describe('contextNavigation block', () => {
     await expect(list).toBeVisible();
   });
 
-  test('context-navigation-layout forces contextNavigation onto 3rd-level pages', async ({ page }) => {
-    // The fixture tree:
-    //   /_test_data/context-navigation-forced-folder/         (no force — depth 2)
-    //   /_test_data/context-navigation-forced-folder/page-a/  (forced)
-    //   /_test_data/context-navigation-forced-folder/page-b/  (forced)
+  test('context-navigation-layout template-merge: inserted-template fixture renders the fixed cnav block + body slot', async ({ page }) => {
+    // page-a/data.json opts into the context-navigation-layout template
+    // via the standard inserted-template pattern (templateId +
+    // templateInstanceId + slotId on the body block) — same shape as
+    // inserted-template-test-page. No path-based force-rule.
     //
-    // test-frontend/index.html sets allowedLayouts=[context-navigation-layout]
-    // for any path under context-navigation-forced-folder/, so
-    // expandTemplates merges the layout's fixed contextNavigation block
-    // on top of the page's own body content.
+    // Why the fixture exists: the template's tpl-context-nav block uses
+    // `items: { items: [...] }` (not `blocks_layout`) for its layout
+    // field. The merge code can't hardcode the field name — it has to
+    // detect it by shape via findBlocksLayoutField. If that detection
+    // regresses, the cnav's listing child won't expand and this test's
+    // sibling-link assertions below will fail loudly.
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/context-navigation-forced-folder/page-a');

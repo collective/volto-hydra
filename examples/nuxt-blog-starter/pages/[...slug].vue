@@ -321,12 +321,14 @@ const footerAllowedLayouts = computed(() => {
     return ['/templates/site-footer'];
 });
 
-// Force context-navigation-layout on every 2nd-level page (and deeper).
+// Force context-navigation-layout on depth-2+ public pages
+// (e.g. /docs/topic/page). Excluded under /_test_data so the per-page
+// allowedLayouts config that other tests rely on stays in effect.
 // Same rule used by both edit-mode initBridge schema (below) and SSR
-// view-mode expandTemplatesSync via mainBlocksAllowedLayouts. Mirrors the
-// footer's path-based force; just keyed on URL depth.
+// view-mode expandTemplatesSync via mainBlocksAllowedLayouts.
 const contextNavLayoutForced = computed(() =>
-    route.path.split('/').filter(Boolean).length >= 2
+    !route.path.startsWith('/_test_data/')
+    && route.path.split('/').filter(Boolean).length >= 2
         ? ['/_test_data/templates/context-navigation-layout']
         : null,
 );

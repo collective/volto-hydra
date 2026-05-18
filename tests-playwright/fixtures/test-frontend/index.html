@@ -292,13 +292,14 @@
                     }
                 }
 
-                // Force context-navigation-layout on every 2nd-level page
-                // (and deeper). The rule lives in one place; both the
-                // view-mode expand below and the edit-mode bridge schema
-                // read this same value. Same idea as the footer's
+                // Force context-navigation-layout on depth-2+ public pages
+                // (e.g. /docs/topic/page). Excluded under /_test_data so
+                // the per-page allowedLayouts config that other tests rely
+                // on stays in effect. Same idea as the footer's
                 // forceFooterLayout flag, just keyed off URL depth.
                 const contextNavLayoutForced =
-                    contentPath.split('/').filter(Boolean).length >= 2
+                    !contentPath.startsWith('/_test_data/')
+                    && contentPath.split('/').filter(Boolean).length >= 2
                         ? ['/_test_data/templates/context-navigation-layout']
                         : null;
 
