@@ -78,10 +78,15 @@ export async function checkEditAnnotations(
   );
   expect(linksWithout, 'All content links should have data-edit-link or data-linkable-allow').toEqual([]);
 
-  // data-linkable-allow says "let click navigate" — which means clicks never
-  // reach a nested data-edit-* annotation. Any editable annotation under a
-  // linkable-allow ancestor is unreachable by design, so it's a contradiction.
-  const trappedAnnotations = await block.locator('[data-linkable-allow] [data-edit-text], [data-linkable-allow] [data-edit-link], [data-linkable-allow] [data-edit-media]').evaluateAll(
+  // data-linkable-allow on a real navigation link (<a href>) means the
+  // click triggers a full page-navigation that tears down the editor —
+  // an editable annotation underneath would never get a chance to fire.
+  // On a non-navigation element (button with @click, tab toggle, etc.)
+  // the click runs an in-page handler; inline editing still works
+  // because contenteditable is set on block selection (not on click),
+  // so click positions the cursor in the field while the handler runs
+  // its action. Only the <a href> case is a genuine contradiction.
+  const trappedAnnotations = await block.locator('a[href][data-linkable-allow] [data-edit-text], a[href][data-linkable-allow] [data-edit-link], a[href][data-linkable-allow] [data-edit-media]').evaluateAll(
     (els: Element[]) => els.map((el) => {
       const which =
         (el.hasAttribute('data-edit-text') && 'data-edit-text') ||
@@ -93,7 +98,7 @@ export async function checkEditAnnotations(
   );
   expect(
     trappedAnnotations,
-    'Editable annotations (data-edit-text/link/media) cannot live inside [data-linkable-allow] — the link navigation steals the click before editing can happen',
+    'Editable annotations (data-edit-text/link/media) cannot live inside <a href data-linkable-allow> — full-page navigation tears down the editor before editing can happen',
   ).toEqual([]);
 
   // Links must point to the same origin as the page, or be relative.
