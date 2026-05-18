@@ -4844,4 +4844,57 @@ test.describe('Accordion Block', () => {
     await expect(titleEl).toBeVisible();
     await expect(titleEl).toContainText('Accordion Header Text');
   });
+
+  test('bridge expose: selecting hidden block inside collapsed panel opens the panel', async ({ page }, testInfo) => {
+    // Companion to 'clicking hidden slide in sidebar ChildBlocksWidget selects it'
+    // — but for accordion's panel-collapse mechanism. Accordion's first
+    // panel starts open and subsequent panels start closed (Nuxt's
+    // openPanels default). The block inside the second panel is hidden;
+    // when the admin selects it, the bridge's tryMakeBlockVisible() finds
+    // the panel-2 button via the word-list `data-block-selector~=` match
+    // (carries panel uid + every child uid) and clicks it, which calls
+    // the toggle() handler and opens the panel.
+    //
+    // admin-nuxt only: the test-frontend accordion is always-expanded
+    // (no collapse mechanism, no data-block-selector on header), so the
+    // bridge path doesn't apply there. Skip on admin-mock.
+    test.skip(
+      testInfo.project.name !== 'admin-nuxt',
+      'accordion bridge-expose only runs on admin-nuxt (test-frontend accordion has no collapse mechanism)',
+    );
+
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/accordion-test-page');
+
+    const iframe = helper.getIframe();
+    await expect(iframe.locator('[data-block-uid="accordion-1"]')).toBeVisible();
+
+    // Sanity: panel-2 outer div is visible (the panel container always
+    // is) but its content child is hidden (v-show on collapsed panel).
+    const panel2 = iframe.locator('[data-block-uid="panel-2"]');
+    await expect(panel2).toBeVisible();
+    const hiddenChild = iframe.locator('[data-block-uid="panel2-hidden-text"]');
+    await expect(hiddenChild).toBeAttached();
+    expect(await helper.isBlockHiddenInIframe('panel2-hidden-text')).toBe(true);
+
+    // The button header must be marked open=false so we know the bridge
+    // actually changes state — not a precondition that's already met.
+    const panel2Button = panel2.locator('button[aria-expanded]');
+    await expect(panel2Button).toHaveAttribute('aria-expanded', 'false');
+
+    // Drive selection of the hidden grandchild like the admin would.
+    await page.evaluate((uid) => {
+      const iframeEl = document.querySelector('iframe');
+      iframeEl.contentWindow.postMessage({ type: 'SELECT_BLOCK', uid }, '*');
+    }, 'panel2-hidden-text');
+
+    // Bridge expose: panel-2 button click → toggle() → openPanels[panel-2]=true
+    // → v-show reveals content → hidden child visible.
+    await expect.poll(
+      async () => panel2Button.getAttribute('aria-expanded'),
+      { timeout: 5000 },
+    ).toBe('true');
+    await expect(hiddenChild).toBeVisible();
+  });
 });

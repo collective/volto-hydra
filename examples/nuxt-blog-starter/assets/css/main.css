@@ -84,3 +84,51 @@ h2, h3, h4, h5, .image-align-center, .image-align-wide, .image-align-full { clea
 
 /* Slate paragraph spacing */
 .slate-block p + p { margin-top: 1em; }
+
+/* contextNavigation — vertical nav with mobile disclosure. Class names
+   match the test-frontend's CSS so cross-renderer tests share selectors. */
+.context-navigation { margin: 0 0 1.5rem 0; }
+.context-navigation-list { list-style: none; padding: 0; margin: 0; }
+.context-navigation-list li { margin: 0; padding: 0; }
+
+.nav-item {
+    display: block;
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    color: inherit;
+    text-decoration: none;
+}
+.nav-item:hover { background: #eef; }
+.nav-item.level-1 { padding-left: 0.6rem; }
+.nav-item.level-2 { padding-left: 1.6rem; }
+.nav-item.level-3 { padding-left: 2.6rem; }
+.nav-item.current,
+.nav-item[aria-current="page"] {
+    font-weight: 600;
+    background: #def;
+}
+.nav-item.in-path { color: #036; }
+
+/* Mobile (default): native <details> collapsed; summary is the tap target. */
+.context-navigation-summary {
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    width: 100%;
+    user-select: none;
+}
+
+/* Desktop (≥768px): sidebar layout + hide summary (matchMedia opens
+   [details] at this breakpoint so the toggle is redundant). */
+@media (min-width: 768px) {
+    .context-navigation {
+        float: left;
+        width: 240px;
+        margin-right: 1.5rem;
+    }
+    .context-navigation-summary {
+        display: none;
+    }
+}

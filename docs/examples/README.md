@@ -30,6 +30,7 @@ These blocks demonstrate common patterns. Register them via `initBridge({ blocks
 |-------|-------------|
 | [Accordion Block](./accordion.md) | A collapsible panel group. Each panel is an `object_list` item with a title and a content area that holds child blocks. |
 | [Columns Block](./columns.md) | A horizontal multi-column container. The block has one slot — `columns` — restricted to `column` children, capped at four. Each `column` is itself a container holding any of its allowed inner block types (slate, image, …). |
+| [Context Navigation](./contextNavigation.md) | Sidebar nav for grouped pages — mixes manually-added `navItem` links with auto path-driven `listing` children, computes indent level + `aria-current` from URL depth. |
 | [Form Block](./form.md) | A multi-field form with configurable field types, validation, and email submission. Fields are stored as a typed `object_list` — each field has a `field_type` that maps to a sub-block schema. |
 | [Hero Block](./hero.md) | A full-width hero section with heading, subheading, image, rich text description, and a call-to-action button. Demonstrates multiple field types in a single block: `string`, `textarea`, `slate`, `image`, and `object_browser`. |
 | [Highlight Block](./highlight.md) | A prominent content section with a background image, overlay, title, rich text body, and an optional call-to-action link. Used for feature callouts and banners. |

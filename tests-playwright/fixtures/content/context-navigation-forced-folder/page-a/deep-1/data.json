@@ -1,0 +1,13 @@
+{
+  "@id": "/_test_data/context-navigation-forced-folder/page-a/deep-1",
+  "@type": "Document",
+  "UID": "context-navigation-forced-folder-page-a-deep-1-uid",
+  "id": "deep-1",
+  "title": "Deep 1",
+  "description": "Grandchild under page-a — exercises listing-derived level-2 indent in nav-4.",
+  "review_state": "published",
+  "blocks": {
+    "title-block": { "@type": "title" }
+  },
+  "blocks_layout": { "items": ["title-block"] }
+}

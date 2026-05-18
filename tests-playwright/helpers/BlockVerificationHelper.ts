@@ -78,6 +78,29 @@ export async function checkEditAnnotations(
   );
   expect(linksWithout, 'All content links should have data-edit-link or data-linkable-allow').toEqual([]);
 
+  // data-linkable-allow on a real navigation link (<a href>) means the
+  // click triggers a full page-navigation that tears down the editor —
+  // an editable annotation underneath would never get a chance to fire.
+  // On a non-navigation element (button with @click, tab toggle, etc.)
+  // the click runs an in-page handler; inline editing still works
+  // because contenteditable is set on block selection (not on click),
+  // so click positions the cursor in the field while the handler runs
+  // its action. Only the <a href> case is a genuine contradiction.
+  const trappedAnnotations = await block.locator('a[href][data-linkable-allow] [data-edit-text], a[href][data-linkable-allow] [data-edit-link], a[href][data-linkable-allow] [data-edit-media]').evaluateAll(
+    (els: Element[]) => els.map((el) => {
+      const which =
+        (el.hasAttribute('data-edit-text') && 'data-edit-text') ||
+        (el.hasAttribute('data-edit-link') && 'data-edit-link') ||
+        'data-edit-media';
+      const field = el.getAttribute(which) || '';
+      return `${which}="${field}" on <${el.tagName.toLowerCase()}>`;
+    }),
+  );
+  expect(
+    trappedAnnotations,
+    'Editable annotations (data-edit-text/link/media) cannot live inside <a href data-linkable-allow> — full-page navigation tears down the editor before editing can happen',
+  ).toEqual([]);
+
   // Links must point to the same origin as the page, or be relative.
   // Catches links that accidentally point to the API instead of the frontend.
   const offSiteLinks = await block.locator('a[href]').evaluateAll(

@@ -1,0 +1,19 @@
+{
+  "@id": "/_test_data/context-navigation-forced-folder",
+  "@type": "Document",
+  "UID": "context-navigation-forced-folder-uid",
+  "id": "context-navigation-forced-folder",
+  "title": "Context Navigation Forced Folder",
+  "description": "Parent folder for testing the context-navigation-layout forced template. Descendants get the contextNavigation block injected via the layout's allowedLayouts.",
+  "is_folderish": true,
+  "review_state": "published",
+  "blocks": {
+    "title-block": { "@type": "title" },
+    "intro": {
+      "@type": "slate",
+      "value": [{ "type": "p", "children": [{ "text": "Top-level page in this section — no forced layout here." }] }],
+      "plaintext": "Top-level page in this section — no forced layout here."
+    }
+  },
+  "blocks_layout": { "items": ["title-block", "intro"] }
+}

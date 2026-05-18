@@ -34,6 +34,18 @@
             }
           },
           "blocks_layout": {"items": ["content-text-1", "content-text-2"]}
+        },
+        {
+          "@id": "panel-2",
+          "title": "Second Panel Header",
+          "blocks": {
+            "panel2-hidden-text": {
+              "@type": "slate",
+              "value": [{"type": "p", "children": [{"text": "Hidden in panel two"}]}],
+              "plaintext": "Hidden in panel two"
+            }
+          },
+          "blocks_layout": {"items": ["panel2-hidden-text"]}
         }
       ]
     },

@@ -54,6 +54,12 @@
     "@plone/volto": "18.31.0",
     "volto-hydra": "workspace:*"
   },
+  "peerDependencies": {
+    "@playwright/test": "^1.58.2"
+  },
+  "peerDependenciesMeta": {
+    "@playwright/test": { "optional": false }
+  },
   "devDependencies": {
     "@babel/core": "^7.0.0",
     "@babel/plugin-proposal-export-default-from": "7.18.10",
@@ -64,7 +70,6 @@
     "@fiverr/afterbuild-webpack-plugin": "^1.0.0",
     "@loadable/babel-plugin": "5.13.2",
     "@loadable/webpack-plugin": "5.15.2",
-    "@playwright/test": "^1.58.2",
     "@storybook/react": "^8.0.4",
     "@sveltejs/vite-plugin-svelte": "^3.0.0",
     "@types/node": "^22",

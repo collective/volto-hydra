@@ -1,0 +1,13 @@
+{
+  "@id": "/_test_data/context-navigation-forced-folder/page-b/under-b",
+  "@type": "Document",
+  "UID": "context-navigation-forced-folder-page-b-under-b-uid",
+  "id": "under-b",
+  "title": "Under B",
+  "description": "Grandchild under page-b. Used to verify expandCurrentOnly hides descendants of unrelated siblings when viewing a page under page-a.",
+  "review_state": "published",
+  "blocks": {
+    "title-block": { "@type": "title" }
+  },
+  "blocks_layout": { "items": ["title-block"] }
+}
