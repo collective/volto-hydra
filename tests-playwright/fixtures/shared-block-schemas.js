@@ -150,6 +150,122 @@ export const sharedBlocksConfig = {
             required: [],
         },
     },
+    // Generic section container — accepts any block type. Used by the
+    // container UX feature tests (wrap, unwrap, edge-drag, convert) and
+    // as a reference shape for consumers who want a "section" block.
+    // No allowedBlocks/defaultBlockType: getAllContainerFields cascades
+    // both from the page (allowedBlocks → page's allowed list,
+    // defaultBlockType → config.settings.defaultBlockType), so a fresh
+    // empty section auto-fills with a typeable child of the page's
+    // default type and "Enter on a section" lands the cursor inside.
+    section: {
+        id: 'section',
+        title: 'Section',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [
+                { id: 'default', title: 'Default', fields: [] },
+            ],
+            properties: {
+                blocks_layout: { widget: 'blocks_layout' },
+            },
+            required: [],
+        },
+    },
+    // Context navigation container: renders a list of links as a sidebar
+    // (desktop) / disclosure (mobile). Children are navItem blocks (hand-
+    // added) and/or listing blocks (auto-populated via path/depth query).
+    // The active link is detected at render time from URL match. Named
+    // after Plone's @contextnavigation endpoint, which serves the same
+    // purpose (sibling/child links scoped to the current context).
+    contextNavigation: {
+        id: 'contextNavigation',
+        title: 'Context Navigation',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h14M3 12h10M3 18h14"/></svg>',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [
+                {
+                    id: 'default',
+                    title: 'Default',
+                    fields: ['ariaLabel', 'expandCurrentOnly', 'includeTop', 'items'],
+                },
+            ],
+            properties: {
+                ariaLabel: {
+                    title: 'Aria label',
+                    type: 'string',
+                    default: 'Section navigation',
+                },
+                expandCurrentOnly: {
+                    // Smart-expansion: when true, only show items whose
+                    // URL is on the path to (or within) the current page.
+                    // Descendants of unrelated siblings are hidden. Matches
+                    // the typical docs sidebar UX (Sphinx, Docusaurus, etc.).
+                    title: 'Expand current section only',
+                    type: 'boolean',
+                    default: true,
+                },
+                includeTop: {
+                    // Include the section root as the first item in the
+                    // nav (e.g. show /concepts itself above /concepts/x).
+                    // Matches Volto's `includeTop` contextnavigation param.
+                    title: 'Include section root',
+                    type: 'boolean',
+                    default: false,
+                },
+                items: {
+                    title: 'Items',
+                    widget: 'blocks_layout',
+                    allowedBlocks: ['navItem', 'listing'],
+                    // No defaultBlockType — author picks which kind to add
+                },
+            },
+            required: [],
+        },
+    },
+    // Restricted nav-item child: a single link. Only valid inside
+    // contextNavigation.items. Also used as a listing item type — when
+    // the listing's variation is "navItem", query results are mapped
+    // via fieldMappings.@default so href / label come out in the same
+    // shape as manual authoring (object_browser array for href, string
+    // for label). Indent level is derived at render time from URL depth.
+    navItem: {
+        id: 'navItem',
+        title: 'Nav link',
+        icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 12h14m-6-6 6 6-6 6"/></svg>',
+        group: 'common',
+        restricted: true,
+        blockSchema: {
+            fieldsets: [
+                {
+                    id: 'default',
+                    title: 'Default',
+                    fields: ['label', 'href'],
+                },
+            ],
+            properties: {
+                label: { title: 'Label', type: 'string' },
+                href: {
+                    title: 'Link',
+                    widget: 'object_browser',
+                    mode: 'link',
+                    allowExternals: true,
+                },
+            },
+            required: ['label'],
+        },
+        fieldMappings: {
+            // Query result → navItem fields. `link` type wraps the @id
+            // string as `[{ '@id': string }]` to match the object_browser
+            // shape produced by manual authoring.
+            '@default': {
+                '@id': { field: 'href', type: 'link' },
+                'title': 'label',
+            },
+        },
+    },
     // Slider container: uses object_list widget (volto-slider-block format)
     // Slides are stored as array with @id instead of blocks/blocks_layout
     slider: {

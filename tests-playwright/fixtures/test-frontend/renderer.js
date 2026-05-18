@@ -161,6 +161,23 @@ async function renderContent(content, containerId = 'content', renderGeneration)
     tfLog('renderContent: SWAP gen=' + renderGeneration + ' t=' + performance.now().toFixed(0));
     container.innerHTML = '';
     container.appendChild(fragment);
+
+    // Mobile-first cnav: sync newly-rendered <details> to the current
+    // viewport. Global listener (below) covers resize after this point.
+    syncCnavOpenState();
+}
+
+/**
+ * Sync contextNavigation <details> open state to viewport. Open at
+ * ≥768px, closed below. Called after every render + on viewport change.
+ * Idempotent — setting `open` to the same value is a no-op.
+ */
+function syncCnavOpenState() {
+    if (typeof window === 'undefined') return;
+    const desktop = window.matchMedia('(min-width: 768px)').matches;
+    document
+        .querySelectorAll('details.context-navigation-disclosure')
+        .forEach((d) => { d.open = desktop; });
 }
 
 /**
@@ -223,6 +240,27 @@ async function renderBlock(blockId, block) {
         case 'section':
             wrapper.innerHTML = await renderSectionBlock(block);
             break;
+        case 'contextNavigation': {
+            // Return the <nav> directly so aria-label / class /
+            // data-block-uid all live on the same element. The default
+            // wrapper would put data-block-uid on a generic div and bury
+            // <nav> a level deeper — a11y checks (and the test contract)
+            // expect them co-located.
+            const navEl = document.createElement('div');
+            navEl.innerHTML = await renderContextNavigationBlock(block, blockId);
+            return navEl.firstElementChild;
+        }
+        case 'navItem': {
+            // Return the <a> as the outer element so data-block-uid lives
+            // alongside the link semantics (matches contextNavigation
+            // putting data-block-uid on the <nav>). The default wrapper
+            // would bury the <a> under a <div>. Manual + listing-synth
+            // navItems share the same shape (listing's fieldMappings
+            // converts @id → href via the `link` type), so one path.
+            const itemEl = document.createElement('div');
+            itemEl.innerHTML = renderNavItemBlock(block, blockId);
+            return itemEl.firstElementChild;
+        }
         case 'gridBlock':
             wrapper.innerHTML = await renderGridBlock(block, blockId);
             break;
@@ -1199,6 +1237,208 @@ async function renderSectionBlock(block) {
 }
 
 /**
+ * Render a contextNavigation block. Wraps its `items` children in <nav><ul>
+ * with a mobile disclosure <button>. Children (navItem + listing) render
+ * themselves; the wrapping <ul> provides the list semantics. Active /
+ * in-path classes are computed inside renderNavItemBlock from each link's
+ * href vs window.location.pathname.
+ */
+async function renderContextNavigationBlock(block, blockId) {
+    const ariaLabel = block.ariaLabel;
+    const blocks = block.blocks;
+    const items = block.items.items;
+    const uid = blockId;
+
+
+    // First pass: walk children and collect a flat list of {block, blockId}
+    // entries. listing children are expanded inline so all their items
+    // join the same flat list. b_size is large so nav listings never
+    // paginate — paging in a sectionNav makes no UX sense.
+    const NAV_LISTING_SIZE = 1000;
+    const flat = [];
+    for (const childId of items) {
+        const child = blocks[childId];
+        if (child['@type'] === 'navItem') {
+            flat.push({ block: child, blockId: childId });
+        } else if (child['@type'] === 'listing') {
+            const { items: expanded } = await window._expandListingBlocks(
+                { [childId]: child },
+                [childId],
+                childId,
+                { start: 0, size: NAV_LISTING_SIZE },
+            );
+            for (const item of expanded) {
+                flat.push({ block: item, blockId: item['@uid'] });
+            }
+        } else {
+            throw new Error(`contextNavigation child of @type "${child['@type']}" is not allowed (expected navItem or listing)`);
+        }
+    }
+
+    // Optional: prepend the section root itself (Volto's `includeTop`).
+    // The section root is the parent of any shallowest item — listings
+    // anchored on a single path always share that parent. We fetch the
+    // root's basic data (just for label) and prepend before level/filter
+    // passes so it gets level-1 and is treated as "current path ancestor"
+    // by the smart-expansion filter.
+    if (block.includeTop && flat.length > 0) {
+        const pathSegsOf2 = (entry) =>
+            new URL(entry.block.href[0]['@id'], window.location.origin)
+                .pathname.split('/').filter(Boolean);
+        const segsList = flat.map(pathSegsOf2);
+        const minDepthForRoot = Math.min(...segsList.map((s) => s.length));
+        const shallow = segsList.find((s) => s.length === minDepthForRoot);
+        const rootSegs = shallow.slice(0, -1);
+        if (rootSegs.length > 0) {
+            const rootPath = '/' + rootSegs.join('/');
+            const res = await fetch(`${window._apiOrigin}/++api++${rootPath}`, {
+                headers: { 'Accept': 'application/json' },
+            });
+            const rootData = await res.json();
+            flat.unshift({
+                block: {
+                    '@type': 'navItem',
+                    label: rootData.title,
+                    href: [{ '@id': rootData['@id'] }],
+                },
+                blockId: `${uid}-top`,
+            });
+        }
+    }
+
+    // Second pass: compute level = depth(href) - minDepth + 1, clamped to 1..3.
+    const pathSegsOf = (entry) =>
+        new URL(entry.block.href[0]['@id'], window.location.origin)
+            .pathname.split('/').filter(Boolean);
+    const allSegs = flat.map(pathSegsOf);
+    const depths = allSegs.map((s) => s.length);
+    const minDepth = Math.min(...depths);
+    flat.forEach((entry, i) => {
+        entry.block._level = Math.max(1, Math.min(3, depths[i] - minDepth + 1));
+    });
+
+    // Third pass: optional smart-expansion filter — drop entries that are
+    // descendants of unrelated siblings (typical docs sidebar UX). An
+    // entry survives if it sits on the ancestor chain of the current page,
+    // is a sibling along that chain, or is a descendant of the current
+    // page. `expandCurrentOnly` defaults true (schema default).
+    const expandCurrentOnly = block.expandCurrentOnly !== false;
+    const visible = expandCurrentOnly
+        ? filterByCurrentPath(flat, allSegs, minDepth)
+        : flat;
+
+    // `data-block-selector` carries the contextNavigation's uid + every
+    // exposed child id (manual navItem ids and the listing block id
+    // whose synthesised items share that uid). Word-list match in
+    // the bridge means selecting any of those uids opens the disclosure.
+    const exposedUids = [uid, ...items].join(' ');
+
+    let html = `<nav data-block-uid="${escapeAttr(uid)}" aria-label="${escapeHtml(ariaLabel)}" class="context-navigation">`;
+    // Mobile-first: rendered without `[open]`. syncCnavOpenState() runs
+    // after every render and a global matchMedia listener resyncs on
+    // resize. Below 768px the disclosure is naturally collapsed; at or
+    // above, the bridge / matchMedia opens it. Native <details>
+    // visibility semantics drive Playwright + screen readers, so the
+    // `open` attribute is the single source of truth — not CSS.
+    html += `<details class="context-navigation-disclosure">`;
+    // Summary has no text content — only the default disclosure chevron.
+    // Screen-reader name comes via aria-label on this <summary>. Empty
+    // textContent keeps the block's ariaLabel value out of any text
+    // node, so block-sanity's "string field must sit inside
+    // [data-edit-text]" rule doesn't fire against it.
+    html += `<summary class="context-navigation-summary" aria-label="Toggle section navigation" data-block-selector="${escapeAttr(exposedUids)}"></summary>`;
+    html += `<ul role="list" id="${uid}-list" class="context-navigation-list">`;
+    for (const entry of visible) {
+        html += `<li>${renderNavItemBlock(entry.block, entry.blockId)}</li>`;
+    }
+    html += '</ul></details></nav>';
+    return html;
+}
+
+/**
+ * Smart-expansion filter for contextNavigation entries. Keeps:
+ *   - any entry whose path is on the ancestor chain of the current page
+ *   - any entry that's a sibling at some ancestor level (parent on chain)
+ *   - any entry that's a descendant of the current page
+ * Drops descendants of unrelated siblings.
+ *
+ * Comparison starts at `minDepth - 1` — the segment index where the
+ * shallowest sibling sits — so the "section root" inferred from the
+ * listing's path filter is treated as the shared common prefix.
+ */
+function filterByCurrentPath(flat, allSegs, minDepth) {
+    const currSegs = window.location.pathname
+        .replace(/\/edit$/, '')
+        .split('/').filter(Boolean);
+    const startIdx = minDepth - 1;
+
+    return flat.filter((_entry, idx) => {
+        const itemSegs = allSegs[idx];
+        const lastItemIdx = itemSegs.length - 1;
+        for (let i = startIdx; i < itemSegs.length; i++) {
+            if (i >= currSegs.length) {
+                // Item is deeper than current; previous segments matched,
+                // so the item is a descendant of the current page.
+                return true;
+            }
+            if (itemSegs[i] !== currSegs[i]) {
+                // Divergence — survive only if it's the last segment
+                // (sibling at an ancestor level).
+                return i === lastItemIdx;
+            }
+        }
+        // All matched up to item's length: item is current or an ancestor.
+        return true;
+    });
+}
+
+/**
+ * Render a single navItem row. The block always has shape:
+ *   { label: string, href: [{ '@id': string }] }
+ * Manual authoring uses object_browser (produces that shape), listing-synth
+ * uses fieldMappings with type='link' on @id (produces the same shape).
+ * Level is auto-derived elsewhere and passed via block._level (set by
+ * renderContextNavigationBlock after collecting all sibling depths).
+ */
+function renderNavItemBlock(block, blockId) {
+    const label = block.label;
+    const href = block.href[0]['@id'];
+    const level = block._level;
+    const uid = blockId;
+
+    const itemPath = new URL(href, window.location.origin).pathname;
+    const currentPath = window.location.pathname.replace(/\/edit$/, '');
+    const active = itemPath === currentPath;
+    const inPath = !active && currentPath.startsWith(itemPath.replace(/\/$/, '') + '/');
+
+    const classes = [
+        'nav-item',
+        `level-${level}`,
+        active ? 'current' : '',
+        inPath ? 'in-path' : '',
+    ].filter(Boolean).join(' ');
+    const ariaCurrent = active ? ' aria-current="page"' : '';
+
+    // Both annotations live here in edit mode:
+    //   data-edit-link="href"   — clicking the link opens the picker for
+    //                              navItem.href (the object_browser field)
+    //   data-edit-text="label"  — clicking the label text inline-edits it
+    // No data-linkable-allow: that would steal the click before either edit
+    // annotation could fire — block-sanity flags that contradiction.
+    return `<a href="${escapeAttr(itemPath)}" data-block-uid="${escapeAttr(uid)}" class="${classes}"${ariaCurrent} data-edit-link="href">` +
+        `<span data-edit-text="label">${escapeHtml(label)}</span>` +
+        `</a>`;
+}
+
+// Minimal HTML escapers — renderer.js doesn't ship a helper module.
+function escapeHtml(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function escapeAttr(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+/**
  * Render paging controls for listing/grid blocks.
  * @param {Object} paging - Paging object from computePagingUI
  * @param {string} blockId - Block ID for URL params
@@ -2145,4 +2385,11 @@ if (document.readyState === 'loading') {
     initCarouselNavigation();
     initSearchFormHandling();
     initFacetHandling();
+}
+
+// Global cnav viewport listener — resyncs all contextNavigation
+// disclosures when crossing the 768px breakpoint. Per-render sync is
+// in renderContent(); this covers user resize + devtools toggle.
+if (typeof window !== 'undefined' && window.matchMedia) {
+    window.matchMedia('(min-width: 768px)').addEventListener('change', syncCnavOpenState);
 }

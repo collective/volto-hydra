@@ -349,6 +349,16 @@ function formatSearchItem(content, baseUrl) {
     'hasPreviewImage': hasPreviewImage,
     'effective': content.effective || content.created || null,
     'created': content.created || null,
+    // Catalog brain attributes that nav-shaped listings rely on:
+    // - getObjPositionInParent: position within immediate parent folder
+    //   (from __metadata__.json ordering). The hierarchical post-sort
+    //   in ploneFetchItems uses this to assemble parent-then-children.
+    // - exclude_from_nav: whether the item is hidden from navigation —
+    //   authors filter on this via a querystring criterion.
+    'getObjPositionInParent': content.UID && uidPositionMap[content.UID] !== undefined
+      ? uidPositionMap[content.UID]
+      : null,
+    'exclude_from_nav': content.exclude_from_nav === true,
   };
 
   // Match real Plone: always include image_field and image_scales.
@@ -422,12 +432,14 @@ function loadContentFromDisk(urlPath, expandList = []) {
 }
 
 /**
- * Format raw content for navigation (avoids enrichment to prevent circular calls)
+ * Format raw content for navigation (avoids enrichment to prevent circular calls).
+ * remainingDepth controls how much of the subtree to include: 0 means no
+ * children, 1 means direct children only, etc.
  */
-function formatNavItem(rawContent, urlPath, baseUrl) {
+function formatNavItem(rawContent, urlPath, baseUrl, remainingDepth) {
   const hasPreviewImage = !!(rawContent.preview_image || rawContent['@type'] === 'Image');
-  const children = (rawContent.is_folderish !== false)
-    ? getNavigationItems(urlPath, 1)
+  const children = (remainingDepth > 0 && rawContent.is_folderish !== false)
+    ? getNavigationItems(urlPath, remainingDepth, baseUrl)
     : [];
   return {
     '@id': `${baseUrl}${urlPath}`,
@@ -450,8 +462,8 @@ function formatNavItem(rawContent, urlPath, baseUrl) {
  * @param {string} basePath - The base path to get navigation for (e.g., '/' or '/pretagov')
  * @param {number} depth - How many levels deep to include (default 1)
  */
-function getNavigationItems(basePath = '/', depth = 1) {
-  const baseUrl = `http://localhost:${PORT}`;
+function getNavigationItems(basePath = '/', depth = 1, baseUrlIn) {
+  const baseUrl = baseUrlIn || `http://localhost:${PORT}`;
   const normalizedBase = basePath.replace(/\/$/, '') || '/';
   const baseDepth = normalizedBase === '/' ? 0 : normalizedBase.split('/').filter(p => p).length;
 
@@ -465,7 +477,8 @@ function getNavigationItems(basePath = '/', depth = 1) {
         return false;
       }
 
-      // Check depth - items should be at baseDepth + 1 level
+      // Direct children of the base only — formatNavItem recurses for the
+      // rest of the subtree with remainingDepth-1.
       const itemParts = itemPath.split('/').filter(p => p);
       return itemParts.length === baseDepth + 1;
     })
@@ -474,7 +487,7 @@ function getNavigationItems(basePath = '/', depth = 1) {
       if (!rawContent) return null;
       if (rawContent.exclude_from_nav) return null;
       if (rawContent['@type'] === 'Image' || rawContent['@type'] === 'File') return null;
-      return formatNavItem(rawContent, itemPath, baseUrl);
+      return formatNavItem(rawContent, itemPath, baseUrl, depth - 1);
     })
     .filter(Boolean);
 
@@ -498,10 +511,11 @@ function getNavigationItems(basePath = '/', depth = 1) {
  * appears alongside docs content in the navigation.
  */
 function getRootNavigationItems() {
-  // Non-root mounts with a root data.json (e.g., /_test_data) appear as
-  // content items at depth 1 under '/', so getNavigationItems('/') finds
-  // them naturally as dropdown folders with their children.
-  return getNavigationItems('/', 1);
+  // Top-level items each pre-populated with their immediate children, so
+  // the dropdown menu shows the next level on hover. depth=2 means "two
+  // levels of items in total" — top + their direct children — which is
+  // what the previous (depth-1-with-implicit-child-recursion) code produced.
+  return getNavigationItems('/', 2);
 }
 
 // ── Per-component builders ────────────────────────────────────────────────
@@ -917,6 +931,36 @@ function initContentDirMap() {
 
 // Initialize on startup
 initContentDirMap();
+
+// Watch content mounts for additions/deletions/modifications and rebuild
+// contentDirMap. node --watch only restarts the JS process on .cjs edits —
+// new fixture directories aren't reliably detected, so listings and other
+// catalog queries would miss fresh content until restart. fs.watch with
+// recursive:true covers macOS + Windows; Linux falls back to no-op (tests
+// fixtures only see live additions during local dev, not CI).
+function setupContentWatchers() {
+  const debounceMs = 100;
+  let timer = null;
+  const onChange = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      initContentDirMap();
+    }, debounceMs);
+  };
+  for (const { dirPath } of CONTENT_MOUNTS) {
+    if (!fs.existsSync(dirPath)) continue;
+    try {
+      fs.watch(dirPath, { recursive: true, persistent: false }, onChange);
+      console.log(`Watching content dir: ${dirPath}`);
+    } catch (err) {
+      // Linux doesn't support recursive — let it throw so the missing
+      // support is visible rather than silently degrading.
+      throw err;
+    }
+  }
+}
+setupContentWatchers();
 
 /**
  * Get content for a path
@@ -1457,6 +1501,10 @@ app.get('*/@querystring', (req, res) => {
       'sortable_title': { 'title': 'Title', 'description': 'Title (sortable)' },
       'Creator': { 'title': 'Creator', 'description': 'Content author' },
       'review_state': { 'title': 'Review state', 'description': 'Workflow state' },
+      // Position in the parent folder — used by navigation listings.
+      // ploneFetchItems detects path+getObjPositionInParent and routes
+      // the call to @navigation instead of @querystring-search.
+      'getObjPositionInParent': { 'title': 'Position in parent', 'description': 'Order within parent folder (navigation order)' },
     },
   });
 });
@@ -1627,7 +1675,22 @@ app.get(/.*\/@actions$/, (req, res) => {
  */
 app.get(/.*\/@navigation$/, (req, res) => {
   const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@navigation$/, '') || '/').replace(/\/+$/, '') || '/';
-  res.json(buildNavigationComponent(cleanPath, `http://localhost:${PORT}`));
+  const baseUrl = `http://localhost:${PORT}`;
+  // Real Plone honors `?expand.navigation.depth=N` and
+  // `?expand.navigation.root_path=/some/path`. Default: rooted at site
+  // root, depth 1 (matches the existing buildNavigationComponent behavior).
+  const depthParam = req.query['expand.navigation.depth'];
+  const rootPathParam = req.query['expand.navigation.root_path'];
+  if (depthParam !== undefined || rootPathParam !== undefined) {
+    const depth = depthParam !== undefined ? parseInt(depthParam, 10) : 1;
+    const rootPath = rootPathParam || '/';
+    res.json({
+      '@id': `${baseUrl}${cleanPath}/@navigation`,
+      items: getNavigationItems(rootPath, depth, baseUrl),
+    });
+    return;
+  }
+  res.json(buildNavigationComponent(cleanPath, baseUrl));
 });
 
 app.get(/.*\/@navroot$/, (req, res) => {
@@ -1654,8 +1717,36 @@ app.post('*/@querystring-search', (req, res) => {
   const contextPath = req.path.replace('/++api++/@querystring-search', '').replace('/@querystring-search', '');
   const baseUrl = `http://localhost:${PORT}`;
 
-  const { query = [], sort_on, sort_order, b_start = 0, b_size = 10, limit } = req.body;
-  console.log('[MOCK-API] @querystring-search query:', JSON.stringify(query));
+  const { query = [], sort_on, sort_order, b_start = 0, b_size = 10, limit, depth } = req.body;
+  console.log('[MOCK-API] @querystring-search query:', JSON.stringify(query), depth !== undefined ? `depth=${depth}` : '');
+
+  // Extract the "root" path from the path criteria so depth (below) can
+  // compute "how far below root is this item". Real Plone applies depth
+  // relative to each path criterion; for our use we only support one path
+  // criterion at a time — which matches sectionNav's listing config.
+  // Resolve `..` / `.` segments in a path the way real Plone does for relativePath.
+  const resolveRelativePath = (base, rel) => {
+    const segs = (base + '/' + rel).split('/').filter(Boolean);
+    const stack = [];
+    for (const seg of segs) {
+      if (seg === '.') continue;
+      if (seg === '..') stack.pop();
+      else stack.push(seg);
+    }
+    return '/' + stack.join('/');
+  };
+
+  let depthRoot = null;
+  for (const cond of query) {
+    if (cond.i !== 'path') continue;
+    if (cond.o.includes('absolutePath')) {
+      depthRoot = cond.v;
+    } else if (cond.o.includes('relativePath')) {
+      let rel = cond.v || '';
+      if (rel === '.' || rel === '') rel = '';
+      depthRoot = rel ? resolveRelativePath(contextPath, rel) : contextPath;
+    }
+  }
 
   // Get all content items using raw content (no enrichment needed for search).
   // loadContentFromDisk enriches every item (resolveuid, image scales, components)
@@ -1684,12 +1775,15 @@ app.post('*/@querystring-search', (req, res) => {
       const types = Array.isArray(value) ? value : [value];
       allItems = allItems.filter((item) => types.includes(item['@type']));
     } else if (index === 'path' && operation.includes('absolutePath')) {
-      // Filter by path - items under the specified path
+      // Filter by path — strict descendants of basePath (exclude basePath
+      // itself). The trailing '/' ensures `/foo` matches `/foo/bar` but
+      // not `/foo` itself, and avoids `/foo` matching `/foobar`.
       const basePath = value || '/';
       if (basePath !== '/') {
+        const prefix = basePath.endsWith('/') ? basePath : basePath + '/';
         allItems = allItems.filter((item) => {
           const itemPath = new URL(item['@id']).pathname;
-          return itemPath.startsWith(basePath);
+          return itemPath.startsWith(prefix);
         });
       }
     } else if (index === 'path' && operation.includes('relativePath')) {
@@ -1699,7 +1793,7 @@ app.post('*/@querystring-search', (req, res) => {
       if (relValue === '.' || relValue === '') {
         relValue = '';
       }
-      const fullPath = (contextPath + (relValue ? '/' + relValue : '')).replace(/\/+/g, '/');
+      const fullPath = relValue ? resolveRelativePath(contextPath, relValue) : contextPath;
       if (fullPath !== '/') {
         allItems = allItems.filter((item) => {
           const itemPath = new URL(item['@id']).pathname;
@@ -1717,6 +1811,14 @@ app.post('*/@querystring-search', (req, res) => {
           return title.includes(searchTerm) || description.includes(searchTerm) || id.includes(searchTerm);
         });
       }
+    } else if (index === 'exclude_from_nav' && operation.includes('boolean')) {
+      // Nav listings filter out items marked exclude_from_nav: true.
+      // Mirrors Plone's plone.app.querystring.operation.boolean.{isFalse,isTrue}.
+      const wantTrue = operation.includes('isTrue');
+      allItems = allItems.filter((item) => {
+        const flag = item.exclude_from_nav === true;
+        return wantTrue ? flag : !flag;
+      });
     } else if (index === 'review_state' && operation.includes('selection')) {
       // Filter by review state
       const states = Array.isArray(value) ? value : [value];
@@ -1741,6 +1843,20 @@ app.post('*/@querystring-search', (req, res) => {
         });
       }
     }
+  }
+
+  // Apply depth limit. Plone's @querystring-search accepts a top-level
+  // `depth` field that constrains results to N levels below the path
+  // criterion's root. Used by sectionNav's listing config so a depth=2
+  // query under /docs returns /docs/foo and /docs/foo/bar but not
+  // /docs/foo/bar/baz.
+  if (typeof depth === 'number' && depthRoot !== null) {
+    const rootSegments = depthRoot.split('/').filter(Boolean).length;
+    const maxSegments = rootSegments + depth;
+    allItems = allItems.filter((item) => {
+      const itemSegments = new URL(item['@id']).pathname.split('/').filter(Boolean).length;
+      return itemSegments <= maxSegments;
+    });
   }
 
   // Sort items

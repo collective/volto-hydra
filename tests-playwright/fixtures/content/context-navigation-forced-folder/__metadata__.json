@@ -1,0 +1,7 @@
+{
+  "_comment": "page-b comes before page-a in the catalog raw sort. Without the hierarchical post-sort, page-a's child (deep-1) would interleave between page-b and page-a in the rendered nav. The post-sort puts deep-1 after page-a.",
+  "ordering": {
+    "context-navigation-forced-folder-page-b-uid": 0,
+    "context-navigation-forced-folder-page-a-uid": 1
+  }
+}

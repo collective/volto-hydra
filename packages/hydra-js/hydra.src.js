@@ -9828,20 +9828,29 @@ export class Bridge {
    */
   isElementHidden(el) {
     if (!el) return true;
-    const style = window.getComputedStyle(el);
-    if (style.display === 'none' || style.visibility === 'hidden') {
-      return true;
+    // Platform API: covers every hiding mechanism the browser knows
+    // about — display:none, visibility:hidden, content-visibility:auto,
+    // AND the closed <details> internal-slot case that computed style
+    // and getBoundingClientRect both miss. Same primitive Playwright
+    // uses for its own visibility checks.
+    if (typeof el.checkVisibility === 'function') {
+      if (!el.checkVisibility({ checkVisibilityCSS: true })) return true;
+    } else {
+      // Fallback for older runtimes (shouldn't fire on current evergreen
+      // browsers — Chromium 105+, Safari 17.4+, Firefox 125+).
+      const style = window.getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden') return true;
+      const rect0 = el.getBoundingClientRect();
+      if (rect0.width === 0 && rect0.height === 0) return true;
     }
+    // checkVisibility() doesn't catch off-screen translates (e.g. Flowbite
+    // carousel uses translate-x-full to hide slides while keeping them
+    // rendered). Element is hidden if it's completely outside its
+    // [data-block-uid] container's horizontal bounds.
     const rect = el.getBoundingClientRect();
-    if (rect.width === 0 && rect.height === 0) {
-      return true;
-    }
-    // Check if element is translated/positioned outside its container
-    // (e.g., Flowbite carousel uses translate-x-full to hide slides)
     const container = el.parentElement?.closest('[data-block-uid]');
     if (container) {
       const containerRect = container.getBoundingClientRect();
-      // Element is hidden if it's completely outside the container bounds
       if (rect.right <= containerRect.left || rect.left >= containerRect.right) {
         return true;
       }
@@ -9885,9 +9894,12 @@ export class Bridge {
     log(`tryMakeBlockVisible: ${targetUid}`);
     // Set flag to prevent handleBlockSelector from interfering
     this._navigatingToBlock = targetUid;
-    // First, try direct selector: data-block-selector="{targetUid}"
+    // Word-list match (`~=`) lets a single trigger element expose many
+    // descendants — `data-block-selector="uid-a uid-b uid-c"` matches
+    // any listed uid. Used by collapsible containers like a
+    // contextNavigation `<summary>` that carries every child's uid.
     const directSelector = document.querySelector(
-      `[data-block-selector="${targetUid}"]`,
+      `[data-block-selector~="${targetUid}"]`,
     );
     // Click the appropriate selector to navigate toward the target block.
     // For direct selectors (data-block-selector="{uid}"), one click suffices.
@@ -9979,9 +9991,29 @@ export class Bridge {
       log(`tryMakeBlockVisible: clicking ${direction}, expecting ${nextUid} to become visible`);
     }
 
-    // Click the selector and wait for nextUid to become visible
-    clickedSelector.click();
-    log(`tryMakeBlockVisible: click() called`);
+    // Idempotency: clicking a toggle that's already in the "open" state
+    // would CLOSE it — the opposite of "make visible". For each container
+    // pattern we know about, skip the toggle when it's already open.
+    //
+    //   <summary>  — read `details.open` directly; setting `open = true`
+    //                is idempotent (no-op when already true).
+    //   accordion  — the toggle button carries `aria-expanded`; if it's
+    //                already "true" the panel is open, skip the click.
+    //   carousel/slider — no aria-expanded; one click always moves it.
+    const summaryDetails =
+      clickedSelector.tagName === 'SUMMARY'
+        ? clickedSelector.closest('details')
+        : null;
+    const expandedAttr = clickedSelector.getAttribute('aria-expanded');
+    if (summaryDetails) {
+      summaryDetails.open = true;
+      log(`tryMakeBlockVisible: opened <details> via summary`);
+    } else if (expandedAttr === 'true') {
+      log(`tryMakeBlockVisible: target trigger already expanded, skipping click`);
+    } else {
+      clickedSelector.click();
+      log(`tryMakeBlockVisible: click() called`);
+    }
 
     const startTime = performance.now();
     const MAX_WAIT_MS = 2000;
@@ -12329,6 +12361,14 @@ export function buildQuerystringSearchBody(queryConfig, paging = {}, extraCriter
     metadata_fields: '_all',
   };
 
+  // Add depth if specified — Plone catalog supports a top-level depth
+  // field that limits results to N levels under each path criterion.
+  // Used by contextNavigation's listing config so a path+depth combo
+  // returns only the right tree slice.
+  if (queryConfig?.depth !== undefined) {
+    body.depth = queryConfig.depth;
+  }
+
   // Add limit if specified (0 or undefined means no limit)
   if (queryConfig?.limit && queryConfig.limit > 0) {
     body.limit = queryConfig.limit;
@@ -12849,7 +12889,7 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
     const rawItems = response.items || [];
     // Normalize: package image_field + image_scales into self-contained image object
     // with @id duplicated inside (imageProps needs it as base URL for relative paths)
-    const items = rawItems.map(item => {
+    let items = rawItems.map(item => {
       if (!item.image_scales || !item.image_field) return item;
       const normalized = { ...item };
       normalized.image = {
@@ -12862,11 +12902,73 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
       return normalized;
     });
 
+    // `getObjPositionInParent` is the catalog's position-within-immediate-parent
+    // index. The catalog returns items in flat position-sorted order — but
+    // for a query that spans multiple folders (e.g. a recursive path query
+    // for a nav listing) that flat order isn't hierarchical: parents and
+    // children interleave by position number rather than appearing as
+    // parent-then-its-subtree-then-next-parent. Post-sort to reconstruct
+    // hierarchical order; level-N rendering and ancestor-aware filters
+    // assume it.
+    if (block.querystring?.sort_on === 'getObjPositionInParent' && items.length > 1) {
+      items = hierarchicalSortByPosition(items);
+    }
+
     return {
       items,
       total: response.items_total ?? rawItems.length,
     };
   };
+}
+
+/**
+ * Re-order a flat result set into parent-before-children, position-sorted
+ * within each parent. Each item must have `@id` (used to derive path +
+ * parent) and `getObjPositionInParent` (numeric; missing values treated
+ * as Infinity so they sort to the end).
+ *
+ * Roots (items whose parent isn't in the result set) are sorted by
+ * position among themselves; each subtree is then walked depth-first.
+ */
+function hierarchicalSortByPosition(items) {
+  const pathOf = (item) => {
+    try { return new URL(item['@id']).pathname; }
+    catch { return item['@id']; }
+  };
+  const parentOf = (path) => path.replace(/\/[^/]+\/?$/, '') || '/';
+  const positionOf = (item) =>
+    typeof item.getObjPositionInParent === 'number'
+      ? item.getObjPositionInParent
+      : Infinity;
+
+  const itemPaths = new Set(items.map(pathOf));
+  const childrenByParent = new Map();
+  const roots = [];
+
+  for (const item of items) {
+    const parent = parentOf(pathOf(item));
+    if (itemPaths.has(parent)) {
+      const bucket = childrenByParent.get(parent) || [];
+      bucket.push(item);
+      childrenByParent.set(parent, bucket);
+    } else {
+      roots.push(item);
+    }
+  }
+
+  for (const bucket of childrenByParent.values()) {
+    bucket.sort((a, b) => positionOf(a) - positionOf(b));
+  }
+  roots.sort((a, b) => positionOf(a) - positionOf(b));
+
+  const out = [];
+  const visit = (item) => {
+    out.push(item);
+    const kids = childrenByParent.get(pathOf(item)) || [];
+    for (const k of kids) visit(k);
+  };
+  for (const r of roots) visit(r);
+  return out;
 }
 
 // ============================================================================
@@ -13564,6 +13666,32 @@ function isBlocksMap(obj) {
 }
 
 /**
+ * Find the field on `tplBlock` that holds the blocks_layout widget's layout
+ * array. The widget can be declared under any field name in a schema —
+ * `blocks_layout` for section/grid, `items` for contextNavigation, etc. —
+ * so we recognise the data shape rather than hardcoding a name:
+ *
+ *   { items: [stringId, ...] } where every id is a key in tplBlock.blocks.
+ *
+ * Returns the field name or null if none matches. Caller decides what to
+ * do with null (throw, or treat as "no nested layout").
+ */
+function findBlocksLayoutField(tplBlock) {
+  if (!tplBlock || !tplBlock.blocks || !isBlocksMap(tplBlock.blocks)) return null;
+  for (const [fieldName, fieldVal] of Object.entries(tplBlock)) {
+    if (fieldName === 'blocks') continue;
+    if (
+      fieldVal && typeof fieldVal === 'object' && !Array.isArray(fieldVal) &&
+      Array.isArray(fieldVal.items) && fieldVal.items.length > 0 &&
+      fieldVal.items.every((id) => typeof id === 'string' && id in tplBlock.blocks)
+    ) {
+      return fieldName;
+    }
+  }
+  return null;
+}
+
+/**
  * Recursively scan for blocks with matching templateInstanceId.
  * Handles arbitrary nesting - looks for blocks maps (values have @type)
  * and corresponding layout arrays.
@@ -13686,10 +13814,20 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
         if (nextTplBlock?.fixed) break;
       }
 
-      // childSlotIds for nested containers
+      // childSlotIds for nested containers. The layout field name comes
+      // from the data (any blocks_layout widget field, not hardcoded to
+      // `blocks_layout`); we throw if `blocks` is present but no matching
+      // field exists, surfacing malformed templates loudly.
       let childSlotIds = undefined;
+      const innerLayoutField = findBlocksLayoutField(tplBlock);
       if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
-        const innerLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
+        if (!innerLayoutField) {
+          throw new Error(
+            `processNestedTemplateLevel: template block "${tplBlockId}" has nested ` +
+            `\`blocks\` but no sibling field whose \`.items\` array lists those block IDs.`,
+          );
+        }
+        const innerLayout = tplBlock[innerLayoutField].items;
         for (const nestedId of innerLayout) {
           const nested = tplBlock.blocks[nestedId];
           if (nested && !nested.fixed && nested.slotId) {
@@ -13717,12 +13855,11 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
       addItem(fixedBlock, blockId);
 
       // Register further nested containers (blocks_layout and object_list)
-      if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
-        const nestedLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
+      if (innerLayoutField) {
         templateState.nestedContainers.set(tplBlock.blocks, {
           templateBlockId: tplBlockId,
           templateBlocks: tplBlock.blocks,
-          templateLayout: nestedLayout,
+          templateLayout: tplBlock[innerLayoutField].items,
         });
       }
       for (const val of Object.values(tplBlock)) {
@@ -14295,14 +14432,24 @@ export function expandTemplatesSync(inputItems, options = {}) {
         if (nextTplBlock?.fixed) break; // Stop at next fixed block
       }
 
-      // For container blocks, filter nested blocks to only those with template markers
-      // (slotId or templateId). Blocks without these are template-internal details
-      // that should not be synced to pages. Also compute childSlotIds.
+      // For container blocks, filter nested blocks to only those with
+      // template markers (slotId or templateId). Blocks without these are
+      // template-internal details that should not be synced to pages.
+      // Field name for the layout is taken from the data (see
+      // findBlocksLayoutField), so we don't assume a canonical name.
       let childSlotIds = undefined;
       let filteredBlocks = blockContent.blocks;
-      let filteredLayout = blockContent.blocks_layout;
+      let filteredLayout = undefined;
+      const layoutField = findBlocksLayoutField(tplBlock);
       if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
-        const nestedLayout = tplBlock.blocks_layout?.items || Object.keys(tplBlock.blocks);
+        if (!layoutField) {
+          throw new Error(
+            `expandTemplatesSync: template block "${tplBlockId}" has nested ` +
+            `\`blocks\` but no sibling field whose \`.items\` array lists those block IDs. ` +
+            `A blocks_layout widget field (any name) is required.`,
+          );
+        }
+        const nestedLayout = tplBlock[layoutField].items;
         const newNestedBlocks = {};
         const newNestedLayout = [];
         for (const nestedId of nestedLayout) {
@@ -14325,7 +14472,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
         {
           ...blockContent,
           blocks: filteredBlocks,
-          blocks_layout: filteredLayout,
+          ...(layoutField && { [layoutField]: filteredLayout }),
           templateId: templateId,
           templateInstanceId: instanceId,
           ...(nextSlotId && { nextSlotId }),
@@ -14334,7 +14481,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
         blockId
       );
 
-      if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
+      if (layoutField) {
         templateState.nestedContainers.set(filteredBlocks, {
           templateBlockId: tplBlockId,
           templateBlocks: filteredBlocks,

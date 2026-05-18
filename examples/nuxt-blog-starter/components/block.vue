@@ -150,6 +150,22 @@
     </div>
   </div>
 
+  <!-- Context navigation: delegates to ContextNavigationBlock which does
+       the async listing-child expansion + level-from-URL-depth derivation
+       inline (no recursive Block render for navItems). Wrapped in
+       <Suspense> because expandListingBlocks fetches asynchronously. -->
+  <Suspense v-else-if="block['@type'] == 'contextNavigation'">
+    <ContextNavigationBlock :block-id="block_uid"
+                            :block="block"
+                            :api-url="effectiveApiUrl"
+                            :context-path="effectiveContextPath" />
+    <template #fallback>
+      <nav :data-block-uid="block_uid" class="context-navigation">
+        <ul role="list" class="context-navigation-list"></ul>
+      </nav>
+    </template>
+  </Suspense>
+
   <div v-else-if="block['@type'] == 'teaser'"
     class="teaser-block max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
     :data-block-uid="block._blockUid || block_uid"
@@ -977,6 +993,7 @@ const gridPageFromUrl = computed(() => {
   return pages[block_uid.value] || 0;
 });
 const gridPaging = reactive({ start: 0, size: GRID_PAGE_SIZE });
+
 const gridBuildPagingUrl = (page) => {
   if (page === 0) return effectiveContextPath.value;
   return `${effectiveContextPath.value}/@pg_${block_uid.value}_${page}`;

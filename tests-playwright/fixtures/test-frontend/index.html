@@ -44,6 +44,69 @@
         nav a:hover {
             text-decoration: underline;
         }
+
+        /* contextNavigation styling — same class names used by Nuxt
+           block.vue so cross-renderer tests can assert against the same
+           selectors. Production frontends override; this is the reference. */
+        .context-navigation {
+            background: transparent;
+            padding: 0;
+            margin: 0 0 1rem 0;
+        }
+        .context-navigation-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .context-navigation-list li {
+            margin: 0;
+            padding: 0;
+            border: none;          /* override generic [data-block-uid] border */
+            background: transparent;
+            cursor: default;
+        }
+        .nav-item {
+            display: block;
+            padding: 0.35rem 0.5rem;
+            margin: 0;
+            text-decoration: none;
+            color: inherit;
+            border: none;
+        }
+        .nav-item:hover { background: #eef; }
+        .nav-item.level-1 { padding-left: 0.5rem; }
+        .nav-item.level-2 { padding-left: 1.5rem; }
+        .nav-item.level-3 { padding-left: 2.5rem; }
+        .nav-item.current,
+        .nav-item[aria-current="page"] {
+            font-weight: 600;
+            background: #def;
+        }
+        .nav-item.in-path { color: #036; }
+
+        /* Mobile (default): native <details> collapsed. Summary is the
+           tap target. */
+        .context-navigation-summary {
+            cursor: pointer;
+            padding: 0.5rem 0.75rem;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            list-style: revert;
+            user-select: none;
+        }
+        /* Desktop: sidebar layout + hide summary (the matchMedia JS
+           opens [details] at this breakpoint so the toggle is redundant). */
+        @media (min-width: 768px) {
+            .context-navigation {
+                float: left;
+                width: 220px;
+                margin-right: 1.5rem;
+            }
+            .context-navigation-summary {
+                display: none;
+            }
+        }
     </style>
 </head>
 <body>
@@ -229,6 +292,17 @@
                     }
                 }
 
+                // Force context-navigation-layout on depth-2+ public pages
+                // (e.g. /docs/topic/page). Excluded under /_test_data so
+                // the per-page allowedLayouts config that other tests rely
+                // on stays in effect. Same idea as the footer's
+                // forceFooterLayout flag, just keyed off URL depth.
+                const contextNavLayoutForced =
+                    !contentPath.startsWith('/_test_data/')
+                    && contentPath.split('/').filter(Boolean).length >= 2
+                        ? ['/_test_data/templates/context-navigation-layout']
+                        : null;
+
                 // Check if hydra bridge should be loaded
                 // - window.name starts with "hydra-edit:" or "hydra-view:" (persists across navigation in admin iframe)
                 // - OR _edit param exists (true for edit mode, false for view mode)
@@ -280,7 +354,12 @@
                 const templateState = {};
                 const expandedItems = await expandTemplates(
                     content.blocks_layout?.items || [],
-                    { blocks: content.blocks || {}, templateState, loadTemplate }
+                    {
+                        blocks: content.blocks || {},
+                        templateState,
+                        loadTemplate,
+                        ...(contextNavLayoutForced ? { allowedLayouts: contextNavLayoutForced } : {}),
+                    }
                 );
                 // Merge expanded blocks back (preserve blocks from other fields like footer_blocks)
                 const expandedBlocksMap = Object.fromEntries(expandedItems.map(item => [item['@uid'], item]));
@@ -340,9 +419,10 @@
                                 properties: {
                                     blocks_layout: {
                                         title: 'Blocks',
-                                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest', 'title', 'description', 'section'],
+                                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest', 'title', 'description', 'section', 'contextNavigation'],
                                         allowedTemplates: ['/_test_data/templates/test-layout'],
-                                        allowedLayouts: [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
+                                        allowedLayouts: contextNavLayoutForced
+                                            || [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
                                     },
                                     footer_blocks: {
                                         title: 'Footer',

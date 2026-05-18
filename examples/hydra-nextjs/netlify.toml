@@ -1,4 +1,9 @@
 [build]
+  # See nuxt-blog-starter/netlify.toml — `ignore = /bin/true` makes
+  # Netlify skip every auto-triggered build. Production deploys go
+  # through deploy-all.sh which uploads pre-built output via
+  # `netlify deploy --prod --no-build --dir .netlify/static …`.
+  ignore = "/bin/true"
   command = "pnpm run build"
   publish = ".next"
 
