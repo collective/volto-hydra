@@ -11,7 +11,7 @@
       "@type": "contextNavigation",
       "fixed": true,
       "readOnly": true,
-      "templateId": "resolveuid/context-navigation-layout-uid",
+      "templateId": "/templates/context-navigation-layout",
       "templateInstanceId": "context-navigation-layout-def-instance",
       "slotId": "context-navigation",
       "ariaLabel": "In this section",
@@ -52,7 +52,7 @@
     },
     "tpl-default-slot": {
       "@type": "slate",
-      "templateId": "resolveuid/context-navigation-layout-uid",
+      "templateId": "/templates/context-navigation-layout",
       "templateInstanceId": "context-navigation-layout-def-instance",
       "slotId": "default",
       "value": [
