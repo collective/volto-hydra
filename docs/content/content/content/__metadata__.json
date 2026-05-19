@@ -63,6 +63,7 @@
     "0c351dd841c34c6da9c313b1bc551e34/data.json",
     "quadrant-svg/data.json",
     "templates/block-reference-layout/data.json",
+    "templates/context-navigation-layout/data.json",
     "templates/event-view/data.json",
     "templates/newsitem-view/data.json",
     "templates/site-footer/data.json",
@@ -514,6 +515,13 @@
       }
     },
     "site-footer-uid": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "context-navigation-layout-uid": {
       "local_roles": {
         "admin": [
           "Owner"
