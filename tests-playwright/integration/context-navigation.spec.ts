@@ -62,7 +62,14 @@ test.describe('contextNavigation block', () => {
     await expect(selfLink).toHaveClass(/\blevel-1\b/);
   });
 
-  test('mobile disclosure toggle hidden on desktop, visible <768', async ({ page }) => {
+  test('summary renders as section header on desktop; both summary + list visible', async ({ page }) => {
+    // The cnav <summary> doubles as the visible section header (the
+    // editable block.ariaLabel text). On desktop it's styled as a
+    // small-caps section label (Stripe/MDN/Primer pattern) with the
+    // disclosure chevron hidden; on mobile it's the disclosure tap
+    // target (pill background + chevron). Both look different but the
+    // element is the same — keeps the [data-edit-text] for ariaLabel
+    // discoverable to the bridge in either viewport.
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/context-navigation-test-page');
@@ -71,19 +78,19 @@ test.describe('contextNavigation block', () => {
     const nav = iframe.locator('[data-block-uid="nav-1"]');
     await expect(nav).toBeVisible({ timeout: 10_000 });
 
-    // The disclosure summary is always in the DOM (as <details><summary>);
-    // CSS hides it on desktop and shows it on mobile.
     const summary = nav.locator('summary.context-navigation-summary');
-    await expect(summary).toBeAttached();
+    await expect(summary).toBeVisible();
 
-    // At the default viewport (≥768) the summary isn't visible. The list
-    // IS visible — the CSS forces `details > :not(summary)` open even
-    // when the <details> itself has no `open` attribute.
-    const summaryHidden = await summary.evaluate(
-      (el) => window.getComputedStyle(el).display === 'none',
-    );
-    expect(summaryHidden, 'summary hidden on desktop').toBe(true);
+    // Desktop styling: small-caps muted label, NOT a pill. The native
+    // disclosure marker (::-webkit-details-marker / list-style) is
+    // hidden so it doesn't look like a clickable disclosure.
+    const summaryStyle = await summary.evaluate((el) => {
+      const s = window.getComputedStyle(el);
+      return { textTransform: s.textTransform, listStyle: s.listStyle };
+    });
+    expect(summaryStyle.textTransform, 'desktop header uppercases').toBe('uppercase');
 
+    // List is also visible (details is open at desktop via matchMedia).
     const list = nav.locator('ul.context-navigation-list');
     await expect(list).toBeVisible();
   });

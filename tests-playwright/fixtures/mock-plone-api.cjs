@@ -1789,6 +1789,14 @@ app.post('*/@querystring-search', (req, res) => {
     } else if (index === 'path' && operation.includes('relativePath')) {
       // Filter by relative path from context.
       // '.' means current context, '..' means parent, etc.
+      //
+      // Plone quirk: relativePath EXCLUDES the current context page
+      // itself from results. So a `..` query from /a/b returns
+      // /a's strict descendants minus /a/b. That's a deliberate Plone
+      // navigation convention ("don't list me in my own nav"). We
+      // replicate it here so cnav rendering works the same under mock
+      // as under prod — including exposing the missing-intermediate-
+      // parent case that hierarchicalSortByPosition has to handle.
       let relValue = value || '';
       if (relValue === '.' || relValue === '') {
         relValue = '';
@@ -1800,6 +1808,7 @@ app.post('*/@querystring-search', (req, res) => {
           return itemPath.startsWith(fullPath + '/');
         });
       }
+      allItems = allItems.filter((item) => new URL(item['@id']).pathname !== contextPath);
     } else if (index === 'SearchableText' && operation.includes('string.contains')) {
       // Full-text search - search in title, description, and text content
       const searchTerm = (value || '').toLowerCase();

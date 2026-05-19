@@ -12904,6 +12904,56 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
       return normalized;
     });
 
+    // Plone's relativePath operator EXCLUDES the current context page
+    // from results (deliberate "don't list me in my own nav" convention).
+    // For cnav use that breaks hierarchical sort: the current page's
+    // children become orphans whose parent isn't in the result set.
+    // If the query was relativePath AND the resolved root contains the
+    // current context, fetch the context page and inject it.
+    const relCond = (block.querystring?.query || []).find(
+      c => c.i === 'path' && typeof c.o === 'string' && c.o.includes('relativePath'),
+    );
+    if (relCond) {
+      const cleanContext = contextPath.replace(/\/$/, '') || '/';
+      // Resolve the relativePath the same way Plone does.
+      let resolved = cleanContext;
+      const parts = (relCond.v || '').split('/').filter(Boolean);
+      const stack = cleanContext.split('/').filter(Boolean);
+      for (const p of parts) {
+        if (p === '..') stack.pop();
+        else if (p !== '.') stack.push(p);
+      }
+      resolved = '/' + stack.join('/');
+      // Only inject when current context sits inside the queried subtree
+      // (so we'd expect Plone to have returned it). Also: don't inject if
+      // some other criterion (e.g. exclude_from_nav) would have filtered
+      // the context out anyway — we honour exclude_from_nav explicitly.
+      const inScope = cleanContext === resolved || cleanContext.startsWith(resolved + '/');
+      const alreadyIn = items.some(it => {
+        try { return new URL(it['@id']).pathname === cleanContext; }
+        catch { return false; }
+      });
+      if (inScope && !alreadyIn) {
+        try {
+          const res2 = await fetch(`${apiUrl}/++api++${cleanContext}`, { headers });
+          if (res2.ok) {
+            const ctxData = await res2.json();
+            const excludeFromNavCond = (block.querystring?.query || []).find(
+              c => c.i === 'exclude_from_nav',
+            );
+            const wantExcluded = excludeFromNavCond?.o?.includes('isTrue');
+            const ctxExcluded = ctxData.exclude_from_nav === true;
+            // Match the exclude_from_nav filter the listing applies.
+            if (!excludeFromNavCond || ctxExcluded === !!wantExcluded) {
+              items.push(ctxData);
+            }
+          }
+        } catch (e) {
+          log('ploneFetchItems: failed to fetch current context for injection', e);
+        }
+      }
+    }
+
     // `getObjPositionInParent` is the catalog's position-within-immediate-parent
     // index. The catalog returns items in flat position-sorted order — but
     // for a query that spans multiple folders (e.g. a recursive path query
