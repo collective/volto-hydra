@@ -329,7 +329,7 @@ const footerAllowedLayouts = computed(() => {
 const contextNavLayoutForced = computed(() =>
     !route.path.startsWith('/_test_data/')
     && route.path.split('/').filter(Boolean).length >= 2
-        ? ['/_test_data/templates/context-navigation-layout']
+        ? ['/templates/context-navigation-layout']
         : null,
 );
 

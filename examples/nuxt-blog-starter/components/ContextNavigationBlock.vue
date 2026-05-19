@@ -11,15 +11,17 @@
        :aria-label="block.ariaLabel"
        class="context-navigation">
     <details ref="detailsRef" class="context-navigation-disclosure">
-      <!-- Static "In this section" header text — visible on both
-           mobile (also the tap target for the disclosure) and desktop
-           (styled as a small section label, à la Stripe/MDN/Primer).
-           Hardcoded string, not pulled from block data, so the
-           block.ariaLabel field value (used on the outer <nav>) doesn't
-           land in any text node — keeps block-sanity's "string field
-           must sit inside [data-edit-text]" rule happy. -->
+      <!-- Summary doubles as the visible header (desktop: styled as a
+           small-caps section label, à la Stripe/MDN/Primer; mobile: the
+           tap target for the disclosure). block.ariaLabel renders here
+           via [data-edit-text] so authors can inline-edit the heading
+           text just like any other string field; clicking the span
+           positions the cursor AND triggers <details>'s native toggle,
+           but that's a benign side-effect — the summary stays visible
+           whether the details is open or closed, so editing continues
+           without losing the cursor. -->
       <summary class="context-navigation-summary"
-               :data-block-selector="exposedUids">In this section</summary>
+               :data-block-selector="exposedUids"><span data-edit-text="ariaLabel">{{ block.ariaLabel }}</span></summary>
       <ul role="list" :id="`${blockId}-list`" class="context-navigation-list">
         <li v-for="entry in entries" :key="entry.blockId">
           <a :href="entry.itemPath"

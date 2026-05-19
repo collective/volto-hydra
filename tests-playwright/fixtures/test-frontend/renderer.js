@@ -1322,14 +1322,14 @@ async function renderContextNavigationBlock(block, blockId) {
     // visibility semantics drive Playwright + screen readers, so the
     // `open` attribute is the single source of truth — not CSS.
     html += `<details class="context-navigation-disclosure">`;
-    // Static "In this section" header text — visible on both mobile
-    // (also the tap target for the disclosure) and desktop (styled as a
-    // small section label, à la Stripe/MDN/Primer). Hardcoded string,
-    // not pulled from block data, so the block.ariaLabel field value
-    // (used on the outer <nav>) doesn't land in any text node — keeps
-    // block-sanity's "string field must sit inside [data-edit-text]"
-    // rule happy.
-    html += `<summary class="context-navigation-summary" data-block-selector="${escapeAttr(exposedUids)}">In this section</summary>`;
+    // Summary doubles as the visible header (desktop: styled as a small-
+    // caps section label, à la Stripe/MDN/Primer; mobile: tap target for
+    // the disclosure). block.ariaLabel renders inside [data-edit-text]
+    // so authors can inline-edit the heading; clicking the span fires
+    // <details>'s native toggle as a side-effect, but the summary stays
+    // visible whether open or closed, so editing continues without
+    // losing the cursor.
+    html += `<summary class="context-navigation-summary" data-block-selector="${escapeAttr(exposedUids)}"><span data-edit-text="ariaLabel">${escapeHtml(ariaLabel)}</span></summary>`;
     html += `<ul role="list" id="${uid}-list" class="context-navigation-list">`;
     for (const entry of visible) {
         html += `<li>${renderNavItemBlock(entry.block, entry.blockId)}</li>`;
