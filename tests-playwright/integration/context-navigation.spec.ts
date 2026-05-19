@@ -164,6 +164,33 @@ test.describe('contextNavigation block', () => {
     expect(hrefs).not.toContain('/_test_data/context-navigation-forced-folder/page-b/under-b');
   });
 
+  test('children of an exclude_from_nav folder are dropped (not shown as orphan roots)', async ({ page }) => {
+    // Fixture under context-navigation-forced-folder/page-a:
+    //   hidden-child            ← exclude_from_nav=true (folder)
+    //   hidden-child/orphan-grandchild   ← NOT excluded (leaf)
+    //
+    // The cnav listing's exclude_from_nav=isFalse criterion drops
+    // hidden-child but its child orphan-grandchild is still returned.
+    // Naive hierarchical sort would put orphan-grandchild at the top of
+    // cnav as a root (its parent isn't in the result). Author intent:
+    // marking a folder as "hide from nav" should hide its whole subtree.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/context-navigation-forced-folder/page-a');
+
+    const iframe = helper.getIframe();
+    const forcedNav = iframe.locator('nav[aria-label="In this section"]');
+    await expect(forcedNav.locator('a.nav-item').first()).toBeVisible({ timeout: 10_000 });
+
+    const hrefs = await forcedNav.locator('a.nav-item').evaluateAll((els) =>
+      els.map((el) => el.getAttribute('href')),
+    );
+    expect(hrefs).not.toContain('/_test_data/context-navigation-forced-folder/page-a/hidden-child');
+    expect(hrefs, 'orphan-grandchild must not appear: ancestor is exclude_from_nav').not.toContain(
+      '/_test_data/context-navigation-forced-folder/page-a/hidden-child/orphan-grandchild',
+    );
+  });
+
   test('includeTop prepends the section root as the first nav item', async ({ page }) => {
     // nav-5 (on context-navigation-test-page) sets includeTop:true. The
     // listing fetches /_test_data/context-navigation-forced-folder/* —

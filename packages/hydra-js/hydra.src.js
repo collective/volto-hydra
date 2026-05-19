@@ -12963,7 +12963,25 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
     // hierarchical order; level-N rendering and ancestor-aware filters
     // assume it.
     if (block.querystring?.sort_on === 'getObjPositionInParent' && items.length > 1) {
-      items = hierarchicalSortByPosition(items);
+      // Resolve the listing's root path so the sort can distinguish
+      // legitimate top-level items (parent IS the root) from orphans
+      // (parent missing from results because some filter — typically
+      // exclude_from_nav — dropped an intermediate ancestor).
+      let rootPath = null;
+      for (const c of block.querystring?.query || []) {
+        if (c.i !== 'path' || typeof c.o !== 'string') continue;
+        if (c.o.includes('absolutePath')) rootPath = c.v;
+        else if (c.o.includes('relativePath')) {
+          const parts = (c.v || '').split('/').filter(Boolean);
+          const stack = (contextPath || '/').split('/').filter(Boolean);
+          for (const p of parts) {
+            if (p === '..') stack.pop();
+            else if (p !== '.') stack.push(p);
+          }
+          rootPath = '/' + stack.join('/');
+        }
+      }
+      items = hierarchicalSortByPosition(items, rootPath);
     }
 
     return {
@@ -12979,10 +12997,18 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
  * parent) and `getObjPositionInParent` (numeric; missing values treated
  * as Infinity so they sort to the end).
  *
- * Roots (items whose parent isn't in the result set) are sorted by
- * position among themselves; each subtree is then walked depth-first.
+ * `rootPath` (optional) is the listing's query root — anything whose
+ * parent equals it is a legitimate top-level item, anything whose
+ * parent is deeper than it but missing from results is an orphan (its
+ * intermediate ancestor was filtered out, e.g. by exclude_from_nav).
+ * Orphans get dropped: if an author hides a folder from nav, its whole
+ * subtree should disappear too — surfacing the grandchildren as bare
+ * roots is worse than hiding them entirely. Pass null to keep the
+ * old "every parent-not-in-set is a root" behavior.
+ *
+ * Each subtree is then walked depth-first.
  */
-function hierarchicalSortByPosition(items) {
+function hierarchicalSortByPosition(items, rootPath = null) {
   const pathOf = (item) => {
     try { return new URL(item['@id']).pathname; }
     catch { return item['@id']; }
@@ -12996,6 +13022,7 @@ function hierarchicalSortByPosition(items) {
   const itemPaths = new Set(items.map(pathOf));
   const childrenByParent = new Map();
   const roots = [];
+  const normRoot = rootPath ? (rootPath.replace(/\/$/, '') || '/') : null;
 
   for (const item of items) {
     const parent = parentOf(pathOf(item));
@@ -13003,9 +13030,10 @@ function hierarchicalSortByPosition(items) {
       const bucket = childrenByParent.get(parent) || [];
       bucket.push(item);
       childrenByParent.set(parent, bucket);
-    } else {
+    } else if (normRoot === null || parent === normRoot) {
       roots.push(item);
     }
+    // else: orphan (parent missing AND not the listing root) — drop.
   }
 
   for (const bucket of childrenByParent.values()) {

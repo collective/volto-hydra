@@ -1,0 +1,11 @@
+{
+  "@id": "/_test_data/context-navigation-forced-folder/page-a/hidden-child/orphan-grandchild",
+  "@type": "Document",
+  "UID": "context-navigation-forced-folder-orphan-grandchild-uid",
+  "id": "orphan-grandchild",
+  "title": "Orphan grandchild",
+  "description": "Child of a hidden-from-nav folder. Should NOT render in cnav because its ancestor chain has an exclude_from_nav=true item.",
+  "review_state": "published",
+  "blocks": { "title-block": { "@type": "title" } },
+  "blocks_layout": { "items": ["title-block"] }
+}
