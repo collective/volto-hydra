@@ -230,6 +230,50 @@ test('listing-derived level + hierarchical sort: depth=2 listing renders mixed l
     expect(pageAIdx, 'page-a before its child deep-1 (hierarchical)').toBeLessThan(deepIdx);
   });
 
+  test('bridge expose: selecting the hidden listing block opens its containing disclosure', async ({ page }) => {
+    // Companion to the navItem version below. The cnav <summary>'s
+    // data-block-selector word-list includes every direct child block
+    // uid — including listing children whose rendered output is the
+    // synthesised nav items (NOT a wrapper DOM element for the listing
+    // itself). So the listing block has no own DOM, yet the admin can
+    // still "select" it via SELECT_BLOCK, and the bridge needs to find
+    // the right <summary> to open via the word-list match.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/context-navigation-test-page');
+
+    const iframe = helper.getIframe();
+    // nav-2 has a single listing child with uid 'snav-listing' (per
+    // the fixture). Confirm the cnav details is mounted, then narrow
+    // viewport so matchMedia closes it.
+    const cnav = iframe.locator('[data-block-uid="nav-2"]');
+    await expect(cnav).toBeAttached({ timeout: 10_000 });
+    await page.setViewportSize({ width: 375, height: 800 });
+    const details = cnav.locator('details');
+    await expect.poll(
+      async () => details.evaluate((d: HTMLDetailsElement) => d.open),
+      { timeout: 5000 },
+    ).toBe(false);
+
+    // Sanity: the summary's data-block-selector lists snav-listing.
+    const selectorAttr = await cnav.locator('summary').getAttribute('data-block-selector');
+    expect(selectorAttr, 'summary exposes listing uid').toContain('snav-listing');
+
+    // Drive selection of the listing block — it has no visible DOM
+    // element of its own; the bridge looks for any element with that
+    // uid in its data-block-selector word-list (the <summary>) and
+    // opens the enclosing <details>.
+    await page.evaluate(() => {
+      const iframeEl = document.querySelector('iframe');
+      iframeEl.contentWindow.postMessage({ type: 'SELECT_BLOCK', uid: 'snav-listing' }, '*');
+    });
+
+    await expect.poll(
+      async () => details.evaluate((d: HTMLDetailsElement) => d.open),
+      { timeout: 5000 },
+    ).toBe(true);
+  });
+
   test('bridge expose: at mobile viewport, selecting hidden navItem opens the disclosure', async ({ page }) => {
     // Companion to the carousel test in container-blocks.spec.ts:
     //   'clicking hidden slide in sidebar ChildBlocksWidget selects it'
