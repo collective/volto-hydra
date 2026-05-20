@@ -259,11 +259,19 @@
           "code": "<script>\n  import { getImageUrl } from './utils.js';\n  export let block;\n  $: href = block.href?.[0]?.['@id'] || block.href;\n  $: imgSrc = getImageUrl(block.url);\n</script>\n\n<div data-block-uid={block['@uid']}>\n  {#if href}\n    <a {href} data-edit-link=\"href\">\n      <img data-edit-media=\"url\" src={imgSrc} alt={block.alt} />\n    </a>\n  {:else}\n    <img data-edit-media=\"url\" src={imgSrc} alt={block.alt} />\n  {/if}\n</div>"
         }
       ]
+    },
+    "editor-screenshot": {
+      "@type": "image",
+      "url": "/docs/images/image-edit",
+      "alt": "The image example block being edited in Volto Hydra",
+      "align": "center",
+      "size": "l"
     }
   },
   "blocks_layout": {
     "items": [
       "4bfc973c-5fbf-45a3-819a-750a3eff4def",
+      "editor-screenshot",
       "ed863393-7692-4cc3-8b39-503591d4ea80",
       "bcc07f9d-7f53-450a-b3f4-20286fd66692",
       "e8178fee-0fb3-405d-8c81-cf47c1d2139f",

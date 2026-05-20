@@ -250,11 +250,19 @@
           "code": "<script>\n  import SlateNode from './SlateNode.svelte';\n  export let block;\n  $: ctaLink = block.cta_link?.[0]?.['@id'] || '';\n\n  const gradients = {\n    'highlight-custom-color-1': 'linear-gradient(135deg, #1e3a5f, #2563eb)',\n    'highlight-custom-color-2': 'linear-gradient(135deg, #064e3b, #059669)',\n    'highlight-custom-color-3': 'linear-gradient(135deg, #581c87, #9333ea)',\n    'highlight-custom-color-4': 'linear-gradient(135deg, #78350f, #d97706)',\n    'highlight-custom-color-5': 'linear-gradient(135deg, #881337, #e11d48)',\n  };\n  $: gradient = gradients[block.styles?.descriptionColor] || 'linear-gradient(135deg, #334, #556)';\n  $: bgStyle = block.image\n    ? `background-image:url(${block.image});background-size:cover;background-position:center`\n    : `background:${gradient}`;\n</script>\n\n<section\n  data-block-uid={block['@uid']}\n  class=\"highlight-block\"\n  style=\"{bgStyle};padding:40px 20px;color:white;border-radius:8px\"\n>\n  <div class=\"highlight-overlay\" style=\"background:rgba(0,0,0,0.4);padding:30px;border-radius:8px\">\n    <h2 data-edit-text=\"title\">{block.title}</h2>\n    <div class=\"highlight-body\" data-edit-text=\"description\">\n      {#each block.description || [] as node, i (i)}\n        <SlateNode {node} />\n      {/each}\n    </div>\n    {#if block.cta_title}\n      <a href={ctaLink} data-edit-text=\"cta_title\" data-edit-link=\"cta_link\" class=\"highlight-cta\"\n        style=\"display:inline-block;padding:10px 20px;background:#007eb1;color:white;text-decoration:none;border-radius:4px;margin-top:16px\">\n        {block.cta_title}\n      </a>\n    {/if}\n  </div>\n</section>"
         }
       ]
+    },
+    "editor-screenshot": {
+      "@type": "image",
+      "url": "/docs/images/highlight-edit",
+      "alt": "The highlight example block being edited in Volto Hydra",
+      "align": "center",
+      "size": "l"
     }
   },
   "blocks_layout": {
     "items": [
       "af3c704a-1f80-48c8-843b-dc29368d43d9",
+      "editor-screenshot",
       "8d932379-1247-4281-bd30-dfecd5b3c378",
       "417e7343-af04-4da4-96bf-29321a3e0fc6",
       "67a6a73a-5ae7-4e14-a11b-bd0139e56513",

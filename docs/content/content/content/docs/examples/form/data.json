@@ -122,11 +122,19 @@
           "code": "<script>\n  export let block;\n</script>\n\n<form data-block-uid={block['@uid']} class=\"form-block\" on:submit|preventDefault>\n  <h3 data-edit-text=\"title\">{block.title}</h3>\n  {#if block.description}\n    <p data-edit-text=\"description\">{block.description}</p>\n  {/if}\n\n  {#each block.subblocks || [] as field (field.field_id || field.id)}\n    <div class=\"form-field\" data-block-uid={field.field_id}>\n      {#if field.field_type === 'text'}\n        <label><span data-edit-text=\"label\">{field.label}</span> <input type=\"text\" required={field.required} /></label>\n      {:else if field.field_type === 'textarea'}\n        <label><span data-edit-text=\"label\">{field.label}</span> <textarea required={field.required} /></label>\n      {:else if field.field_type === 'number'}\n        <label><span data-edit-text=\"label\">{field.label}</span> <input type=\"number\" required={field.required} /></label>\n      {:else if field.field_type === 'from'}\n        <label><span data-edit-text=\"label\">{field.label}</span> <input type=\"email\" required={field.required} /></label>\n      {:else if field.field_type === 'date'}\n        <label><span data-edit-text=\"label\">{field.label}</span> <input type=\"date\" required={field.required} /></label>\n      {:else if field.field_type === 'checkbox'}\n        <label><input type=\"checkbox\" required={field.required} /> <span data-edit-text=\"label\">{field.label}</span></label>\n      {:else if field.field_type === 'select'}\n        <label><span data-edit-text=\"label\">{field.label}</span>\n          <select required={field.required}>\n            <option value=\"\">Choose...</option>\n            {#each field.input_values || [] as v}\n              <option value={v}>{v}</option>\n            {/each}\n          </select>\n        </label>\n      {:else if field.field_type === 'single_choice'}\n        <fieldset>\n          <legend data-edit-text=\"label\">{field.label}</legend>\n          {#each field.input_values || [] as v}\n            <label><input type=\"radio\" name={field.field_id} value={v} /> {v}</label>\n          {/each}\n        </fieldset>\n      {:else if field.field_type === 'multiple_choice'}\n        <fieldset>\n          <legend data-edit-text=\"label\">{field.label}</legend>\n          {#each field.input_values || [] as v}\n            <label><input type=\"checkbox\" value={v} /> {v}</label>\n          {/each}\n        </fieldset>\n      {:else if field.field_type === 'static_text'}\n        <p data-edit-text=\"label\">{field.label}</p>\n      {:else if field.field_type === 'hidden'}\n        <input type=\"hidden\" name={field.field_id} value={field.value || ''} />\n      {:else if field.field_type === 'attachment'}\n        <label><span data-edit-text=\"label\">{field.label}</span> <input type=\"file\" required={field.required} /></label>\n      {:else}\n        <label><span data-edit-text=\"label\">{field.label}</span> <input type=\"text\" /></label>\n      {/if}\n    </div>\n  {/each}\n\n  <button type=\"submit\" data-edit-text=\"submit_label\">{block.submit_label || 'Submit'}</button>\n</form>"
         }
       ]
+    },
+    "editor-screenshot": {
+      "@type": "image",
+      "url": "/docs/images/form-edit",
+      "alt": "The form example block being edited in Volto Hydra",
+      "align": "center",
+      "size": "l"
     }
   },
   "blocks_layout": {
     "items": [
       "00e8d49b-5b99-4d2f-83b3-7d69bc80b893",
+      "editor-screenshot",
       "3687103d-0766-4d5e-8aae-fc7e65c457a6",
       "eb25b89c-d64a-4566-8e6e-71fd0f371964",
       "ref-form-schema",

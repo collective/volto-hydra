@@ -1639,6 +1639,37 @@ function discoverImageRefs() {
 
 const imageRefs = discoverImageRefs();
 
+// Example-block editor screenshots. docs/examples/_images/<slug>-edit.png
+// is produced by tests-playwright/screenshots/example-blocks.spec.ts and
+// is git-ignored (a regenerable staging file). The example pages are pure
+// Plone content with no markdown body, so these screenshots are not
+// reachable by discoverImageRefs above. Register each one directly so
+// Phase 5 materialises a committed Plone Image, and remember the example
+// page it belongs to for the Phase 5b image-block injection.
+const EXAMPLE_IMAGES_DIR = join(EXAMPLES_DIR, '_images');
+const exampleScreenshots = [];
+if (existsSync(EXAMPLE_IMAGES_DIR)) {
+  for (const filename of readdirSync(EXAMPLE_IMAGES_DIR).sort()) {
+    if (!filename.toLowerCase().endsWith('.png')) continue;
+    const imageSlug = filename.replace(/\.[^.]+$/, '');
+    const exampleSlug = imageSlug.replace(/-edit$/, '');
+    const sourcePath = join(EXAMPLE_IMAGES_DIR, filename);
+    const existing = imageRefs.get(imageSlug);
+    if (existing && existing.sourcePath !== sourcePath) {
+      throw new Error(
+        `Image slug collision: '${imageSlug}' resolves to both ` +
+          `${existing.sourcePath} and ${sourcePath}`,
+      );
+    }
+    imageRefs.set(imageSlug, {
+      sourcePath,
+      filename,
+      contentType: extToContentType('png'),
+    });
+    exampleScreenshots.push({ imageSlug, exampleSlug });
+  }
+}
+
 if (imageRefs.size > 0) {
   // Ensure _images parent folder content
   const folderPath = join(CONTENT_DIR, IMAGES_FOLDER_UID);
@@ -1686,6 +1717,60 @@ if (imageRefs.size > 0) {
         if (desiredJson !== originalJson) writeFileSync(dataPath, desiredJson, 'utf-8');
         if (blobNeedsCopy) copyFileSync(ref.sourcePath, blobPath);
         console.log(`Synced image: ${slug} (${reasons.join(', ')})`);
+      }
+    }
+  }
+}
+
+// --- Phase 5b: Inject the editor screenshot into each example page ---
+// Each example-block page (docs/examples/<slug>) gets an `image` block
+// just below its title, showing the editor screenshot materialised in
+// Phase 5. The example .md files carry no image reference on purpose —
+// the screenshot documents the live editor, so it is Plone-only and
+// never ships in the Sphinx build — so the block is injected straight
+// into the page's Plone content. Idempotent: writes only when the block
+// is missing or has drifted. Runs only for screenshots present on disk;
+// on a fresh checkout (docs/examples/_images is git-ignored and empty)
+// the already-committed blocks stand untouched.
+const SCREENSHOT_BLOCK_ID = 'editor-screenshot';
+for (const { imageSlug, exampleSlug } of exampleScreenshots) {
+  const jsonPath = join(mdFileToContentDir(`${exampleSlug}.md`), 'data.json');
+  if (!existsSync(jsonPath)) {
+    console.error(
+      `WARNING: no example page for screenshot '${imageSlug}' ` +
+        `(expected ${jsonPath})`,
+    );
+    continue;
+  }
+  const original = readFileSync(jsonPath, 'utf-8');
+  const data = JSON.parse(original);
+  const desiredBlock = {
+    '@type': 'image',
+    url: `${IMAGES_PARENT_PATH}/images/${imageSlug}`,
+    alt: `The ${exampleSlug} example block being edited in Volto Hydra`,
+    align: 'center',
+    size: 'l',
+  };
+  const items = data.blocks_layout?.items || [];
+  const blockChanged =
+    JSON.stringify(data.blocks?.[SCREENSHOT_BLOCK_ID]) !==
+    JSON.stringify(desiredBlock);
+  // Place the screenshot directly after the title block (item 0).
+  const newItems = items.includes(SCREENSHOT_BLOCK_ID)
+    ? items
+    : [items[0], SCREENSHOT_BLOCK_ID, ...items.slice(1)].filter(Boolean);
+  const layoutChanged = JSON.stringify(newItems) !== JSON.stringify(items);
+  if (blockChanged || layoutChanged) {
+    data.blocks = { ...data.blocks, [SCREENSHOT_BLOCK_ID]: desiredBlock };
+    data.blocks_layout = { ...data.blocks_layout, items: newItems };
+    const updated = JSON.stringify(data, null, 2) + '\n';
+    if (updated !== original) {
+      outOfSync = true;
+      if (checkMode) {
+        console.error(`OUT OF SYNC: ${exampleSlug} editor-screenshot block`);
+      } else {
+        writeFileSync(jsonPath, updated, 'utf-8');
+        console.log(`Injected editor-screenshot block: ${exampleSlug}`);
       }
     }
   }

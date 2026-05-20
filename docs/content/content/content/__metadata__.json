@@ -6,18 +6,33 @@
     "7de78fea55354a29ad78b909efb07436/image/penguin3.jpg",
     "9abc1a813bcf46388e565b277bd8c6bf/image/penguin1.jpg",
     "a5bf990b119747c4b2855fedc1ea0185/image/image.png",
+    "docs-images-accordion-edit-001/image/accordion-edit.png",
     "docs-images-block-mode-001/image/block-mode.png",
     "docs-images-block-selected-001/image/block-selected.png",
+    "docs-images-button-edit-001/image/button-edit.png",
     "docs-images-children-list-001/image/children-list.png",
     "docs-images-container-convert-001/image/container-convert.png",
     "docs-images-edge-drag-ghost-001/image/edge-drag-ghost.png",
+    "docs-images-form-edit-001/image/form-edit.png",
     "docs-images-frontend-switcher-001/image/frontend-switcher.png",
+    "docs-images-highlight-edit-001/image/highlight-edit.png",
+    "docs-images-image-edit-001/image/image-edit.png",
+    "docs-images-introduction-edit-001/image/introduction-edit.png",
     "docs-images-link-picker-001/image/link-picker.png",
+    "docs-images-listing-edit-001/image/listing-edit.png",
+    "docs-images-maps-edit-001/image/maps-edit.png",
     "docs-images-media-empty-placeholder-001/image/media-empty-placeholder.png",
     "docs-images-multi-select-001/image/multi-select.png",
     "docs-images-parent-chain-001/image/parent-chain.png",
+    "docs-images-search-edit-001/image/search-edit.png",
+    "docs-images-separator-edit-001/image/separator-edit.png",
     "docs-images-slash-menu-001/image/slash-menu.png",
+    "docs-images-slate-edit-001/image/slate-edit.png",
+    "docs-images-table-edit-001/image/table-edit.png",
+    "docs-images-teaser-edit-001/image/teaser-edit.png",
     "docs-images-template-locked-001/image/template-locked.png",
+    "docs-images-toc-edit-001/image/toc-edit.png",
+    "docs-images-video-edit-001/image/video-edit.png",
     "docs-images-wrap-chooser-001/image/wrap-chooser.png",
     "docs/examples/content-types/copy_of_news-item/image/sergio-martinez-rhNJJ4eD2zk-unsplash.jpg",
     "docs/examples/content-types/event/preview_image/event.svg",
@@ -89,18 +104,33 @@
     "docs/examples/teaser/data.json",
     "docs/examples/toc/data.json",
     "docs/examples/video/data.json",
+    "docs-images-accordion-edit-001/data.json",
     "docs-images-block-mode-001/data.json",
     "docs-images-block-selected-001/data.json",
+    "docs-images-button-edit-001/data.json",
     "docs-images-children-list-001/data.json",
     "docs-images-container-convert-001/data.json",
     "docs-images-edge-drag-ghost-001/data.json",
+    "docs-images-form-edit-001/data.json",
     "docs-images-frontend-switcher-001/data.json",
+    "docs-images-highlight-edit-001/data.json",
+    "docs-images-image-edit-001/data.json",
+    "docs-images-introduction-edit-001/data.json",
     "docs-images-link-picker-001/data.json",
+    "docs-images-listing-edit-001/data.json",
+    "docs-images-maps-edit-001/data.json",
     "docs-images-media-empty-placeholder-001/data.json",
     "docs-images-multi-select-001/data.json",
     "docs-images-parent-chain-001/data.json",
+    "docs-images-search-edit-001/data.json",
+    "docs-images-separator-edit-001/data.json",
     "docs-images-slash-menu-001/data.json",
+    "docs-images-slate-edit-001/data.json",
+    "docs-images-table-edit-001/data.json",
+    "docs-images-teaser-edit-001/data.json",
     "docs-images-template-locked-001/data.json",
+    "docs-images-toc-edit-001/data.json",
+    "docs-images-video-edit-001/data.json",
     "docs-images-wrap-chooser-001/data.json",
     "docs/static/hydra-demo/data.json",
     "docs/what-editors-will-experience/adding-and-moving-blocks/data.json",
@@ -739,6 +769,111 @@
       }
     },
     "docs-examples-contextNavigation-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-accordion-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-button-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-form-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-highlight-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-image-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-introduction-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-listing-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-maps-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-search-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-separator-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-slate-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-table-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-teaser-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-toc-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-video-edit-001": {
       "local_roles": {
         "admin": [
           "Owner"

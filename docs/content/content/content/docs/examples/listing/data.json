@@ -198,11 +198,19 @@
           "code": "<script>\n  import BlockRenderer from './BlockRenderer.svelte';\n\n  export let block;\n  export let blockId;\n\n  let items = [];\n\n  $: block.querystring, loadItems();\n\n  async function loadItems() {\n    const fetchItems = ploneFetchItems({ apiUrl: API_URL });\n    const result = await expandListingBlocks([blockId], {\n      blocks: { [blockId]: block },\n      fetchItems: { listing: fetchItems },\n      itemTypeField: 'variation',\n    });\n    items = result.items;\n  }\n</script>\n\n<div data-block-uid={blockId} class=\"listing-block\">\n  {#each items as item, i (i)}\n    <BlockRenderer block={item} />\n  {/each}\n</div>"
         }
       ]
+    },
+    "editor-screenshot": {
+      "@type": "image",
+      "url": "/docs/images/listing-edit",
+      "alt": "The listing example block being edited in Volto Hydra",
+      "align": "center",
+      "size": "l"
     }
   },
   "blocks_layout": {
     "items": [
       "43068b6d-d8e9-4acc-912b-eabcdc650939",
+      "editor-screenshot",
       "24280e07-e962-4414-8ee5-cdaf58ca5f35",
       "53ececaa-4219-42a9-861d-862be364fd60",
       "2a597dde-dd2b-4c66-816c-09e243a188f5",

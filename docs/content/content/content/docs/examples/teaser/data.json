@@ -192,11 +192,19 @@
           "code": "<script>\n  import { getImageUrl } from './utils.js';\n  export let block;\n\n  $: hrefObj = block.href?.[0] || null;\n  $: useBlockData = block.overwrite || !hrefObj?.title;\n  $: title = useBlockData ? block.title : hrefObj?.title || '';\n  $: description = useBlockData ? block.description : hrefObj?.description || '';\n  $: href = contentPath(hrefObj?.['@id'] || '');\n  $: imageSrc = block.preview_image\n    ? getImageUrl(block.preview_image)\n    : (hrefObj?.hasPreviewImage ? getImageUrl(`${href}/@@images/preview_image`) : '');\n</script>\n\n{#if !href}\n  <div data-block-uid={block['@uid']} class=\"teaser-placeholder\">\n    <p>Select a target page for this teaser</p>\n  </div>\n{:else}\n  <div data-block-uid={block['@uid']} class=\"teaser-block\">\n    {#if imageSrc}\n      <img data-edit-media=\"preview_image\" src={imageSrc} alt=\"\" />\n    {/if}\n    <h3 data-edit-text=\"title\">{title}</h3>\n    <p data-edit-text=\"description\">{description}</p>\n    <a {href} data-edit-link=\"href\">Read more</a>\n  </div>\n{/if}"
         }
       ]
+    },
+    "editor-screenshot": {
+      "@type": "image",
+      "url": "/docs/images/teaser-edit",
+      "alt": "The teaser example block being edited in Volto Hydra",
+      "align": "center",
+      "size": "l"
     }
   },
   "blocks_layout": {
     "items": [
       "b986b92c-e180-42d3-b755-4728854e5a50",
+      "editor-screenshot",
       "61f0e286-0527-43a7-b8fe-29f1be40a8c3",
       "03fd3352-0845-4c70-9d01-805996bd127b",
       "530939e1-8579-4d37-a111-716475c00cac",

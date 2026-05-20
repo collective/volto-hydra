@@ -382,11 +382,19 @@
           "code": "<script>\n  export let block;\n  export let content = {};\n\n  $: entries = (() => {\n    const result = [];\n    if (!content?.blocks || !content?.blocks_layout?.items) return result;\n    for (const id of content.blocks_layout.items) {\n      const b = content.blocks[id];\n      if (!b) continue;\n      if (b['@type'] === 'heading' && b.heading) {\n        result.push({ id, level: parseInt((b.tag || 'h2').slice(1)), text: b.heading });\n      } else if (b['@type'] === 'slate' && b.value?.[0]?.type?.match(/^h[1-6]$/)) {\n        const level = parseInt(b.value[0].type.slice(1));\n        const text = b.plaintext || b.value[0].children?.map(c => c.text).join('') || '';\n        if (text.trim()) result.push({ id, level, text });\n      }\n    }\n    return result;\n  })();\n</script>\n\n<nav data-block-uid={block['@uid']} class=\"toc-block\">\n  {#if entries.length > 0}\n    <ul>\n      {#each entries as e (e.id)}\n        <li style=\"margin-left: {(e.level - 2) * 1.5}em\">\n          <a href=\"#{e.id}\">{e.text}</a>\n        </li>\n      {/each}\n    </ul>\n  {:else}\n    <p>Table of Contents</p>\n  {/if}\n</nav>"
         }
       ]
+    },
+    "editor-screenshot": {
+      "@type": "image",
+      "url": "/docs/images/toc-edit",
+      "alt": "The toc example block being edited in Volto Hydra",
+      "align": "center",
+      "size": "l"
     }
   },
   "blocks_layout": {
     "items": [
       "537a9742-95f1-4930-9df3-d38766f54a71",
+      "editor-screenshot",
       "22f22002-2159-4e42-942a-8ebc6e930ed5",
       "60a17689-6437-4a88-bf2c-76a62351ca5b",
       "89137ab1-3973-437f-be95-7e91586a4685",

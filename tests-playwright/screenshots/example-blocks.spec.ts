@@ -5,11 +5,14 @@
  * selects the block instance that the page is showcasing, and writes a
  * full-page screenshot into docs/examples/_images/<slug>-edit.png.
  *
- * docs/examples/<slug>.md references that image via ![..](_images/..).
- * sync.mjs Phase 5 picks the reference up and copies the binary into a
- * Plone Image content under docs/_images/<slug>-edit, so the same
- * screenshot ships in both Sphinx (_build/html) and Plone (synced docs
- * site).
+ * The example .md files carry no image reference — the screenshot is
+ * Plone-only; it documents the live editor, not the Sphinx build. On the
+ * next `node docs/sync.mjs`, sync discovers docs/examples/_images/*.png
+ * directly, materialises a Plone Image at /docs/images/<slug>-edit
+ * (Phase 5), and injects an `image` block into the example page's Plone
+ * content just below its title (Phase 5b). The synced Image content +
+ * blob are committed; the docs/examples/_images/ originals are git-
+ * ignored regenerable staging files.
  *
  * Run with:
  *   pnpm exec playwright test --project=screenshots-nuxt \
@@ -69,12 +72,18 @@ const EXAMPLES: Array<{ slug: string; blockType: string }> = [
  * Reads the same data.json the mock-api serves (mount-point `/` ->
  * docs/content/content/content), so the UID is what the iframe will
  * render.
+ *
+ * Skips the `editor-screenshot` block: sync.mjs Phase 5b injects one
+ * `@type: image` block (the page's own editor screenshot) into every
+ * example page, and it would otherwise shadow the real `image` example
+ * block when blockType==='image'.
  */
 function firstBlockUidOfType(slug: string, blockType: string): string {
   const dataPath = path.join(EXAMPLES_CONTENT_DIR, slug, 'data.json');
   const data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
   const items: string[] = data.blocks_layout?.items || [];
   for (const uid of items) {
+    if (uid === 'editor-screenshot') continue;
     if (data.blocks?.[uid]?.['@type'] === blockType) return uid;
   }
   throw new Error(
@@ -101,26 +110,56 @@ test.describe('docs/examples/* screenshots', () => {
       const blockEl = iframe.locator(`[data-block-uid="${uid}"]`).first();
       await blockEl.waitFor({ state: 'attached', timeout: 15000 });
 
-      // Click the first editable element inside the block — text, link or
-      // media. `.locator` descends to any depth, so for a container block
-      // this lands on the first editable sub-field; that sub-block becomes
-      // selected and the sidebar shows it plus its parent chain. Clicking a
-      // container's own wrapper is unreliable — its chrome intercepts the
-      // click — and never lands the cursor in an editable field.
-      const editable = blockEl
-        .locator('[data-edit-text], [data-edit-link], [data-edit-media]')
-        .first();
+      // Pick which editable element to click. `.locator` descends to any
+      // depth. When the container holds *restricted* child blocks — form
+      // fields, search facets: block types that only exist inside their
+      // parent — prefer the first editable that belongs to one of those
+      // children. Editing the restricted child is the point of the
+      // example (a bare form/search block has little to show), and the
+      // container's own editable (a form's `data-edit-text="title"`) sits
+      // first in DOM order and would otherwise win. The renderer marks
+      // each restricted typed child with `data-block-type`; regular
+      // blocks carry only `data-block-uid`. Otherwise click the first
+      // editable; with no editable at all (e.g. separator) select the
+      // block itself via the bridge.
+      const editSel = '[data-edit-text], [data-edit-link], [data-edit-media]';
+      const pick = await blockEl.evaluate((root, sel) => {
+        const all = Array.from(root.querySelectorAll(sel));
+        let fallback = -1;
+        for (let i = 0; i < all.length; i++) {
+          const owner = all[i].closest('[data-block-uid]');
+          if (!owner) continue;
+          if (fallback === -1) fallback = i;
+          if (owner !== root && owner.hasAttribute('data-block-type')) {
+            return {
+              index: i,
+              uid: owner.getAttribute('data-block-uid'),
+              restricted: true,
+            };
+          }
+        }
+        if (fallback === -1) return null;
+        return {
+          index: fallback,
+          uid: all[fallback]
+            .closest('[data-block-uid]')
+            ?.getAttribute('data-block-uid'),
+          restricted: false,
+        };
+      }, editSel);
+
       let selectedUid = uid;
-      if (await editable.count()) {
-        selectedUid =
-          (await editable.evaluate(
-            (el) => el.closest('[data-block-uid]')?.getAttribute('data-block-uid'),
-          )) || uid;
+      if (pick) {
+        if (pick.restricted && !pick.uid) {
+          throw new Error(
+            `${slug}: restricted child block is missing a data-block-uid`,
+          );
+        }
+        selectedUid = pick.uid || uid;
+        const editable = blockEl.locator(editSel).nth(pick.index);
         await editable.scrollIntoViewIfNeeded();
         await editable.click();
       } else {
-        // No editable element at all (e.g. separator) — select the block
-        // itself via the bridge.
         await blockEl.evaluate((el) => {
           (window as any).bridge?.selectBlock(el);
         });
