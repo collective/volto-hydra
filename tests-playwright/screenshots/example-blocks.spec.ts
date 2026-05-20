@@ -162,6 +162,53 @@ test.describe('docs/examples/* screenshots', () => {
           'this screenshot.',
       ).toHaveCount(0);
 
+      // The Quanta toolbar starts every block selection faded to
+      // opacity:0 and only un-fades on pointer activity over the iframe
+      // (SyncedSlateToolbar `isFaded`); selecting a block leaves none —
+      // bridge.selectBlock fires no pointer events, and a programmatic
+      // click's MOUSE_ACTIVITY is overridden by the block-change reset.
+      //
+      // Re-emit hydra's MOUSE_ACTIVITY by dispatching a `mousemove` on
+      // the frontend document — the exact event hydra's reporter listens
+      // for. A real Playwright mouse move is no good: blocks like `video`
+      // fill themselves with a cross-origin embed <iframe> that swallows
+      // the pointer event before hydra's document-level listener sees it.
+      // hydra throttles MOUSE_ACTIVITY to 1/sec (hydra.js
+      // setupMouseActivityReporter), so dispatch on every poll iteration
+      // until one clears the throttle and the toolbar is fully painted.
+      // isVisible()/toBeVisible() do NOT detect opacity, so without this
+      // assertion a faded toolbar would silently ship a screenshot with
+      // no toolbar.
+      const toolbar = page.locator('.quanta-toolbar').first();
+      await expect(toolbar).toBeAttached();
+      const selectedBlockLoc = iframe
+        .locator(`[data-block-uid="${selectedUid}"]`)
+        .first();
+      await expect
+        .poll(
+          async () => {
+            await selectedBlockLoc.evaluate((blockEl) => {
+              const r = blockEl.getBoundingClientRect();
+              blockEl.ownerDocument.dispatchEvent(
+                new MouseEvent('mousemove', {
+                  bubbles: true,
+                  clientX: r.x + r.width / 2,
+                  clientY: r.y + Math.min(60, r.height / 2),
+                }),
+              );
+            });
+            return toolbar.evaluate((el) => getComputedStyle(el).opacity);
+          },
+          {
+            message:
+              'Quanta toolbar stayed faded — the docs screenshot would ' +
+              'have no toolbar.',
+            timeout: 8000,
+            intervals: [500],
+          },
+        )
+        .toBe('1');
+
       const file = path.join(OUT_DIR, `${slug}-edit.png`);
       await page.screenshot({ path: file, fullPage: false });
       expect(fs.existsSync(file)).toBe(true);

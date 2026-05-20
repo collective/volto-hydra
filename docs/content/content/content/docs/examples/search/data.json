@@ -173,8 +173,8 @@
   "blocks_layout": {
     "items": [
       "f6d35d7e-6422-4496-8a65-f7cfd42fb519",
-      "518c46e7-9823-4e03-aa3a-d2a9ec1746dd",
       "42b7d589-4d35-4b81-9fe9-ea17437beb81",
+      "518c46e7-9823-4e03-aa3a-d2a9ec1746dd",
       "ref-search-schema",
       "ref-search-json-data",
       "ref-search-rendering"
