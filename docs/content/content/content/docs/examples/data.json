@@ -12,6 +12,17 @@
       "headlineTag": "h2",
       "styles": {},
       "variation": "summary",
+      "querystring": {
+        "query": [
+          {
+            "i": "path",
+            "o": "plone.app.querystring.operation.string.relativePath",
+            "v": "."
+          }
+        ],
+        "sort_on": "getObjPositionInParent",
+        "depth": 1
+      },
       "fieldMapping": {
         "@id": "href",
         "title": "title",

@@ -2307,7 +2307,7 @@
   ],
   "description": "The accordion contains other blocks in an accordion behavior layout.",
   "effective": "2023-09-22T16:09:00",
-  "exclude_from_nav": true,
+  "exclude_from_nav": false,
   "expires": null,
   "exportimport.constrains": {},
   "exportimport.conversation": [],

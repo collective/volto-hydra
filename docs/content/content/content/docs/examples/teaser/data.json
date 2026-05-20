@@ -215,7 +215,7 @@
   ],
   "description": "The teaser block allows you to add an element that teases existing website content with an image, a title and a description.",
   "effective": "2023-07-06T18:35:00",
-  "exclude_from_nav": true,
+  "exclude_from_nav": false,
   "expires": null,
   "exportimport.constrains": {},
   "exportimport.conversation": [],

@@ -101,10 +101,9 @@ function buildExampleShell(slug, mdContent) {
     creators: ['admin'],
     description,
     effective: null,
-    // Block-reference pages are accessed via the listing block on the
-    // /docs/examples landing page, not the global Plone nav portlet.
-    // Excluding them from nav keeps the top-level docs nav uncluttered.
-    exclude_from_nav: true,
+    // Block-reference pages stay in nav so the cnav force-rule at
+    // /docs/examples and on each per-block page surfaces them as nav links.
+    exclude_from_nav: false,
     expires: null,
     'exportimport.constrains': {},
     'exportimport.conversation': [],
@@ -152,18 +151,20 @@ for (const mdFile of mdFiles) {
   console.log(`Created docs/examples/${slug}/data.json shell`);
 }
 
-// Backfill exclude_from_nav: true on every example page. Existing shells
-// were created with `false`; the policy decision (examples reachable via
-// the /docs/examples listing block, not the global nav) is set in
-// buildExampleShell going forward — this loop catches existing pages.
+// Example pages used to be exclude_from_nav=true on the theory that they'd
+// only be reached via the /docs/examples listing block — but the cnav
+// force-rule at /docs/examples then pulled siblings from /docs and filtered
+// them out, leaving an unhelpful nav. Make them visible to nav so the
+// contextNavigation surfaces the per-block reference pages the way users
+// expect, and unset the flag on any leftover pages from the old policy.
 for (const mdFile of mdFiles) {
   const slug = mdFile.replace(/\.md$/, '');
   const jsonPath = join(mdFileToContentDir(mdFile), 'data.json');
   if (!existsSync(jsonPath)) continue;
   const original = readFileSync(jsonPath, 'utf-8');
   const data = JSON.parse(original);
-  if (data.exclude_from_nav === true) continue;
-  data.exclude_from_nav = true;
+  if (data.exclude_from_nav === false) continue;
+  data.exclude_from_nav = false;
   const updated = JSON.stringify(data, null, 2) + '\n';
   if (updated === original) continue;
   if (checkMode) {
@@ -171,7 +172,7 @@ for (const mdFile of mdFiles) {
     console.error(`OUT OF SYNC: ${jsonPath} (exclude_from_nav)`);
   } else {
     writeFileSync(jsonPath, updated, 'utf-8');
-    console.log(`Updated exclude_from_nav=true: docs/examples/${slug}/data.json`);
+    console.log(`Updated exclude_from_nav=false: docs/examples/${slug}/data.json`);
   }
 }
 
@@ -277,40 +278,67 @@ for (const mdFile of mdFiles) {
 // Ensure the /docs/examples landing page has a listing block that surfaces
 // every child example. Without it, the page renders as just a title and
 // columns/etc. exist only by URL — undiscoverable from the live site.
-// Idempotent: only writes if the listing block isn't already in the layout.
+// Idempotent: only writes when the canonical shape differs from disk, so
+// changes to the desired querystring/fieldMapping below also propagate.
 {
   const examplesIndexJsonPath = join(
     CONTENT_DIR, 'docs', 'examples', 'data.json',
   );
+  // Without an explicit querystring the listing falls back to
+  // @querystring-search with relativePath '.', which on a multi-level
+  // folder like /docs/examples pulls in EVERY descendant (e.g.
+  // content-types/copy_of_event) in arbitrary order. Pin it to direct
+  // children sorted in folder order. Note: NO exclude_from_nav filter —
+  // the per-block example pages are deliberately exclude_from_nav=true
+  // (they're a reference index, not a navigation tier), and the whole
+  // point of this listing is to surface them.
+  const examplesListingBlock = {
+    '@type': 'listing',
+    headlineTag: 'h2',
+    styles: {},
+    variation: 'summary',
+    querystring: {
+      query: [
+        {
+          i: 'path',
+          o: 'plone.app.querystring.operation.string.relativePath',
+          v: '.',
+        },
+      ],
+      sort_on: 'getObjPositionInParent',
+      depth: 1,
+    },
+    fieldMapping: {
+      '@id': 'href',
+      title: 'title',
+      description: 'description',
+      image: 'image',
+    },
+  };
   if (existsSync(examplesIndexJsonPath)) {
     const original = readFileSync(examplesIndexJsonPath, 'utf-8');
     const data = JSON.parse(original);
     const layout = data.blocks_layout?.items || [];
-    if (!layout.includes('examples-listing')) {
+    const currentBlock = data.blocks?.['examples-listing'];
+    const blockNeedsUpdate =
+      JSON.stringify(currentBlock) !== JSON.stringify(examplesListingBlock);
+    const layoutNeedsUpdate = !layout.includes('examples-listing');
+    if (blockNeedsUpdate || layoutNeedsUpdate) {
       data.blocks = {
         ...data.blocks,
-        'examples-listing': {
-          '@type': 'listing',
-          headlineTag: 'h2',
-          styles: {},
-          variation: 'summary',
-          fieldMapping: {
-            '@id': 'href',
-            title: 'title',
-            description: 'description',
-            image: 'image',
-          },
-        },
+        'examples-listing': examplesListingBlock,
       };
-      data.blocks_layout = { items: [...layout, 'examples-listing'] };
+      if (layoutNeedsUpdate) {
+        data.blocks_layout = { items: [...layout, 'examples-listing'] };
+      }
       const updated = JSON.stringify(data, null, 2) + '\n';
       if (updated !== original) {
         outOfSync = true;
         if (checkMode) {
-          console.error('OUT OF SYNC: /docs/examples needs a listing block');
+          console.error('OUT OF SYNC: /docs/examples examples-listing block');
         } else {
           writeFileSync(examplesIndexJsonPath, updated, 'utf-8');
-          console.log('Added listing block to docs/examples/data.json');
+          console.log('Updated examples-listing block in docs/examples/data.json');
         }
       }
     }

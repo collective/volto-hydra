@@ -77,7 +77,7 @@
   ],
   "description": "A full-width hero section with heading, subheading, image, rich text description, and a call-to-action button. Demonstrates multiple field types in a single block: string, textarea, slate, image, and object_browser.",
   "effective": null,
-  "exclude_from_nav": true,
+  "exclude_from_nav": false,
   "expires": null,
   "exportimport.constrains": {},
   "exportimport.conversation": [],
