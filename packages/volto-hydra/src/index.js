@@ -97,6 +97,21 @@ const applyConfig = (config) => {
   config.addonReducers.frontendPreviewUrl = frontendPreviewUrl;
   config.addonReducers.viewportPreset = viewportPreset;
 
+  // Un-reserve frontend-only view routes so content pages can use those
+  // names. Volto's getBaseUrl() strips any nonContentRoutes suffix from a
+  // path — so a content page literally at /docs/examples/search resolves
+  // to its parent /docs/examples ("the search view of /docs/examples"),
+  // and the admin edits the wrong object. In a Hydra deployment the
+  // frontend renders /search, /sitemap and /contact-form — the Volto
+  // admin never does — so dropping them here lets authors name pages
+  // freely. Admin-rendered views (/edit, /add, /contents, /controlpanel,
+  // /login, /logout, /sharing, …) stay reserved.
+  const hydraFrontendOnlyRoutes = ['/search', '/sitemap', '/contact-form'];
+  config.settings.nonContentRoutes = (config.settings.nonContentRoutes || []).filter(
+    (route) =>
+      !(typeof route === 'string' && hydraFrontendOnlyRoutes.includes(route)),
+  );
+
   // Frontend Switcher toolbar menu (viewport + frontend URL switching)
   config.settings.additionalToolbarComponents = {
     ...config.settings.additionalToolbarComponents,
