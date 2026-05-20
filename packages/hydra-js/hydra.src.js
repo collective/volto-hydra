@@ -7505,9 +7505,14 @@ export class Bridge {
       return;
     }
 
-    // For direct UID selector, target that specific block
+    // Direct UID selector. The value is either a single uid (e.g. a
+    // carousel dot → that slide) or a space-separated word-list whose
+    // FIRST uid is the block to select — accordion panel headers carry
+    // `[panelUid, ...childUids]` (panel first), the rest of the list is
+    // only there for tryMakeBlockVisible's `~=` reveal match. Take the
+    // first token either way.
     if (selector !== '+1' && selector !== '-1') {
-      const targetUid = selector;
+      const targetUid = selector.trim().split(/\s+/)[0];
       log('handleBlockSelector: direct selector targetUid =', targetUid);
       // Hide outline during transition (same as +1/-1 path)
       this._blockSelectorNavigating = true;

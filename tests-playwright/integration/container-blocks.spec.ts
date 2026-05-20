@@ -5000,6 +5000,33 @@ test.describe('Accordion Block', () => {
     await expect(titleEl).toContainText('Accordion Header Text');
   });
 
+  test('clicking an accordion panel title selects the panel', async ({ page }, testInfo) => {
+    // The Nuxt accordion panel header is a <button data-block-selector="…">
+    // — the word-list is there for tryMakeBlockVisible's programmatic
+    // reveal click. A user click on the title text (data-edit-text) inside
+    // that button must still select the panel: blockClickHandler must not
+    // hijack a click on an editable element into data-block-selector
+    // navigation.
+    // admin-nuxt only — the test-frontend accordion header has no
+    // data-block-selector (always-expanded, no collapse mechanism).
+    test.skip(
+      testInfo.project.name !== 'admin-nuxt',
+      'Nuxt accordion only — test-frontend header has no data-block-selector',
+    );
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/accordion-test-page');
+
+    const iframe = helper.getIframe();
+    const titleEl = iframe.locator(
+      '[data-block-uid="panel-1"] [data-edit-text="title"]',
+    );
+    await expect(titleEl).toBeVisible();
+    await titleEl.click();
+
+    await helper.waitForBlockSelectedInAdmin('panel-1');
+  });
+
   test('bridge expose: selecting hidden block inside collapsed panel opens the panel', async ({ page }, testInfo) => {
     // Companion to 'clicking hidden slide in sidebar ChildBlocksWidget selects it'
     // — but for accordion's panel-collapse mechanism. Accordion's first
