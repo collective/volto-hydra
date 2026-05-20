@@ -18,6 +18,25 @@ This is a **custom** block — register it via `initBridge`.
           "title": "Link",
           "widget": "object_browser",
           "mode": "link"
+        },
+        "inneralign": {
+          "title": "Alignment",
+          "widget": "select",
+          "choices": [
+            [
+              "left",
+              "Left"
+            ],
+            [
+              "center",
+              "Center"
+            ],
+            [
+              "right",
+              "Right"
+            ]
+          ],
+          "default": "left"
         }
       }
     }

@@ -405,7 +405,7 @@
           "@id": "ref-button-schema-javascript-8aa182",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  \"button\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Label\"\n        },\n        \"href\": {\n          \"title\": \"Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        }\n      }\n    }\n  }\n}"
+          "code": "{\n  \"button\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Label\"\n        },\n        \"href\": {\n          \"title\": \"Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        },\n        \"inneralign\": {\n          \"title\": \"Alignment\",\n          \"widget\": \"select\",\n          \"choices\": [\n            [\n              \"left\",\n              \"Left\"\n            ],\n            [\n              \"center\",\n              \"Center\"\n            ],\n            [\n              \"right\",\n              \"Right\"\n            ]\n          ],\n          \"default\": \"left\"\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },

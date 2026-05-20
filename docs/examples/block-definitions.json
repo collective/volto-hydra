@@ -1527,6 +1527,12 @@
               "title": "Link",
               "widget": "object_browser",
               "mode": "link"
+            },
+            "inneralign": {
+              "title": "Alignment",
+              "widget": "select",
+              "choices": [["left", "Left"], ["center", "Center"], ["right", "Right"]],
+              "default": "left"
             }
           }
         }
