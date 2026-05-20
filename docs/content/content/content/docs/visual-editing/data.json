@@ -813,6 +813,287 @@
     },
     "h-29": {
       "@type": "slate",
+      "plaintext": "One top-level node per slate field",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "One top-level node per slate field"
+            }
+          ]
+        }
+      ]
+    },
+    "p-30": {
+      "@type": "slate",
+      "plaintext": "A slate field's `value` is an array, but it always holds exactly **one top-level node** — a single paragraph, heading, list, or blockquote. Inline content (bold, links, …) lives in that node's `children`.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A slate field's "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "value"
+                }
+              ]
+            },
+            {
+              "text": " is an array, but it always holds exactly "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "one top-level node"
+                }
+              ]
+            },
+            {
+              "text": " — a single paragraph, heading, list, or blockquote. Inline content (bold, links, …) lives in that node's "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "children"
+                }
+              ]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    "p-31": {
+      "@type": "slate",
+      "plaintext": "Editing can transiently produce more than one top-level node — pasting multiple paragraphs, pressing Enter, or a Backspace that demotes a list item to a paragraph (`[ul, p]`). Hydra normalizes that immediately:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Editing can transiently produce more than one top-level node — pasting multiple paragraphs, pressing Enter, or a Backspace that demotes a list item to a paragraph ("
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "[ul, p]"
+                }
+              ]
+            },
+            {
+              "text": "). Hydra normalizes that immediately:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-32": {
+      "@type": "slate",
+      "plaintext": "Split — when the field is the value of a slate block, each extra",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Split"
+                    }
+                  ]
+                },
+                {
+                  "text": " — when the field is the "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "value"
+                    }
+                  ]
+                },
+                {
+                  "text": " of a "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "slate"
+                    }
+                  ]
+                },
+                {
+                  "text": " block, each extra"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-33": {
+      "@type": "slate",
+      "plaintext": "node becomes its own `slate` block, inserted after the original in the   same container (`blocks_layout` or `object_list`). This is how pressing   Enter in a text block produces a new block.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "node becomes its own "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "slate"
+                }
+              ]
+            },
+            {
+              "text": " block, inserted after the original in the   same container ("
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks_layout"
+                }
+              ]
+            },
+            {
+              "text": " or "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "object_list"
+                }
+              ]
+            },
+            {
+              "text": "). This is how pressing   Enter in a text block produces a new block."
+            }
+          ]
+        }
+      ]
+    },
+    "ul-34": {
+      "@type": "slate",
+      "plaintext": "Flatten — when the field can't be split — a slate field of a",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Flatten"
+                    }
+                  ]
+                },
+                {
+                  "text": " — when the field "
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": "can't"
+                    }
+                  ]
+                },
+                {
+                  "text": " be split — a slate field of a"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-35": {
+      "@type": "slate",
+      "plaintext": "non-slate block (e.g. a `slateTable` cell's `value`), or a container   that's full or in table mode — the extra nodes' content merges back into   the first node. No text is lost.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "non-slate block (e.g. a "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "slateTable"
+                }
+              ]
+            },
+            {
+              "text": " cell's "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "value"
+                }
+              ]
+            },
+            {
+              "text": "), or a container   that's full or in table mode — the extra nodes' content merges back into   the first node. No text is lost."
+            }
+          ]
+        }
+      ]
+    },
+    "p-36": {
+      "@type": "slate",
+      "plaintext": "A frontend renderer can therefore always assume one top-level node per slate field; it never has to handle a multi-node `value`.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A frontend renderer can therefore always assume one top-level node per slate field; it never has to handle a multi-node "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "value"
+                }
+              ]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    "h-37": {
+      "@type": "slate",
       "plaintext": "Complete Slate Rendering Example",
       "value": [
         {
@@ -825,7 +1106,7 @@
         }
       ]
     },
-    "p-30": {
+    "p-38": {
       "@type": "slate",
       "plaintext": "Slate data structure (value is an array but always contains a single root node):",
       "value": [
@@ -839,18 +1120,18 @@
         }
       ]
     },
-    "ce-31": {
+    "ce-39": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-31-json-566f4f",
+          "@id": "ce-39-json-5d264e",
           "label": "Json",
           "language": "json",
           "code": "{\n  \"value\": [\n    {\n      \"type\": \"p\", \"nodeId\": \"0\",\n      \"children\": [\n        { \"text\": \"Hello \" },\n        { \"type\": \"strong\", \"nodeId\": \"0.1\",\n          \"children\": [{ \"text\": \"world\" }] },\n        { \"text\": \"! Visit \" },\n        { \"type\": \"link\", \"nodeId\": \"0.3\",\n          \"data\": { \"url\": \"/about\" },\n          \"children\": [{ \"text\": \"our page\" }] }\n      ]\n    }\n  ]\n}"
         }
       ]
     },
-    "p-32": {
+    "p-40": {
       "@type": "slate",
       "plaintext": "Renderer:",
       "value": [
@@ -864,18 +1145,18 @@
         }
       ]
     },
-    "ce-33": {
+    "ce-41": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-33-javascript-120335",
+          "@id": "ce-41-javascript-925664",
           "label": "Javascript",
           "language": "javascript",
           "code": "function renderSlate(nodes) {\n  return (nodes || []).map(node => {\n    if (node.text !== undefined) return escapeHtml(node.text);\n    const tag = { p:'p', h1:'h1', h2:'h2', strong:'strong',\n                  em:'em', link:'a' }[node.type] || 'span';\n    const attrs = node.type === 'link'\n      ? ` href=\"${node.data?.url || '#'}\"` : '';\n    return `<${tag} data-node-id=\"${node.nodeId}\"${attrs}>${renderSlate(node.children)}</${tag}>`;\n  }).join('');\n}"
         }
       ]
     },
-    "p-34": {
+    "p-42": {
       "@type": "slate",
       "plaintext": "Usage:",
       "value": [
@@ -889,11 +1170,11 @@
         }
       ]
     },
-    "ce-35": {
+    "ce-43": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-35-html-8a2ed1",
+          "@id": "ce-43-html-79ffcf",
           "label": "Html",
           "language": "html",
           "code": "<div data-block-uid=\"block-1\" data-edit-text=\"value\">\n  <!-- renderSlate(block.value) output goes here -->\n</div>"
@@ -934,11 +1215,19 @@
       "ce-28",
       "h-29",
       "p-30",
-      "ce-31",
-      "p-32",
-      "ce-33",
-      "p-34",
-      "ce-35"
+      "p-31",
+      "ul-32",
+      "p-33",
+      "ul-34",
+      "p-35",
+      "p-36",
+      "h-37",
+      "p-38",
+      "ce-39",
+      "p-40",
+      "ce-41",
+      "p-42",
+      "ce-43"
     ]
   }
 }

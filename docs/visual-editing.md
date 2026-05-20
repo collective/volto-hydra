@@ -125,6 +125,28 @@ Invalid (missing node-id on wrapper):
 This breaks cursor positioning because hydra.js can't correlate DOM structure to Slate structure.
 ```
 
+## One top-level node per slate field
+
+A slate field's `value` is an array, but it always holds exactly **one
+top-level node** — a single paragraph, heading, list, or blockquote.
+Inline content (bold, links, …) lives in that node's `children`.
+
+Editing can transiently produce more than one top-level node — pasting
+multiple paragraphs, pressing Enter, or a Backspace that demotes a list
+item to a paragraph (`[ul, p]`). Hydra normalizes that immediately:
+
+- **Split** — when the field is the `value` of a `slate` block, each extra
+  node becomes its own `slate` block, inserted after the original in the
+  same container (`blocks_layout` or `object_list`). This is how pressing
+  Enter in a text block produces a new block.
+- **Flatten** — when the field *can't* be split — a slate field of a
+  non-slate block (e.g. a `slateTable` cell's `value`), or a container
+  that's full or in table mode — the extra nodes' content merges back into
+  the first node. No text is lost.
+
+A frontend renderer can therefore always assume one top-level node per
+slate field; it never has to handle a multi-node `value`.
+
 ## Complete Slate Rendering Example
 
 Slate data structure (value is an array but always contains a single root node):
