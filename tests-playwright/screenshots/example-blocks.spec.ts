@@ -97,57 +97,54 @@ test.describe('docs/examples/* screenshots', () => {
       await helper.navigateToEdit(`/docs/examples/${slug}`);
 
       const uid = firstBlockUidOfType(slug, blockType);
+      const iframe = helper.getIframe();
+      const blockEl = iframe.locator(`[data-block-uid="${uid}"]`).first();
+      await blockEl.waitFor({ state: 'attached', timeout: 15000 });
 
-      // A real click drives the same BLOCK_SELECTED postMessage flow that a
-      // user click would — that's what makes Volto portal the block's form
-      // into #sidebar-properties. bridge.selectBlock places the block header
-      // but leaves the form target empty for several block types, so prefer
-      // a click. Fall back to bridge.selectBlock if the click is swallowed
-      // by an intercepting child (some container UIs do).
-      try {
-        await helper.clickBlockInIframe(uid);
-      } catch (_e) {
-        const iframe = helper.getIframe();
-        await iframe.locator(`[data-block-uid="${uid}"]`).first().evaluate((el) => {
+      // Click the first editable element inside the block — text, link or
+      // media. `.locator` descends to any depth, so for a container block
+      // this lands on the first editable sub-field; that sub-block becomes
+      // selected and the sidebar shows it plus its parent chain. Clicking a
+      // container's own wrapper is unreliable — its chrome intercepts the
+      // click — and never lands the cursor in an editable field.
+      const editable = blockEl
+        .locator('[data-edit-text], [data-edit-link], [data-edit-media]')
+        .first();
+      let selectedUid = uid;
+      if (await editable.count()) {
+        selectedUid =
+          (await editable.evaluate(
+            (el) => el.closest('[data-block-uid]')?.getAttribute('data-block-uid'),
+          )) || uid;
+        await editable.scrollIntoViewIfNeeded();
+        await editable.click();
+      } else {
+        // No editable element at all (e.g. separator) — select the block
+        // itself via the bridge.
+        await blockEl.evaluate((el) => {
           (window as any).bridge?.selectBlock(el);
         });
       }
-      await helper.waitForBlockSelectedInAdmin(uid);
+      await helper.waitForBlockSelectedInAdmin(selectedUid);
 
       // Give the block's form a chance to portal into #sidebar-properties
-      // before we snap. Some block types (accordion, search) render most
-      // of their UI via ChildBlocksWidget rather than flat fields, so we
-      // accept any populated child element. A handful (separator) have no
-      // sidebar form at all — that's fine, snap what's there.
+      // before we snap. Some block types render their UI via
+      // ChildBlocksWidget rather than flat fields, so accept any populated
+      // child element; a few (separator) have no sidebar form at all.
       const blockForm = page.locator('#sidebar-properties');
       for (let i = 0; i < 25; i++) {
         if ((await blockForm.locator('*').count()) > 0) break;
         await page.waitForTimeout(100);
       }
 
-      // Scroll the block form into view inside the sidebar — the page
-      // metadata sits above it and on tall content (accordion, image)
-      // pushes the block form below the fold.
+      // Scroll the block form into view inside the sidebar — page metadata
+      // sits above it and on tall content pushes it below the fold.
       if (await blockForm.count()) {
         await blockForm.evaluate((el) => el.scrollIntoView({ block: 'center' }));
       }
 
-      // Focus the first editable field so the screenshot shows actual
-      // editing state, not just selection. Prefer text inputs over
-      // dropdowns / checkboxes (their focus state is barely visible).
-      const editableField = page
-        .locator(
-          '#sidebar-properties input[type="text"]:visible, ' +
-            '#sidebar-properties input:not([type]):visible, ' +
-            '#sidebar-properties textarea:visible',
-        )
-        .first();
-      if (await editableField.count()) {
-        await editableField.focus();
-      }
-
-      // Allow the focus ring + any final layout shifts to settle.
-      await page.waitForTimeout(200);
+      // Allow selection chrome + any final layout shifts to settle.
+      await page.waitForTimeout(300);
 
       // hydra.js paints red diagnostic overlays in the iframe when
       // something is wrong: #hydra-bridge-diagnostic (bridge couldn't
