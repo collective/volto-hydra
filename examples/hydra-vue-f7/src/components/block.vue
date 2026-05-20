@@ -356,7 +356,7 @@
   <hr v-else-if="block['@type'] == 'separator'" :data-block-uid="block_uid" />
 
   <!-- Button -->
-  <div v-else-if="block['@type'] == '__button'" :data-block-uid="block_uid" class="button-block"
+  <div v-else-if="block['@type'] == 'button'" :data-block-uid="block_uid" class="button-block"
        :style="{ textAlign: block.inneralign || 'left' }">
     <f7-button fill :href="getUrl(block.href)" data-edit-link="href" data-edit-text="title">
       {{ block.title || 'Button' }}

@@ -8,7 +8,6 @@ These blocks are available by default — no schema registration required.
 
 | Block | Description |
 |-------|-------------|
-| [Button Block](./button.md) | A call-to-action button with editable label and link. The block type is `__button` (double-underscore prefix indicates a Volto built-in). |
 | [Grid Block](./grid.md) | A responsive grid that lays out child blocks in equal-width cells. The block uses Volto's standard shared-blocks shape — `blocks` is the dict of children, `blocks_layout.items` is their order — and constrains the allowed types via `allowedBlocks`. |
 | [Heading Block](./heading.md) | A standalone heading block that renders as h1–h6 based on a configurable `tag` field. Unlike headings inside a slate block, this is a dedicated block type with its own `heading` text field. |
 | [Image Block](./image.md) | Displays an image with optional alt text and link. Supports the image picker widget for selecting images from the Plone content tree or uploading new ones. |
@@ -29,6 +28,7 @@ These blocks demonstrate common patterns. Register them via `initBridge({ blocks
 | Block | Description |
 |-------|-------------|
 | [Accordion Block](./accordion.md) | A collapsible panel group. Each panel is an `object_list` item with a title and a content area that holds child blocks. |
+| [Button Block](./button.md) | A call-to-action button with an editable label and link. |
 | [Columns Block](./columns.md) | A horizontal multi-column container. The block has one slot — `columns` — restricted to `column` children, capped at four. Each `column` is itself a container holding any of its allowed inner block types (slate, image, …). |
 | [Context Navigation Block](./contextNavigation.md) | A vertical navigation list for grouped pages — a left sidebar on desktop and a collapsible disclosure at the top on mobile. Each row is a `navItem` (hand-added link) and/or a `listing` (auto-populated from a path query). The active link is detected from the current URL and gets `aria-current="page"` plus a `.current` class. Named after Plone's `@contextnavigation` endpoint, which serves the same purpose. |
 | [Form Block](./form.md) | A multi-field form with configurable field types, validation, and email submission. Fields are stored as a typed `object_list` — each field has a `field_type` that maps to a sub-block schema. |

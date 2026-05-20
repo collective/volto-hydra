@@ -59,7 +59,7 @@ const typeMap = {
   form: FormBlock,
   heading: HeadingBlock,
   separator: SeparatorBlock,
-  __button: ButtonBlock,
+  button: ButtonBlock,
   highlight: HighlightBlock,
   video: VideoBlock,
   maps: MapsBlock,

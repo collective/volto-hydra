@@ -56,7 +56,7 @@
   <HeadingBlock {block} />
 {:else if block['@type'] === 'separator'}
   <SeparatorBlock {block} />
-{:else if block['@type'] === '__button'}
+{:else if block['@type'] === 'button'}
   <ButtonBlock {block} />
 {:else if block['@type'] === 'highlight'}
   <HighlightBlock {block} />

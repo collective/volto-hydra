@@ -48,7 +48,7 @@ fs.mkdirSync(OUT_DIR, { recursive: true });
  */
 const EXAMPLES: Array<{ slug: string; blockType: string }> = [
   { slug: 'accordion', blockType: 'accordion' },
-  { slug: 'button', blockType: '__button' },
+  { slug: 'button', blockType: 'button' },
   { slug: 'form', blockType: 'form' },
   { slug: 'highlight', blockType: 'highlight' },
   { slug: 'image', blockType: 'image' },

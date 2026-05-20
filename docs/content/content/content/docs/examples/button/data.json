@@ -11,7 +11,7 @@
       }
     },
     "0b8a95f2-1320-4f44-a21d-4cfada6bd222": {
-      "@type": "__button",
+      "@type": "button",
       "href": [
         {
           "@id": "/",
@@ -29,7 +29,7 @@
       "title": "Button"
     },
     "0d3d0bd6-ee66-44a3-9da8-b5e84ba797e4": {
-      "@type": "__button",
+      "@type": "button",
       "href": [
         {
           "@id": "/",
@@ -113,7 +113,7 @@
       ]
     },
     "31dcaf51-715a-4458-b11b-5d03a085b90d": {
-      "@type": "__button",
+      "@type": "button",
       "href": [
         {
           "@id": "/",
@@ -202,7 +202,7 @@
       }
     },
     "9aa3c0c3-6565-4e9c-8e27-d07eeedf4314": {
-      "@type": "__button",
+      "@type": "button",
       "href": [
         {
           "@id": "/",
@@ -229,7 +229,7 @@
       "tag": "h2"
     },
     "a8d191e1-5b3a-4ef6-b38f-6cb9af33ff85": {
-      "@type": "__button",
+      "@type": "button",
       "href": [
         {
           "@id": "/",
@@ -246,7 +246,7 @@
       "title": "Button"
     },
     "b03e7ce7-b7b5-4413-bd2e-d42bff4bba9a": {
-      "@type": "__button",
+      "@type": "button",
       "href": [
         {
           "@id": "/",
@@ -263,7 +263,7 @@
       "title": "Button"
     },
     "beef7c11-acca-4e40-8477-e6f2e42d0f06": {
-      "@type": "__button",
+      "@type": "button",
       "href": [
         {
           "@id": "/",
@@ -278,7 +278,7 @@
       "title": "Button"
     },
     "dd9dc0eb-821a-4581-97af-7e59afc249e1": {
-      "@type": "__button",
+      "@type": "button",
       "href": [
         {
           "@id": "/",
@@ -296,7 +296,7 @@
       "title": "Button"
     },
     "e150d94a-7a54-451b-8019-31349d98d957": {
-      "@type": "__button",
+      "@type": "button",
       "href": [
         {
           "@id": "/",
@@ -311,7 +311,7 @@
       "title": "Button"
     },
     "e20c3c62-3c1d-4e45-a5c4-649b81b47a46": {
-      "@type": "__button",
+      "@type": "button",
       "href": [
         {
           "@id": "/",
@@ -353,7 +353,7 @@
       "@type": "title"
     },
     "f62e21a3-b906-4c0c-bef8-f42cd9631967": {
-      "@type": "__button",
+      "@type": "button",
       "href": [
         {
           "@id": "/",
@@ -378,7 +378,7 @@
       }
     },
     "fc0ddcf5-4acc-4f9b-8c5c-992db47399ce": {
-      "@type": "__button",
+      "@type": "button",
       "href": [
         {
           "@id": "/",
@@ -405,7 +405,7 @@
           "@id": "ref-button-schema-javascript-8aa182",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  \"__button\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Label\"\n        },\n        \"href\": {\n          \"title\": \"Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        }\n      }\n    }\n  }\n}"
+          "code": "{\n  \"button\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Label\"\n        },\n        \"href\": {\n          \"title\": \"Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },
@@ -419,7 +419,7 @@
           "@id": "ref-button-json-data-json-ed3030",
           "label": "JSON Block Data",
           "language": "json",
-          "code": "{\n  \"@type\": \"__button\",\n  \"title\": \"Learn More\",\n  \"href\": [\n    {\n      \"@id\": \"/about-us\"\n    }\n  ]\n}"
+          "code": "{\n  \"@type\": \"button\",\n  \"title\": \"Learn More\",\n  \"href\": [\n    {\n      \"@id\": \"/about-us\"\n    }\n  ]\n}"
         }
       ]
     },

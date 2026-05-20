@@ -314,7 +314,7 @@ async function renderBlock(blockId, block) {
         case 'separator':
             wrapper.innerHTML = renderSeparatorBlock(block);
             break;
-        case '__button':
+        case 'button':
             wrapper.innerHTML = renderButtonBlock(block);
             break;
         case 'highlight':

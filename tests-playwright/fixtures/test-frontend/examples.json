@@ -475,7 +475,7 @@
       }
     },
     "ex-button": {
-      "@type": "__button",
+      "@type": "button",
       "title": "Learn More",
       "href": [
         {

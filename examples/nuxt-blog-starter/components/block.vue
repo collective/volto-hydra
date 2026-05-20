@@ -523,7 +523,7 @@
     </table>
   </div>
 
-  <div v-else-if="block['@type'] == '__button'" :data-block-uid="block_uid"
+  <div v-else-if="block['@type'] == 'button'" :data-block-uid="block_uid"
        :class="['my-4', {
            'text-center': block.inneralign === 'center',
            'text-right': block.inneralign === 'right'

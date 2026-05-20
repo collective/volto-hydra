@@ -1253,7 +1253,7 @@ function Block({ block, id, data, apiUrl, contextPath }) {
       return <hr data-block-uid={id} />;
 
     // ── Button ──
-    case "__button":
+    case "button":
       return (
         <div data-block-uid={id} className="button-block">
           <a

@@ -22,7 +22,7 @@ function BlockRenderer({ block, content }) {
     case 'form':          return <FormBlock block={block} />;
     case 'heading':       return <HeadingBlock block={block} />;
     case 'separator':     return <SeparatorBlock block={block} />;
-    case '__button':      return <ButtonBlock block={block} />;
+    case 'button':      return <ButtonBlock block={block} />;
     case 'highlight':     return <HighlightBlock block={block} />;
     case 'video':         return <VideoBlock block={block} />;
     case 'maps':          return <MapsBlock block={block} />;

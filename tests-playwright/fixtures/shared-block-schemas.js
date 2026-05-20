@@ -22,6 +22,21 @@ export const sharedBlocksConfig = {
             required: [],
         },
     },
+    // Button block: a call-to-action with an inline-editable label and a
+    // link. Registered here so the admin shows Label + Link sidebar fields.
+    button: {
+        id: 'button',
+        title: 'Button',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'href'] }],
+            properties: {
+                title: { title: 'Label' },
+                href: { title: 'Link', widget: 'object_browser', mode: 'link' },
+            },
+            required: [],
+        },
+    },
     hero: {
         id: 'hero',
         title: 'Hero',

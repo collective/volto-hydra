@@ -197,7 +197,7 @@ const TEMPLATE_ID = 'resolveuid/tpl-block-reference-layout';
 /** Map of markdown filename → { content UID, target block @type, hasEditableFields } */
 const DOC_PAGES: Record<string, { uid: string; blockType: string; editable: boolean }> = {
   'accordion.md': { uid: 'f8cd4a2d8d7c4703b4e41d2093b21aed', blockType: 'accordion', editable: true },
-  'button.md': { uid: '405582582e70493c96a6c549444a1eaa', blockType: '__button', editable: true },
+  'button.md': { uid: '405582582e70493c96a6c549444a1eaa', blockType: 'button', editable: true },
   'columns.md': { uid: '99c70917b6894af08dd306fdbc0eff6a', blockType: 'gridBlock', editable: false },
   'form.md': { uid: '13de82575e16493fbc54514e548a9f3c', blockType: 'form', editable: false },
   'heading.md': { uid: '2f69aa417e894fd3bf23d393287b369e', blockType: 'heading', editable: true },

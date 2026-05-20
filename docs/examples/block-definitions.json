@@ -1517,7 +1517,7 @@
   },
   "button": {
     "blocks": {
-      "__button": {
+      "button": {
         "blockSchema": {
           "properties": {
             "title": {
@@ -1534,7 +1534,7 @@
     },
     "examples": {
       "ex-button": {
-        "@type": "__button",
+        "@type": "button",
         "title": "Learn More",
         "href": [
           {

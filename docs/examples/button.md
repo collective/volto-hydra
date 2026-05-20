@@ -1,14 +1,14 @@
 # Button Block
 
-A call-to-action button with editable label and link. The block type is `__button` (double-underscore prefix indicates a Volto built-in).
+A call-to-action button with an editable label and link.
 
-This is a **built-in** block.
+This is a **custom** block — register it via `initBridge`.
 
 ## Schema
 
 ```json
 {
-  "__button": {
+  "button": {
     "blockSchema": {
       "properties": {
         "title": {
@@ -30,7 +30,7 @@ This is a **built-in** block.
 
 ```json
 {
-  "@type": "__button",
+  "@type": "button",
   "title": "Learn More",
   "href": [
     {

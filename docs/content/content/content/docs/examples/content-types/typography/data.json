@@ -483,7 +483,7 @@
       }
     },
     "dc27e427-babe-4497-a6ae-fdefeaba2d13": {
-      "@type": "__button",
+      "@type": "button",
       "inneralign": "left",
       "styles": {},
       "title": "Button text (button, 18/24px)"
