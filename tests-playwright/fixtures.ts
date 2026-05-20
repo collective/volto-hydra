@@ -49,6 +49,43 @@ const test = baseTest.extend({
     });
 
     await use(page);
+
+    // After the test, fail if hydra.js painted a diagnostic overlay inside
+    // the preview iframe. Two overlays exist:
+    //   #hydra-bridge-diagnostic — bridge never connected to the admin
+    //   #hydra-dev-warning       — e.g. a Slate field with no data-node-id
+    // Both mean the editor was broken during the test even if the test's
+    // own assertions happened to pass. Only enforced when the test would
+    // otherwise pass, so a real failure isn't masked by this check.
+    if (testInfo.status === 'passed' && testInfo.expectedStatus === 'passed') {
+      try {
+        const iframeCount = await page.locator('#previewIframe').count();
+        if (iframeCount > 0) {
+          const overlays = await page
+            .frameLocator('#previewIframe')
+            .locator('#hydra-bridge-diagnostic, #hydra-dev-warning')
+            .count();
+          if (overlays > 0) {
+            const text = await page
+              .frameLocator('#previewIframe')
+              .locator('#hydra-bridge-diagnostic, #hydra-dev-warning')
+              .first()
+              .innerText()
+              .catch(() => '(overlay text unavailable)');
+            throw new Error(
+              `hydra.js diagnostic overlay appeared during this test — the ` +
+                `editor was in a broken state. Overlay text:\n${text}`,
+            );
+          }
+        }
+      } catch (err) {
+        // Re-throw our own assertion; swallow incidental teardown errors
+        // (e.g. page already closed) so they don't mask a green test.
+        if (err instanceof Error && err.message.includes('diagnostic overlay appeared')) {
+          throw err;
+        }
+      }
+    }
   },
 });
 
