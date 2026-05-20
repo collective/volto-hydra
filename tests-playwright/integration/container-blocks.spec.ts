@@ -4,6 +4,7 @@
  * Tests nested block selection, container hierarchy detection,
  * and add/delete operations within containers.
  */
+import type { FrameLocator } from '@playwright/test';
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
@@ -3858,6 +3859,160 @@ test.describe('slateTable Container', () => {
     const secondCellInNewRow = newRow.locator('th[data-block-uid], td[data-block-uid]').nth(1);
     const selectedBlockUid = await secondCellInNewRow.getAttribute('data-block-uid');
     await helper.waitForIframeBlockHandle(selectedBlockUid!);
+  });
+
+  test('cell with multi-node slate value is flattened, not split', async ({
+    page,
+  }) => {
+    // A slate field must hold a single top-level node. splitMultiNodeSlateBlocks
+    // enforces that by splitting into sibling blocks — but a slateTable cell's
+    // value is a slate field of a non-slate block: there is no sibling slate
+    // block to create (the cell's container is a list of cells). Splitting it
+    // corrupts the row (stray non-cell block) and, on Nuxt, loops until React
+    // throws "Maximum update depth exceeded". The correct outcome is to
+    // FLATTEN the multi-node value into one node. table-test-page never
+    // caught this because all its cells are single-node; table-multinode-page
+    // has a cell whose value is [h2, p].
+    const helper = new AdminUIHelper(page);
+    const updateDepthErrors: string[] = [];
+    page.on('pageerror', (e) => {
+      if (e.message.includes('Maximum update depth')) {
+        updateDepthErrors.push(e.message);
+      }
+    });
+
+    await helper.login();
+    await helper.navigateToEdit('/table-multinode-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-mn"]').first().waitFor({
+      state: 'attached',
+      timeout: 10000,
+    });
+    await page.waitForTimeout(1500);
+
+    // Not split: the row still has exactly one cell — no stray block leaked
+    // into the cells list.
+    const row2 = iframe.locator('tr[data-block-uid="mn-row-2"]');
+    await expect(row2.locator('td[data-block-uid], th[data-block-uid]')).toHaveCount(1);
+
+    // Flattened: the cell's value is now a single top-level slate node, and
+    // the text from both original nodes is preserved.
+    const cell2 = iframe.locator('[data-block-uid="mn-cell-2"]');
+    await expect(cell2).toContainText('Cell heading');
+    await expect(cell2).toContainText('Cell paragraph');
+    const topLevelNodeCount = await cell2.evaluate(
+      (el) => el.querySelectorAll(':scope > [data-node-id]').length,
+    );
+    expect(topLevelNodeCount, 'cell value must be flattened to one node').toBe(1);
+
+    expect(
+      updateDepthErrors,
+      'splitMultiNodeSlateBlocks must flatten (not split) slate fields ' +
+        'inside object_list items (table cells).',
+    ).toEqual([]);
+  });
+
+  // The editing actions below each produce a second top-level node in a
+  // table cell's slate value. A cell can't be split into sibling slate
+  // blocks, so each must flatten back to a single node — never corrupt the
+  // row or loop.
+  async function cellTopLevelNodeCount(iframe: FrameLocator, cellUid: string) {
+    return iframe
+      .locator(`[data-block-uid="${cellUid}"]`)
+      .evaluate((el) => el.querySelectorAll(':scope > [data-node-id]').length);
+  }
+
+  test('pressing Enter in a table cell flattens back to a single node', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    const updateDepthErrors: string[] = [];
+    page.on('pageerror', (e) => {
+      if (e.message.includes('Maximum update depth')) updateDepthErrors.push(e.message);
+    });
+
+    await helper.login();
+    await helper.navigateToEdit('/table-multinode-page');
+
+    const editor = await helper.enterEditMode('mn-cell-3');
+    await editor.press('End');
+    await editor.press('Enter');
+    await page.waitForTimeout(1500);
+
+    const iframe = helper.getIframe();
+    await expect(
+      iframe
+        .locator('tr[data-block-uid="mn-row-3"]')
+        .locator('td[data-block-uid], th[data-block-uid]'),
+    ).toHaveCount(1);
+    expect(await cellTopLevelNodeCount(iframe, 'mn-cell-3')).toBe(1);
+    expect(updateDepthErrors).toEqual([]);
+  });
+
+  test('pasting multi-paragraph content into a table cell flattens to a single node', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    const updateDepthErrors: string[] = [];
+    page.on('pageerror', (e) => {
+      if (e.message.includes('Maximum update depth')) updateDepthErrors.push(e.message);
+    });
+
+    await helper.login();
+    await helper.navigateToEdit('/table-multinode-page');
+
+    const editor = await helper.enterEditMode('mn-cell-3');
+    await editor.press('End');
+    // Paste two paragraphs — would be two top-level nodes in the cell.
+    await editor.evaluate((el) => {
+      const dt = new DataTransfer();
+      dt.setData('text/html', '<p>Pasted one</p><p>Pasted two</p>');
+      dt.setData('text/plain', 'Pasted one\nPasted two');
+      const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'clipboardData', { value: dt });
+      el.dispatchEvent(event);
+    });
+    await page.waitForTimeout(1500);
+
+    const iframe = helper.getIframe();
+    await expect(
+      iframe
+        .locator('tr[data-block-uid="mn-row-3"]')
+        .locator('td[data-block-uid], th[data-block-uid]'),
+    ).toHaveCount(1);
+    expect(await cellTopLevelNodeCount(iframe, 'mn-cell-3')).toBe(1);
+    expect(updateDepthErrors).toEqual([]);
+  });
+
+  test('Backspace-demoting a list item in a table cell flattens to a single node', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    const updateDepthErrors: string[] = [];
+    page.on('pageerror', (e) => {
+      if (e.message.includes('Maximum update depth')) updateDepthErrors.push(e.message);
+    });
+
+    await helper.login();
+    await helper.navigateToEdit('/table-multinode-page');
+
+    // Backspace at the start of the second list item demotes it to a
+    // paragraph — leaving [ul, p], two top-level nodes — which must flatten.
+    const editor = await helper.enterEditMode('mn-cell-4');
+    await editor.getByText('Second item').click();
+    await editor.press('Home');
+    await editor.press('Backspace');
+    await page.waitForTimeout(1500);
+
+    const iframe = helper.getIframe();
+    await expect(
+      iframe
+        .locator('tr[data-block-uid="mn-row-4"]')
+        .locator('td[data-block-uid], th[data-block-uid]'),
+    ).toHaveCount(1);
+    expect(await cellTopLevelNodeCount(iframe, 'mn-cell-4')).toBe(1);
+    expect(updateDepthErrors).toEqual([]);
   });
 });
 
