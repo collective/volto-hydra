@@ -769,7 +769,7 @@
             {
               "type": "link",
               "data": {
-                "url": "/login?return_url=/"
+                "url": "https://hydra.pretagov.com/login?return_url=/"
               },
               "children": [
                 {
