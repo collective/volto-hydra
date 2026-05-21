@@ -1717,8 +1717,8 @@ app.post('*/@querystring-search', (req, res) => {
   const contextPath = req.path.replace('/++api++/@querystring-search', '').replace('/@querystring-search', '');
   const baseUrl = `http://localhost:${PORT}`;
 
-  const { query = [], sort_on, sort_order, b_start = 0, b_size = 10, limit, depth } = req.body;
-  console.log('[MOCK-API] @querystring-search query:', JSON.stringify(query), depth !== undefined ? `depth=${depth}` : '');
+  const { query = [], sort_on, sort_order, b_start = 0, b_size = 10, limit } = req.body;
+  console.log('[MOCK-API] @querystring-search query:', JSON.stringify(query));
 
   // Extract the "root" path from the path criteria so depth (below) can
   // compute "how far below root is this item". Real Plone applies depth
@@ -1736,13 +1736,29 @@ app.post('*/@querystring-search', (req, res) => {
     return '/' + stack.join('/');
   };
 
+  // Plone encodes path-criterion depth in the criterion VALUE as
+  // `path::depth` (e.g. `/docs/examples::1`, `.::2`). A bare path is a
+  // recursive query. The top-level `depth` field on the request body is
+  // NOT honoured by Plone's @querystring-search — verified against
+  // demo.plone.org — so it is deliberately ignored here.
+  const splitPathDepth = (v) => {
+    const s = typeof v === 'string' ? v : '';
+    const sep = s.indexOf('::');
+    if (sep === -1) return { path: s, depth: null };
+    const n = parseInt(s.slice(sep + 2), 10);
+    return { path: s.slice(0, sep), depth: Number.isNaN(n) ? null : n };
+  };
+
   let depthRoot = null;
+  let pathDepth = null;
   for (const cond of query) {
     if (cond.i !== 'path') continue;
+    const { path: pathV, depth: critDepth } = splitPathDepth(cond.v);
+    if (critDepth !== null) pathDepth = critDepth;
     if (cond.o.includes('absolutePath')) {
-      depthRoot = cond.v;
+      depthRoot = pathV;
     } else if (cond.o.includes('relativePath')) {
-      let rel = cond.v || '';
+      let rel = pathV;
       if (rel === '.' || rel === '') rel = '';
       depthRoot = rel ? resolveRelativePath(contextPath, rel) : contextPath;
     }
@@ -1768,7 +1784,11 @@ app.post('*/@querystring-search', (req, res) => {
 
   // Apply query filters
   for (const condition of query) {
-    const { i: index, o: operation, v: value } = condition;
+    const { i: index, o: operation } = condition;
+    // For path criteria the value may carry a `::depth` suffix — strip it
+    // for the path match (depth is applied separately, below).
+    const value =
+      index === 'path' ? splitPathDepth(condition.v).path : condition.v;
 
     if (index === 'portal_type' && operation.includes('selection')) {
       // Filter by content type
@@ -1854,14 +1874,12 @@ app.post('*/@querystring-search', (req, res) => {
     }
   }
 
-  // Apply depth limit. Plone's @querystring-search accepts a top-level
-  // `depth` field that constrains results to N levels below the path
-  // criterion's root. Used by sectionNav's listing config so a depth=2
-  // query under /docs returns /docs/foo and /docs/foo/bar but not
-  // /docs/foo/bar/baz.
-  if (typeof depth === 'number' && depthRoot !== null) {
+  // Apply depth limit from the path criterion's `::depth` suffix (parsed
+  // into pathDepth above). `path::1` under /docs returns /docs/foo but
+  // not /docs/foo/bar; a bare path is recursive (no limit).
+  if (typeof pathDepth === 'number' && depthRoot !== null) {
     const rootSegments = depthRoot.split('/').filter(Boolean).length;
-    const maxSegments = rootSegments + depth;
+    const maxSegments = rootSegments + pathDepth;
     allItems = allItems.filter((item) => {
       const itemSegments = new URL(item['@id']).pathname.split('/').filter(Boolean).length;
       return itemSegments <= maxSegments;

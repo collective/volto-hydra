@@ -12909,84 +12909,17 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
       return normalized;
     });
 
-    // Plone's relativePath operator EXCLUDES the current context page
-    // from results (deliberate "don't list me in my own nav" convention).
-    // For cnav use that breaks hierarchical sort: the current page's
-    // children become orphans whose parent isn't in the result set.
-    // If the query was relativePath AND the resolved root contains the
-    // current context, fetch the context page and inject it.
-    const relCond = (block.querystring?.query || []).find(
-      c => c.i === 'path' && typeof c.o === 'string' && c.o.includes('relativePath'),
-    );
-    if (relCond) {
-      const cleanContext = contextPath.replace(/\/$/, '') || '/';
-      // Resolve the relativePath the same way Plone does.
-      let resolved = cleanContext;
-      const parts = (relCond.v || '').split('/').filter(Boolean);
-      const stack = cleanContext.split('/').filter(Boolean);
-      for (const p of parts) {
-        if (p === '..') stack.pop();
-        else if (p !== '.') stack.push(p);
-      }
-      resolved = '/' + stack.join('/');
-      // Only inject when current context sits inside the queried subtree
-      // (so we'd expect Plone to have returned it). Also: don't inject if
-      // some other criterion (e.g. exclude_from_nav) would have filtered
-      // the context out anyway — we honour exclude_from_nav explicitly.
-      const inScope = cleanContext === resolved || cleanContext.startsWith(resolved + '/');
-      const alreadyIn = items.some(it => {
-        try { return new URL(it['@id']).pathname === cleanContext; }
-        catch { return false; }
-      });
-      if (inScope && !alreadyIn) {
-        try {
-          const res2 = await fetch(`${apiUrl}/++api++${cleanContext}`, { headers });
-          if (res2.ok) {
-            const ctxData = await res2.json();
-            const excludeFromNavCond = (block.querystring?.query || []).find(
-              c => c.i === 'exclude_from_nav',
-            );
-            const wantExcluded = excludeFromNavCond?.o?.includes('isTrue');
-            const ctxExcluded = ctxData.exclude_from_nav === true;
-            // Match the exclude_from_nav filter the listing applies.
-            if (!excludeFromNavCond || ctxExcluded === !!wantExcluded) {
-              items.push(ctxData);
-            }
-          }
-        } catch (e) {
-          log('ploneFetchItems: failed to fetch current context for injection', e);
-        }
-      }
-    }
-
-    // `getObjPositionInParent` is the catalog's position-within-immediate-parent
-    // index. The catalog returns items in flat position-sorted order — but
-    // for a query that spans multiple folders (e.g. a recursive path query
-    // for a nav listing) that flat order isn't hierarchical: parents and
-    // children interleave by position number rather than appearing as
-    // parent-then-its-subtree-then-next-parent. Post-sort to reconstruct
-    // hierarchical order; level-N rendering and ancestor-aware filters
-    // assume it.
+    // `getObjPositionInParent` is the catalog's position-within-parent
+    // index. Plone returns items in flat position order; for a query
+    // spanning multiple folders that flat order isn't hierarchical —
+    // parents and children interleave by position number. When the
+    // listing sorts on it, post-sort into parent-before-children order.
+    // This is a pure re-ordering: every item Plone returned is kept and
+    // nothing is injected. Tree expansion and pruning for the context
+    // navigation is the frontend ContextNavigationBlock's job, not this
+    // fetcher's — ploneFetchItems returns exactly what Plone returns.
     if (block.querystring?.sort_on === 'getObjPositionInParent' && items.length > 1) {
-      // Resolve the listing's root path so the sort can distinguish
-      // legitimate top-level items (parent IS the root) from orphans
-      // (parent missing from results because some filter — typically
-      // exclude_from_nav — dropped an intermediate ancestor).
-      let rootPath = null;
-      for (const c of block.querystring?.query || []) {
-        if (c.i !== 'path' || typeof c.o !== 'string') continue;
-        if (c.o.includes('absolutePath')) rootPath = c.v;
-        else if (c.o.includes('relativePath')) {
-          const parts = (c.v || '').split('/').filter(Boolean);
-          const stack = (contextPath || '/').split('/').filter(Boolean);
-          for (const p of parts) {
-            if (p === '..') stack.pop();
-            else if (p !== '.') stack.push(p);
-          }
-          rootPath = '/' + stack.join('/');
-        }
-      }
-      items = hierarchicalSortByPosition(items, rootPath);
+      items = hierarchicalSortByPosition(items);
     }
 
     return {
@@ -12997,23 +12930,16 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
 }
 
 /**
- * Re-order a flat result set into parent-before-children, position-sorted
- * within each parent. Each item must have `@id` (used to derive path +
- * parent) and `getObjPositionInParent` (numeric; missing values treated
- * as Infinity so they sort to the end).
+ * Re-order a flat result set into parent-before-children order,
+ * position-sorted within each parent. Each item must have `@id` (used to
+ * derive its path + parent path); `getObjPositionInParent` orders
+ * siblings (missing values sort last).
  *
- * `rootPath` (optional) is the listing's query root — anything whose
- * parent equals it is a legitimate top-level item, anything whose
- * parent is deeper than it but missing from results is an orphan (its
- * intermediate ancestor was filtered out, e.g. by exclude_from_nav).
- * Orphans get dropped: if an author hides a folder from nav, its whole
- * subtree should disappear too — surfacing the grandchildren as bare
- * roots is worse than hiding them entirely. Pass null to keep the
- * old "every parent-not-in-set is a root" behavior.
- *
- * Each subtree is then walked depth-first.
+ * Pure post-sort: every item is kept and nothing is added. An item whose
+ * parent path is not in the set is a top-level root. Each subtree is
+ * walked depth-first.
  */
-function hierarchicalSortByPosition(items, rootPath = null) {
+function hierarchicalSortByPosition(items) {
   const pathOf = (item) => {
     try { return new URL(item['@id']).pathname; }
     catch { return item['@id']; }
@@ -13027,7 +12953,6 @@ function hierarchicalSortByPosition(items, rootPath = null) {
   const itemPaths = new Set(items.map(pathOf));
   const childrenByParent = new Map();
   const roots = [];
-  const normRoot = rootPath ? (rootPath.replace(/\/$/, '') || '/') : null;
 
   for (const item of items) {
     const parent = parentOf(pathOf(item));
@@ -13035,10 +12960,11 @@ function hierarchicalSortByPosition(items, rootPath = null) {
       const bucket = childrenByParent.get(parent) || [];
       bucket.push(item);
       childrenByParent.set(parent, bucket);
-    } else if (normRoot === null || parent === normRoot) {
+    } else {
+      // Parent not in the result set — a top-level root for ordering.
+      // Never dropped: a pure post-sort keeps every item Plone returned.
       roots.push(item);
     }
-    // else: orphan (parent missing AND not the listing root) — drop.
   }
 
   for (const bucket of childrenByParent.values()) {
