@@ -104,7 +104,13 @@ try {
   );
 } catch { /* SSR or restricted environment */ }
 function log(...args) {
-  if (!debugEnabled && !window['HYDRA_DEBUG']) return;
+  // `window` is absent under SSR / `nuxt generate` — guard it, or this
+  // throws and 500s every server-rendered page that calls log().
+  if (
+    !debugEnabled &&
+    !(typeof window !== 'undefined' && window.HYDRA_DEBUG)
+  )
+    return;
   const runId = typeof window !== 'undefined' && window.__testRunId;
   const prefix = runId != null ? `[HYDRA][RUN-${runId}]` : '[HYDRA]';
   console.log(prefix, ...args);
