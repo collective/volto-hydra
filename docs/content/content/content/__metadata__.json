@@ -16,7 +16,7 @@
     "docs-images-form-edit-001/image/form-edit.png",
     "docs-images-frontend-switcher-001/image/frontend-switcher.png",
     "docs-images-highlight-edit-001/image/highlight-edit.png",
-    "docs-images-image-edit-001/image/image-edit.png",
+    "docs-images-image-block-edit-001/image/image-block-edit.png",
     "docs-images-introduction-edit-001/image/introduction-edit.png",
     "docs-images-link-picker-001/image/link-picker.png",
     "docs-images-listing-edit-001/image/listing-edit.png",
@@ -43,7 +43,7 @@
     "docs/examples/grid/listing/preview_image/black-starry-night.jpg",
     "docs/examples/grid/preview_image/black-starry-night.jpg",
     "docs/examples/highlight/preview_image/black-starry-night.jpg",
-    "docs/examples/image/preview_image/black-starry-night.jpg",
+    "docs/examples/image-block/preview_image/black-starry-night.jpg",
     "docs/examples/introduction/preview_image/black-starry-night.jpg",
     "docs/examples/search/preview_image/black-starry-night.jpg",
     "docs/examples/slate/preview_image/black-starry-night.jpg",
@@ -92,7 +92,7 @@
     "docs/examples/heading/data.json",
     "docs/examples/hero/data.json",
     "docs/examples/highlight/data.json",
-    "docs/examples/image/data.json",
+    "docs/examples/image-block/data.json",
     "docs/examples/introduction/data.json",
     "docs/examples/listing/data.json",
     "docs/examples/maps/data.json",
@@ -114,7 +114,7 @@
     "docs-images-form-edit-001/data.json",
     "docs-images-frontend-switcher-001/data.json",
     "docs-images-highlight-edit-001/data.json",
-    "docs-images-image-edit-001/data.json",
+    "docs-images-image-block-edit-001/data.json",
     "docs-images-introduction-edit-001/data.json",
     "docs-images-link-picker-001/data.json",
     "docs-images-listing-edit-001/data.json",
@@ -803,13 +803,6 @@
         ]
       }
     },
-    "docs-images-image-edit-001": {
-      "local_roles": {
-        "admin": [
-          "Owner"
-        ]
-      }
-    },
     "docs-images-introduction-edit-001": {
       "local_roles": {
         "admin": [
@@ -874,6 +867,13 @@
       }
     },
     "docs-images-video-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-image-block-edit-001": {
       "local_roles": {
         "admin": [
           "Owner"

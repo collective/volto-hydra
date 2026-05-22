@@ -10,7 +10,7 @@ These blocks are available by default — no schema registration required.
 |-------|-------------|
 | [Grid Block](./grid.md) | A responsive grid that lays out child blocks in equal-width cells. The block uses Volto's standard shared-blocks shape — `blocks` is the dict of children, `blocks_layout.items` is their order — and constrains the allowed types via `allowedBlocks`. |
 | [Heading Block](./heading.md) | A standalone heading block that renders as h1–h6 based on a configurable `tag` field. Unlike headings inside a slate block, this is a dedicated block type with its own `heading` text field. |
-| [Image Block](./image.md) | Displays an image with optional alt text and link. Supports the image picker widget for selecting images from the Plone content tree or uploading new ones. |
+| [Image Block](./image-block.md) | Displays an image with optional alt text and link. Supports the image picker widget for selecting images from the Plone content tree or uploading new ones. |
 | [Introduction Block](./introduction.md) | Displays the page's title and description as a styled header. The introduction block has no content of its own — it reads `title` and `description` from the page metadata. |
 | [Listing Block](./listing.md) | Displays a list of content items from a query. The listing block fetches items from the Plone catalog based on a querystring and renders each item using a configurable item type (variation). Built-in item types are `default` (title + description) and `summary` (title + description + image). |
 | [Maps Block](./maps.md) | Embeds a map from a URL (Google Maps, OpenStreetMap, etc.) using an iframe. The `url` field should contain the embed URL, and `title` provides an accessible label. |
@@ -86,7 +86,7 @@ grid
 heading
 hero
 highlight
-image
+image-block
 introduction
 listing
 maps

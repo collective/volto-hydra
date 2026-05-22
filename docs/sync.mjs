@@ -1747,11 +1747,16 @@ const SCREENSHOT_BLOCK_ID = 'editor-screenshot';
 for (const { imageSlug, exampleSlug } of exampleScreenshots) {
   const jsonPath = join(mdFileToContentDir(`${exampleSlug}.md`), 'data.json');
   if (!existsSync(jsonPath)) {
+    // Fatal: a screenshot with no example page means the screenshot ↔
+    // example wiring drifted (e.g. an example was renamed but its
+    // `<slug>-edit.png` screenshot wasn't). Shipping that leaves an
+    // orphaned screenshot and an example page with no editor image —
+    // fail loudly so the rename gets finished.
     console.error(
-      `WARNING: no example page for screenshot '${imageSlug}' ` +
-        `(expected ${jsonPath})`,
+      `ERROR: no example page for screenshot '${imageSlug}' ` +
+        `(expected ${jsonPath}) — rename the screenshot or the example so they match`,
     );
-    continue;
+    process.exit(1);
   }
   const original = readFileSync(jsonPath, 'utf-8');
   const data = JSON.parse(original);

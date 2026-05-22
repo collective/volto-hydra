@@ -1,5 +1,5 @@
 {
-  "@id": "/docs/examples/image",
+  "@id": "/docs/examples/image-block",
   "@type": "Document",
   "UID": "40a436ad604f4f80aeafe0977806760a",
   "allow_discussion": false,
@@ -262,8 +262,8 @@
     },
     "editor-screenshot": {
       "@type": "image",
-      "url": "/docs/images/image-edit",
-      "alt": "The image example block being edited in Volto Hydra",
+      "url": "/docs/images/image-block-edit",
+      "alt": "The image-block example block being edited in Volto Hydra",
       "align": "center",
       "size": "l"
     }
@@ -305,7 +305,7 @@
   "exportimport.constrains": {},
   "exportimport.conversation": [],
   "exportimport.versions": {},
-  "id": "image",
+  "id": "image-block",
   "is_folderish": true,
   "language": "##DEFAULT##",
   "layout": "document_view",
@@ -324,7 +324,7 @@
   },
   "preview_caption": null,
   "preview_image": {
-    "blob_path": "docs/examples/image/preview_image/black-starry-night.jpg",
+    "blob_path": "docs/examples/image-block/preview_image/black-starry-night.jpg",
     "content-type": "image/jpeg",
     "filename": "black-starry-night.jpg",
     "height": 1708,

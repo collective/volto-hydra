@@ -182,7 +182,7 @@
       }
     }
   },
-  "image": {
+  "image-block": {
     "blocks": {
       "image": {
         "fieldMappings": {

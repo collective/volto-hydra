@@ -1,7 +1,7 @@
 {
-  "@id": "/docs/images/image-edit",
+  "@id": "/docs/images/image-block-edit",
   "@type": "Image",
-  "UID": "docs-images-image-edit-001",
+  "UID": "docs-images-image-block-edit-001",
   "allow_discussion": false,
   "contributors": [],
   "created": "2025-01-01T00:00:00+00:00",
@@ -15,11 +15,11 @@
   "exportimport.constrains": {},
   "exportimport.conversation": [],
   "exportimport.versions": {},
-  "id": "image-edit",
+  "id": "image-block-edit",
   "image": {
-    "blob_path": "docs-images-image-edit-001/image/image-edit.png",
+    "blob_path": "docs-images-image-block-edit-001/image/image-block-edit.png",
     "content-type": "image/png",
-    "filename": "image-edit.png",
+    "filename": "image-block-edit.png",
     "height": 900,
     "size": 1054420,
     "width": 1440
@@ -43,7 +43,7 @@
   "review_state": null,
   "rights": "",
   "subjects": [],
-  "title": "image-edit.png",
+  "title": "image-block-edit.png",
   "type_title": "Image",
   "version": "current",
   "workflow_history": {},

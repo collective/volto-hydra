@@ -54,7 +54,7 @@ const EXAMPLES: Array<{ slug: string; blockType: string }> = [
   { slug: 'button', blockType: 'button' },
   { slug: 'form', blockType: 'form' },
   { slug: 'highlight', blockType: 'highlight' },
-  { slug: 'image', blockType: 'image' },
+  { slug: 'image-block', blockType: 'image' },
   { slug: 'introduction', blockType: 'introduction' },
   { slug: 'listing', blockType: 'listing' },
   { slug: 'maps', blockType: 'maps' },
