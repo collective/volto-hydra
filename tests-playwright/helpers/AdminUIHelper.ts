@@ -3,12 +3,22 @@
  */
 import { Page, Locator, FrameLocator, expect, ElementHandle } from '@playwright/test';
 import { TEST_DATA_PREFIX } from './test-paths';
+import { randomUUID } from 'node:crypto';
 
-// Hardcoded test JWT — mock API only checks for "Bearer " prefix, never validates.
-// sub=admin, exp=4102444800 (2100-01-01). Shared with mock-api-server.cjs.
+// Base test JWT — the mock API only checks for the "Bearer " prefix, never
+// validates. sub=admin, exp=4102444800 (2100-01-01). Each AdminUIHelper
+// appends a unique suffix (see `authToken`) so every test gets its own
+// mock-api session — the mock keys session content by the Bearer token.
 export const TEST_AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6NDEwMjQ0NDgwMH0.fake-signature';
 
 export class AdminUIHelper {
+  // Per-test auth token. The mock API keys its session content store by
+  // the Bearer token (getSessionId), so a shared token collapses every
+  // test into one session — saves in one test then leak into others
+  // running in parallel. A unique token per AdminUIHelper instance (one
+  // per test) gives each test its own isolated mock-api session.
+  readonly authToken = `${TEST_AUTH_TOKEN}-${randomUUID()}`;
+
   constructor(
     public readonly page: Page,
     public readonly adminUrl: string = 'http://localhost:3001',
@@ -106,7 +116,7 @@ export class AdminUIHelper {
     // as Authorization: Bearer to the API, so page.goto() to any URL works.
     await this.page.context().addCookies([{
       name: 'auth_token',
-      value: TEST_AUTH_TOKEN,
+      value: this.authToken,
       domain: 'localhost',
       path: '/',
       httpOnly: false,

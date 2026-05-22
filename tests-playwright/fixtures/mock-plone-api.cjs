@@ -73,10 +73,11 @@ const uidPositionMap = {};
 
 /**
  * Get session ID from request header.
- * Uses auth token as session identifier - each test login generates a unique
- * token (based on timestamp), providing session isolation between tests.
- * Both admin (Volto) and Nuxt SSR include Authorization headers, so they
- * share the same session when using the same auth token.
+ * Uses the Bearer auth token as the session identifier. AdminUIHelper
+ * gives each test a unique token (TEST_AUTH_TOKEN + a uuid), so every
+ * test gets an isolated session and its saves don't leak into others.
+ * Admin (Volto) and Nuxt SSR both forward the same Authorization header,
+ * so they share that one test's session.
  * @param {Object} req - Express request
  * @returns {string} Session ID (defaults to '_default' for unauthenticated requests)
  */
