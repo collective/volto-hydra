@@ -34,7 +34,7 @@ import {
   readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync,
   statSync, copyFileSync,
 } from 'fs';
-import { join, dirname, basename, resolve } from 'path';
+import { join, dirname, basename, resolve, relative } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -288,10 +288,11 @@ for (const mdFile of mdFiles) {
   // @querystring-search with relativePath '.', which on a multi-level
   // folder like /docs/examples pulls in EVERY descendant (e.g.
   // content-types/copy_of_event) in arbitrary order. Pin it to direct
-  // children sorted in folder order. Note: NO exclude_from_nav filter —
-  // the per-block example pages are deliberately exclude_from_nav=true
-  // (they're a reference index, not a navigation tier), and the whole
-  // point of this listing is to surface them.
+  // children sorted in folder order. The portal_type `.none` criterion
+  // drops Image/File content (verified against hydra-api.pretagov.com:
+  // real Plone lists `.none` as a valid portal_type operation), and the
+  // exclude_from_nav criterion drops hidden pages — a navigation/index
+  // listing should surface pages, not assets.
   const examplesListingBlock = {
     '@type': 'listing',
     headlineTag: 'h2',
@@ -303,6 +304,16 @@ for (const mdFile of mdFiles) {
           i: 'path',
           o: 'plone.app.querystring.operation.string.relativePath',
           v: '.',
+        },
+        {
+          i: 'portal_type',
+          o: 'plone.app.querystring.operation.selection.none',
+          v: ['Image', 'File'],
+        },
+        {
+          i: 'exclude_from_nav',
+          o: 'plone.app.querystring.operation.boolean.isFalse',
+          v: '',
         },
       ],
       sort_on: 'getObjPositionInParent',
@@ -1774,6 +1785,62 @@ for (const { imageSlug, exampleSlug } of exampleScreenshots) {
       }
     }
   }
+}
+
+// --- Phase 5c: Repair stale blob_path prefixes ---
+// A data.json blob_path must be "<folder>/<field>/<filename>" where
+// <folder> is the data.json's own location relative to CONTENT_DIR.
+// Renaming a content folder (commit d368813 moved docs/examples/* off
+// UID-named folders onto slug paths) leaves the blob_path prefix pointing
+// at the now-deleted UID folder, so Plone's importer can't find the blob
+// and 500s the page. Rewrite every blob_path so its prefix matches the
+// data.json's own folder. Idempotent — only the last two path segments
+// (<field>/<filename>) are kept; the prefix is recomputed.
+{
+  const fixBlobPaths = (node, folder) => {
+    let changed = false;
+    if (Array.isArray(node)) {
+      for (const v of node) changed = fixBlobPaths(v, folder) || changed;
+    } else if (node && typeof node === 'object') {
+      if (typeof node.blob_path === 'string') {
+        const tail = node.blob_path.split('/').slice(-2).join('/');
+        const want = `${folder}/${tail}`;
+        if (node.blob_path !== want) {
+          node.blob_path = want;
+          changed = true;
+        }
+      }
+      for (const v of Object.values(node)) {
+        changed = fixBlobPaths(v, folder) || changed;
+      }
+    }
+    return changed;
+  };
+  const walkBlobs = (absDir) => {
+    for (const entry of readdirSync(absDir, { withFileTypes: true })) {
+      if (entry.name.startsWith('.')) continue;
+      const abs = join(absDir, entry.name);
+      if (entry.isDirectory()) {
+        walkBlobs(abs);
+      } else if (entry.name === 'data.json') {
+        const folder = relative(CONTENT_DIR, dirname(abs));
+        if (!folder) continue; // data.json directly in CONTENT_DIR — no folder
+        const original = readFileSync(abs, 'utf-8');
+        const data = JSON.parse(original);
+        if (!fixBlobPaths(data, folder)) continue;
+        const updated = JSON.stringify(data, null, 2) + '\n';
+        if (updated === original) continue;
+        outOfSync = true;
+        if (checkMode) {
+          console.error(`OUT OF SYNC: ${folder}/data.json (stale blob_path)`);
+        } else {
+          writeFileSync(abs, updated, 'utf-8');
+          console.log(`Fixed stale blob_path prefix: ${folder}/data.json`);
+        }
+      }
+    }
+  };
+  walkBlobs(CONTENT_DIR);
 }
 
 // --- Phase 6: Sync the global __metadata__.json ---

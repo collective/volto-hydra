@@ -1236,9 +1236,10 @@ app.get('*/@querystring', (req, res) => {
         'group': 'Metadata',
         'enabled': true,
         'sortable': false,
+        // portal_type is a FieldIndex (one value per item) — real Plone
+        // offers only .any / .none for it; .all is KeywordIndex-only.
         'operations': [
           'plone.app.querystring.operation.selection.any',
-          'plone.app.querystring.operation.selection.all',
           'plone.app.querystring.operation.selection.none',
         ],
         'operators': {
@@ -1247,12 +1248,6 @@ app.get('*/@querystring', (req, res) => {
             'description': 'Matches any of the selected values',
             'widget': 'MultipleSelectionWidget',
             'operation': 'plone.app.querystring.operation.selection.any',
-          },
-          'plone.app.querystring.operation.selection.all': {
-            'title': 'Matches all of',
-            'description': 'Matches all of the selected values',
-            'widget': 'MultipleSelectionWidget',
-            'operation': 'plone.app.querystring.operation.selection.all',
           },
           'plone.app.querystring.operation.selection.none': {
             'title': 'Matches none of',
@@ -1303,12 +1298,18 @@ app.get('*/@querystring', (req, res) => {
         'sortable': true,
         'operations': [
           'plone.app.querystring.operation.selection.any',
+          'plone.app.querystring.operation.selection.none',
         ],
         'operators': {
           'plone.app.querystring.operation.selection.any': {
             'title': 'Matches any of',
             'widget': 'MultipleSelectionWidget',
             'operation': 'plone.app.querystring.operation.selection.any',
+          },
+          'plone.app.querystring.operation.selection.none': {
+            'title': 'Matches none of',
+            'widget': 'MultipleSelectionWidget',
+            'operation': 'plone.app.querystring.operation.selection.none',
           },
         },
         'values': {
@@ -1783,6 +1784,18 @@ app.post('*/@querystring-search', (req, res) => {
     .filter((content) => content !== null);
 
   // Apply query filters
+  // plone.app.querystring `selection.*` operations apply by index TYPE,
+  // not index name: FieldIndexes (portal_type, review_state — one value
+  // per item) and KeywordIndexes (Subject — a list per item) share the
+  // same .any/.all/.none semantics. selectionFields maps each index to
+  // the item value(s) the operation compares against, so the single
+  // handler below covers them all instead of per-index branches that drift.
+  const selectionFields = {
+    portal_type: (item) => [item['@type']],
+    review_state: (item) => [item.review_state || 'published'],
+    Subject: (item) => item.Subject || [],
+  };
+
   for (const condition of query) {
     const { i: index, o: operation } = condition;
     // For path criteria the value may carry a `::depth` suffix — strip it
@@ -1790,10 +1803,32 @@ app.post('*/@querystring-search', (req, res) => {
     const value =
       index === 'path' ? splitPathDepth(condition.v).path : condition.v;
 
-    if (index === 'portal_type' && operation.includes('selection')) {
-      // Filter by content type
-      const types = Array.isArray(value) ? value : [value];
-      allItems = allItems.filter((item) => types.includes(item['@type']));
+    if (operation.includes('selection')) {
+      // Generic plone.app.querystring selection filter (see selectionFields):
+      //   .all  — item has every wanted value (KeywordIndex only — a
+      //           FieldIndex item has one value, so .all of 2+ matches none)
+      //   .none — item has no wanted value (nav listings use this to drop
+      //           Image/File from portal_type)
+      //   .any  — item has at least one wanted value (default)
+      const accessor = selectionFields[index];
+      const wanted = Array.isArray(value) ? value : [value];
+      if (!accessor) {
+        console.warn(
+          `[MOCK-API] @querystring-search: no selection mapping for index '${index}' — criterion ignored`,
+        );
+      } else if (operation.endsWith('.all')) {
+        allItems = allItems.filter((item) =>
+          wanted.every((w) => accessor(item).includes(w)),
+        );
+      } else if (operation.endsWith('.none')) {
+        allItems = allItems.filter((item) =>
+          !wanted.some((w) => accessor(item).includes(w)),
+        );
+      } else {
+        allItems = allItems.filter((item) =>
+          wanted.some((w) => accessor(item).includes(w)),
+        );
+      }
     } else if (index === 'path' && operation.includes('absolutePath')) {
       // Filter by path — strict descendants of basePath (exclude basePath
       // itself). The trailing '/' ensures `/foo` matches `/foo/bar` but
@@ -1848,29 +1883,6 @@ app.post('*/@querystring-search', (req, res) => {
         const flag = item.exclude_from_nav === true;
         return wantTrue ? flag : !flag;
       });
-    } else if (index === 'review_state' && operation.includes('selection')) {
-      // Filter by review state
-      const states = Array.isArray(value) ? value : [value];
-      allItems = allItems.filter((item) => states.includes(item.review_state || 'published'));
-    } else if (index === 'Subject' && operation.includes('selection')) {
-      // Filter by subject/tag
-      const tags = Array.isArray(value) ? value : [value];
-      if (operation.includes('.any')) {
-        allItems = allItems.filter((item) => {
-          const subjects = item.Subject || [];
-          return tags.some((tag) => subjects.includes(tag));
-        });
-      } else if (operation.includes('.all')) {
-        allItems = allItems.filter((item) => {
-          const subjects = item.Subject || [];
-          return tags.every((tag) => subjects.includes(tag));
-        });
-      } else if (operation.includes('.none')) {
-        allItems = allItems.filter((item) => {
-          const subjects = item.Subject || [];
-          return !tags.some((tag) => subjects.includes(tag));
-        });
-      }
     }
   }
 

@@ -302,4 +302,56 @@ describe('navigation', () => {
     assert.ok(!childIds.includes('test-image-1'), 'should exclude Image items');
     assert.ok(!childIds.includes('test-image-2'), 'should exclude Image items');
   });
+
+  it('portal_type selection.none excludes the listed types', async () => {
+    const data = await querystringSearch('/_test_data', {
+      query: [
+        {
+          i: 'path',
+          o: 'plone.app.querystring.operation.string.relativePath',
+          v: '.',
+        },
+        {
+          i: 'portal_type',
+          o: 'plone.app.querystring.operation.selection.none',
+          v: ['Image', 'File'],
+        },
+      ],
+      b_start: 0,
+      b_size: 50,
+    });
+
+    const ids = data.items.map((i) => i.id);
+    assert.ok(ids.length > 0, 'should still return non-Image items');
+    assert.ok(!ids.includes('test-image-1'), 'selection.none must drop Images');
+    assert.ok(!ids.includes('test-image-2'), 'selection.none must drop Images');
+    for (const item of data.items) {
+      assert.notEqual(item['@type'], 'Image', `${item.id} should not be an Image`);
+    }
+  });
+
+  it('portal_type selection.any keeps only the listed types', async () => {
+    const data = await querystringSearch('/_test_data', {
+      query: [
+        {
+          i: 'path',
+          o: 'plone.app.querystring.operation.string.relativePath',
+          v: '.',
+        },
+        {
+          i: 'portal_type',
+          o: 'plone.app.querystring.operation.selection.any',
+          v: ['Image'],
+        },
+      ],
+      b_start: 0,
+      b_size: 50,
+    });
+
+    const ids = data.items.map((i) => i.id);
+    assert.ok(ids.includes('test-image-1'), 'selection.any must keep Images');
+    for (const item of data.items) {
+      assert.equal(item['@type'], 'Image', `${item.id} should be an Image`);
+    }
+  });
 });
