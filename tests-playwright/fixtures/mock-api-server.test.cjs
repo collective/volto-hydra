@@ -1,5 +1,7 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { app } = require('./mock-api-server.cjs');
 
 let server;
@@ -32,9 +34,12 @@ async function querystringSearch(contextPath, body) {
   return res.json();
 }
 
-// Helper: GET content
+// Helper: GET content. Expands navigation so tests can assert on
+// @components.navigation — a plain GET returns it as an unexpanded
+// {@id} stub (nav.items would be undefined).
 async function getContent(contentPath) {
-  const res = await fetch(`${baseUrl}${contentPath}`, {
+  const sep = contentPath.includes('?') ? '&' : '?';
+  const res = await fetch(`${baseUrl}${contentPath}${sep}expand=navigation`, {
     headers: { Accept: 'application/json' },
   });
   assert.equal(res.status, 200);
@@ -207,45 +212,71 @@ describe('@querystring-search', () => {
 });
 
 describe('folder ordering (__metadata__.json)', () => {
-  it('concepts items are in __metadata__.json order, not alphabetical', async () => {
-    const data = await getContent('/concepts');
+  // The docs topic pages live under /docs (the docs-sphinx tree). Their
+  // folder order is defined by docs/__metadata__.json `ordering` (UID →
+  // position). Derive the expected title order from that same file so the
+  // assertion tracks the content tree instead of hard-coding a page list
+  // that drifts as the docs are restructured.
+  function expectedDocsOrder() {
+    const docsDir = path.join(
+      __dirname, '../../docs/content/content/content/docs',
+    );
+    const meta = JSON.parse(
+      fs.readFileSync(path.join(docsDir, '__metadata__.json'), 'utf8'),
+    );
+    const ordering = meta.ordering || {};
+    const uidTitle = {};
+    for (const entry of fs.readdirSync(docsDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const dj = path.join(docsDir, entry.name, 'data.json');
+      if (!fs.existsSync(dj)) continue;
+      const d = JSON.parse(fs.readFileSync(dj, 'utf8'));
+      if (d.UID) uidTitle[d.UID] = d.title;
+    }
+    return Object.entries(ordering)
+      .sort((a, b) => a[1] - b[1])
+      .map(([uid]) => uidTitle[uid])
+      .filter(Boolean);
+  }
 
-    assert.ok(data.items, 'concepts should have items');
-    assert.ok(data.items.length > 0, 'concepts should have children');
+  it('docs children are in __metadata__.json order, not alphabetical', async () => {
+    const data = await getContent('/docs');
+    assert.ok(data.items && data.items.length > 0, 'docs should have children');
 
+    const expected = expectedDocsOrder();
+    assert.ok(expected.length > 0, 'metadata ordering should resolve to titles');
+
+    // The ordered pages appear first, in metadata order. Children with no
+    // `ordering` entry (e.g. examples) follow — slice to the ordered prefix.
     const titles = data.items.map((i) => i.title);
-    // Order defined in concepts/__metadata__.json matches README order:
-    // architecture, integration-levels, container-blocks, listings, templates, deployment, advanced
-    assert.equal(titles[0], 'How Hydra Works');
-    assert.equal(titles[1], 'The Bridge, Callbacks & Custom Blocks');
-    assert.equal(titles[2], 'Container Blocks');
-    assert.equal(titles[3], 'Listings & Dynamic Blocks');
-    assert.equal(titles[4], 'Templates & Layouts');
-    assert.equal(titles[5], 'Deployment Patterns');
-    assert.equal(titles[6], 'Advanced');
+    assert.deepEqual(titles.slice(0, expected.length), expected);
+    // Sanity: not alphabetical — by id, 'advanced' would otherwise sort first.
+    assert.notEqual(titles[0], 'Advanced');
   });
 
-  it('concepts navigation children match __metadata__.json order', async () => {
-    const data = await getContent('/concepts');
+  it('docs navigation children match __metadata__.json order', async () => {
+    const data = await getContent('/docs');
 
     const nav = data['@components']?.navigation;
-    const conceptsNav = nav.items?.find(
-      (i) => new URL(i['@id']).pathname === '/concepts',
+    const docsNav = nav.items?.find(
+      (i) => new URL(i['@id']).pathname === '/docs',
     );
-    assert.ok(conceptsNav, 'should have concepts in navigation');
+    assert.ok(docsNav, 'should have docs in navigation');
 
-    const titles = conceptsNav.items.map((i) => i.title);
-    assert.equal(titles[0], 'How Hydra Works');
-    assert.equal(titles[6], 'Advanced');
+    const expected = expectedDocsOrder();
+    const titles = docsNav.items.map((i) => i.title);
+    assert.deepEqual(titles.slice(0, expected.length), expected);
   });
 
-  it('getObjPositionInParent uses __metadata__.json for concepts children', async () => {
-    const data = await querystringSearch('/concepts', {
+  it('getObjPositionInParent uses __metadata__.json for docs children', async () => {
+    // absolutePath `/docs::1` — strict children of /docs only (depth 1),
+    // so the position sort isn't diluted by deeper descendants.
+    const data = await querystringSearch('/', {
       query: [
         {
           i: 'path',
-          o: 'plone.app.querystring.operation.string.relativePath',
-          v: '.',
+          o: 'plone.app.querystring.operation.string.absolutePath',
+          v: '/docs::1',
         },
       ],
       sort_on: 'getObjPositionInParent',
@@ -254,9 +285,9 @@ describe('folder ordering (__metadata__.json)', () => {
       b_size: 50,
     });
 
+    const expected = expectedDocsOrder();
     const titles = data.items.map((i) => i.title);
-    assert.equal(titles[0], 'How Hydra Works');
-    assert.equal(titles[titles.length - 1], 'Advanced');
+    assert.deepEqual(titles.slice(0, expected.length), expected);
   });
 });
 

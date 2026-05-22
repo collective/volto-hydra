@@ -1898,36 +1898,36 @@ app.post('*/@querystring-search', (req, res) => {
     });
   }
 
-  // Sort items
+  // Sort items. Plone's `sort_order: descending` reverses the whole result
+  // sequence — tied items included — so sort ascending and reverse the
+  // array. Negating the comparator instead leaves ties in input order
+  // (a stable sort treats -0 as 0), so descending != reverse(ascending).
+  let comparator = null;
   if (sort_on === 'getObjPositionInParent') {
     // Folder order: use __metadata__.json ordering (UID→position),
     // falling back to contentDirMap key order (filesystem alphabetical).
     const allPaths = Object.keys(contentDirMap);
-    allItems.sort((a, b) => {
+    comparator = (a, b) => {
       const aPos = a.UID ? uidPositionMap[a.UID] : undefined;
       const bPos = b.UID ? uidPositionMap[b.UID] : undefined;
-      let cmp;
-      if (aPos !== undefined && bPos !== undefined) {
-        cmp = aPos - bPos;
-      } else if (aPos !== undefined) {
-        cmp = -1; // items with ordering come first
-      } else if (bPos !== undefined) {
-        cmp = 1;
-      } else {
-        // Fallback to contentDirMap key order
-        const aPath = new URL(a['@id']).pathname;
-        const bPath = new URL(b['@id']).pathname;
-        cmp = allPaths.indexOf(aPath) - allPaths.indexOf(bPath);
-      }
-      return sort_order === 'descending' ? -cmp : cmp;
-    });
+      if (aPos !== undefined && bPos !== undefined) return aPos - bPos;
+      if (aPos !== undefined) return -1; // items with ordering come first
+      if (bPos !== undefined) return 1;
+      // Fallback to contentDirMap key order
+      const aPath = new URL(a['@id']).pathname;
+      const bPath = new URL(b['@id']).pathname;
+      return allPaths.indexOf(aPath) - allPaths.indexOf(bPath);
+    };
   } else if (sort_on) {
-    allItems.sort((a, b) => {
+    comparator = (a, b) => {
       const aVal = a[sort_on] || '';
       const bVal = b[sort_on] || '';
-      const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-      return sort_order === 'descending' ? -cmp : cmp;
-    });
+      return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+    };
+  }
+  if (comparator) {
+    allItems.sort(comparator);
+    if (sort_order === 'descending') allItems.reverse();
   }
 
   // Apply results limit (different from b_size which is for pagination)

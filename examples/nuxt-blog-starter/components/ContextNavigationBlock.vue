@@ -123,6 +123,37 @@ async function expandChildren() {
   const pathOf = (entry) =>
     new URL(entry.block.href[0]['@id'], 'http://placeholder').pathname;
   const segsOf = (p) => p.split('/').filter(Boolean);
+  const here = route.path.replace(/\/$/, '');
+
+  // Plone's relativePath '..' resolves to the parent folder and — by
+  // convention — EXCLUDES the context (current) page itself, so the
+  // current page never comes back in the listing. When this nav covers
+  // the current page's own section (its shallowest items are the current
+  // page's siblings), inject the current page so it renders and can carry
+  // aria-current="page".
+  if (flat.length > 0) {
+    const curParent = here.replace(/\/[^/]+\/?$/, '') || '/';
+    const present = flat.some((e) => pathOf(e).replace(/\/$/, '') === here);
+    const minD = Math.min(...flat.map((e) => segsOf(pathOf(e)).length));
+    const shallowSegs = segsOf(
+      pathOf(flat.find((e) => segsOf(pathOf(e)).length === minD)),
+    );
+    const sectionRoot = '/' + shallowSegs.slice(0, -1).join('/');
+    if (!present && sectionRoot === curParent) {
+      const res = await fetch(`${props.apiUrl}/++api++${here}`, {
+        headers: { Accept: 'application/json' },
+      });
+      const curData = await res.json();
+      flat.push({
+        block: {
+          '@type': 'navItem',
+          label: curData.title,
+          href: [{ '@id': here }],
+        },
+        blockId: `${props.blockId}-current`,
+      });
+    }
+  }
 
   // Optional: prepend the section root (Volto's `includeTop`). Derived
   // from the shallowest item's parent — listings anchored on one path
@@ -148,11 +179,23 @@ async function expandChildren() {
     }
   }
 
-  const here = route.path.replace(/\/$/, '');
   const paths = flat.map(pathOf);
   const segs = paths.map(segsOf);
   const depths = segs.map((s) => s.length);
   const minDepth = Math.min(...depths);
+
+  // Orphan prune: a listing filter (e.g. exclude_from_nav) can drop a
+  // folder while still returning its deeper, non-excluded descendants —
+  // those would otherwise surface as stray roots. Drop any entry with a
+  // missing ancestor between the section root and itself, so hiding a
+  // folder hides its whole subtree.
+  const pathSet = new Set(paths.map((p) => p.replace(/\/$/, '')));
+  const hasAllAncestors = (itemSegs) => {
+    for (let d = minDepth; d < itemSegs.length; d++) {
+      if (!pathSet.has('/' + itemSegs.slice(0, d).join('/'))) return false;
+    }
+    return true;
+  };
 
   // Smart-expansion filter (default true): drop entries that are
   // descendants of unrelated siblings — typical docs sidebar UX.
@@ -171,7 +214,7 @@ async function expandChildren() {
   };
 
   return flat.flatMap((entry, i) => {
-    if (!passes(segs[i])) return [];
+    if (!passes(segs[i]) || !hasAllAncestors(segs[i])) return [];
     const itemPath = paths[i];
     const stripped = itemPath.replace(/\/$/, '');
     const active = stripped === here;

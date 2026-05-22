@@ -1256,6 +1256,37 @@ async function renderContextNavigationBlock(block, blockId) {
         }
     }
 
+    // The cnav listing uses `relativePath ..`, which Plone resolves to the
+    // parent folder and — by convention — EXCLUDES the context (current)
+    // page itself, so the current page never comes back in the listing.
+    // When this nav covers the current page's own section (its shallowest
+    // items are the current page's siblings), inject the current page so
+    // it renders and can carry aria-current="page".
+    if (flat.length > 0) {
+        const segsOf = (e) =>
+            new URL(e.block.href?.[0]?.['@id'] || '', window.location.origin)
+                .pathname.split('/').filter(Boolean);
+        const curPath = window.location.pathname.replace(/\/edit$/, '');
+        const curParent = curPath.replace(/\/[^/]+\/?$/, '') || '/';
+        const present = flat.some(
+            (e) => '/' + segsOf(e).join('/') === curPath,
+        );
+        const minD = Math.min(...flat.map((e) => segsOf(e).length));
+        const shallow = flat.map(segsOf).find((s) => s.length === minD);
+        const sectionRoot = '/' + shallow.slice(0, -1).join('/');
+        if (!present && sectionRoot === curParent) {
+            flat.push({
+                block: {
+                    '@type': 'navItem',
+                    label: window._currentFormData?.title
+                        || curPath.split('/').filter(Boolean).pop() || '',
+                    href: [{ '@id': curPath }],
+                },
+                blockId: `${uid}-current`,
+            });
+        }
+    }
+
     // Optional: prepend the section root itself (Volto's `includeTop`).
     // The section root is the parent of any shallowest item — listings
     // anchored on a single path always share that parent. We fetch the
@@ -1291,12 +1322,31 @@ async function renderContextNavigationBlock(block, blockId) {
     const pathSegsOf = (entry) =>
         new URL(entry.block.href[0]['@id'], window.location.origin)
             .pathname.split('/').filter(Boolean);
-    const allSegs = flat.map(pathSegsOf);
+    let allSegs = flat.map(pathSegsOf);
     const depths = allSegs.map((s) => s.length);
     const minDepth = Math.min(...depths);
     flat.forEach((entry, i) => {
         entry.block._level = Math.max(1, Math.min(3, depths[i] - minDepth + 1));
     });
+
+    // Orphan prune: a listing filter (e.g. exclude_from_nav) can drop a
+    // folder while still returning its deeper, non-excluded descendants.
+    // Those would otherwise surface as stray roots. Drop any entry with a
+    // missing ancestor between the section root and itself — hiding a
+    // folder should hide its whole subtree.
+    let pruned = flat;
+    {
+        const pathSet = new Set(allSegs.map((s) => '/' + s.join('/')));
+        const hasAllAncestors = (segs) => {
+            for (let d = minDepth; d < segs.length; d++) {
+                if (!pathSet.has('/' + segs.slice(0, d).join('/'))) return false;
+            }
+            return true;
+        };
+        const keep = allSegs.map(hasAllAncestors);
+        pruned = flat.filter((_e, i) => keep[i]);
+        allSegs = allSegs.filter((_s, i) => keep[i]);
+    }
 
     // Third pass: optional smart-expansion filter — drop entries that are
     // descendants of unrelated siblings (typical docs sidebar UX). An
@@ -1305,8 +1355,8 @@ async function renderContextNavigationBlock(block, blockId) {
     // page. `expandCurrentOnly` defaults true (schema default).
     const expandCurrentOnly = block.expandCurrentOnly !== false;
     const visible = expandCurrentOnly
-        ? filterByCurrentPath(flat, allSegs, minDepth)
-        : flat;
+        ? filterByCurrentPath(pruned, allSegs, minDepth)
+        : pruned;
 
     // `data-block-selector` carries the contextNavigation's uid + every
     // exposed child id (manual navItem ids and the listing block id
