@@ -211,8 +211,15 @@
             // Set up expansion helper for container renderers
             // Use 'variation' field for item type (matches Volto listing block schema)
             // Returns { items, paging } where each item has @uid
-            window._expandListingBlocks = async (blocks, layout, containerId, paging) => {
-                return await expandListingBlocks(layout, { blocks, fetchItems: { listing: fetchItems }, paging, itemTypeField: 'variation' });
+            window._expandListingBlocks = async (blocks, layout, containerId, paging, contextOverride) => {
+                // contextOverride: run @querystring-search against a different
+                // content path. The contextNavigation block fetches its listing
+                // from the PARENT folder (not the current page) so the current
+                // page isn't dropped as the query's excluded "self".
+                const fi = contextOverride
+                    ? ploneFetchItems({ apiUrl: window._apiOrigin, contextPath: contextOverride, extraCriteria })
+                    : fetchItems;
+                return await expandListingBlocks(layout, { blocks, fetchItems: { listing: fi }, paging, itemTypeField: 'variation' });
             };
 
             // Convert layout IDs to block objects with @uid

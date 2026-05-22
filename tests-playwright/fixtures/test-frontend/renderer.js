@@ -1242,48 +1242,44 @@ async function renderContextNavigationBlock(block, blockId) {
         if (child['@type'] === 'navItem') {
             flat.push({ block: child, blockId: childId });
         } else if (child['@type'] === 'listing') {
+            // The cnav listing's `relativePath ..` means "my section".
+            // Fetched from the current page, Plone's @querystring-search
+            // drops the current page — it always excludes its own context
+            // object — so the page can't appear in its own nav. Fetch from
+            // the PARENT folder instead and step the relativePath down one
+            // level (`..` -> `.`): same tree slice, but the current page
+            // comes back as a normal result with its getObjPositionInParent
+            // (so it sorts into place); only the parent is excluded.
+            const curPath = window.location.pathname.replace(/\/edit$/, '');
+            const parentPath = curPath.replace(/\/[^/]+\/?$/, '') || '/';
+            const stepDown = (v) => {
+                const s = String(v || '').split('/').filter(Boolean);
+                if (s[0] === '..') s.shift();
+                return s.length ? s.join('/') : '.';
+            };
+            const shifted = {
+                ...child,
+                querystring: {
+                    ...child.querystring,
+                    query: (child.querystring?.query || []).map((c) =>
+                        c.i === 'path' && c.o?.includes('relativePath')
+                            ? { ...c, v: stepDown(c.v) }
+                            : c,
+                    ),
+                },
+            };
             const { items: expanded } = await window._expandListingBlocks(
-                { [childId]: child },
+                { [childId]: shifted },
                 [childId],
                 childId,
                 { start: 0, size: NAV_LISTING_SIZE },
+                parentPath,
             );
             for (const item of expanded) {
                 flat.push({ block: item, blockId: item['@uid'] });
             }
         } else {
             throw new Error(`contextNavigation child of @type "${child['@type']}" is not allowed (expected navItem or listing)`);
-        }
-    }
-
-    // The cnav listing uses `relativePath ..`, which Plone resolves to the
-    // parent folder and — by convention — EXCLUDES the context (current)
-    // page itself, so the current page never comes back in the listing.
-    // When this nav covers the current page's own section (its shallowest
-    // items are the current page's siblings), inject the current page so
-    // it renders and can carry aria-current="page".
-    if (flat.length > 0) {
-        const segsOf = (e) =>
-            new URL(e.block.href?.[0]?.['@id'] || '', window.location.origin)
-                .pathname.split('/').filter(Boolean);
-        const curPath = window.location.pathname.replace(/\/edit$/, '');
-        const curParent = curPath.replace(/\/[^/]+\/?$/, '') || '/';
-        const present = flat.some(
-            (e) => '/' + segsOf(e).join('/') === curPath,
-        );
-        const minD = Math.min(...flat.map((e) => segsOf(e).length));
-        const shallow = flat.map(segsOf).find((s) => s.length === minD);
-        const sectionRoot = '/' + shallow.slice(0, -1).join('/');
-        if (!present && sectionRoot === curParent) {
-            flat.push({
-                block: {
-                    '@type': 'navItem',
-                    label: window._currentFormData?.title
-                        || curPath.split('/').filter(Boolean).pop() || '',
-                    href: [{ '@id': curPath }],
-                },
-                blockId: `${uid}-current`,
-            });
         }
     }
 

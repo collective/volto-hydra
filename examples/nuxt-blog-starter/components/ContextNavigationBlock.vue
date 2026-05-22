@@ -101,12 +101,37 @@ async function expandChildren() {
     if (child['@type'] === 'navItem') {
       flat.push({ block: child, blockId: childId });
     } else if (child['@type'] === 'listing') {
+      // The cnav listing's `relativePath ..` means "my section". Fetched
+      // from the current page, Plone's @querystring-search drops the
+      // current page — it always excludes its own context object — so the
+      // page can't appear in its own nav. Fetch from the PARENT folder and
+      // step the relativePath down one level (`..` -> `.`): same tree
+      // slice, but the current page comes back as a normal result with its
+      // getObjPositionInParent (so it sorts into place); only the parent
+      // is excluded.
+      const parentPath = props.contextPath.replace(/\/[^/]+\/?$/, '') || '/';
+      const stepDown = (v) => {
+        const s = String(v || '').split('/').filter(Boolean);
+        if (s[0] === '..') s.shift();
+        return s.length ? s.join('/') : '.';
+      };
+      const shifted = {
+        ...child,
+        querystring: {
+          ...child.querystring,
+          query: (child.querystring?.query || []).map((c) =>
+            c.i === 'path' && c.o?.includes('relativePath')
+              ? { ...c, v: stepDown(c.v) }
+              : c,
+          ),
+        },
+      };
       const result = await expandListingBlocks([childId], {
-        blocks: { [childId]: child },
+        blocks: { [childId]: shifted },
         fetchItems: {
           listing: ploneFetchItems({
             apiUrl: props.apiUrl,
-            contextPath: props.contextPath,
+            contextPath: parentPath,
           }),
         },
         paging: { start: 0, size: NAV_LISTING_SIZE },
@@ -124,36 +149,6 @@ async function expandChildren() {
     new URL(entry.block.href[0]['@id'], 'http://placeholder').pathname;
   const segsOf = (p) => p.split('/').filter(Boolean);
   const here = route.path.replace(/\/$/, '');
-
-  // Plone's relativePath '..' resolves to the parent folder and — by
-  // convention — EXCLUDES the context (current) page itself, so the
-  // current page never comes back in the listing. When this nav covers
-  // the current page's own section (its shallowest items are the current
-  // page's siblings), inject the current page so it renders and can carry
-  // aria-current="page".
-  if (flat.length > 0) {
-    const curParent = here.replace(/\/[^/]+\/?$/, '') || '/';
-    const present = flat.some((e) => pathOf(e).replace(/\/$/, '') === here);
-    const minD = Math.min(...flat.map((e) => segsOf(pathOf(e)).length));
-    const shallowSegs = segsOf(
-      pathOf(flat.find((e) => segsOf(pathOf(e)).length === minD)),
-    );
-    const sectionRoot = '/' + shallowSegs.slice(0, -1).join('/');
-    if (!present && sectionRoot === curParent) {
-      const res = await fetch(`${props.apiUrl}/++api++${here}`, {
-        headers: { Accept: 'application/json' },
-      });
-      const curData = await res.json();
-      flat.push({
-        block: {
-          '@type': 'navItem',
-          label: curData.title,
-          href: [{ '@id': here }],
-        },
-        blockId: `${props.blockId}-current`,
-      });
-    }
-  }
 
   // Optional: prepend the section root (Volto's `includeTop`). Derived
   // from the shallowest item's parent — listings anchored on one path
