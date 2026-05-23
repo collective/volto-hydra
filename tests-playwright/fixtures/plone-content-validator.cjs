@@ -103,6 +103,33 @@ function validate(contentDir) {
     errors.push("  __metadata__.json has top-level 'content' key — ExportImportMetadata rejects this at site creation. Use 'local_roles' instead.");
   }
 
+  // redirects.json shape: plone.exportimport's set_redirects expects a
+  // flat Dict[str, str] mapping {old_path: new_path}. The REST API's
+  // @aliases response uses an `{items: [{path, redirect-to, ...}]}` array
+  // shape — easy to confuse the two. The importer iterates `data.items()`
+  // and crashes with `'list' object has no attribute 'endswith'` if you
+  // feed it the items-array shape. Catching this here keeps a bad
+  // redirects.json from silently breaking site bootstrap on deploy.
+  const redirectsPath = path.join(parentDir, 'redirects.json');
+  if (fs.existsSync(redirectsPath)) {
+    let redirectsData;
+    try { redirectsData = readJson(redirectsPath); }
+    catch (e) { errors.push(`  redirects.json: invalid JSON (${e.message})`); }
+    if (redirectsData !== undefined) {
+      if (Array.isArray(redirectsData) || typeof redirectsData !== 'object' || redirectsData === null) {
+        errors.push(`  redirects.json: must be a plain {path: target} object, got ${Array.isArray(redirectsData) ? 'array' : typeof redirectsData}`);
+      } else {
+        for (const [key, value] of Object.entries(redirectsData)) {
+          if (typeof value !== 'string') {
+            errors.push(`  redirects.json: value for "${key}" is ${Array.isArray(value) ? 'an array' : typeof value} — use {"/old": "/new"}, not the REST-API {items: [...]} shape`);
+          } else if (!key.startsWith('/') || !value.startsWith('/')) {
+            errors.push(`  redirects.json: paths must be absolute (start with /): ${JSON.stringify(key)} -> ${JSON.stringify(value)}`);
+          }
+        }
+      }
+    }
+  }
+
   // Per-item checks on EVERY data.json in the tree (not just direct children)
   const allUids = new Set();
   for (const { rel, data, dir } of walkData(contentDir)) {
