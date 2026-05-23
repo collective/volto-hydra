@@ -430,9 +430,26 @@
             ],
           },
         },
+        // codeExample block with a real <pre data-edit-text="code"> code
+        // field (type: string, registered via the tabs object-list schema).
+        // Lets replayKeys.spec.ts exercise replayOneKey's <pre> Enter/Tab
+        // handling against a real registered field, not a faked one.
+        'mock-code-block': {
+          '@type': 'codeExample',
+          tabs: [
+            { '@id': 'mock-code-tab', label: 'JavaScript', language: 'javascript', code: 'line1' },
+          ],
+        },
+        // form block — renders a real <button class="form-submit"
+        // data-edit-text="submit_label"> (submit_label is type: string),
+        // for replayKeys.spec.ts's <button> Space test.
+        'mock-form-block': {
+          '@type': 'form',
+          submit_label: 'Click',
+        },
       },
       blocks_layout: {
-        items: ['mock-block-1', 'mock-text-block', 'mock-multi-field-block', 'mock-textarea-block', 'mock-image-block', 'mock-columns', 'mock-table', 'mock-hero-block'],
+        items: ['mock-block-1', 'mock-text-block', 'mock-multi-field-block', 'mock-textarea-block', 'mock-image-block', 'mock-columns', 'mock-table', 'mock-hero-block', 'mock-code-block', 'mock-form-block'],
       },
     };
 

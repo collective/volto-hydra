@@ -484,25 +484,29 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
   });
 
   test('Enter in pre element inserts newline', async () => {
-    // Wrap in <pre> for the pre-element Enter handler
+    // Exercises replayOneKey's <pre> branch on a REAL code field.
+    // mock-code-block is a codeExample block; its tab's `code` field
+    // (type: string, registered via the tabs object-list schema) renders
+    // as <pre data-edit-text="code">. Using the real registered field —
+    // not a faked one grafted onto a slate block — means selection sync
+    // classifies it as plain text and doesn't raise the data-node-id
+    // overlay, so replayOneKey's <pre> handling is what's actually tested.
     const iframe = helper.getIframe();
     const r = await iframe.locator('body').evaluate(() => {
       const bridge = (window as any).bridge;
-      const blockId = 'mock-block-1';
-      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
-      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+      const tabId = 'mock-code-tab';
+      const pre = document.querySelector(
+        `[data-block-uid="${tabId}"] pre[data-edit-text="code"]`,
+      ) as HTMLElement;
 
       if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
 
-      // Wrap the edit field in <pre> temporarily
-      const pre = document.createElement('pre');
-      pre.setAttribute('data-edit-text', 'code');
-      pre.setAttribute('contenteditable', 'true');
-      pre.innerHTML = 'line1';
-      editField.innerHTML = '';
-      editField.appendChild(pre);
+      // Normalise the rendered code to a single plain text node so the
+      // cursor can be placed by offset (the renderer may add syntax-
+      // highlight spans).
+      pre.textContent = 'line1';
 
-      bridge.selectedBlockUid = blockId;
+      bridge.selectedBlockUid = tabId;
       bridge.focusedFieldName = 'code';
       bridge.isInlineEditing = true;
 
@@ -516,7 +520,7 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
       sel.addRange(range);
 
       // Replay Enter
-      bridge.replayOneKey(blockId, { key: 'Enter', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false }, pre);
+      bridge.replayOneKey(tabId, { key: 'Enter', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false }, pre);
 
       return { text: pre.textContent };
     });
@@ -793,25 +797,25 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
   });
 
   test('Space on button element inserts space (not activate)', async () => {
+    // replayOneKey's <button> Space branch on a REAL <button> element:
+    // the form block's submit button (data-edit-text="submit_label",
+    // type: string). A <button> natively activates on Space \u2014 the bridge
+    // must insert a space instead while the button text is being edited.
     const iframe = helper.getIframe();
     const r = await iframe.locator('body').evaluate(() => {
       const bridge = (window as any).bridge;
-      const blockId = 'mock-block-1';
-      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
-      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+      const blockId = 'mock-form-block';
+      const btn = document.querySelector(
+        `[data-block-uid="${blockId}"] button.form-submit[data-edit-text="submit_label"]`,
+      ) as HTMLElement;
 
       if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
 
-      // Replace edit field content with a contenteditable button
-      const btn = document.createElement('button');
-      btn.setAttribute('data-edit-text', 'buttonText');
       btn.setAttribute('contenteditable', 'true');
       btn.textContent = 'Click';
-      editField.innerHTML = '';
-      editField.appendChild(btn);
 
       bridge.selectedBlockUid = blockId;
-      bridge.focusedFieldName = 'buttonText';
+      bridge.focusedFieldName = 'submit_label';
       bridge.isInlineEditing = true;
 
       // Place cursor at end
@@ -832,23 +836,21 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
   });
 
   test('Tab in pre element inserts spaces', async () => {
+    // replayOneKey's <pre> Tab branch, on the real mock-code-block code
+    // field (registered, type: string) — see the Enter test above.
     const iframe = helper.getIframe();
     const r = await iframe.locator('body').evaluate(() => {
       const bridge = (window as any).bridge;
-      const blockId = 'mock-block-1';
-      const blockEl = document.querySelector('[data-block-uid="mock-block-1"]')!;
-      const editField = (blockEl.querySelector('[data-edit-text]') || blockEl) as HTMLElement;
+      const tabId = 'mock-code-tab';
+      const pre = document.querySelector(
+        `[data-block-uid="${tabId}"] pre[data-edit-text="code"]`,
+      ) as HTMLElement;
 
       if (bridge.blockTextMutationObserver) bridge.blockTextMutationObserver.disconnect();
 
-      const pre = document.createElement('pre');
-      pre.setAttribute('data-edit-text', 'code');
-      pre.setAttribute('contenteditable', 'true');
-      pre.innerHTML = 'hello';
-      editField.innerHTML = '';
-      editField.appendChild(pre);
+      pre.textContent = 'hello';
 
-      bridge.selectedBlockUid = blockId;
+      bridge.selectedBlockUid = tabId;
       bridge.focusedFieldName = 'code';
       bridge.isInlineEditing = true;
 
@@ -860,7 +862,7 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
       sel.removeAllRanges();
       sel.addRange(range);
 
-      bridge.replayOneKey(blockId, { key: 'Tab', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false }, pre);
+      bridge.replayOneKey(tabId, { key: 'Tab', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false }, pre);
 
       return { text: pre.textContent };
     });
