@@ -5731,13 +5731,8 @@ export class Bridge {
 
       console.error('[HYDRA] Selection sync failed - missing data-node-id\n\n' + errorMsg);
 
-      // Show visible warning overlay in iframe (only once per session).
-      // Suppress while a framework re-render is in flight: selectionchange
-      // events fire as the framework replaces DOM nodes, and during that
-      // window the old <p> (sans data-node-id) is briefly the cursor's
-      // container. The next render adds the attribute; warning on the
-      // transient state is a false positive.
-      if (!this._shownNodeIdWarning && !this._renderInProgress) {
+      // Show visible warning overlay in iframe (only once per session)
+      if (!this._shownNodeIdWarning) {
         this._shownNodeIdWarning = true;
         this.showDeveloperWarning(
           'Hydra: Missing data-node-id attributes',
