@@ -241,12 +241,24 @@ function checkIntegrity(contentDir) {
   };
 
   // Pass 1: build UID → relpath and path → data
+  // Detect duplicate UIDs as we go — two content items sharing one UID
+  // makes Plone's catalog throw `A different document with value '<UID>'
+  // already exists in the index` during create-site, which silently leaves
+  // half the import incomplete (missing nav items, redirects don't install,
+  // etc.) while the API still responds enough to pass api-wait. Catching
+  // this here turns it into a deploy-blocking validate failure.
   const uidMap = new Map();
   const pathMap = new Map();
   const items = [];
   for (const { rel, data, dir } of walkData(contentDir)) {
     items.push({ rel, data, dir });
-    if (data.UID) uidMap.set(data.UID, rel);
+    if (data.UID) {
+      if (uidMap.has(data.UID)) {
+        errors.push(`  ${rel}: duplicate UID ${data.UID} (also in ${uidMap.get(data.UID)})`);
+      } else {
+        uidMap.set(data.UID, rel);
+      }
+    }
     const atId = data['@id'];
     if (atId) pathMap.set(atId, data);
     pathMap.set('/' + rel.split(path.sep).join('/'), data);
