@@ -3,7 +3,7 @@
         <Title>{{ data.page?.title }}</Title>
         <Meta name="description" :content="data.page?.description" />
     </Head>
-        <Header :data="data"></Header>
+        <Header></Header>
         <main class="pt-8 pb-16 lg:pt-16 lg:pb-24 bg-white dark:bg-gray-900 antialiased">
         <!-- <div class="flex justify-between px-4 mx-auto max-w-screen-xl "> -->
             <!-- <article class="mx-auto w-full max-w-2xl format format-sm sm:format-base lg:format-lg format-blue dark:format-invert"> -->
@@ -59,6 +59,16 @@ import { ref, computed, provide, inject } from 'vue';
 import { initBridge, expandTemplatesSync, isEditMode } from '@hydra-js/hydra.js';
 import { sharedBlocksConfig } from '@test-fixtures/shared-block-schemas.js';
 import { useRuntimeConfig } from "#imports"
+
+// Paging URLs like `/foo/@pg_<id>_<n>` are sub-states of the same page,
+// not separate pages. Without a stable key, Nuxt remounts the entire
+// page component on every paging click — which tears down our reactive
+// state (the hydra bridge's onEditChange callback is closed over the
+// old component's `data` ref, so admin's resent FORM_DATA lands in the
+// wrong instance and the new instance never gets populated).
+definePageMeta({
+  key: (route) => route.path.replace(/\/@pg_[^/]+_\d+/g, ''),
+});
 
 const runtimeConfig = useRuntimeConfig();
 const apiUrl = runtimeConfig.public.backendBaseUrl || runtimeConfig.public.apiUrl || '';
@@ -356,7 +366,6 @@ const preloadTemplates = [
 
 var path = [];
 var pages = {};
-console.log(route.params.slug);
 for (var part of route.params.slug) {
     if (part.startsWith("@pg_")) {
         const [_,bid,page] = part.split("_");
@@ -366,13 +375,29 @@ for (var part of route.params.slug) {
     }
 }
 
-// retrieve the data associated with an article
-// based on its slug (pre-loads templates for sync expansion)
-const { data, error } = await ploneApi({
-  path: path,
-  pages: pages,
-  preloadTemplates,
-});
+// Detect edit mode synchronously at setup time. We need the answer
+// BEFORE the (await ploneApi) below, so we can skip the page fetch.
+// `window.name` is set by the admin before the iframe loads and
+// persists across in-page paging; the `_edit` query string is the
+// SSR-safe fallback but gets dropped by paging URLs.
+const inEditModeAtSetup =
+    route.query._edit === 'true'
+    || (typeof window !== 'undefined' && window.name?.startsWith('hydra-edit:'));
+
+// In edit mode the bridge owns the page document — it ships the only
+// copy that carries the `nodeId` attributes selection sync depends on
+// (see docs/architecture.md "Realtime preview"; docs/templates.md:65).
+// Skip the ploneApi page fetch entirely; onEditChange (below in
+// onMounted) populates data.value.page from admin's INITIAL_DATA.
+// Templates are also admin-resolved in edit mode (templates.md:155).
+// Site-wide navigation is fetched once by useSiteNav() inside Header.
+let data, error;
+if (inEditModeAtSetup) {
+  data = ref({ page: undefined, templates: {}, _listing_pages: pages });
+  error = ref(null);
+} else {
+  ({ data, error } = await ploneApi({ path, pages, preloadTemplates }));
+}
 
 // Provide templates, apiUrl, contextPath, templateState for nested components (grids, etc.)
 provide('templates', computed(() => data.value?.templates || {}));
