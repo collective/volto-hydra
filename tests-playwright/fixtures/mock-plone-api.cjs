@@ -369,6 +369,10 @@ function formatSearchItem(content, baseUrl) {
       ? uidPositionMap[content.UID]
       : null,
     'exclude_from_nav': content.exclude_from_nav === true,
+    // Subject (capital S) is the Plone catalog index name; the @querystring-search
+    // filter reads `item.Subject` for facet.Subject criteria. Populate from the
+    // content's `subjects` field (the lowercase schema field).
+    'Subject': content.subjects || [],
   };
 
   // Match real Plone: always include image_field and image_scales.
@@ -1232,6 +1236,28 @@ app.get('/health', (req, res) => {
 });
 
 /**
+ * Walk every registered content dir and collect unique `subjects` values
+ * across all data.json files. Returns the `{ value: { title } }` shape
+ * Plone's @querystring endpoint uses for the Subject (Keywords) index.
+ */
+function collectSubjectValues() {
+  const subjects = new Set();
+  for (const { dirPath } of Object.values(contentDirMap)) {
+    const dataFile = path.join(dirPath, 'data.json');
+    if (!fs.existsSync(dataFile)) continue;
+    try {
+      const data = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
+      for (const s of (data.subjects || [])) {
+        if (typeof s === 'string' && s) subjects.add(s);
+      }
+    } catch { /* ignore malformed data.json */ }
+  }
+  const out = {};
+  for (const s of [...subjects].sort()) out[s] = { title: s };
+  return out;
+}
+
+/**
  * GET /@querystring
  * Get querystring schema (available indexes, operators, sortable indexes)
  * Used by QuerystringWidget to populate criteria and sort dropdowns
@@ -1449,9 +1475,7 @@ app.get('*/@querystring', (req, res) => {
             'operation': 'plone.app.querystring.operation.selection.none',
           },
         },
-        'values': {
-          'main folder': { 'title': 'main folder' },
-        },
+        'values': collectSubjectValues(),
       },
       'Title': {
         'title': 'Title',
@@ -1803,7 +1827,11 @@ app.post('*/@querystring-search', (req, res) => {
   const selectionFields = {
     portal_type: (item) => [item['@type']],
     review_state: (item) => [item.review_state || 'published'],
-    Subject: (item) => item.Subject || [],
+    // Items here come from loadRawContentFromDisk — the raw content schema
+    // field is lowercase `subjects`. The catalog index name `Subject`
+    // (capital S) is only added later by formatSearchItem. Read both so
+    // this works whether the filter runs on raw or brain-formatted items.
+    Subject: (item) => item.subjects || item.Subject || [],
   };
 
   for (const condition of query) {
@@ -1893,6 +1921,9 @@ app.post('*/@querystring-search', (req, res) => {
         const flag = item.exclude_from_nav === true;
         return wantTrue ? flag : !flag;
       });
+      // Note: `review_state` and `Subject` selection.{any,all,none} are
+      // handled generically above via `selectionFields` (which already
+      // maps both indices), so we don't need explicit branches here.
     }
   }
 
