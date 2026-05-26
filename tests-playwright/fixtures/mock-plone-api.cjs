@@ -335,8 +335,17 @@ function getPlaceholderImageScales(title, fieldName = 'image') {
  * Includes hasPreviewImage for teaser blocks to show target's preview image
  */
 function formatSearchItem(content, baseUrl) {
-  // Check if content has a preview image (common for Documents, News Items, etc.)
-  const hasPreviewImage = !!(content.preview_image || content['@type'] === 'Image');
+  // Check if content has a preview image (common for Documents, News Items, etc.).
+  // For distribution-style content the preview_image is a blob_path reference;
+  // unless the bytes also exist on disk under the content dir, the mock can't
+  // serve the @@images URL — so don't claim a preview image we can't deliver.
+  const declaresPreview = !!(content.preview_image || content['@type'] === 'Image');
+  let hasPreviewImage = declaresPreview;
+  if (declaresPreview && content.preview_image?.blob_path) {
+    const urlPath = (content['@id'] || '').replace(/^https?:\/\/[^/]+/, '') || '/';
+    const dirInfo = contentDirMap[urlPath];
+    hasPreviewImage = !!(dirInfo && findFirstImageFile(dirInfo.dirPath, 3));
+  }
 
   const item = {
     '@id': content['@id'],
@@ -2218,6 +2227,26 @@ app.get('*/resolveuid/:uid', (req, res) => {
  * Serves actual image files from content directories if they exist,
  * otherwise falls back to placeholder SVGs.
  */
+function findFirstImageFile(rootDir, maxDepth) {
+  const imageExts = new Set(['.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp']);
+  const stack = [{ dir: rootDir, depth: 0 }];
+  while (stack.length) {
+    const { dir, depth } = stack.pop();
+    if (depth > maxDepth) continue;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isFile() && imageExts.has(path.extname(entry.name).toLowerCase())) {
+        return full;
+      }
+      if (entry.isDirectory()) {
+        stack.push({ dir: full, depth: depth + 1 });
+      }
+    }
+  }
+  return null;
+}
+
 app.get('*/@@images/*', (req, res) => {
   // Extract content path and field name from URL. Serves the same image
   // file regardless of scale — the mock doesn't generate actual scales.
@@ -2242,27 +2271,41 @@ app.get('*/@@images/*', (req, res) => {
   }
   const imageDir = dirInfo ? path.join(dirInfo.dirPath, fieldName) : null;
 
+  const mimeTypes = {
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+  };
+  const isImageExt = (ext) => ext in mimeTypes;
+  const serveFile = (imageFile) => {
+    const ext = path.extname(imageFile).toLowerCase();
+    res.set('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+    res.sendFile(imageFile);
+  };
+
   if (imageDir && fs.existsSync(imageDir)) {
     const files = fs.readdirSync(imageDir);
     if (files.length > 0) {
-      const imageFile = path.join(imageDir, files[0]);
-      const ext = path.extname(files[0]).toLowerCase();
-      const mimeTypes = {
-        '.svg': 'image/svg+xml',
-        '.png': 'image/png',
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.gif': 'image/gif',
-        '.webp': 'image/webp',
-      };
-      const contentType = mimeTypes[ext] || 'application/octet-stream';
-      res.set('Content-Type', contentType);
-      res.sendFile(imageFile);
+      serveFile(path.join(imageDir, files[0]));
       return;
     }
   }
 
-  // No image file found — return 404 (don't hide missing images with placeholders)
+  // Fallback for distribution-style content where preview_image is set via
+  // blob_path. The actual bytes live in a nested image content item under
+  // the data dir, e.g. <content>/<screenshot>.png/image/<file>.png.
+  // Walk the dir tree and serve the first image file found (depth-limited).
+  if (dirInfo && fs.existsSync(dirInfo.dirPath)) {
+    const found = findFirstImageFile(dirInfo.dirPath, 3);
+    if (found) {
+      serveFile(found);
+      return;
+    }
+  }
+
   res.status(404).json({
     error: { type: 'NotFound', message: `Image not found: ${req.path}` }
   });
