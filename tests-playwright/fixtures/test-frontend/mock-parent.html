@@ -47,7 +47,10 @@
       border: none;
     }
     /* Log overlays the bottom of the viewport so it doesn't push the
-       iframe up. It scrolls within itself. */
+       iframe up. It scrolls within itself. pointer-events: none so
+       it doesn't intercept clicks on iframe content underneath
+       (mock-hero-block's buttonText sits near the bottom of the
+       iframe content area and would otherwise be unclickable). */
     #log {
       position: fixed;
       left: 20px;
@@ -61,6 +64,7 @@
       overflow-y: auto;
       z-index: 500;
       opacity: 0.92;
+      pointer-events: none;
     }
     .log-entry {
       margin: 2px 0;
