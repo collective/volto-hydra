@@ -387,16 +387,20 @@ const inEditModeAtSetup =
 // In edit mode the bridge owns the page document — it ships the only
 // copy that carries the `nodeId` attributes selection sync depends on
 // (see docs/architecture.md "Realtime preview"; docs/templates.md:65).
-// Skip the ploneApi page fetch entirely; onEditChange (below in
-// onMounted) populates data.value.page from admin's INITIAL_DATA.
-// Templates are also admin-resolved in edit mode (templates.md:155).
+// But the frontend's layout rules (CONTENT_TYPE_LAYOUTS below) need
+// the page's `@type` BEFORE initBridge fires — admin can't know which
+// template to merge until we tell it, and we tell it via the
+// initBridge schema config which goes out as part of INIT. So we
+// still fetch the page here (cheap, view mode does it anyway) but
+// strip it down to just the metadata our rules consume; the bridge's
+// onEditChange will replace it with the full nodeId-bearing copy.
 // Site-wide navigation is fetched once by useSiteNav() inside Header.
-let data, error;
-if (inEditModeAtSetup) {
-  data = ref({ page: undefined, templates: {}, _listing_pages: pages });
-  error = ref(null);
-} else {
-  ({ data, error } = await ploneApi({ path, pages, preloadTemplates }));
+const { data, error } = await ploneApi({ path, pages, preloadTemplates });
+if (inEditModeAtSetup && data.value?.page) {
+  data.value.page = {
+    '@id':   data.value.page['@id'],
+    '@type': data.value.page['@type'],
+  };
 }
 
 // Provide templates, apiUrl, contextPath, templateState for nested components (grids, etc.)
