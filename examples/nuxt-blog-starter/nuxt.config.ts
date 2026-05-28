@@ -12,6 +12,11 @@ export default defineNuxtConfig({
     prerender: {
       failOnError: false, // IPX image routes may 500 during local build
       requestTimeout: 30000, // 30s timeout for SSG fetch requests (default 10s)
+      // Cap at 2 parallel routes. Nitro defaults to 1 (serial). The
+      // deployed Plone API is a single small (512MB) auto-suspending
+      // instance, so 2 keeps the build faster than serial without
+      // overwhelming a cold instance.
+      concurrency: 2,
     },
   },
   app: {
