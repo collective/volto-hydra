@@ -11,14 +11,17 @@
        :aria-label="block.ariaLabel"
        class="context-navigation">
     <details ref="detailsRef" class="context-navigation-disclosure">
-      <!-- Empty textContent — only the default disclosure chevron
-           shows visually. Screen-reader name via aria-label. Keeps the
-           block's ariaLabel value out of any text node so block-sanity's
-           "string field must sit inside [data-edit-text]" rule doesn't
-           fire against this <summary>. -->
+      <!-- Summary doubles as the visible header (desktop: styled as a
+           small-caps section label, à la Stripe/MDN/Primer; mobile: the
+           tap target for the disclosure). block.ariaLabel renders here
+           via [data-edit-text] so authors can inline-edit the heading
+           text just like any other string field; clicking the span
+           positions the cursor AND triggers <details>'s native toggle,
+           but that's a benign side-effect — the summary stays visible
+           whether the details is open or closed, so editing continues
+           without losing the cursor. -->
       <summary class="context-navigation-summary"
-               aria-label="Toggle section navigation"
-               :data-block-selector="exposedUids"></summary>
+               :data-block-selector="exposedUids"><span data-edit-text="ariaLabel">{{ block.ariaLabel }}</span></summary>
       <ul role="list" :id="`${blockId}-list`" class="context-navigation-list">
         <li v-for="entry in entries" :key="entry.blockId">
           <a :href="entry.itemPath"
@@ -98,12 +101,37 @@ async function expandChildren() {
     if (child['@type'] === 'navItem') {
       flat.push({ block: child, blockId: childId });
     } else if (child['@type'] === 'listing') {
+      // The cnav listing's `relativePath ..` means "my section". Fetched
+      // from the current page, Plone's @querystring-search drops the
+      // current page — it always excludes its own context object — so the
+      // page can't appear in its own nav. Fetch from the PARENT folder and
+      // step the relativePath down one level (`..` -> `.`): same tree
+      // slice, but the current page comes back as a normal result with its
+      // getObjPositionInParent (so it sorts into place); only the parent
+      // is excluded.
+      const parentPath = props.contextPath.replace(/\/[^/]+\/?$/, '') || '/';
+      const stepDown = (v) => {
+        const s = String(v || '').split('/').filter(Boolean);
+        if (s[0] === '..') s.shift();
+        return s.length ? s.join('/') : '.';
+      };
+      const shifted = {
+        ...child,
+        querystring: {
+          ...child.querystring,
+          query: (child.querystring?.query || []).map((c) =>
+            c.i === 'path' && c.o?.includes('relativePath')
+              ? { ...c, v: stepDown(c.v) }
+              : c,
+          ),
+        },
+      };
       const result = await expandListingBlocks([childId], {
-        blocks: { [childId]: child },
+        blocks: { [childId]: shifted },
         fetchItems: {
           listing: ploneFetchItems({
             apiUrl: props.apiUrl,
-            contextPath: props.contextPath,
+            contextPath: parentPath,
           }),
         },
         paging: { start: 0, size: NAV_LISTING_SIZE },
@@ -120,6 +148,7 @@ async function expandChildren() {
   const pathOf = (entry) =>
     new URL(entry.block.href[0]['@id'], 'http://placeholder').pathname;
   const segsOf = (p) => p.split('/').filter(Boolean);
+  const here = route.path.replace(/\/$/, '');
 
   // Optional: prepend the section root (Volto's `includeTop`). Derived
   // from the shallowest item's parent — listings anchored on one path
@@ -145,11 +174,23 @@ async function expandChildren() {
     }
   }
 
-  const here = route.path.replace(/\/$/, '');
   const paths = flat.map(pathOf);
   const segs = paths.map(segsOf);
   const depths = segs.map((s) => s.length);
   const minDepth = Math.min(...depths);
+
+  // Orphan prune: a listing filter (e.g. exclude_from_nav) can drop a
+  // folder while still returning its deeper, non-excluded descendants —
+  // those would otherwise surface as stray roots. Drop any entry with a
+  // missing ancestor between the section root and itself, so hiding a
+  // folder hides its whole subtree.
+  const pathSet = new Set(paths.map((p) => p.replace(/\/$/, '')));
+  const hasAllAncestors = (itemSegs) => {
+    for (let d = minDepth; d < itemSegs.length; d++) {
+      if (!pathSet.has('/' + itemSegs.slice(0, d).join('/'))) return false;
+    }
+    return true;
+  };
 
   // Smart-expansion filter (default true): drop entries that are
   // descendants of unrelated siblings — typical docs sidebar UX.
@@ -168,7 +209,7 @@ async function expandChildren() {
   };
 
   return flat.flatMap((entry, i) => {
-    if (!passes(segs[i])) return [];
+    if (!passes(segs[i]) || !hasAllAncestors(segs[i])) return [];
     const itemPath = paths[i];
     const stripped = itemPath.replace(/\/$/, '');
     const active = stripped === here;

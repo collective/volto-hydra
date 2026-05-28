@@ -40,3 +40,10 @@ cache/
 # via the package's exports field which now points at the source.
 packages/hydra-js/hydra.js
 packages/hydra-js/hydra.js.map
+
+# Generated screenshots and demo video — web-only artifacts, not version
+# controlled. The capture specs regenerate them on demand and they are
+# delivered to the Plone site directly, not through the committed docs.
+docs/examples/_images/
+*.mp4
+*.webm

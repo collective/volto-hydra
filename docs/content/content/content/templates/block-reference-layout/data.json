@@ -96,7 +96,7 @@
             {
               "type": "a",
               "data": {
-                "url": "/concepts/integration-levels"
+                "url": "/docs/live-preview"
               },
               "children": [
                 {
@@ -281,5 +281,13 @@
   },
   "effective": "2025-01-01T00:00:00",
   "modified": "2025-01-01T00:00:00+00:00",
-  "created": "2025-01-01T00:00:00+00:00"
+  "created": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/templates",
+    "@type": "Folder",
+    "UID": "tpl-folder-001",
+    "description": "Layout and block templates",
+    "title": "Templates",
+    "type_title": "Page"
+  }
 }

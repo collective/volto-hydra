@@ -1,0 +1,381 @@
+{
+  "@id": "/docs",
+  "@type": "Document",
+  "UID": "docs-folder-001",
+  "allow_discussion": false,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "p-1": {
+      "@type": "slate",
+      "plaintext": "A Visual Headless CMS using Plone as a server, providing true visual editing with drag-and-drop blocks and editable text — with any frontend stack you choose.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A Visual Headless CMS using Plone as a server, providing true visual editing with drag-and-drop blocks and editable text — with any frontend stack you choose."
+            }
+          ]
+        }
+      ]
+    },
+    "h-2": {
+      "@type": "slate",
+      "plaintext": "Why Hydra?",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Why Hydra?"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-3": {
+      "@type": "slate",
+      "plaintext": "Visual + True Headless + Open Source — a unique combination in the CMS space Framework agnostic — use Next.js, Nuxt.js, Astro, or any frontend stack Quick visual editing — enable it with simple HTML data attributes, no React or Vue required in your frontend Omni-channel — switch between multiple frontends mid-edit Enterprise features — versioning, i18n, workflow, and automated content rules Customisable — both the admin interface and block definitions are fully configurable",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Visual + True Headless + Open Source"
+                    }
+                  ]
+                },
+                {
+                  "text": " — a unique combination in the CMS space"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Framework agnostic"
+                    }
+                  ]
+                },
+                {
+                  "text": " — use Next.js, Nuxt.js, Astro, or any frontend stack"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Quick visual editing"
+                    }
+                  ]
+                },
+                {
+                  "text": " — enable it with simple HTML data attributes, no React or Vue required in your frontend"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Omni-channel"
+                    }
+                  ]
+                },
+                {
+                  "text": " — switch between multiple frontends mid-edit"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Enterprise features"
+                    }
+                  ]
+                },
+                {
+                  "text": " — versioning, i18n, workflow, and automated content rules"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Customisable"
+                    }
+                  ]
+                },
+                {
+                  "text": " — both the admin interface and block definitions are fully configurable"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "h-4": {
+      "@type": "slate",
+      "plaintext": "Try the online demo",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Try the online demo"
+            }
+          ]
+        }
+      ]
+    },
+    "p-5": {
+      "@type": "slate",
+      "plaintext": "The fastest way to feel what Hydra does is to log into the hosted demo and edit a real page against a real frontend.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The fastest way to feel what Hydra does is to log into the hosted demo and edit a real page against a real frontend."
+            }
+          ]
+        }
+      ]
+    },
+    "p-6": {
+      "@type": "slate",
+      "plaintext": "Open <https://hydra.pretagov.com>, log in, then:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Open <https://hydra.pretagov.com>, log in, then:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-7": {
+      "@type": "slate",
+      "plaintext": "Open user preferences (bottom-left). Pick one of the preset frontends, or paste in your own frontend URL. Edit any page — every change updates the live preview.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Open user preferences (bottom-left)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Pick one of the preset frontends, or paste in your own frontend URL."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Edit any page — every change updates the live preview."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-8": {
+      "@type": "slate",
+      "plaintext": "The default preset is a Nuxt.js frontend deployed as an [SSG](https://hydra-nuxt-flowbrite.netlify.app/) to demonstrate scale-to-zero editing on free hosting. See [Build a frontend › Deployment patterns](./build-a-frontend.md#deployment-patterns).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The default preset is a Nuxt.js frontend deployed as an "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "https://hydra-nuxt-flowbrite.netlify.app/"
+              },
+              "children": [
+                {
+                  "text": "SSG"
+                }
+              ]
+            },
+            {
+              "text": " to demonstrate scale-to-zero editing on free hosting. See "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "./build-a-frontend.md#deployment-patterns"
+              },
+              "children": [
+                {
+                  "text": "Build a frontend › Deployment patterns"
+                }
+              ]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    "p-9": {
+      "@type": "slate",
+      "plaintext": "To run Hydra locally against your own frontend, see the **Run Locally** section of the [project README](https://github.com/collective/volto-hydra#run-locally).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "To run Hydra locally against your own frontend, see the "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Run Locally"
+                }
+              ]
+            },
+            {
+              "text": " section of the "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "https://github.com/collective/volto-hydra#run-locally"
+              },
+              "children": [
+                {
+                  "text": "project README"
+                }
+              ]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    "listing-1": {
+      "@type": "listing",
+      "headlineTag": "h2",
+      "styles": {},
+      "variation": "summary",
+      "fieldMapping": {
+        "@id": "href",
+        "title": "title",
+        "description": "description",
+        "image": "image"
+      }
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "p-1",
+      "h-2",
+      "ul-3",
+      "h-4",
+      "p-5",
+      "p-6",
+      "ul-7",
+      "p-8",
+      "p-9",
+      "listing-1"
+    ]
+  },
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "A Visual Headless CMS using Plone as a server, providing true visual editing with drag-and-drop blocks and editable text — with any frontend stack you choose.",
+  "effective": "2025-01-01T00:00:00",
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "docs",
+  "is_folderish": true,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/",
+    "@type": "Plone Site",
+    "UID": "plone_site_root",
+    "description": "A Visual Headless CMS",
+    "title": "Volto Hydra",
+    "type_title": "Plone Site"
+  },
+  "preview_caption": null,
+  "preview_image": null,
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Volto Hydra Documentation",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2025-01-01T00:00:00+00:00"
+      }
+    ]
+  },
+  "working_copy": null,
+  "working_copy_of": null
+}

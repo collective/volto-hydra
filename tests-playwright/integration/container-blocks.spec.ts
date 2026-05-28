@@ -4,6 +4,7 @@
  * Tests nested block selection, container hierarchy detection,
  * and add/delete operations within containers.
  */
+import type { FrameLocator } from '@playwright/test';
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
@@ -225,11 +226,11 @@ test.describe('Adding Blocks to Containers', () => {
 
     const iframe = helper.getIframe();
 
-    // Count initial blocks in col-1 (should be 2: text-1a, text-1b)
+    // Count initial blocks in col-1 (text-1a, text-1b, col1-img-1)
     const initialCol1Blocks = await iframe
       .locator('[data-block-uid="col-1"] > [data-block-uid]')
       .count();
-    expect(initialCol1Blocks).toBe(2);
+    expect(initialCol1Blocks).toBe(3);
 
     // Count initial page-level blocks
     const initialPageBlocks = await iframe
@@ -241,11 +242,11 @@ test.describe('Adding Blocks to Containers', () => {
     await helper.clickAddBlockButton();
     await helper.selectBlockType('slate');
 
-    // col-1 should now have 3 blocks
+    // col-1 should now have one more block (the new slate)
     const finalCol1Blocks = await iframe
       .locator('[data-block-uid="col-1"] > [data-block-uid]')
       .count();
-    expect(finalCol1Blocks).toBe(3);
+    expect(finalCol1Blocks).toBe(initialCol1Blocks + 1);
 
     // Page-level blocks should be unchanged
     const finalPageBlocks = await iframe
@@ -311,11 +312,11 @@ test.describe('Adding Blocks to Containers', () => {
 
     const iframe = helper.getIframe();
 
-    // Count initial blocks in col-1 (should be 2: text-1a, text-1b)
+    // Count initial blocks in col-1 (text-1a, text-1b, col1-img-1)
     const initialCol1Blocks = await iframe
       .locator('[data-block-uid="col-1"] > [data-block-uid]')
       .count();
-    expect(initialCol1Blocks).toBe(2);
+    expect(initialCol1Blocks).toBe(3);
 
     // Count initial page-level blocks
     const initialPageBlocks = await iframe
@@ -329,11 +330,11 @@ test.describe('Adding Blocks to Containers', () => {
     await helper.moveCursorToEnd(editor);
     await page.keyboard.press('Enter');
 
-    // Wait for col-1 to have 3 blocks (text-1a was split, creating a new block)
+    // Wait for col-1 to have one more block (text-1a was split, new block added)
     const col1BlocksLocator = iframe.locator(
       '[data-block-uid="col-1"] > [data-block-uid]',
     );
-    await expect(col1BlocksLocator).toHaveCount(3);
+    await expect(col1BlocksLocator).toHaveCount(initialCol1Blocks + 1);
 
     // Page-level blocks should be unchanged - the new block should be in the container
     const finalPageBlocks = await iframe
@@ -382,9 +383,18 @@ test.describe('Adding Blocks to Containers', () => {
   test('pressing Enter in container with single allowedBlock creates that type, not slate', async ({
     page,
   }) => {
-    // top_images field on the columns block allows only 'image' blocks.
-    // Pressing Enter on an image block there should create another image block,
-    // not a slate block (which is the hardcoded default in View.jsx).
+    // The `columns` slot has allowedBlocks: ['column'] and intentionally
+    // NO defaultBlockType — the factory must fall back to "use the only
+    // allowed type" (column), NOT the global slate default in View.jsx.
+    // This guards against the "global slate default leaks into single-
+    // allowedBlock slots" regression.
+    //
+    // Source is a container (column has children), so per the docs on
+    // "Enter in block mode on a container source" in block-add-remove
+    // .spec.ts, ADD_BLOCK_AFTER's "another one of these" rule creates
+    // another column AND auto-initialises a slate child inside it, with
+    // focus moving into that slate. Two Escapes walk back up to the
+    // new column block to verify its type via sidebar.
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -392,22 +402,25 @@ test.describe('Adding Blocks to Containers', () => {
 
     const iframe = helper.getIframe();
 
-    // Count initial top_images blocks (should be 2: top-img-1, top-img-2)
-    const topImagesLocator = iframe.locator('.top-images-row > [data-block-uid]');
-    await expect(topImagesLocator).toHaveCount(2);
+    // Count initial columns (should be 2: col-1, col-2).
+    const columnsLocator = iframe.locator('.columns-row > [data-block-uid]');
+    await expect(columnsLocator).toHaveCount(2);
 
-    // Click on top-img-1 (an image block in the top_images container)
-    await helper.clickBlockInIframe('top-img-1');
+    // Select col-2 in block mode.
+    await helper.clickContainerBlockInIframe('col-2', { waitForToolbar: false });
+    await helper.waitForBlockSelectedInAdmin('col-2');
 
-    // Press Enter to create a new block after top-img-1
+    // Press Enter — single-allowedBlock fallback creates a column (not a
+    // slate). The new column auto-inits a slate child; focus lands there.
     await page.keyboard.press('Enter');
+    await expect(columnsLocator).toHaveCount(3);
 
-    // Wait for a third block to appear in the top_images row
-    await expect(topImagesLocator).toHaveCount(3);
-
-    // The new block should be an image block, not slate.
-    // Verify via sidebar: the newly selected block should show "Image" as the current type.
-    await helper.waitForSidebarCurrentBlock('Image');
+    // Walk up from the auto-init slate to the new column block to verify
+    // its type. Escape #1 leaves text mode → block mode on the slate;
+    // Escape #2 bubbles up to its parent (the new column).
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await helper.waitForSidebarCurrentBlock('Column', 5_000);
   });
 
   test('sidebar add at page level adds block to page blocks', async ({
@@ -549,11 +562,11 @@ test.describe('Deleting Blocks from Containers', () => {
 
     const iframe = helper.getIframe();
 
-    // Count initial blocks in col-1 (should be 2: text-1a, text-1b)
+    // Count initial blocks in col-1 (text-1a, text-1b, col1-img-1)
     const initialCol1Blocks = await iframe
       .locator('[data-block-uid="col-1"] > [data-block-uid]')
       .count();
-    expect(initialCol1Blocks).toBe(2);
+    expect(initialCol1Blocks).toBe(3);
 
     // Count initial page-level blocks
     const initialPageBlocks = await iframe
@@ -566,11 +579,11 @@ test.describe('Deleting Blocks from Containers', () => {
     await helper.clickQuantaToolbarMenuOption('text-1b', 'Remove');
     await helper.waitForBlockToDisappear('text-1b');
 
-    // col-1 should now have 1 block
+    // col-1 should now have one fewer block
     const finalCol1Blocks = await iframe
       .locator('[data-block-uid="col-1"] > [data-block-uid]')
       .count();
-    expect(finalCol1Blocks).toBe(1);
+    expect(finalCol1Blocks).toBe(initialCol1Blocks - 1);
 
     // Page-level blocks should be unchanged
     const finalPageBlocks = await iframe
@@ -749,9 +762,9 @@ test.describe('Hierarchical Sidebar', () => {
     const childBlocksWidget = page.locator('#sidebar-order .child-blocks-widget');
     await expect(childBlocksWidget).toBeVisible();
 
-    // Should show the child blocks (text-1a, text-1b)
+    // Should show col-1's child blocks (text-1a, text-1b, col1-img-1)
     const childItems = page.locator('#sidebar-order .child-block-item');
-    await expect(childItems).toHaveCount(2);
+    await expect(childItems).toHaveCount(3);
   });
 
   test('clicking arrow on headers navigates up to parent', async ({
@@ -1025,7 +1038,12 @@ test.describe('Empty Block Behavior', () => {
     // The column block has defaultBlock: 'slate', so when we delete all blocks,
     // it should create a slate block, not an empty block.
 
-    // First delete text-1b from col-1
+    // col-1 starts with text-1a, text-1b, col1-img-1 — delete all three
+    await helper.clickBlockInIframe('col1-img-1');
+    await helper.openQuantaToolbarMenu('col1-img-1');
+    await helper.clickQuantaToolbarMenuOption('col1-img-1', 'Remove');
+    await helper.waitForBlockToDisappear('col1-img-1');
+
     await helper.clickBlockInIframe('text-1b');
     await helper.openQuantaToolbarMenu('text-1b');
     await helper.clickQuantaToolbarMenuOption('text-1b', 'Remove');
@@ -1555,7 +1573,7 @@ test.describe('Single Allowed Block Auto-Insert', () => {
     const initialColumnCount = await iframe
       .locator('[data-block-uid="columns-1"] > .columns-row > [data-block-uid]')
       .count();
-    expect(initialBlocksInCol1).toBe(2); // text-1a and text-1b
+    expect(initialBlocksInCol1).toBe(3); // text-1a, text-1b, col1-img-1
     expect(initialColumnCount).toBe(2); // col-1 and col-2
 
     // Select col-1 (a column that allows slate and image)
@@ -1565,9 +1583,9 @@ test.describe('Single Allowed Block Auto-Insert', () => {
     // Note: the column's container field is titled "Content" in its blockSchema
     await helper.addBlockViaSidebar('Content', 'Text');
 
-    // Verify: col-1 should now have 3 children (new block added INSIDE)
+    // Verify: col-1 should have one more child (new block added INSIDE)
     const col1Blocks = iframe.locator('[data-block-uid="col-1"] > [data-block-uid]');
-    await expect(col1Blocks).toHaveCount(3); // was 2, now 3
+    await expect(col1Blocks).toHaveCount(initialBlocksInCol1 + 1);
 
     // Verify: columns-1 should still have 2 columns (NO sibling added)
     const newColumnCount = await iframe
@@ -1767,10 +1785,10 @@ test.describe('Container Block Drag and Drop', () => {
 
     const iframe = helper.getIframe();
 
-    // Get initial order of blocks in col-1 (has text-1a, text-1b)
+    // Get initial order of blocks in col-1 (text-1a, text-1b, col1-img-1)
     const col1 = iframe.locator('[data-block-uid="col-1"]');
     const initialBlocks = await col1.locator(':scope > [data-block-uid]').all();
-    expect(initialBlocks.length).toBe(2);
+    expect(initialBlocks.length).toBe(3);
 
     const firstBlockUid = await initialBlocks[0].getAttribute('data-block-uid');
     const secondBlockUid = await initialBlocks[1].getAttribute('data-block-uid');
@@ -1816,7 +1834,7 @@ test.describe('Container Block Drag and Drop', () => {
       .locator(':scope > [data-block-uid]')
       .count();
 
-    expect(col1InitialCount).toBe(2); // text-1a, text-1b
+    expect(col1InitialCount).toBe(3); // text-1a, text-1b, col1-img-1
     expect(col2InitialCount).toBe(1); // text-2a
 
     // Select text-1a from col-1
@@ -1829,8 +1847,10 @@ test.describe('Container Block Drag and Drop', () => {
     await helper.dragBlockWithMouse(dragHandle, targetBlock, true); // Insert after
 
     // Wait for block to move between containers (React re-render may be async)
-    await expect(col1.locator(':scope > [data-block-uid]')).toHaveCount(1, { timeout: 5000 }); // Only text-1b left
-    await expect(col2.locator(':scope > [data-block-uid]')).toHaveCount(2, { timeout: 5000 }); // text-2a + text-1a
+    await expect(col1.locator(':scope > [data-block-uid]'))
+      .toHaveCount(col1InitialCount - 1, { timeout: 5000 });
+    await expect(col2.locator(':scope > [data-block-uid]'))
+      .toHaveCount(col2InitialCount + 1, { timeout: 5000 });
   });
 
   test('can drag block from container to page level', async ({ page }) => {
@@ -1847,8 +1867,8 @@ test.describe('Container Block Drag and Drop', () => {
       .locator(':scope > [data-block-uid]')
       .count();
 
-    // Verify text-1a starts inside col-1
-    expect(col1InitialCount).toBe(2);
+    // Verify col-1 starts with text-1a, text-1b, col1-img-1
+    expect(col1InitialCount).toBe(3);
 
     // Select text-1a from col-1 and wait for toolbar
     await helper.clickBlockInIframe('text-1a');
@@ -2194,40 +2214,36 @@ test.describe('Container Block Drag and Drop', () => {
     await helper.clickBlockInIframe('text-1a');
     await page.waitForTimeout(300);
 
-    // Try to drag slate block to top_images container (which only allows 'image')
-    // The top_images container only allows image blocks, not slate
-    // Hydra will walk up to find a valid container (page level) that allows slate
+    // Drag the slate to col-2's left edge — that lands in the `columns`
+    // slot of the columns block, whose allowedBlocks is ['column'] only.
+    // Slate is rejected there; Hydra walks up to find a valid parent
+    // (the page level allows slate) and drops there instead.
     const dragHandle = await helper.getDragHandle();
-    const topImg1 = iframe.locator('[data-block-uid="top-img-1"]');
+    const col2 = iframe.locator('[data-block-uid="col-2"]');
 
-    // Use horizontal drag to top-img-1 (in top_images container that only allows 'image')
-    // expectIndicator=true because hydra walks up to find valid parent (page level)
     const indicatorShown = await helper.dragBlockWithMouseHorizontal(
       dragHandle,
-      topImg1,
-      false, // insertAfter=false (left side)
-      true, // expectIndicator=true (drop redirected to valid parent)
+      col2,
+      false, // insertAfter=false (left side, between col-1 and col-2)
+      true,  // expectIndicator=true (drop redirected to valid parent)
     );
 
-    // Indicator should have been shown (for the valid parent container)
     expect(indicatorShown).toBe(true);
 
-    // text-1a should have moved (not still in col-1)
-    // Use auto-retrying assertion to wait for DOM update after drag-drop
+    // Auto-retrying: text-1a moves out of col-1.
     await expect(col1.locator('[data-block-uid="text-1a"]')).toHaveCount(0);
 
-    // CRITICAL: text-1a should NOT be in the top_images container
-    // Even though we dragged to top-img-1, slate is not allowed there
-    const columnsBlock = iframe.locator('[data-block-uid="columns-1"]');
-    const topImagesChildren = await columnsBlock
-      .locator('.top-images-row > [data-block-uid]')
+    // CRITICAL: text-1a should NOT be a sibling of col-1/col-2 inside
+    // the columns slot — slate isn't allowed there.
+    const columnsRowChildren = await iframe
+      .locator('[data-block-uid="columns-1"] .columns-row > [data-block-uid]')
       .all();
-    const topImagesUids = await Promise.all(
-      topImagesChildren.map((b) => b.getAttribute('data-block-uid')),
+    const columnsRowUids = await Promise.all(
+      columnsRowChildren.map((b) => b.getAttribute('data-block-uid')),
     );
-    expect(topImagesUids).not.toContain('text-1a');
+    expect(columnsRowUids).not.toContain('text-1a');
 
-    // text-1a should be at page level (sibling of columns-1, not inside it)
+    // It should have landed at page level instead.
     const pageLevelBlocks = iframe.locator('[data-block-uid]:not([data-block-uid] [data-block-uid])');
     const pageLevelUids = await pageLevelBlocks.evaluateAll(blocks =>
       blocks.map(b => b.getAttribute('data-block-uid'))
@@ -2540,7 +2556,7 @@ test.describe('Container Block Drag and Drop', () => {
     expect(text2aInCol2).toBe(0);
 
     const col1NewCount = await col1.locator(':scope > [data-block-uid]').count();
-    expect(col1NewCount).toBe(3); // text-1a, text-1b, text-2a
+    expect(col1NewCount).toBe(4); // text-1a, text-1b, col1-img-1, text-2a
 
     // Verify text-2a is now in col-1
     const text2aInCol1 = await col1
@@ -2619,37 +2635,40 @@ test.describe('Sidebar Child Blocks Reordering', () => {
 
     const iframe = helper.getIframe();
 
-    // Select col-1 (a container with 2 child blocks: text-1a, text-1b)
+    // Select col-1 (col-1 has text-1a, text-1b, col1-img-1)
     await helper.clickContainerBlockInIframe('col-1', { waitForToolbar: false });
     await helper.waitForSidebarCurrentBlock('Column');
 
-    // Verify initial order in iframe: text-1a comes before text-1b
+    // Verify initial order in iframe.
     const col1 = iframe.locator('[data-block-uid="col-1"]');
     const initialOrder = await col1
       .locator(':scope > [data-block-uid]')
       .evaluateAll((els) => els.map((el) => el.getAttribute('data-block-uid')));
-    expect(initialOrder).toEqual(['text-1a', 'text-1b']);
+    expect(initialOrder).toEqual(['text-1a', 'text-1b', 'col1-img-1']);
 
     // Find the child blocks widget in sidebar (Order tab)
     await helper.openSidebarTab('Order');
     const childBlocksWidget = page.locator('.child-blocks-widget');
     await expect(childBlocksWidget).toBeVisible();
 
-    // Find the drag handles for the two child blocks
+    // Find the drag handles for the three child blocks
     const dragHandles = childBlocksWidget.locator('.child-block-item .drag-handle');
-    await expect(dragHandles).toHaveCount(2);
+    await expect(dragHandles).toHaveCount(3);
 
-    // Drag text-1a below text-1b to reorder
-    // Must drag from the drag handle for react-beautiful-dnd to work
+    // Drag text-1a below text-1b (the second item) to reorder text-1a.
+    // Must drag from the drag handle for react-beautiful-dnd to work.
     const firstDragHandle = dragHandles.first();
-    const secondItem = childBlocksWidget.locator('.child-block-item').last();
+    const secondItem = childBlocksWidget.locator('.child-block-item').nth(1);
 
     const firstHandleBox = await firstDragHandle.boundingBox();
     const secondBox = await secondItem.boundingBox();
     expect(firstHandleBox).not.toBeNull();
     expect(secondBox).not.toBeNull();
 
-    // Drag from first item's drag handle to below second item
+    // Drag from first item's drag handle to below second item, but
+    // stop short of any third item's centre — col-1 has 3 children
+    // (text-1a, text-1b, col1-img-1), so an aggressive y+height+10
+    // would land inside col1-img-1's row and reorder past it.
     await page.mouse.move(
       firstHandleBox!.x + firstHandleBox!.width / 2,
       firstHandleBox!.y + firstHandleBox!.height / 2,
@@ -2657,18 +2676,21 @@ test.describe('Sidebar Child Blocks Reordering', () => {
     await page.mouse.down();
     await page.mouse.move(
       secondBox!.x + secondBox!.width / 2,
-      secondBox!.y + secondBox!.height + 10,
+      // Land in the lower half of text-1b — react-beautiful-dnd reads
+      // that as "place after text-1b" without crossing into col1-img-1.
+      secondBox!.y + secondBox!.height * 0.75,
       { steps: 10 },
     );
     await page.waitForTimeout(100); // Small delay for drag library to register position
     await page.mouse.up();
 
     // Verify order changed in iframe: text-1b now comes before text-1a
+    // (col1-img-1 stays in its original third position).
     await expect(async () => {
       const newOrder = await col1
         .locator(':scope > [data-block-uid]')
         .evaluateAll((els) => els.map((el) => el.getAttribute('data-block-uid')));
-      expect(newOrder).toEqual(['text-1b', 'text-1a']);
+      expect(newOrder).toEqual(['text-1b', 'text-1a', 'col1-img-1']);
     }).toPass({ timeout: 5000 });
   });
 
@@ -3219,10 +3241,11 @@ test.describe('Slider with listing expansion', () => {
     const slider = iframe.locator('[data-block-uid="gallery-slider"]');
     await expect(slider).toBeVisible();
 
-    // The listing should have expanded into image slides (all 11 mock images).
+    // The listing should expand the gallery's images (scoped to /images/
+    // by path filter so docs screenshots don't bleed into the test count).
     // All listing items share the listing block's @uid ("gallery-listing").
     const gallerySlides = iframe.locator('[data-block-uid="gallery-listing"]');
-    await expect(gallerySlides).toHaveCount(11, { timeout: 10000 });
+    await expect(gallerySlides).toHaveCount(5, { timeout: 10000 });
 
     // Verify image slides are rendered as image blocks (have img or data-edit-media)
     const firstGallerySlide = gallerySlides.first();
@@ -3238,25 +3261,27 @@ test.describe('Slider with listing expansion', () => {
 
     const iframe = helper.getIframe();
 
-    // Wait for listing expansion (11 listing + 1 manual image = 12 total slides)
-    await expect(iframe.locator('[data-block-uid="gallery-listing"]')).toHaveCount(11, { timeout: 10000 });
+    // Wait for listing expansion (5 listing + 1 manual image = 6 total slides;
+    // the listing query is path-scoped to /images/ so the count is stable
+    // even as docs sync adds new Image content elsewhere in the tree).
+    await expect(iframe.locator('[data-block-uid="gallery-listing"]')).toHaveCount(5, { timeout: 10000 });
 
     // First visible slide is a listing slide — click it
     await helper.clickBlockInIframe('gallery-listing');
     await helper.waitForBlockSelectedInAdmin('gallery-listing');
 
-    // Navigate +1 through all 11 listing slides to reach manual-image-1
+    // Navigate +1 through all 5 listing slides to reach manual-image-1
     const nextButton = iframe.locator('[data-block-selector="+1"]');
     await expect(nextButton).toBeVisible();
 
-    for (let i = 0; i < 11; i++) {
+    for (let i = 0; i < 5; i++) {
       await nextButton.click();
-      if (i < 10) {
+      if (i < 4) {
         await helper.waitForBlockSelectedInAdmin('gallery-listing');
       }
     }
 
-    // After 11 clicks we should be on the manual image slide
+    // After 5 clicks we should be on the manual image slide
     await helper.waitForBlockSelectedInAdmin('manual-image-1');
   });
 
@@ -3269,8 +3294,8 @@ test.describe('Slider with listing expansion', () => {
 
     const iframe = helper.getIframe();
 
-    // Wait for listing expansion
-    await expect(iframe.locator('[data-block-uid="gallery-listing"]')).toHaveCount(11, { timeout: 10000 });
+    // Wait for listing expansion (path-scoped to /images/ — see test above)
+    await expect(iframe.locator('[data-block-uid="gallery-listing"]')).toHaveCount(5, { timeout: 10000 });
 
     // Select gallery-listing (first visible slide), navigate up to slider, then select manual-image-1
     await helper.clickBlockInIframe('gallery-listing');
@@ -3835,33 +3860,194 @@ test.describe('slateTable Container', () => {
     const selectedBlockUid = await secondCellInNewRow.getAttribute('data-block-uid');
     await helper.waitForIframeBlockHandle(selectedBlockUid!);
   });
+
+  test('cell with multi-node slate value is flattened, not split', async ({
+    page,
+  }) => {
+    // A slate field must hold a single top-level node. splitMultiNodeSlateBlocks
+    // enforces that by splitting into sibling blocks — but a slateTable cell's
+    // value is a slate field of a non-slate block: there is no sibling slate
+    // block to create (the cell's container is a list of cells). Splitting it
+    // corrupts the row (stray non-cell block) and, on Nuxt, loops until React
+    // throws "Maximum update depth exceeded". The correct outcome is to
+    // FLATTEN the multi-node value into one node. table-test-page never
+    // caught this because all its cells are single-node; table-multinode-page
+    // has a cell whose value is [h2, p].
+    const helper = new AdminUIHelper(page);
+    const updateDepthErrors: string[] = [];
+    page.on('pageerror', (e) => {
+      if (e.message.includes('Maximum update depth')) {
+        updateDepthErrors.push(e.message);
+      }
+    });
+
+    await helper.login();
+    await helper.navigateToEdit('/table-multinode-page');
+
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="table-mn"]').first().waitFor({
+      state: 'attached',
+      timeout: 10000,
+    });
+    await page.waitForTimeout(1500);
+
+    // Not split: the row still has exactly one cell — no stray block leaked
+    // into the cells list.
+    const row2 = iframe.locator('tr[data-block-uid="mn-row-2"]');
+    await expect(row2.locator('td[data-block-uid], th[data-block-uid]')).toHaveCount(1);
+
+    // Flattened: the cell's value is now a single top-level slate node, and
+    // the text from both original nodes is preserved.
+    const cell2 = iframe.locator('[data-block-uid="mn-cell-2"]');
+    await expect(cell2).toContainText('Cell heading');
+    await expect(cell2).toContainText('Cell paragraph');
+    const topLevelNodeCount = await cell2.evaluate(
+      (el) => el.querySelectorAll(':scope > [data-node-id]').length,
+    );
+    expect(topLevelNodeCount, 'cell value must be flattened to one node').toBe(1);
+
+    expect(
+      updateDepthErrors,
+      'splitMultiNodeSlateBlocks must flatten (not split) slate fields ' +
+        'inside object_list items (table cells).',
+    ).toEqual([]);
+  });
+
+  // The editing actions below each produce a second top-level node in a
+  // table cell's slate value. A cell can't be split into sibling slate
+  // blocks, so each must flatten back to a single node — never corrupt the
+  // row or loop.
+  async function cellTopLevelNodeCount(iframe: FrameLocator, cellUid: string) {
+    return iframe
+      .locator(`[data-block-uid="${cellUid}"]`)
+      .evaluate((el) => el.querySelectorAll(':scope > [data-node-id]').length);
+  }
+
+  test('pressing Enter in a table cell flattens back to a single node', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    const updateDepthErrors: string[] = [];
+    page.on('pageerror', (e) => {
+      if (e.message.includes('Maximum update depth')) updateDepthErrors.push(e.message);
+    });
+
+    await helper.login();
+    await helper.navigateToEdit('/table-multinode-page');
+
+    const editor = await helper.enterEditMode('mn-cell-3');
+    await editor.press('End');
+    await editor.press('Enter');
+    await page.waitForTimeout(1500);
+
+    const iframe = helper.getIframe();
+    await expect(
+      iframe
+        .locator('tr[data-block-uid="mn-row-3"]')
+        .locator('td[data-block-uid], th[data-block-uid]'),
+    ).toHaveCount(1);
+    expect(await cellTopLevelNodeCount(iframe, 'mn-cell-3')).toBe(1);
+    expect(updateDepthErrors).toEqual([]);
+  });
+
+  test('pasting multi-paragraph content into a table cell flattens to a single node', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    const updateDepthErrors: string[] = [];
+    page.on('pageerror', (e) => {
+      if (e.message.includes('Maximum update depth')) updateDepthErrors.push(e.message);
+    });
+
+    await helper.login();
+    await helper.navigateToEdit('/table-multinode-page');
+
+    const editor = await helper.enterEditMode('mn-cell-3');
+    await editor.press('End');
+    // Paste two paragraphs — would be two top-level nodes in the cell.
+    await editor.evaluate((el) => {
+      const dt = new DataTransfer();
+      dt.setData('text/html', '<p>Pasted one</p><p>Pasted two</p>');
+      dt.setData('text/plain', 'Pasted one\nPasted two');
+      const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'clipboardData', { value: dt });
+      el.dispatchEvent(event);
+    });
+    await page.waitForTimeout(1500);
+
+    const iframe = helper.getIframe();
+    await expect(
+      iframe
+        .locator('tr[data-block-uid="mn-row-3"]')
+        .locator('td[data-block-uid], th[data-block-uid]'),
+    ).toHaveCount(1);
+    expect(await cellTopLevelNodeCount(iframe, 'mn-cell-3')).toBe(1);
+    expect(updateDepthErrors).toEqual([]);
+  });
+
+  test('Backspace-demoting a list item in a table cell flattens to a single node', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    const updateDepthErrors: string[] = [];
+    page.on('pageerror', (e) => {
+      if (e.message.includes('Maximum update depth')) updateDepthErrors.push(e.message);
+    });
+
+    await helper.login();
+    await helper.navigateToEdit('/table-multinode-page');
+
+    // Backspace at the start of the second list item demotes it to a
+    // paragraph — leaving [ul, p], two top-level nodes — which must flatten.
+    const editor = await helper.enterEditMode('mn-cell-4');
+    await editor.getByText('Second item').click();
+    await editor.press('Home');
+    await editor.press('Backspace');
+    await page.waitForTimeout(1500);
+
+    const iframe = helper.getIframe();
+    await expect(
+      iframe
+        .locator('tr[data-block-uid="mn-row-4"]')
+        .locator('td[data-block-uid], th[data-block-uid]'),
+    ).toHaveCount(1);
+    expect(await cellTopLevelNodeCount(iframe, 'mn-cell-4')).toBe(1);
+    expect(updateDepthErrors).toEqual([]);
+  });
 });
 
 // ============================================================================
 // Multi-Container Field Tests
-// Block UIDs are unique so admin derives container field from blockPathMap
-// Tests both accordion (header/content fields) and columns (top_images/columns fields)
+// Block UIDs are unique so admin derives container field from blockPathMap.
+// Coverage uses two multi-slot blocks of different shapes:
+//   - search: facets (object_list) + listing (blocks_layout) — parallel
+//     slots of different widget kinds, exercising the object_list branch.
+//   - columns: columns slot (blocks_layout) — same-kind nesting via
+//     `Escape from column block` below.
 // ============================================================================
 test.describe('Multi-Container Field Operations', () => {
-  test('selecting block in top_images field shows Image sidebar', async ({
+  test('selecting block in search facets field shows facet sidebar', async ({
     page,
   }) => {
+    // The search block has two parallel slots: facets (object_list of
+    // checkboxFacet/etc.) and listing (blocks_layout of listing). Clicking
+    // a child of the facets slot should route the sidebar to that facet's
+    // schema (e.g. checkboxFacet's Title field), not the search parent's
+    // schema. Catches regressions where slot routing collapses to the
+    // multi-slot parent.
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await helper.navigateToEdit('/container-test-page');
+    await helper.navigateToEdit('/search-test-page');
 
     const iframe = helper.getIframe();
-    await iframe.locator('[data-block-uid="top-img-1"]').waitFor();
+    await iframe.locator('[data-block-uid="facet-type"]').waitFor();
 
-    // Click the first top image block
-    await helper.clickBlockInIframe('top-img-1');
+    await helper.clickBlockInIframe('facet-type');
 
-    // Wait for sidebar to show Image block settings (includes nav chevron "‹ Image")
     const sidebar = page.locator('.sidebar-container');
-    await expect(sidebar.locator('text=Image').first()).toBeVisible();
-
-    // Verify image-specific settings are present
-    await expect(sidebar.getByText('Alt text')).toBeVisible();
+    // checkboxFacet's "Title" field (the user-facing label) should be
+    // editable in the sidebar.
+    await expect(sidebar.getByLabel('Title').first()).toBeVisible({ timeout: 5_000 });
   });
 
   test('selecting block in columns field shows Column sidebar', async ({
@@ -3879,28 +4065,31 @@ test.describe('Multi-Container Field Operations', () => {
     await helper.waitForSidebarCurrentBlock('Column');
   });
 
-  test('Escape from top_images block navigates to columns parent', async ({
+  test('Escape from search facet navigates to search parent', async ({
     page,
   }) => {
+    // Escape from a child of the facets slot must navigate UP to the
+    // search block parent — not page level, not a sibling slot. Verifies
+    // the parent-chain resolution lands on the multi-slot parent.
+    // The search block's sidebar exposes facets/headline that a facet
+    // child does not, so the field swap proves the navigation.
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await helper.navigateToEdit('/container-test-page');
+    await helper.navigateToEdit('/search-test-page');
 
     const iframe = helper.getIframe();
-    await iframe.locator('[data-block-uid="top-img-1"]').waitFor();
+    await iframe.locator('[data-block-uid="facet-type"]').waitFor();
 
-    // Click the first top image to select it
-    await helper.clickBlockInIframe('top-img-1');
-
-    // Wait for Image sidebar to appear
+    await helper.clickBlockInIframe('facet-type');
     const sidebar = page.locator('.sidebar-container');
-    await expect(sidebar.locator('text=Image').first()).toBeVisible();
+    // Confirm the facet's sidebar is up before escape (Title field is on
+    // checkboxFacet's schema).
+    await expect(sidebar.getByLabel('Title').first()).toBeVisible({ timeout: 5_000 });
 
-    // Press Escape to navigate to parent (columns)
+    // Escape → search parent. Search block has the Headline field which
+    // facet children don't have.
     await helper.escapeToParent();
-
-    // Verify the columns block is now selected - Title field should be editable
-    await expect(sidebar.getByLabel('Title')).toBeVisible();
+    await expect(sidebar.getByLabel(/Headline/i).first()).toBeVisible({ timeout: 5_000 });
   });
 
   test('Escape from column block navigates to columns parent', async ({
@@ -3928,6 +4117,12 @@ test.describe('Multi-Container Field Operations', () => {
   test('clicking block in sidebar ChildBlocksWidget selects it in iframe', async ({
     page,
   }) => {
+    // The sidebar's ChildBlocksWidget renders the selected container's
+    // children as buttons. Clicking one navigates the sidebar (and the
+    // iframe selection) to that child. Used to test against `Image`
+    // entries when columns had a top_images slot; now columns-1's only
+    // children are columns, so this navigates to a Column entry instead.
+    // Same selection-routing mechanism either way.
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
@@ -3935,21 +4130,70 @@ test.describe('Multi-Container Field Operations', () => {
     const iframe = helper.getIframe();
     await iframe.locator('[data-block-uid="columns-1"]').waitFor();
 
-    // First select the columns block to see its child blocks in sidebar
-    await helper.clickBlockInIframe('columns-1');
+    // Select the columns block via its title heading (clicking the
+    // bbox center would land inside col-1's slate, since columns-1
+    // has no top-level row above its column children).
+    await helper.clickBlockInIframe('columns-1', { selector: 'h3' });
 
     // Wait for sidebar to show columns block with child blocks widget
     const sidebar = page.locator('.sidebar-container');
     await expect(sidebar.getByLabel('Title')).toBeVisible();
 
-    // The sidebar shows child blocks as buttons like "⋮⋮ Image ›"
-    // Click on the first Image entry button (the full row with › arrow)
-    const imageButton = sidebar.getByRole('button', { name: /Image/ }).first();
-    await expect(imageButton).toBeVisible();
-    await imageButton.click();
+    // ChildBlocksWidget lists each column child as a row button. Click
+    // the first Column entry — col-1 — to navigate sidebar focus.
+    const columnButton = sidebar.getByRole('button', { name: /Column/ }).first();
+    await expect(columnButton).toBeVisible();
+    await columnButton.click();
 
-    // Verify the image block is now selected in the iframe
-    await expect(sidebar.getByText('Alt text')).toBeVisible();
+    // Sidebar's current block should now be the column (col-1).
+    await helper.waitForSidebarCurrentBlock('Column', 5_000);
+  });
+
+  test('ChildBlocksWidget renders all slots of a multi-slot container and child clicks select across slots', async ({
+    page,
+  }) => {
+    // The search block has two container fields: `facets` (typed
+    // object_list, "Facets" section) and `listing` (blocks_layout,
+    // "Results Listing" section). ChildBlocksWidget must render BOTH
+    // sections, and clicking a child from the non-primary slot
+    // (results-listing under "Results Listing") must select that block.
+    //
+    // This test replaces the multi-slot coverage previously provided by
+    // columns' top_images + columns slots — those collapsed to single-
+    // slot when top_images was removed from the public docs schema.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/search-test-page');
+    await helper.getStableBlockCount();
+
+    // Select the search block (search-block-1) so its ChildBlocksWidget
+    // renders.
+    await helper.clickBlockInIframe('search-block-1', { selector: 'h2' });
+    await helper.waitForBlockSelectedInAdmin('search-block-1');
+
+    const sidebar = page.locator('.sidebar-container');
+    await helper.waitForSidebarCurrentBlock('Search');
+
+    // Both slot sections must render — proves multi-slot widget output.
+    const facetsSection = sidebar
+      .locator('.container-field-section')
+      .filter({ has: page.locator('.widget-title', { hasText: 'Facets' }) })
+      .first();
+    const listingSection = sidebar
+      .locator('.container-field-section')
+      .filter({ has: page.locator('.widget-title', { hasText: 'Results Listing' }) })
+      .first();
+    await expect(facetsSection).toBeVisible({ timeout: 5_000 });
+    await expect(listingSection).toBeVisible({ timeout: 5_000 });
+
+    // Click the listing slot's child (results-listing) to verify
+    // child-click navigation works for a non-primary blocks_layout slot.
+    const listingItem = listingSection.locator('.child-block-item').first();
+    await expect(listingItem).toBeVisible({ timeout: 5_000 });
+    await listingItem.click();
+
+    await helper.waitForBlockSelectedInAdmin('results-listing');
+    await helper.waitForSidebarCurrentBlock('Listing', 5_000);
   });
 
   test('can clear image inside container using inline toolbar', async ({
@@ -3961,8 +4205,8 @@ test.describe('Multi-Container Field Operations', () => {
 
     const iframe = helper.getIframe();
 
-    // Click on the image inside the columns container (top-img-1)
-    const imageBlock = iframe.locator('[data-block-uid="top-img-1"]');
+    // Click on the image inside col-1 (col1-img-1)
+    const imageBlock = iframe.locator('[data-block-uid="col1-img-1"]');
     await expect(imageBlock).toBeVisible({ timeout: 10000 });
     await imageBlock.click();
 
@@ -4041,9 +4285,20 @@ test.describe('Multi-Container Field Operations', () => {
     expect(blockBox!.height).toBeGreaterThan(50);
   });
 
-  test('creating a new columns block has selectable image child blocks', async ({
+  test('creating a new columns block auto-creates a selectable column child', async ({
     page,
   }) => {
+    // The columns slot has allowedBlocks: ['column'] with no
+    // defaultBlockType. When the BlockChooser adds a new columns block,
+    // the factory must initialise its `columns` slot via the single-
+    // allowedBlock fallback (same path Test 1 exercises) — creating one
+    // column child so the user has somewhere to drop content.
+    //
+    // Original test asserted on an auto-init image child in top_images;
+    // that slot is gone. The same factory mechanism still applies to the
+    // columns slot — this test now verifies it via the column child
+    // (split from the empty-image min-size mechanism, which gets its
+    // own test below using a page-level image block).
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -4051,37 +4306,72 @@ test.describe('Multi-Container Field Operations', () => {
 
     const iframe = helper.getIframe();
 
-    // Click on a page-level block (title-block) to enable add button
+    // Add a new columns block at page level.
     await helper.clickBlockInIframe('title-block');
     await helper.waitForBlockSelectedInAdmin('title-block');
-
-    // Add a new columns block
     await helper.clickAddBlockButton();
     await helper.selectBlockType('columns');
 
-    // Wait for the sidebar to show Columns as the current block
     await helper.waitForSidebarOpen();
-    await helper.waitForSidebarCurrentBlock('Columns', 10000);
+    await helper.waitForSidebarCurrentBlock('Columns', 10_000);
 
-    // The new columns block should have an image child block in top_images
-    // Find image blocks that have data-edit-media directly on them (not deeply nested)
-    // These are actual image-type blocks, not container blocks
+    // Find the new columns block by excluding the existing columns-1
+    // fixture. Mirrors the gridBlock test's pattern.
+    const newColumnsBlock = iframe.locator(
+      '[data-block-uid]:has(> .columns-row):not([data-block-uid="columns-1"])',
+    );
+    await expect(newColumnsBlock).toBeVisible({ timeout: 5_000 });
+
+    // The new columns block's columns-row has at least one auto-init
+    // column child (via single-allowedBlock fallback).
+    const newColumnChild = newColumnsBlock
+      .locator('> .columns-row > [data-block-uid]')
+      .first();
+    await expect(newColumnChild).toBeVisible({ timeout: 5_000 });
+
+    // Selection routing on factory-fresh children: clicking the new
+    // column should select it; sidebar shows Column. Click the top-left
+    // corner so the click lands on the column itself and not on whatever
+    // empty-state child happens to fill its center.
+    await newColumnChild.click({ position: { x: 5, y: 5 } });
+    await helper.waitForSidebarCurrentBlock('Column', 5_000);
+  });
+
+  test('an empty image block gets a minimum size so it stays clickable', async ({
+    page,
+  }) => {
+    // Split from the columns-factory test. An empty <img> renders 0×0
+    // by default; without ensureElementsHaveMinSize injecting a min
+    // size, users can't click into it to assign a source. Verifies the
+    // chrome-injection mechanism for empty media-editable fields.
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Add an empty image block at page level.
+    await helper.clickBlockInIframe('title-block');
+    await helper.waitForBlockSelectedInAdmin('title-block');
+    await helper.clickAddBlockButton();
+    await helper.selectBlockType('image');
+
+    await helper.waitForSidebarOpen();
+    await helper.waitForSidebarCurrentBlock('Image', 10_000);
+
+    // The empty image's media-editable element should have min dims so
+    // it's clickable — even though the underlying <img> has no src.
     const imageMediaFields = iframe.locator('[data-edit-media="url"]');
+    await expect(imageMediaFields.last()).toBeVisible({ timeout: 5_000 });
+    const box = await imageMediaFields.last().boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.width).toBeGreaterThan(50);
+    expect(box!.height).toBeGreaterThan(50);
 
-    // Wait for at least one image field to exist (from new columns block)
-    await expect(imageMediaFields.first()).toBeVisible({ timeout: 5000 });
-
-    // The image field should have minimum dimensions (from ensureElementsHaveMinSize)
-    const imageFieldBox = await imageMediaFields.first().boundingBox();
-    expect(imageFieldBox).not.toBeNull();
-    expect(imageFieldBox!.width).toBeGreaterThan(50);
-    expect(imageFieldBox!.height).toBeGreaterThan(50);
-
-    // Click directly on the media field element to select the image block
-    await imageMediaFields.first().click();
-
-    // Verify the sidebar now shows Image as current block
-    await helper.waitForSidebarCurrentBlock('Image', 5000);
+    // Clicking the empty media field selects the image block.
+    await imageMediaFields.last().click();
+    await helper.waitForSidebarCurrentBlock('Image', 5_000);
   });
 
   test('gridBlock only shows allowed block types in chooser', async ({
@@ -4708,6 +4998,33 @@ test.describe('Accordion Block', () => {
     const titleEl = panel.locator('[data-edit-text="title"]');
     await expect(titleEl).toBeVisible();
     await expect(titleEl).toContainText('Accordion Header Text');
+  });
+
+  test('clicking an accordion panel title selects the panel', async ({ page }, testInfo) => {
+    // The Nuxt accordion panel header is a <button data-block-selector="…">
+    // — the word-list is there for tryMakeBlockVisible's programmatic
+    // reveal click. A user click on the title text (data-edit-text) inside
+    // that button must still select the panel: blockClickHandler must not
+    // hijack a click on an editable element into data-block-selector
+    // navigation.
+    // admin-nuxt only — the test-frontend accordion header has no
+    // data-block-selector (always-expanded, no collapse mechanism).
+    test.skip(
+      testInfo.project.name !== 'admin-nuxt',
+      'Nuxt accordion only — test-frontend header has no data-block-selector',
+    );
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/accordion-test-page');
+
+    const iframe = helper.getIframe();
+    const titleEl = iframe.locator(
+      '[data-block-uid="panel-1"] [data-edit-text="title"]',
+    );
+    await expect(titleEl).toBeVisible();
+    await titleEl.click();
+
+    await helper.waitForBlockSelectedInAdmin('panel-1');
   });
 
   test('bridge expose: selecting hidden block inside collapsed panel opens the panel', async ({ page }, testInfo) => {

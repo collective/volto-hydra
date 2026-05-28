@@ -53,12 +53,47 @@ const getFieldTypeString = (field) => {
  * Returns true if all paths in the selection exist in the document.
  */
 /**
- * Scan all slate blocks for multi-node values and split them into
- * separate blocks. Returns null if no splits needed, or { formData, selectBlockId }.
+ * Count the items currently in a block's container.
+ * Works for page-level fields, blocks_layout containers and object_list
+ * containers (used for the maxLength check below).
+ */
+function countContainerItems(formData, blockPathMap, containerConfig) {
+  const parent =
+    getBlockById(formData, blockPathMap, containerConfig.parentId) || formData;
+  if (containerConfig.isObjectList) {
+    let arr = parent;
+    for (const key of containerConfig.dataPath || [containerConfig.fieldName]) {
+      arr = arr?.[key];
+    }
+    return Array.isArray(arr) ? arr.length : 0;
+  }
+  return parent?.[containerConfig.fieldName]?.items?.length ?? 0;
+}
+
+/**
+ * Enforce the one-node-per-slate-field invariant.
+ *
+ * A slate field must hold a single top-level node. When one holds several
+ * (paste, a deleteBackward demote producing [ul, p], imported content),
+ * this either SPLITS — each extra node becomes its own sibling block — or,
+ * when splitting is impossible, FLATTENS the value into a single node.
+ *
+ * Splitting only works when the block is itself a `slate` block (so the new
+ * `{ '@type': 'slate', value: [...] }` siblings are valid) AND its container
+ * can take that many more slate blocks. It is NOT possible for:
+ *  - a slate-typed field of a non-slate block (slateTable cell `value`,
+ *    teaser `description`, …) — there is no slate-block sibling to create;
+ *  - a full container (maxLength reached) or one that disallows `slate`;
+ *  - a table-mode container, where a new sibling means a new column.
+ * In those cases the extra nodes are flattened into the first node.
+ *
+ * Returns null if nothing needed changing, otherwise { formData,
+ * selectBlockId, selection }.
  */
 function splitMultiNodeSlateBlocks(formData, blockPathMap, blocksConfig, uuidGenerator, selection) {
   let result = formData;
   let selectBlockId = null;
+  let flattenedAny = false;
 
   for (const [blockId, pathInfo] of Object.entries(blockPathMap)) {
     if (blockId.startsWith('_')) continue;
@@ -77,17 +112,47 @@ function splitMultiNodeSlateBlocks(formData, blockPathMap, blocksConfig, uuidGen
       const value = block[fieldName];
       if (!Array.isArray(value) || value.length <= 1) continue;
 
-      // Found a multi-node slate value — split it
-      const firstNode = [value[0]];
       const restNodes = value.slice(1);
 
-      // Update current block to keep only the first node
-      const updatedBlock = { ...block, [fieldName]: firstNode };
-      result = updateBlockById(result, blockPathMap, blockId, updatedBlock);
+      // Can this multi-node value be split into sibling slate blocks?
+      const containerConfig = blockType === 'slate'
+        ? getContainerFieldConfig(blockId, blockPathMap, result, blocksConfig)
+        : null;
+      const splittable =
+        blockType === 'slate' &&
+        !!containerConfig &&
+        containerConfig.addMode !== 'table' &&
+        (containerConfig.allowedBlocks == null ||
+          containerConfig.allowedBlocks.includes('slate')) &&
+        (containerConfig.maxLength == null ||
+          countContainerItems(result, blockPathMap, containerConfig) +
+            restNodes.length <=
+            containerConfig.maxLength);
 
-      // Create new blocks for each remaining top-level node.
-      // Chain inserts: each new block goes after the previous one.
-      const containerConfig = getContainerFieldConfig(blockId, blockPathMap, result, blocksConfig);
+      if (!splittable) {
+        // Flatten: merge every node's children into the first node so the
+        // field holds exactly one top-level node. No data is discarded.
+        const merged = {
+          ...value[0],
+          children: value.flatMap((n) =>
+            Array.isArray(n.children) ? n.children : [],
+          ),
+        };
+        if (merged.children.length === 0) merged.children = [{ text: '' }];
+        result = updateBlockById(result, blockPathMap, blockId, {
+          ...block,
+          [fieldName]: [merged],
+        });
+        flattenedAny = true;
+        continue;
+      }
+
+      // Split: keep the first node, each remaining node becomes a new
+      // sibling slate block. Chain inserts so each goes after the previous.
+      result = updateBlockById(result, blockPathMap, blockId, {
+        ...block,
+        [fieldName]: [value[0]],
+      });
       let afterBlockId = blockId;
       for (let i = 0; i < restNodes.length; i++) {
         const newBlockId = uuidGenerator();
@@ -110,11 +175,15 @@ function splitMultiNodeSlateBlocks(formData, blockPathMap, blocksConfig, uuidGen
         };
       }
 
-      // Only process one split per render cycle to avoid stale blockPathMap
+      // Only process one split per render cycle to avoid stale blockPathMap.
+      // Flattens done so far this pass ride along in `result`.
       return { formData: result, selectBlockId, selection: newSelection };
     }
   }
 
+  if (flattenedAny) {
+    return { formData: result, selectBlockId: null, selection: null };
+  }
   return null;
 }
 
@@ -662,7 +731,7 @@ const Iframe = (props) => {
   const u =
     useSelector((state) => state.frontendPreviewUrl.url) ||
     Cookies.get(getIframeUrlCookieName()) ||
-    urlFromEnv[0];
+    urlFromEnv[0]?.url;
 
   // Track last SELECT_BLOCK sent to avoid redundant sends during pending selection
   const lastSentSelectBlockRef = useRef(null);
@@ -2755,8 +2824,14 @@ const Iframe = (props) => {
           }
 
           // --- Single-block selection from here on ---
-          // Clear multiSelected unless we're in selection mode (preserve during navigation)
-          if (onSetMultiSelected && !selectionMode) onSetMultiSelected([]);
+          // Clear multiSelected unless we're in selection mode (preserve
+          // during navigation). Skip the clear for position-only updates
+          // (scroll/resize) — those aren't real selection changes and
+          // would otherwise wipe a multi-select that was just initiated
+          // from the sidebar before selectionMode flips to true.
+          if (onSetMultiSelected && !selectionMode && !isPositionUpdateOnly) {
+            onSetMultiSelected([]);
+          }
           if (isNewBlock) {
             log('BLOCK_SELECTED calling onSelectBlock:', event.data.blockUid);
             onSelectBlock(event.data.blockUid);

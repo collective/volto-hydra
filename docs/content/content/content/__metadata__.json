@@ -1,101 +1,161 @@
 {
   "__version__": "1.0.0",
   "_blob_files_": [
-    "99c70917b6894af08dd306fdbc0eff6a/preview_image/black-starry-night.jpg",
-    "3ac4a2c6c4034a1686bc0ee2d2072fd6/preview_image/black-starry-night.jpg",
-    "8416628543f146ff9a18d281c03e2399/preview_image/black-starry-night.jpg",
-    "40a436ad604f4f80aeafe0977806760a/preview_image/black-starry-night.jpg",
-    "00cef5f245a342958288ace545e3c097/preview_image/black-starry-night.jpg",
-    "928010d84e5d4df2b2282f3e179d6b1a/preview_image/black-starry-night.jpg",
-    "102f648399914851951ffa3fefc8665c/preview_image/black-starry-night.jpg",
-    "bd2b39d2745847db82ed197a4eb1effc/preview_image/black-starry-night.jpg",
-    "2508797173824f0e9f82bb2e7cfe922d/preview_image/black-starry-night.jpg",
-    "3906609d0456404ca7146f6aa1f12f32/preview_image/black-starry-night.jpg",
-    "af85ff98cd6446eebcba56305ed89fed/image/sergio-martinez-rhNJJ4eD2zk-unsplash.jpg",
-    "7adc12f0e7604982a6cdcb9437bccf66/preview_image/event.svg",
-    "6cca02c5580d4f7c865af74835ceab9d/image/danielle-barnes-kGNaS3lYCso-unsplash.jpg",
-    "970ec24c76784c66a06d8c8d8b6522b2/image/black-starry-night.jpg",
-    "eec82559bf3242a6be4d43bc2096f399/image/image-light.jpg",
-    "7ab9c48ede33415fa2a66a99549c8f70/preview_image/black-starry-night.jpg",
-    "9abc1a813bcf46388e565b277bd8c6bf/image/penguin1.jpg",
     "05bace45294c45d5ab93de883e7ce702/image/penguin2.jpg",
-    "7de78fea55354a29ad78b909efb07436/image/penguin3.jpg",
     "0c351dd841c34c6da9c313b1bc551e34/image/penguin4.jpg",
+    "7de78fea55354a29ad78b909efb07436/image/penguin3.jpg",
+    "9abc1a813bcf46388e565b277bd8c6bf/image/penguin1.jpg",
     "a5bf990b119747c4b2855fedc1ea0185/image/image.png",
+    "docs-images-accordion-edit-001/image/accordion-edit.png",
+    "docs-images-block-mode-001/image/block-mode.png",
+    "docs-images-block-selected-001/image/block-selected.png",
+    "docs-images-button-edit-001/image/button-edit.png",
+    "docs-images-children-list-001/image/children-list.png",
+    "docs-images-container-convert-001/image/container-convert.png",
+    "docs-images-edge-drag-ghost-001/image/edge-drag-ghost.png",
+    "docs-images-form-edit-001/image/form-edit.png",
+    "docs-images-frontend-switcher-001/image/frontend-switcher.png",
+    "docs-images-highlight-edit-001/image/highlight-edit.png",
+    "docs-images-image-block-edit-001/image/image-block-edit.png",
+    "docs-images-introduction-edit-001/image/introduction-edit.png",
+    "docs-images-link-picker-001/image/link-picker.png",
+    "docs-images-listing-edit-001/image/listing-edit.png",
+    "docs-images-maps-edit-001/image/maps-edit.png",
+    "docs-images-media-empty-placeholder-001/image/media-empty-placeholder.png",
+    "docs-images-multi-select-001/image/multi-select.png",
+    "docs-images-parent-chain-001/image/parent-chain.png",
+    "docs-images-search-edit-001/image/search-edit.png",
+    "docs-images-separator-edit-001/image/separator-edit.png",
+    "docs-images-slash-menu-001/image/slash-menu.png",
+    "docs-images-slate-edit-001/image/slate-edit.png",
+    "docs-images-table-edit-001/image/table-edit.png",
+    "docs-images-teaser-edit-001/image/teaser-edit.png",
+    "docs-images-template-locked-001/image/template-locked.png",
+    "docs-images-toc-edit-001/image/toc-edit.png",
+    "docs-images-video-edit-001/image/video-edit.png",
+    "docs-images-wrap-chooser-001/image/wrap-chooser.png",
+    "docs/examples/content-types/copy_of_news-item/image/sergio-martinez-rhNJJ4eD2zk-unsplash.jpg",
+    "docs/examples/content-types/event/preview_image/event.svg",
+    "docs/examples/content-types/example-image.jpg/image/danielle-barnes-kGNaS3lYCso-unsplash.jpg",
+    "docs/examples/content-types/image-dark/image/black-starry-night.jpg",
+    "docs/examples/content-types/image-light/image/image-light.jpg",
+    "docs/examples/content-types/page/preview_image/black-starry-night.jpg",
+    "docs/examples/grid/listing/preview_image/black-starry-night.jpg",
+    "docs/examples/grid/preview_image/black-starry-night.jpg",
+    "docs/examples/highlight/preview_image/black-starry-night.jpg",
+    "docs/examples/image-block/preview_image/black-starry-night.jpg",
+    "docs/examples/introduction/preview_image/black-starry-night.jpg",
+    "docs/examples/search/preview_image/black-starry-night.jpg",
+    "docs/examples/slate/preview_image/black-starry-night.jpg",
+    "docs/examples/table/preview_image/black-starry-night.jpg",
+    "docs/examples/teaser/preview_image/black-starry-night.jpg",
+    "docs/examples/toc/preview_image/black-starry-night.jpg",
     "quadrant-svg/image/quadrant.svg"
   ],
   "_data_files_": [
     "plone_site_root/data.json",
-    "425695d2b7cb47e69374d6f211f17e38/data.json",
-    "f8cd4a2d8d7c4703b4e41d2093b21aed/data.json",
-    "405582582e70493c96a6c549444a1eaa/data.json",
-    "13de82575e16493fbc54514e548a9f3c/data.json",
-    "99c70917b6894af08dd306fdbc0eff6a/data.json",
-    "28cc586c504d436aa26fd2aa12f16f84/data.json",
-    "3ac4a2c6c4034a1686bc0ee2d2072fd6/data.json",
-    "c2adb9f7b0824bd5a3e07048d887f48d/data.json",
-    "fb086a3d1d3d4a9ebf9bc864d2172e79/data.json",
-    "2f69aa417e894fd3bf23d393287b369e/data.json",
-    "8416628543f146ff9a18d281c03e2399/data.json",
-    "40a436ad604f4f80aeafe0977806760a/data.json",
-    "00cef5f245a342958288ace545e3c097/data.json",
-    "6bd32a3367ea4254b295db642655b9d3/data.json",
-    "e090d954d0a448bca81c1a646e673a12/data.json",
-    "928010d84e5d4df2b2282f3e179d6b1a/data.json",
-    "546e82cce6c842d0a4046a0131539bd2/data.json",
-    "102f648399914851951ffa3fefc8665c/data.json",
-    "bd2b39d2745847db82ed197a4eb1effc/data.json",
-    "2508797173824f0e9f82bb2e7cfe922d/data.json",
-    "3906609d0456404ca7146f6aa1f12f32/data.json",
-    "6d37dd19ef754344aaa254fa288e44b4/data.json",
-    "e8178744e30a418b9a5768997bb29a19/data.json",
-    "a2f2c6a524094c9482cc5384883fd8e7/data.json",
-    "af85ff98cd6446eebcba56305ed89fed/data.json",
-    "2e8ed811e2954e9882d561be8b25cb8c/data.json",
-    "7adc12f0e7604982a6cdcb9437bccf66/data.json",
-    "6cca02c5580d4f7c865af74835ceab9d/data.json",
-    "362783c333434d2f89a00bd48ea37e34/data.json",
-    "970ec24c76784c66a06d8c8d8b6522b2/data.json",
-    "eec82559bf3242a6be4d43bc2096f399/data.json",
-    "195d96ca9952493cbffa69cda040b8b3/data.json",
-    "51aa57a0fb694d528ee5a76af0107131/data.json",
-    "8cc3e9af77c0452aa2278b0bfdcf9c85/data.json",
-    "7ab9c48ede33415fa2a66a99549c8f70/data.json",
-    "49d22a94521c4883a1bb448ac7863cdd/data.json",
+    "docs/data.json",
     "342acac105fe4a43ae0a19d49d752e0b/data.json",
+    "a5bf990b119747c4b2855fedc1ea0185/data.json",
+    "search/data.json",
+    "templates/data.json",
+    "docs/advanced/data.json",
+    "docs/architecture/data.json",
+    "docs/build-a-frontend/data.json",
+    "docs/container-blocks/data.json",
+    "docs/custom-blocks/data.json",
+    "docs/examples/data.json",
+    "docs-images-folder-001/data.json",
+    "docs/listings/data.json",
+    "docs/live-preview/data.json",
+    "docs/static/data.json",
+    "docs/templates/data.json",
+    "docs/visual-editing/data.json",
+    "docs/what-editors-will-experience/data.json",
     "9abc1a813bcf46388e565b277bd8c6bf/data.json",
     "05bace45294c45d5ab93de883e7ce702/data.json",
     "7de78fea55354a29ad78b909efb07436/data.json",
     "0c351dd841c34c6da9c313b1bc551e34/data.json",
-    "a5bf990b119747c4b2855fedc1ea0185/data.json",
-    "c40a2be214b645338a7ef2e711e2f5c6/data.json",
-    "f0018ecb26ac442aa1f03482a09c8b81/data.json",
-    "c8531174ccd54e39a284a347e9cece83/data.json",
-    "d2ce9e4549e54ea8978cf521bb997ad4/data.json",
-    "cffd9eef5c154c04891af9ef9185ed8c/data.json",
-    "d7c7e8ed1ffb4b2fa20525f4f434ba27/data.json",
-    "6a82ae8d8a434e019b404f4387fe1a42/data.json",
-    "f51777793dab4a61982e35dfa71d0575/data.json",
-    "e017bd4a0b3845aab26f6d855cc4ef14/data.json",
-    "1efc7b73b28e4edeaf40040709299d69/data.json",
-    "7950cae06c994276930f6d13151308c5/data.json",
-    "concepts/data.json",
-    "concepts/architecture/data.json",
-    "concepts/integration-levels/data.json",
-    "concepts/visual-editing/data.json",
-    "concepts/custom-blocks/data.json",
-    "concepts/container-blocks/data.json",
-    "concepts/listings/data.json",
-    "concepts/templates/data.json",
-    "concepts/deployment/data.json",
-    "concepts/advanced/data.json",
-    "search/data.json",
-    "templates/data.json",
+    "quadrant-svg/data.json",
     "templates/block-reference-layout/data.json",
+    "templates/context-navigation-layout/data.json",
     "templates/event-view/data.json",
     "templates/newsitem-view/data.json",
     "templates/site-footer/data.json",
-    "quadrant-svg/data.json"
+    "docs/examples/accordion/data.json",
+    "docs/examples/button/data.json",
+    "docs/examples/columns/data.json",
+    "docs/examples/content-types/data.json",
+    "docs/examples/contextNavigation/data.json",
+    "docs/examples/form/data.json",
+    "docs/examples/grid/data.json",
+    "docs/examples/heading/data.json",
+    "docs/examples/hero/data.json",
+    "docs/examples/highlight/data.json",
+    "docs/examples/image-block/data.json",
+    "docs/examples/introduction/data.json",
+    "docs/examples/listing/data.json",
+    "docs/examples/maps/data.json",
+    "docs/examples/search/data.json",
+    "docs/examples/separator/data.json",
+    "docs/examples/slate/data.json",
+    "docs/examples/slider/data.json",
+    "docs/examples/table/data.json",
+    "docs/examples/teaser/data.json",
+    "docs/examples/toc/data.json",
+    "docs/examples/video/data.json",
+    "docs-images-accordion-edit-001/data.json",
+    "docs-images-block-mode-001/data.json",
+    "docs-images-block-selected-001/data.json",
+    "docs-images-button-edit-001/data.json",
+    "docs-images-children-list-001/data.json",
+    "docs-images-container-convert-001/data.json",
+    "docs-images-edge-drag-ghost-001/data.json",
+    "docs-images-form-edit-001/data.json",
+    "docs-images-frontend-switcher-001/data.json",
+    "docs-images-highlight-edit-001/data.json",
+    "docs-images-image-block-edit-001/data.json",
+    "docs-images-introduction-edit-001/data.json",
+    "docs-images-link-picker-001/data.json",
+    "docs-images-listing-edit-001/data.json",
+    "docs-images-maps-edit-001/data.json",
+    "docs-images-media-empty-placeholder-001/data.json",
+    "docs-images-multi-select-001/data.json",
+    "docs-images-parent-chain-001/data.json",
+    "docs-images-search-edit-001/data.json",
+    "docs-images-separator-edit-001/data.json",
+    "docs-images-slash-menu-001/data.json",
+    "docs-images-slate-edit-001/data.json",
+    "docs-images-table-edit-001/data.json",
+    "docs-images-teaser-edit-001/data.json",
+    "docs-images-template-locked-001/data.json",
+    "docs-images-toc-edit-001/data.json",
+    "docs-images-video-edit-001/data.json",
+    "docs-images-wrap-chooser-001/data.json",
+    "docs/static/hydra-demo/data.json",
+    "docs/what-editors-will-experience/adding-and-moving-blocks/data.json",
+    "docs/what-editors-will-experience/containers/data.json",
+    "docs/what-editors-will-experience/editing-text/data.json",
+    "docs/what-editors-will-experience/links-and-media/data.json",
+    "docs/what-editors-will-experience/selecting-blocks/data.json",
+    "docs/what-editors-will-experience/templates-and-layouts/data.json",
+    "docs/examples/content-types/copy_of_event/data.json",
+    "docs/examples/content-types/copy_of_news-item/data.json",
+    "docs/examples/content-types/copy_of_page/data.json",
+    "docs/examples/content-types/event/data.json",
+    "docs/examples/content-types/example-image.jpg/data.json",
+    "docs/examples/content-types/external-link/data.json",
+    "docs/examples/content-types/image-dark/data.json",
+    "docs/examples/content-types/image-light/data.json",
+    "docs/examples/content-types/internal-link/data.json",
+    "docs/examples/content-types/link/data.json",
+    "docs/examples/content-types/news-item/data.json",
+    "docs/examples/content-types/page/data.json",
+    "docs/examples/content-types/typography/data.json",
+    "docs/examples/grid/grid-image/data.json",
+    "docs/examples/grid/listing/data.json",
+    "docs/examples/grid/teaser/data.json",
+    "docs/examples/grid/text/data.json"
   ],
   "default_page": {},
   "local_roles": {
@@ -135,13 +195,6 @@
       }
     },
     "195d96ca9952493cbffa69cda040b8b3": {
-      "local_roles": {
-        "admin": [
-          "Owner"
-        ]
-      }
-    },
-    "1efc7b73b28e4edeaf40040709299d69": {
       "local_roles": {
         "admin": [
           "Owner"
@@ -218,13 +271,6 @@
         ]
       }
     },
-    "425695d2b7cb47e69374d6f211f17e38": {
-      "local_roles": {
-        "admin": [
-          "Owner"
-        ]
-      }
-    },
     "49d22a94521c4883a1bb448ac7863cdd": {
       "local_roles": {
         "admin": [
@@ -246,13 +292,6 @@
         ]
       }
     },
-    "6a82ae8d8a434e019b404f4387fe1a42": {
-      "local_roles": {
-        "admin": [
-          "Owner"
-        ]
-      }
-    },
     "6bd32a3367ea4254b295db642655b9d3": {
       "local_roles": {
         "admin": [
@@ -268,13 +307,6 @@
       }
     },
     "6d37dd19ef754344aaa254fa288e44b4": {
-      "local_roles": {
-        "admin": [
-          "Owner"
-        ]
-      }
-    },
-    "7950cae06c994276930f6d13151308c5": {
       "local_roles": {
         "admin": [
           "Owner"
@@ -379,48 +411,6 @@
         ]
       }
     },
-    "c40a2be214b645338a7ef2e711e2f5c6": {
-      "local_roles": {
-        "admin": [
-          "Owner"
-        ]
-      }
-    },
-    "c8531174ccd54e39a284a347e9cece83": {
-      "local_roles": {
-        "admin": [
-          "Owner"
-        ]
-      }
-    },
-    "cffd9eef5c154c04891af9ef9185ed8c": {
-      "local_roles": {
-        "admin": [
-          "Owner"
-        ]
-      }
-    },
-    "d2ce9e4549e54ea8978cf521bb997ad4": {
-      "local_roles": {
-        "admin": [
-          "Owner"
-        ]
-      }
-    },
-    "d7c7e8ed1ffb4b2fa20525f4f434ba27": {
-      "local_roles": {
-        "admin": [
-          "Owner"
-        ]
-      }
-    },
-    "e017bd4a0b3845aab26f6d855cc4ef14": {
-      "local_roles": {
-        "admin": [
-          "Owner"
-        ]
-      }
-    },
     "e090d954d0a448bca81c1a646e673a12": {
       "local_roles": {
         "admin": [
@@ -436,20 +426,6 @@
       }
     },
     "eec82559bf3242a6be4d43bc2096f399": {
-      "local_roles": {
-        "admin": [
-          "Owner"
-        ]
-      }
-    },
-    "f0018ecb26ac442aa1f03482a09c8b81": {
-      "local_roles": {
-        "admin": [
-          "Owner"
-        ]
-      }
-    },
-    "f51777793dab4a61982e35dfa71d0575": {
       "local_roles": {
         "admin": [
           "Owner"
@@ -477,70 +453,63 @@
         ]
       }
     },
-    "concepts-folder-001": {
+    "docs-folder-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-architecture-001": {
+    "docs-architecture-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-integration-levels-001": {
+    "docs-live-preview-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-visual-editing-001": {
+    "docs-visual-editing-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-custom-blocks-001": {
+    "docs-custom-blocks-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-container-blocks-001": {
+    "docs-container-blocks-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-listings-001": {
+    "docs-listings-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-templates-001": {
+    "docs-templates-001": {
       "local_roles": {
         "admin": [
           "Owner"
         ]
       }
     },
-    "concepts-deployment-001": {
-      "local_roles": {
-        "admin": [
-          "Owner"
-        ]
-      }
-    },
-    "concepts-advanced-001": {
+    "docs-advanced-001": {
       "local_roles": {
         "admin": [
           "Owner"
@@ -582,7 +551,329 @@
         ]
       }
     },
+    "context-navigation-layout-uid": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
     "quadrant-svg": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "120c479717b248a8b28c3556ee63e054": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-block-mode-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-block-selected-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-children-list-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-container-convert-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-edge-drag-ghost-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-folder-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-frontend-switcher-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-link-picker-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-media-empty-placeholder-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-multi-select-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-parent-chain-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-slash-menu-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-template-locked-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-wrap-chooser-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-build-a-frontend-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-what-editors-will-experience-adding-and-moving-blocks-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-what-editors-will-experience-containers-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-what-editors-will-experience-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-what-editors-will-experience-editing-text-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-what-editors-will-experience-links-and-media-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-what-editors-will-experience-selecting-blocks-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-what-editors-will-experience-templates-and-layouts-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-examples-folder-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-examples-columns-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-examples-hero-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-examples-slider-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-static-folder-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-static-hydra-demo-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-examples-contextNavigation-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-accordion-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-button-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-form-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-highlight-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-introduction-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-listing-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-maps-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-search-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-separator-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-slate-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-table-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-teaser-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-toc-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-video-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-image-block-edit-001": {
       "local_roles": {
         "admin": [
           "Owner"
@@ -591,7 +882,7 @@
     }
   },
   "ordering": {
-    "concepts-folder-001": 0,
+    "docs-folder-001": 0,
     "00cef5f245a342958288ace545e3c097": 6,
     "05bace45294c45d5ab93de883e7ce702": 1,
     "0c351dd841c34c6da9c313b1bc551e34": 3,

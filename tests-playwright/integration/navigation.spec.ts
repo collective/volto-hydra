@@ -54,7 +54,7 @@ test.describe('Navigation and URL Handling', () => {
       await expect(modal).toBeVisible({ timeout: 5000 });
 
       // Add the hash-based frontend URL
-      const urlInput = modal.locator('.frontend-settings-input');
+      const urlInput = modal.locator('.frontend-settings-url-input');
       await urlInput.fill(format.url);
       await modal.locator('.frontend-settings-add-btn').click();
 
@@ -120,7 +120,7 @@ test.describe('Navigation and URL Handling', () => {
     await expect(modal).toBeVisible({ timeout: 5000 });
 
     // Add F7 hash-based URL
-    const input = modal.locator('.frontend-settings-input');
+    const input = modal.locator('.frontend-settings-url-input');
     await input.fill('http://localhost:3008/#!');
     await modal.locator('.frontend-settings-add-btn').click();
 
@@ -465,7 +465,7 @@ test.describe('Navigation and URL Handling', () => {
     await expect(modal).toBeVisible({ timeout: 5000 });
 
     // Add hash-based frontend URL
-    const urlInput = modal.locator('.frontend-settings-input');
+    const urlInput = modal.locator('.frontend-settings-url-input');
     await urlInput.fill('http://localhost:8889/#/');
     await modal.locator('.frontend-settings-add-btn').click();
 

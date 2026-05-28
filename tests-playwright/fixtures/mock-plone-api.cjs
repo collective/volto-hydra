@@ -73,10 +73,11 @@ const uidPositionMap = {};
 
 /**
  * Get session ID from request header.
- * Uses auth token as session identifier - each test login generates a unique
- * token (based on timestamp), providing session isolation between tests.
- * Both admin (Volto) and Nuxt SSR include Authorization headers, so they
- * share the same session when using the same auth token.
+ * Uses the Bearer auth token as the session identifier. AdminUIHelper
+ * gives each test a unique token (TEST_AUTH_TOKEN + a uuid), so every
+ * test gets an isolated session and its saves don't leak into others.
+ * Admin (Volto) and Nuxt SSR both forward the same Authorization header,
+ * so they share that one test's session.
  * @param {Object} req - Express request
  * @returns {string} Session ID (defaults to '_default' for unauthenticated requests)
  */
@@ -1236,9 +1237,10 @@ app.get('*/@querystring', (req, res) => {
         'group': 'Metadata',
         'enabled': true,
         'sortable': false,
+        // portal_type is a FieldIndex (one value per item) — real Plone
+        // offers only .any / .none for it; .all is KeywordIndex-only.
         'operations': [
           'plone.app.querystring.operation.selection.any',
-          'plone.app.querystring.operation.selection.all',
           'plone.app.querystring.operation.selection.none',
         ],
         'operators': {
@@ -1247,12 +1249,6 @@ app.get('*/@querystring', (req, res) => {
             'description': 'Matches any of the selected values',
             'widget': 'MultipleSelectionWidget',
             'operation': 'plone.app.querystring.operation.selection.any',
-          },
-          'plone.app.querystring.operation.selection.all': {
-            'title': 'Matches all of',
-            'description': 'Matches all of the selected values',
-            'widget': 'MultipleSelectionWidget',
-            'operation': 'plone.app.querystring.operation.selection.all',
           },
           'plone.app.querystring.operation.selection.none': {
             'title': 'Matches none of',
@@ -1303,12 +1299,18 @@ app.get('*/@querystring', (req, res) => {
         'sortable': true,
         'operations': [
           'plone.app.querystring.operation.selection.any',
+          'plone.app.querystring.operation.selection.none',
         ],
         'operators': {
           'plone.app.querystring.operation.selection.any': {
             'title': 'Matches any of',
             'widget': 'MultipleSelectionWidget',
             'operation': 'plone.app.querystring.operation.selection.any',
+          },
+          'plone.app.querystring.operation.selection.none': {
+            'title': 'Matches none of',
+            'widget': 'MultipleSelectionWidget',
+            'operation': 'plone.app.querystring.operation.selection.none',
           },
         },
         'values': {
@@ -1717,8 +1719,8 @@ app.post('*/@querystring-search', (req, res) => {
   const contextPath = req.path.replace('/++api++/@querystring-search', '').replace('/@querystring-search', '');
   const baseUrl = `http://localhost:${PORT}`;
 
-  const { query = [], sort_on, sort_order, b_start = 0, b_size = 10, limit, depth } = req.body;
-  console.log('[MOCK-API] @querystring-search query:', JSON.stringify(query), depth !== undefined ? `depth=${depth}` : '');
+  const { query = [], sort_on, sort_order, b_start = 0, b_size = 10, limit } = req.body;
+  console.log('[MOCK-API] @querystring-search query:', JSON.stringify(query));
 
   // Extract the "root" path from the path criteria so depth (below) can
   // compute "how far below root is this item". Real Plone applies depth
@@ -1736,13 +1738,29 @@ app.post('*/@querystring-search', (req, res) => {
     return '/' + stack.join('/');
   };
 
+  // Plone encodes path-criterion depth in the criterion VALUE as
+  // `path::depth` (e.g. `/docs/examples::1`, `.::2`). A bare path is a
+  // recursive query. The top-level `depth` field on the request body is
+  // NOT honoured by Plone's @querystring-search — verified against
+  // demo.plone.org — so it is deliberately ignored here.
+  const splitPathDepth = (v) => {
+    const s = typeof v === 'string' ? v : '';
+    const sep = s.indexOf('::');
+    if (sep === -1) return { path: s, depth: null };
+    const n = parseInt(s.slice(sep + 2), 10);
+    return { path: s.slice(0, sep), depth: Number.isNaN(n) ? null : n };
+  };
+
   let depthRoot = null;
+  let pathDepth = null;
   for (const cond of query) {
     if (cond.i !== 'path') continue;
+    const { path: pathV, depth: critDepth } = splitPathDepth(cond.v);
+    if (critDepth !== null) pathDepth = critDepth;
     if (cond.o.includes('absolutePath')) {
-      depthRoot = cond.v;
+      depthRoot = pathV;
     } else if (cond.o.includes('relativePath')) {
-      let rel = cond.v || '';
+      let rel = pathV;
       if (rel === '.' || rel === '') rel = '';
       depthRoot = rel ? resolveRelativePath(contextPath, rel) : contextPath;
     }
@@ -1767,13 +1785,51 @@ app.post('*/@querystring-search', (req, res) => {
     .filter((content) => content !== null);
 
   // Apply query filters
-  for (const condition of query) {
-    const { i: index, o: operation, v: value } = condition;
+  // plone.app.querystring `selection.*` operations apply by index TYPE,
+  // not index name: FieldIndexes (portal_type, review_state — one value
+  // per item) and KeywordIndexes (Subject — a list per item) share the
+  // same .any/.all/.none semantics. selectionFields maps each index to
+  // the item value(s) the operation compares against, so the single
+  // handler below covers them all instead of per-index branches that drift.
+  const selectionFields = {
+    portal_type: (item) => [item['@type']],
+    review_state: (item) => [item.review_state || 'published'],
+    Subject: (item) => item.Subject || [],
+  };
 
-    if (index === 'portal_type' && operation.includes('selection')) {
-      // Filter by content type
-      const types = Array.isArray(value) ? value : [value];
-      allItems = allItems.filter((item) => types.includes(item['@type']));
+  for (const condition of query) {
+    const { i: index, o: operation } = condition;
+    // For path criteria the value may carry a `::depth` suffix — strip it
+    // for the path match (depth is applied separately, below).
+    const value =
+      index === 'path' ? splitPathDepth(condition.v).path : condition.v;
+
+    if (operation.includes('selection')) {
+      // Generic plone.app.querystring selection filter (see selectionFields):
+      //   .all  — item has every wanted value (KeywordIndex only — a
+      //           FieldIndex item has one value, so .all of 2+ matches none)
+      //   .none — item has no wanted value (nav listings use this to drop
+      //           Image/File from portal_type)
+      //   .any  — item has at least one wanted value (default)
+      const accessor = selectionFields[index];
+      const wanted = Array.isArray(value) ? value : [value];
+      if (!accessor) {
+        console.warn(
+          `[MOCK-API] @querystring-search: no selection mapping for index '${index}' — criterion ignored`,
+        );
+      } else if (operation.endsWith('.all')) {
+        allItems = allItems.filter((item) =>
+          wanted.every((w) => accessor(item).includes(w)),
+        );
+      } else if (operation.endsWith('.none')) {
+        allItems = allItems.filter((item) =>
+          !wanted.some((w) => accessor(item).includes(w)),
+        );
+      } else {
+        allItems = allItems.filter((item) =>
+          wanted.some((w) => accessor(item).includes(w)),
+        );
+      }
     } else if (index === 'path' && operation.includes('absolutePath')) {
       // Filter by path — strict descendants of basePath (exclude basePath
       // itself). The trailing '/' ensures `/foo` matches `/foo/bar` but
@@ -1789,6 +1845,14 @@ app.post('*/@querystring-search', (req, res) => {
     } else if (index === 'path' && operation.includes('relativePath')) {
       // Filter by relative path from context.
       // '.' means current context, '..' means parent, etc.
+      //
+      // Plone quirk: relativePath EXCLUDES the current context page
+      // itself from results. So a `..` query from /a/b returns
+      // /a's strict descendants minus /a/b. That's a deliberate Plone
+      // navigation convention ("don't list me in my own nav"). We
+      // replicate it here so cnav rendering works the same under mock
+      // as under prod — including exposing the missing-intermediate-
+      // parent case that hierarchicalSortByPosition has to handle.
       let relValue = value || '';
       if (relValue === '.' || relValue === '') {
         relValue = '';
@@ -1800,6 +1864,7 @@ app.post('*/@querystring-search', (req, res) => {
           return itemPath.startsWith(fullPath + '/');
         });
       }
+      allItems = allItems.filter((item) => new URL(item['@id']).pathname !== contextPath);
     } else if (index === 'SearchableText' && operation.includes('string.contains')) {
       // Full-text search - search in title, description, and text content
       const searchTerm = (value || '').toLowerCase();
@@ -1819,76 +1884,51 @@ app.post('*/@querystring-search', (req, res) => {
         const flag = item.exclude_from_nav === true;
         return wantTrue ? flag : !flag;
       });
-    } else if (index === 'review_state' && operation.includes('selection')) {
-      // Filter by review state
-      const states = Array.isArray(value) ? value : [value];
-      allItems = allItems.filter((item) => states.includes(item.review_state || 'published'));
-    } else if (index === 'Subject' && operation.includes('selection')) {
-      // Filter by subject/tag
-      const tags = Array.isArray(value) ? value : [value];
-      if (operation.includes('.any')) {
-        allItems = allItems.filter((item) => {
-          const subjects = item.Subject || [];
-          return tags.some((tag) => subjects.includes(tag));
-        });
-      } else if (operation.includes('.all')) {
-        allItems = allItems.filter((item) => {
-          const subjects = item.Subject || [];
-          return tags.every((tag) => subjects.includes(tag));
-        });
-      } else if (operation.includes('.none')) {
-        allItems = allItems.filter((item) => {
-          const subjects = item.Subject || [];
-          return !tags.some((tag) => subjects.includes(tag));
-        });
-      }
     }
   }
 
-  // Apply depth limit. Plone's @querystring-search accepts a top-level
-  // `depth` field that constrains results to N levels below the path
-  // criterion's root. Used by sectionNav's listing config so a depth=2
-  // query under /docs returns /docs/foo and /docs/foo/bar but not
-  // /docs/foo/bar/baz.
-  if (typeof depth === 'number' && depthRoot !== null) {
+  // Apply depth limit from the path criterion's `::depth` suffix (parsed
+  // into pathDepth above). `path::1` under /docs returns /docs/foo but
+  // not /docs/foo/bar; a bare path is recursive (no limit).
+  if (typeof pathDepth === 'number' && depthRoot !== null) {
     const rootSegments = depthRoot.split('/').filter(Boolean).length;
-    const maxSegments = rootSegments + depth;
+    const maxSegments = rootSegments + pathDepth;
     allItems = allItems.filter((item) => {
       const itemSegments = new URL(item['@id']).pathname.split('/').filter(Boolean).length;
       return itemSegments <= maxSegments;
     });
   }
 
-  // Sort items
+  // Sort items. Plone's `sort_order: descending` reverses the whole result
+  // sequence — tied items included — so sort ascending and reverse the
+  // array. Negating the comparator instead leaves ties in input order
+  // (a stable sort treats -0 as 0), so descending != reverse(ascending).
+  let comparator = null;
   if (sort_on === 'getObjPositionInParent') {
     // Folder order: use __metadata__.json ordering (UID→position),
     // falling back to contentDirMap key order (filesystem alphabetical).
     const allPaths = Object.keys(contentDirMap);
-    allItems.sort((a, b) => {
+    comparator = (a, b) => {
       const aPos = a.UID ? uidPositionMap[a.UID] : undefined;
       const bPos = b.UID ? uidPositionMap[b.UID] : undefined;
-      let cmp;
-      if (aPos !== undefined && bPos !== undefined) {
-        cmp = aPos - bPos;
-      } else if (aPos !== undefined) {
-        cmp = -1; // items with ordering come first
-      } else if (bPos !== undefined) {
-        cmp = 1;
-      } else {
-        // Fallback to contentDirMap key order
-        const aPath = new URL(a['@id']).pathname;
-        const bPath = new URL(b['@id']).pathname;
-        cmp = allPaths.indexOf(aPath) - allPaths.indexOf(bPath);
-      }
-      return sort_order === 'descending' ? -cmp : cmp;
-    });
+      if (aPos !== undefined && bPos !== undefined) return aPos - bPos;
+      if (aPos !== undefined) return -1; // items with ordering come first
+      if (bPos !== undefined) return 1;
+      // Fallback to contentDirMap key order
+      const aPath = new URL(a['@id']).pathname;
+      const bPath = new URL(b['@id']).pathname;
+      return allPaths.indexOf(aPath) - allPaths.indexOf(bPath);
+    };
   } else if (sort_on) {
-    allItems.sort((a, b) => {
+    comparator = (a, b) => {
       const aVal = a[sort_on] || '';
       const bVal = b[sort_on] || '';
-      const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-      return sort_order === 'descending' ? -cmp : cmp;
-    });
+      return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+    };
+  }
+  if (comparator) {
+    allItems.sort(comparator);
+    if (sort_order === 'descending') allItems.reverse();
   }
 
   // Apply results limit (different from b_size which is for pagination)

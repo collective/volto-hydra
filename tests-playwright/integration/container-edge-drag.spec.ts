@@ -35,12 +35,7 @@ test.describe('Container UX: Edge-drag', () => {
     expect(visibleIframeEdges).toEqual([]);
   });
 
-  // Container, but no nearby sibling has an accepted descendant type:
-  // top_images on columns-1 only allows image. Sibling siblings of col-1
-  // (i.e. col-2, top-img-*, …) — col-2 contains slates not images, so the
-  // "absorb across boundary" path doesn't yield an accepted descendant.
-  // Edge-handle should be hidden on the right side (where col-2 sits).
-  // Repro: after selecting a container that has edge handles, selecting
+  // After selecting a container that has edge handles, selecting
   // a leaf descendant should NOT inherit those edge sides. The leaf isn't
   // a container — it shouldn't show edges regardless of what was selected
   // before. Verifies the iframe → admin canResize lifecycle resets cleanly
@@ -57,7 +52,10 @@ test.describe('Container UX: Edge-drag', () => {
     });
     await helper.waitForIframeBlockHandle('col-1');
     const adminEdges = page.locator('.volto-hydra-edge-handle-visual');
-    expect(await adminEdges.count()).toBeGreaterThan(0); // sanity: container does show edges
+    // Edge handles render in the admin after a canResize round-trip
+    // from the iframe — wait for the first one rather than racing the
+    // count check (synchronous count was flaky on the slower nuxt path).
+    await expect(adminEdges.first()).toBeVisible({ timeout: 5000 });
 
     // 2. Select text-1a (a slate inside col-1 — leaf, no children).
     await iframe.locator('[data-block-uid="text-1a"]').first().evaluate((el) => {
@@ -123,13 +121,13 @@ test.describe('Container UX: Edge-drag', () => {
     await helper.navigateToEdit('/container-test-page');
 
     const iframe = helper.getIframe();
-    // top-img-1 is a leaf image block (no children of its own). Documents
+    // col1-img-1 is a leaf image block (no children of its own). Documents
     // the early-return path. Once we have a fixture with a leaf-but-
     // container shape (e.g. an empty-but-typed container), extend.
-    await iframe.locator('[data-block-uid="top-img-1"]').first().evaluate((el) => {
+    await iframe.locator('[data-block-uid="col1-img-1"]').first().evaluate((el) => {
       (window as any).bridge?.selectBlock(el);
     });
-    await helper.waitForIframeBlockHandle('top-img-1');
+    await helper.waitForIframeBlockHandle('col1-img-1');
     const adminEdges = page.locator('.volto-hydra-edge-handle-visual');
     await expect(adminEdges).toHaveCount(0);
     const visibleIframeEdges = await iframe.locator('html').first().evaluate(() => {

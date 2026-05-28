@@ -523,15 +523,18 @@
     </table>
   </div>
 
-  <div v-else-if="block['@type'] == '__button'" :data-block-uid="block_uid"
+  <div v-else-if="block['@type'] == 'button'" :data-block-uid="block_uid"
        :class="['my-4', {
            'text-center': block.inneralign === 'center',
            'text-right': block.inneralign === 'right'
        }]">
+    <!-- data-edit-link marks the link editable AND tells hydra.js to
+         intercept the click in edit mode so it selects/edits instead of
+         navigating away. -->
     <NuxtLink :to="getUrl(block.href)"
       class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-      data-edit-text="title">
-      {{ block.title || 'Read more' }}
+      data-edit-link="href">
+      <span data-edit-text="title">{{ block.title || 'Read more' }}</span>
     </NuxtLink>
   </div>
 
@@ -541,8 +544,15 @@
           :src="`https://www.youtube.com/embed/${getYouTubeId(block.url)}`"
           frameborder="0" allowfullscreen></iframe>
     </div>
-    <video v-else-if="block.url" class="w-full h-auto max-w-full rounded-lg" controls>
-      <source :src="block.url" type="video/mp4">
+    <video v-else-if="block.url"
+           class="w-full h-auto max-w-full rounded-lg"
+           data-edit-media="url"
+           :controls="block.controls !== false"
+           :autoplay="!!block.autoplay"
+           :loop="!!block.loop"
+           :muted="!!block.muted || !!block.autoplay"
+           playsinline>
+      <source :src="getVideoSrc(block.url)" type="video/mp4">
     </video>
   </div>
 
@@ -1191,6 +1201,18 @@ const getYouTubeId = (url) => {
   if (!url) return null;
   const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&?/]+)/);
   return match?.[1] || null;
+};
+
+// Helper for the <video> src on Plone-hosted mp4s. A video block whose `url`
+// is a Plone @id (starts with `/`) needs the API base URL prepended and a
+// /@@download/file suffix to resolve to the actual binary; otherwise the
+// browser tries to fetch the @id off the frontend host and 404s.
+const getVideoSrc = (url) => {
+  if (!url) return '';
+  if (/^https?:\/\//.test(url)) return url;
+  const runtimeConfig = useRuntimeConfig();
+  const backendBaseUrl = runtimeConfig.public.backendBaseUrl;
+  return `${backendBaseUrl}${url}/@@download/file`;
 };
 
 // Helper to get image URL from various formats (string, array, or object with @id)

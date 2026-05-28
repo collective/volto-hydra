@@ -22,6 +22,28 @@ export const sharedBlocksConfig = {
             required: [],
         },
     },
+    // Button block: a call-to-action with an inline-editable label and a
+    // link. Registered here so the admin shows Label / Link / Alignment
+    // sidebar fields.
+    button: {
+        id: 'button',
+        title: 'Button',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'href', 'inneralign'] }],
+            properties: {
+                title: { title: 'Label' },
+                href: { title: 'Link', widget: 'object_browser', mode: 'link' },
+                inneralign: {
+                    title: 'Alignment',
+                    widget: 'select',
+                    choices: [['left', 'Left'], ['center', 'Center'], ['right', 'Right']],
+                    default: 'left',
+                },
+            },
+            required: [],
+        },
+    },
     hero: {
         id: 'hero',
         title: 'Hero',
@@ -85,8 +107,10 @@ export const sharedBlocksConfig = {
             },
         },
     },
-    // Container block: columns contains column children AND top_images
-    // Tests multi-container field routing
+    // Container block: columns contains column children. The columns
+    // slot has allowedBlocks: ['column'] with no defaultBlockType — this
+    // is the single-allowedBlock-fallback path that the
+    // "Enter in container with single allowedBlock" test exercises.
     columns: {
         id: 'columns',
         title: 'Columns',
@@ -97,18 +121,13 @@ export const sharedBlocksConfig = {
                 {
                     id: 'default',
                     title: 'Default',
-                    fields: ['title', 'top_images', 'columns'],
+                    fields: ['title', 'columns'],
                 },
             ],
             properties: {
                 title: {
                     title: 'Title',
                     type: 'string',
-                },
-                top_images: {
-                    title: 'Top Images',
-                    widget: 'blocks_layout',
-                    allowedBlocks: ['image'],
                 },
                 columns: {
                     title: 'Columns',

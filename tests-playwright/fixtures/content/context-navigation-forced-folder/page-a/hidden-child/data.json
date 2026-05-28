@@ -1,0 +1,12 @@
+{
+  "@id": "/_test_data/context-navigation-forced-folder/page-a/hidden-child",
+  "@type": "Document",
+  "UID": "context-navigation-forced-folder-hidden-child-uid",
+  "id": "hidden-child",
+  "title": "Hidden child (exclude_from_nav)",
+  "description": "Folder marked exclude_from_nav=true. The cnav listing's exclude_from_nav filter drops it, so it's missing from results — but its child (orphan-grandchild) is NOT excluded and still comes back. Without ancestor-aware filtering the grandchild becomes an orphan root in the cnav rendering.",
+  "review_state": "published",
+  "exclude_from_nav": true,
+  "blocks": { "title-block": { "@type": "title" } },
+  "blocks_layout": { "items": ["title-block"] }
+}

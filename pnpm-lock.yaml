@@ -173,11 +173,11 @@ importers:
         specifier: 3.0.0
         version: 3.0.0
 
-  docs/blocks/test-react: {}
+  docs/examples/test-react: {}
 
-  docs/blocks/test-svelte: {}
+  docs/examples/test-svelte: {}
 
-  docs/blocks/test-vue:
+  docs/examples/test-vue:
     dependencies:
       '@vitejs/plugin-vue':
         specifier: ^6.0.4

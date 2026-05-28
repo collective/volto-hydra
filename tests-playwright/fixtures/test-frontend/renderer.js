@@ -314,7 +314,7 @@ async function renderBlock(blockId, block) {
         case 'separator':
             wrapper.innerHTML = renderSeparatorBlock(block);
             break;
-        case '__button':
+        case 'button':
             wrapper.innerHTML = renderButtonBlock(block);
             break;
         case 'highlight':
@@ -1092,15 +1092,14 @@ function attachFormValidation(formEl, block) {
 
 /**
  * Render a columns container block.
- * Has TWO container fields: top_images and columns (tests multi-field routing)
+ * One blocks_layout slot (`columns`) restricted to `column` children.
  * Calls window._expandListingBlocks for nested listings in columns.
- * @param {Object} block - Columns block data with shared blocks dict + top_images/columns layout fields
+ * @param {Object} block - Columns block data with shared blocks dict + columns layout field
  * @returns {Promise<string>} HTML string
  */
 async function renderColumnsBlock(block) {
     // Support both flat (block.blocks) and nested (block.columns.blocks) formats
     const blocks = block.blocks || block.columns?.blocks || {};
-    const topImagesItems = block.top_images?.items || [];
     const columnsItems = block.columns?.items || [];
     const title = block.title || '';
 
@@ -1109,24 +1108,6 @@ async function renderColumnsBlock(block) {
     // Render editable title for columns block
     if (title) {
         html += `<h3 data-edit-text="title" class="columns-title" style="margin-bottom: 10px;">${title}</h3>`;
-    }
-
-    // Render top_images container field (images go right)
-    if (topImagesItems.length > 0) {
-        html += '<div class="top-images-row" style="display: flex; gap: 10px; margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 4px;">';
-        html += '<div class="field-label" style="font-weight: bold; color: #666; font-size: 12px; writing-mode: vertical-rl; text-orientation: mixed;">TOP IMAGES</div>';
-
-        for (const imgId of topImagesItems) {
-            const img = blocks[imgId];
-            if (!img) continue;
-
-            // Render image as a nested block with data-block-uid and data-block-add="right"
-            html += `<div data-block-uid="${imgId}" data-block-add="right" class="top-image" style="flex: 0 0 auto;">`;
-            html += renderImageBlock(img);
-            html += '</div>';
-        }
-
-        html += '</div>';
     }
 
     // Render columns container (columns go right)
@@ -1261,11 +1242,38 @@ async function renderContextNavigationBlock(block, blockId) {
         if (child['@type'] === 'navItem') {
             flat.push({ block: child, blockId: childId });
         } else if (child['@type'] === 'listing') {
+            // The cnav listing's `relativePath ..` means "my section".
+            // Fetched from the current page, Plone's @querystring-search
+            // drops the current page — it always excludes its own context
+            // object — so the page can't appear in its own nav. Fetch from
+            // the PARENT folder instead and step the relativePath down one
+            // level (`..` -> `.`): same tree slice, but the current page
+            // comes back as a normal result with its getObjPositionInParent
+            // (so it sorts into place); only the parent is excluded.
+            const curPath = window.location.pathname.replace(/\/edit$/, '');
+            const parentPath = curPath.replace(/\/[^/]+\/?$/, '') || '/';
+            const stepDown = (v) => {
+                const s = String(v || '').split('/').filter(Boolean);
+                if (s[0] === '..') s.shift();
+                return s.length ? s.join('/') : '.';
+            };
+            const shifted = {
+                ...child,
+                querystring: {
+                    ...child.querystring,
+                    query: (child.querystring?.query || []).map((c) =>
+                        c.i === 'path' && c.o?.includes('relativePath')
+                            ? { ...c, v: stepDown(c.v) }
+                            : c,
+                    ),
+                },
+            };
             const { items: expanded } = await window._expandListingBlocks(
-                { [childId]: child },
+                { [childId]: shifted },
                 [childId],
                 childId,
                 { start: 0, size: NAV_LISTING_SIZE },
+                parentPath,
             );
             for (const item of expanded) {
                 flat.push({ block: item, blockId: item['@uid'] });
@@ -1310,12 +1318,31 @@ async function renderContextNavigationBlock(block, blockId) {
     const pathSegsOf = (entry) =>
         new URL(entry.block.href[0]['@id'], window.location.origin)
             .pathname.split('/').filter(Boolean);
-    const allSegs = flat.map(pathSegsOf);
+    let allSegs = flat.map(pathSegsOf);
     const depths = allSegs.map((s) => s.length);
     const minDepth = Math.min(...depths);
     flat.forEach((entry, i) => {
         entry.block._level = Math.max(1, Math.min(3, depths[i] - minDepth + 1));
     });
+
+    // Orphan prune: a listing filter (e.g. exclude_from_nav) can drop a
+    // folder while still returning its deeper, non-excluded descendants.
+    // Those would otherwise surface as stray roots. Drop any entry with a
+    // missing ancestor between the section root and itself — hiding a
+    // folder should hide its whole subtree.
+    let pruned = flat;
+    {
+        const pathSet = new Set(allSegs.map((s) => '/' + s.join('/')));
+        const hasAllAncestors = (segs) => {
+            for (let d = minDepth; d < segs.length; d++) {
+                if (!pathSet.has('/' + segs.slice(0, d).join('/'))) return false;
+            }
+            return true;
+        };
+        const keep = allSegs.map(hasAllAncestors);
+        pruned = flat.filter((_e, i) => keep[i]);
+        allSegs = allSegs.filter((_s, i) => keep[i]);
+    }
 
     // Third pass: optional smart-expansion filter — drop entries that are
     // descendants of unrelated siblings (typical docs sidebar UX). An
@@ -1324,8 +1351,8 @@ async function renderContextNavigationBlock(block, blockId) {
     // page. `expandCurrentOnly` defaults true (schema default).
     const expandCurrentOnly = block.expandCurrentOnly !== false;
     const visible = expandCurrentOnly
-        ? filterByCurrentPath(flat, allSegs, minDepth)
-        : flat;
+        ? filterByCurrentPath(pruned, allSegs, minDepth)
+        : pruned;
 
     // `data-block-selector` carries the contextNavigation's uid + every
     // exposed child id (manual navItem ids and the listing block id
@@ -1341,12 +1368,14 @@ async function renderContextNavigationBlock(block, blockId) {
     // visibility semantics drive Playwright + screen readers, so the
     // `open` attribute is the single source of truth — not CSS.
     html += `<details class="context-navigation-disclosure">`;
-    // Summary has no text content — only the default disclosure chevron.
-    // Screen-reader name comes via aria-label on this <summary>. Empty
-    // textContent keeps the block's ariaLabel value out of any text
-    // node, so block-sanity's "string field must sit inside
-    // [data-edit-text]" rule doesn't fire against it.
-    html += `<summary class="context-navigation-summary" aria-label="Toggle section navigation" data-block-selector="${escapeAttr(exposedUids)}"></summary>`;
+    // Summary doubles as the visible header (desktop: styled as a small-
+    // caps section label, à la Stripe/MDN/Primer; mobile: tap target for
+    // the disclosure). block.ariaLabel renders inside [data-edit-text]
+    // so authors can inline-edit the heading; clicking the span fires
+    // <details>'s native toggle as a side-effect, but the summary stays
+    // visible whether open or closed, so editing continues without
+    // losing the cursor.
+    html += `<summary class="context-navigation-summary" data-block-selector="${escapeAttr(exposedUids)}"><span data-edit-text="ariaLabel">${escapeHtml(ariaLabel)}</span></summary>`;
     html += `<ul role="list" id="${uid}-list" class="context-navigation-list">`;
     for (const entry of visible) {
         html += `<li>${renderNavItemBlock(entry.block, entry.blockId)}</li>`;

@@ -37,6 +37,38 @@ export default async function ploneApi({
     headers,
   });
 
+  // Fetch a single template by id/path.
+  const loadTemplate = async (templateId) => {
+    // templateId may be a path or a full URL — normalise to path
+    const tplPath = templateId.startsWith('http')
+      ? new URL(templateId).pathname
+      : `/${templateId.replace(/^\//, '')}`;
+    const url = `${runtimeConfig.public.backendBaseUrl}/++api++${tplPath}`;
+    const response = await fetch(url, { headers });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch template: ${templateId}`);
+    }
+    return response.json();
+  };
+
+  // Preload the forced-layout templates. These come from route-based
+  // rules (site-footer, context-navigation-layout, content-type
+  // layouts), not the page content — so kick the fetches off NOW, in
+  // parallel with the page fetch below, instead of waiting until the
+  // page resolves and loading them sequentially inside the transform.
+  // The resolved objects are merged into the template cache so
+  // loadTemplates only has to fetch what the page content references.
+  const preloadPromise = Promise.all(
+    [...new Set(preloadTemplates.filter(Boolean))].map(async (id) => {
+      try {
+        return [id, await loadTemplate(id)];
+      } catch (error) {
+        console.warn(`[ploneApi] Failed to preload template ${id}:`, error);
+        return null;
+      }
+    }),
+  ).then((entries) => Object.fromEntries(entries.filter(Boolean)));
+
   return useFetch(api, {
     key,
     method: query ? 'POST' : 'GET',
@@ -68,20 +100,11 @@ export default async function ploneApi({
         const comp = data['@components'];
         delete data['@components'];
 
-        // Pre-load templates for SSR (avoids Suspense flicker)
-        const loadTemplate = async (templateId) => {
-          // templateId may be a path or a full URL — normalise to path
-          const tplPath = templateId.startsWith('http')
-            ? new URL(templateId).pathname
-            : `/${templateId.replace(/^\//, '')}`;
-          const url = `${runtimeConfig.public.backendBaseUrl}/++api++${tplPath}`;
-          const response = await fetch(url, { headers });
-          if (!response.ok) {
-            throw new Error(`Failed to fetch template: ${templateId}`);
-          }
-          return response.json();
-        };
-        const { templates, errors } = await loadTemplates(data, loadTemplate, templateCache, preloadTemplates);
+        // Merge the preloaded forced-layout templates (fetched in
+        // parallel with this page) into the cache, then loadTemplates
+        // only needs to fetch the templates the page content references.
+        Object.assign(templateCache, await preloadPromise);
+        const { templates, errors } = await loadTemplates(data, loadTemplate, templateCache, []);
         if (errors.length) {
           console.warn('[ploneApi] Failed to load templates:', errors.map(e => `${e.templateId}: ${e.error?.message || e.error}`).join('; '));
         }

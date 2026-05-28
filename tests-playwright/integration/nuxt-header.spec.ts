@@ -23,7 +23,10 @@ test.describe('Nuxt header', () => {
 
     const header = iframe.locator('header');
     await expect(header).toBeVisible({ timeout: 15000 });
-    await expect(header.locator('text=Hydra')).toBeVisible();
+    // Match the site-name span exactly — `text=Hydra` is a substring
+    // selector and would also match navigation links like "Volto Hydra
+    // Documentation" added when docs got linked into the nav.
+    await expect(header.getByText('Hydra', { exact: true })).toBeVisible();
   });
 
   test('search icon expands into input field', async ({ page }) => {

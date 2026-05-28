@@ -475,7 +475,7 @@
       }
     },
     "ex-button": {
-      "@type": "__button",
+      "@type": "button",
       "title": "Learn More",
       "href": [
         {
@@ -610,6 +610,66 @@
           }
         }
       ]
+    },
+    "ex-contextnav": {
+      "@type": "contextNavigation",
+      "ariaLabel": "Section navigation",
+      "blocks": {
+        "nav-1": {
+          "@type": "navItem",
+          "label": "Introduction",
+          "href": [
+            {
+              "@id": "/docs/introduction"
+            }
+          ]
+        },
+        "nav-2": {
+          "@type": "navItem",
+          "label": "Custom blocks",
+          "href": [
+            {
+              "@id": "/docs/custom-blocks"
+            }
+          ]
+        },
+        "nav-2a": {
+          "@type": "navItem",
+          "label": "Schema",
+          "href": [
+            {
+              "@id": "/docs/custom-blocks/schema"
+            }
+          ]
+        },
+        "nav-2b": {
+          "@type": "navItem",
+          "label": "Rendering",
+          "href": [
+            {
+              "@id": "/docs/custom-blocks/rendering"
+            }
+          ]
+        },
+        "nav-3": {
+          "@type": "navItem",
+          "label": "Listings",
+          "href": [
+            {
+              "@id": "/docs/listings"
+            }
+          ]
+        }
+      },
+      "items": {
+        "items": [
+          "nav-1",
+          "nav-2",
+          "nav-2a",
+          "nav-2b",
+          "nav-3"
+        ]
+      }
     }
   },
   "blocks_layout": {
@@ -637,7 +697,8 @@
       "ex-maps",
       "ex-toc",
       "ex-codeExample",
-      "ex-grid"
+      "ex-grid",
+      "ex-contextnav"
     ]
   },
   "is_folderish": false,

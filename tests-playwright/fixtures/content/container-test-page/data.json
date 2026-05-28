@@ -19,32 +19,51 @@
       "@type": "columns",
       "title": "My Columns Section",
       "blocks": {
-        "top-img-1": {
-          "@type": "image",
-          "url": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2760%27 height=%2740%27%3E%3Crect width=%2760%27 height=%2740%27 fill=%27%23aabbcc%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 dy=%270.3em%27%3ETop 1%3C/text%3E%3C/svg%3E",
-          "alt": "Top Image 1"
-        },
-        "top-img-2": {
-          "@type": "image",
-          "url": "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2760%27 height=%2740%27%3E%3Crect width=%2760%27 height=%2740%27 fill=%27%23ccbbaa%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 dy=%270.3em%27%3ETop 2%3C/text%3E%3C/svg%3E",
-          "alt": "Top Image 2"
-        },
         "col-1": {
           "@type": "column",
           "title": "Left Column",
           "blocks": {
             "text-1a": {
               "@type": "slate",
-              "value": [{"type": "p", "children": [{"text": "Col 1 Text 1"}]}],
+              "value": [
+                {
+                  "type": "p",
+                  "children": [
+                    {
+                      "text": "Col 1 Text 1"
+                    }
+                  ]
+                }
+              ],
               "plaintext": "Col 1 Text 1"
             },
             "text-1b": {
               "@type": "slate",
-              "value": [{"type": "p", "children": [{"text": "Col 1 Text 2"}]}],
+              "value": [
+                {
+                  "type": "p",
+                  "children": [
+                    {
+                      "text": "Col 1 Text 2"
+                    }
+                  ]
+                }
+              ],
               "plaintext": "Col 1 Text 2"
+            },
+            "col1-img-1": {
+              "@type": "image",
+              "url": "/docs/examples/content-types/image-dark",
+              "alt": "Sample image"
             }
           },
-          "blocks_layout": {"items": ["text-1a", "text-1b"]}
+          "blocks_layout": {
+            "items": [
+              "text-1a",
+              "text-1b",
+              "col1-img-1"
+            ]
+          }
         },
         "col-2": {
           "@type": "column",
@@ -52,19 +71,45 @@
           "blocks": {
             "text-2a": {
               "@type": "slate",
-              "value": [{"type": "p", "children": [{"text": "Col 2 Text 1"}]}],
+              "value": [
+                {
+                  "type": "p",
+                  "children": [
+                    {
+                      "text": "Col 2 Text 1"
+                    }
+                  ]
+                }
+              ],
               "plaintext": "Col 2 Text 1"
             }
           },
-          "blocks_layout": {"items": ["text-2a"]}
+          "blocks_layout": {
+            "items": [
+              "text-2a"
+            ]
+          }
         }
       },
-      "top_images": {"items": ["top-img-1", "top-img-2"]},
-      "columns": {"items": ["col-1", "col-2"]}
+      "columns": {
+        "items": [
+          "col-1",
+          "col-2"
+        ]
+      }
     },
     "text-after": {
       "@type": "slate",
-      "value": [{"type": "p", "children": [{"text": "Text after columns"}]}],
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Text after columns"
+            }
+          ]
+        }
+      ],
       "plaintext": "Text after columns"
     },
     "grid-1": {
@@ -74,16 +119,33 @@
           "@type": "teaser",
           "title": "Grid Teaser 1",
           "description": "First grid teaser",
-          "href": [{"@id": "/test-page", "@type": "Document", "title": "Test Page"}]
+          "href": [
+            {
+              "@id": "/test-page",
+              "@type": "Document",
+              "title": "Test Page"
+            }
+          ]
         },
         "grid-cell-2": {
           "@type": "teaser",
           "title": "Grid Teaser 2",
           "description": "Second grid teaser",
-          "href": [{"@id": "/another-page", "@type": "Document", "title": "Another Page"}]
+          "href": [
+            {
+              "@id": "/another-page",
+              "@type": "Document",
+              "title": "Another Page"
+            }
+          ]
         }
       },
-      "blocks_layout": {"items": ["grid-cell-1", "grid-cell-2"]}
+      "blocks_layout": {
+        "items": [
+          "grid-cell-1",
+          "grid-cell-2"
+        ]
+      }
     },
     "grid-2": {
       "@type": "gridBlock",
@@ -92,25 +154,51 @@
           "@type": "teaser",
           "title": "Grid Teaser 3",
           "description": "Third grid teaser",
-          "href": [{"@id": "/test-page", "@type": "Document", "title": "Test Page"}]
+          "href": [
+            {
+              "@id": "/test-page",
+              "@type": "Document",
+              "title": "Test Page"
+            }
+          ]
         },
         "grid-cell-4": {
           "@type": "teaser",
           "title": "Grid Teaser 4",
           "description": "Fourth grid teaser",
-          "href": [{"@id": "/another-page", "@type": "Document", "title": "Another Page"}]
+          "href": [
+            {
+              "@id": "/another-page",
+              "@type": "Document",
+              "title": "Another Page"
+            }
+          ]
         }
       },
-      "blocks_layout": {"items": ["grid-cell-3", "grid-cell-4"]}
+      "blocks_layout": {
+        "items": [
+          "grid-cell-3",
+          "grid-cell-4"
+        ]
+      }
     },
     "grid-empty": {
       "@type": "gridBlock",
       "blocks": {},
-      "blocks_layout": {"items": []}
+      "blocks_layout": {
+        "items": []
+      }
     }
   },
   "blocks_layout": {
-    "items": ["title-block", "columns-1", "text-after", "grid-1", "grid-2", "grid-empty"]
+    "items": [
+      "title-block",
+      "columns-1",
+      "text-after",
+      "grid-1",
+      "grid-2",
+      "grid-empty"
+    ]
   },
   "allow_discussion": false,
   "is_folderish": false,
@@ -125,7 +213,20 @@
     "actions": {
       "@id": "http://localhost:8888/container-test-page/@actions",
       "document_actions": [],
-      "object": [{"id": "view", "title": "View"}, {"id": "edit", "title": "Edit"}, {"id": "folderContents", "title": "Contents"}],
+      "object": [
+        {
+          "id": "view",
+          "title": "View"
+        },
+        {
+          "id": "edit",
+          "title": "Edit"
+        },
+        {
+          "id": "folderContents",
+          "title": "Contents"
+        }
+      ],
       "object_buttons": [],
       "portal_tabs": [],
       "site_actions": [],
@@ -134,8 +235,14 @@
     "breadcrumbs": {
       "@id": "http://localhost:8888/container-test-page/@breadcrumbs",
       "items": [
-        {"@id": "http://localhost:8888", "title": "Home"},
-        {"@id": "http://localhost:8888/container-test-page", "title": "Container Test Page"}
+        {
+          "@id": "http://localhost:8888",
+          "title": "Home"
+        },
+        {
+          "@id": "http://localhost:8888/container-test-page",
+          "title": "Container Test Page"
+        }
       ],
       "root": "http://localhost:8888"
     },

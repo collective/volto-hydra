@@ -104,7 +104,13 @@ try {
   );
 } catch { /* SSR or restricted environment */ }
 function log(...args) {
-  if (!debugEnabled && !window['HYDRA_DEBUG']) return;
+  // `window` is absent under SSR / `nuxt generate` — guard it, or this
+  // throws and 500s every server-rendered page that calls log().
+  if (
+    !debugEnabled &&
+    !(typeof window !== 'undefined' && window.HYDRA_DEBUG)
+  )
+    return;
   const runId = typeof window !== 'undefined' && window.__testRunId;
   const prefix = runId != null ? `[HYDRA][RUN-${runId}]` : '[HYDRA]';
   console.log(prefix, ...args);
@@ -7505,9 +7511,14 @@ export class Bridge {
       return;
     }
 
-    // For direct UID selector, target that specific block
+    // Direct UID selector. The value is either a single uid (e.g. a
+    // carousel dot → that slide) or a space-separated word-list whose
+    // FIRST uid is the block to select — accordion panel headers carry
+    // `[panelUid, ...childUids]` (panel first), the rest of the list is
+    // only there for tryMakeBlockVisible's `~=` reveal match. Take the
+    // first token either way.
     if (selector !== '+1' && selector !== '-1') {
-      const targetUid = selector;
+      const targetUid = selector.trim().split(/\s+/)[0];
       log('handleBlockSelector: direct selector targetUid =', targetUid);
       // Hide outline during transition (same as +1/-1 path)
       this._blockSelectorNavigating = true;
@@ -11738,12 +11749,14 @@ export class Bridge {
         [data-edit-text][data-placeholder][data-empty]:focus::before {
           display: none;
         }
-        /* Empty fields with placeholder: placeholder text provides the height */
-        [data-edit-text][data-placeholder][data-empty] {
+        /* Empty editable fields — reserve height so the field stays clickable
+           and the placeholder text (rendered via the absolutely-positioned
+           ::before above) doesn't overlap adjacent content. The pseudo-element
+           is out of the normal flow so the parent must explicitly reserve
+           space; without min-height, an empty field with a placeholder
+           collapses to 0px even though the placeholder appears to render. */
+        [data-edit-text][data-empty] {
           position: relative;
-        }
-        /* Empty fields without placeholder: min-height fallback so they stay clickable */
-        [data-edit-text][data-empty]:not([data-placeholder]) {
           min-height: 1.5em;
         }
         /* Linkable field hover styles - indicate clickable link areas */
@@ -12902,14 +12915,15 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
       return normalized;
     });
 
-    // `getObjPositionInParent` is the catalog's position-within-immediate-parent
-    // index. The catalog returns items in flat position-sorted order — but
-    // for a query that spans multiple folders (e.g. a recursive path query
-    // for a nav listing) that flat order isn't hierarchical: parents and
-    // children interleave by position number rather than appearing as
-    // parent-then-its-subtree-then-next-parent. Post-sort to reconstruct
-    // hierarchical order; level-N rendering and ancestor-aware filters
-    // assume it.
+    // `getObjPositionInParent` is the catalog's position-within-parent
+    // index. Plone returns items in flat position order; for a query
+    // spanning multiple folders that flat order isn't hierarchical —
+    // parents and children interleave by position number. When the
+    // listing sorts on it, post-sort into parent-before-children order.
+    // This is a pure re-ordering: every item Plone returned is kept and
+    // nothing is injected. Tree expansion and pruning for the context
+    // navigation is the frontend ContextNavigationBlock's job, not this
+    // fetcher's — ploneFetchItems returns exactly what Plone returns.
     if (block.querystring?.sort_on === 'getObjPositionInParent' && items.length > 1) {
       items = hierarchicalSortByPosition(items);
     }
@@ -12922,13 +12936,14 @@ export function ploneFetchItems({ apiUrl, contextPath = '/', extraCriteria = {} 
 }
 
 /**
- * Re-order a flat result set into parent-before-children, position-sorted
- * within each parent. Each item must have `@id` (used to derive path +
- * parent) and `getObjPositionInParent` (numeric; missing values treated
- * as Infinity so they sort to the end).
+ * Re-order a flat result set into parent-before-children order,
+ * position-sorted within each parent. Each item must have `@id` (used to
+ * derive its path + parent path); `getObjPositionInParent` orders
+ * siblings (missing values sort last).
  *
- * Roots (items whose parent isn't in the result set) are sorted by
- * position among themselves; each subtree is then walked depth-first.
+ * Pure post-sort: every item is kept and nothing is added. An item whose
+ * parent path is not in the set is a top-level root. Each subtree is
+ * walked depth-first.
  */
 function hierarchicalSortByPosition(items) {
   const pathOf = (item) => {
@@ -12952,6 +12967,8 @@ function hierarchicalSortByPosition(items) {
       bucket.push(item);
       childrenByParent.set(parent, bucket);
     } else {
+      // Parent not in the result set — a top-level root for ordering.
+      // Never dropped: a pure post-sort keeps every item Plone returned.
       roots.push(item);
     }
   }

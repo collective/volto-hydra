@@ -1,0 +1,1596 @@
+{
+  "@id": "/docs/build-a-frontend",
+  "@type": "Document",
+  "UID": "docs-build-a-frontend-001",
+  "allow_discussion": false,
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "The actual code you write will depend on the framework you choose. You can look at these examples to help you:",
+  "effective": "2025-01-01T00:00:00",
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "build-a-frontend",
+  "is_folderish": false,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {
+    "locked": false,
+    "stealable": true
+  },
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/docs",
+    "@type": "Document",
+    "UID": "docs-folder-001",
+    "description": "Developer guide for Volto Hydra",
+    "title": "Docs",
+    "type_title": "Page"
+  },
+  "preview_caption": null,
+  "preview_image": null,
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Build a frontend",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {
+    "simple_publication_workflow": [
+      {
+        "action": "publish",
+        "actor": "admin",
+        "comments": "",
+        "review_state": "published",
+        "time": "2025-01-01T00:00:00+00:00"
+      }
+    ]
+  },
+  "working_copy": null,
+  "working_copy_of": null,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "p-1": {
+      "@type": "slate",
+      "plaintext": "The actual code you write will depend on the framework you choose. You can look at these examples to help you:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The actual code you write will depend on the framework you choose. You can look at these examples to help you:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-2": {
+      "@type": "slate",
+      "plaintext": "Nuxt.js Next.js F7-Vue",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "https://github.com/collective/volto-hydra/tree/main/examples/nuxt-blog-starter"
+                  },
+                  "children": [
+                    {
+                      "text": "Nuxt.js"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs"
+                  },
+                  "children": [
+                    {
+                      "text": "Next.js"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7"
+                  },
+                  "children": [
+                    {
+                      "text": "F7-Vue"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "h-3": {
+      "@type": "slate",
+      "plaintext": "What an integrated frontend looks like",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "What an integrated frontend looks like"
+            }
+          ]
+        }
+      ]
+    },
+    "p-4": {
+      "@type": "slate",
+      "plaintext": "Before you dive into the steps, here's what your frontend ends up doing.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Before you dive into the steps, here's what your frontend ends up doing."
+            }
+          ]
+        }
+      ]
+    },
+    "p-5": {
+      "@type": "slate",
+      "plaintext": "To make a site editable with Hydra you break a page into:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "To make a site editable with Hydra you break a page into:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-6": {
+      "@type": "slate",
+      "plaintext": "Blocks layout — areas of the page that contain a list of blocks that make up your page content. Blocks — discrete visual elements with a schema and settings that can be moved and edited.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Blocks layout"
+                    }
+                  ]
+                },
+                {
+                  "text": " — areas of the page that contain a list of blocks that make up your page content."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Blocks"
+                    }
+                  ]
+                },
+                {
+                  "text": " — discrete visual elements with a schema and settings that can be moved and edited."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-7": {
+      "@type": "slate",
+      "plaintext": "- Type, title, icon etc. so the user can pick from a menu.   - Fields: string, image, link etc. each with their own sidebar widget.     - `slate` is a special field that contains JSON for a paragraph, heading etc.     - `blocks` fields let a block hold other blocks.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "- Type, title, icon etc. so the user can pick from a menu.   - Fields: string, image, link etc. each with their own sidebar widget.     - "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "slate"
+                }
+              ]
+            },
+            {
+              "text": " is a special field that contains JSON for a paragraph, heading etc.     - "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks"
+                }
+              ]
+            },
+            {
+              "text": " fields let a block hold other blocks."
+            }
+          ]
+        }
+      ]
+    },
+    "p-8": {
+      "@type": "slate",
+      "plaintext": "When the page loads inside Hydra's edit iframe, you initialise the bridge and declare your blocks; otherwise you render normally from the API:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "When the page loads inside Hydra's edit iframe, you initialise the bridge and declare your blocks; otherwise you render normally from the API:"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-9": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-9-js-912029",
+          "label": "Js",
+          "language": "js",
+          "code": "let bridge;\n\nif (window.name.startsWith('hydra')) {\n    bridge = initBridge({\n      page: {\n        schema: {\n          properties: {\n            blocks_layout: { allowedBlocks: ['slate', 'grid', 'myimage'] },\n            header_blocks: { allowedBlocks: ['slate', 'image'], maxLength: 3 },\n            footer_blocks: { allowedBlocks: ['slate', 'link'] },\n          },\n        },\n      },\n      blocks: {\n        // we can add custom blocks (or alter builtin ones)\n        myimage: {\n          blockSchema: {\n            properties: {\n              image: { widget: 'image' },\n              url: { widget: 'url' },\n              caption: { type: 'string' },\n            }\n          }\n        }\n      },\n      onEditChange: (formData) => renderPage(formData),\n    });\n}\nelse {\n    // When not editing, render from the server api\n    renderPage(await fetchContent(path));\n}"
+        }
+      ]
+    },
+    "p-10": {
+      "@type": "slate",
+      "plaintext": "Page data ends up shaped like this:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Page data ends up shaped like this:"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-11": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-11-js-c500c8",
+          "label": "Js",
+          "language": "js",
+          "code": "{\n  ...\n  blocks: {\n    'text-1': { '@type': 'slate', ... },\n    'header-1': { '@type': 'image', ... },\n    'footer-1': { '@type': 'slate', ... }\n  },\n  blocks_layout: { items: ['text-1'] },\n  header_blocks: { items: ['header-1'] },\n  footer_blocks: { items: ['footer-1'] }\n}"
+        }
+      ]
+    },
+    "p-12": {
+      "@type": "slate",
+      "plaintext": "Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -->` comments) so Hydra can find your blocks and editable fields:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Then you augment the rendered HTML with "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-"
+                }
+              ]
+            },
+            {
+              "text": " attributes (or "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "<!-- hydra ... -->"
+                }
+              ]
+            },
+            {
+              "text": " comments) so Hydra can find your blocks and editable fields:"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-13": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-13-html-ef9711",
+          "label": "Html",
+          "language": "html",
+          "code": "<!-- hydra edit-text=title -->\n<div>Page Title</div>\n\n<div id=content>\n  <!-- hydra block-uid=\"1234\" edit-text=title(p) edit-media=image(img) edit-link=url -->\n  <a href=\"http://go.to\">\n    <img src=\"http://my.img\"/>\n    <p>A caption</p>\n  </a>\n</div>"
+        }
+      ]
+    },
+    "h-14": {
+      "@type": "slate",
+      "plaintext": "The steps",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "The steps"
+            }
+          ]
+        }
+      ]
+    },
+    "p-15": {
+      "@type": "slate",
+      "plaintext": "The steps involved in creating a frontend are roughly the same for all these frameworks:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The steps involved in creating a frontend are roughly the same for all these frameworks:"
+            }
+          ]
+        }
+      ]
+    },
+    "h-16": {
+      "@type": "slate",
+      "plaintext": "1. Create a Catch-All Route",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "1. Create a Catch-All Route"
+            }
+          ]
+        }
+      ]
+    },
+    "p-17": {
+      "@type": "slate",
+      "plaintext": "Create a route for any path which goes to a single page.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Create a route for any path which goes to a single page."
+            }
+          ]
+        }
+      ]
+    },
+    "p-18": {
+      "@type": "slate",
+      "plaintext": "For example, in Nuxt.js you create a file `pages/[..slug].vue`.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "For example, in Nuxt.js you create a file "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "pages/[..slug].vue"
+                }
+              ]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    "h-19": {
+      "@type": "slate",
+      "plaintext": "2. Build the Page Template",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "2. Build the Page Template"
+            }
+          ]
+        }
+      ]
+    },
+    "p-20": {
+      "@type": "slate",
+      "plaintext": "The page has a template with the static parts of your theme like header and footer. You might also check the content type to render each differently.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The page has a template with the static parts of your theme like header and footer. You might also check the content type to render each differently."
+            }
+          ]
+        }
+      ]
+    },
+    "h-21": {
+      "@type": "slate",
+      "plaintext": "3. Fetch Content from Plone REST API",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "3. Fetch Content from Plone REST API"
+            }
+          ]
+        }
+      ]
+    },
+    "p-22": {
+      "@type": "slate",
+      "plaintext": "On page setup, take the path and make a [REST API call to the contents endpoint](https://6.docs.plone.org/plone.restapi/docs/source/endpoints/content-types.html) to get the JSON for this page.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "On page setup, take the path and make a "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "https://6.docs.plone.org/plone.restapi/docs/source/endpoints/content-types.html"
+              },
+              "children": [
+                {
+                  "text": "REST API call to the contents endpoint"
+                }
+              ]
+            },
+            {
+              "text": " to get the JSON for this page."
+            }
+          ]
+        }
+      ]
+    },
+    "ul-23": {
+      "@type": "slate",
+      "plaintext": "You can use @plone/client for this In some frameworks (such as Nuxt.js) it's better to use their built-in fetch You can also use the Plone GraphQL API",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "You can use "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "@plone/client"
+                    }
+                  ]
+                },
+                {
+                  "text": " for this"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "In some frameworks (such as Nuxt.js) it's better to use their built-in fetch"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "You can also use the "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "https://2022.training.plone.org/gatsby/data.html"
+                  },
+                  "children": [
+                    {
+                      "text": "Plone GraphQL API"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-24": {
+      "@type": "slate",
+      "plaintext": "- Note: this is just a wrapper on the REST API rather than a server-side implementation, so it's not more efficient than using the REST API directly",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "- Note: this is just a wrapper on the REST API rather than a server-side implementation, so it's not more efficient than using the REST API directly"
+            }
+          ]
+        }
+      ]
+    },
+    "h-25": {
+      "@type": "slate",
+      "plaintext": "4. Render Page Metadata",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "4. Render Page Metadata"
+            }
+          ]
+        }
+      ]
+    },
+    "p-26": {
+      "@type": "slate",
+      "plaintext": "In your page template, fill title etc. from the content metadata.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "In your page template, fill title etc. from the content metadata."
+            }
+          ]
+        }
+      ]
+    },
+    "h-27": {
+      "@type": "slate",
+      "plaintext": "5. Navigation",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "5. Navigation"
+            }
+          ]
+        }
+      ]
+    },
+    "ol-28": {
+      "@type": "slate",
+      "plaintext": "Adjust the contents API call to use @expand and return navigation data in the same call Create a component for your top-level nav that uses this nav JSON to create a menu",
+      "value": [
+        {
+          "type": "ol",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Adjust the contents API call to use "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "https://6.docs.plone.org/volto/configuration/expanders.html"
+                  },
+                  "children": [
+                    {
+                      "text": "`@expand`"
+                    }
+                  ]
+                },
+                {
+                  "text": " and return "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "https://6.docs.plone.org/plone.restapi/docs/source/endpoints/navigation.html"
+                  },
+                  "children": [
+                    {
+                      "text": "navigation data"
+                    }
+                  ]
+                },
+                {
+                  "text": " in the same call"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Create a component for your top-level nav that uses this nav JSON to create a menu"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "h-29": {
+      "@type": "slate",
+      "plaintext": "6. Blocks",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "6. Blocks"
+            }
+          ]
+        }
+      ]
+    },
+    "ol-30": {
+      "@type": "slate",
+      "plaintext": "Create a Block component that takes the id and block JSON as arguments Use if statements to check the block type and determine how to render that block If the block is a container, call the Block component recursively In your page, iterate down the blocks_layout list and render a Block component for each Rendering Slate — split into a separate component as it's used in many blocks and is also recursive",
+      "value": [
+        {
+          "type": "ol",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Create a "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "Block"
+                    }
+                  ]
+                },
+                {
+                  "text": " component that takes the id and block JSON as arguments"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Use if statements to check the block type and determine how to render that block"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "If the block is a container, call the "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "Block"
+                    }
+                  ]
+                },
+                {
+                  "text": " component recursively"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "In your page, iterate down the "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "blocks_layout"
+                    }
+                  ]
+                },
+                {
+                  "text": " list and render a "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "Block"
+                    }
+                  ]
+                },
+                {
+                  "text": " component for each"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Rendering Slate — split into a separate component as it's used in many blocks and is also recursive"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "h-31": {
+      "@type": "slate",
+      "plaintext": "7. Helper Functions",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "7. Helper Functions"
+            }
+          ]
+        }
+      ]
+    },
+    "p-32": {
+      "@type": "slate",
+      "plaintext": "Several helper functions get reused in many blocks:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Several helper functions get reused in many blocks:"
+            }
+          ]
+        }
+      ]
+    },
+    "ol-33": {
+      "@type": "slate",
+      "plaintext": "Generating a URL for links — all REST API URLs are relative to the API URL, so you need to convert these to the right frontend URL Generating a URL for an image — blocks have image data in many formats so a helper function is useful",
+      "value": [
+        {
+          "type": "ol",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Generating a URL for links"
+                    }
+                  ]
+                },
+                {
+                  "text": " — all REST API URLs are relative to the API URL, so you need to convert these to the right frontend URL"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Generating a URL for an image"
+                    }
+                  ]
+                },
+                {
+                  "text": " — blocks have image data in many formats so a helper function is useful"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-34": {
+      "@type": "slate",
+      "plaintext": "- You may also decide to use your framework or hosting solution for image resizing",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "- You may also decide to use your framework or hosting solution for image resizing"
+            }
+          ]
+        }
+      ]
+    },
+    "h-35": {
+      "@type": "slate",
+      "plaintext": "8. Listing Blocks",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "8. Listing Blocks"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-36": {
+      "@type": "slate",
+      "plaintext": "Use the Listing Helpers or make your own REST API call to query items Create your own pagination scheme (e.g., embed page in URL for static generation) Render the items and pagination",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Use the "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "listings.md"
+                  },
+                  "children": [
+                    {
+                      "text": "Listing Helpers"
+                    }
+                  ]
+                },
+                {
+                  "text": " or make your own "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html"
+                  },
+                  "children": [
+                    {
+                      "text": "REST API call to query items"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Create your own pagination scheme (e.g., embed page in URL for static generation)"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Render the items and pagination"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "h-37": {
+      "@type": "slate",
+      "plaintext": "9. Redirects",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "9. Redirects"
+            }
+          ]
+        }
+      ]
+    },
+    "ol-38": {
+      "@type": "slate",
+      "plaintext": "If your contents call results in a redirect, you will need to do an internal redirect in the framework so the path shown is correct If you are using SSG, you will need special code to query all the redirects at generate time and add redirect routes",
+      "value": [
+        {
+          "type": "ol",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "If your contents call results in a redirect, you will need to do an internal redirect in the framework so the path shown is correct"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "If you are using SSG, you will need special code to "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "https://6.docs.plone.org/plone.restapi/docs/source/endpoints/aliases.html#listing-all-available-aliases-via-json"
+                  },
+                  "children": [
+                    {
+                      "text": "query all the redirects"
+                    }
+                  ]
+                },
+                {
+                  "text": " at generate time and add redirect routes"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "h-39": {
+      "@type": "slate",
+      "plaintext": "10. Error Pages",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "10. Error Pages"
+            }
+          ]
+        }
+      ]
+    },
+    "p-40": {
+      "@type": "slate",
+      "plaintext": "If your [REST API call returns an error](https://6.docs.plone.org/plone.restapi/docs/source/http-status-codes.html), handle this within the framework to display the error and set the status code.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "If your "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "https://6.docs.plone.org/plone.restapi/docs/source/http-status-codes.html"
+              },
+              "children": [
+                {
+                  "text": "REST API call returns an error"
+                }
+              ]
+            },
+            {
+              "text": ", handle this within the framework to display the error and set the status code."
+            }
+          ]
+        }
+      ]
+    },
+    "h-41": {
+      "@type": "slate",
+      "plaintext": "11. Search Blocks",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "11. Search Blocks"
+            }
+          ]
+        }
+      ]
+    },
+    "p-42": {
+      "@type": "slate",
+      "plaintext": "If you choose to allow Volto's built-in Search Block for end-user customisable search:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "If you choose to allow Volto's built-in Search Block for end-user customisable search:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-43": {
+      "@type": "slate",
+      "plaintext": "Render Facets/Filters (currently not as sub-blocks but this could change) Build your query and make a REST API call to query items",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Render Facets/Filters (currently not as sub-blocks but this could change)"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Build your query and make a "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "https://6.docs.plone.org/plone.restapi/docs/source/endpoints/querystring.html"
+                  },
+                  "children": [
+                    {
+                      "text": "REST API call to query items"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "h-44": {
+      "@type": "slate",
+      "plaintext": "12. Form Blocks",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "12. Form Blocks"
+            }
+          ]
+        }
+      ]
+    },
+    "p-45": {
+      "@type": "slate",
+      "plaintext": "Form-block is a plugin that allows a visual form builder:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Form-block is a plugin that allows a visual form builder:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-46": {
+      "@type": "slate",
+      "plaintext": "Currently not a container with sub-blocks but this could change Render each field type component (or limit which are available) Produce a compatible JSON submission to the form-block endpoint Handle field validation errors Handle the thank-you page",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Currently not a container with sub-blocks but this could change"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Render each field type component (or limit which are available)"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Produce a compatible JSON submission to the form-block endpoint"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Handle field validation errors"
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Handle the thank-you page"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "h-47": {
+      "@type": "slate",
+      "plaintext": "Deployment patterns",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Deployment patterns"
+            }
+          ]
+        }
+      ]
+    },
+    "p-48": {
+      "@type": "slate",
+      "plaintext": "Hydra separates your production frontend from the editing experience, which gives you choice in how each is deployed.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Hydra separates your production frontend from the editing experience, which gives you choice in how each is deployed."
+            }
+          ]
+        }
+      ]
+    },
+    "h-49": {
+      "@type": "slate",
+      "plaintext": "SPA / Hybrid — full visual editing",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "SPA / Hybrid — full visual editing"
+            }
+          ]
+        }
+      ]
+    },
+    "p-50": {
+      "@type": "slate",
+      "plaintext": "The simplest setup — your frontend handles both production and editing:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The simplest setup — your frontend handles both production and editing:"
+            }
+          ]
+        }
+      ]
+    },
+    "ol-51": {
+      "@type": "slate",
+      "plaintext": "Deploy your frontend as SPA or Hybrid (SSR + client-side hydration). Deploy Hydra and the Plone API server. Log in to Hydra, go to user preferences, set your frontend URL.",
+      "value": [
+        {
+          "type": "ol",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Deploy your frontend as SPA or Hybrid (SSR + client-side hydration)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Deploy Hydra and the Plone API server."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "text": "Log in to Hydra, go to user preferences, set your frontend URL."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-52": {
+      "@type": "slate",
+      "plaintext": "This gives you all visual editing features including inline text editing, drag and drop, and realtime preview.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This gives you all visual editing features including inline text editing, drag and drop, and realtime preview."
+            }
+          ]
+        }
+      ]
+    },
+    "h-53": {
+      "@type": "slate",
+      "plaintext": "SSG / SSR — production speed + visual editing",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "SSG / SSR — production speed + visual editing"
+            }
+          ]
+        }
+      ]
+    },
+    "p-54": {
+      "@type": "slate",
+      "plaintext": "Get the speed of static generation while keeping visual editing. Deploy two versions of the same frontend:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Get the speed of static generation while keeping visual editing. Deploy two versions of the same frontend:"
+            }
+          ]
+        }
+      ]
+    },
+    "ol-55": {
+      "@type": "slate",
+      "plaintext": "Production — deploy your frontend in SSG or SSR mode (fast, cacheable). Editing — deploy the same frontend in SPA mode to a separate URL (used only inside Hydra). Hydra + Plone — only needs to run during editing, so scale-to-zero / serverless works. SSG rebuild — for SSG, configure collective.webhook to trigger a rebuild on edit. SSR doesn't need this.",
+      "value": [
+        {
+          "type": "ol",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Production"
+                    }
+                  ]
+                },
+                {
+                  "text": " — deploy your frontend in SSG or SSR mode (fast, cacheable)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Editing"
+                    }
+                  ]
+                },
+                {
+                  "text": " — deploy the same frontend in SPA mode to a separate URL (used only inside Hydra)."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Hydra + Plone"
+                    }
+                  ]
+                },
+                {
+                  "text": " — only needs to run during editing, so scale-to-zero / serverless works."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "SSG rebuild"
+                    }
+                  ]
+                },
+                {
+                  "text": " — for SSG, configure "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "https://github.com/collective/collective.webhook"
+                  },
+                  "children": [
+                    {
+                      "text": "collective.webhook"
+                    }
+                  ]
+                },
+                {
+                  "text": " to trigger a rebuild on edit. SSR doesn't need this."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "h-56": {
+      "@type": "slate",
+      "plaintext": "Example: the Nuxt.js demo",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Example: the Nuxt.js demo"
+            }
+          ]
+        }
+      ]
+    },
+    "p-57": {
+      "@type": "slate",
+      "plaintext": "The default Hydra demo uses exactly the SSG / SSR pattern above:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The default Hydra demo uses exactly the SSG / SSR pattern above:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-58": {
+      "@type": "slate",
+      "plaintext": "Production — SSG on Netlify. All pages statically generated, images optimized, fast globally. Editing — same Nuxt codebase deployed as SPA to a different Netlify URL. Only loaded inside Hydra's iframe. Hydra + Plone — deployed to fly.io with scale-to-zero. Cost is free or minimal since it only runs during editing.",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Production"
+                    }
+                  ]
+                },
+                {
+                  "text": " — "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "https://hydra-nuxt-flowbrite.netlify.app/"
+                  },
+                  "children": [
+                    {
+                      "text": "SSG on Netlify"
+                    }
+                  ]
+                },
+                {
+                  "text": ". All pages statically generated, images optimized, fast globally."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Editing"
+                    }
+                  ]
+                },
+                {
+                  "text": " — same Nuxt codebase deployed as SPA to a different Netlify URL. Only loaded inside Hydra's iframe."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Hydra + Plone"
+                    }
+                  ]
+                },
+                {
+                  "text": " — deployed to "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "https://hydra.pretagov.com"
+                  },
+                  "children": [
+                    {
+                      "text": "fly.io"
+                    }
+                  ]
+                },
+                {
+                  "text": " with scale-to-zero. Cost is free or minimal since it only runs during editing."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-59": {
+      "@type": "slate",
+      "plaintext": "For most frameworks, switching between SSG / SSR and SPA is just a config toggle, so you get the best of both worlds with minimal effort.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "For most frameworks, switching between SSG / SSR and SPA is just a config toggle, so you get the best of both worlds with minimal effort."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "p-1",
+      "ul-2",
+      "h-3",
+      "p-4",
+      "p-5",
+      "ul-6",
+      "p-7",
+      "p-8",
+      "ce-9",
+      "p-10",
+      "ce-11",
+      "p-12",
+      "ce-13",
+      "h-14",
+      "p-15",
+      "h-16",
+      "p-17",
+      "p-18",
+      "h-19",
+      "p-20",
+      "h-21",
+      "p-22",
+      "ul-23",
+      "p-24",
+      "h-25",
+      "p-26",
+      "h-27",
+      "ol-28",
+      "h-29",
+      "ol-30",
+      "h-31",
+      "p-32",
+      "ol-33",
+      "p-34",
+      "h-35",
+      "ul-36",
+      "h-37",
+      "ol-38",
+      "h-39",
+      "p-40",
+      "h-41",
+      "p-42",
+      "ul-43",
+      "h-44",
+      "p-45",
+      "ul-46",
+      "h-47",
+      "p-48",
+      "h-49",
+      "p-50",
+      "ol-51",
+      "p-52",
+      "h-53",
+      "p-54",
+      "ol-55",
+      "h-56",
+      "p-57",
+      "ul-58",
+      "p-59"
+    ]
+  }
+}

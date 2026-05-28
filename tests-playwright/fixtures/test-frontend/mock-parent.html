@@ -5,32 +5,66 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mock Parent Window - Hydra Format Testing</title>
   <style>
+    /* Mirror Volto's iframe-host layout (packages/volto-hydra/src/components/Iframe/styles.css):
+       body is a flex column that fills the viewport with overflow:hidden,
+       and the iframe-container/iframe expand to fill it. This stops the
+       parent page from being scrollable — without it, Playwright's
+       auto-scroll-to-target on Firefox would shift the iframe in the
+       viewport AFTER the admin had already placed overlays at the
+       pre-scroll position, causing a 29px outline-vs-block mismatch. */
+    html, body {
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
+    }
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
-      margin: 0;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
     }
     h1 {
       font-size: 20px;
-      margin-bottom: 10px;
+      margin: 0 0 10px;
+      flex-shrink: 0;
+    }
+    body > p {
+      flex-shrink: 0;
+      margin: 0 0 10px;
     }
     #iframe-container {
       border: 2px solid #ccc;
       margin-top: 20px;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
     }
     iframe {
       width: 100%;
-      height: 600px;
+      height: 100%;
       border: none;
     }
+    /* Log overlays the bottom of the viewport so it doesn't push the
+       iframe up. It scrolls within itself. pointer-events: none so
+       it doesn't intercept clicks on iframe content underneath
+       (mock-hero-block's buttonText sits near the bottom of the
+       iframe content area and would otherwise be unclickable). */
     #log {
-      margin-top: 20px;
+      position: fixed;
+      left: 20px;
+      right: 20px;
+      bottom: 20px;
       padding: 10px;
       background: #f0f0f0;
       font-family: monospace;
       font-size: 12px;
       max-height: 200px;
       overflow-y: auto;
+      z-index: 500;
+      opacity: 0.92;
+      pointer-events: none;
     }
     .log-entry {
       margin: 2px 0;
@@ -430,9 +464,28 @@
             ],
           },
         },
+        // codeExample block with a real <pre data-edit-text="code"> code
+        // field (type: string, registered via the tabs object-list schema).
+        // Lets replayKeys.spec.ts exercise replayOneKey's <pre> Enter/Tab
+        // handling against a real registered field, not a faked one.
+        'mock-code-block': {
+          '@type': 'codeExample',
+          tabs: [
+            { '@id': 'mock-code-tab', label: 'JavaScript', language: 'javascript', code: 'line1' },
+          ],
+        },
+        // form block — renders a real <button class="form-submit"
+        // data-edit-text="submit_label"> (submit_label is type: string),
+        // for replayKeys.spec.ts's <button> Space test.
+        'mock-form-block': {
+          '@type': 'form',
+          submit_label: 'Click',
+        },
       },
       blocks_layout: {
-        items: ['mock-block-1', 'mock-text-block', 'mock-multi-field-block', 'mock-textarea-block', 'mock-image-block', 'mock-columns', 'mock-table', 'mock-hero-block'],
+        // mock-hero-block is intentionally last — block-navigation.spec.ts:180
+        // ("ArrowDown at end of last block stays in same block") relies on it.
+        items: ['mock-block-1', 'mock-text-block', 'mock-multi-field-block', 'mock-textarea-block', 'mock-image-block', 'mock-columns', 'mock-table', 'mock-code-block', 'mock-form-block', 'mock-hero-block'],
       },
     };
 

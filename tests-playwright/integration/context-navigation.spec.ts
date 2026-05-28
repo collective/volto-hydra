@@ -62,7 +62,14 @@ test.describe('contextNavigation block', () => {
     await expect(selfLink).toHaveClass(/\blevel-1\b/);
   });
 
-  test('mobile disclosure toggle hidden on desktop, visible <768', async ({ page }) => {
+  test('summary renders as section header on desktop; both summary + list visible', async ({ page }) => {
+    // The cnav <summary> doubles as the visible section header (the
+    // editable block.ariaLabel text). On desktop it's styled as a
+    // small-caps section label (Stripe/MDN/Primer pattern) with the
+    // disclosure chevron hidden; on mobile it's the disclosure tap
+    // target (pill background + chevron). Both look different but the
+    // element is the same — keeps the [data-edit-text] for ariaLabel
+    // discoverable to the bridge in either viewport.
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/context-navigation-test-page');
@@ -71,19 +78,19 @@ test.describe('contextNavigation block', () => {
     const nav = iframe.locator('[data-block-uid="nav-1"]');
     await expect(nav).toBeVisible({ timeout: 10_000 });
 
-    // The disclosure summary is always in the DOM (as <details><summary>);
-    // CSS hides it on desktop and shows it on mobile.
     const summary = nav.locator('summary.context-navigation-summary');
-    await expect(summary).toBeAttached();
+    await expect(summary).toBeVisible();
 
-    // At the default viewport (≥768) the summary isn't visible. The list
-    // IS visible — the CSS forces `details > :not(summary)` open even
-    // when the <details> itself has no `open` attribute.
-    const summaryHidden = await summary.evaluate(
-      (el) => window.getComputedStyle(el).display === 'none',
-    );
-    expect(summaryHidden, 'summary hidden on desktop').toBe(true);
+    // Desktop styling: small-caps muted label, NOT a pill. The native
+    // disclosure marker (::-webkit-details-marker / list-style) is
+    // hidden so it doesn't look like a clickable disclosure.
+    const summaryStyle = await summary.evaluate((el) => {
+      const s = window.getComputedStyle(el);
+      return { textTransform: s.textTransform, listStyle: s.listStyle };
+    });
+    expect(summaryStyle.textTransform, 'desktop header uppercases').toBe('uppercase');
 
+    // List is also visible (details is open at desktop via matchMedia).
     const list = nav.locator('ul.context-navigation-list');
     await expect(list).toBeVisible();
   });
@@ -157,6 +164,33 @@ test.describe('contextNavigation block', () => {
     expect(hrefs).not.toContain('/_test_data/context-navigation-forced-folder/page-b/under-b');
   });
 
+  test('children of an exclude_from_nav folder are dropped (not shown as orphan roots)', async ({ page }) => {
+    // Fixture under context-navigation-forced-folder/page-a:
+    //   hidden-child            ← exclude_from_nav=true (folder)
+    //   hidden-child/orphan-grandchild   ← NOT excluded (leaf)
+    //
+    // The cnav listing's exclude_from_nav=isFalse criterion drops
+    // hidden-child but its child orphan-grandchild is still returned.
+    // Naive hierarchical sort would put orphan-grandchild at the top of
+    // cnav as a root (its parent isn't in the result). Author intent:
+    // marking a folder as "hide from nav" should hide its whole subtree.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/context-navigation-forced-folder/page-a');
+
+    const iframe = helper.getIframe();
+    const forcedNav = iframe.locator('nav[aria-label="In this section"]');
+    await expect(forcedNav.locator('a.nav-item').first()).toBeVisible({ timeout: 10_000 });
+
+    const hrefs = await forcedNav.locator('a.nav-item').evaluateAll((els) =>
+      els.map((el) => el.getAttribute('href')),
+    );
+    expect(hrefs).not.toContain('/_test_data/context-navigation-forced-folder/page-a/hidden-child');
+    expect(hrefs, 'orphan-grandchild must not appear: ancestor is exclude_from_nav').not.toContain(
+      '/_test_data/context-navigation-forced-folder/page-a/hidden-child/orphan-grandchild',
+    );
+  });
+
   test('includeTop prepends the section root as the first nav item', async ({ page }) => {
     // nav-5 (on context-navigation-test-page) sets includeTop:true. The
     // listing fetches /_test_data/context-navigation-forced-folder/* —
@@ -221,6 +255,50 @@ test('listing-derived level + hierarchical sort: depth=2 listing renders mixed l
     expect(deepIdx, 'deep-1 present').toBeGreaterThanOrEqual(0);
     expect(pageBIdx, 'page-b before page-a (position-0 first)').toBeLessThan(pageAIdx);
     expect(pageAIdx, 'page-a before its child deep-1 (hierarchical)').toBeLessThan(deepIdx);
+  });
+
+  test('bridge expose: selecting the hidden listing block opens its containing disclosure', async ({ page }) => {
+    // Companion to the navItem version below. The cnav <summary>'s
+    // data-block-selector word-list includes every direct child block
+    // uid — including listing children whose rendered output is the
+    // synthesised nav items (NOT a wrapper DOM element for the listing
+    // itself). So the listing block has no own DOM, yet the admin can
+    // still "select" it via SELECT_BLOCK, and the bridge needs to find
+    // the right <summary> to open via the word-list match.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/context-navigation-test-page');
+
+    const iframe = helper.getIframe();
+    // nav-2 has a single listing child with uid 'snav-listing' (per
+    // the fixture). Confirm the cnav details is mounted, then narrow
+    // viewport so matchMedia closes it.
+    const cnav = iframe.locator('[data-block-uid="nav-2"]');
+    await expect(cnav).toBeAttached({ timeout: 10_000 });
+    await page.setViewportSize({ width: 375, height: 800 });
+    const details = cnav.locator('details');
+    await expect.poll(
+      async () => details.evaluate((d: HTMLDetailsElement) => d.open),
+      { timeout: 5000 },
+    ).toBe(false);
+
+    // Sanity: the summary's data-block-selector lists snav-listing.
+    const selectorAttr = await cnav.locator('summary').getAttribute('data-block-selector');
+    expect(selectorAttr, 'summary exposes listing uid').toContain('snav-listing');
+
+    // Drive selection of the listing block — it has no visible DOM
+    // element of its own; the bridge looks for any element with that
+    // uid in its data-block-selector word-list (the <summary>) and
+    // opens the enclosing <details>.
+    await page.evaluate(() => {
+      const iframeEl = document.querySelector('iframe');
+      iframeEl.contentWindow.postMessage({ type: 'SELECT_BLOCK', uid: 'snav-listing' }, '*');
+    });
+
+    await expect.poll(
+      async () => details.evaluate((d: HTMLDetailsElement) => d.open),
+      { timeout: 5000 },
+    ).toBe(true);
   });
 
   test('bridge expose: at mobile viewport, selecting hidden navItem opens the disclosure', async ({ page }) => {

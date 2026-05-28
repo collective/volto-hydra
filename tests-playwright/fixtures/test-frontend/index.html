@@ -85,7 +85,7 @@
         .nav-item.in-path { color: #036; }
 
         /* Mobile (default): native <details> collapsed. Summary is the
-           tap target. */
+           tap target — styled as a clickable pill. */
         .context-navigation-summary {
             cursor: pointer;
             padding: 0.5rem 0.75rem;
@@ -94,18 +94,29 @@
             border-radius: 4px;
             list-style: revert;
             user-select: none;
+            font-weight: 600;
         }
-        /* Desktop: sidebar layout + hide summary (the matchMedia JS
-           opens [details] at this breakpoint so the toggle is redundant). */
+        /* Desktop: nav stays at top of the content. matchMedia opens
+           [details]; summary becomes a section-label header (small caps,
+           muted) à la Stripe/MDN/Primer. Drop the chevron + pill since
+           there's no interactive toggling happening visually. */
         @media (min-width: 768px) {
-            .context-navigation {
-                float: left;
-                width: 220px;
-                margin-right: 1.5rem;
-            }
             .context-navigation-summary {
-                display: none;
+                cursor: default;
+                padding: 0 0 0.25rem 0;
+                background: transparent;
+                border: none;
+                border-bottom: 1px solid #e5e7eb;
+                border-radius: 0;
+                margin-bottom: 0.5rem;
+                font-size: 0.75rem;
+                font-weight: 600;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                color: #6b7280;
+                list-style: none;
             }
+            .context-navigation-summary::-webkit-details-marker { display: none; }
         }
     </style>
 </head>
@@ -200,8 +211,15 @@
             // Set up expansion helper for container renderers
             // Use 'variation' field for item type (matches Volto listing block schema)
             // Returns { items, paging } where each item has @uid
-            window._expandListingBlocks = async (blocks, layout, containerId, paging) => {
-                return await expandListingBlocks(layout, { blocks, fetchItems: { listing: fetchItems }, paging, itemTypeField: 'variation' });
+            window._expandListingBlocks = async (blocks, layout, containerId, paging, contextOverride) => {
+                // contextOverride: run @querystring-search against a different
+                // content path. The contextNavigation block fetches its listing
+                // from the PARENT folder (not the current page) so the current
+                // page isn't dropped as the query's excluded "self".
+                const fi = contextOverride
+                    ? ploneFetchItems({ apiUrl: window._apiOrigin, contextPath: contextOverride, extraCriteria })
+                    : fetchItems;
+                return await expandListingBlocks(layout, { blocks, fetchItems: { listing: fi }, paging, itemTypeField: 'variation' });
             };
 
             // Convert layout IDs to block objects with @uid
@@ -300,7 +318,7 @@
                 const contextNavLayoutForced =
                     !contentPath.startsWith('/_test_data/')
                     && contentPath.split('/').filter(Boolean).length >= 2
-                        ? ['/_test_data/templates/context-navigation-layout']
+                        ? ['/templates/context-navigation-layout']
                         : null;
 
                 // Check if hydra bridge should be loaded

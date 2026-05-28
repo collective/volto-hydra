@@ -151,7 +151,7 @@ const Login = (props) => {
               </Header>
               <p style={{ margin: '1em 0 0.5em' }}>Editor for</p>
               <div style={{ display: 'flex', gap: '0.75em', flexWrap: 'wrap' }}>
-                {getURlsFromEnv().map((url) => {
+                {getURlsFromEnv().map(({ url, name }) => {
                   const displayUrl = url.replace(/#.*$/, '');
                   return (
                     <a
@@ -186,7 +186,7 @@ const Login = (props) => {
                       }}>
                         {getDomainInitials(url)}
                       </span>
-                      {new URL(displayUrl).hostname}
+                      {name || new URL(displayUrl).hostname}
                     </a>
                   );
                 })}

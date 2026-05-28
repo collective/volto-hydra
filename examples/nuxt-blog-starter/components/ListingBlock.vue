@@ -6,7 +6,7 @@
 </template>
 
 <script setup>
-import { inject, ref, reactive, watch } from 'vue';
+import { computed, ref, reactive, watch } from 'vue';
 import { expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';
 
 const props = defineProps({
@@ -20,8 +20,6 @@ const props = defineProps({
   apiUrl: { type: String, required: true },
   contextPath: { type: String, required: true },
 });
-
-const injectedPages = inject('pages', {});
 
 const route = useRoute();
 
@@ -38,10 +36,24 @@ function buildExtraCriteria(query) {
 // Create own paging if none shared.
 const ownsPaging = !props.paging;
 const DEFAULT_PAGE_SIZE = 6;
-const listingPage = ownsPaging
-  ? ((injectedPages.value || injectedPages)[props.id] || 0)
-  : 0;
-const paging = props.paging || reactive({ start: listingPage * DEFAULT_PAGE_SIZE, size: DEFAULT_PAGE_SIZE });
+
+// Parse our own paging segment out of the URL. The route is reactive,
+// so this re-evaluates whenever the iframe navigates to a paging URL
+// like `/path/@pg_<id>_<n>` — paging.start follows without a remount.
+const listingPage = computed(() => {
+  if (!ownsPaging) return 0;
+  const slug = route.params.slug || [];
+  const prefix = `@pg_${props.id}_`;
+  for (const part of slug) {
+    if (part.startsWith(prefix)) {
+      const n = Number(part.slice(prefix.length));
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return 0;
+});
+
+const paging = props.paging || reactive({ start: listingPage.value * DEFAULT_PAGE_SIZE, size: DEFAULT_PAGE_SIZE });
 
 async function fetchListing(query) {
   const opts = {
@@ -61,12 +73,17 @@ const result = await fetchListing(route.query);
 const items = ref(result.items);
 if (paging) Object.assign(paging, result.paging);
 
-// Re-fetch when route query or block data changes (e.g. variation change from sidebar).
-watch([() => route.query, () => props.block], async ([newQuery]) => {
-  const result = await fetchListing(newQuery);
-  items.value = result.items;
-  if (paging) Object.assign(paging, result.paging);
-}, { deep: false });
+// Re-fetch when route query, block data, or paging page (from URL) changes.
+watch(
+  [() => route.query, () => props.block, () => listingPage.value],
+  async ([newQuery, , newPage]) => {
+    if (ownsPaging) paging.start = newPage * DEFAULT_PAGE_SIZE;
+    const result = await fetchListing(newQuery);
+    items.value = result.items;
+    if (paging) Object.assign(paging, result.paging);
+  },
+  { deep: false },
+);
 
 // Build paging URL for own paging (per-listing)
 let contextPath = props.contextPath;

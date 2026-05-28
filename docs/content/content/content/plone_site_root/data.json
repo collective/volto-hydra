@@ -94,7 +94,7 @@
       "blocks": {
         "box-visual": {
           "@type": "slate",
-          "plaintext": "Visual Editing. True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes.",
+          "plaintext": "Visual Editing. True WYSIWYG with drag-and-drop blocks. No special frontend framework required \u2014 just HTML attributes.",
           "value": [
             {
               "children": [
@@ -112,7 +112,7 @@
             {
               "children": [
                 {
-                  "text": "True WYSIWYG with drag-and-drop blocks. No special frontend framework required — just HTML attributes."
+                  "text": "True WYSIWYG with drag-and-drop blocks. No special frontend framework required \u2014 just HTML attributes."
                 }
               ],
               "type": "p"
@@ -240,7 +240,7 @@
                 {
                   "children": [
                     {
-                      "text": "Hydra on GitHub — source code, issues, and documentation"
+                      "text": "Hydra on GitHub \u2014 source code, issues, and documentation"
                     }
                   ],
                   "data": {
@@ -317,7 +317,7 @@
           "head_title": "Welcome to Hydra",
           "href": [
             {
-              "@id": "/content-types",
+              "@id": "/docs/examples/content-types",
               "@type": "Document",
               "Description": "This section has a sample of content types available in this site.",
               "Title": "Content Types",
@@ -391,7 +391,7 @@
           "hideButton": false,
           "href": [
             {
-              "@id": "/block",
+              "@id": "/docs/examples",
               "@type": "Document",
               "Description": "",
               "Title": "Blocks",
@@ -455,79 +455,6 @@
             }
           ],
           "title": "You are enjoying one of many possible frontends"
-        },
-        {
-          "@id": "59d1d748-d722-4b15-8098-037bef1c99de",
-          "description": "Hydra sets your developers free",
-          "flagAlign": "left",
-          "head_title": "Welcome to Hydra",
-          "hideButton": true,
-          "href": [
-            {
-              "@id": "/vertical-spacing",
-              "@type": "Document",
-              "Description": "",
-              "Title": "Vertical Spacing",
-              "hasPreviewImage": null,
-              "head_title": null,
-              "image_field": "",
-              "title": "Vertical Spacing"
-            }
-          ],
-          "preview_image": [
-            {
-              "@id": "/images/penguin3.jpg",
-              "@type": "Image",
-              "CreationDate": "2024-03-08T13:05:46+01:00",
-              "Creator": "admin",
-              "Date": "2024-03-08T13:05:46+01:00",
-              "Description": "",
-              "EffectiveDate": "None",
-              "ExpirationDate": "None",
-              "ModificationDate": "2024-03-08T13:05:46+01:00",
-              "Subject": [],
-              "Title": "penguin3.jpg",
-              "Type": "Bild",
-              "UID": "7de78fea55354a29ad78b909efb07436",
-              "author_name": null,
-              "cmf_uid": null,
-              "commentators": [],
-              "created": "2024-03-08T12:05:46+00:00",
-              "description": "",
-              "effective": "1969-12-30T23:00:00+00:00",
-              "end": null,
-              "exclude_from_nav": false,
-              "expires": "2499-12-30T23:00:00+00:00",
-              "getIcon": true,
-              "getId": "penguin3.jpg",
-              "getObjSize": "1.0 MB",
-              "getPath": "/Plone/images/penguin3.jpg",
-              "getRemoteUrl": null,
-              "getURL": "http://localhost:3000/images/penguin3.jpg",
-              "hasPreviewImage": null,
-              "head_title": null,
-              "id": "penguin3.jpg",
-              "image_field": "image",
-              "in_response_to": null,
-              "is_folderish": false,
-              "last_comment_date": null,
-              "listCreators": [
-                "admin"
-              ],
-              "location": null,
-              "mime_type": "image/jpeg",
-              "modified": "2024-03-08T12:05:46+00:00",
-              "nav_title": null,
-              "portal_type": "Image",
-              "review_state": null,
-              "start": null,
-              "sync_uid": null,
-              "title": "penguin3.jpg",
-              "total_comments": 0,
-              "type_title": "Bild"
-            }
-          ],
-          "title": "Hydra is the key to have any frontend for Plone 6"
         }
       ],
       "styles": {}
@@ -821,10 +748,93 @@
         ]
       },
       "styles": {}
+    },
+    "video-hero-001": {
+      "@type": "video",
+      "url": "/docs/static/hydra-demo",
+      "align": "center",
+      "styles": {},
+      "autoplay": true,
+      "loop": true,
+      "muted": true,
+      "controls": false
+    },
+    "hero-cta": {
+      "@type": "slate",
+      "plaintext": "Try the demo  \u00b7  Source on GitHub",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "type": "link",
+              "data": {
+                "url": "https://hydra.pretagov.com/login?return_url=/"
+              },
+              "children": [
+                {
+                  "text": "Try the demo"
+                }
+              ]
+            },
+            {
+              "text": "  \u00b7  "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "https://github.com/collective/volto-hydra"
+              },
+              "children": [
+                {
+                  "text": "Source on GitHub"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "styles": {
+        "backgroundColor": "grey"
+      }
+    },
+    "hero-headline": {
+      "@type": "slate",
+      "plaintext": "Visual editing. Any frontend.",
+      "value": [
+        {
+          "type": "h1",
+          "children": [
+            {
+              "text": "Visual editing. Any frontend."
+            }
+          ]
+        }
+      ],
+      "styles": {}
+    },
+    "hero-subhead": {
+      "@type": "slate",
+      "plaintext": "A visual headless CMS using Plone \u2014 drag-and-drop blocks and inline text editing, with whichever frontend stack you choose.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A visual headless CMS using Plone \u2014 drag-and-drop blocks and inline text editing, with whichever frontend stack you choose."
+            }
+          ]
+        }
+      ],
+      "styles": {}
     }
   },
   "blocks_layout": {
     "items": [
+      "hero-headline",
+      "hero-subhead",
+      "hero-cta",
+      "video-hero-001",
       "why-hydra-heading",
       "why-hydra-tagline",
       "why-hydra-quadrant",
@@ -844,7 +854,7 @@
   "creators": [
     "admin"
   ],
-  "description": "A Visual Headless CMS — true visual editing with drag and drop blocks using any frontend stack",
+  "description": "A Visual Headless CMS \u2014 true visual editing with drag and drop blocks using any frontend stack",
   "effective": null,
   "exclude_from_nav": false,
   "expires": null,

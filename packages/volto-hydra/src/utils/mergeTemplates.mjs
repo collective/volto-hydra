@@ -119,11 +119,18 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
               filterInstanceId,
               idField,
             });
-            // Strip @uid (transport field) and write back through dataPath
+            // Strip @uid (transport field) and write back through dataPath.
+            // Clone each level while descending: processedBlock is a shallow
+            // copy of `block`, so its nested objects (e.g. block.table for
+            // slateTable's table.rows dataPath) are still the original —
+            // and INITIAL_DATA arrives deep-frozen, so a direct assignment
+            // throws "Cannot assign to read only property".
             const cleaned = expanded.map(({ '@uid': _uid, ...rest }) => rest);
             let target = processedBlock;
             for (let i = 0; i < dataPath.length - 1; i++) {
-              target = target[dataPath[i]];
+              const key = dataPath[i];
+              target[key] = { ...target[key] };
+              target = target[key];
             }
             target[dataPath[dataPath.length - 1]] = cleaned;
           }

@@ -5,6 +5,7 @@
   "id": "another-page",
   "title": "Another Page",
   "description": "Another test page for linking",
+  "effective": "2024-11-01T00:00:00+00:00",
   "review_state": "published",
   "preview_image": true,
   "parent": {

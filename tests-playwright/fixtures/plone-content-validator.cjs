@@ -56,7 +56,20 @@ function* walkData(contentDir) {
 }
 
 /**
- * Export-shape validation. Mirrors validate-content.py.
+ * Export-shape validation. Mirrors validate-content.py, plus a few checks
+ * we've learned about the hard way at site-creation time:
+ *
+ *   - `id` starting with underscore — Plone OFS rejects with
+ *     "BadRequest: The id ... is invalid because it begins with an underscore"
+ *     (see Products/CMFCore/PortalFolder.py).
+ *   - Top-level `content` key in __metadata__.json — Plone's
+ *     ExportImportMetadata.__init__ rejects unknown kwargs at site creation
+ *     and the whole import aborts before any content is created.
+ *   - Every UID has a local_roles entry — without it, the imported page
+ *     has no owner and may not be reachable from the admin.
+ *
+ * Walks the entire content tree (not just direct children) so nested
+ * pages catch the same failures as top-level ones.
  */
 function validate(contentDir) {
   const errors = [];
@@ -82,27 +95,40 @@ function validate(contentDir) {
     }
   }
 
-  // Per-item checks on direct children of contentDir
-  for (const { name, dataFile } of listDataEntries(contentDir)) {
-    const entry = `${name}/data.json`;
-    if (!listed.has(entry)) {
+  // ExportImportMetadata is a strict dataclass — unknown kwargs raise TypeError.
+  // The legitimate top-level keys here are:
+  //   __version__, _blob_files_, _data_files_, default_page, local_roles,
+  //   ordering, relations
+  if ('content' in meta) {
+    errors.push("  __metadata__.json has top-level 'content' key — ExportImportMetadata rejects this at site creation. Use 'local_roles' instead.");
+  }
+
+  // Per-item checks on EVERY data.json in the tree (not just direct children)
+  const allUids = new Set();
+  for (const { rel, data, dir } of walkData(contentDir)) {
+    const relSlash = rel.split(path.sep).join('/');
+    const entry = relSlash === '.' ? 'data.json' : `${relSlash}/data.json`;
+    const isRoot = relSlash === 'plone_site_root';
+    const contentType = data['@type'] || '?';
+
+    if (entry !== 'data.json' && !listed.has(entry)) {
       errors.push(`  ${entry} on disk but not in __metadata__.json _data_files_`);
     }
-    const d = readJson(dataFile);
-    const contentType = d['@type'] || '?';
-
-    if (name !== 'plone_site_root' && !d.UID) {
+    if (!isRoot && !data.UID) {
       errors.push(`  ${entry} missing UID`);
     }
-    if (name !== 'plone_site_root' && !d.parent) {
+    if (!isRoot && !data.parent) {
       errors.push(`  ${entry} missing parent`);
     }
-    if (!d.id) {
+    if (!data.id) {
       errors.push(`  ${entry} has empty id`);
+    } else if (/^_/.test(data.id)) {
+      errors.push(`  ${entry} id "${data.id}" starts with underscore (Plone OFS rejects this at import)`);
     }
+    if (data.UID) allUids.add(data.UID);
 
     if (contentType === 'Image') {
-      const img = d.image || {};
+      const img = data.image || {};
       const blobPath = img.blob_path || '';
       const download = img.download || '';
       if (download && download.startsWith('http')) {
@@ -155,6 +181,19 @@ function validate(contentDir) {
   for (const entry of listedBlobs) {
     if (!fs.existsSync(path.join(contentDir, entry))) {
       errors.push(`  ${entry} in _blob_files_ but missing from disk`);
+    }
+  }
+
+  // local_roles coverage: every UID needs an entry; every entry needs a UID.
+  const localRoles = meta.local_roles || {};
+  for (const uid of allUids) {
+    if (!(uid in localRoles)) {
+      errors.push(`  UID ${uid} not in __metadata__.json local_roles`);
+    }
+  }
+  for (const uid of Object.keys(localRoles)) {
+    if (!allUids.has(uid)) {
+      warnings.push(`  UID ${uid} listed in local_roles but no on-disk data.json claims it`);
     }
   }
 

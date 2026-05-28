@@ -683,14 +683,15 @@ test.describe('Block Mode (Escape state machine)', () => {
     await expect(page.locator('.volto-hydra-block-outline[data-outline-style="border"]'))
       .toBeVisible({ timeout: 3000 });
 
-    // Third Cmd+A: selects all sibling blocks (multi-selection)
+    // Third Cmd+A: selects all sibling blocks (multi-selection).
+    // col-1 has 3 children: text-1a, text-1b, col1-img-1.
     await page.keyboard.press('ControlOrMeta+a');
 
-    await helper.waitForMultiSelectOutlines(2);
+    await helper.waitForMultiSelectOutlines(3);
 
-    // Sidebar should show "2 selected" summary bar
+    // Sidebar should show "3 selected" summary bar
     await expect(page.locator('.multi-select-bar'))
-      .toContainText('2 selected', { timeout: 3000 });
+      .toContainText('3 selected', { timeout: 3000 });
   });
 
   test('Cmd+A in block mode selects all sibling blocks', async ({ page }) => {
@@ -742,19 +743,25 @@ test.describe('Block Mode (Escape state machine)', () => {
     await helper.clickBlockInIframe('text-1a');
     await helper.waitForIframeBlockHandle('text-1a');
 
-    // Press 1: text in field. Press 2: block mode. Press 3: siblings in col-1.
+    // Press 1: text in field. Press 2: block mode. Press 3: siblings in
+    // col-1 (text-1a, text-1b, col1-img-1 = 3 blocks).
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.press('ControlOrMeta+a');
-    await helper.waitForMultiSelectOutlines(2);
+    await helper.waitForMultiSelectOutlines(3);
     const level3Count = await page.locator('.selected-block-path').count();
-    expect(level3Count).toBe(2);
+    expect(level3Count).toBe(3);
 
-    // Press 4: escalate to siblings of col-1 (inside columns-1). Should include col-2 at minimum.
+    // Press 4: escalate to siblings of col-1 (inside columns-1). The
+    // signal is that a Column entry (col-2) shows up in the selection —
+    // counts alone aren't enough since columns-1 has only 2 columns,
+    // matching col-1's 2 children.
     await page.keyboard.press('ControlOrMeta+a');
-    await expect.poll(async () => page.locator('.selected-block-path').count(), {
-      timeout: 3000,
-    }).toBeGreaterThan(level3Count);
+    await expect.poll(async () => {
+      const rows = page.locator('.selected-block-path');
+      const texts = await rows.allTextContents();
+      return texts.some((t) => t.includes('Column')) ? texts.length : null;
+    }, { timeout: 3000 }).not.toBeNull();
     const level4Count = await page.locator('.selected-block-path').count();
 
     // Press 5: escalate to columns-1's siblings (page level). Page has title + columns-1 + text-after + grid-1.
@@ -1004,6 +1011,53 @@ test.describe('Multi-Block Selection', () => {
     await expect(page.locator('.volto-hydra-block-outline')).not.toBeVisible({ timeout: 3000 });
   });
 
+  // Regression: ChildBlocksWidget's onClick handler used to close over
+  // useSelector's `multiSelected`. Two ctrl+clicks fired back-to-back (no
+  // React re-render between them) both saw the pre-first-click value, so
+  // the second dispatch overwrote the first instead of appending —
+  // multiSelected ended up containing only the second item. This is hard
+  // to surface from the existing 'Ctrl+Click in sidebar block list…'
+  // test because the failure depends on click timing relative to React
+  // render commits. This test forces the race by issuing both clicks
+  // via dispatchEvent in a single page.evaluate (zero React render time
+  // between them) and asserts both ids end up in multiSelected.
+  test('two rapid ctrl+clicks in ChildBlocksWidget both multi-select (no stale-closure overwrite)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    // Navigate the sidebar so col-1 is current and its child rows render.
+    await helper.clickBlockInIframe('text-1a');
+    await helper.waitForIframeBlockHandle('text-1a');
+    await helper.escapeToParent();
+    await helper.waitForIframeBlockHandle('col-1');
+
+    const blockList = page.locator('.child-blocks-widget');
+    await expect(blockList.locator('.child-block-item')).toHaveCount(3);
+
+    // Fire both ctrl+click events synchronously via JS — no awaits, no
+    // React render commit between them. The pre-fix code would overwrite
+    // the first dispatch with the second; the fix reads fresh state from
+    // the store at click time so both append.
+    await page.evaluate(() => {
+      const rows = document.querySelectorAll(
+        '.child-blocks-widget .child-block-item',
+      );
+      const fire = (el: Element) => {
+        const ev = new MouseEvent('click', {
+          bubbles: true, cancelable: true, ctrlKey: true, metaKey: true,
+        });
+        el.dispatchEvent(ev);
+      };
+      fire(rows[0]);
+      fire(rows[1]);
+    });
+
+    // Both rows should end up with .selected class.
+    await expect(blockList.locator('.child-block-item.selected'))
+      .toHaveCount(2, { timeout: 5_000 });
+  });
+
   test('Ctrl+Click in sidebar block list multi-selects and highlights blocks', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -1020,8 +1074,8 @@ test.describe('Multi-Block Selection', () => {
 
     // Ctrl+Click first item (text-1a)
     await blockList.locator('.child-block-item').first().click({ modifiers: ['ControlOrMeta'] });
-    // Ctrl+Click second item (text-1b)
-    await blockList.locator('.child-block-item').last().click({ modifiers: ['ControlOrMeta'] });
+    // Ctrl+Click second item (text-1b — col-1 has text-1a, text-1b, col1-img-1)
+    await blockList.locator('.child-block-item').nth(1).click({ modifiers: ['ControlOrMeta'] });
 
     // Both items should be highlighted in the block list
     await expect(blockList.locator('.child-block-item.selected'))
@@ -1036,7 +1090,7 @@ test.describe('Multi-Block Selection', () => {
 
     // Sidebar view should NOT have changed — still showing col-1's children
     // (Ctrl+Click toggles selection, doesn't navigate to the clicked block)
-    await expect(blockList.locator('.child-block-item')).toHaveCount(2);
+    await expect(blockList.locator('.child-block-item')).toHaveCount(3);
   });
 
   test('Shift+Click in sidebar block list selects range and highlights', async ({ page }) => {
