@@ -375,14 +375,25 @@ for (var part of route.params.slug) {
     }
 }
 
-// Detect edit mode synchronously at setup time. We need the answer
-// BEFORE the (await ploneApi) below, so we can skip the page fetch.
-// `window.name` is set by the admin before the iframe loads and
-// persists across in-page paging; the `_edit` query string is the
-// SSR-safe fallback but gets dropped by paging URLs.
+// Detect edit mode synchronously at setup time. `window.name` is set
+// by the admin before the iframe loads and persists across in-page
+// paging; the `_edit` query string is the SSR-safe fallback but gets
+// dropped by paging URLs.
 const inEditModeAtSetup =
     route.query._edit === 'true'
     || (typeof window !== 'undefined' && window.name?.startsWith('hydra-edit:'));
+
+// retrieve the data associated with an article
+// based on its slug (pre-loads templates for sync expansion)
+const result = await ploneApi({ path, pages, preloadTemplates });
+
+// Moved content: ploneApi detected the backend's 302 and resolved the
+// new frontend path. Issue a permanent redirect from the page setup
+// (where Nuxt honors SSR redirects) before rendering the old route.
+if (result.redirectTo) {
+  await navigateTo(result.redirectTo, { redirectCode: 301 });
+}
+const { data, error } = result;
 
 // In edit mode the bridge owns the page document — it ships the only
 // copy that carries the `nodeId` attributes selection sync depends on
@@ -395,7 +406,6 @@ const inEditModeAtSetup =
 // strip it down to just the metadata our rules consume; the bridge's
 // onEditChange will replace it with the full nodeId-bearing copy.
 // Site-wide navigation is fetched once by useSiteNav() inside Header.
-const { data, error } = await ploneApi({ path, pages, preloadTemplates });
 if (inEditModeAtSetup && data.value?.page) {
   data.value.page = {
     '@id':   data.value.page['@id'],

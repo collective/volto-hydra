@@ -39,6 +39,31 @@ function parseContentMounts() {
 
 const CONTENT_MOUNTS = parseContentMounts();
 
+/**
+ * Resolve a moved-content redirect, mimicking plone.app.redirector.
+ * Each mount may carry a redirects.json sibling ({ oldPath: newPath },
+ * mount-relative) next to its content dir. Returns the new mount-prefixed
+ * path or null. Read fresh each call (tiny file, only hit on a 404) so dev
+ * edits to redirects.json take effect without a restart.
+ */
+function getRedirectTarget(cleanPath) {
+  for (const { mountPath, dirPath } of CONTENT_MOUNTS) {
+    const redirectsFile = path.join(dirPath, '..', 'redirects.json');
+    if (!fs.existsSync(redirectsFile)) continue;
+    let map;
+    try { map = JSON.parse(fs.readFileSync(redirectsFile, 'utf8')); }
+    catch { continue; }
+    const rel = mountPath === '/'
+      ? cleanPath
+      : (cleanPath.startsWith(mountPath) ? cleanPath.slice(mountPath.length) || '/' : null);
+    if (rel == null) continue;
+    if (map[rel]) {
+      return mountPath === '/' ? map[rel] : mountPath + map[rel];
+    }
+  }
+  return null;
+}
+
 // Validate each mounted content tree at startup. Errors are loud (listed)
 // but non-fatal — tests using the mock API still start. Set
 // SKIP_CONTENT_VALIDATION=true to suppress entirely.
@@ -2471,6 +2496,13 @@ app.get('*', (req, res, next) => {
     }
     res.json(filteredContent);
   } else {
+    // plone.app.redirector: moved content 302s (GET) to the new path, keeping
+    // the ++api++ namespace. The frontend (ploneApi) upgrades this to a 301.
+    const redirectTo = getRedirectTarget(cleanPath);
+    if (redirectTo) {
+      res.redirect(302, `http://localhost:${PORT}/++api++${redirectTo}`);
+      return;
+    }
     res.status(404).json({
       error: {
         type: 'NotFound',
