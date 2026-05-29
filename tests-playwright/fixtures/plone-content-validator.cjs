@@ -303,27 +303,43 @@ function checkIntegrity(contentDir) {
     }
   }
 
-  // Pass 2c: Internal link refs in blocks (image.url paths, teaser/button hrefs)
+  // Pass 2c: Internal link refs in blocks. Covers any block's plain `url`
+  // string (image, hero, button, ...) and `href` link-object arrays
+  // (teaser/button/cta), walking nested blocks (sections, grids, columns)
+  // — not just the top level, so a broken CTA inside a section is caught too.
+  const isInternalPath = (u) =>
+    typeof u === 'string' && u.startsWith('/') &&
+    !u.includes('resolveuid') && !u.includes('@@') && !u.includes('/++');
+
+  function* walkBlocks(blocks) {
+    for (const [bid, block] of Object.entries(blocks || {})) {
+      if (!block || typeof block !== 'object') continue;
+      yield [bid, block];
+      if (block.blocks && typeof block.blocks === 'object') {
+        yield* walkBlocks(block.blocks);
+      }
+    }
+  }
+
   for (const { rel, data } of items) {
-    const blocks = data.blocks || {};
-    for (const [bid, block] of Object.entries(blocks)) {
-      if (block && block['@type'] === 'image') {
-        const url = block.url;
-        if (typeof url === 'string' && url.startsWith('/') && !url.includes('resolveuid')) {
-          if (pathMap.has(url)) {
-            stats.linksOk += 1;
-          } else {
-            warnings.push(`  ${rel}: image block ${bid} references missing path: ${url}`);
-            stats.linksBroken += 1;
-          }
+    for (const [bid, block] of walkBlocks(data.blocks)) {
+      // Plain string url on any block (hero CTA, image, button-with-url, ...)
+      if (isInternalPath(block.url)) {
+        if (pathMap.has(block.url)) {
+          stats.linksOk += 1;
+        } else {
+          warnings.push(`  ${rel}: block ${bid} (${block['@type']}) url references missing: ${block.url}`);
+          stats.linksBroken += 1;
         }
       }
-      const href = block && block.href;
-      if (Array.isArray(href)) {
-        for (const h of href) {
-          if (h && typeof h === 'object') {
-            const linkId = h['@id'] || '';
-            if (typeof linkId === 'string' && linkId.startsWith('/') && !pathMap.has(linkId)) {
+      // href link-object arrays (teaser/button/cta)
+      if (Array.isArray(block.href)) {
+        for (const h of block.href) {
+          const linkId = (h && typeof h === 'object') ? (h['@id'] || '') : '';
+          if (isInternalPath(linkId)) {
+            if (pathMap.has(linkId)) {
+              stats.linksOk += 1;
+            } else {
               warnings.push(`  ${rel}: block ${bid} href references missing: ${linkId}`);
               stats.linksBroken += 1;
             }
