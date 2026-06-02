@@ -24,12 +24,6 @@ catalogs:
     '@testing-library/react':
       specifier: ^16.3.2
       version: 16.3.2
-    '@types/react':
-      specifier: ^18.3.1
-      version: 18.3.30
-    '@types/react-dom':
-      specifier: ^18.3.1
-      version: 18.3.7
     '@vitejs/plugin-react':
       specifier: ^5.0.2
       version: 5.2.0
@@ -106,8 +100,8 @@ overrides:
   slate-history: 0.109.0
   react: 18.2.0
   react-dom: 18.2.0
-
-pnpmfileChecksum: sha256-dFy7ngLwhYOBDl5xCrgRP3d50zz0rubPIU9cRMLYzYw=
+  '@types/react': 18.3.30
+  '@types/react-dom': 18.3.7
 
 importers:
 
@@ -338,10 +332,10 @@ importers:
         specifier: ^3.5.7
         version: 3.5.9
       '@types/react':
-        specifier: 'catalog:'
+        specifier: 18.3.30
         version: 18.3.30
       '@types/react-dom':
-        specifier: 'catalog:'
+        specifier: 18.3.7
         version: 18.3.7(@types/react@18.3.30)
       '@vitejs/plugin-react':
         specifier: 'catalog:'
@@ -411,10 +405,10 @@ importers:
         specifier: workspace:*
         version: link:../types
       '@types/react':
-        specifier: ^18
+        specifier: 18.3.30
         version: 18.3.30
       '@types/react-dom':
-        specifier: ^18
+        specifier: 18.3.7
         version: 18.3.7(@types/react@18.3.30)
       '@types/react-redux':
         specifier: ^7.1.33
@@ -468,10 +462,10 @@ importers:
         specifier: ^24
         version: 24.12.4
       '@types/react':
-        specifier: ^18
+        specifier: 18.3.30
         version: 18.3.30
       '@types/react-dom':
-        specifier: ^18
+        specifier: 18.3.7
         version: 18.3.7(@types/react@18.3.30)
       '@types/tmp':
         specifier: ^0.2.6
@@ -554,10 +548,10 @@ importers:
         version: 18.2.0(react@18.2.0)
     devDependencies:
       '@types/react':
-        specifier: ^18
+        specifier: 18.3.30
         version: 18.3.30
       '@types/react-dom':
-        specifier: ^18
+        specifier: 18.3.7
         version: 18.3.7(@types/react@18.3.30)
       release-it:
         specifier: 'catalog:'
@@ -951,10 +945,10 @@ importers:
         specifier: ^24
         version: 24.12.4
       '@types/react':
-        specifier: ^18
+        specifier: 18.3.30
         version: 18.3.30
       '@types/react-dom':
-        specifier: ^18
+        specifier: 18.3.7
         version: 18.3.7(@types/react@18.3.30)
       '@types/react-intl-redux':
         specifier: ^0.1.19
@@ -1443,10 +1437,10 @@ importers:
         version: 9.1.0(react@18.2.0)
       react-intl:
         specifier: 3.12.1
-        version: 3.12.1(@types/react@19.2.7)(react@18.2.0)
+        version: 3.12.1(@types/react@18.3.30)(react@18.2.0)
       react-redux:
         specifier: 8.1.2
-        version: 8.1.2(@types/react-dom@18.3.7(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(redux@4.2.1)
+        version: 8.1.2(@types/react-dom@18.3.7(@types/react@18.3.30))(@types/react@18.3.30)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(redux@4.2.1)
       react-router-dom:
         specifier: 5.2.0
         version: 5.2.0(react@18.2.0)
@@ -1483,7 +1477,7 @@ importers:
     devDependencies:
       '@testing-library/react':
         specifier: 'catalog:'
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7(@types/react@18.3.30))(@types/react@18.3.30)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       jsdom:
         specifier: 'catalog:'
         version: 28.1.0(@noble/hashes@1.8.0)
@@ -3895,7 +3889,7 @@ packages:
   '@mdx-js/react@3.1.1':
     resolution: {integrity: sha512-f++rKLQgUVYDAtECQ6fn/is15GkEH9+nZPM3MS0RcxVqoTfawHvDlSCH7JbMhAM6uJ32v3eXLvLmLvjGu7PTQw==}
     peerDependencies:
-      '@types/react': '>=16'
+      '@types/react': 18.3.30
       react: 18.2.0
 
   '@napi-rs/wasm-runtime@0.2.12':
@@ -5002,7 +4996,7 @@ packages:
     resolution: {integrity: sha512-Aqhl2IVmLt8IovEVarNDFuJDVWVvhnr9/GCU6UUnrYXwgDFF9h2L2o2P9KBni1AST5sT6riAyoukFLyjQUgD/g==}
     engines: {node: '>=12'}
     peerDependencies:
-      '@types/react': ^16.9.0 || ^17.0.0
+      '@types/react': 18.3.30
       react: 18.2.0
       react-dom: 18.2.0
       react-test-renderer: ^16.9.0 || ^17.0.0
@@ -5019,8 +5013,8 @@ packages:
     engines: {node: '>=18'}
     peerDependencies:
       '@testing-library/dom': ^10.0.0
-      '@types/react': ^18.0.0 || ^19.0.0
-      '@types/react-dom': ^18.0.0 || ^19.0.0
+      '@types/react': 18.3.30
+      '@types/react-dom': 18.3.7
       react: 18.2.0
       react-dom: 18.2.0
     peerDependenciesMeta:
@@ -5134,7 +5128,7 @@ packages:
   '@types/hoist-non-react-statics@3.3.7':
     resolution: {integrity: sha512-PQTyIulDkIDro8P+IHbKCsw7U2xxBYflVzW/FgWdCAePD9xGSidgA76/GeJ6lBKoblyhf9pBY763gbrN+1dI8g==}
     peerDependencies:
-      '@types/react': '*'
+      '@types/react': 18.3.30
 
   '@types/html-minifier-terser@6.1.0':
     resolution: {integrity: sha512-oh/6byDPnL1zeNXFrDXFLyZjkr1MsBG667IM792caf1L2UPOOMf65NFzjUH/ltyfwjAGfs1rsX1eftK0jC/KIg==}
@@ -5224,7 +5218,7 @@ packages:
   '@types/react-dom@18.3.7':
     resolution: {integrity: sha512-MEe3UeoENYVFXzoXEWsvcpg6ZvlrFNlOQ7EOsvhI3CfAXwzPfO8Qwuxd40nepsYKqyyVQnTdEfv68q91yLcKrQ==}
     peerDependencies:
-      '@types/react': ^18.0.0
+      '@types/react': 18.3.30
 
   '@types/react-intl-redux@0.1.19':
     resolution: {integrity: sha512-upa3MY7MiskgTAHBza0nS/D/a4YmnKol7ieHOpkgds8AQBEEXHwP0MKDGni7TcsjWekqYnXSExiTj/jg1pNhDg==}
@@ -5243,9 +5237,6 @@ packages:
 
   '@types/react@18.3.30':
     resolution: {integrity: sha512-3ek6mwJL5/VBewBcY4S66cqlCtK3qi4WIq37Z0m/NHw1hjhI7274Mx1qz/+ggSzyBCOEf7eHjBN6INjPAWYfYw==}
-
-  '@types/react@19.2.7':
-    resolution: {integrity: sha512-MWtvHrGZLFttgeEj28VXHxpmwYbor/ATPYbBfSFZEIRK0ecCFLl2Qo55z52Hss+UV9CRN7trSeq1zbgx7YDWWg==}
 
   '@types/redux-mock-store@1.5.0':
     resolution: {integrity: sha512-jcscBazm6j05Hs6xYCca6psTUBbFT2wqMxT7wZEHAYFxHB/I8jYk7d5msrHUlDiSL02HdTqTmkK2oIV8i3C8DA==}
@@ -9641,7 +9632,7 @@ packages:
     resolution: {integrity: sha512-B/PsewAQ0UOS5e2+TTWegUPQ3SCLPCjPY24LYUjfn2EorGlluTA2dFjVLgF1+xHLjK9Jit3y5mKHyMG3Xq/GZg==}
     engines: {node: '>=12.20.0'}
     peerDependencies:
-      '@types/react': '>=17.0.0'
+      '@types/react': 18.3.30
       react: 18.2.0
     peerDependenciesMeta:
       '@types/react':
@@ -11981,8 +11972,8 @@ packages:
   react-redux@8.1.2:
     resolution: {integrity: sha512-xJKYI189VwfsFc4CJvHqHlDrzyFTY/3vZACbE+rr/zQ34Xx1wQfB4OTOSeOSNrF6BDVe8OOdxIrAnMGXA3ggfw==}
     peerDependencies:
-      '@types/react': ^16.8 || ^17.0 || ^18.0
-      '@types/react-dom': ^16.8 || ^17.0 || ^18.0
+      '@types/react': 18.3.30
+      '@types/react-dom': 18.3.7
       react: 18.2.0
       react-dom: 18.2.0
       react-native: '>=0.59'
@@ -17485,7 +17476,7 @@ snapshots:
       '@types/istanbul-lib-coverage': 2.0.6
       collect-v8-coverage: 1.0.3
 
-  '@jest/test-sequencer@26.6.3(ts-node@10.9.2(@types/node@22.19.3)(typescript@5.9.3))':
+  '@jest/test-sequencer@26.6.3':
     dependencies:
       '@jest/test-result': 26.6.2
       graceful-fs: 4.2.11
@@ -17493,11 +17484,7 @@ snapshots:
       jest-runner: 26.6.3(ts-node@10.9.2(@types/node@22.19.3)(typescript@5.9.3))
       jest-runtime: 26.6.3(ts-node@10.9.2(@types/node@22.19.3)(typescript@5.9.3))
     transitivePeerDependencies:
-      - bufferutil
-      - canvas
       - supports-color
-      - ts-node
-      - utf-8-validate
 
   '@jest/test-sequencer@30.2.0':
     dependencies:
@@ -18985,16 +18972,6 @@ snapshots:
       '@types/react': 18.3.30
       '@types/react-dom': 18.3.7(@types/react@18.3.30)
 
-  '@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
-    dependencies:
-      '@babel/runtime': 7.28.4
-      '@testing-library/dom': 10.4.1
-      react: 18.2.0
-      react-dom: 18.2.0(react@18.2.0)
-    optionalDependencies:
-      '@types/react': 19.2.7
-      '@types/react-dom': 18.3.7(@types/react@19.2.7)
-
   '@testing-library/user-event@14.5.2(@testing-library/dom@10.4.0)':
     dependencies:
       '@testing-library/dom': 10.4.0
@@ -19127,11 +19104,6 @@ snapshots:
       '@types/react': 18.3.30
       hoist-non-react-statics: 3.3.2
 
-  '@types/hoist-non-react-statics@3.3.7(@types/react@19.2.7)':
-    dependencies:
-      '@types/react': 19.2.7
-      hoist-non-react-statics: 3.3.2
-
   '@types/html-minifier-terser@6.1.0': {}
 
   '@types/http-errors@2.0.5': {}
@@ -19214,11 +19186,6 @@ snapshots:
     dependencies:
       '@types/react': 18.3.30
 
-  '@types/react-dom@18.3.7(@types/react@19.2.7)':
-    dependencies:
-      '@types/react': 19.2.7
-    optional: true
-
   '@types/react-intl-redux@0.1.19(@types/react@18.3.30)(react@18.2.0)':
     dependencies:
       '@types/react-redux': 7.1.34
@@ -19253,10 +19220,6 @@ snapshots:
   '@types/react@18.3.30':
     dependencies:
       '@types/prop-types': 15.7.15
-      csstype: 3.2.3
-
-  '@types/react@19.2.7':
-    dependencies:
       csstype: 3.2.3
 
   '@types/redux-mock-store@1.5.0':
@@ -24518,7 +24481,7 @@ snapshots:
   jest-config@26.6.3(ts-node@10.9.2(@types/node@22.19.3)(typescript@5.9.3)):
     dependencies:
       '@babel/core': 7.29.7
-      '@jest/test-sequencer': 26.6.3(ts-node@10.9.2(@types/node@22.19.3)(typescript@5.9.3))
+      '@jest/test-sequencer': 26.6.3
       '@jest/types': 26.6.2
       babel-jest: 26.6.3(@babel/core@7.29.7)
       chalk: 4.1.2
@@ -24528,7 +24491,7 @@ snapshots:
       jest-environment-jsdom: 26.6.2
       jest-environment-node: 26.6.2
       jest-get-type: 26.3.0
-      jest-jasmine2: 26.6.3
+      jest-jasmine2: 26.6.3(ts-node@10.9.2(@types/node@22.19.3)(typescript@5.9.3))
       jest-regex-util: 26.0.0
       jest-resolve: 26.6.2
       jest-util: 26.6.2
@@ -24695,7 +24658,7 @@ snapshots:
     optionalDependencies:
       fsevents: 2.3.3
 
-  jest-jasmine2@26.6.3:
+  jest-jasmine2@26.6.3(ts-node@10.9.2(@types/node@22.19.3)(typescript@5.9.3)):
     dependencies:
       '@babel/traverse': 7.29.7
       '@jest/environment': 26.6.2
@@ -24716,7 +24679,11 @@ snapshots:
       pretty-format: 26.6.2
       throat: 5.0.0
     transitivePeerDependencies:
+      - bufferutil
+      - canvas
       - supports-color
+      - ts-node
+      - utf-8-validate
 
   jest-leak-detector@26.6.2:
     dependencies:
@@ -27788,24 +27755,6 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react'
 
-  react-intl@3.12.1(@types/react@19.2.7)(react@18.2.0):
-    dependencies:
-      '@formatjs/intl-displaynames': 1.2.10
-      '@formatjs/intl-listformat': 1.4.8
-      '@formatjs/intl-relativetimeformat': 4.5.16
-      '@formatjs/intl-unified-numberformat': 3.3.7
-      '@formatjs/intl-utils': 2.3.0
-      '@types/hoist-non-react-statics': 3.3.7(@types/react@19.2.7)
-      '@types/invariant': 2.2.37
-      hoist-non-react-statics: 3.3.2
-      intl-format-cache: 4.3.1
-      intl-messageformat: 7.8.4
-      intl-messageformat-parser: 3.6.4
-      react: 18.2.0
-      shallow-equal: 1.2.1
-    transitivePeerDependencies:
-      - '@types/react'
-
   react-is-mounted-hook@1.1.2(react-dom@18.2.0(react@18.2.0))(react@18.2.0):
     dependencies:
       react: 18.2.0
@@ -27877,21 +27826,6 @@ snapshots:
     optionalDependencies:
       '@types/react': 18.3.30
       '@types/react-dom': 18.3.7(@types/react@18.3.30)
-      react-dom: 18.2.0(react@18.2.0)
-      redux: 4.2.1
-
-  react-redux@8.1.2(@types/react-dom@18.3.7(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(redux@4.2.1):
-    dependencies:
-      '@babel/runtime': 7.28.4
-      '@types/hoist-non-react-statics': 3.3.7(@types/react@19.2.7)
-      '@types/use-sync-external-store': 0.0.3
-      hoist-non-react-statics: 3.3.2
-      react: 18.2.0
-      react-is: 18.3.1
-      use-sync-external-store: 1.6.0(react@18.2.0)
-    optionalDependencies:
-      '@types/react': 19.2.7
-      '@types/react-dom': 18.3.7(@types/react@19.2.7)
       react-dom: 18.2.0(react@18.2.0)
       redux: 4.2.1
 
