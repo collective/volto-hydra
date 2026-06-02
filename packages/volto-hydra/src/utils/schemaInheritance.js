@@ -36,6 +36,19 @@ import config from '@plone/volto/registry';
 import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds } from './blockPath';
 import { PAGE_BLOCK_UID, convertFieldValue } from '@volto-hydra/hydra-js';
 import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context';
+// Pure validation/default-application logic lives in schemaValidation.js
+// (no dependencies — safe to import from CI scripts and test runners).
+// Re-exported here for backward compat; schemaValidation.js is the SSOT.
+export {
+  applySchemaDefaultsToBlock,
+  applySchemaDefaultsToBlockWithContext,
+} from './schemaValidation';
+// The internal callers below need direct access (re-exports aren't visible
+// to module-local code in some bundler configs).
+import {
+  applySchemaDefaultsToBlock,
+  applySchemaDefaultsToBlockWithContext,
+} from './schemaValidation';
 
 // Re-export getBlockTypeSchema from blockPath for convenience
 export { getBlockTypeSchema };
@@ -1232,164 +1245,6 @@ export function computeSmartDefaults(sourceFields, targetSchema, declaredMapping
   return mapping;
 }
 
-/**
- * Apply schema defaults to a block's data.
- *
- * This is used before sending FORM_DATA to the frontend to ensure
- * fields with schema defaults (like fieldMapping smart defaults) are
- * applied even when the schema changes mid-edit.
- *
- * Applies defaults when:
- * - The schema property has a `default` value AND either:
- *   - The current field value is undefined, null, or empty object
- *   - The current value has invalid options (for field_mapping widget)
- *
- * @param {Object} blockData - The block's current data
- * @param {Object} schema - The block's schema (with enhancers applied)
- * @returns {Object} - Block data with defaults applied (or original if no changes)
- */
-export function applySchemaDefaultsToBlock(blockData, schema) {
-  if (!schema?.properties || !blockData) return blockData;
-
-  let modified = false;
-  const newData = { ...blockData };
-
-  for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
-    const currentValue = blockData[fieldName];
-
-    // First: validate current value - clear if invalid
-    if (currentValue !== undefined && currentValue !== null) {
-      if (!isValidValue(currentValue, fieldDef)) {
-        newData[fieldName] = null;
-        modified = true;
-      }
-    }
-  }
-
-  // Second pass: apply defaults to empty/null fields
-  for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
-    if (fieldDef.default === undefined) continue;
-
-    const currentValue = newData[fieldName];
-
-    // Check if current value is "empty" (needs default)
-    const needsDefault =
-      currentValue === undefined ||
-      currentValue === null ||
-      (typeof currentValue === 'object' &&
-        !Array.isArray(currentValue) &&
-        Object.keys(currentValue).length === 0);
-
-    if (needsDefault) {
-      newData[fieldName] = fieldDef.default;
-      modified = true;
-    }
-  }
-
-  return modified ? newData : blockData;
-}
-
-/**
- * Apply schema defaults to a block, with support for function defaults.
- * Function defaults receive context: { containerId, field, position, allBlocks, blockPathMap }
- *
- * @param {Object} blockData - The block's current data
- * @param {Object} schema - The block's schema (with enhancers applied)
- * @param {Object} context - Context for function defaults { containerId, field, position, allBlocks, blockPathMap }
- * @returns {Object} - Block data with defaults applied (or original if no changes)
- */
-export function applySchemaDefaultsToBlockWithContext(blockData, schema, context = {}) {
-  if (!schema?.properties || !blockData) return blockData;
-
-  let modified = false;
-  const newData = { ...blockData };
-
-  // First: validate current value - clear if invalid
-  for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
-    const currentValue = blockData[fieldName];
-    if (currentValue !== undefined && currentValue !== null) {
-      if (!isValidValue(currentValue, fieldDef)) {
-        newData[fieldName] = null;
-        modified = true;
-      }
-    }
-  }
-
-  // Second pass: apply defaults to empty/null fields
-  for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
-    if (fieldDef.default === undefined) continue;
-
-    const currentValue = newData[fieldName];
-
-    // Check if current value is "empty" (needs default)
-    const needsDefault =
-      currentValue === undefined ||
-      currentValue === null ||
-      (typeof currentValue === 'object' &&
-        !Array.isArray(currentValue) &&
-        Object.keys(currentValue).length === 0);
-
-    if (needsDefault) {
-      // Support function defaults - call with context
-      const defaultValue = typeof fieldDef.default === 'function'
-        ? fieldDef.default(context)
-        : fieldDef.default;
-
-      // Only set if function returned a value (undefined means "no default")
-      if (defaultValue !== undefined) {
-        newData[fieldName] = defaultValue;
-        modified = true;
-      }
-    }
-  }
-
-  return modified ? newData : blockData;
-}
-
-/**
- * Check if a value is valid for a field definition.
- * Returns true if valid, false if invalid.
- */
-function isValidValue(value, fieldDef) {
-  // For choice fields: check if value is one of the allowed choices
-  if (fieldDef.choices) {
-    const validValues = new Set(
-      fieldDef.choices.map((c) => {
-        if (c === undefined || c === null) return c;
-        if (Array.isArray(c)) return c[0];
-        return c.value ?? c.token ?? c;
-      }),
-    );
-    return validValues.has(value);
-  }
-
-  // For enum fields (JSON Schema style)
-  if (fieldDef.enum) {
-    return fieldDef.enum.includes(value);
-  }
-
-
-  // For objects with propertyNames.enum - validate each property key
-  if (fieldDef.propertyNames?.enum && typeof value === 'object' && value !== null) {
-    const validKeys = new Set(fieldDef.propertyNames.enum);
-    if (!Object.keys(value).every((k) => validKeys.has(k))) {
-      return false;
-    }
-  }
-
-  // For objects with additionalProperties.enum - validate each property value
-  if (fieldDef.additionalProperties?.enum && typeof value === 'object' && value !== null) {
-    const validValues = new Set(fieldDef.additionalProperties.enum);
-    const invalidValues = Object.entries(value).filter(([k, v]) => v && !validValues.has(v));
-    if (invalidValues.length > 0) {
-      console.log('[isValidValue] Invalid values found:', invalidValues, 'validValues:', [...validValues]);
-      return false;
-    }
-  }
-
-  // No validation constraints - value is valid
-  return true;
-}
 
 /**
  * Apply schema defaults to all blocks in formData.
