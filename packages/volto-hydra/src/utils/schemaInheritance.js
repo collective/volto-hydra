@@ -42,13 +42,13 @@ import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '
 export {
   applySchemaDefaultsToBlock,
   applySchemaDefaultsToBlockWithContext,
-} from './schemaValidation';
+} from './schemaValidation.mjs';
 // The internal callers below need direct access (re-exports aren't visible
 // to module-local code in some bundler configs).
 import {
   applySchemaDefaultsToBlock,
   applySchemaDefaultsToBlockWithContext,
-} from './schemaValidation';
+} from './schemaValidation.mjs';
 
 // Re-export getBlockTypeSchema from blockPath for convenience
 export { getBlockTypeSchema };
