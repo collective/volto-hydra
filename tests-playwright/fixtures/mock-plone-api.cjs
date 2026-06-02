@@ -1620,6 +1620,13 @@ app.get('/@site', (req, res) => {
     '@id': 'http://localhost:8888',
     'plone.site_title': 'Plone Site',
     'plone.site_logo': null,
+    // Volto 19 reads `plone.default_language` from this response as the
+    // middle fallback in its SSR language-resolution chain
+    // (server.jsx -> toBackendLang(initialLang)). Volto 18 used
+    // `config.settings.defaultLanguage` instead — the source moved from
+    // frontend config to backend response, so the mock has to provide it.
+    'plone.default_language': 'en',
+    'plone.available_languages': ['en'],
   });
 });
 
