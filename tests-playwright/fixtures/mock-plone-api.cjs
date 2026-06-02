@@ -39,6 +39,31 @@ function parseContentMounts() {
 
 const CONTENT_MOUNTS = parseContentMounts();
 
+/**
+ * Resolve a moved-content redirect, mimicking plone.app.redirector.
+ * Each mount may carry a redirects.json sibling ({ oldPath: newPath },
+ * mount-relative) next to its content dir. Returns the new mount-prefixed
+ * path or null. Read fresh each call (tiny file, only hit on a 404) so dev
+ * edits to redirects.json take effect without a restart.
+ */
+function getRedirectTarget(cleanPath) {
+  for (const { mountPath, dirPath } of CONTENT_MOUNTS) {
+    const redirectsFile = path.join(dirPath, '..', 'redirects.json');
+    if (!fs.existsSync(redirectsFile)) continue;
+    let map;
+    try { map = JSON.parse(fs.readFileSync(redirectsFile, 'utf8')); }
+    catch { continue; }
+    const rel = mountPath === '/'
+      ? cleanPath
+      : (cleanPath.startsWith(mountPath) ? cleanPath.slice(mountPath.length) || '/' : null);
+    if (rel == null) continue;
+    if (map[rel]) {
+      return mountPath === '/' ? map[rel] : mountPath + map[rel];
+    }
+  }
+  return null;
+}
+
 // Validate each mounted content tree at startup. Errors are loud (listed)
 // but non-fatal — tests using the mock API still start. Set
 // SKIP_CONTENT_VALIDATION=true to suppress entirely.
@@ -335,8 +360,17 @@ function getPlaceholderImageScales(title, fieldName = 'image') {
  * Includes hasPreviewImage for teaser blocks to show target's preview image
  */
 function formatSearchItem(content, baseUrl) {
-  // Check if content has a preview image (common for Documents, News Items, etc.)
-  const hasPreviewImage = !!(content.preview_image || content['@type'] === 'Image');
+  // Check if content has a preview image (common for Documents, News Items, etc.).
+  // For distribution-style content the preview_image is a blob_path reference;
+  // unless the bytes also exist on disk under the content dir, the mock can't
+  // serve the @@images URL — so don't claim a preview image we can't deliver.
+  const declaresPreview = !!(content.preview_image || content['@type'] === 'Image');
+  let hasPreviewImage = declaresPreview;
+  if (declaresPreview && content.preview_image?.blob_path) {
+    const urlPath = (content['@id'] || '').replace(/^https?:\/\/[^/]+/, '') || '/';
+    const dirInfo = contentDirMap[urlPath];
+    hasPreviewImage = !!(dirInfo && findFirstImageFile(dirInfo.dirPath, 3));
+  }
 
   const item = {
     '@id': content['@id'],
@@ -360,6 +394,10 @@ function formatSearchItem(content, baseUrl) {
       ? uidPositionMap[content.UID]
       : null,
     'exclude_from_nav': content.exclude_from_nav === true,
+    // Subject (capital S) is the Plone catalog index name; the @querystring-search
+    // filter reads `item.Subject` for facet.Subject criteria. Populate from the
+    // content's `subjects` field (the lowercase schema field).
+    'Subject': content.subjects || [],
   };
 
   // Match real Plone: always include image_field and image_scales.
@@ -1223,6 +1261,28 @@ app.get('/health', (req, res) => {
 });
 
 /**
+ * Walk every registered content dir and collect unique `subjects` values
+ * across all data.json files. Returns the `{ value: { title } }` shape
+ * Plone's @querystring endpoint uses for the Subject (Keywords) index.
+ */
+function collectSubjectValues() {
+  const subjects = new Set();
+  for (const { dirPath } of Object.values(contentDirMap)) {
+    const dataFile = path.join(dirPath, 'data.json');
+    if (!fs.existsSync(dataFile)) continue;
+    try {
+      const data = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
+      for (const s of (data.subjects || [])) {
+        if (typeof s === 'string' && s) subjects.add(s);
+      }
+    } catch { /* ignore malformed data.json */ }
+  }
+  const out = {};
+  for (const s of [...subjects].sort()) out[s] = { title: s };
+  return out;
+}
+
+/**
  * GET /@querystring
  * Get querystring schema (available indexes, operators, sortable indexes)
  * Used by QuerystringWidget to populate criteria and sort dropdowns
@@ -1440,9 +1500,7 @@ app.get('*/@querystring', (req, res) => {
             'operation': 'plone.app.querystring.operation.selection.none',
           },
         },
-        'values': {
-          'main folder': { 'title': 'main folder' },
-        },
+        'values': collectSubjectValues(),
       },
       'Title': {
         'title': 'Title',
@@ -1794,7 +1852,11 @@ app.post('*/@querystring-search', (req, res) => {
   const selectionFields = {
     portal_type: (item) => [item['@type']],
     review_state: (item) => [item.review_state || 'published'],
-    Subject: (item) => item.Subject || [],
+    // Items here come from loadRawContentFromDisk — the raw content schema
+    // field is lowercase `subjects`. The catalog index name `Subject`
+    // (capital S) is only added later by formatSearchItem. Read both so
+    // this works whether the filter runs on raw or brain-formatted items.
+    Subject: (item) => item.subjects || item.Subject || [],
   };
 
   for (const condition of query) {
@@ -1884,6 +1946,9 @@ app.post('*/@querystring-search', (req, res) => {
         const flag = item.exclude_from_nav === true;
         return wantTrue ? flag : !flag;
       });
+      // Note: `review_state` and `Subject` selection.{any,all,none} are
+      // handled generically above via `selectionFields` (which already
+      // maps both indices), so we don't need explicit branches here.
     }
   }
 
@@ -2218,6 +2283,26 @@ app.get('*/resolveuid/:uid', (req, res) => {
  * Serves actual image files from content directories if they exist,
  * otherwise falls back to placeholder SVGs.
  */
+function findFirstImageFile(rootDir, maxDepth) {
+  const imageExts = new Set(['.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp']);
+  const stack = [{ dir: rootDir, depth: 0 }];
+  while (stack.length) {
+    const { dir, depth } = stack.pop();
+    if (depth > maxDepth) continue;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isFile() && imageExts.has(path.extname(entry.name).toLowerCase())) {
+        return full;
+      }
+      if (entry.isDirectory()) {
+        stack.push({ dir: full, depth: depth + 1 });
+      }
+    }
+  }
+  return null;
+}
+
 app.get('*/@@images/*', (req, res) => {
   // Extract content path and field name from URL. Serves the same image
   // file regardless of scale — the mock doesn't generate actual scales.
@@ -2242,27 +2327,41 @@ app.get('*/@@images/*', (req, res) => {
   }
   const imageDir = dirInfo ? path.join(dirInfo.dirPath, fieldName) : null;
 
+  const mimeTypes = {
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+  };
+  const isImageExt = (ext) => ext in mimeTypes;
+  const serveFile = (imageFile) => {
+    const ext = path.extname(imageFile).toLowerCase();
+    res.set('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+    res.sendFile(imageFile);
+  };
+
   if (imageDir && fs.existsSync(imageDir)) {
     const files = fs.readdirSync(imageDir);
     if (files.length > 0) {
-      const imageFile = path.join(imageDir, files[0]);
-      const ext = path.extname(files[0]).toLowerCase();
-      const mimeTypes = {
-        '.svg': 'image/svg+xml',
-        '.png': 'image/png',
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.gif': 'image/gif',
-        '.webp': 'image/webp',
-      };
-      const contentType = mimeTypes[ext] || 'application/octet-stream';
-      res.set('Content-Type', contentType);
-      res.sendFile(imageFile);
+      serveFile(path.join(imageDir, files[0]));
       return;
     }
   }
 
-  // No image file found — return 404 (don't hide missing images with placeholders)
+  // Fallback for distribution-style content where preview_image is set via
+  // blob_path. The actual bytes live in a nested image content item under
+  // the data dir, e.g. <content>/<screenshot>.png/image/<file>.png.
+  // Walk the dir tree and serve the first image file found (depth-limited).
+  if (dirInfo && fs.existsSync(dirInfo.dirPath)) {
+    const found = findFirstImageFile(dirInfo.dirPath, 3);
+    if (found) {
+      serveFile(found);
+      return;
+    }
+  }
+
   res.status(404).json({
     error: { type: 'NotFound', message: `Image not found: ${req.path}` }
   });
@@ -2397,6 +2496,13 @@ app.get('*', (req, res, next) => {
     }
     res.json(filteredContent);
   } else {
+    // plone.app.redirector: moved content 302s (GET) to the new path, keeping
+    // the ++api++ namespace. The frontend (ploneApi) upgrades this to a 301.
+    const redirectTo = getRedirectTarget(cleanPath);
+    if (redirectTo) {
+      res.redirect(302, `http://localhost:${PORT}/++api++${redirectTo}`);
+      return;
+    }
     res.status(404).json({
       error: {
         type: 'NotFound',
