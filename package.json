@@ -51,7 +51,7 @@
     "example:nuxt": "pnpm --filter nuxt-blog-starter install && pnpm --filter nuxt-blog-starter run dev"
   },
   "dependencies": {
-    "@plone/volto": "18.31.0",
+    "@plone/volto": "19.1.1",
     "volto-hydra": "workspace:*"
   },
   "peerDependencies": {
