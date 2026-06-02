@@ -16,6 +16,7 @@ import includes from 'lodash/includes';
 import some from 'lodash/some';
 import first from 'lodash/first';
 import { makeEditor } from '@plone/volto-slate/utils/editor';
+import { safeEditorNodes } from '@plone/volto-slate/utils/safe';
 
 // case sensitive; first in an inner array is the default and preffered format
 // in that array of formats
@@ -95,7 +96,7 @@ export function createParagraph(text) {
 }
 
 export const isSingleBlockTypeActive = (editor, format) => {
-  const [match] = Editor.nodes(editor, {
+  const [match] = safeEditorNodes(editor, {
     match: (n) => n.type === format,
   });
 
@@ -145,8 +146,6 @@ export const getBlockTypeContextData = (editor, format) => {
 };
 
 export const toggleInlineFormat = (editor, format) => {
-  console.log('[SHADOW toggleInlineFormat] called with format:', format, 'selection:', JSON.stringify(editor.selection));
-  // Guard against null selection
   if (!editor.selection) {
     return;
   }
@@ -157,7 +156,6 @@ export const toggleInlineFormat = (editor, format) => {
   );
 
   if (isActive) {
-    console.log('[SHADOW] isActive=true, unwrapping. children before:', JSON.stringify(editor.children));
     const rangeRef = Editor.rangeRef(editor, editor.selection);
 
     Transforms.unwrapNodes(editor, {
@@ -165,21 +163,16 @@ export const toggleInlineFormat = (editor, format) => {
       split: false,
     });
 
-    console.log('[SHADOW] After unwrap. children:', JSON.stringify(editor.children), 'rangeRef.current:', JSON.stringify(rangeRef.current));
-
     if (rangeRef.current) {
       const newSel = JSON.parse(JSON.stringify(rangeRef.current));
       rangeRef.unref();
-      console.log('[SHADOW] Setting selection to:', JSON.stringify(newSel));
       Transforms.select(editor, newSel);
       if (editor.setSavedSelection) {
         editor.setSavedSelection(newSel);
       }
     } else {
-      console.log('[SHADOW] rangeRef.current is null after unwrap!');
       rangeRef.unref();
     }
-    // Don't call editor.onChange() explicitly - Slate handles it automatically after transforms
     return;
   }
 
