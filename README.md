@@ -63,6 +63,17 @@ RAZZLE_API_PATH="http://localhost:8080/Plone" RAZZLE_DEFAULT_IFRAME_URL=http://l
 
 Log in at <http://localhost:3001>.
 
+### Optional: clone Volto source for IDE navigation
+
+`@plone/volto` is installed from npm, but its source is unzipped deep in `node_modules/.pnpm/@plone+volto@…/`, which is awkward to navigate in an editor. If you want to read or grep the Volto source at the version this repo pins, clone the matching tag into `core/` next to the workspace:
+
+```bash
+# Match the version pinned in package.json
+git clone --branch 18.31.0 --depth 1 https://github.com/plone/volto.git core
+```
+
+`core/` is `.gitignore`d and not part of the pnpm workspace — the build always uses the npm `@plone/volto`. The local checkout is purely a developer convenience for code reading; remove or skip it if you don't need it.
+
 ### Run only your frontend, against the deployed CMS
 
 If you don't want to run Plone + Hydra locally and just want to develop your frontend against the deployed admin:
