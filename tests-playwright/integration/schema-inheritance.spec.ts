@@ -736,8 +736,9 @@ test.describe('Frontend-Driven Schema Enhancers', () => {
 
     // Verify inherited fields are present in Grid section (from teaser schema)
     // These fields are NOT in teaser's editableFields, so they get inherited to parent
-    // head_title -> "Head title", openLinkInNewTab -> "Open in a new tab", align -> "Alignment"
-    const headTitleField = gridSection.locator('text=Head title');
+    // head_title -> "Kicker" (renamed from "Head title" in Volto 19),
+    // openLinkInNewTab -> "Open in a new tab", align -> "Alignment"
+    const headTitleField = gridSection.locator('text=Kicker');
     await expect(headTitleField).toBeVisible({ timeout: 5000 });
 
     const alignmentField = gridSection.locator('text=Alignment');

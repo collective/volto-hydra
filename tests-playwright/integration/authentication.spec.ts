@@ -47,9 +47,19 @@ test.describe('Authentication and Access Control', () => {
     // Try to access edit page without logging in
     await page.goto(helper.contentUrl('/test-page', '/edit'));
 
-    // Should show Unauthorized page (not the edit form)
-    const unauthorized = page.locator('text=Unauthorized');
-    await expect(unauthorized).toBeVisible({ timeout: 10000 });
+    // Volto 19 redirects to /login?return_url=... rather than rendering an
+    // inline "Unauthorized" page (upgrade guide: "401 unauthorized error
+    // route handling behaviors have changed"). Accept either: a redirect
+    // landing on /login, or the legacy Unauthorized text — whichever
+    // surfaces first means the edit form was correctly NOT rendered.
+    await Promise.race([
+      page.waitForURL(/.*login.*/, { timeout: 10000 }),
+      page.locator('text=Unauthorized').waitFor({ state: 'visible', timeout: 10000 }),
+    ]);
+
+    const currentUrl = page.url();
+    const hasUnauthorized = await page.locator('text=Unauthorized').isVisible();
+    expect(currentUrl.includes('login') || hasUnauthorized).toBe(true);
   });
 
   test('View page requires authentication', async ({ page }) => {
