@@ -687,6 +687,14 @@ test.describe('Page Creation', () => {
     await page.waitForURL(/\/add\?type=Document/, { timeout: 10000 });
 
     // Fill Title and save.
+    // NOTE: the Add shadow at packages/volto-hydra/.../Add/Add.jsx forces
+    // `visual = false` so this page renders the flat schema form (a real
+    // <input> for title), not Volto's in-page visual block editor.
+    // Probing that boolean from outside is hard — BlocksToolbar renders
+    // nothing until a block is selected, the schema form is structurally
+    // similar in both modes, and the only visible difference is mounting
+    // order of UI Hydra never shows. So we leave it as a documented
+    // assumption rather than a brittle assertion.
     const titleField = page.locator('#field-title input, input[name="title"]').first();
     await expect(titleField).toBeVisible({ timeout: 5000 });
     await titleField.fill('TDD Created Document');
@@ -695,18 +703,16 @@ test.describe('Page Creation', () => {
     // POST should have happened with @type:Document.
     await expect.poll(() => createdAtId, { timeout: 10000 }).toBeTruthy();
 
-    // Navigate to the newly created doc's /edit. createdAtId is an
-    // absolute API URL — strip origin for the admin route.
-    // Use client-side navigation so the admin's session/auth state
-    // (including any in-memory session content stored against the
-    // test auth token in the mock-api) survives the route change.
-    // page.goto() would force an SSR round-trip and the admin server's
-    // own fetch may not include the same Authorization header.
+    // Add-shadow check #2 (auto-edit redirect): after a successful
+    // create the Add shadow's history.push points at
+    // `${flattenToAppURL(content['@id'])}/edit`, not the canonical view
+    // URL — so editors land in edit mode on the new item. Wait for the
+    // natural redirect rather than manually pushing /edit ourselves.
     const newDocPath = new URL(createdAtId!).pathname;
-    await page.evaluate((path) => {
-      window.history.pushState({}, '', path);
-      window.dispatchEvent(new PopStateEvent('popstate'));
-    }, `${newDocPath}/edit`);
+    await page.waitForURL(
+      new RegExp(`${newDocPath.replace(/\//g, '\\/')}\\/edit$`),
+      { timeout: 10000 },
+    );
     await helper.waitForIframeReady();
 
     // The new document loads with at least one block (Volto auto-creates

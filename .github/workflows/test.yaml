@@ -36,6 +36,12 @@ jobs:
           pnpm install --frozen-lockfile
       - name: Run hydra-js unit tests
         run: cd packages/hydra-js && pnpm test
+      - name: Build workspace deps (@plone/registry, @plone/components)
+        # Volto 19 reads these via workspace symlinks but its razzle.config
+        # requires their built dist/ output (create-addons-loader.cjs, etc.).
+        # Locally `make install` handles this; CI runs install directly so
+        # build:deps is added explicitly here.
+        run: pnpm build:deps
       - name: Build Volto for production
         run: pnpm build
         env:
@@ -167,6 +173,10 @@ jobs:
         run: |
           pnpm dlx mrs-developer missdev --no-config --fetch-https
           pnpm install --frozen-lockfile
+      - name: Build workspace deps (@plone/registry, @plone/components)
+        # pnpm start:prod loads these at runtime via workspace symlinks;
+        # their dist/ output must exist or the SSR server fails to boot.
+        run: pnpm build:deps
       - name: Download Volto build
         uses: actions/download-artifact@v4
         with:
@@ -331,6 +341,10 @@ jobs:
         run: |
           pnpm dlx mrs-developer missdev --no-config --fetch-https
           pnpm install --frozen-lockfile
+      - name: Build workspace deps (@plone/registry, @plone/components)
+        # pnpm start:prod loads these at runtime via workspace symlinks;
+        # their dist/ output must exist or the SSR server fails to boot.
+        run: pnpm build:deps
       - name: Download Volto build
         uses: actions/download-artifact@v4
         with:

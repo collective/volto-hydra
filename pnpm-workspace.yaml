@@ -1,6 +1,13 @@
 packages:
   # all packages in direct subdirs of packages/
   - 'packages/*'
+  # Volto monorepo packages, cloned by mrs-developer into ./core/ per
+  # mrs.developer.json. `@plone/volto`, `@plone/razzle`,
+  # `@plone/razzle-dev-utils`, `@plone/babel-preset-razzle` etc. all come
+  # from here. Required because Volto 19 only publishes some of its forks
+  # to npm — the rest are workspace-only. Run `make install` first to
+  # populate core/ from a fresh clone.
+  - 'core/packages/*'
   - 'examples/*'
   - '!examples/hydra-vue-f7'
   - '!examples/hydra-nextjs'
@@ -8,3 +15,45 @@ packages:
   - 'docs/examples/test-react'
   - 'docs/examples/test-svelte'
   - 'docs/examples/test-vue'
+
+# Mirror of core/catalog.json. Volto 19's monorepo packages (e.g.
+# core/packages/components) reference shared deps via `catalog:` and Volto
+# loads them from core/catalog.json via core/.pnpmfile.cjs. Our root pnpm
+# 9 doesn't run that hook (catalogs API changed in pnpm 10), so we mirror
+# the entries here. Bump these in lockstep with mrs.developer.json's tag —
+# any drift will surface as a missing-version error.
+catalog:
+  '@internationalized/date': ^3.12.1
+  '@react-aria/utils': ^3.34.0
+  '@react-spectrum/utils': ^3.13.0
+  '@tailwindcss/vite': ^4.1.4
+  '@testing-library/jest-dom': ^6.9.1
+  '@testing-library/react': ^16.3.2
+  '@types/node': ^24
+  '@types/react-dom': ^18.3.1
+  '@types/react': ^18.3.1
+  '@vitejs/plugin-react': ^5.0.2
+  '@vitest/coverage-v8': ^3.2.4
+  '@vitest/ui': ^3.2.4
+  cypress: 15.16.0
+  jsdom: ^28.1.0
+  lodash: 4.18.1
+  postcss: ^8.5.10
+  postcss-load-config: ^6.0.1
+  postcss-loader: ^8.2.1
+  react-aria-components: ^1.17.0
+  react-aria: ^3.48.0
+  react-stately: ^3.46.0
+  react-dom: 18.2.0
+  react: 18.2.0
+  release-it: ^20.0.1
+  tailwind-merge: ^3.5.0
+  tailwind-variants: ^3.2.2
+  tailwindcss: ^4.1.12
+  tsup: ^8.5.0
+  typescript: ^5.9.2
+  vite: ^6.4.2
+  vitest: ^3.2.4
+  wait-on: ^9.0.4
+  webpack: 5.105.4
+  webpack-dev-server: ^5.2.4

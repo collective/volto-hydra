@@ -4,7 +4,7 @@
  */
 
 import { Icon, Toast } from '@plone/volto/components';
-import { Field, BlocksForm } from '@plone/volto/components/manage/Form';
+import { Field } from '@plone/volto/components/manage/Form';
 import BlocksToolbar from '@plone/volto/components/manage/Form/BlocksToolbar';
 import UndoToolbar from '@plone/volto/components/manage/Form/UndoToolbar';
 import {

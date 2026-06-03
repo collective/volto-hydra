@@ -1,11 +1,3 @@
-/**
- * Shadow of ObjectBrowserBody.jsx
- * Changes from original:
- * 1. New handleSelectItem method — ALWAYS selects, never navigates
- * 2. Simplified handleClickOnItem — folderish items ALWAYS navigate (all modes)
- * 3. Removed handleDoubleClickOnItem (no longer needed)
- * 4. Pass handleSelectItem to ObjectBrowserNav
- */
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { compose } from 'redux';
@@ -15,6 +7,9 @@ import { Input, Segment, Breadcrumb } from 'semantic-ui-react';
 
 import join from 'lodash/join';
 
+// These absolute imports (without using the corresponding centralized index.js) are required
+// to cut circular import problems, this file should never use them. This is because of
+// the very nature of the functionality of the component and its relationship with others
 import { searchContent } from '@plone/volto/actions/search/search';
 import Icon from '@plone/volto/components/theme/Icon/Icon';
 import { flattenToAppURL, isInternalURL } from '@plone/volto/helpers/Url/Url';
@@ -67,7 +62,17 @@ function getParentURL(url) {
   return flattenToAppURL(`${join(url.split('/').slice(0, -1), '/')}`) || '/';
 }
 
+/**
+ * ObjectBrowserBody container class.
+ * @class ObjectBrowserBody
+ * @extends Component
+ */
 class ObjectBrowserBody extends Component {
+  /**
+   * Property types.
+   * @property {Object} propTypes Property types.
+   * @static
+   */
   static propTypes = {
     block: PropTypes.string.isRequired,
     mode: PropTypes.string.isRequired,
@@ -79,10 +84,17 @@ class ObjectBrowserBody extends Component {
     onSelectItem: PropTypes.func,
     dataName: PropTypes.string,
     maximumSelectionSize: PropTypes.number,
+    initialPath: PropTypes.string,
     contextURL: PropTypes.string,
     searchableTypes: PropTypes.arrayOf(PropTypes.string),
+    onlyFolderishSelectable: PropTypes.bool,
   };
 
+  /**
+   * Default properties.
+   * @property {Object} defaultProps Default properties.
+   * @static
+   */
   static defaultProps = {
     image: '',
     href: '',
@@ -91,22 +103,32 @@ class ObjectBrowserBody extends Component {
     selectableTypes: [],
     searchableTypes: null,
     maximumSelectionSize: null,
+    onlyFolderishSelectable: false,
   };
 
+  /**
+   * Constructor
+   * @method constructor
+   * @param {Object} props Component properties
+   * @constructs WysiwygEditor
+   */
   constructor(props) {
     super(props);
+    const defaultMultiplePath = props.initialPath || '/';
     this.state = {
       currentFolder:
-        this.props.mode === 'multiple' ? '/' : this.props.contextURL || '/',
+        this.props.mode === 'multiple'
+          ? defaultMultiplePath
+          : this.props.contextURL || '/',
       currentImageFolder:
         this.props.mode === 'multiple'
-          ? '/'
+          ? defaultMultiplePath
           : this.props.mode === 'image' && this.props.data?.url
             ? getParentURL(this.props.data.url)
             : '/',
       currentLinkFolder:
         this.props.mode === 'multiple'
-          ? '/'
+          ? defaultMultiplePath
           : this.props.mode === 'link' && this.props.data?.href
             ? getParentURL(this.props.data.href)
             : '/',
@@ -124,15 +146,26 @@ class ObjectBrowserBody extends Component {
             ? flattenToAppURL(this.props.data.href)
             : '',
       showSearchInput: false,
+      // In image mode, the searchable types default to the image types which
+      // can be overridden with the property if specified.
+      // If selectableTypes are passed, the searchableTypes are the selectableTypes
       searchableTypes:
         this.props.mode === 'image'
           ? this.props.searchableTypes || config.settings.imageObjects
-          : this.props.searchableTypes,
+          : [
+              ...(this.props.searchableTypes ?? []),
+              ...(this.props.selectableTypes ?? []),
+            ],
       view: this.props.mode === 'image' ? 'icons' : 'list',
     };
     this.searchInputRef = React.createRef();
   }
 
+  /**
+   * Component did mount
+   * @method componentDidMount
+   * @returns {undefined}
+   */
   componentDidMount() {
     this.initialSearch(this.props.mode);
   }
@@ -306,13 +339,26 @@ class ObjectBrowserBody extends Component {
   };
 
   isSelectable = (item) => {
-    const { maximumSelectionSize, data, mode, selectableTypes } = this.props;
+    const {
+      maximumSelectionSize,
+      data,
+      mode,
+      selectableTypes,
+      onlyFolderishSelectable,
+    } = this.props;
+
+    if (onlyFolderishSelectable && !item.is_folderish) {
+      return false;
+    }
     if (
       maximumSelectionSize &&
       data &&
       mode === 'multiple' &&
       maximumSelectionSize <= data.length
     )
+      // The item should actually be selectable, but only for removing it from already selected items list.
+      // handleClickOnItem will handle the deselection logic.
+      // The item is not selectable if we reached/exceeded maximumSelectionSize and is not already selected.
       return data.some(
         (d) => flattenToAppURL(d['@id']) === flattenToAppURL(item['@id']),
       );
@@ -321,15 +367,14 @@ class ObjectBrowserBody extends Component {
       : true;
   };
 
-  /**
-   * New: explicit selection handler — ALWAYS selects, never navigates.
-   * Called from radio/checkbox controls in ObjectBrowserNav.
-   */
+  // HYDRA: explicit selection handler — ALWAYS selects, never navigates.
+  // Wired into the radio/checkbox controls in ObjectBrowserNav so the user
+  // can click a folder name to navigate into it AND independently select
+  // the folder via its control (upstream couples these into one click).
   handleSelectItem = (item) => {
     const { mode, maximumSelectionSize, data } = this.props;
 
     if (mode === 'multiple') {
-      // Toggle selection in multiple mode
       const isDeselecting =
         Array.isArray(data) &&
         data.some(
@@ -338,39 +383,41 @@ class ObjectBrowserBody extends Component {
       this.onSelectItem(item);
       const length = data ? data.length : 0;
       const newLength = isDeselecting ? length - 1 : length + 1;
-      if (
-        maximumSelectionSize > 0 &&
-        newLength >= maximumSelectionSize
-      ) {
+      if (maximumSelectionSize > 0 && newLength >= maximumSelectionSize) {
         this.props.closeObjectBrowser();
       }
     } else {
-      // Single-select (link, image): select and close
+      // Single-select (link, image): select and close.
       this.onSelectItem(item);
       this.props.closeObjectBrowser();
     }
   };
 
-  /**
-   * Simplified: clicking a row.
-   * - Folderish items → ALWAYS navigate (all modes)
-   * - Non-folderish items → select if selectable
-   */
+  // HYDRA: simplified row click.
+  //   - Folderish items ALWAYS navigate (every mode), so the file tree
+  //     stays navigable independent of selection state — upstream
+  //     conditionally selects-or-navigates, which gets confusing when
+  //     the folder itself is also selectable.
+  //   - Non-folderish items fall through to handleSelectItem.
+  // (Upstream handleDoubleClickOnItem is dropped — single-click is now
+  // unambiguous and the double-click affordance isn't needed.)
   handleClickOnItem = (item) => {
     if (item.is_folderish) {
       this.navigateTo(item['@id']);
-    } else {
-      // Non-folderish: select if selectable
-      if (this.props.mode === 'image') {
-        if (config.settings.imageObjects.includes(item['@type'])) {
-          this.handleSelectItem(item);
-        }
-      } else if (this.isSelectable(item)) {
+    } else if (this.props.mode === 'image') {
+      if (config.settings.imageObjects.includes(item['@type'])) {
         this.handleSelectItem(item);
       }
+    } else if (this.isSelectable(item)) {
+      this.handleSelectItem(item);
     }
   };
 
+  /**
+   * Render method.
+   * @method render
+   * @returns {string} Markup for the component.
+   */
   render() {
     return (
       <Segment.Group raised className="object-browser">

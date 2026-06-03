@@ -64,6 +64,28 @@ function getRedirectTarget(cleanPath) {
   return null;
 }
 
+/**
+ * Enumerate every redirects.json entry across mounts as mount-prefixed
+ * {path, 'redirect-to'} pairs. Used by the @aliases endpoint.
+ */
+function getAllRedirects() {
+  const out = [];
+  for (const { mountPath, dirPath } of CONTENT_MOUNTS) {
+    const redirectsFile = path.join(dirPath, '..', 'redirects.json');
+    if (!fs.existsSync(redirectsFile)) continue;
+    let map;
+    try { map = JSON.parse(fs.readFileSync(redirectsFile, 'utf8')); }
+    catch { continue; }
+    for (const [from, to] of Object.entries(map)) {
+      out.push({
+        path: mountPath === '/' ? from : mountPath + from,
+        'redirect-to': mountPath === '/' ? to : mountPath + to,
+      });
+    }
+  }
+  return out;
+}
+
 // Validate each mounted content tree at startup. Errors are loud (listed)
 // but non-fatal — tests using the mock API still start. Set
 // SKIP_CONTENT_VALIDATION=true to suppress entirely.
@@ -351,6 +373,26 @@ function getPlaceholderImageScales(title, fieldName = 'image') {
       },
     }],
   };
+}
+
+/**
+ * Match a SearchableText query against an item, mimicking Plone 6.2's
+ * plone.app.querystring 3.0.0 `munge_search_term`: split the term on
+ * whitespace, then each word must prefix-match a word token in any of
+ * title/description/id. (Plone uses ZCText word-prefix indexing; we
+ * tokenize on `\W+` and check `startsWith`, which is close enough.)
+ */
+function matchSearchableText(searchTerm, item) {
+  const term = (searchTerm || '').replace(/\*+$/g, '').trim().toLowerCase();
+  if (!term) return true;
+  const parts = term.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return true;
+  const haystackTokens = [
+    ...(item.title || '').toLowerCase().split(/\W+/),
+    ...(item.description || '').toLowerCase().split(/\W+/),
+    ...(item.id || '').toLowerCase().split(/\W+/),
+  ].filter(Boolean);
+  return parts.every((p) => haystackTokens.some((tok) => tok.startsWith(p)));
 }
 
 /**
@@ -1578,6 +1620,13 @@ app.get('/@site', (req, res) => {
     '@id': 'http://localhost:8888',
     'plone.site_title': 'Plone Site',
     'plone.site_logo': null,
+    // Volto 19 reads `plone.default_language` from this response as the
+    // middle fallback in its SSR language-resolution chain
+    // (server.jsx -> toBackendLang(initialLang)). Volto 18 used
+    // `config.settings.defaultLanguage` instead — the source moved from
+    // frontend config to backend response, so the mock has to provide it.
+    'plone.default_language': 'en',
+    'plone.available_languages': ['en'],
   });
 });
 
@@ -1759,6 +1808,27 @@ app.get(/.*\/@navroot$/, (req, res) => {
 });
 
 /**
+ * GET /@aliases or /:path/@aliases
+ * plone.app.redirector aliases (manual redirects). On the site root the
+ * response lists every alias; on a context it filters to aliases that
+ * target that context (path or descendant), matching plone.restapi's
+ * `@aliases` GET behavior in Plone 6.2.
+ */
+app.get(/.*\/@aliases$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@aliases$/, '') || '/').replace(/\/+$/, '') || '/';
+  const baseUrl = `http://localhost:${PORT}`;
+  const all = getAllRedirects();
+  const items = cleanPath === '/'
+    ? all
+    : all.filter((a) => a['redirect-to'] === cleanPath || a['redirect-to'].startsWith(cleanPath + '/'));
+  res.json({
+    '@id': `${baseUrl}${cleanPath === '/' ? '' : cleanPath}/@aliases`,
+    items,
+    items_total: items.length,
+  });
+});
+
+/**
  * POST /@querystring-search
  * Search for content using Volto's querystring format.
  * Used by listing blocks to fetch query results.
@@ -1928,15 +1998,11 @@ app.post('*/@querystring-search', (req, res) => {
       }
       allItems = allItems.filter((item) => new URL(item['@id']).pathname !== contextPath);
     } else if (index === 'SearchableText' && operation.includes('string.contains')) {
-      // Full-text search - search in title, description, and text content
-      const searchTerm = (value || '').toLowerCase();
-      if (searchTerm) {
-        allItems = allItems.filter((item) => {
-          const title = (item.title || '').toLowerCase();
-          const description = (item.description || '').toLowerCase();
-          const id = (item.id || '').toLowerCase();
-          return title.includes(searchTerm) || description.includes(searchTerm) || id.includes(searchTerm);
-        });
+      // Full-text search across title/description/id. Mirrors Plone 6.2's
+      // plone.app.querystring 3.0.0 wildcard-prefix behavior — each word in
+      // the search term must prefix-match a word token in one of those fields.
+      if (value) {
+        allItems = allItems.filter((item) => matchSearchableText(value, item));
       }
     } else if (index === 'exclude_from_nav' && operation.includes('boolean')) {
       // Nav listings filter out items marked exclude_from_nav: true.
@@ -2043,17 +2109,14 @@ app.get('*/@search', (req, res) => {
 
   let items;
 
-  // Handle SearchableText (used by ObjectBrowser search input)
+  // Handle SearchableText (used by ObjectBrowser search input). Plone 6.2
+  // (plone.app.querystring 3.0.0) appends a wildcard to each word and ANDs
+  // the parts — matchSearchableText replicates that on title/description/id.
   if (searchableText) {
-    const searchTerm = searchableText.replace(/\*$/, '').toLowerCase();
     items = Object.keys(contentDirMap)
       .filter((itemPath) => itemPath !== '/')
       .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl))
-      .filter((item) => {
-        const title = (item.title || '').toLowerCase();
-        const description = (item.description || '').toLowerCase();
-        return title.includes(searchTerm) || description.includes(searchTerm);
-      });
+      .filter((item) => matchSearchableText(searchableText, item));
     // Filter by portal_type if specified
     if (portalType) {
       const types = Array.isArray(portalType) ? portalType : [portalType];
