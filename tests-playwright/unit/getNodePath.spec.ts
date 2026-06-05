@@ -5,6 +5,7 @@
 
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import { URL } from '../ports';
 
 test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', () => {
   let helper: AdminUIHelper;
@@ -13,7 +14,7 @@ test.describe('getNodePath() - DOM to Slate path conversion (real hydra.js)', ()
     helper = new AdminUIHelper(page);
 
     // Load the mock parent page which initializes the real hydra.js bridge
-    await page.goto('http://localhost:8889/mock-parent.html');
+    await page.goto(`${URL.testFrontend}/mock-parent.html`);
     await helper.waitForIframeReady();
     await helper.waitForIframeBlockHandle('mock-block-1');
 
@@ -1541,7 +1542,7 @@ test.describe('getNodeIdFromPath() - Slate path to DOM nodeId conversion (real h
     helper = new AdminUIHelper(page);
 
     // Load the mock parent page which initializes the real hydra.js bridge
-    await page.goto('http://localhost:8889/mock-parent.html');
+    await page.goto(`${URL.testFrontend}/mock-parent.html`);
     await helper.waitForIframeReady();
     await helper.waitForIframeBlockHandle('mock-block-1');
 

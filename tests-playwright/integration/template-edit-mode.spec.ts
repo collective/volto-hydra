@@ -14,6 +14,7 @@
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import { URL } from '../ports';
 
 // Content strings to find fixed template blocks (they have random UUIDs after merge)
 const TEMPLATE_HEADER_CONTENT = 'Template Header - From Template';
@@ -125,7 +126,7 @@ test.describe('Template Creation', () => {
     const contentPosts: Array<{ url: string; body: any }> = [];
     page.on('request', (req) => {
       if (req.method() !== 'POST') return;
-      if (!req.url().startsWith('http://localhost:8888')) return;
+      if (!req.url().startsWith(URL.mockApi)) return;
       let body: any = null;
       try { body = req.postDataJSON(); } catch { /* not JSON */ }
       if (!body || !body['@type']) return;

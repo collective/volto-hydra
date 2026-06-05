@@ -26,6 +26,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import { URL } from '../ports';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..');
@@ -101,7 +102,7 @@ test.describe('docs/examples/* screenshots', () => {
     test(`${slug} — ${blockType} block selected`, async ({ page }) => {
       // contentPrefix='' so navigateToEdit hits /docs/examples/<slug>/edit
       // directly (not /_test_data/...).
-      const helper = new AdminUIHelper(page, 'http://localhost:3001', '');
+      const helper = new AdminUIHelper(page, URL.voltoSsr, '');
       await helper.login();
       await helper.navigateToEdit(`/docs/examples/${slug}`);
 

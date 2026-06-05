@@ -21,6 +21,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import { PORTS, URL } from '../ports';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SHOWCASE_PATH = '/showcase-page';
@@ -40,10 +41,10 @@ test.describe.configure({ mode: 'serial' });
 // fast instead. Update this list (and start:test / RAZZLE_DEFAULT_IFRAME_URL)
 // together if the demo flow gets new beats.
 const REQUIRED_SERVERS = [
-  { url: 'http://localhost:8888/@search?path=/', label: 'mock-api on :8888    (pnpm start:mock-api)' },
-  { url: 'http://localhost:3002/health',         label: 'Volto compile on :3002 (pnpm start:test)' },
-  { url: 'http://localhost:3003/',               label: 'Nuxt on :3003          (pnpm start:nuxt:test)' },
-  { url: 'http://localhost:3008/',               label: 'F7 Mobile on :3008     (cd examples/hydra-vue-f7 && pnpm dev:test)' },
+  { url: `${URL.mockApi}/@search?path=/`, label: `mock-api on :${PORTS.mockApi}    (pnpm start:mock-api)` },
+  { url: `${URL.voltoWebpack}/health`,    label: `Volto compile on :${PORTS.voltoWebpack} (pnpm start:test)` },
+  { url: `${URL.nuxt}/`,                  label: `Nuxt on :${PORTS.nuxt}          (pnpm start:nuxt:test)` },
+  { url: `${URL.f7}/`,                    label: `F7 Mobile on :${PORTS.f7}     (cd examples/hydra-vue-f7 && pnpm dev:test)` },
 ];
 
 test.beforeAll(async () => {
@@ -126,7 +127,7 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   // viewport, then click F7 Mobile. The iframe swaps to the F7
   // frontend at mobile width showing the same content through a
   // different design system — the omni-channel feature in action.
-  // Requires the F7 dev frontend on :3008 (pnpm --filter hydra-vue-f7
+  // Requires the F7 dev frontend on its dedicated port (pnpm --filter hydra-vue-f7
   // run dev:test) and the start:test env var to map "F7 Mobile" to
   // that URL.
   // The pauses around the panel are deliberately slow so a viewer can
@@ -151,7 +152,7 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   await f7Item.click();
   await expect(async () => {
     const src = await page.locator('#previewIframe').getAttribute('src');
-    expect(src).toContain('localhost:3008');
+    expect(src).toContain(`localhost:${PORTS.f7}`);
   }).toPass({ timeout: 5_000 });
   // Let the F7 frontend finish loading inside the iframe so the swap
   // is visibly captured (not just the URL change).

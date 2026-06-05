@@ -7,6 +7,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { chromium } from '@playwright/test';
+import { URL } from './ports';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const { discoverBlocks } = require('./helpers/discover-blocks.cjs');
@@ -98,8 +99,8 @@ async function globalSetup() {
   // can override with VOLTO_HEALTH_URL.
   const usePrebuilt = process.env.USE_PREBUILT === 'true';
   const defaultHealthUrl = usePrebuilt
-    ? 'http://localhost:3001'
-    : 'http://localhost:3002/health';
+    ? URL.voltoSsr
+    : `${URL.voltoWebpack}/health`;
   const healthUrl = process.env.VOLTO_HEALTH_URL || defaultHealthUrl;
   const serverType = usePrebuilt ? 'production server' : 'webpack compilation';
 

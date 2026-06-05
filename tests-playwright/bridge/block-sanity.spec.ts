@@ -6,11 +6,11 @@
  * via mock-parent's ?api_path= and runs verifyBlockRendering.
  *
  * Run with:
- *   DISCOVER_BLOCKS_API=http://localhost:8888 pnpm exec playwright test block-sanity
+ *   DISCOVER_BLOCKS_API=<mock-api-url> pnpm exec playwright test block-sanity
  *
  * Env vars:
  *   DISCOVER_BLOCKS_API  - Plone API URL for discovery and content fetching
- *   MOCK_PARENT_URL      - URL of mock-parent.html (default: http://localhost:8889/mock-parent.html)
+ *   MOCK_PARENT_URL      - URL of mock-parent.html (defaults to test-frontend port)
  *
  * Works against any Plone API — mock or remote.
  */
@@ -18,6 +18,7 @@ import { test as base, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { verifyBlockRendering } from '../helpers/BlockVerificationHelper';
 import { getFrontendUrl } from './fixtures';
+import { URL } from '../ports';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -76,8 +77,8 @@ test.describe('Block sanity (auto-discovered)', () => {
 
       // Use api_path to load the full page content from the API
       // The mock-parent fetches the page JSON and sends it via the bridge protocol
-      const apiOrigin = process.env.DISCOVER_BLOCKS_API || 'http://localhost:8888';
-      const mockParentUrl = process.env.MOCK_PARENT_URL || 'http://localhost:8889/mock-parent.html';
+      const apiOrigin = process.env.DISCOVER_BLOCKS_API || URL.mockApi;
+      const mockParentUrl = process.env.MOCK_PARENT_URL || `${URL.testFrontend}/mock-parent.html`;
       const apiPath = `${apiOrigin}${block.pagePath}`;
       await page.goto(
         `${mockParentUrl}?api_path=${encodeURIComponent(apiPath)}${frontend}`,

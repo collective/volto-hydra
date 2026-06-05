@@ -3,6 +3,7 @@
  */
 import { Page, Locator, FrameLocator, expect, ElementHandle } from '@playwright/test';
 import { TEST_DATA_PREFIX } from './test-paths';
+import { URL } from '../ports';
 import { randomUUID } from 'node:crypto';
 
 // Base test JWT — the mock API only checks for the "Bearer " prefix, never
@@ -21,7 +22,7 @@ export class AdminUIHelper {
 
   constructor(
     public readonly page: Page,
-    public readonly adminUrl: string = 'http://localhost:3001',
+    public readonly adminUrl: string = URL.voltoSsr,
     public readonly contentPrefix: string = TEST_DATA_PREFIX
   ) {
     // Capture browser console - all logs locally, only errors/warnings in CI
@@ -127,7 +128,7 @@ export class AdminUIHelper {
 
   /**
    * Build a full admin URL for a content path, e.g. contentUrl('/test-page', '/edit')
-   * → 'http://localhost:3001/_test_data/test-page/edit'
+   * → '<adminUrl>/_test_data/test-page/edit'
    */
   contentUrl(contentPath: string, suffix: string = ''): string {
     return `${this.adminUrl}${this.contentPrefix}${contentPath}${suffix}`;
