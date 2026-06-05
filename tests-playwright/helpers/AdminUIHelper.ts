@@ -3006,7 +3006,12 @@ export class AdminUIHelper {
    * so the call works without a per-type display-name mapping.
    */
   async selectBlockType(blockType: string): Promise<void> {
-    const chooser = this.page.locator('.blocks-chooser').first();
+    // Scope to the visible chooser. A previous chooser instance may still be
+    // in the DOM mid-unmount; `.first()` without `:visible` can pick that
+    // stale one, so the click is a no-op and the new chooser appears to
+    // "stay open". Observed on admin-mock CI as
+    // `15 x locator resolved to visible <div class="blocks-chooser ...">`.
+    const chooser = this.page.locator('.blocks-chooser:visible').first();
     await chooser.waitFor({ state: 'visible', timeout: 5000 });
     const button = chooser.locator(`button.${blockType}`).first();
     // The button always exists in the DOM (even inside collapsed accordions).
@@ -3016,7 +3021,12 @@ export class AdminUIHelper {
     // Popup geometry and accidentally close it.
     await button.waitFor({ state: 'attached', timeout: 5000 });
     await button.evaluate((el) => (el as HTMLButtonElement).click());
-    await chooser.waitFor({ state: 'hidden', timeout: 5000 });
+    // After click, wait until no visible chooser remains. Using a fresh
+    // locator (not `chooser`) so we observe the live DOM state, not the
+    // captured stale-now reference.
+    await expect(this.page.locator('.blocks-chooser:visible')).toHaveCount(0, {
+      timeout: 5000,
+    });
   }
 
   /**
@@ -4104,10 +4114,24 @@ export class AdminUIHelper {
     let stableChecks = 0;
     const requiredStableChecks = 2;
 
-    while (Date.now() - startTime < timeout) {
-      const currentCount = await this.getBlockCount();
+    // Caller often triggers a navigation (e.g. search form submit) then
+    // immediately polls. evaluateAll throws "Execution context was
+    // destroyed" if the iframe navigates mid-call. Treat that as
+    // "iframe is still settling" and keep polling instead of failing.
+    const safeCount = async (): Promise<number> => {
+      try {
+        return await this.getBlockCount();
+      } catch (e) {
+        const msg = (e as Error).message ?? '';
+        if (msg.includes('Execution context was destroyed')) return -1;
+        throw e;
+      }
+    };
 
-      if (currentCount === lastCount) {
+    while (Date.now() - startTime < timeout) {
+      const currentCount = await safeCount();
+
+      if (currentCount !== -1 && currentCount === lastCount) {
         stableChecks++;
         if (stableChecks >= requiredStableChecks) {
           return currentCount;
@@ -4121,7 +4145,7 @@ export class AdminUIHelper {
     }
 
     // Return the last count if timeout reached
-    return await this.getBlockCount();
+    return await safeCount();
   }
 
   /**
@@ -4357,6 +4381,20 @@ export class AdminUIHelper {
         `LinkEditor popup has no dimensions! Size: ${boundingBox.width}x${boundingBox.height}`
       );
     }
+
+    // AddLinkForm.componentDidMount does setTimeout(input.focus, 50). The
+    // Escape/Enter handler is bound to the input, so callers that press
+    // Escape immediately after this returns race the focus timeout. Wait
+    // for the input to actually own focus before returning.
+    await this.page.waitForFunction(
+      () => {
+        const input = document.querySelector(
+          '.add-link input, .slate-inline-toolbar input',
+        ) as HTMLInputElement | null;
+        return input !== null && document.activeElement === input;
+      },
+      { timeout },
+    );
 
     return { popup, boundingBox };
   }
