@@ -5,14 +5,14 @@
 
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
-import { URL } from '../ports';
+import { URLS } from '../ports';
 
 test.describe('Bridge.restoreSlateSelection()', () => {
   let helper: AdminUIHelper;
 
   test.beforeEach(async ({ page }) => {
     helper = new AdminUIHelper(page);
-    await page.goto(`${URL.testFrontend}/mock-parent.html`);
+    await page.goto(`${URLS.testFrontend}/mock-parent.html`);
     await helper.waitForIframeReady();
     await helper.waitForIframeBlockHandle('mock-block-1');
   });

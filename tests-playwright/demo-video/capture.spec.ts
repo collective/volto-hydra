@@ -21,7 +21,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
-import { PORTS, URL } from '../ports';
+import { PORTS, URLS } from '../ports';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SHOWCASE_PATH = '/showcase-page';
@@ -41,10 +41,10 @@ test.describe.configure({ mode: 'serial' });
 // fast instead. Update this list (and start:test / RAZZLE_DEFAULT_IFRAME_URL)
 // together if the demo flow gets new beats.
 const REQUIRED_SERVERS = [
-  { url: `${URL.mockApi}/@search?path=/`, label: `mock-api on :${PORTS.mockApi}    (pnpm start:mock-api)` },
-  { url: `${URL.voltoWebpack}/health`,    label: `Volto compile on :${PORTS.voltoWebpack} (pnpm start:test)` },
-  { url: `${URL.nuxt}/`,                  label: `Nuxt on :${PORTS.nuxt}          (pnpm start:nuxt:test)` },
-  { url: `${URL.f7}/`,                    label: `F7 Mobile on :${PORTS.f7}     (cd examples/hydra-vue-f7 && pnpm dev:test)` },
+  { url: `${URLS.mockApi}/@search?path=/`, label: `mock-api on :${PORTS.mockApi}    (pnpm start:mock-api)` },
+  { url: `${URLS.voltoWebpack}/health`,    label: `Volto compile on :${PORTS.voltoWebpack} (pnpm start:test)` },
+  { url: `${URLS.nuxt}/`,                  label: `Nuxt on :${PORTS.nuxt}          (pnpm start:nuxt:test)` },
+  { url: `${URLS.f7}/`,                    label: `F7 Mobile on :${PORTS.f7}     (cd examples/hydra-vue-f7 && pnpm dev:test)` },
 ];
 
 test.beforeAll(async () => {

@@ -18,7 +18,7 @@ import { test as base, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { verifyBlockRendering } from '../helpers/BlockVerificationHelper';
 import { getFrontendUrl } from './fixtures';
-import { URL } from '../ports';
+import { URLS } from '../ports';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -77,8 +77,8 @@ test.describe('Block sanity (auto-discovered)', () => {
 
       // Use api_path to load the full page content from the API
       // The mock-parent fetches the page JSON and sends it via the bridge protocol
-      const apiOrigin = process.env.DISCOVER_BLOCKS_API || URL.mockApi;
-      const mockParentUrl = process.env.MOCK_PARENT_URL || `${URL.testFrontend}/mock-parent.html`;
+      const apiOrigin = process.env.DISCOVER_BLOCKS_API || URLS.mockApi;
+      const mockParentUrl = process.env.MOCK_PARENT_URL || `${URLS.testFrontend}/mock-parent.html`;
       const apiPath = `${apiOrigin}${block.pagePath}`;
       await page.goto(
         `${mockParentUrl}?api_path=${encodeURIComponent(apiPath)}${frontend}`,

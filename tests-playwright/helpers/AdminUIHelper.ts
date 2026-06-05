@@ -3,7 +3,7 @@
  */
 import { Page, Locator, FrameLocator, expect, ElementHandle } from '@playwright/test';
 import { TEST_DATA_PREFIX } from './test-paths';
-import { URL } from '../ports';
+import { URLS } from '../ports';
 import { randomUUID } from 'node:crypto';
 
 // Base test JWT — the mock API only checks for the "Bearer " prefix, never
@@ -22,7 +22,7 @@ export class AdminUIHelper {
 
   constructor(
     public readonly page: Page,
-    public readonly adminUrl: string = URL.voltoSsr,
+    public readonly adminUrl: string = URLS.voltoSsr,
     public readonly contentPrefix: string = TEST_DATA_PREFIX
   ) {
     // Capture browser console - all logs locally, only errors/warnings in CI

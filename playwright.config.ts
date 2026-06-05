@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import * as path from 'path';
-import { PORTS, URL } from './tests-playwright/ports';
+import { PORTS, URLS } from './tests-playwright/ports';
 
 // Check which extra servers we need based on --project arg
 const projectArgIndex = process.argv.indexOf('--project');
@@ -79,7 +79,7 @@ export default defineConfig({
   /* Shared settings for all the projects below */
   use: {
     /* Base URL to use in actions like `await page.goto('/')` */
-    baseURL: URL.voltoSsr,
+    baseURL: URLS.voltoSsr,
 
     /* Trace recording - disabled by default to save space. Enable with TRACE=1 */
     trace: process.env.TRACE ? 'on-first-retry' : 'off',
@@ -334,7 +334,7 @@ export default defineConfig({
       // Test frontend is served by the separate Vite webServer entry below
       name: 'Mock API',
       command: `node --watch --watch-path=tests-playwright/fixtures --watch-path=packages/hydra-js ${path.join(__dirname, 'tests-playwright/fixtures/mock-api-server.cjs')}`,
-      url: `${URL.mockApi}/health`,
+      url: `${URLS.mockApi}/health`,
       timeout: 30 * 1000,
       reuseExistingServer: true,
       cwd: process.cwd(),
@@ -350,7 +350,7 @@ export default defineConfig({
       // Health check on hydra.js (not HTML) to ensure Vite has compiled it
       name: 'Test Frontend',
       command: 'npx vite --config tests-playwright/fixtures/test-frontend/vite.config.js',
-      url: `${URL.testFrontend}/hydra.js`,
+      url: `${URLS.testFrontend}/hydra.js`,
       timeout: 30 * 1000,
       reuseExistingServer: true,
       cwd: process.cwd(),
@@ -362,8 +362,8 @@ export default defineConfig({
       ? {
           // Production server (prebuilt in CI) - starts immediately, no webpack compilation
           name: 'Volto Admin UI (Production)',
-          command: `PORT=${PORTS.voltoSsr} RAZZLE_API_PATH=${URL.mockApi} RAZZLE_DEFAULT_IFRAME_URL=${URL.testFrontend} pnpm start:prod`,
-          url: URL.voltoSsr, // Health check on SSR server directly
+          command: `PORT=${PORTS.voltoSsr} RAZZLE_API_PATH=${URLS.mockApi} RAZZLE_DEFAULT_IFRAME_URL=${URLS.testFrontend} pnpm start:prod`,
+          url: URLS.voltoSsr, // Health check on SSR server directly
           timeout: 30 * 1000, // 30 seconds should be plenty for starting prebuilt server
           reuseExistingServer: true, // CI starts server in advance
           cwd: process.cwd(),
@@ -372,11 +372,11 @@ export default defineConfig({
           env: {
             NODE_ENV: 'production',
             PORT: String(PORTS.voltoSsr),
-            RAZZLE_API_PATH: URL.mockApi,
+            RAZZLE_API_PATH: URLS.mockApi,
             // All frontends available for switching
             RAZZLE_DEFAULT_IFRAME_URL: [
-              URL.testFrontend, URL.nuxt, URL.reactDoc, URL.svelteDoc,
-              URL.vueDoc, URL.nextjs, URL.f7,
+              URLS.testFrontend, URLS.nuxt, URLS.reactDoc, URLS.svelteDoc,
+              URLS.vueDoc, URLS.nextjs, URLS.f7,
             ].join(','),
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
           },
@@ -389,8 +389,8 @@ export default defineConfig({
           // Tests navigate to voltoSsr (SSR server for content)
           // Health check on voltoWebpack (webpack-dev-server) waits for compilation to complete
           name: 'Volto Admin UI (Dev)',
-          command: `PORT=${PORTS.voltoSsr} RAZZLE_API_PATH=${URL.mockApi} RAZZLE_DEFAULT_IFRAME_URL=${URL.testFrontend} VOLTOCONFIG=$(pwd)/volto.config.js razzle start`,
-          url: `${URL.voltoWebpack}/health`, // Health check on webpack-dev-server (returns 200 when ready)
+          command: `PORT=${PORTS.voltoSsr} RAZZLE_API_PATH=${URLS.mockApi} RAZZLE_DEFAULT_IFRAME_URL=${URLS.testFrontend} VOLTOCONFIG=$(pwd)/volto.config.js razzle start`,
+          url: `${URLS.voltoWebpack}/health`, // Health check on webpack-dev-server (returns 200 when ready)
           timeout: 300 * 1000, // 5 minutes for initial webpack compilation
           reuseExistingServer: true, // Always reuse - local dev starts manually
           cwd: process.cwd(),
@@ -398,11 +398,11 @@ export default defineConfig({
           stderr: 'pipe' as const,
           env: {
             PORT: String(PORTS.voltoSsr),
-            RAZZLE_API_PATH: URL.mockApi,
+            RAZZLE_API_PATH: URLS.mockApi,
             // All frontends available for switching
             RAZZLE_DEFAULT_IFRAME_URL: [
-              URL.testFrontend, URL.nuxt, URL.reactDoc, URL.svelteDoc,
-              URL.vueDoc, URL.nextjs, URL.f7,
+              URLS.testFrontend, URLS.nuxt, URLS.reactDoc, URLS.svelteDoc,
+              URLS.vueDoc, URLS.nextjs, URLS.f7,
             ].join(','),
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
             // Prevent parcel from trying to access TTY (fixes segfault in background process)
@@ -413,7 +413,7 @@ export default defineConfig({
     ...(needsNuxt ? [{
       name: 'Nuxt Frontend (Test)',
       command: 'pnpm run dev:test',
-      url: URL.nuxt,
+      url: URLS.nuxt,
       timeout: 120 * 1000, // 2 minutes for Nuxt compilation
       reuseExistingServer: true, // CI starts server in advance, local dev starts manually
       cwd: path.join(process.cwd(), 'examples/nuxt-blog-starter'),
@@ -424,7 +424,7 @@ export default defineConfig({
     ...(needsReact ? [{
       name: 'React Frontend (Test)',
       command: `npx vite --port ${PORTS.reactDoc} --strictPort`,
-      url: URL.reactDoc,
+      url: URLS.reactDoc,
       timeout: 30 * 1000,
       reuseExistingServer: true,
       cwd: path.join(process.cwd(), 'docs/blocks/test-react'),
@@ -435,7 +435,7 @@ export default defineConfig({
     ...(needsSvelte ? [{
       name: 'Svelte Frontend (Test)',
       command: `npx vite --port ${PORTS.svelteDoc} --strictPort`,
-      url: URL.svelteDoc,
+      url: URLS.svelteDoc,
       timeout: 30 * 1000,
       reuseExistingServer: true,
       cwd: path.join(process.cwd(), 'docs/blocks/test-svelte'),
@@ -446,7 +446,7 @@ export default defineConfig({
     ...(needsVue ? [{
       name: 'Vue Frontend (Test)',
       command: `npx vite --port ${PORTS.vueDoc} --strictPort`,
-      url: URL.vueDoc,
+      url: URLS.vueDoc,
       timeout: 30 * 1000,
       reuseExistingServer: true,
       cwd: path.join(process.cwd(), 'docs/blocks/test-vue'),
@@ -457,20 +457,20 @@ export default defineConfig({
     ...(needsNextjs ? [{
       name: 'Next.js Frontend (Test)',
       command: 'pnpm run dev:test',
-      url: URL.nextjs,
+      url: URLS.nextjs,
       timeout: 120 * 1000,
       reuseExistingServer: true,
       cwd: path.join(process.cwd(), 'examples/hydra-nextjs'),
       stdout: 'pipe' as const,
       stderr: 'pipe' as const,
       env: {
-        NEXT_PUBLIC_BACKEND_BASE_URL: URL.mockApi,
+        NEXT_PUBLIC_BACKEND_BASE_URL: URLS.mockApi,
       },
     }] : []),
     ...(needsF7 ? [{
       name: 'Framework7 Frontend (Test)',
       command: `cp ../../packages/hydra-js/hydra.js ./src/js/hydra.js && npx vite --port ${PORTS.f7} --strictPort --config vite.config.test.js`,
-      url: URL.f7,
+      url: URLS.f7,
       timeout: 120 * 1000,
       reuseExistingServer: true,
       cwd: path.join(process.cwd(), 'examples/hydra-vue-f7'),
@@ -478,7 +478,7 @@ export default defineConfig({
       stderr: 'pipe' as const,
       env: {
         ...process.env,
-        VITE_API_BASE_URL: URL.mockApi,
+        VITE_API_BASE_URL: URLS.mockApi,
       },
     }] : []),
   ],

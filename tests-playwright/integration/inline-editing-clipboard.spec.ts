@@ -9,7 +9,7 @@
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
-import { URL } from '../ports';
+import { URLS } from '../ports';
 
 test.describe('Inline Editing - Clipboard', () => {
   test('can cut and paste plain text', async ({ page }) => {
@@ -229,7 +229,7 @@ test.describe('Inline Editing - Clipboard', () => {
       const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
       Object.defineProperty(event, 'clipboardData', { value: dt });
       el.dispatchEvent(event);
-    }, URL.mockApi);
+    }, URLS.mockApi);
 
     // Should create 2 new blocks (image + "World" text) in the same column
     await helper.waitForBlockCountToBe(initialBlocks + 2, 10000);

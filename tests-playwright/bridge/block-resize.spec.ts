@@ -5,7 +5,7 @@
  * the selection outline is updated to match the new dimensions.
  */
 import { test, expect } from './fixtures';
-import { URL } from '../ports';
+import { URLS } from '../ports';
 
 test.describe('Block Resize Detection', () => {
   test('ResizeObserver updates overlay when block size changes', async ({ helper, page }) => {
@@ -98,7 +98,7 @@ test.describe('Block Resize Detection', () => {
           blockPathMap: (window as any).mockParent.buildBlockPathMap(),
         }, '*');
       }
-    }, URL.mockApi);
+    }, URLS.mockApi);
 
     // Wait for re-render to complete
     await page.waitForTimeout(300);

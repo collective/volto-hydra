@@ -56,8 +56,12 @@ export const PORTS = {
 /**
  * Pre-built `http://localhost:N` strings for the common ports. Use these
  * instead of building URLs ad-hoc to keep the call sites short.
+ *
+ * Named `URLS` (plural) so it doesn't shadow the global `URL` constructor
+ * in any file that does `import { URLS } from '../ports'` and also calls
+ * `new URL(...)` (e.g. navigation.spec.ts parsing iframe `src` origins).
  */
-export const URL = {
+export const URLS = {
   mockApi: `http://localhost:${PORTS.mockApi}`,
   testFrontend: `http://localhost:${PORTS.testFrontend}`,
   mockParent: `http://localhost:${PORTS.mockParent}`,

@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { TEST_DATA_PREFIX } from '../helpers/test-paths';
-import { PORTS, URL } from '../ports';
+import { PORTS, URLS } from '../ports';
 
 test.describe('Navigation and URL Handling', () => {
   test('External URLs do not load in iframe', async ({ page }, testInfo) => {
@@ -30,8 +30,8 @@ test.describe('Navigation and URL Handling', () => {
 
   // Test hash-based routing with different URL formats
   const hashFormats = [
-    { name: '#/', url: `${URL.testFrontend}/#/`, expectedHash: `#${TEST_DATA_PREFIX}/test-page` },
-    { name: '#!/', url: `${URL.testFrontend}/#!/`, expectedHash: `#!${TEST_DATA_PREFIX}/test-page` },
+    { name: '#/', url: `${URLS.testFrontend}/#/`, expectedHash: `#${TEST_DATA_PREFIX}/test-page` },
+    { name: '#!/', url: `${URLS.testFrontend}/#!/`, expectedHash: `#!${TEST_DATA_PREFIX}/test-page` },
   ];
 
   for (const format of hashFormats) {
@@ -97,7 +97,7 @@ test.describe('Navigation and URL Handling', () => {
 
   test('Switching to hash-based frontend stays in edit mode', async ({ page }) => {
     // Requires F7 running on its dedicated port
-    const response = await page.request.get(URL.f7).catch(() => null);
+    const response = await page.request.get(URLS.f7).catch(() => null);
     test.skip(!response?.ok(), `F7 not running on port ${PORTS.f7}`);
 
     // Reproduces production bug: F7 uses hash-bang routing (#!/path).
@@ -122,7 +122,7 @@ test.describe('Navigation and URL Handling', () => {
 
     // Add F7 hash-based URL
     const input = modal.locator('.frontend-settings-url-input');
-    await input.fill(`${URL.f7}/#!`);
+    await input.fill(`${URLS.f7}/#!`);
     await modal.locator('.frontend-settings-add-btn').click();
 
     // Close modal
@@ -298,7 +298,7 @@ test.describe('Navigation and URL Handling', () => {
     await helper.login();
 
     // Navigate to root in edit mode
-    await page.goto(`${URL.voltoSsr}/edit`);
+    await page.goto(`${URLS.voltoSsr}/edit`);
 
     // Wait for iframe element to be visible
     await page.locator('#previewIframe').waitFor({ state: 'visible', timeout: 10000 });
@@ -467,7 +467,7 @@ test.describe('Navigation and URL Handling', () => {
 
     // Add hash-based frontend URL
     const urlInput = modal.locator('.frontend-settings-url-input');
-    await urlInput.fill(`${URL.testFrontend}/#/`);
+    await urlInput.fill(`${URLS.testFrontend}/#/`);
     await modal.locator('.frontend-settings-add-btn').click();
 
     // Close the settings modal
@@ -638,7 +638,7 @@ test.describe('Navigation and URL Handling', () => {
   test('Frontend switcher button visible in view mode', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await page.goto(`${URL.voltoSsr}/test-page`);
+    await page.goto(`${URLS.voltoSsr}/test-page`);
     await page.waitForLoadState('networkidle');
 
     const switcherBtn = page.locator('#toolbar-frontend-switcher');

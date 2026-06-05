@@ -11,19 +11,19 @@
  */
 import { test as base, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
-import { URL } from '../ports';
+import { URLS } from '../ports';
 
 /**
  * Map project names to frontend URLs.
  * The default (mock) uses the test frontend embedded on port 8888.
  */
 const FRONTEND_URLS: Record<string, string> = {
-  nuxt: URL.nuxt,
-  react: URL.reactDoc,
-  svelte: URL.svelteDoc,
-  vue: URL.vueDoc,
-  nextjs: URL.nextjs,
-  f7: URL.f7,
+  nuxt: URLS.nuxt,
+  react: URLS.reactDoc,
+  svelte: URLS.svelteDoc,
+  vue: URLS.vueDoc,
+  nextjs: URLS.nextjs,
+  f7: URLS.f7,
 };
 
 export function getFrontendUrl(projectName: string): string | undefined {
@@ -35,7 +35,7 @@ const test = base.extend<{ helper: AdminUIHelper }>({
     const helper = new AdminUIHelper(page);
     const url = getFrontendUrl(testInfo.project.name);
     const frontend = url ? `?frontend=${encodeURIComponent(url)}` : '';
-    await page.goto(`${URL.testFrontend}/mock-parent.html${frontend}`);
+    await page.goto(`${URLS.testFrontend}/mock-parent.html${frontend}`);
     await helper.waitForIframeReady();
     await helper.waitForIframeBlockHandle('mock-block-1');
     await use(helper);
