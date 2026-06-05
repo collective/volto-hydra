@@ -1,10 +1,11 @@
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import { URLS } from '../ports';
 
 test.describe('Authentication and Access Control', () => {
   test('Login form accepts admin/admin and redirects to dashboard', async ({ page }) => {
     // Go to login page
-    await page.goto('http://localhost:3001/login');
+    await page.goto(`${URLS.voltoSsr}/login`);
 
     // Wait for the login form to be visible
     const usernameField = page.getByLabel('Login Name');
@@ -237,7 +238,7 @@ test.describe('Authentication and Access Control', () => {
     await helper.navigateToEdit('/test-page');
 
     // Navigate away and back
-    await page.goto('http://localhost:3001/contents');
+    await page.goto(`${URLS.voltoSsr}/contents`);
     await page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
 
     // Navigate back to edit

@@ -39,9 +39,16 @@ jobs:
       - name: Build workspace deps (@plone/registry, @plone/components)
         # Volto 19 reads these via workspace symlinks but its razzle.config
         # requires their built dist/ output (create-addons-loader.cjs, etc.).
-        # Locally `make install` handles this; CI runs install directly so
-        # build:deps is added explicitly here.
+        # Also needed by vitest because the addon tests import via @plone/*
+        # workspace aliases and the test-setup files touch the built dist/.
         run: pnpm build:deps
+      - name: Run volto-hydra addon unit tests (vitest)
+        run: pnpm test
+      - name: Run mock-api unit tests (node:test)
+        # Plone 6.2 fidelity coverage (@aliases, SearchableText prefix
+        # match, navigation, folder ordering). Was not previously wired
+        # into CI even though the test file existed.
+        run: pnpm test:api
       - name: Build Volto for production
         run: pnpm build
         env:

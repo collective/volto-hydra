@@ -5,6 +5,7 @@
  * the selection outline is updated to match the new dimensions.
  */
 import { test, expect } from './fixtures';
+import { URLS } from '../ports';
 
 test.describe('Block Resize Detection', () => {
   test('ResizeObserver updates overlay when block size changes', async ({ helper, page }) => {
@@ -58,14 +59,14 @@ test.describe('Block Resize Detection', () => {
     // Trigger a FORM_DATA message to cause a re-render
     // TODO: replace this with a page resize which is more realisitic
     const iframe = helper.getIframe();
-    await page.evaluate(() => {
+    await page.evaluate((mockApiUrl) => {
       const iframeWindow = (document.getElementById('previewIframe') as HTMLIFrameElement).contentWindow;
       if (iframeWindow) {
         // Send a FORM_DATA message to trigger re-render
         iframeWindow.postMessage({
           type: 'FORM_DATA',
           data: {
-            '@id': 'http://localhost:8888/test-page',
+            '@id': `${mockApiUrl}/test-page`,
             '@type': 'Document',
             title: 'Mock Test Page',
             blocks: {
@@ -97,7 +98,7 @@ test.describe('Block Resize Detection', () => {
           blockPathMap: (window as any).mockParent.buildBlockPathMap(),
         }, '*');
       }
-    });
+    }, URLS.mockApi);
 
     // Wait for re-render to complete
     await page.waitForTimeout(300);
