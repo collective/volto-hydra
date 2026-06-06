@@ -1,67 +1,65 @@
 /**
- * Integration coverage for the Url helper shadow that flattens
- * iframe-frontend URLs when the editor pastes them into a link widget.
- * Verifies the value that actually hits the mock API in the save
- * PATCH — not just the helper's pure-function output.
+ * Integration coverage for Hydra's dynamic publicURL — i.e. the
+ * publicUrlSync middleware that updates `settings.publicURL` when the
+ * editor switches iframe frontends.
  *
- * Both scenarios use off-host origins registered on a single saved
- * frontend entry as `Name|EditURL|PublishURL`. Neither origin is the
- * Volto admin (publicURL) or the mock API (apiPath), so the ONLY reason
- * flattenToAppURL strips them is the Hydra shadow's getKnownFrontendUrls
- * lookup. Stock Volto would not flatten either; with the shadow loaded,
- * both get flattened to a /path that addAppURL then re-prefixes with
- * apiPath.
+ * Setup registers two reachable frontends, both pointing at the same
+ * test-frontend server but addressed by different hostnames so the
+ * browser treats them as distinct origins:
  *
- *   1. Editor pastes a URL from the edit origin of a saved frontend.
- *   2. Editor pastes a URL from the publish origin of the same saved
- *      frontend (publish ≠ edit). This is the case Volto's stock helper
- *      can't handle.
+ *   Frontend A: http://localhost:<port>   → publishUrl http://www.published-a.example.test
+ *   Frontend B: http://127.0.0.1:<port>   → publishUrl http://www.published-b.example.test
  *
- * Deliberately not testing publicURL flattening here — that's Volto's
- * own behavior and depends on RAZZLE_PUBLIC_URL being set in prod,
- * which isn't always true in CI. The shadow is what this PR adds.
+ * Both serve real content (the iframe loads), so we can paste-edit-save
+ * in each one without hitting a broken iframe. The test:
+ *
+ *   1. Active = A on load (cookie). Paste A's publishUrl into a link
+ *      widget, save, assert the PATCH body's slate node has the
+ *      apiPath-prefixed flattened path — A's publish origin is gone.
+ *   2. Switch to B via the toolbar switcher (real click on
+ *      .frontend-switcher-url-item). Re-enter edit mode. Paste B's
+ *      publishUrl, save, assert the same — B's publish origin gone.
+ *
+ * If publicURL were pinned (RAZZLE_PUBLIC_URL or any static value),
+ * exactly one of the two pastes would survive. Both pass only when
+ * publicURL follows the active frontend.
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { PORTS, URLS } from '../ports';
 
-// Two distinct off-host origins. The test registers both as iframe-frontend
-// URLs on a single saved entry (edit + publish). Neither is the Volto admin
-// (publicURL) or the mock API (apiPath) — so the ONLY reason flattenToAppURL
-// strips them is the Hydra shadow's getKnownFrontendUrls lookup. Stock Volto
-// would not flatten either; with the shadow loaded, both get flattened.
-//
-// Using non-routable hosts on purpose: the test never fetches these URLs,
-// it just verifies the link widget's save round-trip strips them from the
-// stored slate node.
-const EDIT_ORIGIN = 'http://edit.published.example.test';
-const PUBLISH_ORIGIN = 'http://www.published.example.test';
+const FRONTEND_A_EDIT = `http://localhost:${PORTS.testFrontend}`;
+const FRONTEND_A_PUBLISH = 'http://www.published-a.example.test';
+const FRONTEND_B_EDIT = `http://127.0.0.1:${PORTS.testFrontend}`;
+const FRONTEND_B_PUBLISH = 'http://www.published-b.example.test';
 
-test.describe('Url flatten on save (link widget)', () => {
+test.describe('publicURL follows the active iframe frontend', () => {
   test.beforeEach(async ({ page }) => {
-    // One saved frontend entry with BOTH a distinct edit URL and a publish
-    // URL. saved_urls cookie is port-namespaced by Hydra's cookieNames.
+    // Register both frontends BEFORE Volto loads. iframe_url cookie pins
+    // A as the active one on initial render; applyConfig + middleware
+    // then derive settings.publicURL = A.publishUrl.
     await page.context().addCookies([
       {
         name: `saved_urls_${PORTS.voltoSsr}`,
-        value: `Pub|${EDIT_ORIGIN}|${PUBLISH_ORIGIN}`,
+        value: [
+          `A|${FRONTEND_A_EDIT}|${FRONTEND_A_PUBLISH}`,
+          `B|${FRONTEND_B_EDIT}|${FRONTEND_B_PUBLISH}`,
+        ].join(','),
+        url: URLS.voltoSsr,
+      },
+      {
+        name: `iframe_url_${PORTS.voltoSsr}`,
+        value: FRONTEND_A_EDIT,
         url: URLS.voltoSsr,
       },
     ]);
   });
 
-  const runLinkFlattenTest = async (
-    page: import('@playwright/test').Page,
-    pastedUrl: string,
-    expectedPath: string,
-  ) => {
+  test('paste-and-save uses the active frontend on load, then follows a UI switch', async ({
+    page,
+  }) => {
     const helper = new AdminUIHelper(page);
-    await helper.login();
 
-    // Capture every PATCH that updates the test-page content. The slate
-    // node's `data.url` in the body is what proves the shadow works —
-    // the iframe's rendered href reflects frontend-side rendering choices
-    // and isn't a reliable signal of what was saved.
     const patchBodies: any[] = [];
     page.on('request', (req) => {
       if (
@@ -71,77 +69,77 @@ test.describe('Url flatten on save (link widget)', () => {
         try {
           patchBodies.push(JSON.parse(req.postData() || '{}'));
         } catch {
-          // Ignore non-JSON bodies; we only care about content updates.
+          // non-JSON PATCH — ignore
         }
       }
     });
 
+    await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    const blockId = 'block-1-uuid';
-    await helper.editBlockTextInIframe(blockId, 'Click here');
-
-    const editor = await helper.getEditorLocator(blockId);
+    // ---- Step 1: paste A's publishUrl while A is the active frontend.
+    const blockA = 'block-1-uuid';
+    await helper.editBlockTextInIframe(blockA, 'Click here');
+    let editor = await helper.getEditorLocator(blockA);
     await helper.selectAllTextInEditor(editor);
     await helper.clickFormatButton('link');
     await helper.waitForLinkEditorPopup();
-
-    const linkInput = await helper.getLinkEditorUrlInput();
-    await linkInput.fill(pastedUrl);
-    await linkInput.press('Enter');
-
-    // Wait for the link to actually appear in the iframe DOM before
-    // saving — otherwise the PATCH may not yet include the link.
+    await (await helper.getLinkEditorUrlInput()).fill(
+      `${FRONTEND_A_PUBLISH}/_test_data/another-page`,
+    );
+    await page.keyboard.press('Enter');
     await expect(async () => {
-      const blockHtml = await editor.innerHTML();
-      expect(blockHtml).toContain('<a ');
-      expect(blockHtml).toContain(expectedPath);
+      const html = await editor.innerHTML();
+      expect(html).toContain('<a ');
     }).toPass({ timeout: 5000 });
-
     await helper.saveContent();
 
-    expect(
-      patchBodies,
-      'expected at least one PATCH to the content endpoint',
-    ).not.toHaveLength(0);
-
-    const lastPatch = patchBodies[patchBodies.length - 1];
-    const blockData = lastPatch.blocks?.[blockId];
-    expect(blockData, `block ${blockId} should be in PATCH body`).toBeDefined();
-
-    // The serialised slate node's data.url must be the apiPath-prefixed
-    // form — never the pasted iframe-frontend origin. With Volto's stock
-    // helpers, both EDIT_ORIGIN and PUBLISH_ORIGIN survive verbatim
-    // (isInternalURL doesn't recognise them); with the Hydra shadow
-    // loaded, they get stripped to /path then re-prefixed with apiPath.
-    const serialised = JSON.stringify(blockData);
-    expect(
-      serialised,
-      'serialised slate must NOT contain the pasted edit origin',
-    ).not.toContain(EDIT_ORIGIN);
-    expect(
-      serialised,
-      'serialised slate must NOT contain the pasted publish origin',
-    ).not.toContain(PUBLISH_ORIGIN);
-    expect(
-      serialised,
-      'serialised slate must contain the API-prefixed flattened path',
-    ).toContain(`${URLS.mockApi}${expectedPath}`);
-  };
-
-  test('edit-origin URL (saved frontend) is flattened in the saved PATCH', async ({ page }) => {
-    await runLinkFlattenTest(
-      page,
-      `${EDIT_ORIGIN}/_test_data/another-page`,
-      '/_test_data/another-page',
+    const patchAfterA = patchBodies.at(-1);
+    expect(patchAfterA, 'expected a PATCH after first save').toBeTruthy();
+    const slateA = JSON.stringify(patchAfterA.blocks?.[blockA]);
+    expect(slateA, `slate node for ${blockA} should be in PATCH`).toBeTruthy();
+    expect(slateA, 'A publish origin must not survive the first save').not.toContain(
+      FRONTEND_A_PUBLISH,
     );
-  });
+    expect(
+      slateA,
+      'first save should store the apiPath-prefixed flattened path',
+    ).toContain(`${URLS.mockApi}/_test_data/another-page`);
 
-  test('publish-origin URL (different host than edit) is flattened in the saved PATCH', async ({ page }) => {
-    await runLinkFlattenTest(
-      page,
-      `${PUBLISH_ORIGIN}/_test_data/another-page`,
-      '/_test_data/another-page',
+    // ---- Step 2: switch to B in the toolbar, then paste B's publishUrl.
+    await helper.navigateToEdit('/test-page');
+    await helper.switchFrontend('B', FRONTEND_B_EDIT);
+
+    const blockB = 'block-3-uuid'; // different slate block so block-1's link stays put
+    await helper.editBlockTextInIframe(blockB, 'Click here');
+    editor = await helper.getEditorLocator(blockB);
+    await helper.selectAllTextInEditor(editor);
+    await helper.clickFormatButton('link');
+    await helper.waitForLinkEditorPopup();
+    await (await helper.getLinkEditorUrlInput()).fill(
+      `${FRONTEND_B_PUBLISH}/_test_data/another-page`,
     );
+    await page.keyboard.press('Enter');
+    await expect(async () => {
+      const html = await editor.innerHTML();
+      expect(html).toContain('<a ');
+    }).toPass({ timeout: 5000 });
+    await helper.saveContent();
+
+    const patchAfterB = patchBodies.at(-1);
+    expect(
+      patchAfterB,
+      'expected a PATCH after the second save',
+    ).toBeTruthy();
+    const slateB = JSON.stringify(patchAfterB.blocks?.[blockB]);
+    expect(slateB, `slate node for ${blockB} should be in PATCH`).toBeTruthy();
+    expect(
+      slateB,
+      'B publish origin must not survive the post-switch save',
+    ).not.toContain(FRONTEND_B_PUBLISH);
+    expect(
+      slateB,
+      'post-switch save should store the apiPath-prefixed flattened path',
+    ).toContain(`${URLS.mockApi}/_test_data/another-page`);
   });
 });
