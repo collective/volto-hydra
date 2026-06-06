@@ -1,40 +1,50 @@
 /**
  * Integration coverage for the Url helper shadow that flattens
- * iframe-frontend URLs (admin / publish) when the editor pastes them
- * into a link widget. Verifies the value that actually hits the mock
- * API in the save PATCH — not just the helper's pure-function output.
+ * iframe-frontend URLs when the editor pastes them into a link widget.
+ * Verifies the value that actually hits the mock API in the save
+ * PATCH — not just the helper's pure-function output.
  *
- * Two scenarios are exercised, both expecting the SAME outcome:
+ * Both scenarios use off-host origins registered on a single saved
+ * frontend entry as `Name|EditURL|PublishURL`. Neither origin is the
+ * Volto admin (publicURL) or the mock API (apiPath), so the ONLY reason
+ * flattenToAppURL strips them is the Hydra shadow's getKnownFrontendUrls
+ * lookup. Stock Volto would not flatten either; with the shadow loaded,
+ * both get flattened to a /path that addAppURL then re-prefixes with
+ * apiPath.
  *
- *   1. Editor pastes a URL from the admin origin
- *      (`settings.publicURL`, http://localhost:3001/...).
- *      Stock Volto already handles this — the test is a control to
- *      prove the harness/save plumbing works.
+ *   1. Editor pastes a URL from the edit origin of a saved frontend.
+ *   2. Editor pastes a URL from the publish origin of the same saved
+ *      frontend (publish ≠ edit). This is the case Volto's stock helper
+ *      can't handle.
  *
- *   2. Editor pastes a URL from a registered "publish URL" frontend
- *      that lives at a different origin than the edit frontend.
- *      Stock Volto stores this verbatim (absolute, with publish-origin
- *      prefix) → breaks resolveuid. With the Hydra shadow loaded, the
- *      pasted URL should be flattened to a /path and saved as the
- *      API-prefixed form.
- *
- * The publish-origin URL is set via the saved-URLs cookie BEFORE the
- * edit page loads, so getKnownFrontendUrls picks it up.
+ * Deliberately not testing publicURL flattening here — that's Volto's
+ * own behavior and depends on RAZZLE_PUBLIC_URL being set in prod,
+ * which isn't always true in CI. The shadow is what this PR adds.
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { PORTS, URLS } from '../ports';
 
-const PUBLISH_ORIGIN = 'http://www.published.example.com';
+// Two distinct off-host origins. The test registers both as iframe-frontend
+// URLs on a single saved entry (edit + publish). Neither is the Volto admin
+// (publicURL) or the mock API (apiPath) — so the ONLY reason flattenToAppURL
+// strips them is the Hydra shadow's getKnownFrontendUrls lookup. Stock Volto
+// would not flatten either; with the shadow loaded, both get flattened.
+//
+// Using non-routable hosts on purpose: the test never fetches these URLs,
+// it just verifies the link widget's save round-trip strips them from the
+// stored slate node.
+const EDIT_ORIGIN = 'http://edit.published.example.test';
+const PUBLISH_ORIGIN = 'http://www.published.example.test';
 
 test.describe('Url flatten on save (link widget)', () => {
   test.beforeEach(async ({ page }) => {
-    // Register a frontend with a publish URL distinct from the edit URL.
-    // saved_urls cookie is port-namespaced; voltoSsr is what the browser sees.
+    // One saved frontend entry with BOTH a distinct edit URL and a publish
+    // URL. saved_urls cookie is port-namespaced by Hydra's cookieNames.
     await page.context().addCookies([
       {
         name: `saved_urls_${PORTS.voltoSsr}`,
-        value: `Pub|${URLS.testFrontend}|${PUBLISH_ORIGIN}`,
+        value: `Pub|${EDIT_ORIGIN}|${PUBLISH_ORIGIN}`,
         url: URLS.voltoSsr,
       },
     ]);
@@ -100,29 +110,29 @@ test.describe('Url flatten on save (link widget)', () => {
     expect(blockData, `block ${blockId} should be in PATCH body`).toBeDefined();
 
     // The serialised slate node's data.url must be the apiPath-prefixed
-    // form — never the pasted origin. With Volto's stock helpers the
-    // publish-origin URL survives verbatim (no flatten because
-    // isInternalURL doesn't recognise it); with the Hydra shadow loaded,
-    // it gets stripped to /path then re-prefixed with apiPath.
+    // form — never the pasted iframe-frontend origin. With Volto's stock
+    // helpers, both EDIT_ORIGIN and PUBLISH_ORIGIN survive verbatim
+    // (isInternalURL doesn't recognise them); with the Hydra shadow
+    // loaded, they get stripped to /path then re-prefixed with apiPath.
     const serialised = JSON.stringify(blockData);
+    expect(
+      serialised,
+      'serialised slate must NOT contain the pasted edit origin',
+    ).not.toContain(EDIT_ORIGIN);
     expect(
       serialised,
       'serialised slate must NOT contain the pasted publish origin',
     ).not.toContain(PUBLISH_ORIGIN);
     expect(
       serialised,
-      'serialised slate must NOT contain the admin origin',
-    ).not.toContain(URLS.voltoSsr);
-    expect(
-      serialised,
       'serialised slate must contain the API-prefixed flattened path',
     ).toContain(`${URLS.mockApi}${expectedPath}`);
   };
 
-  test('admin-origin URL is flattened in the saved PATCH', async ({ page }) => {
+  test('edit-origin URL (saved frontend) is flattened in the saved PATCH', async ({ page }) => {
     await runLinkFlattenTest(
       page,
-      `${URLS.voltoSsr}/_test_data/another-page`,
+      `${EDIT_ORIGIN}/_test_data/another-page`,
       '/_test_data/another-page',
     );
   });
