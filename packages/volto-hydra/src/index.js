@@ -31,9 +31,14 @@ const messages = defineMessages({
     defaultMessage: 'Add some HTML here',
   },
 });
+import Cookies from 'js-cookie';
 import frontendPreviewUrl, { viewportPreset } from './reducers';
 import FrontendSwitcherPlug from './components/Toolbar/FrontendSwitcherPlug';
 import FrontendSwitcherPanel from './components/Toolbar/FrontendSwitcherPanel';
+import { getIframeUrlCookieName } from './utils/cookieNames';
+import getSavedURLs, { getURlsFromEnv } from './utils/getSavedURLs';
+import getCurrentFrontendPublicUrl from './utils/getCurrentFrontendPublicUrl';
+import publicUrlSync from './middleware/publicUrlSync';
 import {
   getAllowedBlocksList,
   subscribeToAllowedBlocksListChanges,
@@ -96,6 +101,27 @@ const applyConfig = (config) => {
   // Add reducers
   config.addonReducers.frontendPreviewUrl = frontendPreviewUrl;
   config.addonReducers.viewportPreset = viewportPreset;
+
+  // HYDRA: keep settings.publicURL pinned to the currently selected
+  // iframe frontend. publicURL in Hydra means "where this content is
+  // served to end users" — which changes every time the editor picks a
+  // different frontend in the toolbar switcher. RAZZLE_PUBLIC_URL is
+  // therefore inapplicable; the middleware listens for the same Redux
+  // action FrontendSwitcherPanel already dispatches.
+  config.settings.storeExtenders = [
+    ...(config.settings.storeExtenders || []),
+    (stack) => [...stack, publicUrlSync],
+  ];
+  if (typeof window !== 'undefined') {
+    // Boot value: pick the frontend the editor was last viewing (cookie
+    // set by View.jsx), or the first env-default frontend on a fresh
+    // session. Without this, settings.publicURL stays at Volto's stock
+    // default until the first switch.
+    const currentEditUrl =
+      Cookies.get(getIframeUrlCookieName()) || getURlsFromEnv()[0]?.url;
+    const initial = getCurrentFrontendPublicUrl(getSavedURLs(), currentEditUrl);
+    if (initial) config.settings.publicURL = initial;
+  }
 
   // Un-reserve frontend-only view routes so content pages can use those
   // names. Volto's getBaseUrl() strips any nonContentRoutes suffix from a
