@@ -195,6 +195,47 @@ const SyncedSlateToolbar = ({
     return updateBlockById(form, blockPathMap, blockId, newBlockData);
   }, [form, blockPathMap]);
 
+  // ──────────────────────────────────────────────────────────────
+  // Chevron move buttons (mobile #145).
+  // Within-parent only — ▲ on the top sibling is a no-op (disabled),
+  // ▲/▼ never traverse out to the grandparent. The keyboard arrows in
+  // hydra.src.js handle cursor navigation, not block reorder, so this
+  // helper is net new (~30 lines) — proceed-approved by user.
+  const getSiblingItems = () => {
+    const entry = blockPathMap?.[selectedBlock];
+    if (!entry) return null;
+    const parentId = entry.parentId;
+    const containerField = entry.containerField || 'blocks_layout';
+    const parentBlock = !parentId || parentId === PAGE_BLOCK_UID
+      ? form
+      : getBlockById(form, blockPathMap, parentId);
+    const items = parentBlock?.[containerField]?.items || [];
+    return { items, idx: items.indexOf(selectedBlock), parentBlock, parentId, containerField };
+  };
+  const moveSelectedBlock = (direction) => {
+    const sib = getSiblingItems();
+    if (!sib) return;
+    const newIdx = sib.idx + (direction === 'up' ? -1 : 1);
+    if (sib.idx < 0 || newIdx < 0 || newIdx >= sib.items.length) return;
+    const targetBlockId = sib.items[newIdx];
+    // Dispatch the hydra-move-block CustomEvent — View.jsx listens for it
+    // (added alongside hydra-copy-blocks et al.) and fans into the existing
+    // MOVE_BLOCKS path. Same path the iframe drag handler ultimately uses.
+    document.dispatchEvent(
+      new CustomEvent('hydra-move-block', {
+        detail: {
+          blockId: selectedBlock,
+          targetBlockId,
+          insertAfter: direction === 'down',
+          targetParentId: sib.parentId,
+        },
+      }),
+    );
+  };
+  const chevronSib = getSiblingItems();
+  const isAtTopOfParent = !chevronSib || chevronSib.idx <= 0;
+  const isAtBottomOfParent = !chevronSib || chevronSib.idx >= chevronSib.items.length - 1;
+
   // Create Slate editor once using Volto's makeEditor (includes all plugins)
   // Add withEmptyInlineRemoval to clean up empty formatting elements after delete
   const [editor] = useState(() => {
@@ -1242,6 +1283,33 @@ const SyncedSlateToolbar = ({
           overflow: 'hidden', // Ensure buttons don't extend past maxWidth
         }}
       >
+      {/* Mobile-only chevron move buttons. Hidden on desktop/tablet via
+       * .quanta-toolbar .chevron-buttons { display: none } in
+       * mobile-tablet.css. Within-parent move only. */}
+      {(() => {
+        if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) return null;
+        const block = getBlock(selectedBlock);
+        if (isBlockPositionLocked(block, templateEditMode)) return null;
+        return (
+          <div className="chevron-buttons">
+            <button
+              type="button"
+              className="chevron-up"
+              aria-label="Move block up"
+              disabled={isAtTopOfParent}
+              onClick={() => moveSelectedBlock('up')}
+            >▲</button>
+            <button
+              type="button"
+              className="chevron-down"
+              aria-label="Move block down"
+              disabled={isAtBottomOfParent}
+              onClick={() => moveSelectedBlock('down')}
+            >▼</button>
+          </div>
+        );
+      })()}
+
       {/* Drag handle or lock icon - only show for blocks, not page-level fields */}
       {(() => {
         if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) {

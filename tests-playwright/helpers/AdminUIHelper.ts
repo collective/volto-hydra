@@ -1149,9 +1149,15 @@ export class AdminUIHelper {
     }, { timeout: 5000 }).toBeTruthy();
 
     // Wait for both drag handles (iframe and Volto toolbar) to be aligned
-    // Only check if the Volto toolbar drag handle exists (some blocks/tests may not have it)
+    // Only check if the Volto toolbar drag handle is actually visible.
+    // On mobile (@media max-width:600px) the drag handle is hidden via
+    // display:none — the chevron buttons replace it — so alignment is
+    // moot. Skip silently in that case.
     const voltoToolbarDragHandle = this.page.locator('.quanta-toolbar .drag-handle');
-    if (await voltoToolbarDragHandle.count() > 0) {
+    const dragHandleVisible =
+      (await voltoToolbarDragHandle.count()) > 0 &&
+      (await voltoToolbarDragHandle.isVisible().catch(() => false));
+    if (dragHandleVisible) {
       await this.waitForDragHandlesAligned(5000);
     }
   }
@@ -4245,24 +4251,37 @@ export class AdminUIHelper {
 
     await userMenu.click();
 
-    // Wait for dropdown to appear - the logout is a Link with id="toolbar-logout"
-    // It contains an SVG with class="logout"
-    const logoutButton = this.page
-      .locator('#toolbar-logout')
-      .or(this.page.locator('a .icon.logout').first())
-      .or(this.page.locator('[aria-label="Logout"]'))
-      .or(this.page.locator('text=Logout'));
+    // Wait for the actual Logout link to appear. The .or() fallback exists
+    // for Volto variants that don't emit #toolbar-logout, but on the live
+    // tree (Volto 19) it does — and we MUST wait specifically for it
+    // because an a11y announcement <span class="visually-hidden">
+    // containing "Menu opened, Focus on Logout" appears slightly before
+    // the real link, and an .or()/.first() race can resolve to that span.
+    const primaryLogout = this.page.locator('#toolbar-logout');
+    const primaryCount = await primaryLogout
+      .waitFor({ state: 'visible', timeout: 4000 })
+      .then(() => 1)
+      .catch(() => 0);
+    const logoutButton = primaryCount > 0
+      ? primaryLogout
+      : this.page
+          .locator('a .icon.logout')
+          .or(this.page.locator('[aria-label="Logout"]'))
+          .or(this.page.locator('text=Logout'))
+          .first();
 
-    try {
-      await logoutButton.first().waitFor({ state: 'visible', timeout: 2000 });
-    } catch (e) {
-      throw new Error(
-        'Logout button did not appear after clicking user menu. ' +
-        'Check that the menu dropdown is working correctly.'
-      );
+    if (primaryCount === 0) {
+      try {
+        await logoutButton.waitFor({ state: 'visible', timeout: 2000 });
+      } catch (e) {
+        throw new Error(
+          'Logout button did not appear after clicking user menu. ' +
+          'Check that the menu dropdown is working correctly.'
+        );
+      }
     }
 
-    await logoutButton.first().click();
+    await logoutButton.click();
 
     // Wait for redirect to login page
     try {

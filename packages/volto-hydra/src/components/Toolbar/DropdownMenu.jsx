@@ -532,6 +532,16 @@ const DropdownMenu = ({
           </div>
         );
       })()}
+      {/* Mobile-only back-arrow. Hidden on desktop/tablet via
+       * .mobile-sheet-back { display: none } in mobile-tablet.css. */}
+      <button
+        type="button"
+        className="mobile-sheet-back"
+        aria-label="Close menu"
+        onClick={onClose}
+      >
+        ←
+      </button>
     </div>,
     document.body,
   );

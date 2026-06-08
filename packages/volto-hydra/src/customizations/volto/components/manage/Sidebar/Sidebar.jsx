@@ -64,9 +64,23 @@ const messages = defineMessages({
 const Sidebar = (props) => {
   const intl = useIntl();
   const { cookies, content } = props;
-  const [expanded, setExpanded] = useState(
-    cookies.get('sidebar_expanded') !== 'false',
-  );
+  const [expanded, setExpanded] = useState(() => {
+    const cookieValue = cookies.get('sidebar_expanded');
+    if (cookieValue !== undefined) return cookieValue !== 'false';
+    // No cookie set yet — pick a sensible default per viewport.
+    // Mobile (≤600px) starts collapsed: the sidebar is full-screen on
+    // mobile (see mobile-tablet.css) and auto-opening it would hide the
+    // canvas before the editor's first interaction. Desktop / tablet
+    // preserve the existing "open by default" behavior.
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(max-width: 600px)').matches
+    ) {
+      return false;
+    }
+    return true;
+  });
   const [size] = useState(0);
   const [showFull, setshowFull] = useState(true);
   const sidebarContentRef = useRef(null);
