@@ -75,7 +75,7 @@ const Sidebar = (props) => {
     if (
       typeof window !== 'undefined' &&
       window.matchMedia &&
-      window.matchMedia('(max-width: 600px)').matches
+      window.matchMedia('(max-width: 767px)').matches
     ) {
       return false;
     }

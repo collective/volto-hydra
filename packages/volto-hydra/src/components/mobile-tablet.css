@@ -4,17 +4,27 @@
  * layout. Desktop (>=1024px) inherits NO rules from this file — verify
  * via the desktop control test in mobile-tablet-admin-layout.spec.ts.
  *
- * Z-index ladder (set as custom properties so the rules below stay
- * legible):
+ * Breakpoints aligned with Volto's own Semantic-UI defaults:
+ *   - mobile  ≤ 767px   (Volto's `largestMobileScreen`)
+ *   - tablet  768–1023px
+ *   - desktop ≥ 1024px
+ *
+ * NB the spec originally said 600/1023 — we aligned with 767 instead
+ * because Volto's stock CSS at 601–767 collapses the toolbar to top
+ * horizontally, and fighting that cascade is more work than just
+ * adopting Volto's boundary. The 601–767 range therefore gets the
+ * mobile layout, not the tablet one.
+ *
+ * Z-index ladder:
  *   --hydra-z-toolbars:        100
  *   --hydra-z-sheet-backdrop:  200
  *   --hydra-z-sheet:           201
  *   --hydra-z-sidebar-mobile:  300
  *
  * Inline-style note: .quanta-toolbar is inline-styled in
- * SyncedSlateToolbar.jsx (top/left/maxWidth driven by JS-calculated
- * coordinates). Mobile rules that override its position MUST use
- * !important — scoped strictly to @media (max-width: 600px).
+ * SyncedSlateToolbar.jsx (top/left/maxWidth/opacity driven by JS).
+ * Mobile rules that override its position/visibility MUST use
+ * !important — scoped strictly to @media (max-width: 767px).
  */
 
 :root {
@@ -24,11 +34,11 @@
   --hydra-z-sidebar-mobile: 300;
 }
 
-/* ─── Tablet (601–1023px) ─────────────────────────────────────────── */
+/* ─── Tablet (768–1023px) ─────────────────────────────────────────── */
 /* The visible main toolbar is #toolbar-body (class "toolbar expanded"),
  * position:fixed. The outer #toolbar is just a static wrapper that holds
  * it. Target the inner element by id. */
-@media (min-width: 601px) and (max-width: 1023px) {
+@media (min-width: 768px) and (max-width: 1023px) {
   /* Move the main Volto toolbar from its desktop left-edge position to
    * the far right of the sidebar. The sidebar's natural right-edge
    * positioning is unchanged; the toolbar slides past it. */
@@ -36,21 +46,35 @@
     left: auto !important;
     right: 0 !important;
   }
-  /* Sidebar pulls left so the toolbar's width has somewhere to go.
-   * 80px matches the toolbar's measured width (verified via
-   * page.locator('#toolbar-body').boundingBox() — width=80).
-   * Target .sidebar-container (the visible fixed-positioned element);
-   * the bare #sidebar is just an empty static wrapper from Html.jsx. */
+  /* Sidebar shifts left by the toolbar width. .sidebar-container is the
+   * visible fixed-positioned element; the bare #sidebar is just an
+   * empty static wrapper from Html.jsx. */
   .sidebar-container {
     right: 80px !important;
   }
+  /* Iframe container shrinks to leave room for [Sidebar 375px] +
+   * [Toolbar 80px] on the right. The #previewIframe inside takes
+   * 100% of this container. Pin it to the LEFT EDGE — by default
+   * Volto reserves 80px on the left for the desktop toolbar, but
+   * the toolbar moved to the right on tablet so that gap should
+   * close up. */
+  #iframeContainer {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: calc(100vw - 455px) !important;
+    max-width: calc(100vw - 455px) !important;
+  }
 }
 
-/* ─── Mobile (≤600px) ─────────────────────────────────────────────── */
-@media (max-width: 600px) {
+/* ─── Mobile (≤767px) ─────────────────────────────────────────────── */
+@media (max-width: 767px) {
 
-  /* Quanta toolbar: pinned to top, full-width.
-   * !important because SyncedSlateToolbar.jsx inline-styles position. */
+  /* Quanta toolbar: pinned to top, full-width, ALWAYS visible.
+   * Overrides both the JS-driven inline position AND the inline
+   * `opacity: isFaded ? 0 : 1` — the desktop fade-on-idle UX doesn't
+   * make sense when Quanta is the persistent top toolbar. */
   .quanta-toolbar {
     position: fixed !important;
     top: 0 !important;
@@ -61,6 +85,7 @@
     z-index: var(--hydra-z-toolbars) !important;
     border-radius: 0 !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+    opacity: 1 !important;
   }
 
   /* Main Volto toolbar: pinned to bottom, full-width, safe-area-aware.
@@ -78,38 +103,35 @@
     flex-direction: row !important;
   }
 
-  /* Iframe canvas: fills the area between Quanta top and main toolbar bottom.
-   * 100dvh accounts for iOS Safari's collapsing address bar.
+  /* Iframe canvas: fills the area between Quanta top and main toolbar
+   * bottom. 100dvh accounts for iOS Safari's collapsing address bar.
    *
-   * Literals 44px (Quanta) and 56px (main toolbar) are measured values
-   * — verified during Task 3 implementation via boundingBox(). If either
-   * toolbar's intrinsic height changes, update the literal here AND the
-   * test's tolerance assertions. Deliberately NOT using CSS custom-property
-   * fallbacks (`var(..., 44px)`) — fallback-only vars hide the literal
-   * and violate the project's no-fallback rule. */
-  #previewIframe,
-  .iframe-container {
+   * Literals 44 / 56px are measured values for the toolbar heights —
+   * verified via boundingBox(). Deliberately NOT using CSS
+   * custom-property fallbacks (`var(..., 44px)`); fallback-only vars
+   * hide the literal and violate the project's no-fallback rule. */
+  /* Iframe canvas: fills the area between Quanta (top) and main toolbar
+   * (bottom). Bottom literal 110px is the measured toolbar height plus
+   * a small safety margin — the toolbar's intrinsic height varies with
+   * the number of visible icons (Save / Cancel / Frontend / Undo / Redo
+   * / Personal-tools), so this leaves slack. If you add/remove items,
+   * re-measure and update both this literal and the test tolerance. */
+  #iframeContainer {
     position: fixed !important;
     top: 44px !important;
-    bottom: 56px !important;
+    bottom: 110px !important;
     left: 0 !important;
     right: 0 !important;
     width: 100% !important;
+    max-width: none !important;
     height: auto !important;
+  }
+  #previewIframe {
+    height: 100% !important;
   }
 
   /* Bottom-sheet popups on mobile. The popup React state-machine is
-   * unchanged — only the geometry changes here.
-   *
-   * Targets the OUTER portaled wrapper of each popup so my CSS wins
-   * against the inline styles set on those wrappers:
-   *   - .volto-hydra-dropdown-menu  → ⋯ menu (DropdownMenu.jsx outer)
-   *   - .container-block-chooser    → ⋯ Convert/Wrap chooser wrapper (View.jsx)
-   *   - .add-new-block-popup        → + add-new-block popper wrapper (View.jsx)
-   *
-   * The inner Volto-rendered <BlockChooser> (which carries
-   * `.blocks-chooser`) is NOT targeted — its parent's geometry
-   * dictates its position, so leaving it alone is correct. */
+   * unchanged — only the geometry changes here. */
   .volto-hydra-dropdown-menu,
   .container-block-chooser,
   .add-new-block-popup {
@@ -136,8 +158,7 @@
     to   { transform: translateY(0); }
   }
 
-  /* Back-arrow inside bottom sheets. Hidden on desktop / tablet via
-   * the rule below the mobile block. */
+  /* Back-arrow inside bottom sheets. */
   .mobile-sheet-back {
     display: flex !important;
     align-items: center;
@@ -169,14 +190,13 @@
 
   /* The sidebar already has a .sidebar-close-button (Sidebar.jsx:182,
    * onClick={onToggleExpanded}). On mobile the full-screen sheet just
-   * needs it bigger and at the top-left. */
+   * needs it to be a bigger touch target. Stays in its natural flex
+   * position in the page-header (right-aligned), no absolute hack —
+   * absolute positioning would overlap the title text and the title
+   * (which is itself clickable) would steal the click. */
   .hydra-sidebar .sidebar-close-button {
-    position: absolute !important;
-    top: 8px !important;
-    left: 8px !important;
     width: 44px !important;
     height: 44px !important;
-    z-index: calc(var(--hydra-z-sidebar-mobile) + 1) !important;
   }
 
   /* Chevron move buttons replace the drag handle. */
@@ -200,8 +220,8 @@
   }
 }
 
-/* Desktop + tablet: hide the mobile-only affordances. */
-@media (min-width: 601px) {
+/* Desktop + tablet (≥768px): hide the mobile-only affordances. */
+@media (min-width: 768px) {
   .mobile-sheet-back { display: none !important; }
   .quanta-toolbar .chevron-buttons { display: none !important; }
 }

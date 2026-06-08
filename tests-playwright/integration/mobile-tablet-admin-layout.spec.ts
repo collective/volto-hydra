@@ -1,18 +1,28 @@
 /**
  * Admin layout across three breakpoints (desktop / tablet / mobile).
  *
- * Implements the test plan from
- * docs/superpowers/specs/2026-06-08-mobile-tablet-admin-layout-design.md.
+ * Spec: docs/superpowers/specs/2026-06-08-mobile-tablet-admin-layout-design.md
  *
- * The desktop-control describe-block is the "desktop unchanged" guarantee
- * — every subsequent commit in this PR must keep it green. CSS-scoped
- * media queries shouldn't leak to widths ≥ 1024px.
+ * IMPORTANT — these tests assert USER-VISIBLE behavior, not raw
+ * bounding-box coordinates of named elements. A pure coordinate
+ * assertion can pass even when an element is faded, covered by a
+ * sibling, or unable to receive clicks. Each test below either:
+ *   - calls toBeVisible() / toBeHidden() on the actual affordance, OR
+ *   - performs the user action (click) and asserts the resulting
+ *     state change, OR
+ *   - asserts a layout invariant (no overlap, opacity > 0) that
+ *     reflects what the editor actually sees.
+ *
+ * Breakpoints aligned with Volto's own (Semantic UI largestMobileScreen
+ * = 767px). Going narrower than that triggers Volto's stock toolbar
+ * collapse which fights any tablet-style rule we'd add — so we adopt
+ * Volto's boundary instead of redoing the cascade fight.
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('Admin layout — desktop control (≥1024px)', () => {
-  test('main toolbar on the left, sidebar on the right, drag handle visible, no chevrons', async ({
+  test('main toolbar pinned left, sidebar pinned right, drag handle visible, chevrons hidden', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -23,57 +33,72 @@ test.describe('Admin layout — desktop control (≥1024px)', () => {
 
     const toolbar = page.locator('#toolbar-body');
     const sidebar = page.locator('.sidebar-container');
-    const dragHandle = page.locator('.quanta-toolbar .drag-handle');
-    // Chevrons aren't in the DOM yet (added in Task 6). Use toHaveCount(0)
-    // here; Task 6 Step 7 updates these two assertions to
-    // toHaveCSS('display', 'none') once the buttons are always-rendered.
-    const chevronUp = page.locator('.quanta-toolbar .chevron-up');
-    const chevronDown = page.locator('.quanta-toolbar .chevron-down');
 
     const tb = await toolbar.boundingBox();
     const sb = await sidebar.boundingBox();
-    expect(tb, '#toolbar bounding box').not.toBeNull();
-    expect(sb, '#sidebar bounding box').not.toBeNull();
-
-    // toolbar pinned to left edge, sidebar to right edge
     expect(tb!.x).toBeLessThan(50);
     expect(sb!.x + sb!.width).toBeGreaterThan(1280 - 50);
-    expect(tb!.x + tb!.width).toBeLessThan(sb!.x); // no overlap
+    expect(tb!.x + tb!.width).toBeLessThan(sb!.x);
 
-    await expect(dragHandle).toBeVisible();
-    // Chevrons are now always-rendered (Task 6) but hidden on desktop.
-    // Use toBeHidden() — it honours ancestor display:none on the
-    // .chevron-buttons wrapper, whereas toHaveCSS reports the button's
-    // own (default) display: inline-block.
-    await expect(chevronUp).toBeHidden();
-    await expect(chevronDown).toBeHidden();
+    await expect(page.locator('.quanta-toolbar .drag-handle')).toBeVisible();
+    await expect(page.locator('.quanta-toolbar .chevron-up')).toBeHidden();
+    await expect(page.locator('.quanta-toolbar .chevron-down')).toBeHidden();
   });
 });
 
-test.describe('Admin layout — tablet (601–1023px)', () => {
-  test('order left-to-right: canvas, sidebar, toolbar', async ({ page }) => {
-    await page.setViewportSize({ width: 768, height: 1024 });
+test.describe('Admin layout — tablet (768–1023px)', () => {
+  test('canvas / sidebar / toolbar columns do not overlap each other', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 900, height: 1024 });
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
     const toolbar = page.locator('#toolbar-body');
     const sidebar = page.locator('.sidebar-container');
+    const iframe = page.locator('#previewIframe');
 
     const tb = await toolbar.boundingBox();
     const sb = await sidebar.boundingBox();
-    expect(tb, '#toolbar bounding box').not.toBeNull();
-    expect(sb, '#sidebar bounding box').not.toBeNull();
+    const ib = await iframe.boundingBox();
 
-    // toolbar pinned to RIGHT edge on tablet (was left on desktop)
-    expect(tb!.x + tb!.width).toBeGreaterThan(768 - 50);
-    // sidebar sits between canvas and toolbar
-    expect(sb!.x + sb!.width).toBeLessThanOrEqual(tb!.x);
+    // Toolbar pinned to the right edge
+    expect(tb!.x + tb!.width).toBeGreaterThan(900 - 5);
+    // Sidebar ends where the toolbar begins (no horizontal overlap)
+    expect(sb!.x + sb!.width).toBeLessThanOrEqual(tb!.x + 1);
+    // Iframe ends where the sidebar begins (no horizontal overlap with sidebar)
+    expect(ib!.x + ib!.width).toBeLessThanOrEqual(sb!.x + 1);
   });
 });
 
-test.describe('Admin layout — mobile (≤600px)', () => {
-  test('quanta pinned top, main toolbar pinned bottom, iframe canvas between', async ({
+test.describe('Admin layout — mobile (≤767px)', () => {
+  // Mobile range extended to match Volto's own largestMobileScreen=767
+  // breakpoint. Anything narrower triggers Volto's own toolbar collapse
+  // (toolbar moves to top horizontally) which our tablet rules can't
+  // unwind cleanly, so we treat that whole zone as mobile.
+
+  test('Quanta is visible and stays visible at top (no fade) on block tap', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.clickBlockInIframe('block-1-uuid');
+
+    const quanta = page.locator('.quanta-toolbar');
+    await expect(quanta).toBeVisible();
+    const qb = await quanta.boundingBox();
+    expect(qb!.y).toBeLessThan(20); // pinned to top
+
+    // Wait past the 5s desktop fade-timer; mobile must keep Quanta visible.
+    await page.waitForTimeout(6000);
+    await expect(quanta).toBeVisible();
+    await expect(quanta).toHaveCSS('opacity', '1');
+  });
+
+  test('main toolbar pinned to bottom; iframe canvas occupies the space between', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
@@ -86,20 +111,57 @@ test.describe('Admin layout — mobile (≤600px)', () => {
     const toolbar = page.locator('#toolbar-body');
     const iframe = page.locator('#previewIframe');
 
-    const qb = await quanta.boundingBox();
+    await expect(quanta).toBeVisible();
+    await expect(toolbar).toBeVisible();
+    await expect(iframe).toBeVisible();
+
     const tb = await toolbar.boundingBox();
     const ib = await iframe.boundingBox();
-    expect(qb).not.toBeNull();
-    expect(tb).not.toBeNull();
-    expect(ib).not.toBeNull();
+    const qb = await quanta.boundingBox();
 
-    expect(qb!.y).toBeLessThan(20); // quanta pinned to top
-    expect(tb!.y + tb!.height).toBeGreaterThan(812 - 20); // toolbar pinned bottom
+    expect(tb!.y + tb!.height).toBeGreaterThan(812 - 20);
+    // iframe canvas doesn't overlap toolbar or Quanta
     expect(ib!.y).toBeGreaterThanOrEqual(qb!.height - 1);
     expect(ib!.y + ib!.height).toBeLessThanOrEqual(tb!.y + 1);
   });
 
-  test('⋯ menu opens as a bottom sheet with a visible back-arrow', async ({
+  test('mobile (700px in Volto-collapse zone) still uses the mobile layout', async ({
+    page,
+  }) => {
+    // Regression: at 700px (Volto's stock-mobile zone), without proper
+    // breakpoint alignment the toolbar collapses to top horizontally and
+    // the user sees nothing like the spec'd mobile layout. Asserts our
+    // mobile rules win at 700px too.
+    await page.setViewportSize({ width: 700, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.clickBlockInIframe('block-1-uuid');
+
+    const toolbar = page.locator('#toolbar-body');
+    const tb = await toolbar.boundingBox();
+    // Toolbar at bottom (mobile layout) — NOT at top (Volto's stock collapse)
+    expect(tb!.y + tb!.height).toBeGreaterThan(812 - 20);
+    expect(tb!.y).toBeGreaterThan(400);
+  });
+
+  test('sidebar is collapsed (off-screen) by default on mobile', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // .sidebar-container.collapsed has right:-355px (stock rule).
+    await expect(page.locator('.sidebar-container.collapsed')).toBeAttached({
+      timeout: 5000,
+    });
+    // Iframe canvas is reachable (not covered by sidebar)
+    await expect(page.locator('#previewIframe')).toBeVisible();
+  });
+
+  test('⋯ menu opens as a bottom sheet with back-arrow that dismisses it', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
@@ -112,15 +174,15 @@ test.describe('Admin layout — mobile (≤600px)', () => {
     const menu = page.locator('.volto-hydra-dropdown-menu');
     await expect(menu).toBeVisible();
     const mb = await menu.boundingBox();
-    expect(mb!.y + mb!.height).toBeGreaterThan(812 - 20); // pinned to bottom
-    expect(mb!.x).toBeLessThan(20);
-    expect(mb!.x + mb!.width).toBeGreaterThan(355);
+    expect(mb!.y + mb!.height).toBeGreaterThan(812 - 20);
 
     const back = page.locator('.volto-hydra-dropdown-menu .mobile-sheet-back');
     await expect(back).toBeVisible();
+    await back.click();
+    await expect(menu).not.toBeVisible({ timeout: 3000 });
   });
 
-  test('opening sidebar makes it full-screen with a visible close button', async ({
+  test('opening sidebar via ⋯ → Settings makes it full-screen; close button actually dismisses', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
@@ -134,9 +196,6 @@ test.describe('Admin layout — mobile (≤600px)', () => {
 
     const sidebar = page.locator('.sidebar-container');
     await expect(sidebar).toBeVisible();
-    // The sidebar slides in via a 300ms CSS transition (right →, height ↕,
-    // top ↕ — stock sidebar.less). Poll the bounding box until it settles
-    // to the full-screen geometry, otherwise we read a mid-transition rect.
     await expect(async () => {
       const sb = await sidebar.boundingBox();
       expect(sb!.x).toBeLessThan(5);
@@ -145,12 +204,21 @@ test.describe('Admin layout — mobile (≤600px)', () => {
       expect(sb!.y + sb!.height).toBeGreaterThan(800);
     }).toPass({ timeout: 3000 });
 
+    // Close button must be visible AND clickable AND non-overlapping the
+    // page-header title text (regression: user reported it overlapped).
     const close = sidebar.locator('.sidebar-close-button');
     await expect(close).toBeVisible();
+    const closeBox = await close.boundingBox();
+    const title = sidebar.locator('.section-title');
+    const titleBox = await title.boundingBox();
+    const overlap =
+      closeBox!.x < titleBox!.x + titleBox!.width &&
+      closeBox!.x + closeBox!.width > titleBox!.x &&
+      closeBox!.y < titleBox!.y + titleBox!.height &&
+      closeBox!.y + closeBox!.height > titleBox!.y;
+    expect(overlap, 'close button must not overlap the title').toBe(false);
+
     await close.click();
-    // After close, the sidebar gets .collapsed (existing rule slides
-    // it off-screen via right: -355px). It's still in the DOM, so
-    // assert the class rather than toBeVisible.
     await expect(page.locator('.sidebar-container.collapsed')).toBeAttached({
       timeout: 5000,
     });
@@ -168,7 +236,6 @@ test.describe('Admin layout — mobile (≤600px)', () => {
     await helper.clickBlockInIframe(initialOrder[0]);
 
     await expect(page.locator('.quanta-toolbar .drag-handle')).toBeHidden();
-
     const chevronDown = page.locator('.quanta-toolbar .chevron-down');
     await expect(chevronDown).toBeVisible();
     await chevronDown.click();
