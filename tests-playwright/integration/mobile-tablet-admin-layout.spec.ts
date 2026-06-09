@@ -297,6 +297,71 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     await isBottomSheet(page, '.frontend-settings-modal');
   });
 
+  test('sidebar starts collapsed on mobile EVEN IF a desktop sidebar_expanded=true cookie exists', async ({
+    page,
+    context,
+  }) => {
+    // Reproduces the user-reported regression: a previous desktop
+    // session left sidebar_expanded=true; visiting on mobile would
+    // honour that cookie and open the full-screen sheet on first
+    // load. Mobile should ignore the cookie and always start collapsed.
+    await context.addCookies([
+      {
+        name: 'sidebar_expanded',
+        value: 'true',
+        url: 'http://localhost:3001',
+      },
+    ]);
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    await expect(page.locator('.sidebar-container.collapsed')).toBeAttached({
+      timeout: 5000,
+    });
+    await expect(page.locator('#previewIframe')).toBeVisible();
+  });
+
+  test('main toolbar height matches Quanta (compact 44px bar)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.clickBlockInIframe('block-1-uuid');
+
+    const tb = await page.locator('#toolbar-body').boundingBox();
+    const qb = await page.locator('.quanta-toolbar').boundingBox();
+    expect(tb!.height, 'main toolbar should be 44px tall').toBeLessThanOrEqual(
+      50,
+    );
+    expect(qb!.height, 'Quanta toolbar should be ~44px tall').toBeLessThanOrEqual(
+      50,
+    );
+    // The two bars should feel balanced — within ±10px of each other
+    expect(Math.abs(tb!.height - qb!.height)).toBeLessThanOrEqual(10);
+  });
+
+  test('Settings icon in bottom toolbar opens the sidebar (no ⋯ detour)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    await expect(page.locator('.sidebar-container.collapsed')).toBeAttached({
+      timeout: 5000,
+    });
+    const toggle = page.locator('#toolbar-body .sidebar-toggle-toolbar-btn');
+    await expect(toggle).toBeVisible();
+    await toggle.click();
+    await expect(page.locator('.sidebar-container')).toBeVisible();
+    await expect(page.locator('.sidebar-container.collapsed')).toHaveCount(0);
+  });
+
   test('chevron ▲ disabled at top, ▼ disabled at bottom', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     const helper = new AdminUIHelper(page);

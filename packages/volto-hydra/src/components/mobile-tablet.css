@@ -89,18 +89,34 @@
   }
 
   /* Main Volto toolbar: pinned to bottom, full-width, safe-area-aware.
-   * Target the visible inner #toolbar-body (the outer #toolbar is a
-   * static wrapper). */
+   * Compact to match Quanta's height (44px) so the two bars feel
+   * balanced and the iframe canvas gets the maximum vertical space.
+   * Allow horizontal scroll if there are more icons than fit at 375px;
+   * the bar's role is quick-access shortcuts, not a primary menu. */
   #toolbar-body {
     top: auto !important;
     bottom: 0 !important;
     left: 0 !important;
     right: 0 !important;
     width: 100% !important;
-    height: auto !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
     padding-bottom: env(safe-area-inset-bottom) !important;
-    z-index: var(--hydra-z-toolbars) !important;
+    z-index: auto !important;
     flex-direction: row !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+  /* Icons inside the bottom toolbar — scale to fit the 44px bar. */
+  #toolbar-body button,
+  #toolbar-body a {
+    height: 44px !important;
+    padding: 6px 10px !important;
+  }
+  #toolbar-body svg {
+    width: 22px !important;
+    height: 22px !important;
   }
 
   /* Iframe canvas: fills the area between Quanta top and main toolbar
@@ -110,16 +126,14 @@
    * verified via boundingBox(). Deliberately NOT using CSS
    * custom-property fallbacks (`var(..., 44px)`); fallback-only vars
    * hide the literal and violate the project's no-fallback rule. */
-  /* Iframe canvas: fills the area between Quanta (top) and main toolbar
-   * (bottom). Bottom literal 110px is the measured toolbar height plus
-   * a small safety margin — the toolbar's intrinsic height varies with
-   * the number of visible icons (Save / Cancel / Frontend / Undo / Redo
-   * / Personal-tools), so this leaves slack. If you add/remove items,
-   * re-measure and update both this literal and the test tolerance. */
+  /* Iframe canvas: fills the area between Quanta (top, 44px) and main
+   * toolbar (bottom, 44px). Both bars now force-clamp to 44px height
+   * via the #toolbar-body rule above, so the iframe gets a predictable
+   * top/bottom offset and the available vertical space is maximised. */
   #iframeContainer {
     position: fixed !important;
     top: 44px !important;
-    bottom: 110px !important;
+    bottom: 44px !important;
     left: 0 !important;
     right: 0 !important;
     width: 100% !important;

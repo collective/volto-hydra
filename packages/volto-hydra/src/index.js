@@ -34,6 +34,7 @@ const messages = defineMessages({
 import Cookies from 'js-cookie';
 import frontendPreviewUrl, { viewportPreset } from './reducers';
 import FrontendSwitcherPlug from './components/Toolbar/FrontendSwitcherPlug';
+import SidebarToggleToolbarPlug from './components/Toolbar/SidebarToggleToolbarPlug';
 import FrontendSwitcherPanel from './components/Toolbar/FrontendSwitcherPanel';
 import { getIframeUrlCookieName } from './utils/cookieNames';
 import getSavedURLs, { getURlsFromEnv } from './utils/getSavedURLs';
@@ -152,6 +153,7 @@ const applyConfig = (config) => {
   config.settings.appExtras = [
     ...(config.settings.appExtras || []),
     { match: '/', component: FrontendSwitcherPlug },
+    { match: '/', component: SidebarToggleToolbarPlug },
   ];
 
   // Hide container block fields - ChildBlocksWidget handles their UI
