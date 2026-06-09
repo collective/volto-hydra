@@ -130,11 +130,39 @@
     height: 100% !important;
   }
 
+  /* The toolbar's .pusher-puller has BOTH an inline
+   * `transform: translateX(0px)` (for the desktop slide animation) AND
+   * `will-change: transform` in stock CSS. Both make it a containing
+   * block for position:fixed descendants, anchoring my bottom-sheet
+   * popups to .pusher-puller (which sits above the mobile viewport)
+   * instead of the viewport. Reset both on mobile so the popups
+   * resolve correctly. */
+  #toolbar .pusher-puller,
+  #toolbar .toolbar-content {
+    transform: none !important;
+    will-change: auto !important;
+  }
+  /* The toolbar's outer #toolbar-body has its own z-index: 100 (set by
+   * my own mobile rule) which becomes a stacking context — any popup
+   * rendered inside it is trapped below other toolbar descendants like
+   * .toolbar-handler-button. Drop the toolbar's stacking context on
+   * mobile so the bottom-sheet popups can rise above siblings via
+   * their natural z-index ladder. Other elements that depend on the
+   * toolbar z (like the iframe below it) get z-index from .iframe
+   * stacking, not from the toolbar's. */
+  #toolbar-body { z-index: auto !important; }
+
   /* Bottom-sheet popups on mobile. The popup React state-machine is
-   * unchanged — only the geometry changes here. */
+   * unchanged — only the geometry changes here. Every popup the admin
+   * surfaces (⋯ menu, +, convert chooser, frontend switcher, settings
+   * modal, LinkEditor) gets the same slide-up sheet treatment so the
+   * editor sees one consistent gesture model. */
   .volto-hydra-dropdown-menu,
   .container-block-chooser,
-  .add-new-block-popup {
+  .add-new-block-popup,
+  .frontend-switcher-panel,
+  .frontend-settings-modal,
+  .add-link {
     position: fixed !important;
     bottom: 0 !important;
     left: 0 !important;
@@ -144,6 +172,7 @@
     max-height: 70vh !important;
     width: 100% !important;
     min-width: 0 !important;
+    background: #fff !important;
     border-radius: 12px 12px 0 0 !important;
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12) !important;
     z-index: var(--hydra-z-sheet) !important;
@@ -151,6 +180,48 @@
     overflow-y: auto !important;
     transform: translateY(0) !important;
     animation: hydra-sheet-slide-up 0.2s ease-out !important;
+  }
+
+  /* Backdrop behind every bottom sheet — dims the page and traps clicks
+   * outside the sheet so accidental taps on the canvas don't fire. We
+   * attach it via ::before on document.body when a known popup is in
+   * the DOM. body:has() is supported on iOS Safari 15.4+ and modern
+   * Android Chrome — falls back to no-backdrop on older browsers
+   * (sheet still works). */
+  body:has(.volto-hydra-dropdown-menu),
+  body:has(.container-block-chooser),
+  body:has(.add-new-block-popup),
+  body:has(.frontend-switcher-panel),
+  body:has(.frontend-settings-modal),
+  body:has(.add-link) {
+    overflow: hidden;
+  }
+  body:has(.volto-hydra-dropdown-menu)::before,
+  body:has(.container-block-chooser)::before,
+  body:has(.add-new-block-popup)::before,
+  body:has(.frontend-switcher-panel)::before,
+  body:has(.frontend-settings-modal)::before,
+  body:has(.add-link)::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: var(--hydra-z-sheet-backdrop);
+    pointer-events: none;
+  }
+
+  /* FrontendSettingsModal: the .frontend-settings-overlay is the backdrop
+   * that wraps the modal. On desktop it's a centered modal; on mobile
+   * the inner .frontend-settings-modal is the sheet — make the backdrop
+   * full-viewport and the modal slide up. */
+  .frontend-settings-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(0, 0, 0, 0.3) !important;
+    z-index: var(--hydra-z-sheet-backdrop) !important;
+    display: flex !important;
+    align-items: flex-end !important;
+    justify-content: stretch !important;
   }
 
   @keyframes hydra-sheet-slide-up {

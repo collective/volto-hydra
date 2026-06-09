@@ -247,6 +247,56 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     }).toPass({ timeout: 5000 });
   });
 
+  /**
+   * Every popup the admin surfaces should render as a bottom sheet on
+   * mobile — same geometry, same gesture. Assert each known popup's
+   * bounding box pins to the bottom and spans full width.
+   */
+  const isBottomSheet = async (
+    page: import('@playwright/test').Page,
+    selector: string,
+  ) => {
+    const locator = page.locator(selector);
+    await expect(locator).toBeVisible();
+    const box = await locator.boundingBox();
+    expect(box, `${selector} should have a box`).not.toBeNull();
+    expect(box!.y + box!.height, `${selector} bottom edge`).toBeGreaterThan(
+      812 - 20,
+    );
+    expect(box!.x, `${selector} left edge`).toBeLessThan(5);
+    expect(
+      box!.x + box!.width,
+      `${selector} right edge`,
+    ).toBeGreaterThan(370);
+  };
+
+  test('frontend switcher panel renders as a bottom sheet', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    await page.locator('#toolbar-frontend-switcher').click();
+    await isBottomSheet(page, '.frontend-switcher-panel');
+  });
+
+  test('frontend settings modal renders as a bottom sheet', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    await page.locator('#toolbar-frontend-switcher').click();
+    await page
+      .locator('.frontend-switcher-panel .frontend-switcher-settings-btn')
+      .click();
+    await isBottomSheet(page, '.frontend-settings-modal');
+  });
+
   test('chevron ▲ disabled at top, ▼ disabled at bottom', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     const helper = new AdminUIHelper(page);
