@@ -25,7 +25,6 @@ const DropdownMenu = ({
   onClose,
   onOpenSettings,
   parentId,
-  onSelectBlock,
   overflowButtons = [], // Array of { name, element } for buttons that overflow
   showFormatDropdown = false, // Whether to show FormatDropdown in overflow
   blockButtons = [], // Block buttons for FormatDropdown
@@ -90,12 +89,6 @@ const DropdownMenu = ({
     }
   };
 
-  const handleSelectContainer = () => {
-    onClose();
-    if (parentId && onSelectBlock) {
-      onSelectBlock(parentId);
-    }
-  };
 
   const handleRemove = () => {
     onClose();
@@ -451,35 +444,6 @@ const DropdownMenu = ({
             </div>
           )}
           <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.1)', margin: '0 10px' }} />
-        </>
-      )}
-      {/* Select Container option - only shown for nested blocks with a real parent (not page) */}
-      {parentId && parentId !== PAGE_BLOCK_UID && onSelectBlock && (
-        <>
-          <div
-            className="volto-hydra-dropdown-item"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: '10px',
-              cursor: 'pointer',
-              fontSize: '15px',
-              fontWeight: '500',
-            }}
-            onMouseEnter={(e) => (e.target.style.background = '#f0f0f0')}
-            onMouseLeave={(e) => (e.target.style.background = 'transparent')}
-            data-action="select-container"
-            onClick={handleSelectContainer}
-          >
-            ⬆️ Select Container
-          </div>
-          <div
-            style={{
-              height: '1px',
-              background: 'rgba(0, 0, 0, 0.1)',
-              margin: '0 10px',
-            }}
-          />
         </>
       )}
       {/* Remove action - label changes based on table mode and add direction */}

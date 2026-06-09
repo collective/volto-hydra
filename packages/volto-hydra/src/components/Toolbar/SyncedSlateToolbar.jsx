@@ -1494,6 +1494,42 @@ const SyncedSlateToolbar = ({
         );
       })()}
 
+      {/* Select-parent button — visible always when the selected block has
+       * a non-page parent. Promoted from DropdownMenu.jsx's "⬆️ Select
+       * Container" item so editors can escape upward in one tap rather
+       * than via ⋯ → menu. Same handler as the old menu item used; the
+       * iframe selection re-syncs via the existing selectedBlock-watching
+       * effect in View.jsx. */}
+      {(() => {
+        const parentEntry = blockPathMap?.[selectedBlock];
+        const parentBlockId = parentEntry?.parentId;
+        if (!parentBlockId || parentBlockId === PAGE_BLOCK_UID) return null;
+        return (
+          <button
+            type="button"
+            className="select-parent-btn"
+            aria-label="Select parent container"
+            title="Select parent container"
+            onClick={() => onSelectBlock(parentBlockId)}
+            style={{
+              background: '#fff',
+              border: 'none',
+              padding: '4px 6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              color: '#666',
+              pointerEvents: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            ⬆
+          </button>
+        );
+      })()}
+
       {/* Three-dots menu button */}
       <button
         className="volto-hydra-menu-trigger"
@@ -1538,7 +1574,6 @@ const SyncedSlateToolbar = ({
           }
         }}
         parentId={parentId}
-        onSelectBlock={onSelectBlock}
         overflowButtons={overflowButtons}
         showFormatDropdown={!showFormatDropdown}
         blockButtons={blockButtons}

@@ -376,3 +376,102 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     await expect(page.locator('.quanta-toolbar .chevron-down')).toBeDisabled();
   });
 });
+
+/**
+ * Select-parent button (⬆) in Quanta toolbar.
+ *
+ * Spec: docs/superpowers/specs/2026-06-09-select-parent-quanta-button-design.md
+ *
+ * Promoted from the ⋯ dropdown's "Select Container" item to a visible
+ * Quanta button so editors can escape one level upward in a single tap.
+ * Always-visible on all viewports (matches Gutenberg). The handler is
+ * the existing onSelectBlock prop — iframe sync rides the existing
+ * selectedBlock-watching effect in View.jsx.
+ *
+ * Nested block used for these tests: `manual-teaser` lives inside
+ * `block-8-grid` (a gridBlock) per
+ * tests-playwright/fixtures/content/test-page/data.json.
+ */
+test.describe('Quanta select-parent button (⬆)', () => {
+  test('visible when a nested block is selected; clicking walks up one level', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.clickBlockInIframe('manual-teaser');
+
+    const btn = page.locator('.quanta-toolbar .select-parent-btn');
+    await expect(btn).toBeVisible();
+
+    await btn.click();
+    await helper.waitForBlockSelectedInAdmin('block-8-grid');
+  });
+
+  test('not rendered when a top-level block is selected', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.clickBlockInIframe('block-1-uuid');
+
+    await expect(page.locator('.quanta-toolbar')).toBeVisible();
+    await expect(
+      page.locator('.quanta-toolbar .select-parent-btn'),
+    ).toHaveCount(0);
+  });
+
+  test('repeat-clicks walk up the chain until top-level, then button hides', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.clickBlockInIframe('manual-teaser');
+
+    const btn = page.locator('.quanta-toolbar .select-parent-btn');
+    await expect(btn).toBeVisible();
+
+    // One walk lands on block-8-grid which IS top-level — button must hide.
+    await btn.click();
+    await helper.waitForBlockSelectedInAdmin('block-8-grid');
+    await expect(btn).toHaveCount(0);
+  });
+
+  test('regression: ⋯ dropdown no longer offers Select Container', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.clickBlockInIframe('manual-teaser');
+
+    await page.locator('.quanta-toolbar .volto-hydra-menu-trigger').click();
+    const menu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(menu).toBeVisible();
+    await expect(menu.locator(':text("Select Container")')).toHaveCount(0);
+  });
+
+  test('mobile: button is visible and tappable inside Quanta at 375px', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.clickBlockInIframe('manual-teaser');
+
+    const btn = page.locator('.quanta-toolbar .select-parent-btn');
+    await expect(btn).toBeVisible();
+    const box = await btn.boundingBox();
+    // Sits within the viewport (no horizontal overflow hiding it)
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(375);
+
+    await btn.click();
+    await helper.waitForBlockSelectedInAdmin('block-8-grid');
+  });
+});
