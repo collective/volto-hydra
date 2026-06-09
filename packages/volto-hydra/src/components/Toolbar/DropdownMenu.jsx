@@ -12,7 +12,7 @@ import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
  * Renders a dropdown menu with:
  * - Overflow buttons (formatting buttons that don't fit in toolbar)
  * - Table actions (add row/column before, delete row/column) when in table mode
- * - Settings, Select Container, and Remove options
+ * - Settings and Remove options
  * Uses React portal to avoid container clipping issues.
  *
  * Overflow buttons are wrapped in a Slate context using the passed editor
@@ -24,7 +24,6 @@ const DropdownMenu = ({
   menuButtonRect,
   onClose,
   onOpenSettings,
-  parentId,
   overflowButtons = [], // Array of { name, element } for buttons that overflow
   showFormatDropdown = false, // Whether to show FormatDropdown in overflow
   blockButtons = [], // Block buttons for FormatDropdown

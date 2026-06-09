@@ -1573,7 +1573,6 @@ const SyncedSlateToolbar = ({
             triggerButton?.click();
           }
         }}
-        parentId={parentId}
         overflowButtons={overflowButtons}
         showFormatDropdown={!showFormatDropdown}
         blockButtons={blockButtons}
