@@ -92,21 +92,60 @@
    * Compact to match Quanta's height (44px) so the two bars feel
    * balanced and the iframe canvas gets the maximum vertical space.
    * Allow horizontal scroll if there are more icons than fit at 375px;
-   * the bar's role is quick-access shortcuts, not a primary menu. */
+   * the bar's role is quick-access shortcuts, not a primary menu.
+   *
+   * Heights: min-height: 44px reserves space for the icons; padding-bottom
+   * with env(safe-area-inset-bottom) extends the bar BELOW the icons by
+   * the iOS home-indicator height (~34px). DO NOT add max-height — that
+   * would clamp the total box and the safe-area padding would eat into
+   * the icon content area, squeezing the icons to ~10px (the user-visible
+   * regression that triggered this rewrite). */
   #toolbar-body {
     top: auto !important;
     bottom: 0 !important;
     left: 0 !important;
     right: 0 !important;
     width: 100% !important;
-    height: 44px !important;
+    height: auto !important;
     min-height: 44px !important;
-    max-height: 44px !important;
+    max-height: none !important;
     padding-bottom: env(safe-area-inset-bottom) !important;
     z-index: auto !important;
     flex-direction: row !important;
     overflow-x: auto !important;
     overflow-y: hidden !important;
+  }
+  /* Stock Volto nests a `.toolbar-body` (CLASS) container inside the
+   * `#toolbar-body` (ID) wrapper — on desktop it's a vertical column
+   * holding Save/Cancel/etc. stacked top-to-bottom. On mobile we lay
+   * the icons out horizontally so they fit in the 44px bottom bar.
+   * Without this rule the inner column stays vertical (~100px tall),
+   * which pushes #toolbar-body's auto-height up too and breaks the
+   * "44px tall" invariant the existing test (line ~489) checks. */
+  #toolbar-body .toolbar-body {
+    flex-direction: row !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+  }
+  /* The desktop "Shrink toolbar" handle (.toolbar-handler) is rendered
+   * as a sibling of .toolbar-body inside #toolbar-body. On the
+   * compact mobile bar there is nothing to shrink, and the handle's
+   * default positioning overlaps the rightmost toolbar buttons
+   * (frontend switcher, settings shortcut) and steals clicks. Hide it. */
+  #toolbar-body .toolbar-handler {
+    display: none !important;
+  }
+  /* Volto stock layout reserves ~100px of vertical space at the top via
+   * `#toolbar > .pusher` so static content sits BELOW where the
+   * (desktop, left-anchored) toolbar would be. On mobile we pull
+   * #toolbar-body out to position:fixed at the BOTTOM — so .pusher's
+   * reservation becomes a phantom gap with no toolbar inside it. This
+   * is what the user saw as "the toolbar is pushed down screen, gap
+   * at the top". Collapse the pusher on mobile so #main sits at y=0. */
+  #toolbar .pusher {
+    height: 0 !important;
+    min-height: 0 !important;
   }
   /* Icons inside the bottom toolbar — scale to fit the 44px bar. */
   #toolbar-body button,

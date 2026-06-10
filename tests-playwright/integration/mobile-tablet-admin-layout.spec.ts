@@ -646,6 +646,103 @@ test.describe('Admin layout — mobile (≤767px)', () => {
       'picker wrapper covers viewport bottom',
     ).toBeGreaterThan(800);
   });
+
+  /**
+   * User-reported regression: on mobile in VIEW mode (not /edit), the
+   * editor saw a big empty gap at the top of the screen and the
+   * bottom toolbar's icons were squeezed/cut off.
+   *
+   * Root cause investigated against prod:
+   *  - #toolbar > .pusher is a stock Volto layout element that
+   *    reserves vertical space at the top (~100px on mobile) so page
+   *    content sits BELOW where the toolbar would be. On desktop the
+   *    toolbar is at the left/top so this reservation is correct.
+   *    On mobile our CSS pulls #toolbar-body out to position:fixed
+   *    bottom:0, so .pusher's reservation becomes a phantom gap with
+   *    no toolbar inside it.
+   *  - The toolbar's `height: 44px !important` + `padding-bottom:
+   *    env(safe-area-inset-bottom)` fight on iOS: padding pushes
+   *    actual height past 44px but max-height clamps content area to
+   *    ~10px after the home-indicator padding, squeezing the icons.
+   *
+   * These tests assert the symptoms (no gap at top, toolbar fully
+   * intact at bottom) so any future regression is caught.
+   */
+  test('view mode: no phantom gap at the top of the viewport', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToView('/test-page');
+
+    // #main should start within ~10px of viewport top — i.e. no
+    // reserved toolbar space pushing it down. The bug had it at y=100.
+    const main = await page.locator('#main').boundingBox();
+    expect(main).not.toBeNull();
+    expect(
+      main!.y,
+      '#main must not be pushed down by phantom toolbar reservation',
+    ).toBeLessThan(10);
+
+    // Direct: the layout-space reservation element (#toolbar .pusher)
+    // must collapse to zero height on mobile.
+    const pusherH = await page
+      .locator('#toolbar .pusher')
+      .evaluate((el) => el.getBoundingClientRect().height);
+    expect(
+      pusherH,
+      '#toolbar .pusher must have 0 height on mobile (it reserves space we do not need)',
+    ).toBeLessThan(5);
+  });
+
+  test('edit mode: no phantom gap at the top either', async ({ page }) => {
+    // Edit mode hides the gap visually because the iframe is fixed
+    // over it, but the underlying layout reservation is still wrong.
+    // Same assertion as view mode — .pusher should collapse.
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const pusherH = await page
+      .locator('#toolbar .pusher')
+      .evaluate((el) => el.getBoundingClientRect().height);
+    expect(
+      pusherH,
+      '#toolbar .pusher must have 0 height on mobile in edit mode too',
+    ).toBeLessThan(5);
+  });
+
+  test('bottom toolbar: full 44px content area, not squeezed by safe-area padding', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Probe: the icon button inside the toolbar must render at the
+    // intended ~44px height. If safe-area padding squeezes the inner
+    // content the buttons collapse and become unclickable.
+    const tb = await page.locator('#toolbar-body').boundingBox();
+    expect(tb).not.toBeNull();
+    expect(tb!.height, 'toolbar visible band').toBeGreaterThanOrEqual(40);
+
+    // Sample an actual icon button in the toolbar — it should be
+    // ≥30px tall (not crushed). The Save button always exists.
+    const saveBtn = page.locator('#toolbar-body .save').first();
+    await expect(saveBtn).toBeVisible({ timeout: 5000 });
+    const sb = await saveBtn.boundingBox();
+    expect(sb).not.toBeNull();
+    expect(
+      sb!.height,
+      'toolbar icon button must keep ~44px content area, not get crushed by safe-area padding',
+    ).toBeGreaterThanOrEqual(30);
+    // And the button must be inside the viewport vertically.
+    expect(sb!.y + sb!.height, 'button bottom edge inside viewport').toBeLessThanOrEqual(812);
+    expect(sb!.y, 'button top edge inside viewport').toBeGreaterThanOrEqual(0);
+  });
 });
 
 /**
