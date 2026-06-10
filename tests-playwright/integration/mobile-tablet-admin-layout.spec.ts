@@ -743,6 +743,130 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     expect(sb!.y + sb!.height, 'button bottom edge inside viewport').toBeLessThanOrEqual(812);
     expect(sb!.y, 'button top edge inside viewport').toBeGreaterThanOrEqual(0);
   });
+
+  /**
+   * User feedback after seeing the first deployed mobile toolbar:
+   *  - "icons are clipped" — buttons overflow the viewport right edge
+   *  - "scrolling on the bottom bar when editing" — toolbar has
+   *    overflow-x: auto and content exceeds 375px
+   *  - "the icons swap sides between view and edit modes" — the
+   *    primary action (Edit pencil in view; Save in edit) lands in
+   *    different positions; UX has no consistent "save" spot
+   *  - "edit and save should both end up on the right" — primary
+   *    action belongs on the right (standard mobile CTA position)
+   */
+  test('mobile toolbar (edit): Save is the rightmost visible button', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const positions = await page.evaluate(() => {
+      const inner = document.querySelector('#toolbar-body .toolbar-body');
+      if (!inner) return [];
+      return [...inner.querySelectorAll('button, a')]
+        .map((b) => {
+          const r = b.getBoundingClientRect();
+          return {
+            label: b.getAttribute('aria-label') || b.textContent?.trim() || '?',
+            right: r.x + r.width,
+            visible: r.width > 0 && r.height > 0,
+          };
+        })
+        .filter((b) => b.visible);
+    });
+    expect(positions.length, 'toolbar should have buttons').toBeGreaterThan(0);
+    const rightmost = positions.reduce((max, b) =>
+      b.right > max.right ? b : max,
+    );
+    expect(
+      rightmost.label,
+      `Save must be the rightmost button. Got order: ${positions.map((b) => b.label).join(' → ')}`,
+    ).toBe('Save');
+  });
+
+  test('mobile toolbar (view): Edit is the rightmost visible button', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToView('/test-page');
+
+    const positions = await page.evaluate(() => {
+      const inner = document.querySelector('#toolbar-body .toolbar-body');
+      if (!inner) return [];
+      return [...inner.querySelectorAll('button, a')]
+        .map((b) => {
+          const r = b.getBoundingClientRect();
+          return {
+            label: b.getAttribute('aria-label') || b.textContent?.trim() || '?',
+            right: r.x + r.width,
+            visible: r.width > 0 && r.height > 0,
+          };
+        })
+        .filter((b) => b.visible);
+    });
+    expect(positions.length, 'toolbar should have buttons').toBeGreaterThan(0);
+    const rightmost = positions.reduce((max, b) =>
+      b.right > max.right ? b : max,
+    );
+    expect(
+      rightmost.label,
+      `Edit must be the rightmost button. Got order: ${positions.map((b) => b.label).join(' → ')}`,
+    ).toBe('Edit');
+  });
+
+  test('mobile toolbar: every visible button fits inside the viewport (no clipping)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const overflow = await page.evaluate(() => {
+      const inner = document.querySelector('#toolbar-body .toolbar-body');
+      if (!inner) return [];
+      return [...inner.querySelectorAll('button, a')]
+        .map((b) => {
+          const r = b.getBoundingClientRect();
+          return {
+            label: b.getAttribute('aria-label') || b.textContent?.trim() || '?',
+            x: r.x,
+            right: r.x + r.width,
+            visible: r.width > 0 && r.height > 0,
+          };
+        })
+        .filter((b) => b.visible)
+        .filter((b) => b.right > 375 || b.x < 0);
+    });
+    expect(
+      overflow,
+      `no toolbar button should overflow the viewport. Overflowing: ${overflow
+        .map((b) => `${b.label} (x=${b.x.toFixed(0)}, right=${b.right.toFixed(0)})`)
+        .join(', ')}`,
+    ).toEqual([]);
+  });
+
+  test('mobile toolbar: no horizontal scrolling needed', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const overflow = await page.evaluate(() => {
+      const tb = document.querySelector('#toolbar-body');
+      if (!tb) return { sw: 0, cw: 0 };
+      return { sw: tb.scrollWidth, cw: tb.clientWidth };
+    });
+    expect(
+      overflow.sw,
+      `toolbar scrollWidth (${overflow.sw}) should not exceed clientWidth (${overflow.cw}) — content must fit without horizontal scrolling`,
+    ).toBeLessThanOrEqual(overflow.cw + 1);
+  });
 });
 
 /**

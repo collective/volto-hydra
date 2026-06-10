@@ -136,6 +136,62 @@
   #toolbar-body .toolbar-handler {
     display: none !important;
   }
+
+  /* Mobile bottom toolbar layout
+   *
+   * Default Volto stuffs 6–7 buttons into the bar (Save/Cancel + Undo/
+   * Redo + Frontend switcher + Settings + Personal tools, plus More/Add/
+   * Contents/Edit in view mode). At 375px the rightmost 2–3 spill off
+   * the viewport — visible "icons clipped" + "horizontal scroll on the
+   * bar" issues the user reported.
+   *
+   * Strategy:
+   *  1. Hide buttons that are rarely needed on mobile and are reachable
+   *     elsewhere (Undo/Redo: long-press / system gestures; Contents
+   *     and Personal tools: not primary editor flows).
+   *  2. Push the primary action (Save in edit mode, Edit in view mode)
+   *     to the RIGHT edge with margin-left: auto — standard mobile
+   *     primary-CTA placement, and the position stays consistent so
+   *     editors don't have to hunt for it across modes.
+   *
+   * After this: 4–5 buttons remain, all fit within 375px, primary CTA
+   * is always rightmost. */
+  #toolbar-body .undo,
+  #toolbar-body .redo,
+  #toolbar-body .user {
+    display: none !important;
+  }
+  /* "Contents" is rendered as an anchor without a class — target by href
+   * suffix instead. Hide on mobile (not a primary editor flow). */
+  #toolbar-body a[href$="/contents"] {
+    display: none !important;
+  }
+  /* Primary action goes to the right edge.
+   *
+   * Volto's stock structure inside #toolbar-body .toolbar-body is two
+   * wrapper divs as the actual flex items:
+   *   - .toolbar-actions  (Save + Cancel in edit; Edit in view)
+   *   - .toolbar-bottom   (Frontend switcher, Settings, Undo, Redo, …)
+   * So `order` / `margin-left: auto` belongs on .toolbar-actions, not
+   * on .save / .edit directly (they aren't direct flex items of
+   * .toolbar-body — they're nested inside the wrapper).
+   *
+   * .toolbar-bottom gets order: 1 (sits to the LEFT) and
+   * .toolbar-actions gets order: 999 + margin-left: auto (sits to the
+   * RIGHT, pinned to the viewport's right edge). Within
+   * .toolbar-actions, Save itself is pushed to the rightmost slot via
+   * an inner order rule so Cancel stays to its left. */
+  #toolbar-body .toolbar-bottom {
+    order: 1 !important;
+  }
+  #toolbar-body .toolbar-actions {
+    order: 999 !important;
+    margin-left: auto !important;
+  }
+  /* DON'T override Save's order: stock .toolbar-actions is
+   * `flex-direction: row-reverse`, so DOM-first (Save) is already
+   * visually rightmost. Setting an explicit order on Save would push
+   * it left instead. */
   /* Volto stock layout reserves ~100px of vertical space at the top via
    * `#toolbar > .pusher` so static content sits BELOW where the
    * (desktop, left-anchored) toolbar would be. On mobile we pull
