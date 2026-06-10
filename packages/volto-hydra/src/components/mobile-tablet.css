@@ -273,6 +273,19 @@
     z-index: var(--hydra-z-sidebar-mobile) !important;
   }
 
+  /* Stock Volto leaves a 20px sliver of the collapsed sidebar peeking
+   * out on the right (sidebar.less:114-121: `right: calc(-100vw + 20px)`
+   * for the .trigger button to expand it). On mobile we have a Settings
+   * shortcut in the bottom toolbar that serves the same purpose without
+   * the visual cruft on the right edge, so push the collapsed sidebar
+   * fully offscreen and hide the trigger button it exposes. */
+  .sidebar-container.collapsed {
+    right: -100vw !important;
+  }
+  .sidebar-container.collapsed .trigger {
+    display: none !important;
+  }
+
   /* The sidebar already has a .sidebar-close-button (Sidebar.jsx:182,
    * onClick={onToggleExpanded}). On mobile the full-screen sheet just
    * needs it to be a bigger touch target. Stays in its natural flex

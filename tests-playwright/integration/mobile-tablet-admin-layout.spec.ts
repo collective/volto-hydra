@@ -161,6 +161,36 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     await expect(page.locator('#previewIframe')).toBeVisible();
   });
 
+  test('no sidebar sliver on the right edge when collapsed', async ({
+    page,
+  }) => {
+    // Stock Volto leaves a 20px sliver of the sidebar visible at the
+    // right edge of the viewport on narrow screens (sidebar.less:114-121)
+    // as a "trigger" to expand it. With the Settings shortcut in the
+    // bottom toolbar, that sliver is redundant cruft. Regression: ensure
+    // nothing of the collapsed sidebar (including its .trigger button)
+    // sits inside the viewport's right edge.
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    await expect(page.locator('.sidebar-container.collapsed')).toBeAttached({
+      timeout: 5000,
+    });
+
+    const sb = await page.locator('.sidebar-container.collapsed').boundingBox();
+    expect(sb!.x, 'sidebar must be fully offscreen on the right').toBeGreaterThanOrEqual(
+      375,
+    );
+
+    // The .trigger button (which is the stock sliver) must not be
+    // visible to the editor on mobile.
+    await expect(
+      page.locator('.sidebar-container.collapsed .trigger'),
+    ).toBeHidden();
+  });
+
   test('⋯ menu opens as a bottom sheet with back-arrow that dismisses it', async ({
     page,
   }) => {
