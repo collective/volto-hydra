@@ -18,8 +18,27 @@
  * collapse which fights any tablet-style rule we'd add — so we adopt
  * Volto's boundary instead of redoing the cascade fight.
  */
+import * as fs from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
+
+// When CAPTURE_MOBILE_SCREENSHOTS=1, the four "snapshot" tests at the
+// bottom of this file each save a viewport screenshot into the editor
+// guide's _images dir. These tests intentionally re-use the
+// already-proven admin-mock setup so the bridge handshake (which is
+// flaky with Nuxt in headless capture) is reliable.
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const SHOTS_OUT_DIR = path.join(
+  SCRIPT_DIR,
+  '..',
+  '..',
+  'docs',
+  'what-editors-will-experience',
+  '_images',
+);
+const CAPTURE_SHOTS = process.env.CAPTURE_MOBILE_SCREENSHOTS === '1';
 
 test.describe('Admin layout — desktop control (≥1024px)', () => {
   test('main toolbar pinned left, sidebar pinned right, drag handle visible, chevrons hidden', async ({
@@ -653,5 +672,106 @@ test.describe('Quanta select-parent button (⬆)', () => {
 
     await btn.click();
     await helper.waitForBlockSelectedInAdmin('block-8-grid');
+  });
+});
+
+/**
+ * Mobile screenshots for the Editor Guide.
+ *
+ * Skipped by default. Run with:
+ *   CAPTURE_MOBILE_SCREENSHOTS=1 pnpm exec playwright test \
+ *     tests-playwright/integration/mobile-tablet-admin-layout.spec.ts \
+ *     --project=admin-mock --grep "screenshot:"
+ *
+ * Uses the admin-mock test frontend (not Nuxt) because admin-mock's
+ * bridge handshake is reliable in headless capture. The visuals show
+ * the editor *chrome* — Quanta, bottom toolbar, sidebar sheet, link
+ * editor, picker — which is the same on every Hydra frontend; the
+ * iframe content underneath is whatever the test fixture renders.
+ */
+test.describe('Editor Guide screenshots — mobile', () => {
+  test.skip(!CAPTURE_SHOTS, 'set CAPTURE_MOBILE_SCREENSHOTS=1 to capture');
+
+  test.beforeAll(() => {
+    fs.mkdirSync(SHOTS_OUT_DIR, { recursive: true });
+  });
+
+  const snap = async (
+    page: import('@playwright/test').Page,
+    name: string,
+  ) => {
+    const file = path.join(SHOTS_OUT_DIR, `${name}.png`);
+    await page.screenshot({ path: file, fullPage: false });
+  };
+
+  test('screenshot: mobile-block-selected — Quanta top + compact bottom toolbar', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    await helper.clickBlockInIframe('block-1-uuid');
+    await page.waitForTimeout(300);
+
+    await snap(page, 'mobile-block-selected');
+  });
+
+  test('screenshot: mobile-dropdown-menu — ⋯ menu as a bottom sheet', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    await helper.clickBlockInIframe('block-1-uuid');
+    await page.locator('.quanta-toolbar .volto-hydra-menu-trigger').click();
+    await expect(page.locator('.volto-hydra-dropdown-menu')).toBeVisible({
+      timeout: 3000,
+    });
+    await page.waitForTimeout(300);
+
+    await snap(page, 'mobile-dropdown-menu');
+  });
+
+  test('screenshot: mobile-sidebar-fullscreen — sidebar covers everything', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Open via the bottom-toolbar Settings shortcut (the mobile path).
+    await page.locator('#toolbar-body .sidebar-toggle-toolbar-btn').click();
+    await expect(page.locator('.sidebar-container')).toBeVisible({
+      timeout: 3000,
+    });
+    await expect(page.locator('.sidebar-container.collapsed')).toHaveCount(0, {
+      timeout: 3000,
+    });
+    await page.waitForTimeout(300);
+
+    await snap(page, 'mobile-sidebar-fullscreen');
+  });
+
+  test('screenshot: mobile-select-parent — ⬆ button on a nested block', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // manual-teaser lives inside block-8-grid → parent button appears.
+    await helper.clickBlockInIframe('manual-teaser');
+    await expect(page.locator('.quanta-toolbar .select-parent-btn')).toBeVisible(
+      { timeout: 3000 },
+    );
+    await page.waitForTimeout(300);
+
+    await snap(page, 'mobile-select-parent');
   });
 });

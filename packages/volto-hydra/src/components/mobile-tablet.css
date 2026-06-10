@@ -185,13 +185,19 @@
     right: 0 !important;
     top: auto !important;
     max-width: none !important;
-    max-height: 70vh !important;
+    /* 90vh, not 70vh: at 70 the last menu item (Remove, etc.) gets
+     * clipped on common ~6-item menus. Sheet still scrolls if taller. */
+    max-height: 90vh !important;
     width: 100% !important;
     min-width: 0 !important;
     background: #fff !important;
     border-radius: 12px 12px 0 0 !important;
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12) !important;
     z-index: var(--hydra-z-sheet) !important;
+    /* Reserve room at the top for the .mobile-sheet-back affordance
+     * (44px button + 12+12 px breathing room). Items inside the sheet
+     * scroll under it but never get hidden behind it. */
+    padding-top: 56px !important;
     padding-bottom: env(safe-area-inset-bottom) !important;
     overflow-y: auto !important;
     transform: translateY(0) !important;
@@ -289,20 +295,26 @@
     to   { transform: translateY(0); }
   }
 
-  /* Back-arrow inside bottom sheets. */
+  /* Back-arrow inside bottom sheets. Pinned to the TOP-LEFT of the
+   * sheet — standard mobile bottom-sheet convention puts the dismiss
+   * affordance at the top, not the bottom. The sheet rule above
+   * reserves padding-top: 56px so the items below never sit under it. */
   .mobile-sheet-back {
     display: flex !important;
     align-items: center;
     justify-content: center;
     position: absolute;
-    bottom: 12px;
+    top: 12px;
     left: 12px;
+    bottom: auto;
     width: 44px;
     height: 44px;
     border-radius: 50%;
     border: none;
     background: #f0f0f0;
-    font-size: 20px;
+    color: #222;
+    font-size: 22px;
+    line-height: 1;
     cursor: pointer;
     z-index: calc(var(--hydra-z-sheet) + 1);
   }
@@ -345,7 +357,14 @@
   .sidebar-container.collapsed {
     right: -100vw !important;
   }
-  .sidebar-container.collapsed .trigger {
+  /* Hide the .trigger button in BOTH collapsed and expanded states on
+   * mobile. Collapsed: was the right-edge sliver (replaced by the
+   * Settings shortcut). Expanded full-screen: stock CSS still renders
+   * its .trigger:before — a 4px blue highlight bar at left:0 — which
+   * leaks through as a stray vertical mark on the full-screen sheet
+   * (visible in screenshots). The mobile sheet has a dedicated close
+   * button in the page-header; the .trigger affordance is redundant. */
+  .sidebar-container .trigger {
     display: none !important;
   }
 

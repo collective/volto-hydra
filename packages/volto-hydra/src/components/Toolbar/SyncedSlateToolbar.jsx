@@ -16,6 +16,7 @@ import DropdownMenu from './DropdownMenu';
 import linkSVG from '@plone/volto/icons/link.svg';
 import imageSVG from '@plone/volto/icons/image.svg';
 import clearSVG from '@plone/volto/icons/clear.svg';
+import upSVG from '@plone/volto/icons/up.svg';
 import AddLinkForm from '@plone/volto/components/manage/AnchorPlugin/components/LinkButton/AddLinkForm';
 import { ImageInput } from '@plone/volto/components/manage/Widgets/ImageWidget';
 import { createLog } from '../../utils/log';
@@ -1516,8 +1517,7 @@ const SyncedSlateToolbar = ({
               border: 'none',
               padding: '4px 6px',
               cursor: 'pointer',
-              fontSize: '14px',
-              color: '#666',
+              color: '#222',
               pointerEvents: 'auto',
               display: 'flex',
               alignItems: 'center',
@@ -1525,7 +1525,7 @@ const SyncedSlateToolbar = ({
               flexShrink: 0,
             }}
           >
-            ⬆
+            <Icon name={upSVG} size="20px" color="#222" />
           </button>
         );
       })()}
