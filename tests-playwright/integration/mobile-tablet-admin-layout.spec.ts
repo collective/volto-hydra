@@ -44,6 +44,48 @@ test.describe('Admin layout — desktop control (≥1024px)', () => {
     await expect(page.locator('.quanta-toolbar .chevron-up')).toBeHidden();
     await expect(page.locator('.quanta-toolbar .chevron-down')).toBeHidden();
   });
+
+  test('collapsed sidebar trigger sliver remains visible + clickable on desktop (stock Volto)', async ({
+    page,
+  }) => {
+    // Counterpart to the mobile "no sidebar sliver on the right edge"
+    // test: on desktop, Volto's stock .trigger sliver MUST stay
+    // visible+clickable so editors can expand a collapsed sidebar from
+    // the right edge. The mobile fix is scoped to max-width: 767px and
+    // must not bleed into desktop.
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const trigger = page.locator('.sidebar-container .trigger');
+    await expect(trigger).toBeVisible();
+
+    // Click to collapse, then assert the trigger is STILL visible (the
+    // sliver) and is positioned somewhere inside the viewport (i.e.
+    // unlike on mobile it is NOT pushed offscreen by the mobile fix).
+    await trigger.click();
+    await expect(page.locator('.sidebar-container.collapsed')).toBeAttached({
+      timeout: 5000,
+    });
+    // Wait for the 300ms sidebar-slide transition to settle so bbox is stable.
+    await expect(async () => {
+      const tb = await trigger.boundingBox();
+      expect(tb).not.toBeNull();
+      expect(tb!.x, 'trigger inside viewport (not pushed offscreen)').toBeLessThan(
+        1280,
+      );
+      expect(tb!.x + tb!.width, 'trigger inside viewport').toBeGreaterThan(0);
+    }).toPass({ timeout: 3000 });
+    await expect(trigger).toBeVisible();
+
+    // Clicking the sliver re-expands — the affordance is functional, not
+    // just visible.
+    await trigger.click();
+    await expect(page.locator('.sidebar-container.collapsed')).toHaveCount(0, {
+      timeout: 5000,
+    });
+  });
 });
 
 test.describe('Admin layout — tablet (768–1023px)', () => {
