@@ -273,6 +273,67 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     await expect(menu).not.toBeVisible({ timeout: 3000 });
   });
 
+  test('⋯ menu bottom sheet: back-arrow is at the TOP, last item visible below it', async ({
+    page,
+  }) => {
+    // Regression: I shipped the back-arrow at the BOTTOM-LEFT of the
+    // sheet, which (a) breaks mobile bottom-sheet convention (close
+    // affordance belongs at the top) and (b) overlapped the last menu
+    // item ("Remove") so it got hidden behind the button. This test
+    // asserts both: the back arrow sits in the top half of the sheet
+    // AND every menu item's bottom edge is above the back arrow's top
+    // edge (i.e. no item is drawn under it).
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.clickBlockInIframe('block-1-uuid');
+
+    await page.locator('.quanta-toolbar button:has-text("⋯")').click();
+    const menu = page.locator('.volto-hydra-dropdown-menu');
+    await expect(menu).toBeVisible();
+    const mb = await menu.boundingBox();
+    const back = page.locator('.volto-hydra-dropdown-menu .mobile-sheet-back');
+    await expect(back).toBeVisible();
+    const bb = await back.boundingBox();
+
+    // Back arrow lives in the TOP half of the sheet (within ~80px of
+    // the sheet's top edge).
+    expect(
+      bb!.y - mb!.y,
+      'back arrow should be near the top of the sheet',
+    ).toBeLessThan(80);
+    expect(
+      bb!.y - mb!.y,
+      'back arrow should not be at the bottom of the sheet',
+    ).toBeLessThan(mb!.height / 2);
+
+    // Every menu item must be FULLY visible (top and bottom inside the
+    // viewport) — proves nothing is clipped at the sheet's bottom edge
+    // (the old 70vh max-height + cramped layout hid "Remove").
+    const items = page.locator('.volto-hydra-dropdown-menu .volto-hydra-dropdown-item');
+    const count = await items.count();
+    expect(count, 'menu should render its items').toBeGreaterThan(0);
+    for (let i = 0; i < count; i++) {
+      const ib = await items.nth(i).boundingBox();
+      expect(
+        ib!.y + ib!.height,
+        `menu item ${i} must be inside the viewport`,
+      ).toBeLessThanOrEqual(812);
+      // And not under the back arrow (its top edge stays below the back
+      // button's bottom edge OR is not horizontally overlapping it).
+      const itemOverlapsBack =
+        ib!.y < bb!.y + bb!.height &&
+        ib!.y + ib!.height > bb!.y &&
+        ib!.x < bb!.x + bb!.width &&
+        ib!.x + ib!.width > bb!.x;
+      expect(
+        itemOverlapsBack,
+        `menu item ${i} must not overlap the back arrow`,
+      ).toBe(false);
+    }
+  });
+
   test('opening sidebar via ⋯ → Settings makes it full-screen; close button actually dismisses', async ({
     page,
   }) => {
@@ -294,6 +355,17 @@ test.describe('Admin layout — mobile (≤767px)', () => {
       expect(sb!.y).toBeLessThan(5);
       expect(sb!.y + sb!.height).toBeGreaterThan(800);
     }).toPass({ timeout: 3000 });
+
+    // Regression: stock Volto's .trigger button is part of every
+    // sidebar (it's the right-edge sliver on desktop). On mobile the
+    // sheet doesn't need it — we have the X close in the page-header.
+    // Worse, .trigger:before is a 4px blue highlight bar at left:0 which
+    // used to leak through as a stray vertical line on the full-screen
+    // sheet (visible in mobile-sidebar-fullscreen.png before the fix).
+    await expect(
+      sidebar.locator('.trigger'),
+      'stock .trigger must not be visible on the mobile sidebar sheet',
+    ).toBeHidden();
 
     // Close button must be visible AND clickable AND non-overlapping the
     // page-header title text (regression: user reported it overlapped).
@@ -603,6 +675,16 @@ test.describe('Quanta select-parent button (⬆)', () => {
 
     const btn = page.locator('.quanta-toolbar .select-parent-btn');
     await expect(btn).toBeVisible();
+    // Regression: v1 of this button used a unicode ⬆ glyph at color
+    // #666 / 14px — visibly invisible in screenshots and indistinct
+    // from the ▲ sibling-reorder chevron. The fix replaced the glyph
+    // with the standard Volto Icon component (up.svg) so the button
+    // renders a real <svg> element. Asserting on <svg> presence
+    // catches a regression back to a bare text glyph at this size.
+    await expect(
+      btn.locator('svg'),
+      'select-parent button must render an SVG icon (not a bare unicode glyph)',
+    ).toBeVisible();
 
     await btn.click();
     await helper.waitForBlockSelectedInAdmin('block-8-grid');
