@@ -169,14 +169,16 @@
   /* Bottom-sheet popups on mobile. The popup React state-machine is
    * unchanged — only the geometry changes here. Every popup the admin
    * surfaces (⋯ menu, +, convert chooser, frontend switcher, settings
-   * modal, LinkEditor) gets the same slide-up sheet treatment so the
-   * editor sees one consistent gesture model. */
+   * modal) gets the same slide-up sheet treatment so the editor sees
+   * one consistent gesture model. NOTE: .add-link (the slate
+   * LinkEditor) is NOT in this list — it gets a top-pinned treatment
+   * further down because it's a contextual editor for selected text,
+   * not a menu/picker, and should sit where the format toolbar is. */
   .volto-hydra-dropdown-menu,
   .container-block-chooser,
   .add-new-block-popup,
   .frontend-switcher-panel,
-  .frontend-settings-modal,
-  .add-link {
+  .frontend-settings-modal {
     position: fixed !important;
     bottom: 0 !important;
     left: 0 !important;
@@ -206,22 +208,66 @@
   body:has(.container-block-chooser),
   body:has(.add-new-block-popup),
   body:has(.frontend-switcher-panel),
-  body:has(.frontend-settings-modal),
-  body:has(.add-link) {
+  body:has(.frontend-settings-modal) {
     overflow: hidden;
   }
   body:has(.volto-hydra-dropdown-menu)::before,
   body:has(.container-block-chooser)::before,
   body:has(.add-new-block-popup)::before,
   body:has(.frontend-switcher-panel)::before,
-  body:has(.frontend-settings-modal)::before,
-  body:has(.add-link)::before {
+  body:has(.frontend-settings-modal)::before {
     content: '';
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.3);
     z-index: var(--hydra-z-sheet-backdrop);
     pointer-events: none;
+  }
+
+  /* Slate LinkEditor — pinned to the TOP, covering Quanta. The
+   * desktop behavior is "the LinkEditor sits on top of the format
+   * toolbar in the same spot" (asserted by
+   * inline-editing-links.spec.ts). Mobile should keep that mental
+   * model: when you tap the link button, the format buttons swap out
+   * for a URL field in the same position. Bottom-sheet doesn't fit
+   * here — link editing is contextual to the selected text, not a
+   * menu/picker. Override the PositionedToolbar's inline top/left
+   * (set via JS in PositionedToolbar.jsx:25-27) with !important. */
+  .add-link {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: auto !important;
+    max-width: none !important;
+    width: 100% !important;
+    background: #fff !important;
+    border-radius: 0 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+    /* Above Quanta — same stack as Quanta is at var(--hydra-z-toolbars);
+     * bump by 1 so this sits visually atop Quanta without changing the
+     * scrim ladder. */
+    z-index: calc(var(--hydra-z-toolbars) + 1) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  /* The inner .link-form-container has desktop styling (rounded border,
+   * boxshadow) — drop those on mobile so it fills the top bar cleanly
+   * and matches Quanta's 44px height. */
+  .add-link .link-form-container {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    height: 44px !important;
+    width: 100% !important;
+    padding: 0 8px !important;
+  }
+  /* The URL input grows to fill the bar. */
+  .add-link .link-form-container input[type='text'],
+  .add-link .link-form-container input[type='url'] {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    height: 32px !important;
   }
 
   /* FrontendSettingsModal: the .frontend-settings-overlay is the backdrop
@@ -263,13 +309,30 @@
 
   /* Sidebar full-screen on mobile ONLY WHEN EXPANDED. When collapsed,
    * the existing rule (`right: -355px`) slides it off-screen — leave
-   * that alone so the editor sees the canvas by default. */
-  .sidebar-container:not(.collapsed) {
+   * that alone so the editor sees the canvas by default.
+   *
+   * Same rule also handles the ObjectBrowser picker, which Volto renders
+   * via SidebarPopup as a portaled <aside class="sidebar-container">.
+   * SidebarPopup uses CSSTransition with classNames="sidebar-container"
+   * — so during its 500ms enter animation the element carries
+   * .sidebar-container-enter / -enter-active and stock pastanaga
+   * (sidebar.less:392-423) re-mixes the desktop .sidebar-container
+   * rules (width:375px, right:0) PLUS a transform:translate(100%, 0%)
+   * for the slide-in. None of those rules use !important, but the
+   * transform must be overridden too or the picker renders mid-slide
+   * (i.e. partially offscreen on the right) when bbox is measured.
+   * Target both the bare class and the CSSTransition state classes,
+   * and zero out the transform. */
+  .sidebar-container:not(.collapsed),
+  .sidebar-container-enter,
+  .sidebar-container-enter-active,
+  .sidebar-container-enter-done {
     position: fixed !important;
     inset: 0 !important;
     width: 100% !important;
     max-width: none !important;
     height: 100dvh !important;
+    transform: none !important;
     z-index: var(--hydra-z-sidebar-mobile) !important;
   }
 

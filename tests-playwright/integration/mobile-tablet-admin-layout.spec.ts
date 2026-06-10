@@ -447,6 +447,114 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     await helper.clickBlockInIframe(order[order.length - 1]);
     await expect(page.locator('.quanta-toolbar .chevron-down')).toBeDisabled();
   });
+
+  /**
+   * Slate LinkEditor on mobile.
+   *
+   * Desktop behavior (inline-editing-links.spec.ts:12): the LinkEditor
+   * popup sits ON TOP OF Quanta in the same x/y as the format toolbar
+   * — clicking "link" swaps Quanta for the URL form, same place.
+   *
+   * Mobile must preserve that mental model: the LinkEditor covers the
+   * top toolbar (Quanta), full-width, NOT as a bottom sheet. The
+   * picker (browse → ObjectBrowser, rendered inside SidebarPopup's
+   * <aside class="sidebar-container">) takes the WHOLE SCREEN, like
+   * the main sidebar does when expanded on mobile.
+   */
+  test('LinkEditor on mobile covers Quanta at the top of the viewport', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    await helper.editBlockTextInIframe(blockId, 'Tap me');
+    const editor = await helper.getEditorLocator(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await helper.clickFormatButton('link');
+
+    const linkEditor = page.locator('.add-link').first();
+    await expect(linkEditor).toBeVisible({ timeout: 5000 });
+
+    // Pinned to top, full-width (NOT a bottom sheet).
+    const lb = await linkEditor.boundingBox();
+    expect(lb).not.toBeNull();
+    expect(lb!.y, 'LinkEditor sits at the top of the viewport').toBeLessThan(5);
+    expect(lb!.x, 'LinkEditor starts at viewport left').toBeLessThan(5);
+    expect(
+      lb!.x + lb!.width,
+      'LinkEditor reaches viewport right',
+    ).toBeGreaterThan(370);
+
+    // Quanta sits at top:0 too — the LinkEditor must visually cover it.
+    // Same vertical band (overlap), not below it.
+    const qb = await page.locator('.quanta-toolbar').boundingBox();
+    expect(qb).not.toBeNull();
+    expect(
+      lb!.y,
+      'LinkEditor y must overlap Quanta y (i.e. cover it, not sit below)',
+    ).toBeLessThanOrEqual(qb!.y + 5);
+
+    // Can actually type + submit a URL from the top-pinned editor.
+    const urlInput = await helper.getLinkEditorUrlInput();
+    await urlInput.fill('https://plone.org');
+    await urlInput.press('Enter');
+
+    await expect(async () => {
+      const html = await editor.innerHTML();
+      expect(html).toContain('<a ');
+      expect(html).toContain('https://plone.org');
+    }).toPass({ timeout: 5000 });
+
+    // After submit the LinkEditor goes away (Quanta still visible).
+    await expect(page.locator('.add-link')).not.toBeVisible();
+    await expect(page.locator('.quanta-toolbar')).toBeVisible();
+  });
+
+  test('object-browser picker takes the whole screen on mobile', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    await helper.editBlockTextInIframe(blockId, 'Tap me');
+    const editor = await helper.getEditorLocator(blockId);
+    await helper.selectAllTextInEditor(editor);
+    await helper.clickFormatButton('link');
+
+    await expect(page.locator('.add-link').first()).toBeVisible({
+      timeout: 5000,
+    });
+
+    // The browse button inside the LinkEditor opens the ObjectBrowser
+    // picker. It's rendered as <aside class="sidebar-container"> by
+    // SidebarPopup (Volto core), so my existing
+    // .sidebar-container:not(.collapsed) full-screen rule applies.
+    await page.locator('.add-link .link-form-container button').first().click();
+
+    const picker = page.locator('.object-browser').first();
+    await expect(picker).toBeVisible({ timeout: 5000 });
+
+    // The picker's wrapping .sidebar-container must be full-viewport.
+    const wrapper = picker.locator('xpath=ancestor::*[contains(@class, "sidebar-container")]').first();
+    const wb = await wrapper.boundingBox();
+    expect(wb).not.toBeNull();
+    expect(wb!.x, 'picker wrapper covers viewport left').toBeLessThan(5);
+    expect(wb!.y, 'picker wrapper covers viewport top').toBeLessThan(5);
+    expect(
+      wb!.x + wb!.width,
+      'picker wrapper covers viewport right',
+    ).toBeGreaterThan(370);
+    expect(
+      wb!.y + wb!.height,
+      'picker wrapper covers viewport bottom',
+    ).toBeGreaterThan(800);
+  });
 });
 
 /**
