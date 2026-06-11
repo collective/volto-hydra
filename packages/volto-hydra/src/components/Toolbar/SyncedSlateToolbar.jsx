@@ -1495,40 +1495,43 @@ const SyncedSlateToolbar = ({
         );
       })()}
 
-      {/* Select-parent button — visible always when the selected block has
-       * a non-page parent. Promoted from DropdownMenu.jsx's "⬆️ Select
-       * Container" item so editors can escape upward in one tap rather
-       * than via ⋯ → menu. Same handler as the old menu item used; the
-       * iframe selection re-syncs via the existing selectedBlock-watching
-       * effect in View.jsx. */}
-      {(() => {
-        const parentEntry = blockPathMap?.[selectedBlock];
-        const parentBlockId = parentEntry?.parentId;
-        if (!parentBlockId || parentBlockId === PAGE_BLOCK_UID) return null;
-        return (
-          <button
-            type="button"
-            className="select-parent-btn"
-            aria-label="Select parent container"
-            title="Select parent container"
-            onClick={() => onSelectBlock(parentBlockId)}
-            style={{
-              background: '#fff',
-              border: 'none',
-              padding: '4px 6px',
-              cursor: 'pointer',
-              color: '#222',
-              pointerEvents: 'auto',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <Icon name={upSVG} size="20px" color="#222" />
-          </button>
-        );
-      })()}
+      {/* Step-up button — mobile equivalent of the Escape key.
+       * The state machine (text → block → parent → deselect) lives in
+       * hydra.js's stepUpSelection() method. The button simply posts a
+       * STEP_UP message to the iframe; the SAME code path runs whether
+       * the editor pressed Escape (desktop) or tapped this button
+       * (mobile). Zero duplicated logic.
+       *
+       * Visible whenever ANY block is selected (including top-level)
+       * so a touch editor always has a way back. */}
+      {selectedBlock && (
+        <button
+          type="button"
+          className="select-parent-btn"
+          aria-label="Step up (exit text / select parent / deselect)"
+          title="Step up"
+          onClick={() => {
+            const iframe = document.getElementById('previewIframe');
+            if (iframe?.contentWindow) {
+              iframe.contentWindow.postMessage({ type: 'STEP_UP' }, '*');
+            }
+          }}
+          style={{
+            background: '#fff',
+            border: 'none',
+            padding: '4px 6px',
+            cursor: 'pointer',
+            color: '#222',
+            pointerEvents: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <Icon name={upSVG} size="20px" color="#222" />
+        </button>
+      )}
 
       {/* Three-dots menu button */}
       <button

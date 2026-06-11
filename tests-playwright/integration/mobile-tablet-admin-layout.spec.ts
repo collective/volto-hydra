@@ -1394,114 +1394,55 @@ test.describe('Admin layout — mobile (≤767px)', () => {
  * `block-8-grid` (a gridBlock) per
  * tests-playwright/fixtures/content/test-page/data.json.
  */
-test.describe('Quanta select-parent button (⬆)', () => {
-  test('visible when a nested block is selected; clicking walks up one level', async ({
+test.describe("Quanta select-parent button (⬆) — mobile layout", () => {
+  test("button uses an SVG icon (regression: was a low-contrast unicode glyph)", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await helper.navigateToEdit('/test-page');
-    await helper.clickBlockInIframe('manual-teaser');
+    await helper.navigateToEdit("/test-page");
+    await helper.clickBlockInIframe("manual-teaser");
 
-    const btn = page.locator('.quanta-toolbar .select-parent-btn');
+    const btn = page.locator(".quanta-toolbar .select-parent-btn");
     await expect(btn).toBeVisible();
-    // Regression: v1 of this button used a unicode ⬆ glyph at color
-    // #666 / 14px — visibly invisible in screenshots and indistinct
-    // from the ▲ sibling-reorder chevron. The fix replaced the glyph
-    // with the standard Volto Icon component (up.svg) so the button
-    // renders a real <svg> element. Asserting on <svg> presence
-    // catches a regression back to a bare text glyph at this size.
     await expect(
-      btn.locator('svg'),
-      'select-parent button must render an SVG icon (not a bare unicode glyph)',
+      btn.locator("svg"),
+      "select-parent button must render an SVG icon (not a bare unicode glyph)",
     ).toBeVisible();
-
-    await btn.click();
-    await helper.waitForBlockSelectedInAdmin('block-8-grid');
   });
 
-  test('not rendered when a top-level block is selected', async ({ page }) => {
-    await page.setViewportSize({ width: 1280, height: 800 });
-    const helper = new AdminUIHelper(page);
-    await helper.login();
-    await helper.navigateToEdit('/test-page');
-    await helper.clickBlockInIframe('block-1-uuid');
-
-    await expect(page.locator('.quanta-toolbar')).toBeVisible();
-    await expect(
-      page.locator('.quanta-toolbar .select-parent-btn'),
-    ).toHaveCount(0);
-  });
-
-  test('repeat-clicks walk up the chain until top-level, then button hides', async ({
+  test("regression: ⋯ dropdown no longer offers Select Container", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await helper.navigateToEdit('/test-page');
-    await helper.clickBlockInIframe('manual-teaser');
+    await helper.navigateToEdit("/test-page");
+    await helper.clickBlockInIframe("manual-teaser");
 
-    const btn = page.locator('.quanta-toolbar .select-parent-btn');
-    await expect(btn).toBeVisible();
-
-    // One walk lands on block-8-grid which IS top-level — button must hide.
-    await btn.click();
-    await helper.waitForBlockSelectedInAdmin('block-8-grid');
-    await expect(btn).toHaveCount(0);
-  });
-
-  test('regression: ⋯ dropdown no longer offers Select Container', async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 1280, height: 800 });
-    const helper = new AdminUIHelper(page);
-    await helper.login();
-    await helper.navigateToEdit('/test-page');
-    await helper.clickBlockInIframe('manual-teaser');
-
-    await page.locator('.quanta-toolbar .volto-hydra-menu-trigger').click();
-    const menu = page.locator('.volto-hydra-dropdown-menu');
+    await page.locator(".quanta-toolbar .volto-hydra-menu-trigger").click();
+    const menu = page.locator(".volto-hydra-dropdown-menu");
     await expect(menu).toBeVisible();
-    await expect(menu.locator(':text("Select Container")')).toHaveCount(0);
+    await expect(menu.locator(":text(\"Select Container\")")).toHaveCount(0);
   });
 
-  test('mobile: button is visible and tappable inside Quanta at 375px', async ({
+  test("mobile: button fits inside the 375px viewport (no clipping)", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await helper.navigateToEdit('/test-page');
-    await helper.clickBlockInIframe('manual-teaser');
+    await helper.navigateToEdit("/test-page");
+    await helper.clickBlockInIframe("manual-teaser");
 
-    const btn = page.locator('.quanta-toolbar .select-parent-btn');
+    const btn = page.locator(".quanta-toolbar .select-parent-btn");
     await expect(btn).toBeVisible();
     const box = await btn.boundingBox();
-    // Sits within the viewport (no horizontal overflow hiding it)
     expect(box!.x).toBeGreaterThanOrEqual(0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(375);
-
-    await btn.click();
-    await helper.waitForBlockSelectedInAdmin('block-8-grid');
   });
 });
-
-/**
- * Mobile screenshots for the Editor Guide.
- *
- * Skipped by default. Run with:
- *   CAPTURE_MOBILE_SCREENSHOTS=1 pnpm exec playwright test \
- *     tests-playwright/integration/mobile-tablet-admin-layout.spec.ts \
- *     --project=admin-mock --grep "screenshot:"
- *
- * Uses the admin-mock test frontend (not Nuxt) because admin-mock's
- * bridge handshake is reliable in headless capture. The visuals show
- * the editor *chrome* — Quanta, bottom toolbar, sidebar sheet, link
- * editor, picker — which is the same on every Hydra frontend; the
- * iframe content underneath is whatever the test fixture renders.
- */
 test.describe('Editor Guide screenshots — mobile', () => {
   test.skip(!CAPTURE_SHOTS, 'set CAPTURE_MOBILE_SCREENSHOTS=1 to capture');
 

@@ -2791,6 +2791,95 @@ export class Bridge {
    * @param {string} [options.focusedFieldName] - Override focused field name
    * @param {Object} [options.selection] - Serialized selection to include
    */
+  /**
+   * Progressive step-up state machine (the "Escape" gesture).
+   *
+   * Walks ONE step up from the current selection state:
+   *   1. Multi-select       → single anchor block
+   *   2. Nothing selected   → confirm-deselect (no-op signal to admin)
+   *   3. Text mode          → block mode of the same block
+   *   4. Block mode (nested) → parent block
+   *   5. Block mode (root)  → deselect (page mode)
+   *
+   * Triggered by:
+   *   - Escape key (admin-side handler when iframe doesn't have focus,
+   *     and iframe-side handler when it does)
+   *   - STEP_UP postMessage from the admin (e.g., the ⬆ button in Quanta
+   *     on mobile — touch devices have no Escape key)
+   *
+   * Returns true if the gesture was consumed (so the caller can
+   * preventDefault on the event); false otherwise.
+   */
+  stepUpSelection(opts = {}) {
+    // 1. Multi-select → single block (anchor)
+    if (this.multiSelectedBlockUids.length > 0) {
+      const anchorUid = this.multiSelectedBlockUids[0];
+      this.multiSelectedBlockUids = [];
+      this.selectedBlockUid = anchorUid;
+      const anchorEl = this.queryBlockElement(anchorUid);
+      if (anchorEl) {
+        this.sendBlockSelected(opts.source || 'stepUpMultiSelect', anchorEl, {
+          focusedFieldName: null,
+        });
+      }
+      return true;
+    }
+
+    // 2. No block selected: confirm deselect to admin
+    if (!this.selectedBlockUid) {
+      this.sendBlockSelected(opts.source || 'stepUp', null);
+      return true;
+    }
+
+    // 3. Text mode → Block mode (when an inline edit field is active)
+    const activeEditField = document.activeElement?.closest?.(
+      '[data-edit-text][contenteditable="true"]',
+    );
+    // Also accept this.editMode === 'text' so a STEP_UP message that
+    // arrives AFTER focus has shifted off the inline editor (which is
+    // what happens when the user taps the admin-side ⬆ button) still
+    // recognises text mode.
+    if (activeEditField || this.editMode === 'text') {
+      log('stepUp: text → block mode for', this.selectedBlockUid);
+      this.editMode = 'block';
+      const blockElement = this.queryBlockElement(this.selectedBlockUid);
+      if (blockElement) {
+        this.collectBlockFields(blockElement, 'data-edit-text', (el) => {
+          if (el.getAttribute('contenteditable') === 'true') {
+            el.setAttribute('contenteditable', 'false');
+          }
+        });
+      }
+      if (activeEditField) activeEditField.blur();
+      this.focusedFieldName = null;
+      if (blockElement) {
+        this.sendBlockSelected(opts.source || 'stepUpToBlockMode', blockElement, {
+          focusedFieldName: null,
+        });
+      }
+      return true;
+    }
+
+    // 4 & 5. Block mode → Parent (or deselect)
+    this.editMode = 'block';
+    const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
+    const parentId = pathInfo?.parentId || null;
+    log('stepUp: block → parent', parentId, 'from', this.selectedBlockUid);
+    if (parentId && parentId !== PAGE_BLOCK_UID) {
+      if (this.blockPathMap?.[parentId]?.isTemplateInstance) {
+        this.selectBlock(parentId);
+      } else {
+        const parentElement = this.queryBlockElement(parentId);
+        if (parentElement) this.selectBlock(parentElement);
+      }
+    } else {
+      this.selectedBlockUid = null;
+      this.editMode = 'text';
+      this.sendBlockSelected(opts.source || 'stepUp', null);
+    }
+    return true;
+  }
+
   sendBlockSelected(src, blockElement, options = {}) {
     // Suppress position-tracking updates during carousel/selector navigation
     // Allow initial selection sources (fieldFocusListener, selectionChangeListener, etc.) through
@@ -3736,6 +3825,14 @@ export class Bridge {
           this.multiSelectedBlockUids = [];
           // Ack back to admin so it can clear selectionMode
           this.sendMessageToParent({ type: 'EXIT_SELECTION_MODE' });
+        } else if (event.data.type === 'STEP_UP') {
+          // Admin-side ⬆ button (mobile, where no Escape key exists)
+          // routes through the same state machine as the desktop
+          // Escape key. The button click is just a relay — all the
+          // text → block → parent → deselect logic lives in
+          // stepUpSelection() so there is one source of truth.
+          log('Received STEP_UP');
+          this.stepUpSelection({ source: 'stepUpMessage' });
         } else if (event.data.type === 'TEMPLATE_EDIT_MODE') {
           // Toggle template edit mode - affects which blocks are editable via isBlockReadonly
           // instanceId: the template instance being edited, or null to exit edit mode
@@ -4156,63 +4253,17 @@ export class Bridge {
 
         // === Escape: three-state machine (works in all modes) ===
         if (e.key === 'Escape') {
-          // Multi-select → single block (anchor)
-          if (this.multiSelectedBlockUids.length > 0) {
-            const anchorUid = this.multiSelectedBlockUids[0];
-            this.multiSelectedBlockUids = [];
-            this.selectedBlockUid = anchorUid;
-            const anchorEl = this.queryBlockElement(anchorUid);
-            if (anchorEl) {
-              this.sendBlockSelected('escapeMultiSelect', anchorEl, { focusedFieldName: null });
-            }
-            return;
-          }
-          // No block selected: send deselect to admin
-          if (!this.selectedBlockUid) {
-            this.sendBlockSelected('escapeKey', null);
-            return;
-          }
           // Don't interfere with slash menu, modals, dropdowns
           if (this._slashMenuActive) return;
           const isInPopup = e.target?.closest?.('.volto-hydra-dropdown-menu, .blocks-chooser, [role="dialog"]');
           if (isInPopup) return;
 
-          e.preventDefault();
-          if (activeEditField) {
-            // Text mode → Block mode
-            log('Escape key - entering block mode from text editing:', this.selectedBlockUid);
-            this.editMode = 'block';
-            const blockElement = this.queryBlockElement(this.selectedBlockUid);
-            if (blockElement) {
-              this.collectBlockFields(blockElement, 'data-edit-text', (el) => {
-                if (el.getAttribute('contenteditable') === 'true') {
-                  el.setAttribute('contenteditable', 'false');
-                }
-              });
-            }
-            activeEditField.blur();
-            this.focusedFieldName = null;
-            if (blockElement) {
-              this.sendBlockSelected('escapeToBlockMode', blockElement, { focusedFieldName: null });
-            }
-          } else {
-            // Block mode → Parent (or deselect)
-            this.editMode = 'block'; // stay in block mode for parent
-            const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
-            const parentId = pathInfo?.parentId || null;
-            log('Escape key - selecting parent:', parentId, 'from:', this.selectedBlockUid);
-            if (parentId && parentId !== PAGE_BLOCK_UID) {
-              if (this.blockPathMap?.[parentId]?.isTemplateInstance) {
-                this.selectBlock(parentId);
-              } else {
-                const parentElement = this.queryBlockElement(parentId);
-                if (parentElement) this.selectBlock(parentElement);
-              }
-            } else {
-              this.selectedBlockUid = null;
-              this.editMode = 'text';
-              this.sendBlockSelected('escapeKey', null);
-            }
+          // The state machine itself lives in stepUpSelection() — that
+          // way the SAME progression is reachable from a STEP_UP
+          // postMessage (sent by the admin-side ⬆ button), with zero
+          // duplicated logic.
+          if (this.stepUpSelection({ source: 'escapeKey' })) {
+            e.preventDefault();
           }
           return;
         }
