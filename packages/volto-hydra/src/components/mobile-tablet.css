@@ -39,9 +39,25 @@
  * position:fixed. The outer #toolbar is just a static wrapper that holds
  * it. Target the inner element by id. */
 @media (min-width: 768px) and (max-width: 1023px) {
+  /* Same semantic-ui-mobile-icon-vanishing fix as landscape: stock
+   * Volto's More button has two Icon children gated by `mobile only`
+   * vs `mobile hidden`. Semantic-UI's `.mobile.hidden` rule hides
+   * its icon at our 768-1023 px breakpoint AND `.mobile.only` already
+   * hides at >767. Result: BOTH icons display:none, the More button
+   * renders as an empty 44×44 slot. Force the desktop variant
+   * visible so the editor actually sees the ⋯ dots. */
+  #toolbar-body .more svg.icon.mobile.hidden {
+    display: inline-block !important;
+  }
+  /* The desktop "Shrink toolbar" handle has a workflow-state colored
+   * stripe that bleeds through the right-edge strip as a thin
+   * vertical bar. Hide it on tablet portrait — same as portrait
+   * mobile and landscape. */
+  #toolbar-body .toolbar-handler {
+    display: none !important;
+  }
   /* Move the main Volto toolbar from its desktop left-edge position to
-   * the far right of the sidebar. The sidebar's natural right-edge
-   * positioning is unchanged; the toolbar slides past it. */
+   * the far right of the viewport. */
   #toolbar-body {
     left: auto !important;
     right: 0 !important;
@@ -52,19 +68,23 @@
   .sidebar-container {
     right: 80px !important;
   }
-  /* Iframe container shrinks to leave room for [Sidebar 375px] +
-   * [Toolbar 80px] on the right. The #previewIframe inside takes
-   * 100% of this container. Pin it to the LEFT EDGE — by default
-   * Volto reserves 80px on the left for the desktop toolbar, but
-   * the toolbar moved to the right on tablet so that gap should
-   * close up. */
+  /* Iframe canvas: fill the viewport minus the right-edge toolbar
+   * (80px). The previous version of this rule subtracted ANOTHER
+   * 375 px for the sidebar (`calc(100vw - 455px)`) which squashed
+   * the iframe to 313 px at tablet portrait (768 px wide), leaving a
+   * huge empty middle column and squeezing all page content into a
+   * narrow ribbon on the left. On tablet portrait the sidebar isn't
+   * even rendered (it overlays when expanded); on tablet landscape
+   * (1024-wide) this whole media block doesn't match anyway. So just
+   * subtract the toolbar width. */
   #iframeContainer {
     position: fixed !important;
     left: 0 !important;
     top: 0 !important;
     bottom: 0 !important;
-    width: calc(100vw - 455px) !important;
-    max-width: calc(100vw - 455px) !important;
+    right: 80px !important;
+    width: auto !important;
+    max-width: none !important;
   }
 }
 

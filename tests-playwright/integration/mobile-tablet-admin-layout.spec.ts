@@ -183,6 +183,72 @@ test.describe('Admin layout — mobile landscape', () => {
   });
 });
 
+/**
+ * Tablet PORTRAIT regression tests — the iPad Mini (768×1024) layout
+ * the user screenshotted.
+ *
+ * Two bugs that had to be caught:
+ *   1. Iframe was squashed to 313px wide because the tablet rule
+ *      subtracted both the toolbar (80px) AND a phantom sidebar (375px)
+ *      from the viewport, leaving most of the screen empty.
+ *   2. The More button (⋯) rendered empty because semantic-ui's
+ *      `.mobile.hidden` rule was hiding BOTH icon children at this
+ *      breakpoint.
+ */
+test.describe('Admin layout — tablet portrait (768×1024)', () => {
+  test('iframe canvas fills viewport minus right-edge toolbar', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToView('/test-page');
+
+    const ic = await page.locator('#iframeContainer').boundingBox();
+    const tb = await page.locator('#toolbar-body').boundingBox();
+    expect(ic).not.toBeNull();
+    expect(tb).not.toBeNull();
+
+    // Toolbar pinned to the right edge as a vertical strip (~80px).
+    expect(tb!.x + tb!.width, 'toolbar hugs right edge').toBeGreaterThan(760);
+    expect(tb!.width, 'toolbar is a narrow strip').toBeLessThan(120);
+
+    // Iframe fills from the left edge to just before the toolbar.
+    expect(ic!.x, 'iframe starts at left edge').toBeLessThan(5);
+    expect(
+      ic!.width,
+      `iframe must be at least 600px wide; got ${ic!.width.toFixed(0)}`,
+    ).toBeGreaterThan(600);
+    expect(ic!.x + ic!.width, 'iframe ends where toolbar begins').toBeLessThanOrEqual(
+      tb!.x + 1,
+    );
+  });
+
+  test('More button (⋯) renders a visible icon (semantic-ui mobile-hidden fix)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToView('/test-page');
+
+    const more = page.locator('#toolbar-body .more');
+    await expect(more).toBeVisible({ timeout: 5000 });
+
+    // The button itself is 44×44 (other rules), but the regression
+    // we're catching is that the SVG icon INSIDE has display:none
+    // because semantic-ui's `.mobile.hidden` rule kicks in. Assert
+    // that at least one svg inside the button is rendered (not none).
+    const visibleSvgs = await more.locator('svg').evaluateAll((svgs) =>
+      svgs.filter((s) => window.getComputedStyle(s).display !== 'none').length,
+    );
+    expect(
+      visibleSvgs,
+      'More button must render at least one visible SVG icon',
+    ).toBeGreaterThan(0);
+  });
+});
+
 test.describe('Admin layout — tablet (768–1023px)', () => {
   test('canvas / sidebar / toolbar columns do not overlap each other', async ({
     page,
