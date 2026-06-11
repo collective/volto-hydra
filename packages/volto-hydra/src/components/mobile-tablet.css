@@ -640,12 +640,19 @@
     min-height: 0 !important;
     max-height: none !important;
   }
-  /* Buttons stay 44×44 squares regardless of orientation. */
+  /* Buttons stay 44×44 squares regardless of orientation. Use
+   * min-height (not height) because stock pastanaga sets
+   * `flex: 0 1 0%` on some toolbar buttons (e.g. .more), which
+   * collapses fixed `height` declarations to content size. min-height
+   * survives the flex-basis: 0% collapse. */
   #toolbar-body button,
   #toolbar-body a {
     width: 44px !important;
+    min-width: 44px !important;
     height: 44px !important;
+    min-height: 44px !important;
     padding: 6px !important;
+    flex: 0 0 44px !important;
   }
 
   /* View-mode landscape order (top → bottom):
