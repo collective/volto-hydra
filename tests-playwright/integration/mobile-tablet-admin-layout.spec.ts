@@ -107,6 +107,82 @@ test.describe('Admin layout — desktop control (≥1024px)', () => {
   });
 });
 
+/**
+ * Mobile in LANDSCAPE orientation (per the user's mockup).
+ *
+ * The main toolbar rotates from a bottom horizontal bar (portrait) to
+ * a right-edge vertical strip (landscape). Same icons, same sequence
+ * from primary-CTA toward meta — just rotated 90°. Primary CTA (Edit
+ * in view mode) stays at the strong-reach position: rightmost in
+ * portrait → topmost in landscape.
+ *
+ * Media-query rule used:
+ *   @media (orientation: landscape) and (max-width: 1023px)
+ * This catches phones rotated to landscape and small tablets in
+ * landscape; large tablets / desktop keep their own layout.
+ */
+test.describe('Admin layout — mobile landscape', () => {
+  test('view mode: toolbar pinned to RIGHT edge as a vertical strip', async ({
+    page,
+  }) => {
+    // iPhone-class viewport rotated to landscape.
+    await page.setViewportSize({ width: 812, height: 375 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToView('/test-page');
+
+    const tb = await page.locator('#toolbar-body').boundingBox();
+    expect(tb).not.toBeNull();
+    // Vertical strip: taller than wide.
+    expect(tb!.height, 'toolbar must be taller than wide').toBeGreaterThan(
+      tb!.width,
+    );
+    // Pinned to the right edge of the viewport (right edge ≥ 800).
+    expect(
+      tb!.x + tb!.width,
+      'toolbar right edge must hug the viewport right',
+    ).toBeGreaterThan(800);
+  });
+
+  test('view mode: Edit at TOP, User at BOTTOM (primary at top in landscape)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 812, height: 375 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToView('/test-page');
+
+    const labels = await page.evaluate(() => {
+      const inner = document.querySelector('#toolbar-body .toolbar-body');
+      if (!inner) return [];
+      return [...inner.querySelectorAll('button, a')]
+        .map((b) => {
+          const r = b.getBoundingClientRect();
+          return {
+            label: b.getAttribute('aria-label') || b.textContent?.trim() || '?',
+            y: r.y,
+            visible: r.width > 0 && r.height > 0,
+          };
+        })
+        .filter((b) => b.visible)
+        .sort((a, b) => a.y - b.y)
+        .map((b) => b.label);
+    });
+
+    expect(
+      labels,
+      `landscape toolbar must match the designed top→bottom order. Got: ${labels.join(' → ')}`,
+    ).toEqual([
+      'Edit',
+      'Contents',
+      'Add',
+      'More',
+      'Frontend & Viewport',
+      'Personal tools',
+    ]);
+  });
+});
+
 test.describe('Admin layout — tablet (768–1023px)', () => {
   test('canvas / sidebar / toolbar columns do not overlap each other', async ({
     page,
@@ -273,16 +349,16 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     await expect(menu).not.toBeVisible({ timeout: 3000 });
   });
 
-  test('⋯ menu bottom sheet: back-arrow is at the TOP, last item visible below it', async ({
+  test('⋯ menu bottom sheet: back-arrow at bottom-left, every menu item visible above it', async ({
     page,
   }) => {
-    // Regression: I shipped the back-arrow at the BOTTOM-LEFT of the
-    // sheet, which (a) breaks mobile bottom-sheet convention (close
-    // affordance belongs at the top) and (b) overlapped the last menu
-    // item ("Remove") so it got hidden behind the button. This test
-    // asserts both: the back arrow sits in the top half of the sheet
-    // AND every menu item's bottom edge is above the back arrow's top
-    // edge (i.e. no item is drawn under it).
+    // The dismiss affordance is the ← back-arrow at the BOTTOM-LEFT
+    // of the sheet (per the user's portrait mockups for both Add and
+    // ⋯ menus). This regression test also asserts a second invariant
+    // the earlier shipping path missed: every menu item must be fully
+    // visible inside the viewport AND not horizontally overlap the
+    // back-arrow's hit box (the old 70vh + cramped layout used to hide
+    // "Remove" behind the dismiss button).
     await page.setViewportSize({ width: 375, height: 812 });
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -297,16 +373,16 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     await expect(back).toBeVisible();
     const bb = await back.boundingBox();
 
-    // Back arrow lives in the TOP half of the sheet (within ~80px of
-    // the sheet's top edge).
+    // Back arrow lives in the BOTTOM half of the sheet AND in the LEFT
+    // half (= bottom-left corner).
     expect(
       bb!.y - mb!.y,
-      'back arrow should be near the top of the sheet',
-    ).toBeLessThan(80);
+      'back arrow should sit in the bottom half of the sheet',
+    ).toBeGreaterThan(mb!.height / 2);
     expect(
-      bb!.y - mb!.y,
-      'back arrow should not be at the bottom of the sheet',
-    ).toBeLessThan(mb!.height / 2);
+      bb!.x - mb!.x,
+      'back arrow should sit in the left half of the sheet',
+    ).toBeLessThan(mb!.width / 2);
 
     // Every menu item must be FULLY visible (top and bottom inside the
     // viewport) — proves nothing is clipped at the sheet's bottom edge
@@ -819,6 +895,53 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     ).toBe('Edit');
   });
 
+  /**
+   * Designed view-mode toolbar order (per the user's portrait mockup):
+   *   Personal tools → Frontend & Viewport → More → Add → Contents → Edit
+   * left to right. Primary CTA (Edit) is rightmost (matches mobile
+   * convention + matches the mockup). Personal tools is the leftmost
+   * "meta" affordance, Frontend & Viewport next to it. The middle
+   * three (More / Add / Contents) are content-navigation. Edit pinned
+   * right.
+   */
+  test('mobile toolbar (view): visible buttons match the designed order', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToView('/test-page');
+
+    const labels = await page.evaluate(() => {
+      const inner = document.querySelector('#toolbar-body .toolbar-body');
+      if (!inner) return [];
+      return [...inner.querySelectorAll('button, a')]
+        .map((b) => {
+          const r = b.getBoundingClientRect();
+          return {
+            label: b.getAttribute('aria-label') || b.textContent?.trim() || '?',
+            x: r.x,
+            visible: r.width > 0 && r.height > 0,
+          };
+        })
+        .filter((b) => b.visible)
+        .sort((a, b) => a.x - b.x)
+        .map((b) => b.label);
+    });
+
+    expect(
+      labels,
+      `view-mode toolbar must match the designed order. Got: ${labels.join(' → ')}`,
+    ).toEqual([
+      'Personal tools',
+      'Frontend & Viewport',
+      'More',
+      'Add',
+      'Contents',
+      'Edit',
+    ]);
+  });
+
   test('mobile toolbar: every visible button fits inside the viewport (no clipping)', async ({
     page,
   }) => {
@@ -1206,15 +1329,17 @@ test.describe('Admin layout — mobile (≤767px)', () => {
   ] as const;
 
   /**
-   * Every bottom popup on mobile must share a consistent close
-   * affordance: an X (or equivalent) in the TOP-RIGHT corner. Same
-   * style, same position, same dismiss behavior. Catches: missing
-   * closes, closes in inconsistent corners, closes that don't dismiss.
+   * Every bottom popup on mobile must share a consistent dismiss
+   * affordance: a back-arrow (←) in the BOTTOM-LEFT corner. This
+   * matches the user's portrait mockup where the Add-blocks popup and
+   * the ⋯ menu both show a circular ← button anchored bottom-left.
+   * Same style, same position, same dismiss behavior across every
+   * popup so the editor learns the gesture once.
    *
    * For each popup type below:
    *   - open it via its trigger
-   *   - assert the close affordance exists, is visible, is in the
-   *     RIGHT half of the panel and the TOP half (top-right corner)
+   *   - assert the dismiss affordance exists, is visible, is in the
+   *     LEFT half of the panel and the BOTTOM quarter (bottom-left)
    *   - assert clicking it dismisses the panel
    */
   type PopupSpec = {
@@ -1252,7 +1377,7 @@ test.describe('Admin layout — mobile (≤767px)', () => {
       panelSelector: '#toolbar .toolbar-content.show',
       // MobileSubmenuClose portals the close button to document.body
       // (Volto's stock .toolbar-content has no injection point inside).
-      // The button is at the same TOP-RIGHT viewport geometry but a
+      // The button is at the same BOTTOM-LEFT viewport geometry but a
       // body-level sibling, not a panel descendant.
       closeSelector: 'body > .mobile-submenu-close',
     },
@@ -1268,7 +1393,7 @@ test.describe('Admin layout — mobile (≤767px)', () => {
   ];
 
   for (const popup of POPUPS) {
-    test(`bottom popup: ${popup.label} has a top-right close button that dismisses it`, async ({
+    test(`bottom popup: ${popup.label} has a bottom-left back-arrow that dismisses it`, async ({
       page,
     }) => {
       await page.setViewportSize({ width: 375, height: 812 });
@@ -1286,32 +1411,32 @@ test.describe('Admin layout — mobile (≤767px)', () => {
       const close = page.locator(popup.closeSelector).first();
       await expect(
         close,
-        `${popup.label} must have a close affordance at ${popup.closeSelector}`,
+        `${popup.label} must have a dismiss affordance at ${popup.closeSelector}`,
       ).toBeVisible({ timeout: 3000 });
 
-      // TOP-RIGHT corner geometry:
-      //   close.x is in the right half of the panel (x > panel.midX)
-      //   close.y is in the top quarter of the panel
+      // BOTTOM-LEFT corner geometry:
+      //   close.x is in the LEFT half of the panel (x < panel.midX)
+      //   close.y is in the BOTTOM quarter of the panel
       const cb = await close.boundingBox();
       const pb = await panel.boundingBox();
       expect(cb).not.toBeNull();
       expect(pb).not.toBeNull();
       const panelMidX = pb!.x + pb!.width / 2;
-      const panelTopQuarter = pb!.y + pb!.height / 4;
+      const panelBottomQuarter = pb!.y + (pb!.height * 3) / 4;
       expect(
         cb!.x,
-        `${popup.label} close must be in the RIGHT half (panel midX=${panelMidX.toFixed(0)}, close x=${cb!.x.toFixed(0)})`,
-      ).toBeGreaterThan(panelMidX);
+        `${popup.label} dismiss must be in the LEFT half (panel midX=${panelMidX.toFixed(0)}, close x=${cb!.x.toFixed(0)})`,
+      ).toBeLessThan(panelMidX);
       expect(
         cb!.y,
-        `${popup.label} close must be in the TOP quarter (panel topQuarter=${panelTopQuarter.toFixed(0)}, close y=${cb!.y.toFixed(0)})`,
-      ).toBeLessThan(panelTopQuarter);
+        `${popup.label} dismiss must be in the BOTTOM quarter (panel bottomQuarter=${panelBottomQuarter.toFixed(0)}, close y=${cb!.y.toFixed(0)})`,
+      ).toBeGreaterThan(panelBottomQuarter);
 
       // And: clicking it actually dismisses the panel.
       await close.click();
       await expect(
         panel,
-        `${popup.label} must dismiss after clicking its close affordance`,
+        `${popup.label} must dismiss after clicking its dismiss affordance`,
       ).not.toBeVisible({ timeout: 3000 });
     });
   }

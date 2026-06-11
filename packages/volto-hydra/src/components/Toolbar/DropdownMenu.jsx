@@ -495,7 +495,7 @@ const DropdownMenu = ({
           </div>
         );
       })()}
-      {/* Mobile-only close button at top-right corner. Hidden on
+      {/* Mobile-only back-arrow at bottom-left corner. Hidden on
        * desktop/tablet via .mobile-sheet-close { display: none } in
        * mobile-tablet.css. */}
       <button
@@ -504,7 +504,7 @@ const DropdownMenu = ({
         aria-label="Close menu"
         onClick={onClose}
       >
-        ×
+        ←
       </button>
     </div>,
     document.body,

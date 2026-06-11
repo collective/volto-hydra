@@ -192,19 +192,53 @@
    * is always rightmost. */
   /* Hide secondary actions that don't fit on a 375px compact bar:
    *   - .redo: paired with Undo, but the user prioritised Undo only
-   *   - .user: Personal tools — not an editor flow on mobile
-   * .undo is intentionally NOT hidden — it belongs on the edit bar. */
-  #toolbar-body .redo,
-  #toolbar-body .user {
+   * .undo is intentionally NOT hidden — it belongs on the edit bar.
+   * .user (Personal tools) is hidden in EDIT mode only (see rule
+   * below) — it stays visible in VIEW mode per the user's mobile
+   * toolbar mockup (leftmost icon). */
+  #toolbar-body .redo {
     display: none !important;
   }
-  /* In EDIT mode hide the Frontend & Viewport switcher from the bottom
-   * bar — editors need Undo + Cancel + Save more than they need a
-   * frontend swap during inline edits. It's still reachable via ⋯.
-   * In VIEW mode the Frontend switcher stays visible — switching what
-   * the page renders on is the core "preview" affordance. */
-  body.view-editview #toolbar-body .frontend-switcher-btn {
+  /* In EDIT mode hide the Frontend & Viewport switcher AND Personal
+   * tools from the bottom bar — editors need Undo + Cancel + Save more
+   * than meta actions during inline edits. Both still reachable via ⋯.
+   * In VIEW mode the Frontend switcher and Personal tools stay
+   * visible — they're part of the designed view-mode toolbar. */
+  body.view-editview #toolbar-body .frontend-switcher-btn,
+  body.view-editview #toolbar-body .user {
     display: none !important;
+  }
+
+  /* View-mode bottom-toolbar order (per the user's portrait mockup):
+   *   User → Monitor → More → Add → Contents → Edit
+   * Volto stock DOM groups buttons in two wrappers inside the inner
+   * .toolbar-body flex row:
+   *   .toolbar-actions  → [Edit, Contents, Add, More]  (row-reverse)
+   *   .toolbar-bottom   → [Frontend & Viewport, Personal tools]
+   * The outer ordering rules above already put .toolbar-bottom on the
+   * LEFT and .toolbar-actions on the RIGHT. So we just need to fix
+   * the order WITHIN each wrapper so the right icons end up in the
+   * right slots. .toolbar-actions stays row-reverse (so Edit, the
+   * DOM-first child, lands rightmost). .toolbar-bottom needs the
+   * User icon ON THE LEFT of Frontend, but stock DOM order is
+   * [Frontend, User] — flip via flex order.
+   *
+   * Stock pastanaga (toolbar.less:271-281) hides .toolbar-bottom via
+   * `opacity: 0` and hides the .user button inside it with
+   * `display: none`. Both have to be undone on mobile so the icons
+   * actually render. Stock uses `flex-direction: row-reverse` for
+   * `.toolbar-bottom`; force `row` so the flex `order` properties
+   * line up with the L→R visual order. */
+  body.view-viewview #toolbar-body .toolbar-bottom {
+    opacity: 1 !important;
+    flex-direction: row !important;
+  }
+  body.view-viewview #toolbar-body .toolbar-bottom .user {
+    display: flex !important;
+    order: 0 !important;
+  }
+  body.view-viewview #toolbar-body .toolbar-bottom .frontend-switcher-btn {
+    order: 1 !important;
   }
   /* Primary action goes to the right edge.
    *
@@ -335,11 +369,10 @@
     border-radius: 12px 12px 0 0 !important;
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12) !important;
     z-index: var(--hydra-z-sheet) !important;
-    /* Reserve room at the top for the .mobile-sheet-close affordance
-     * (44px button + 12+12 px breathing room). Items inside the sheet
-     * scroll under it but never get hidden behind it. */
-    padding-top: 56px !important;
-    padding-bottom: env(safe-area-inset-bottom) !important;
+    /* Reserve room at the BOTTOM for the .mobile-sheet-close back-
+     * arrow (44px button + 12+12 px breathing room + iOS safe area).
+     * Items inside the sheet scroll naturally above the back button. */
+    padding-bottom: calc(56px + env(safe-area-inset-bottom)) !important;
     overflow-y: auto !important;
     transform: translateY(0) !important;
     animation: hydra-sheet-slide-up 0.2s ease-out !important;
@@ -436,21 +469,23 @@
     to   { transform: translateY(0); }
   }
 
-  /* Close (X) inside bottom sheets. Pinned to the TOP-RIGHT corner of
-   * every popup — standard mobile-app close-button convention. Same
-   * style across every popup (⋯ menu, Frontend & Viewport, Add/More
-   * submenus) so editors don't have to learn a different dismiss for
-   * each panel. The sheet rule above reserves padding-top: 56px so
-   * items below never sit under it. */
+  /* Back-arrow (←) inside bottom sheets. Pinned to the BOTTOM-LEFT
+   * corner of every popup — matches the user's portrait mockup where
+   * the Add-blocks popup and the ⋯ menu both show a circular ← button
+   * anchored at the bottom-left. Same style across every popup
+   * (⋯ menu, Frontend & Viewport, Add/More submenus) so editors learn
+   * one dismiss gesture for all panels. The sheet rule above does NOT
+   * reserve padding-top because the dismiss is at the bottom; items
+   * scroll naturally above the back button. */
   .mobile-sheet-close {
     display: flex !important;
     align-items: center;
     justify-content: center;
     position: absolute;
-    top: 12px;
-    right: 12px;
-    left: auto;
-    bottom: auto;
+    bottom: 12px;
+    left: 12px;
+    top: auto;
+    right: auto;
     width: 44px;
     height: 44px;
     border-radius: 50%;
@@ -462,18 +497,20 @@
     cursor: pointer;
     z-index: calc(var(--hydra-z-sheet) + 1);
   }
-  /* The MobileSubmenuClose component portals its close button into
+  /* The MobileSubmenuClose component portals its back button into
    * document.body (so it sits above .toolbar-content.show's stacking
-   * context). When rendered, position it at the top-right of the
-   * submenu sheet — which is the same geometry. The submenu sheet
-   * uses var(--hydra-z-sidebar-mobile); make sure the portaled close
-   * sits above it. */
+   * context). When rendered, position it at the bottom-left of the
+   * submenu sheet — same bottom-left geometry as the other sheets.
+   * The submenu sheet uses var(--hydra-z-sidebar-mobile); make sure
+   * the portaled button sits above it. Leave room for the bottom bar
+   * (44px) so the back arrow doesn't sit on top of the editor's
+   * toolbar icons. */
   .mobile-submenu-close {
     position: fixed !important;
-    top: 12px !important;
-    right: 12px !important;
-    left: auto !important;
-    bottom: auto !important;
+    bottom: calc(44px + 12px) !important;
+    left: 12px !important;
+    top: auto !important;
+    right: auto !important;
     z-index: calc(var(--hydra-z-sidebar-mobile) + 1) !important;
   }
 
@@ -563,4 +600,110 @@
   .mobile-sheet-close,
   .mobile-submenu-close { display: none !important; }
   .quanta-toolbar .chevron-buttons { display: none !important; }
+}
+
+/* MOBILE LANDSCAPE — phones rotated and small tablets in landscape
+ * (max-width: 1023 so large tablets / desktop stay on their own
+ * layout). Rotates the bottom toolbar to the RIGHT edge as a vertical
+ * strip: same icons, same primary-toward-meta sequence as desktop's
+ * vertical bar (Edit at TOP, Personal tools at BOTTOM).
+ *
+ * Why orientation rather than width-only: a phone in portrait at
+ * 375×812 should keep the bottom bar; rotated to 812×375 it should
+ * become the right-edge strip. `@media (orientation: landscape)` is
+ * the exact device-feature signal for that flip.
+ */
+@media (orientation: landscape) and (max-width: 1023px) {
+  /* Pin toolbar to the right edge, full height, narrow column. */
+  #toolbar-body {
+    top: 0 !important;
+    bottom: 0 !important;
+    left: auto !important;
+    right: 0 !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding-bottom: 0 !important;
+    padding-right: env(safe-area-inset-right) !important;
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+  /* Inner column: stack vertically, full 44px wide rows. */
+  #toolbar-body .toolbar-body {
+    flex-direction: column !important;
+    width: 44px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+  /* Buttons stay 44×44 squares regardless of orientation. */
+  #toolbar-body button,
+  #toolbar-body a {
+    width: 44px !important;
+    height: 44px !important;
+    padding: 6px !important;
+  }
+
+  /* View-mode landscape order (top → bottom):
+   *   Edit → Contents → Add → More → Frontend → Personal tools
+   * Same primary-toward-meta sequence as desktop's vertical bar. The
+   * portrait CSS uses `flex-direction: row` on .toolbar-actions plus
+   * .toolbar-actions { order: 999; margin-left: auto } to push it
+   * right. In landscape we need .toolbar-actions at the TOP (primary
+   * Edit there) and .toolbar-bottom at the BOTTOM (meta).
+   *
+   * For the inner wrappers:
+   *   - .toolbar-actions: row-reverse (stock) → column flips Edit
+   *     visually first; force column with DOM-first child at top.
+   *   - .toolbar-bottom: column with .frontend-switcher-btn (Monitor)
+   *     above .user (Personal tools).
+   */
+  #toolbar-body .toolbar-actions {
+    order: 0 !important;
+    margin-left: 0 !important;
+    margin-top: 0 !important;
+    margin-bottom: auto !important; /* push the meta column to the bottom */
+    flex-direction: column !important;
+    width: 44px !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+  }
+  #toolbar-body .toolbar-bottom {
+    order: 999 !important;
+    flex-direction: column !important;
+    width: 44px !important;
+    height: auto !important;
+  }
+  /* View-mode .toolbar-bottom inner order: Frontend → User
+   * (top → bottom). */
+  body.view-viewview #toolbar-body .toolbar-bottom .frontend-switcher-btn {
+    order: 0 !important;
+  }
+  body.view-viewview #toolbar-body .toolbar-bottom .user {
+    order: 1 !important;
+  }
+
+  /* The portaled MobileSubmenuClose sits above the bottom bar in
+   * portrait (calc(44px + 12px) from the bottom). In landscape there
+   * is no bottom bar — the strip is on the right. Pin the back arrow
+   * to the bottom-left of the viewport with normal 12px margin. */
+  .mobile-submenu-close {
+    bottom: 12px !important;
+    left: 12px !important;
+  }
+
+  /* The iframe canvas needs to fill the width up to the right-edge
+   * toolbar (44px). Quanta still pins to top in landscape. */
+  #iframeContainer {
+    top: 44px !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 44px !important;
+    width: auto !important;
+  }
 }

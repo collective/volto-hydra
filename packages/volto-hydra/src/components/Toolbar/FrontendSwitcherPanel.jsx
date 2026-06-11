@@ -45,7 +45,7 @@ const FrontendSwitcherPanel = ({
 
   return (
     <div className="pastanaga-menu frontend-switcher-panel">
-      {/* Mobile-only close affordance — pinned top-right of the
+      {/* Mobile-only back-arrow — pinned bottom-left of the
        * bottom-sheet via mobile-tablet.css's .mobile-sheet-close rule.
        * Hidden on desktop where click-outside is the dismiss gesture. */}
       {closeMenu && (
@@ -55,7 +55,7 @@ const FrontendSwitcherPanel = ({
           aria-label="Close panel"
           onClick={closeMenu}
         >
-          ×
+          ←
         </button>
       )}
       {/* Viewport section */}

@@ -83,7 +83,7 @@ const MobileSubmenuClose = () => {
       aria-label="Close menu"
       onClick={handleClick}
     >
-      ×
+      ←
     </button>,
     document.body,
   );
