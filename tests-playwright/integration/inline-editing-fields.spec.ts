@@ -118,43 +118,42 @@ test.describe('Inline editing - linkable/media fields', () => {
     await expect(linkButton).toBeVisible();
   });
 
-  test('hover state shows dashed border on linkable field', async ({ page }) => {
+  test('hover state shows dashed outline on linkable field', async ({ page }) => {
+    // The hover affordance is now drawn with CSS `outline` (renders
+    // outside the box, no layout impact) instead of a positioned
+    // `::after` pseudo-element. The visual is the same — dashed cyan
+    // border — but the host element's `position` is no longer forced
+    // to relative just to anchor the pseudo. See host-css-preservation
+    // spec for the regression that drove the change.
     const helper = new AdminUIHelper(page);
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Hover over the linkable element
     const iframe = helper.getIframe();
     const linkableElement = iframe.locator('[data-edit-link="buttonLink"]');
     await linkableElement.hover();
 
-    // Check that the ::after pseudo-element creates a dashed border
-    // We verify by checking computed style
-    const hasHoverStyle = await linkableElement.evaluate((el) => {
-      const afterStyle = window.getComputedStyle(el, '::after');
-      return afterStyle.borderStyle.includes('dashed');
-    });
-    expect(hasHoverStyle).toBe(true);
+    const outlineStyle = await linkableElement.evaluate(
+      (el) => window.getComputedStyle(el).outlineStyle,
+    );
+    expect(outlineStyle).toBe('dashed');
   });
 
-  test('hover state shows dashed border on media field', async ({ page }) => {
+  test('hover state shows dashed outline on media field', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
     await helper.navigateToEdit('/test-page');
 
-    // Hover over the media element (scope to hero block to avoid strict mode violation)
     const iframe = helper.getIframe();
     const heroBlock = iframe.locator('[data-block-uid="block-4-hero"]');
     const mediaElement = heroBlock.locator('[data-edit-media="image"]');
     await mediaElement.hover();
 
-    // Check that the ::after pseudo-element creates a dashed border
-    const hasHoverStyle = await mediaElement.evaluate((el) => {
-      const afterStyle = window.getComputedStyle(el, '::after');
-      return afterStyle.borderStyle.includes('dashed');
-    });
-    expect(hasHoverStyle).toBe(true);
+    const outlineStyle = await mediaElement.evaluate(
+      (el) => window.getComputedStyle(el).outlineStyle,
+    );
+    expect(outlineStyle).toBe('dashed');
   });
 });
