@@ -769,4 +769,51 @@ test.describe('Page Creation', () => {
       'Add chooser must contain at least one type item when visible',
     ).toBeGreaterThan(0);
   });
+
+  /**
+   * The Add refactor: clicking the toolbar Add button must NAVIGATE
+   * to a full-screen `/add` page that lists the addable types — same
+   * pattern as Contents (which is a route, not a dropdown). After
+   * picking a type, the existing form flow handles the rest.
+   *
+   * Catches three things at once:
+   *   1. Click on #toolbar-add changes URL to `${path}/add` (no longer
+   *      an inline submenu).
+   *   2. The /add page renders the type chooser (assert at least one
+   *      [id^="toolbar-add-"] link is visible — same selectors the
+   *      happy-path test above uses).
+   *   3. Clicking a type link navigates to `${path}/add?type=X`,
+   *      which is what Add.jsx already renders the form for.
+   */
+  test('Add button navigates to a full-screen /add chooser page (not an inline submenu)', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await page.goto(`${helper.adminUrl}/_test_data`);
+
+    const addBtn = page.locator('#toolbar-add');
+    await expect(addBtn).toBeVisible({ timeout: 5000 });
+
+    await addBtn.click();
+
+    // (1) URL must change to /<path>/add — proves the click navigated
+    // instead of just opening a popup over the current page.
+    await page.waitForURL(/\/_test_data\/add($|\?)/, { timeout: 5000 });
+    expect(page.url()).toMatch(/\/_test_data\/add($|\?)/);
+
+    // (2) Inline submenu must NOT be the dismiss surface. The chooser
+    // should be a real page layout, not the small `.menu-more` floating
+    // box. Asserting that the page DOESN'T have the old submenu
+    // visible catches a regression where someone re-introduces it.
+    const inlineSubmenu = page.locator('.toolbar-content.show');
+    await expect(inlineSubmenu).toHaveCount(0);
+
+    // (3) Chooser must render at least one type link, and clicking
+    // one must navigate to /add?type=X.
+    const docLink = page.locator('#toolbar-add-document');
+    await expect(docLink).toBeVisible({ timeout: 5000 });
+    await docLink.click();
+    await page.waitForURL(/\/_test_data\/add\?type=Document/, { timeout: 5000 });
+  });
 });

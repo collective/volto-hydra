@@ -54,6 +54,8 @@ import config from '@plone/volto/registry';
 import saveSVG from '@plone/volto/icons/save.svg';
 import clearSVG from '@plone/volto/icons/clear.svg';
 
+import AddTypeChooser from '../../../../../components/AddTypeChooser';
+
 const messages = defineMessages({
   add: {
     id: 'Add {type}',
@@ -264,6 +266,36 @@ class Add extends Component {
    * @returns {string} Markup for the component.
    */
   render() {
+    // HYDRA: when /add is hit WITHOUT a `?type=` query (e.g., the
+    // toolbar Add button click landed here), render the full-screen
+    // type chooser instead of trying to load a 'Default' schema. The
+    // chooser navigates to /add?type=X and this same component then
+    // renders the actual form. Replaces the legacy inline `.menu-more`
+    // dropdown editors used to see.
+    //
+    // Wrap with the same Toolbar / Sidebar chrome the form uses so
+    // editors don't see a bare unstyled page — only the centre column
+    // changes between "pick a type" and "fill the form".
+    const queryType = qs.parse(this.props.location?.search || '').type;
+    if (!queryType) {
+      return (
+        <div id="page-add">
+          <Helmet title="Add Content" />
+          <AddTypeChooser pathname={this.props.pathname} />
+          {this.state.isClient &&
+            createPortal(
+              <Toolbar
+                pathname={this.props.pathname}
+                hideDefaultViewButtons
+                inner={<span />}
+              />,
+              document.getElementById('toolbar'),
+            )}
+          {this.state.isClient &&
+            createPortal(<Sidebar />, document.getElementById('sidebar'))}
+        </div>
+      );
+    }
     if (this.props.schemaRequest.loaded) {
       // HYDRA: force the flat (non-visual) Add form. Hydra owns block editing
       // through the bridge/iframe; Volto's in-page visual mode would compete
