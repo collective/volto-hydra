@@ -9,6 +9,7 @@
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import { URLS } from '../ports';
 
 test.describe('Inline Editing - Clipboard', () => {
   test('can cut and paste plain text', async ({ page }) => {
@@ -221,14 +222,14 @@ test.describe('Inline Editing - Clipboard', () => {
     const initialBlocks = await helper.getStableBlockCount();
 
     // Paste HTML with text + image + more text
-    await editor.evaluate((el) => {
+    await editor.evaluate((el, mockApiUrl) => {
       const dt = new DataTransfer();
-      dt.setData('text/html', '<p>Hello</p><img src="http://localhost:8888/test-image.jpg" alt="Pasted image"><p>World</p>');
+      dt.setData('text/html', `<p>Hello</p><img src="${mockApiUrl}/test-image.jpg" alt="Pasted image"><p>World</p>`);
       dt.setData('text/plain', 'Hello\n[image]\nWorld');
       const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
       Object.defineProperty(event, 'clipboardData', { value: dt });
       el.dispatchEvent(event);
-    });
+    }, URLS.mockApi);
 
     // Should create 2 new blocks (image + "World" text) in the same column
     await helper.waitForBlockCountToBe(initialBlocks + 2, 10000);

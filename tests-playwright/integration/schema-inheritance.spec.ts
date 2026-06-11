@@ -736,12 +736,23 @@ test.describe('Frontend-Driven Schema Enhancers', () => {
 
     // Verify inherited fields are present in Grid section (from teaser schema)
     // These fields are NOT in teaser's editableFields, so they get inherited to parent
-    // head_title -> "Head title", openLinkInNewTab -> "Open in a new tab", align -> "Alignment"
-    const headTitleField = gridSection.locator('text=Head title');
-    await expect(headTitleField).toBeVisible({ timeout: 5000 });
+    // head_title -> "Kicker" (renamed from "Head title" in Volto 19),
+    // openLinkInNewTab -> "Open in a new tab", align -> "Alignment"
+    //
+    // The schemaEnhancer pipeline runs asynchronously after the Item Type
+    // selection — wait for the resulting fieldset header to mount before
+    // checking individual field labels, rather than racing the render.
+    await gridSection.getByText('Teaser Defaults').waitFor({ state: 'visible' });
 
-    const alignmentField = gridSection.locator('text=Alignment');
-    await expect(alignmentField).toBeVisible({ timeout: 3000 });
+    // Use getByText (modern Playwright) instead of the legacy `text=` selector.
+    // getByText matches the accessible-name-style text including labels for
+    // form controls; the legacy text= selector kept missing the Kicker label
+    // even though the page snapshot showed it rendered.
+    const headTitleField = gridSection.getByText('Kicker', { exact: true });
+    await expect(headTitleField).toBeVisible();
+
+    const alignmentField = gridSection.getByText('Alignment', { exact: true });
+    await expect(alignmentField).toBeVisible();
 
     // Verify "Customize teaser content" (overwrite) is NOT in Grid section
     // It's in editableFields so it stays on the child teaser

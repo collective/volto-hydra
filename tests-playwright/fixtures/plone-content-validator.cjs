@@ -103,6 +103,33 @@ function validate(contentDir) {
     errors.push("  __metadata__.json has top-level 'content' key — ExportImportMetadata rejects this at site creation. Use 'local_roles' instead.");
   }
 
+  // redirects.json shape: plone.exportimport's set_redirects expects a
+  // flat Dict[str, str] mapping {old_path: new_path}. The REST API's
+  // @aliases response uses an `{items: [{path, redirect-to, ...}]}` array
+  // shape — easy to confuse the two. The importer iterates `data.items()`
+  // and crashes with `'list' object has no attribute 'endswith'` if you
+  // feed it the items-array shape. Catching this here keeps a bad
+  // redirects.json from silently breaking site bootstrap on deploy.
+  const redirectsPath = path.join(parentDir, 'redirects.json');
+  if (fs.existsSync(redirectsPath)) {
+    let redirectsData;
+    try { redirectsData = readJson(redirectsPath); }
+    catch (e) { errors.push(`  redirects.json: invalid JSON (${e.message})`); }
+    if (redirectsData !== undefined) {
+      if (Array.isArray(redirectsData) || typeof redirectsData !== 'object' || redirectsData === null) {
+        errors.push(`  redirects.json: must be a plain {path: target} object, got ${Array.isArray(redirectsData) ? 'array' : typeof redirectsData}`);
+      } else {
+        for (const [key, value] of Object.entries(redirectsData)) {
+          if (typeof value !== 'string') {
+            errors.push(`  redirects.json: value for "${key}" is ${Array.isArray(value) ? 'an array' : typeof value} — use {"/old": "/new"}, not the REST-API {items: [...]} shape`);
+          } else if (!key.startsWith('/') || !value.startsWith('/')) {
+            errors.push(`  redirects.json: paths must be absolute (start with /): ${JSON.stringify(key)} -> ${JSON.stringify(value)}`);
+          }
+        }
+      }
+    }
+  }
+
   // Per-item checks on EVERY data.json in the tree (not just direct children)
   const allUids = new Set();
   for (const { rel, data, dir } of walkData(contentDir)) {
@@ -214,12 +241,24 @@ function checkIntegrity(contentDir) {
   };
 
   // Pass 1: build UID → relpath and path → data
+  // Detect duplicate UIDs as we go — two content items sharing one UID
+  // makes Plone's catalog throw `A different document with value '<UID>'
+  // already exists in the index` during create-site, which silently leaves
+  // half the import incomplete (missing nav items, redirects don't install,
+  // etc.) while the API still responds enough to pass api-wait. Catching
+  // this here turns it into a deploy-blocking validate failure.
   const uidMap = new Map();
   const pathMap = new Map();
   const items = [];
   for (const { rel, data, dir } of walkData(contentDir)) {
     items.push({ rel, data, dir });
-    if (data.UID) uidMap.set(data.UID, rel);
+    if (data.UID) {
+      if (uidMap.has(data.UID)) {
+        errors.push(`  ${rel}: duplicate UID ${data.UID} (also in ${uidMap.get(data.UID)})`);
+      } else {
+        uidMap.set(data.UID, rel);
+      }
+    }
     const atId = data['@id'];
     if (atId) pathMap.set(atId, data);
     pathMap.set('/' + rel.split(path.sep).join('/'), data);
@@ -264,27 +303,43 @@ function checkIntegrity(contentDir) {
     }
   }
 
-  // Pass 2c: Internal link refs in blocks (image.url paths, teaser/button hrefs)
+  // Pass 2c: Internal link refs in blocks. Covers any block's plain `url`
+  // string (image, hero, button, ...) and `href` link-object arrays
+  // (teaser/button/cta), walking nested blocks (sections, grids, columns)
+  // — not just the top level, so a broken CTA inside a section is caught too.
+  const isInternalPath = (u) =>
+    typeof u === 'string' && u.startsWith('/') &&
+    !u.includes('resolveuid') && !u.includes('@@') && !u.includes('/++');
+
+  function* walkBlocks(blocks) {
+    for (const [bid, block] of Object.entries(blocks || {})) {
+      if (!block || typeof block !== 'object') continue;
+      yield [bid, block];
+      if (block.blocks && typeof block.blocks === 'object') {
+        yield* walkBlocks(block.blocks);
+      }
+    }
+  }
+
   for (const { rel, data } of items) {
-    const blocks = data.blocks || {};
-    for (const [bid, block] of Object.entries(blocks)) {
-      if (block && block['@type'] === 'image') {
-        const url = block.url;
-        if (typeof url === 'string' && url.startsWith('/') && !url.includes('resolveuid')) {
-          if (pathMap.has(url)) {
-            stats.linksOk += 1;
-          } else {
-            warnings.push(`  ${rel}: image block ${bid} references missing path: ${url}`);
-            stats.linksBroken += 1;
-          }
+    for (const [bid, block] of walkBlocks(data.blocks)) {
+      // Plain string url on any block (hero CTA, image, button-with-url, ...)
+      if (isInternalPath(block.url)) {
+        if (pathMap.has(block.url)) {
+          stats.linksOk += 1;
+        } else {
+          warnings.push(`  ${rel}: block ${bid} (${block['@type']}) url references missing: ${block.url}`);
+          stats.linksBroken += 1;
         }
       }
-      const href = block && block.href;
-      if (Array.isArray(href)) {
-        for (const h of href) {
-          if (h && typeof h === 'object') {
-            const linkId = h['@id'] || '';
-            if (typeof linkId === 'string' && linkId.startsWith('/') && !pathMap.has(linkId)) {
+      // href link-object arrays (teaser/button/cta)
+      if (Array.isArray(block.href)) {
+        for (const h of block.href) {
+          const linkId = (h && typeof h === 'object') ? (h['@id'] || '') : '';
+          if (isInternalPath(linkId)) {
+            if (pathMap.has(linkId)) {
+              stats.linksOk += 1;
+            } else {
               warnings.push(`  ${rel}: block ${bid} href references missing: ${linkId}`);
               stats.linksBroken += 1;
             }

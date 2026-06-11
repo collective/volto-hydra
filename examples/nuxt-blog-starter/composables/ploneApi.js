@@ -69,7 +69,19 @@ export default async function ploneApi({
     }),
   ).then((entries) => Object.fromEntries(entries.filter(Boolean)));
 
-  return useFetch(api, {
+  // plone.app.redirector 302s moved content (/++api++/old -> /++api++/new).
+  // ofetch auto-follows to valid JSON, so without this the page would render
+  // the new content under the OLD url. Capture the followed-redirect target
+  // and surface it so the page setup can navigateTo() a permanent 301 — the
+  // redirect can't be issued from the ofetch interceptor (it won't propagate
+  // as an SSR redirect).
+  let redirectTarget = null;
+  const toFrontendPath = (u) => u
+    .replace(runtimeConfig.public.backendBaseUrl, '')
+    .replace('/++api++', '')
+    .replace(/\?.*$/, '');
+
+  const result = await useFetch(api, {
     key,
     method: query ? 'POST' : 'GET',
     headers: headers,
@@ -80,6 +92,14 @@ export default async function ploneApi({
     watch: watch,
     default: () => {
       return _default;
+    },
+    onResponse({ response }) {
+      if (response.redirected && response.url) {
+        const target = toFrontendPath(response.url);
+        if (target && !target.startsWith('http') && target !== toFrontendPath(api)) {
+          redirectTarget = target;
+        }
+      }
     },
     onResponseError({ request, response, options }) {
       const error = response._data;
@@ -119,4 +139,13 @@ export default async function ploneApi({
       }
     },
   });
+
+  // Moved content: surface the target so the page setup can navigateTo() it.
+  // Must be issued from the page's setup context for Nuxt to honor the SSR
+  // redirect (not from here, and not from the ofetch interceptor).
+  if (redirectTarget) {
+    result.redirectTo = redirectTarget;
+  }
+
+  return result;
 }

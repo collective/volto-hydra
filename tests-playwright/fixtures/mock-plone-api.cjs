@@ -39,6 +39,53 @@ function parseContentMounts() {
 
 const CONTENT_MOUNTS = parseContentMounts();
 
+/**
+ * Resolve a moved-content redirect, mimicking plone.app.redirector.
+ * Each mount may carry a redirects.json sibling ({ oldPath: newPath },
+ * mount-relative) next to its content dir. Returns the new mount-prefixed
+ * path or null. Read fresh each call (tiny file, only hit on a 404) so dev
+ * edits to redirects.json take effect without a restart.
+ */
+function getRedirectTarget(cleanPath) {
+  for (const { mountPath, dirPath } of CONTENT_MOUNTS) {
+    const redirectsFile = path.join(dirPath, '..', 'redirects.json');
+    if (!fs.existsSync(redirectsFile)) continue;
+    let map;
+    try { map = JSON.parse(fs.readFileSync(redirectsFile, 'utf8')); }
+    catch { continue; }
+    const rel = mountPath === '/'
+      ? cleanPath
+      : (cleanPath.startsWith(mountPath) ? cleanPath.slice(mountPath.length) || '/' : null);
+    if (rel == null) continue;
+    if (map[rel]) {
+      return mountPath === '/' ? map[rel] : mountPath + map[rel];
+    }
+  }
+  return null;
+}
+
+/**
+ * Enumerate every redirects.json entry across mounts as mount-prefixed
+ * {path, 'redirect-to'} pairs. Used by the @aliases endpoint.
+ */
+function getAllRedirects() {
+  const out = [];
+  for (const { mountPath, dirPath } of CONTENT_MOUNTS) {
+    const redirectsFile = path.join(dirPath, '..', 'redirects.json');
+    if (!fs.existsSync(redirectsFile)) continue;
+    let map;
+    try { map = JSON.parse(fs.readFileSync(redirectsFile, 'utf8')); }
+    catch { continue; }
+    for (const [from, to] of Object.entries(map)) {
+      out.push({
+        path: mountPath === '/' ? from : mountPath + from,
+        'redirect-to': mountPath === '/' ? to : mountPath + to,
+      });
+    }
+  }
+  return out;
+}
+
 // Validate each mounted content tree at startup. Errors are loud (listed)
 // but non-fatal — tests using the mock API still start. Set
 // SKIP_CONTENT_VALIDATION=true to suppress entirely.
@@ -329,14 +376,43 @@ function getPlaceholderImageScales(title, fieldName = 'image') {
 }
 
 /**
+ * Match a SearchableText query against an item, mimicking Plone 6.2's
+ * plone.app.querystring 3.0.0 `munge_search_term`: split the term on
+ * whitespace, then each word must prefix-match a word token in any of
+ * title/description/id. (Plone uses ZCText word-prefix indexing; we
+ * tokenize on `\W+` and check `startsWith`, which is close enough.)
+ */
+function matchSearchableText(searchTerm, item) {
+  const term = (searchTerm || '').replace(/\*+$/g, '').trim().toLowerCase();
+  if (!term) return true;
+  const parts = term.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return true;
+  const haystackTokens = [
+    ...(item.title || '').toLowerCase().split(/\W+/),
+    ...(item.description || '').toLowerCase().split(/\W+/),
+    ...(item.id || '').toLowerCase().split(/\W+/),
+  ].filter(Boolean);
+  return parts.every((p) => haystackTokens.some((tok) => tok.startsWith(p)));
+}
+
+/**
  * Format a content item for search results
  * Includes image_field and image_scales matching real Plone API structure
  * Includes is_folderish for folder navigation in object browser
  * Includes hasPreviewImage for teaser blocks to show target's preview image
  */
 function formatSearchItem(content, baseUrl) {
-  // Check if content has a preview image (common for Documents, News Items, etc.)
-  const hasPreviewImage = !!(content.preview_image || content['@type'] === 'Image');
+  // Check if content has a preview image (common for Documents, News Items, etc.).
+  // For distribution-style content the preview_image is a blob_path reference;
+  // unless the bytes also exist on disk under the content dir, the mock can't
+  // serve the @@images URL — so don't claim a preview image we can't deliver.
+  const declaresPreview = !!(content.preview_image || content['@type'] === 'Image');
+  let hasPreviewImage = declaresPreview;
+  if (declaresPreview && content.preview_image?.blob_path) {
+    const urlPath = (content['@id'] || '').replace(/^https?:\/\/[^/]+/, '') || '/';
+    const dirInfo = contentDirMap[urlPath];
+    hasPreviewImage = !!(dirInfo && findFirstImageFile(dirInfo.dirPath, 3));
+  }
 
   const item = {
     '@id': content['@id'],
@@ -360,6 +436,10 @@ function formatSearchItem(content, baseUrl) {
       ? uidPositionMap[content.UID]
       : null,
     'exclude_from_nav': content.exclude_from_nav === true,
+    // Subject (capital S) is the Plone catalog index name; the @querystring-search
+    // filter reads `item.Subject` for facet.Subject criteria. Populate from the
+    // content's `subjects` field (the lowercase schema field).
+    'Subject': content.subjects || [],
   };
 
   // Match real Plone: always include image_field and image_scales.
@@ -1223,6 +1303,28 @@ app.get('/health', (req, res) => {
 });
 
 /**
+ * Walk every registered content dir and collect unique `subjects` values
+ * across all data.json files. Returns the `{ value: { title } }` shape
+ * Plone's @querystring endpoint uses for the Subject (Keywords) index.
+ */
+function collectSubjectValues() {
+  const subjects = new Set();
+  for (const { dirPath } of Object.values(contentDirMap)) {
+    const dataFile = path.join(dirPath, 'data.json');
+    if (!fs.existsSync(dataFile)) continue;
+    try {
+      const data = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
+      for (const s of (data.subjects || [])) {
+        if (typeof s === 'string' && s) subjects.add(s);
+      }
+    } catch { /* ignore malformed data.json */ }
+  }
+  const out = {};
+  for (const s of [...subjects].sort()) out[s] = { title: s };
+  return out;
+}
+
+/**
  * GET /@querystring
  * Get querystring schema (available indexes, operators, sortable indexes)
  * Used by QuerystringWidget to populate criteria and sort dropdowns
@@ -1440,9 +1542,7 @@ app.get('*/@querystring', (req, res) => {
             'operation': 'plone.app.querystring.operation.selection.none',
           },
         },
-        'values': {
-          'main folder': { 'title': 'main folder' },
-        },
+        'values': collectSubjectValues(),
       },
       'Title': {
         'title': 'Title',
@@ -1520,6 +1620,13 @@ app.get('/@site', (req, res) => {
     '@id': 'http://localhost:8888',
     'plone.site_title': 'Plone Site',
     'plone.site_logo': null,
+    // Volto 19 reads `plone.default_language` from this response as the
+    // middle fallback in its SSR language-resolution chain
+    // (server.jsx -> toBackendLang(initialLang)). Volto 18 used
+    // `config.settings.defaultLanguage` instead — the source moved from
+    // frontend config to backend response, so the mock has to provide it.
+    'plone.default_language': 'en',
+    'plone.available_languages': ['en'],
   });
 });
 
@@ -1701,6 +1808,27 @@ app.get(/.*\/@navroot$/, (req, res) => {
 });
 
 /**
+ * GET /@aliases or /:path/@aliases
+ * plone.app.redirector aliases (manual redirects). On the site root the
+ * response lists every alias; on a context it filters to aliases that
+ * target that context (path or descendant), matching plone.restapi's
+ * `@aliases` GET behavior in Plone 6.2.
+ */
+app.get(/.*\/@aliases$/, (req, res) => {
+  const cleanPath = (req.path.replace('/++api++', '').replace(/\/?@aliases$/, '') || '/').replace(/\/+$/, '') || '/';
+  const baseUrl = `http://localhost:${PORT}`;
+  const all = getAllRedirects();
+  const items = cleanPath === '/'
+    ? all
+    : all.filter((a) => a['redirect-to'] === cleanPath || a['redirect-to'].startsWith(cleanPath + '/'));
+  res.json({
+    '@id': `${baseUrl}${cleanPath === '/' ? '' : cleanPath}/@aliases`,
+    items,
+    items_total: items.length,
+  });
+});
+
+/**
  * POST /@querystring-search
  * Search for content using Volto's querystring format.
  * Used by listing blocks to fetch query results.
@@ -1794,7 +1922,11 @@ app.post('*/@querystring-search', (req, res) => {
   const selectionFields = {
     portal_type: (item) => [item['@type']],
     review_state: (item) => [item.review_state || 'published'],
-    Subject: (item) => item.Subject || [],
+    // Items here come from loadRawContentFromDisk — the raw content schema
+    // field is lowercase `subjects`. The catalog index name `Subject`
+    // (capital S) is only added later by formatSearchItem. Read both so
+    // this works whether the filter runs on raw or brain-formatted items.
+    Subject: (item) => item.subjects || item.Subject || [],
   };
 
   for (const condition of query) {
@@ -1866,15 +1998,11 @@ app.post('*/@querystring-search', (req, res) => {
       }
       allItems = allItems.filter((item) => new URL(item['@id']).pathname !== contextPath);
     } else if (index === 'SearchableText' && operation.includes('string.contains')) {
-      // Full-text search - search in title, description, and text content
-      const searchTerm = (value || '').toLowerCase();
-      if (searchTerm) {
-        allItems = allItems.filter((item) => {
-          const title = (item.title || '').toLowerCase();
-          const description = (item.description || '').toLowerCase();
-          const id = (item.id || '').toLowerCase();
-          return title.includes(searchTerm) || description.includes(searchTerm) || id.includes(searchTerm);
-        });
+      // Full-text search across title/description/id. Mirrors Plone 6.2's
+      // plone.app.querystring 3.0.0 wildcard-prefix behavior — each word in
+      // the search term must prefix-match a word token in one of those fields.
+      if (value) {
+        allItems = allItems.filter((item) => matchSearchableText(value, item));
       }
     } else if (index === 'exclude_from_nav' && operation.includes('boolean')) {
       // Nav listings filter out items marked exclude_from_nav: true.
@@ -1884,6 +2012,9 @@ app.post('*/@querystring-search', (req, res) => {
         const flag = item.exclude_from_nav === true;
         return wantTrue ? flag : !flag;
       });
+      // Note: `review_state` and `Subject` selection.{any,all,none} are
+      // handled generically above via `selectionFields` (which already
+      // maps both indices), so we don't need explicit branches here.
     }
   }
 
@@ -1978,17 +2109,14 @@ app.get('*/@search', (req, res) => {
 
   let items;
 
-  // Handle SearchableText (used by ObjectBrowser search input)
+  // Handle SearchableText (used by ObjectBrowser search input). Plone 6.2
+  // (plone.app.querystring 3.0.0) appends a wildcard to each word and ANDs
+  // the parts — matchSearchableText replicates that on title/description/id.
   if (searchableText) {
-    const searchTerm = searchableText.replace(/\*$/, '').toLowerCase();
     items = Object.keys(contentDirMap)
       .filter((itemPath) => itemPath !== '/')
       .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl))
-      .filter((item) => {
-        const title = (item.title || '').toLowerCase();
-        const description = (item.description || '').toLowerCase();
-        return title.includes(searchTerm) || description.includes(searchTerm);
-      });
+      .filter((item) => matchSearchableText(searchableText, item));
     // Filter by portal_type if specified
     if (portalType) {
       const types = Array.isArray(portalType) ? portalType : [portalType];
@@ -2220,6 +2348,26 @@ app.get('*/resolveuid/:uid', (req, res) => {
  * Serves actual image files from content directories if they exist,
  * otherwise falls back to placeholder SVGs.
  */
+function findFirstImageFile(rootDir, maxDepth) {
+  const imageExts = new Set(['.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp']);
+  const stack = [{ dir: rootDir, depth: 0 }];
+  while (stack.length) {
+    const { dir, depth } = stack.pop();
+    if (depth > maxDepth) continue;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isFile() && imageExts.has(path.extname(entry.name).toLowerCase())) {
+        return full;
+      }
+      if (entry.isDirectory()) {
+        stack.push({ dir: full, depth: depth + 1 });
+      }
+    }
+  }
+  return null;
+}
+
 app.get('*/@@images/*', (req, res) => {
   // Extract content path and field name from URL. Serves the same image
   // file regardless of scale — the mock doesn't generate actual scales.
@@ -2244,27 +2392,41 @@ app.get('*/@@images/*', (req, res) => {
   }
   const imageDir = dirInfo ? path.join(dirInfo.dirPath, fieldName) : null;
 
+  const mimeTypes = {
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+  };
+  const isImageExt = (ext) => ext in mimeTypes;
+  const serveFile = (imageFile) => {
+    const ext = path.extname(imageFile).toLowerCase();
+    res.set('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+    res.sendFile(imageFile);
+  };
+
   if (imageDir && fs.existsSync(imageDir)) {
     const files = fs.readdirSync(imageDir);
     if (files.length > 0) {
-      const imageFile = path.join(imageDir, files[0]);
-      const ext = path.extname(files[0]).toLowerCase();
-      const mimeTypes = {
-        '.svg': 'image/svg+xml',
-        '.png': 'image/png',
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.gif': 'image/gif',
-        '.webp': 'image/webp',
-      };
-      const contentType = mimeTypes[ext] || 'application/octet-stream';
-      res.set('Content-Type', contentType);
-      res.sendFile(imageFile);
+      serveFile(path.join(imageDir, files[0]));
       return;
     }
   }
 
-  // No image file found — return 404 (don't hide missing images with placeholders)
+  // Fallback for distribution-style content where preview_image is set via
+  // blob_path. The actual bytes live in a nested image content item under
+  // the data dir, e.g. <content>/<screenshot>.png/image/<file>.png.
+  // Walk the dir tree and serve the first image file found (depth-limited).
+  if (dirInfo && fs.existsSync(dirInfo.dirPath)) {
+    const found = findFirstImageFile(dirInfo.dirPath, 3);
+    if (found) {
+      serveFile(found);
+      return;
+    }
+  }
+
   res.status(404).json({
     error: { type: 'NotFound', message: `Image not found: ${req.path}` }
   });
@@ -2399,6 +2561,13 @@ app.get('*', (req, res, next) => {
     }
     res.json(filteredContent);
   } else {
+    // plone.app.redirector: moved content 302s (GET) to the new path, keeping
+    // the ++api++ namespace. The frontend (ploneApi) upgrades this to a 301.
+    const redirectTo = getRedirectTarget(cleanPath);
+    if (redirectTo) {
+      res.redirect(302, `http://localhost:${PORT}/++api++${redirectTo}`);
+      return;
+    }
     res.status(404).json({
       error: {
         type: 'NotFound',

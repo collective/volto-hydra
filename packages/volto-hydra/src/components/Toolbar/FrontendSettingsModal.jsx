@@ -207,7 +207,12 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
               onKeyDown={handleKeyDown}
               placeholder="https://my-frontend.com"
               className="frontend-settings-input frontend-settings-url-input"
-              autoFocus
+              // No autoFocus: Volto 19's Toolbar adds an onBlur handler on
+              // toolbarWindow that calls closeMenu() when focus shifts
+              // outside the toolbar. This modal portals to document.body
+              // (outside toolbarWindow), so autoFocus here would
+              // immediately blur the toolbar -> menu closes -> our panel
+              // unmounts -> this modal unmounts.
               aria-label="URL"
             />
             <button
@@ -256,7 +261,14 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
         </div>
       </div>
     </div>,
-    document.body,
+    // Portal target: prefer the Volto toolbar window (.toolbar-content) so
+    // focus shifts inside the modal stay "inside the toolbar" from the
+    // toolbar's perspective. Volto 19 added an onBlur on toolbarWindow that
+    // calls closeMenu() when focus moves to a relatedTarget OUTSIDE
+    // toolbarWindow — autoFocus or fill() on our inputs would otherwise
+    // immediately collapse the parent panel and unmount us. Fall back to
+    // document.body if the toolbar isn't mounted (e.g. tests/SSR).
+    document.querySelector('.toolbar-content') || document.body,
   );
 };
 
