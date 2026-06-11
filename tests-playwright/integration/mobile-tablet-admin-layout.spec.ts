@@ -863,6 +863,56 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     ).toBe('Save');
   });
 
+  /**
+   * Edit-mode toolbar gap: same shape as desktop's two-group toolbar.
+   * The meta group on the LEFT (Undo + Settings) and the action group
+   * on the RIGHT (Cancel + Save) must be separated by an explicit gap
+   * (≥ 30 px) — without it the four icons pack to the left and the
+   * right of the bar reads as empty/broken. The gap is implemented
+   * via `justify-content: space-between` on the inner .toolbar-body
+   * plus `width: 100%`; if either is reverted this assertion fires.
+   */
+  test('mobile toolbar (edit): visible gap between left meta group and right action group', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const buttons = await page.evaluate(() => {
+      const inner = document.querySelector('#toolbar-body .toolbar-body');
+      if (!inner) return [];
+      return [...inner.querySelectorAll('button, a')]
+        .map((b) => {
+          const r = b.getBoundingClientRect();
+          return {
+            label: b.getAttribute('aria-label') || b.textContent?.trim() || '?',
+            x: r.x,
+            right: r.x + r.width,
+            visible: r.width > 0 && r.height > 0,
+          };
+        })
+        .filter((b) => b.visible)
+        .sort((a, b) => a.x - b.x);
+    });
+    expect(buttons.length).toBeGreaterThanOrEqual(4);
+
+    const settings = buttons.find((b) => b.label === 'Open settings');
+    const cancel = buttons.find((b) => b.label === 'Cancel');
+    expect(settings, 'Settings (left meta group) must be visible').toBeTruthy();
+    expect(cancel, 'Cancel (right action group) must be visible').toBeTruthy();
+
+    // The horizontal gap between the right edge of Settings and the
+    // left edge of Cancel must be ≥ 30 px — proves the two button
+    // groups are visibly separated, not stacked side-by-side.
+    const gap = cancel!.x - settings!.right;
+    expect(
+      gap,
+      `expected a visible gap between Settings (right=${settings!.right.toFixed(0)}) and Cancel (left=${cancel!.x.toFixed(0)})`,
+    ).toBeGreaterThanOrEqual(30);
+  });
+
   test('mobile toolbar (view): Edit is the rightmost visible button', async ({
     page,
   }) => {

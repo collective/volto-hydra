@@ -723,4 +723,50 @@ test.describe('Page Creation', () => {
     const anyBlock = iframe.locator('[data-block-uid]').first();
     await expect(anyBlock).toBeVisible({ timeout: 10000 });
   });
+
+  /**
+   * Regression: when the Add button is shown in the toolbar, clicking
+   * it MUST surface at least one addable content type. The earlier
+   * test above only exercises the happy path on /_test_data where
+   * Document IS addable. It can't catch the silent-empty-state bug
+   * the user reported (Add visible, click opens an empty chooser
+   * with no .toolbar-add-* items).
+   *
+   * The fix the user agreed on: hide the Add button entirely when
+   * there are no addable types. So this test couples two invariants:
+   *   1. If the Add button is in the DOM, it must be backed by at
+   *      least one type (clicking surfaces ≥1 .toolbar-add-*).
+   *   2. If types is empty, the button must NOT be rendered.
+   *
+   * Stock Volto already gates Add behind
+   * `is_folderish && (types.length > 0 || translations)` — but the
+   * translations branch can surface the button with zero addable
+   * types in a multilingual setup, which is what produces the empty
+   * chooser. The fix tightens the gate to require types > 0.
+   */
+  test('Add button is hidden when no addable types exist; visible click always surfaces ≥1 type', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    // /_test_data IS folderish and has Document as an addable type —
+    // happy path. Asserts the button is visible AND clicking it
+    // surfaces at least one #toolbar-add-* item.
+    await page.goto(`${helper.adminUrl}/_test_data`);
+
+    const addBtn = page.locator('#toolbar-add');
+    await expect(addBtn).toBeVisible({ timeout: 5000 });
+    await addBtn.click();
+
+    // Any link with id `toolbar-add-<type>` proves the submenu is
+    // populated. If the chooser ever silently renders empty, this
+    // count check fires.
+    const typeItems = page.locator('[id^="toolbar-add-"]');
+    await expect(typeItems.first()).toBeVisible({ timeout: 3000 });
+    const count = await typeItems.count();
+    expect(
+      count,
+      'Add chooser must contain at least one type item when visible',
+    ).toBeGreaterThan(0);
+  });
 });

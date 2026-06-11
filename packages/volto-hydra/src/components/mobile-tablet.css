@@ -127,6 +127,17 @@
     height: 44px !important;
     min-height: 44px !important;
     max-height: 44px !important;
+    /* Push .toolbar-bottom (left group: User/Monitor/Undo/Settings)
+     * and .toolbar-actions (right group: Save/Cancel or Edit/Add/etc)
+     * to opposite ends of the row, with the empty space between them
+     * as a gap — same desktop "spacer" pattern users expect when they
+     * see two button groups in a single bar.
+     *
+     * The full-width is required for space-between to have free space
+     * to distribute: stock pastanaga sizes the inner .toolbar-body to
+     * its content (~284px on a 4-icon bar), leaving the gap empty. */
+    width: 100% !important;
+    justify-content: space-between !important;
   }
   /* The desktop "Shrink toolbar" handle (.toolbar-handler) is rendered
    * as a sibling of .toolbar-body inside #toolbar-body. On the
