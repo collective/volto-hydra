@@ -137,6 +137,40 @@
     display: none !important;
   }
 
+  /* Stock Volto's toolbar submenus (More → History/State/Links,
+   * Add → Add Content) render inside #toolbar > .toolbar-content,
+   * which has `position: static; z-index: 3; no background` — on
+   * desktop it sits inside the expanded vertical toolbar panel, but
+   * on mobile with the toolbar pinned to the bottom there's no panel,
+   * so the menu renders transparent and overlaps the iframe content
+   * (visible to editors as "menus that bleed through the page"). Make
+   * the .show state behave like the other mobile bottom sheets: full-
+   * viewport, opaque, on top of everything, scrollable. */
+  #toolbar .toolbar-content.show {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    /* Leave 44px at the bottom for the bottom toolbar so editors can
+     * still tap More/Add again to dismiss, or tap outside. */
+    bottom: 44px !important;
+    width: 100% !important;
+    max-width: none !important;
+    background: #fff !important;
+    z-index: var(--hydra-z-sidebar-mobile) !important;
+    overflow-y: auto !important;
+    padding: 0 !important;
+  }
+  /* The default `.pastanaga-menu` inside .toolbar-content has its own
+   * sizing rules that fight the full-viewport layout; let the parent
+   * own the geometry. */
+  #toolbar .toolbar-content.show .pastanaga-menu {
+    max-width: none !important;
+    width: 100% !important;
+    height: 100% !important;
+    box-shadow: none !important;
+  }
+
   /* Mobile bottom toolbar layout
    *
    * Default Volto stuffs 6–7 buttons into the bar (Save/Cancel + Undo/
@@ -156,14 +190,20 @@
    *
    * After this: 4–5 buttons remain, all fit within 375px, primary CTA
    * is always rightmost. */
-  #toolbar-body .undo,
+  /* Hide secondary actions that don't fit on a 375px compact bar:
+   *   - .redo: paired with Undo, but the user prioritised Undo only
+   *   - .user: Personal tools — not an editor flow on mobile
+   * .undo is intentionally NOT hidden — it belongs on the edit bar. */
   #toolbar-body .redo,
   #toolbar-body .user {
     display: none !important;
   }
-  /* "Contents" is rendered as an anchor without a class — target by href
-   * suffix instead. Hide on mobile (not a primary editor flow). */
-  #toolbar-body a[href$="/contents"] {
+  /* In EDIT mode hide the Frontend & Viewport switcher from the bottom
+   * bar — editors need Undo + Cancel + Save more than they need a
+   * frontend swap during inline edits. It's still reachable via ⋯.
+   * In VIEW mode the Frontend switcher stays visible — switching what
+   * the page renders on is the core "preview" affordance. */
+  body.view-editview #toolbar-body .frontend-switcher-btn {
     display: none !important;
   }
   /* Primary action goes to the right edge.
@@ -187,6 +227,12 @@
   #toolbar-body .toolbar-actions {
     order: 999 !important;
     margin-left: auto !important;
+    /* Stock pastanaga has 20px padding on the wrapper; when the wrapper
+     * is right-aligned to the viewport edge that padding pushes the
+     * rightmost button past viewport (Edit/Save extends ~25px past).
+     * Zero it on mobile so the bounding box hugs the icon's visual edge. */
+    padding-right: 0 !important;
+    padding-left: 0 !important;
   }
   /* DON'T override Save's order: stock .toolbar-actions is
    * `flex-direction: row-reverse`, so DOM-first (Save) is already
@@ -289,7 +335,7 @@
     border-radius: 12px 12px 0 0 !important;
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12) !important;
     z-index: var(--hydra-z-sheet) !important;
-    /* Reserve room at the top for the .mobile-sheet-back affordance
+    /* Reserve room at the top for the .mobile-sheet-close affordance
      * (44px button + 12+12 px breathing room). Items inside the sheet
      * scroll under it but never get hidden behind it. */
     padding-top: 56px !important;
@@ -390,17 +436,20 @@
     to   { transform: translateY(0); }
   }
 
-  /* Back-arrow inside bottom sheets. Pinned to the TOP-LEFT of the
-   * sheet — standard mobile bottom-sheet convention puts the dismiss
-   * affordance at the top, not the bottom. The sheet rule above
-   * reserves padding-top: 56px so the items below never sit under it. */
-  .mobile-sheet-back {
+  /* Close (X) inside bottom sheets. Pinned to the TOP-RIGHT corner of
+   * every popup — standard mobile-app close-button convention. Same
+   * style across every popup (⋯ menu, Frontend & Viewport, Add/More
+   * submenus) so editors don't have to learn a different dismiss for
+   * each panel. The sheet rule above reserves padding-top: 56px so
+   * items below never sit under it. */
+  .mobile-sheet-close {
     display: flex !important;
     align-items: center;
     justify-content: center;
     position: absolute;
     top: 12px;
-    left: 12px;
+    right: 12px;
+    left: auto;
     bottom: auto;
     width: 44px;
     height: 44px;
@@ -412,6 +461,20 @@
     line-height: 1;
     cursor: pointer;
     z-index: calc(var(--hydra-z-sheet) + 1);
+  }
+  /* The MobileSubmenuClose component portals its close button into
+   * document.body (so it sits above .toolbar-content.show's stacking
+   * context). When rendered, position it at the top-right of the
+   * submenu sheet — which is the same geometry. The submenu sheet
+   * uses var(--hydra-z-sidebar-mobile); make sure the portaled close
+   * sits above it. */
+  .mobile-submenu-close {
+    position: fixed !important;
+    top: 12px !important;
+    right: 12px !important;
+    left: auto !important;
+    bottom: auto !important;
+    z-index: calc(var(--hydra-z-sidebar-mobile) + 1) !important;
   }
 
   /* Sidebar full-screen on mobile ONLY WHEN EXPANDED. When collapsed,
@@ -497,6 +560,7 @@
 
 /* Desktop + tablet (≥768px): hide the mobile-only affordances. */
 @media (min-width: 768px) {
-  .mobile-sheet-back { display: none !important; }
+  .mobile-sheet-close,
+  .mobile-submenu-close { display: none !important; }
   .quanta-toolbar .chevron-buttons { display: none !important; }
 }

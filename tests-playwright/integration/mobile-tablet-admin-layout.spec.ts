@@ -267,7 +267,7 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     const mb = await menu.boundingBox();
     expect(mb!.y + mb!.height).toBeGreaterThan(812 - 20);
 
-    const back = page.locator('.volto-hydra-dropdown-menu .mobile-sheet-back');
+    const back = page.locator('.volto-hydra-dropdown-menu .mobile-sheet-close');
     await expect(back).toBeVisible();
     await back.click();
     await expect(menu).not.toBeVisible({ timeout: 3000 });
@@ -293,7 +293,7 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     const menu = page.locator('.volto-hydra-dropdown-menu');
     await expect(menu).toBeVisible();
     const mb = await menu.boundingBox();
-    const back = page.locator('.volto-hydra-dropdown-menu .mobile-sheet-back');
+    const back = page.locator('.volto-hydra-dropdown-menu .mobile-sheet-close');
     await expect(back).toBeVisible();
     const bb = await back.boundingBox();
 
@@ -867,6 +867,516 @@ test.describe('Admin layout — mobile (≤767px)', () => {
       `toolbar scrollWidth (${overflow.sw}) should not exceed clientWidth (${overflow.cw}) — content must fit without horizontal scrolling`,
     ).toBeLessThanOrEqual(overflow.cw + 1);
   });
+
+  /**
+   * Second round of user feedback (after the right-align + no-scroll fix):
+   *  - Settings icon should be a cog, not the sliders SVG
+   *  - Settings icon shouldn't show in view mode (only relevant in edit)
+   *  - Contents button should be back in view mode
+   *  - Frontend & Viewport panel needs a close button on mobile
+   *  - Edit toolbar should prioritize Undo + Cancel over Frontend switcher
+   */
+  test('mobile toolbar (edit): Settings shortcut renders an SVG cog icon (not bare sliders)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const btn = page.locator('#toolbar-body .sidebar-toggle-toolbar-btn');
+    await expect(btn).toBeVisible({ timeout: 3000 });
+    await expect(
+      btn.locator('svg'),
+      'Settings shortcut must render an SVG icon',
+    ).toBeVisible();
+    // Volto's stock settings.svg has a distinctive 3-slider path (paths
+    // like `M10 20C8.897` — circle nodes on parallel lines). A cog has a
+    // characteristic outer-gear path with radial teeth — different shape
+    // entirely. Asserting the path content isn't `settings.svg`-shaped
+    // is the cheapest regression catch.
+    const svgContent = await btn.locator('svg').evaluate((el) => el.innerHTML);
+    expect(
+      svgContent,
+      'Settings icon must NOT use stock sliders settings.svg (it should be a cog)',
+    ).not.toContain('M10 20C8.897 20 8 19.103');
+  });
+
+  test('mobile toolbar (view): Settings shortcut is NOT shown', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToView('/test-page');
+
+    await expect(
+      page.locator('#toolbar-body .sidebar-toggle-toolbar-btn'),
+      'Settings shortcut is editing-only and must not render in view mode',
+    ).toHaveCount(0);
+  });
+
+  test('mobile toolbar (view): Contents link is visible', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToView('/test-page');
+
+    // Contents anchor has no class — match by href suffix.
+    const contents = page.locator('#toolbar-body a[href$="/contents"]');
+    await expect(
+      contents,
+      'Contents link must remain accessible in view mode on mobile',
+    ).toBeVisible();
+  });
+
+  test('mobile toolbar (edit): Undo is visible, Frontend & Viewport is NOT', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    await expect(
+      page.locator('#toolbar-body .undo'),
+      'Undo must be visible in edit mode (more important than Frontend switcher)',
+    ).toBeVisible();
+    await expect(
+      page.locator('#toolbar-body .frontend-switcher-btn'),
+      'Frontend & Viewport switcher does not belong in edit-mode bottom bar',
+    ).toBeHidden();
+  });
+
+  test('frontend-switcher panel has a close button on mobile', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    // Open from view mode so the Frontend switcher button is visible.
+    await helper.navigateToView('/test-page');
+
+    await page.locator('#toolbar-frontend-switcher').click();
+    const panel = page.locator('.frontend-switcher-panel');
+    await expect(panel).toBeVisible({ timeout: 3000 });
+
+    const back = panel.locator('.mobile-sheet-close');
+    await expect(
+      back,
+      'Frontend & Viewport panel must have a close affordance on mobile',
+    ).toBeVisible();
+
+    // And it must dismiss the panel.
+    await back.click();
+    await expect(panel).not.toBeVisible({ timeout: 3000 });
+  });
+
+  /**
+   * Comprehensive button-by-button audit of the mobile bottom toolbar.
+   * For each button that's visible on mobile in each mode, this exercises:
+   *   1. The button is visible at 375px (no clipping, in viewport)
+   *   2. Clicking it actually does something observable (URL change OR
+   *      a panel/menu opens in a visible state)
+   *   3. If a panel/menu opens, it has a clear close affordance and
+   *      that close affordance actually dismisses the panel
+   *
+   * If any single button is silently broken — click does nothing,
+   * opens an off-screen panel, opens a panel that can't be closed —
+   * the test fails with a specific name so the bug is obvious without
+   * having to scroll a screenshot.
+   */
+  const VIEW_BUTTONS = [
+    {
+      label: 'Frontend & Viewport',
+      selector: '#toolbar-body .frontend-switcher-btn',
+      // Opens a portal panel rendered into #toolbar-content.
+      expectPanel: '.frontend-switcher-panel',
+      expectClose: '.frontend-switcher-panel .mobile-sheet-close',
+    },
+    {
+      label: 'More',
+      selector: '#toolbar-body .more',
+      // Volto Toolbar's submenu container; its visibility is signalled
+      // by .toolbar-content gaining the .show class.
+      expectPanel: '.toolbar-content.show',
+      // Re-clicking the More button itself dismisses the menu — same
+      // affordance the editor would use. A separate close affordance
+      // would be ideal but Volto doesn't render one.
+      expectClose: '#toolbar-body .more',
+    },
+    {
+      label: 'Contents',
+      selector: '#toolbar-body a[href$="/contents"]',
+      // Navigation link — assert URL changes to /contents.
+      expectUrlContains: '/contents',
+    },
+    {
+      label: 'Add',
+      selector: '#toolbar-body .add',
+      // Volto's Add button calls toggleMenu(e, 'types'), which expands
+      // .toolbar-content into the .show state with the Types submenu
+      // rendered inside. The user reported "Add new content does
+      // nothing"; this test catches a regression to actually-nothing
+      // (no DOM change on click). If Add opens a menu but the menu is
+      // visually broken on mobile, that's a SEPARATE Volto-stock
+      // submenu-rendering bug — see project memory entry.
+      expectPanel: '.toolbar-content.show',
+      expectClose: '#toolbar-body .add',
+    },
+    {
+      label: 'Edit',
+      selector: '#toolbar-body .edit',
+      expectUrlContains: '/edit',
+    },
+  ] as const;
+
+  for (const btn of VIEW_BUTTONS) {
+    test(`view mode: ${btn.label} button — visible, clickable, observable result, dismissible`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      const helper = new AdminUIHelper(page);
+      await helper.login();
+      await helper.navigateToView('/test-page');
+
+      const btnLoc = page.locator(btn.selector);
+      await expect(btnLoc, `${btn.label} must be visible on mobile`).toBeVisible(
+        { timeout: 3000 },
+      );
+
+      // Visible AND fully inside the viewport.
+      const box = await btnLoc.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x, `${btn.label} left edge inside viewport`).toBeGreaterThanOrEqual(0);
+      expect(
+        box!.x + box!.width,
+        `${btn.label} right edge inside viewport`,
+      ).toBeLessThanOrEqual(376);
+
+      const beforeUrl = page.url();
+      await btnLoc.click();
+      await page.waitForTimeout(500);
+
+      if ('expectUrlContains' in btn && btn.expectUrlContains) {
+        await page.waitForURL((u) => u.toString().includes(btn.expectUrlContains!), {
+          timeout: 5000,
+        });
+        expect(page.url()).not.toBe(beforeUrl);
+        return;
+      }
+
+      if ('expectPanel' in btn && btn.expectPanel) {
+        const panel = page.locator(btn.expectPanel).first();
+        await expect(
+          panel,
+          `${btn.label} click must open ${btn.expectPanel}`,
+        ).toBeVisible({ timeout: 3000 });
+
+        const close = page.locator(btn.expectClose!).first();
+        await expect(
+          close,
+          `${btn.label} panel must have a close affordance (${btn.expectClose})`,
+        ).toBeVisible({ timeout: 3000 });
+        await close.click();
+        await expect(
+          panel,
+          `${btn.label} panel must dismiss after clicking its close affordance`,
+        ).not.toBeVisible({ timeout: 3000 });
+      }
+    });
+  }
+
+  const EDIT_BUTTONS = [
+    {
+      label: 'Settings (cog)',
+      selector: '#toolbar-body .sidebar-toggle-toolbar-btn',
+      // Click toggles the .collapsed class on .sidebar-container.
+      expectSideEffect: async (page: import('@playwright/test').Page) => {
+        await expect(
+          page.locator('.sidebar-container.collapsed'),
+          'Settings click should open (uncollapse) the sidebar',
+        ).toHaveCount(0, { timeout: 3000 });
+      },
+      // To restore for next test: click the X to re-close.
+      cleanup: async (page: import('@playwright/test').Page) => {
+        await page.locator('.sidebar-container .sidebar-close-button').first().click();
+      },
+    },
+    {
+      label: 'Cancel',
+      selector: '#toolbar-body .cancel',
+      // Cancel navigates back to view mode.
+      expectUrlNotEndsWith: '/edit',
+    },
+    {
+      label: 'Save',
+      selector: '#toolbar-body .save',
+      // Save persists + navigates to view mode.
+      expectUrlNotEndsWith: '/edit',
+    },
+  ] as const;
+
+  for (const btn of EDIT_BUTTONS) {
+    test(`edit mode: ${btn.label} button — visible, clickable, observable result`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      const helper = new AdminUIHelper(page);
+      await helper.login();
+      await helper.navigateToEdit('/test-page');
+
+      const btnLoc = page.locator(btn.selector);
+      await expect(btnLoc, `${btn.label} must be visible on mobile`).toBeVisible(
+        { timeout: 3000 },
+      );
+
+      const box = await btnLoc.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x, `${btn.label} left edge inside viewport`).toBeGreaterThanOrEqual(0);
+      expect(
+        box!.x + box!.width,
+        `${btn.label} right edge inside viewport`,
+      ).toBeLessThanOrEqual(376);
+
+      const beforeUrl = page.url();
+      await btnLoc.click();
+      await page.waitForTimeout(800);
+
+      if ('expectUrlNotEndsWith' in btn && btn.expectUrlNotEndsWith) {
+        await page.waitForURL((u) => !u.toString().endsWith(btn.expectUrlNotEndsWith!), {
+          timeout: 5000,
+        });
+        expect(page.url()).not.toBe(beforeUrl);
+        return;
+      }
+
+      if ('expectSideEffect' in btn && btn.expectSideEffect) {
+        await btn.expectSideEffect(page);
+        if ('cleanup' in btn && btn.cleanup) await btn.cleanup(page);
+      }
+    });
+  }
+
+  test('edit mode: Undo button — visible and clickable (issues Undo)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const undoBtn = page.locator('#toolbar-body .undo');
+    await expect(undoBtn).toBeVisible({ timeout: 3000 });
+    const box = await undoBtn.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(376);
+
+    // We don't assert state change (Undo on a fresh page with no edits
+    // is a no-op) — just that the button isn't disabled and renders.
+    await expect(undoBtn).toBeEnabled();
+  });
+
+  /**
+   * Stronger-than-toBeVisible tests: assert a panel is actually opaquely
+   * rendered on top of the page content, not just present in the DOM.
+   *
+   * The original Add/More submenu bug looked "visible" to Playwright
+   * (`toBeVisible()` passed) — the element existed at display:flex with
+   * non-zero size — but it had no background-color and lived at z-index:
+   * 3 in static position, so the iframe content bled through. The fix
+   * needed two assertions Playwright doesn't have built-in:
+   *
+   *   1. The element under the user's tap at the panel's centre is the
+   *      panel (or a descendant), not the iframe sitting behind it.
+   *      We use document.elementFromPoint() in the page context — same
+   *      hit-testing the browser does for a real tap.
+   *
+   *   2. The panel's computed background-color is not transparent
+   *      (rgba(0,0,0,0) / 'transparent'). Pre-fix this returned
+   *      rgba(0,0,0,0); post-fix it's a real solid colour.
+   *
+   * If either assertion fails the user would see content from the page
+   * behind the menu — i.e. the bleed-through bug.
+   */
+  const SUBMENU_BUTTONS = [
+    { label: 'Add', trigger: '#toolbar-body .add' },
+    { label: 'More', trigger: '#toolbar-body .more' },
+  ] as const;
+
+  /**
+   * Every bottom popup on mobile must share a consistent close
+   * affordance: an X (or equivalent) in the TOP-RIGHT corner. Same
+   * style, same position, same dismiss behavior. Catches: missing
+   * closes, closes in inconsistent corners, closes that don't dismiss.
+   *
+   * For each popup type below:
+   *   - open it via its trigger
+   *   - assert the close affordance exists, is visible, is in the
+   *     RIGHT half of the panel and the TOP half (top-right corner)
+   *   - assert clicking it dismisses the panel
+   */
+  type PopupSpec = {
+    label: string;
+    setup: (page: import('@playwright/test').Page, helper: AdminUIHelper) => Promise<void>;
+    panelSelector: string;
+    closeSelector: string;
+  };
+  const POPUPS: PopupSpec[] = [
+    {
+      label: '⋯ dropdown menu',
+      setup: async (page, helper) => {
+        await helper.navigateToEdit('/test-page');
+        await helper.clickBlockInIframe('block-1-uuid');
+        await page.locator('.quanta-toolbar button:has-text("⋯")').click();
+      },
+      panelSelector: '.volto-hydra-dropdown-menu',
+      closeSelector: '.volto-hydra-dropdown-menu .mobile-sheet-close',
+    },
+    {
+      label: 'Frontend & Viewport panel',
+      setup: async (page, helper) => {
+        await helper.navigateToView('/test-page');
+        await page.locator('#toolbar-frontend-switcher').click();
+      },
+      panelSelector: '.frontend-switcher-panel',
+      closeSelector: '.frontend-switcher-panel .mobile-sheet-close',
+    },
+    {
+      label: 'Add (Types) submenu',
+      setup: async (page, helper) => {
+        await helper.navigateToView('/test-page');
+        await page.locator('#toolbar-body .add').click();
+      },
+      panelSelector: '#toolbar .toolbar-content.show',
+      // MobileSubmenuClose portals the close button to document.body
+      // (Volto's stock .toolbar-content has no injection point inside).
+      // The button is at the same TOP-RIGHT viewport geometry but a
+      // body-level sibling, not a panel descendant.
+      closeSelector: 'body > .mobile-submenu-close',
+    },
+    {
+      label: 'More submenu',
+      setup: async (page, helper) => {
+        await helper.navigateToView('/test-page');
+        await page.locator('#toolbar-body .more').click();
+      },
+      panelSelector: '#toolbar .toolbar-content.show',
+      closeSelector: 'body > .mobile-submenu-close',
+    },
+  ];
+
+  for (const popup of POPUPS) {
+    test(`bottom popup: ${popup.label} has a top-right close button that dismisses it`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      const helper = new AdminUIHelper(page);
+      await helper.login();
+      await popup.setup(page, helper);
+
+      const panel = page.locator(popup.panelSelector).first();
+      await expect(
+        panel,
+        `${popup.label} did not open`,
+      ).toBeVisible({ timeout: 3000 });
+      await page.waitForTimeout(200); // animation settle
+
+      const close = page.locator(popup.closeSelector).first();
+      await expect(
+        close,
+        `${popup.label} must have a close affordance at ${popup.closeSelector}`,
+      ).toBeVisible({ timeout: 3000 });
+
+      // TOP-RIGHT corner geometry:
+      //   close.x is in the right half of the panel (x > panel.midX)
+      //   close.y is in the top quarter of the panel
+      const cb = await close.boundingBox();
+      const pb = await panel.boundingBox();
+      expect(cb).not.toBeNull();
+      expect(pb).not.toBeNull();
+      const panelMidX = pb!.x + pb!.width / 2;
+      const panelTopQuarter = pb!.y + pb!.height / 4;
+      expect(
+        cb!.x,
+        `${popup.label} close must be in the RIGHT half (panel midX=${panelMidX.toFixed(0)}, close x=${cb!.x.toFixed(0)})`,
+      ).toBeGreaterThan(panelMidX);
+      expect(
+        cb!.y,
+        `${popup.label} close must be in the TOP quarter (panel topQuarter=${panelTopQuarter.toFixed(0)}, close y=${cb!.y.toFixed(0)})`,
+      ).toBeLessThan(panelTopQuarter);
+
+      // And: clicking it actually dismisses the panel.
+      await close.click();
+      await expect(
+        panel,
+        `${popup.label} must dismiss after clicking its close affordance`,
+      ).not.toBeVisible({ timeout: 3000 });
+    });
+  }
+
+  for (const btn of SUBMENU_BUTTONS) {
+    test(`view mode: ${btn.label} menu is opaque (no iframe bleed-through)`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      const helper = new AdminUIHelper(page);
+      await helper.login();
+      await helper.navigateToView('/test-page');
+
+      await page.locator(btn.trigger).click();
+      const panel = page.locator('#toolbar #toolbar-content, #toolbar .toolbar-content').first();
+      await expect(panel).toBeVisible({ timeout: 3000 });
+      // Let any open/transition settle so elementFromPoint is stable.
+      await page.waitForTimeout(300);
+
+      // Strong assertion 1: at the panel's centre, the topmost element
+      // under the pointer must be the panel or a descendant of it.
+      // If the panel were transparent and at low z-index (the original
+      // bug), elementFromPoint would return the iframe behind it.
+      const hit = await page.evaluate(() => {
+        const tc = document.querySelector('#toolbar .toolbar-content.show');
+        if (!tc) return { err: 'no .toolbar-content.show' };
+        const r = tc.getBoundingClientRect();
+        const cx = r.x + r.width / 2;
+        const cy = r.y + r.height / 2;
+        const el = document.elementFromPoint(cx, cy);
+        if (!el) return { err: 'no element at point' };
+        // Walk up to see whether the panel is in the ancestor chain.
+        let cur: Element | null = el;
+        let panelAncestor = false;
+        while (cur) {
+          if (cur === tc) { panelAncestor = true; break; }
+          cur = cur.parentElement;
+        }
+        return {
+          hitTag: el.tagName,
+          hitId: el.id,
+          hitClass: typeof el.className === 'string' ? el.className.slice(0, 80) : '',
+          panelAncestor,
+        };
+      });
+      expect(
+        hit.panelAncestor,
+        `${btn.label} menu must be hit-target at its own centre (not the iframe). Hit: ${JSON.stringify(hit)}`,
+      ).toBe(true);
+
+      // Strong assertion 2: the panel's computed background-color must
+      // not be transparent. The original bug had `background: none`.
+      const bg = await page.evaluate(() => {
+        const tc = document.querySelector('#toolbar .toolbar-content.show');
+        if (!tc) return null;
+        return window.getComputedStyle(tc).backgroundColor;
+      });
+      expect(bg).not.toBeNull();
+      expect(
+        bg,
+        `${btn.label} menu must have a non-transparent background-color (got: ${bg})`,
+      ).not.toBe('rgba(0, 0, 0, 0)');
+      expect(bg).not.toBe('transparent');
+    });
+  }
 });
 
 /**

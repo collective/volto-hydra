@@ -4123,15 +4123,16 @@ const Iframe = (props) => {
           >
             Cancel
           </button>
-          {/* Mobile-only back-arrow. Hidden on desktop/tablet via
-           * .mobile-sheet-back { display: none } in mobile-tablet.css. */}
+          {/* Mobile-only close button at top-right corner. Hidden on
+           * desktop/tablet via .mobile-sheet-close { display: none } in
+           * mobile-tablet.css. */}
           <button
             type="button"
-            className="mobile-sheet-back"
+            className="mobile-sheet-close"
             aria-label="Close menu"
             onClick={() => setChooser(null)}
           >
-            ←
+            ×
           </button>
         </div>,
         document.body,
@@ -4216,15 +4217,16 @@ const Iframe = (props) => {
               navRoot={navRoot}
               contentType={contentType}
             />
-            {/* Mobile-only back-arrow. Hidden on desktop/tablet via
-             * .mobile-sheet-back { display: none } in mobile-tablet.css. */}
+            {/* Mobile-only close button at top-right corner. Hidden on
+             * desktop/tablet via .mobile-sheet-close { display: none } in
+             * mobile-tablet.css. */}
             <button
               type="button"
-              className="mobile-sheet-back"
+              className="mobile-sheet-close"
               aria-label="Close menu"
               onClick={() => setAddNewBlockOpened(false)}
             >
-              ←
+              ×
             </button>
           </div>,
           document.body,
