@@ -11747,6 +11747,21 @@ export class Bridge {
         [data-edit-text][data-placeholder][data-empty]:focus::before {
           visibility: hidden;
         }
+        /* If the frontend renders its own empty-paragraph placeholder
+           inside the editable field (e.g. Slate's <p><br></p> convention
+           which contributes one line of layout via the <br> and any ZWS
+           the bridge has inserted for cursor preservation), don't ALSO
+           render the bridge's ::before placeholder — it would stack on
+           top of the empty paragraph and the field would be 2 lines tall
+           when empty but 1 line tall after the first keystroke. We only
+           suppress ::before when the editable has a NON-EMPTY child
+           element (one that itself has children/text). A truly bare
+           <p></p> doesn't provide layout, so ::before still fires for it
+           (covers the fixture-empty case where the frontend renders no
+           empty-paragraph marker). */
+        [data-edit-text][data-placeholder][data-empty]:has(*:not(:empty))::before {
+          content: none;
+        }
         /* Linkable field hover styles - indicate clickable link areas.
            Uses CSS outline (renders outside the box, ignores layout) so the
            host element position is NOT mutated. */
