@@ -4527,29 +4527,6 @@ export class Bridge {
     }
   }
 
-  /**
-   * Handles timeout when a Slate transform takes too long to respond.
-   * Shows error state and permanently disables editing to prevent data corruption.
-   *
-   * @param {string} blockId - Block UID that timed out
-   */
-  handleTransformTimeout(blockId) {
-    const block = this.queryBlockElement(blockId);
-    const editableField = block ? this.getOwnFirstEditableField(block) : null;
-
-    if (editableField) {
-      // Show error state - permanently disable editing
-      editableField.setAttribute('contenteditable', 'false');
-      editableField.style.cursor = 'not-allowed';
-      editableField.style.opacity = '0.5';
-      editableField.title =
-        'Transform timeout - refresh page to continue editing';
-    }
-
-    console.error('[HYDRA] Transform timeout for block:', blockId);
-    this.pendingTransform = null;
-  }
-
   ////////////////////////////////////////////////////////////////////////////////
   // Whitespace & Zero-Width Space (ZWS) Strategy
   //
@@ -5889,13 +5866,12 @@ export class Bridge {
       log(`activateEditableField: focused field`);
     }
 
-    // Hide placeholder on focus — remove data-empty so CSS ::before hides
-    fieldElement.removeAttribute('data-empty');
-    // Re-add on blur if still empty
-    if (!fieldElement._placeholderBlurHandler) {
-      fieldElement._placeholderBlurHandler = () => this.updateEmptyState(fieldElement);
-      fieldElement.addEventListener('blur', fieldElement._placeholderBlurHandler);
-    }
+    // Make sure data-empty reflects current text content. data-empty no
+    // longer flips based on focus — the placeholder ::before is held
+    // invisible by :focus::before { visibility: hidden } and its
+    // layout space keeps the field's height stable across focus,
+    // empty-typing, and content states without any host-CSS rule.
+    this.updateEmptyState(fieldElement);
 
     // If field was already editable AND already focused, browser already handled
     // cursor positioning on click - don't redo it (causes race with typing)
@@ -10952,9 +10928,14 @@ export class Bridge {
    * Checks three sources in priority order:
    * 1. Instance-level: block.fieldPlaceholders[fieldName] (from template authoring)
    * 2. Schema-level: resolvedBlockSchema.properties[fieldName].placeholder
+   * 3. Universal fallback: 'Click to edit' — ensures every empty
+   *    editable field has something rendered via ::before, which in turn
+   *    gives the host element natural height. Without the fallback, plain
+   *    div wrappers (slate blocks) collapse to 0px when empty and we have
+   *    to force host CSS to keep them clickable.
    * @param {string} blockUid - The block UID
    * @param {string} fieldName - The field name
-   * @returns {string|undefined} Placeholder text or undefined
+   * @returns {string} Placeholder text (never undefined — universal fallback)
    */
   getFieldPlaceholder(blockUid, fieldName) {
     const resolved = this.resolveFieldPath(fieldName, blockUid);
@@ -10973,7 +10954,9 @@ export class Bridge {
     }
     // 2. Schema-level placeholder
     const fieldDef = this.getBlockSchema(resolved.blockId)?.properties?.[resolved.fieldName];
-    return fieldDef?.placeholder || undefined;
+    if (fieldDef?.placeholder) return fieldDef.placeholder;
+    // 3. Universal fallback
+    return 'Click to edit';
   }
 
   /**
@@ -10988,7 +10971,13 @@ export class Bridge {
     // it would flash between keystrokes as the user types/deletes.
     const doc = field.ownerDocument;
     const isFocused = doc && (doc.activeElement === field || field.contains(doc.activeElement));
-    field.toggleAttribute('data-empty', isEmpty && !isFocused);
+    // data-empty depends purely on whether the field has content. We
+    // do NOT toggle it based on focus — keeping it set even during
+    // focus means the placeholder ::before stays in the layout (held
+    // invisible by :focus::before { visibility: hidden }). That keeps
+    // the field's height stable across unfocused / focused / typing
+    // without any host-CSS min-height override.
+    field.toggleAttribute('data-empty', isEmpty);
   }
 
   /**
@@ -11737,72 +11726,51 @@ export class Bridge {
         [contenteditable] {
           outline: 0px solid transparent;
         }
-        /* Placeholder text for empty editable fields — keeps them visible/clickable */
+        /* Placeholder text for empty editable fields. The ::before is in
+           normal flow (no position: absolute) so the placeholder text
+           contributes its natural line-height to the parent. That holds
+           the field open at exactly one line of text — same height
+           whether the placeholder is visible (unfocused), invisible
+           (focused), or replaced by typed content (single line). No
+           min-height override needed. */
         [data-edit-text][data-placeholder][data-empty]::before {
           content: attr(data-placeholder);
           color: #aaa;
           font-style: italic;
           pointer-events: none;
-          position: absolute;
         }
-        /* Hide placeholder when field is focused (user is editing) */
+        /* Hide the placeholder TEXT while the user is focused, but keep
+           the ::before in layout (visibility:hidden, NOT display:none) so
+           the parent's height stays the same. The bridge no longer needs
+           to mutate host CSS to keep the focused-empty field clickable —
+           the invisible ::before is doing the job. */
         [data-edit-text][data-placeholder][data-empty]:focus::before {
-          display: none;
+          visibility: hidden;
         }
-        /* Empty editable fields — reserve height so the field stays clickable
-           and the placeholder text (rendered via the absolutely-positioned
-           ::before above) doesn't overlap adjacent content. The pseudo-element
-           is out of the normal flow so the parent must explicitly reserve
-           space; without min-height, an empty field with a placeholder
-           collapses to 0px even though the placeholder appears to render. */
-        [data-edit-text][data-empty] {
-          position: relative;
-          min-height: 1.5em;
-        }
-        /* Linkable field hover styles - indicate clickable link areas */
+        /* Linkable field hover styles - indicate clickable link areas.
+           Uses CSS outline (renders outside the box, ignores layout) so the
+           host element position is NOT mutated. */
         /* Exclude fields inside readonly blocks (listing items, non-overwrite teasers) */
         [data-edit-link]:not([data-block-readonly] [data-edit-link]):not([data-block-readonly][data-edit-link]) {
           cursor: pointer;
-          position: relative;
         }
-        [data-edit-link]:not([data-block-readonly] [data-edit-link]):not([data-block-readonly][data-edit-link]):hover::after {
-          content: "";
-          position: absolute;
-          inset: -2px;
-          border: 2px dashed rgba(0, 126, 177, 0.5);
+        [data-edit-link]:not([data-block-readonly] [data-edit-link]):not([data-block-readonly][data-edit-link]):hover {
+          outline: 2px dashed rgba(0, 126, 177, 0.5);
+          outline-offset: 2px;
           border-radius: 4px;
-          pointer-events: none;
         }
-        /* Media field hover styles - indicate clickable image areas */
+        /* Media field hover styles - indicate clickable image areas.
+           Same outline approach — host CSS untouched. */
         /* Exclude fields inside readonly blocks */
         [data-edit-media]:not([data-block-readonly] [data-edit-media]):not([data-block-readonly][data-edit-media]) {
           cursor: pointer;
-          position: relative;
         }
-        [data-edit-media]:not([data-block-readonly] [data-edit-media]):not([data-block-readonly][data-edit-media]):hover::after {
-          content: "";
-          position: absolute;
-          inset: -2px;
-          border: 2px dashed rgba(120, 192, 215, 0.5);
+        [data-edit-media]:not([data-block-readonly] [data-edit-media]):not([data-block-readonly][data-edit-media]):hover {
+          outline: 2px dashed rgba(120, 192, 215, 0.5);
+          outline-offset: 2px;
           border-radius: 4px;
-          pointer-events: none;
         }
         /* Readonly block styles are applied dynamically via applyReadonlyVisuals() */
-        .volto-hydra--outline {
-          position: relative !important;
-        }
-        .volto-hydra--outline:before {
-          content: "";
-          position: absolute;
-          top: -1px;
-          left: -1px;
-          right: -1px;
-          bottom: -1px;
-          border: 2px solid rgba(120,192,215,.75);
-          border-radius: 6px;
-          pointer-events: none;
-          z-index: 5;
-        }
         .volto-hydra-add-button {
           position: absolute;
           background: none;
@@ -11892,12 +11860,6 @@ export class Bridge {
           opacity: 0.5;
           pointer-events: none;
           z-index: 1000;
-        }
-        .highlighted-block {
-          border-top: 5px solid blue; 
-        }
-        .highlighted-block-bottom {
-          border-bottom: 5px solid blue;
         }
         .link-input-container {
           position: absolute;
