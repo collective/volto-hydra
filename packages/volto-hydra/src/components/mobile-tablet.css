@@ -614,6 +614,23 @@
  * the exact device-feature signal for that flip.
  */
 @media (orientation: landscape) and (max-width: 1023px) {
+  /* Hide the desktop "Shrink toolbar" handle (and its workflow-state
+   * colored stripe) — same rule as portrait. It sits as a sibling of
+   * .toolbar-body inside #toolbar-body; in column mode it lands
+   * between Add and Frontend, appearing as a thin vertical colored
+   * bar that editors mistake for a divider. */
+  #toolbar-body .toolbar-handler {
+    display: none !important;
+  }
+  /* Stock Volto renders the More button with TWO Icon children, one
+   * with semantic-ui's `mobile hidden` (visible at >767px) and one
+   * with `mobile only` (visible at ≤767px). In our 812×375 landscape
+   * viewport semantic-ui hides BOTH (the .mobile.hidden rule kicks in
+   * for our wide-but-short viewport). Force the desktop variant
+   * visible so editors actually see the ⋯ dots. */
+  #toolbar-body .more svg.icon.mobile.hidden {
+    display: inline-block !important;
+  }
   /* Pin toolbar to the right edge, full height, narrow column. */
   #toolbar-body {
     top: 0 !important;
