@@ -2199,7 +2199,9 @@ app.get('*/@search', (req, res) => {
     initContentDirMap();
     items = Object.keys(contentDirMap)
       .filter((itemPath) => itemPath !== '/')
-      .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl));
+      .map((itemPath) => loadContentFromDisk(itemPath))
+      .filter((content) => content != null)  // skip dirs with no parseable data.json
+      .map((content) => formatSearchItem(content, baseUrl));
   }
 
   const searchUrl = searchPath === '' || searchPath === '/'
