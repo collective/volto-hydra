@@ -2142,6 +2142,34 @@ export class AdminUIHelper {
   }
 
   /**
+   * Switch the iframe to a saved frontend by its display name.
+   * Opens the toolbar Frontend & Viewport panel, clicks the entry,
+   * and waits for the iframe's `src` to actually update to that origin.
+   *
+   * The panel closes itself on click (FrontendSwitcherPanel.jsx calls
+   * closeMenu()), so we don't need to dismiss it afterward.
+   */
+  async switchFrontend(name: string, expectedOrigin: string): Promise<void> {
+    await this.page.locator('#toolbar-frontend-switcher').click();
+    const panel = this.page.locator('.frontend-switcher-panel');
+    await panel.waitFor({ state: 'visible', timeout: 5000 });
+    // Exact-text match on the label so a name like "B" doesn't substring-match
+    // unrelated entries (e.g. "Nuxt Blog").
+    await panel
+      .locator('.frontend-switcher-url-item')
+      .filter({ has: this.page.locator(`.pastanaga-menu-label:text-is("${name}")`) })
+      .click();
+    // Iframe `src` updates on the next React tick after the dispatch.
+    // Wait for the origin to reflect the choice — confirms the switch
+    // actually went through, not just the UI click.
+    await expect(async () => {
+      const src = await this.page.locator('#previewIframe').getAttribute('src');
+      expect(src).toBeTruthy();
+      expect(new URL(src!).origin).toBe(expectedOrigin);
+    }).toPass({ timeout: 5000 });
+  }
+
+  /**
    * Get cursor position information for a contenteditable element.
    * Returns details about the cursor position, selection, and text content.
    */

@@ -26,6 +26,10 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
   const [entries, setEntries] = useState(() => getSavedURLs());
   const [newName, setNewName] = useState('');
   const [newUrl, setNewUrl] = useState('');
+  // Optional: only set when the published frontend lives at a different
+  // origin than the edit-mode one. Recognised by the Url-helper shadow so
+  // links pasted from the published origin still flatten to /paths.
+  const [newPublishUrl, setNewPublishUrl] = useState('');
   const [error, setError] = useState('');
 
   const currentWidths = useSelector(
@@ -54,6 +58,18 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
     onUrlsChanged();
   };
 
+  const normalizeUrlInput = (raw) => {
+    try {
+      const urlObj = new URL(raw);
+      if (!urlObj.hash) {
+        urlObj.pathname = urlObj.pathname.replace(/\/$/, '') || '/';
+      }
+      return urlObj.toString();
+    } catch {
+      return raw;
+    }
+  };
+
   const handleAdd = () => {
     const trimmedUrl = newUrl.trim();
     if (!trimmedUrl) return;
@@ -63,30 +79,34 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
       return;
     }
 
-    let normalized = trimmedUrl;
-    try {
-      const urlObj = new URL(trimmedUrl);
-      if (!urlObj.hash) {
-        urlObj.pathname = urlObj.pathname.replace(/\/$/, '') || '/';
-      }
-      normalized = urlObj.toString();
-    } catch {
-      // Use as-is if URL parsing fails
-    }
+    const normalized = normalizeUrlInput(trimmedUrl);
 
     if (entries.some((e) => e.url === normalized)) {
       setError('URL already exists');
       return;
     }
 
+    const trimmedPublishUrl = newPublishUrl.trim();
+    let normalizedPublishUrl = '';
+    if (trimmedPublishUrl) {
+      if (!isValidUrl(trimmedPublishUrl)) {
+        setError('Invalid Publish URL');
+        return;
+      }
+      normalizedPublishUrl = normalizeUrlInput(trimmedPublishUrl);
+    }
+
     setError('');
     const trimmedName = newName.trim();
+    const newEntry = {
+      url: normalized,
+      name: trimmedName || normalized.replace(/^https?:\/\//, ''),
+    };
+    if (normalizedPublishUrl) newEntry.publishUrl = normalizedPublishUrl;
     setNewName('');
     setNewUrl('');
-    saveEntries([
-      ...entries,
-      { url: normalized, name: trimmedName || normalized.replace(/^https?:\/\//, '') },
-    ]);
+    setNewPublishUrl('');
+    saveEntries([...entries, newEntry]);
   };
 
   const handleRemove = (url) => {
@@ -95,6 +115,23 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
 
   const handleRename = (url, newNameValue) => {
     saveEntries(entries.map((e) => (e.url === url ? { ...e, name: newNameValue } : e)));
+  };
+
+  const handlePublishUrlChange = (url, value) => {
+    const trimmed = (value || '').trim();
+    saveEntries(
+      entries.map((e) => {
+        if (e.url !== url) return e;
+        if (!trimmed) {
+          // Drop the field entirely so serialiseEntries keeps the legacy
+          // 2-part `Name|URL` shape — avoids spurious cookie changes when
+          // the user clears the input.
+          const { publishUrl, ...rest } = e;
+          return rest;
+        }
+        return { ...e, publishUrl: trimmed };
+      }),
+    );
   };
 
   const handleKeyDown = (e) => {
@@ -145,7 +182,7 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
           {/* Frontend URLs */}
           <div className="frontend-settings-section-label">Frontend URLs</div>
           <div className="frontend-settings-list">
-            {entries.map(({ url, name }) => {
+            {entries.map(({ url, name, publishUrl }) => {
               const isEnv = envUrls.has(url);
               return (
                 <div key={url} className="frontend-settings-item">
@@ -164,6 +201,16 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
                     <span className="frontend-settings-item-url">
                       {url.replace(/^https?:\/\//, '')}
                     </span>
+                    <input
+                      type="text"
+                      value={publishUrl || ''}
+                      onChange={(e) =>
+                        handlePublishUrlChange(url, e.target.value)
+                      }
+                      placeholder="Publish URL (optional)"
+                      className="frontend-settings-publish-input"
+                      aria-label={`Publish URL for ${url}`}
+                    />
                   </div>
                   {!isEnv && (
                     <button
@@ -214,6 +261,18 @@ const FrontendSettingsModal = ({ onClose, onUrlsChanged }) => {
               // immediately blur the toolbar -> menu closes -> our panel
               // unmounts -> this modal unmounts.
               aria-label="URL"
+            />
+            <input
+              type="text"
+              value={newPublishUrl}
+              onChange={(e) => {
+                setNewPublishUrl(e.target.value);
+                setError('');
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="Publish URL (optional)"
+              className="frontend-settings-input frontend-settings-publish-input"
+              aria-label="Publish URL"
             />
             <button
               className="frontend-settings-add-btn"
