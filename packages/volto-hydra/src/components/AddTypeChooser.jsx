@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import filter from 'lodash/filter';
 import { getTypes } from '@plone/volto/actions/types/types';
 import { getBaseUrl } from '@plone/volto/helpers/Url/Url';
+import './AddTypeChooser.css';
 
 /**
  * Full-screen page that lists the addable content types for the
@@ -34,41 +35,56 @@ const AddTypeChooser = ({ types, pathname, getTypes: dispatchGetTypes }) => {
   if (!addable.length) {
     return (
       <div className="add-type-chooser">
-        <h1>Add Content</h1>
-        <p>
-          There are no content types you can add to this location.
-        </p>
-        <p>
-          <Link to={basePath || '/'}>← Back</Link>
-        </p>
+        <header className="add-type-chooser-header">
+          <h1>Add Content</h1>
+        </header>
+        <div className="add-type-chooser-body">
+          <p className="add-type-empty">
+            There are no content types you can add to this location.
+          </p>
+          <Link className="add-type-cancel" to={basePath || '/'}>
+            ← Back
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="add-type-chooser">
-      <h1>Add Content</h1>
-      <ul className="add-type-list">
-        {addable.map((item) => {
-          const typeName = item['@id'].split('@types/')[1];
-          return (
-            <li key={item['@id']}>
-              <Link
-                id={`toolbar-add-${typeName.toLowerCase().replace(' ', '-')}`}
-                to={`${basePath}/add?type=${typeName}`}
-                className="add-type-item"
-              >
-                {item.title}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-      <p>
+      <header className="add-type-chooser-header">
+        <h1>Add Content</h1>
+        <p className="add-type-chooser-subtitle">
+          Choose the kind of content to add to{' '}
+          <code>{basePath || '/'}</code>
+        </p>
+      </header>
+      <div className="add-type-chooser-body">
+        <ul className="add-type-list">
+          {addable.map((item) => {
+            const typeName = item['@id'].split('@types/')[1];
+            return (
+              <li key={item['@id']} className="add-type-list-item">
+                <Link
+                  id={`toolbar-add-${typeName.toLowerCase().replace(' ', '-')}`}
+                  to={`${basePath}/add?type=${typeName}`}
+                  className="add-type-item"
+                >
+                  <span className="add-type-name">{item.title}</span>
+                  {item.description && (
+                    <span className="add-type-description">
+                      {item.description}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
         <Link className="add-type-cancel" to={basePath || '/'}>
           Cancel
         </Link>
-      </p>
+      </div>
     </div>
   );
 };
