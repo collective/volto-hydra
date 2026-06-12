@@ -1,8 +1,8 @@
 /**
- * ImageWidget sibling preservation on save.
+ * ImageWidget sibling preservation on save — regression guard.
  *
- * Bug reproducer. When a block schema declares an `image` field with
- * `widget: 'image'`, Hydra's ImageWidget storage convention is:
+ * When a block schema declares an `image` field with `widget: 'image'`,
+ * Hydra's ImageWidget storage convention is:
  *
  *   block.image        = "<url string>"
  *   block.image_field  = "image"                 (sibling)
@@ -13,23 +13,30 @@
  * frontend has only an opaque URL and can't do responsive image loading.
  *
  * On pretagovsite-frontend.fly.dev we observed homepage hero saves landing
- * with `block.image` = string URL but BOTH siblings missing. This test
- * isolates the question: does the save path drop the siblings?
+ * with `block.image` = string URL but BOTH siblings missing. That bug is
+ * NOT reproducible against current main (most likely fixed upstream in the
+ * Volto 19 upgrade, #220). This test locks in the good behavior so any
+ * future regression on the save path is caught.
  *
  * Fixture page:
  *   /_test_data/image-widget-siblings-test
- * has a hero block already populated with image + image_field + image_scales.
- * We open it in admin, click Save with no changes, capture the PATCH body
- * the bridge sends to the API, and assert all three fields are present in
- * the persisted block payload.
+ * has a hero block pre-populated with `image` + `image_field` + `image_scales`.
+ * We open it in admin, touch the heading so the hero block lands in the PATCH,
+ * save, and assert all three fields are present in the captured PATCH body.
  *
- * Expected: test FAILS today on the prod-symptom case → bug confirmed →
- * proceed to fix Hydra's save path. When fixed, this test should pass.
+ * NOTE on the heading touch: Volto omits unchanged fields from PATCH bodies.
+ * Without a touch, the PATCH only ever carries `footer_blocks: {items: []}`
+ * and we can't observe whether the bridge would have dropped the siblings.
+ * The heading touch (type+delete) returns the value to its original text but
+ * marks the block dirty.
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
-const FIXTURE_PATH = '/_test_data/image-widget-siblings-test';
+// navigateToEdit prepends helper.contentPrefix ("/_test_data"), so the
+// path passed in must NOT already include it.
+const FIXTURE_PATH = '/image-widget-siblings-test';
+const FIXTURE_URL_PATH = '/_test_data/image-widget-siblings-test';
 const BLOCK_UID = 'block-hero-with-siblings';
 
 test.describe('ImageWidget sibling preservation', () => {
@@ -51,17 +58,29 @@ test.describe('ImageWidget sibling preservation', () => {
     await helper.login();
     await helper.navigateToEdit(FIXTURE_PATH);
 
-    // No edits — we're testing the idempotent round-trip. If save drops the
-    // siblings, that proves the save path is the bug (not user input).
+    // Touch the hero block's heading so the bridge marks `blocks` dirty
+    // and includes the hero block in the PATCH. (Volto skips unchanged
+    // fields in the PATCH — without a touch the PATCH only ever carries
+    // `footer_blocks` and we can't observe whether the siblings survive.)
+    const iframe = helper.getIframe();
+    const heading = iframe.locator(`[data-block-uid="${BLOCK_UID}"] [data-edit-text="heading"]`);
+    await heading.click();
+    await page.keyboard.press('End');
+    await page.keyboard.type(' x');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Backspace');
+    // Heading is now back to its original text — but the block is dirty
+    // so it WILL be in the PATCH body.
+
     await helper.saveContent();
 
     // We expect at least one PATCH targeting the fixture path.
     const fixturePatches = contentPatches.filter((r) =>
-      r.url.includes(FIXTURE_PATH)
+      r.url.includes(FIXTURE_URL_PATH)
     );
     expect(
       fixturePatches.length,
-      `expected ≥1 PATCH to ${FIXTURE_PATH}; captured PATCHes: ${
+      `expected ≥1 PATCH to ${FIXTURE_URL_PATH}; captured PATCHes: ${
         JSON.stringify(contentPatches.map((p) => p.url))
       }`,
     ).toBeGreaterThanOrEqual(1);
