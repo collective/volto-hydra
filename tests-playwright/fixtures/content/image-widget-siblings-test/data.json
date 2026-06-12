@@ -1,0 +1,52 @@
+{
+    "@type": "Document",
+    "id": "image-widget-siblings-test",
+    "title": "Image widget siblings test",
+    "description": "Fixture for verifying that image_field and image_scales siblings survive a save through the editor when the block schema declares image with widget:'image' (ImageWidget storage convention).",
+    "UID": "iws-test-page-uid",
+    "review_state": "published",
+    "blocks": {
+        "block-title": {
+            "@type": "title"
+        },
+        "block-hero-with-siblings": {
+            "@type": "hero",
+            "heading": "Hero with image siblings",
+            "subheading": "image is a URL string plus image_field + image_scales siblings on the block — the ImageWidget storage convention.",
+            "image": "http://localhost:8888/_test_data/images/test-image-1/@@images/image",
+            "image_field": "image",
+            "image_scales": {
+                "image": [
+                    {
+                        "content-type": "image/svg+xml",
+                        "download": "@@images/image",
+                        "filename": "test-image-1.svg",
+                        "width": 200,
+                        "height": 200,
+                        "scales": {
+                            "preview": {
+                                "download": "@@images/image/preview",
+                                "width": 200,
+                                "height": 200
+                            }
+                        }
+                    }
+                ]
+            },
+            "description": [
+                {
+                    "type": "p",
+                    "children": [
+                        { "text": "Sibling-preservation test fixture." }
+                    ]
+                }
+            ]
+        }
+    },
+    "blocks_layout": {
+        "items": [
+            "block-title",
+            "block-hero-with-siblings"
+        ]
+    }
+}
