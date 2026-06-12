@@ -3,6 +3,7 @@
  */
 import { Page, Locator, FrameLocator, expect, ElementHandle } from '@playwright/test';
 import { TEST_DATA_PREFIX } from './test-paths';
+import { URLS } from '../ports';
 import { randomUUID } from 'node:crypto';
 
 // Base test JWT — the mock API only checks for the "Bearer " prefix, never
@@ -21,7 +22,7 @@ export class AdminUIHelper {
 
   constructor(
     public readonly page: Page,
-    public readonly adminUrl: string = 'http://localhost:3001',
+    public readonly adminUrl: string = URLS.voltoSsr,
     public readonly contentPrefix: string = TEST_DATA_PREFIX
   ) {
     // Capture browser console - all logs locally, only errors/warnings in CI
@@ -127,7 +128,7 @@ export class AdminUIHelper {
 
   /**
    * Build a full admin URL for a content path, e.g. contentUrl('/test-page', '/edit')
-   * → 'http://localhost:3001/_test_data/test-page/edit'
+   * → '<adminUrl>/_test_data/test-page/edit'
    */
   contentUrl(contentPath: string, suffix: string = ''): string {
     return `${this.adminUrl}${this.contentPrefix}${contentPath}${suffix}`;
@@ -2141,6 +2142,34 @@ export class AdminUIHelper {
   }
 
   /**
+   * Switch the iframe to a saved frontend by its display name.
+   * Opens the toolbar Frontend & Viewport panel, clicks the entry,
+   * and waits for the iframe's `src` to actually update to that origin.
+   *
+   * The panel closes itself on click (FrontendSwitcherPanel.jsx calls
+   * closeMenu()), so we don't need to dismiss it afterward.
+   */
+  async switchFrontend(name: string, expectedOrigin: string): Promise<void> {
+    await this.page.locator('#toolbar-frontend-switcher').click();
+    const panel = this.page.locator('.frontend-switcher-panel');
+    await panel.waitFor({ state: 'visible', timeout: 5000 });
+    // Exact-text match on the label so a name like "B" doesn't substring-match
+    // unrelated entries (e.g. "Nuxt Blog").
+    await panel
+      .locator('.frontend-switcher-url-item')
+      .filter({ has: this.page.locator(`.pastanaga-menu-label:text-is("${name}")`) })
+      .click();
+    // Iframe `src` updates on the next React tick after the dispatch.
+    // Wait for the origin to reflect the choice — confirms the switch
+    // actually went through, not just the UI click.
+    await expect(async () => {
+      const src = await this.page.locator('#previewIframe').getAttribute('src');
+      expect(src).toBeTruthy();
+      expect(new URL(src!).origin).toBe(expectedOrigin);
+    }).toPass({ timeout: 5000 });
+  }
+
+  /**
    * Get cursor position information for a contenteditable element.
    * Returns details about the cursor position, selection, and text content.
    */
@@ -3005,7 +3034,12 @@ export class AdminUIHelper {
    * so the call works without a per-type display-name mapping.
    */
   async selectBlockType(blockType: string): Promise<void> {
-    const chooser = this.page.locator('.blocks-chooser').first();
+    // Scope to the visible chooser. A previous chooser instance may still be
+    // in the DOM mid-unmount; `.first()` without `:visible` can pick that
+    // stale one, so the click is a no-op and the new chooser appears to
+    // "stay open". Observed on admin-mock CI as
+    // `15 x locator resolved to visible <div class="blocks-chooser ...">`.
+    const chooser = this.page.locator('.blocks-chooser:visible').first();
     await chooser.waitFor({ state: 'visible', timeout: 5000 });
     const button = chooser.locator(`button.${blockType}`).first();
     // The button always exists in the DOM (even inside collapsed accordions).
@@ -3015,7 +3049,12 @@ export class AdminUIHelper {
     // Popup geometry and accidentally close it.
     await button.waitFor({ state: 'attached', timeout: 5000 });
     await button.evaluate((el) => (el as HTMLButtonElement).click());
-    await chooser.waitFor({ state: 'hidden', timeout: 5000 });
+    // After click, wait until no visible chooser remains. Using a fresh
+    // locator (not `chooser`) so we observe the live DOM state, not the
+    // captured stale-now reference.
+    await expect(this.page.locator('.blocks-chooser:visible')).toHaveCount(0, {
+      timeout: 5000,
+    });
   }
 
   /**
@@ -4103,10 +4142,24 @@ export class AdminUIHelper {
     let stableChecks = 0;
     const requiredStableChecks = 2;
 
-    while (Date.now() - startTime < timeout) {
-      const currentCount = await this.getBlockCount();
+    // Caller often triggers a navigation (e.g. search form submit) then
+    // immediately polls. evaluateAll throws "Execution context was
+    // destroyed" if the iframe navigates mid-call. Treat that as
+    // "iframe is still settling" and keep polling instead of failing.
+    const safeCount = async (): Promise<number> => {
+      try {
+        return await this.getBlockCount();
+      } catch (e) {
+        const msg = (e as Error).message ?? '';
+        if (msg.includes('Execution context was destroyed')) return -1;
+        throw e;
+      }
+    };
 
-      if (currentCount === lastCount) {
+    while (Date.now() - startTime < timeout) {
+      const currentCount = await safeCount();
+
+      if (currentCount !== -1 && currentCount === lastCount) {
         stableChecks++;
         if (stableChecks >= requiredStableChecks) {
           return currentCount;
@@ -4120,7 +4173,7 @@ export class AdminUIHelper {
     }
 
     // Return the last count if timeout reached
-    return await this.getBlockCount();
+    return await safeCount();
   }
 
   /**
@@ -4356,6 +4409,20 @@ export class AdminUIHelper {
         `LinkEditor popup has no dimensions! Size: ${boundingBox.width}x${boundingBox.height}`
       );
     }
+
+    // AddLinkForm.componentDidMount does setTimeout(input.focus, 50). The
+    // Escape/Enter handler is bound to the input, so callers that press
+    // Escape immediately after this returns race the focus timeout. Wait
+    // for the input to actually own focus before returning.
+    await this.page.waitForFunction(
+      () => {
+        const input = document.querySelector(
+          '.add-link input, .slate-inline-toolbar input',
+        ) as HTMLInputElement | null;
+        return input !== null && document.activeElement === input;
+      },
+      { timeout },
+    );
 
     return { popup, boundingBox };
   }

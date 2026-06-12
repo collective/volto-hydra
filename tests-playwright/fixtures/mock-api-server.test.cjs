@@ -386,3 +386,19 @@ describe('navigation', () => {
     }
   });
 });
+
+describe('@site', () => {
+  it('returns plone.default_language so Volto 19 SSR can resolve initialLang', async () => {
+    // Volto 19's server.jsx reads
+    // `state.site.data['plone.default_language']` as the middle fallback in
+    // its language-resolution chain. If our mock omits this key, the
+    // SSR's `toReactIntlLang(undefined)` crashes with a 500.
+    // (Volto 18 used `config.settings.defaultLanguage` here instead — the
+    // contract moved from frontend config to backend response.)
+    const res = await fetch(`${baseUrl}/@site`, { headers: { Accept: 'application/json' } });
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(typeof data['plone.default_language'], 'string', '@site must include plone.default_language as a string');
+    assert.ok(Array.isArray(data['plone.available_languages']), '@site must include plone.available_languages as an array (read by ManageTranslations)');
+  });
+});

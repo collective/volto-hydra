@@ -14,16 +14,18 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "start": "VOLTOCONFIG=$(pwd)/volto.config.js razzle start",
-    "start:test": "PORT=3001 RAZZLE_API_PATH=http://localhost:8888 RAZZLE_DEFAULT_IFRAME_URL='Test frontend|http://localhost:8889,Nuxt blog|http://localhost:3003,F7 Mobile|http://localhost:3008/#!,Next.js|http://localhost:3007' VOLTOCONFIG=$(pwd)/volto.config.js razzle start",
-    "start:mock-api": "CONTENT_MOUNTS='/:docs/content/content/content,/_test_data:tests-playwright/fixtures/content' node --watch --watch-path=tests-playwright/fixtures --watch-path=packages/hydra-js --watch-path=docs/content tests-playwright/fixtures/mock-api-server.cjs",
+    "start:test": "PORT=${HYDRA_VOLTO_SSR_PORT:-3001} RAZZLE_API_PATH=http://localhost:${HYDRA_MOCK_API_PORT:-8888} RAZZLE_DEFAULT_IFRAME_URL=\"Test frontend|http://localhost:${HYDRA_TEST_FRONTEND_PORT:-8889},Nuxt blog|http://localhost:${HYDRA_NUXT_PORT:-3003},F7 Mobile|http://localhost:${HYDRA_F7_PORT:-3008}/#!,Next.js|http://localhost:${HYDRA_NEXTJS_PORT:-3007}\" VOLTOCONFIG=$(pwd)/volto.config.js razzle start",
+    "start:mock-api": "PORT=${HYDRA_MOCK_API_PORT:-8888} CONTENT_MOUNTS='/:docs/content/content/content,/_test_data:tests-playwright/fixtures/content' node --watch --watch-path=tests-playwright/fixtures --watch-path=packages/hydra-js --watch-path=docs/content tests-playwright/fixtures/mock-api-server.cjs",
     "start:test-frontend": "npx vite --config tests-playwright/fixtures/test-frontend/vite.config.js",
     "start:nuxt:test": "cd examples/nuxt-blog-starter && pnpm run dev:test",
     "start:react:test": "cd docs/examples/test-react && pnpm run dev:test",
     "start:svelte:test": "cd docs/examples/test-svelte && pnpm run dev:test",
     "start:prod": "NODE_ENV=production node --enable-source-maps build/server.js",
     "build": "VOLTOCONFIG=$(pwd)/volto.config.js razzle build --noninteractive",
+    "build:deps": "pnpm --filter @plone/registry --filter @plone/components build",
     "i18n": "pnpm --filter volto-hydra i18n",
-    "test": "RAZZLE_JEST_CONFIG=$(pwd)/jest-addon.config.js razzle test --maxWorkers=50%",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:coverage": "COVERAGE=1 playwright test",
     "test:e2e:headed": "playwright test --headed",
@@ -51,7 +53,7 @@
     "example:nuxt": "pnpm --filter nuxt-blog-starter install && pnpm --filter nuxt-blog-starter run dev"
   },
   "dependencies": {
-    "@plone/volto": "18.31.0",
+    "@plone/volto": "workspace:*",
     "volto-hydra": "workspace:*"
   },
   "peerDependencies": {
@@ -61,6 +63,11 @@
     "@playwright/test": { "optional": false }
   },
   "devDependencies": {
+    "@plone/babel-preset-razzle": "workspace:*",
+    "@plone/razzle": "workspace:*",
+    "@plone/razzle-dev-utils": "workspace:*",
+    "vitest": "catalog:",
+    "jsdom": "catalog:",
     "@babel/core": "^7.0.0",
     "@babel/plugin-proposal-export-default-from": "7.18.10",
     "@babel/plugin-proposal-nullish-coalescing-operator": "7.18.6",
@@ -82,7 +89,6 @@
     "babel-plugin-lodash": "3.3.4",
     "babel-plugin-react-intl": "5.1.17",
     "babel-plugin-root-import": "6.1.0",
-    "babel-preset-razzle": "4.2.18",
     "circular-dependency-plugin": "5.2.2",
     "cors": "^2.8.5",
     "css-loader": "5.2.7",
@@ -97,8 +103,6 @@
     "postcss-flexbugs-fixes": "5.0.2",
     "postcss-load-config": "3.1.4",
     "postcss-loader": "7.0.2",
-    "razzle": "4.2.18",
-    "razzle-dev-utils": "4.2.18",
     "razzle-plugin-scss": "4.2.18",
     "style-loader": "3.3.1",
     "svelte": "^4.0.0",
@@ -111,7 +115,7 @@
     "webpack-dev-server": "4.11.1",
     "webpack-node-externals": "3.0.0"
   },
-  "packageManager": "pnpm@9.1.1",
+  "packageManager": "pnpm@10.34.1",
   "files": [
     "./dist"
   ],
@@ -121,7 +125,21 @@
       "slate-react": "0.118.2",
       "slate-history": "0.109.0",
       "react": "18.2.0",
-      "react-dom": "18.2.0"
-    }
+      "react-dom": "18.2.0",
+      "@types/react": "18.3.30",
+      "@types/react-dom": "18.3.7"
+    },
+    "ignoredBuiltDependencies": [
+      "@parcel/watcher"
+    ],
+    "onlyBuiltDependencies": [
+      "core-js",
+      "core-js-pure",
+      "cypress",
+      "es5-ext",
+      "esbuild",
+      "lightningcss-cli",
+      "unrs-resolver"
+    ]
   }
 }

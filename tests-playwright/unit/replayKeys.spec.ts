@@ -7,6 +7,7 @@
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import { URLS } from '../ports';
 
 /**
  * Set up DOM, place cursor, replay keys, return { text, textBefore }.
@@ -206,7 +207,7 @@ test.describe('replayOneKey — cursor movement and editing', () => {
 
   test.beforeEach(async ({ page }) => {
     helper = new AdminUIHelper(page);
-    await page.goto('http://localhost:8889/mock-parent.html');
+    await page.goto(`${URLS.testFrontend}/mock-parent.html`);
     await helper.waitForIframeReady();
     await helper.waitForIframeBlockHandle('mock-block-1');
   });
@@ -402,7 +403,7 @@ test.describe('replayOneKey — slash menu, undo, save, Enter, Tab', () => {
 
   test.beforeEach(async ({ page }) => {
     helper = new AdminUIHelper(page);
-    await page.goto('http://localhost:8889/mock-parent.html');
+    await page.goto(`${URLS.testFrontend}/mock-parent.html`);
     await helper.waitForIframeReady();
     await helper.waitForIframeBlockHandle('mock-block-1');
   });

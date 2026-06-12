@@ -52,6 +52,8 @@ import {
   UndoControlpanel,
   UpgradeControlPanel,
 } from '@plone/volto/components/manage/Controlpanels';
+import BlockTypesControlpanel from '@plone/volto/components/manage/Controlpanels/BlockTypes';
+import BlockTypeControlpanel from '@plone/volto/components/manage/Controlpanels/BlockType';
 
 import withClientSideContent from '@plone/volto/helpers/Content/withClientSideContent';
 
@@ -131,7 +133,7 @@ export function getExternalRoutes() {
 export const defaultRoutes = [
   // redirect to external links if path is in blacklist
   ...getExternalRoutes(),
-  ...((config.settings?.isMultilingual && multilingualRoutes) || []),
+  ...(config.settings?.isMultilingual !== false ? multilingualRoutes : []),
   // REMOVED: Separate "/" exact route - now combined with "/**" below
   // {
   //   path: '/',
@@ -236,6 +238,14 @@ export const defaultRoutes = [
   {
     path: '/controlpanel/relations',
     component: RelationsControlpanel,
+  },
+  {
+    path: '/controlpanel/block-types/:id',
+    component: BlockTypeControlpanel,
+  },
+  {
+    path: '/controlpanel/block-types',
+    component: BlockTypesControlpanel,
   },
   {
     path: '/controlpanel/:id',

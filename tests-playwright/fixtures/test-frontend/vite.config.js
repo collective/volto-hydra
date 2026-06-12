@@ -6,6 +6,12 @@ export default defineConfig({
   server: {
     port: 8889,
     strictPort: true,
+    // Bind on all interfaces so tests can reach the same server via both
+    // http://localhost:8889 and http://127.0.0.1:8889 — different origins
+    // to the browser, used by the publicURL-flatten test to simulate
+    // switching between two frontends without standing up a second Vite
+    // process.
+    host: true,
     headers: {
       'Content-Security-Policy': 'frame-ancestors *',
     },

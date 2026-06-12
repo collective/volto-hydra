@@ -14,6 +14,7 @@ import { test as base, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { checkDataEditTextClicks, verifyBlockRendering } from '../helpers/BlockVerificationHelper';
 import { getFrontendUrl } from './fixtures';
+import { URLS } from '../ports';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -61,7 +62,7 @@ const test = base.extend<{ helper: AdminUIHelper }>({
     const frontendUrl = getFrontendUrl(testInfo.project.name);
     const frontend = frontendUrl ? `&frontend=${encodeURIComponent(frontendUrl)}` : '';
     await page.goto(
-      `http://localhost:8889/mock-parent.html?content=examples${frontend}`,
+      `${URLS.testFrontend}/mock-parent.html?content=examples${frontend}`,
     );
     await helper.waitForIframeReady();
     await use(helper);
@@ -301,7 +302,7 @@ docBlockTest.describe('Doc page blocks render', () => {
       });
 
       await page.goto(
-        `http://localhost:8889/mock-parent.html?content=docblock${frontend}`,
+        `${URLS.testFrontend}/mock-parent.html?content=docblock${frontend}`,
       );
       await helper.waitForIframeReady();
 

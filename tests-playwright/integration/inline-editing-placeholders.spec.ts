@@ -55,14 +55,15 @@ test.describe('Inline Editing - Placeholders', () => {
     // Verify text is actually cleared in the DOM
     await expect(headingField).toHaveText('', { timeout: 3000 });
 
-    // Field is focused, so data-empty should NOT be set (placeholder hidden during editing)
-    await expect(headingField).not.toHaveAttribute('data-empty', '');
+    // data-empty now depends purely on whether the field has content —
+    // NOT on whether it's focused. The placeholder ::before is held
+    // invisible by `:focus::before { visibility: hidden }` while the
+    // user is editing, so it doesn't visually appear, but the layout
+    // space is preserved and the attribute stays set.
+    await expect(headingField).toHaveAttribute('data-empty', '', { timeout: 3000 });
 
-    // Click a different block to blur and let the cleared value sync via FORM_DATA
+    // After blur the placeholder ::before becomes visible again.
     await helper.clickBlockInIframe('block-1-uuid');
-
-    // After FORM_DATA re-render, applyPlaceholders should set data-empty on the
-    // now-empty heading field (even though the hero block is not selected)
     await expect(headingField).toHaveAttribute('data-empty', '', { timeout: 5000 });
   });
 
@@ -175,7 +176,13 @@ test.describe('Inline Editing - Placeholders', () => {
     await expect(headingField).toContainText('New heading');
   });
 
-  test('field without schema placeholder has no data-placeholder attribute', async ({ page }) => {
+  test('field with no schema placeholder gets the universal "Click to edit" fallback', async ({ page }) => {
+    // Hydra ships a universal placeholder fallback so EVERY editable text
+    // field has something rendered when empty. This both gives the field
+    // natural height (via the ::before flow, removing the need to force
+    // host CSS) and gives the user a hint they can click. The fallback is
+    // applied in getFieldPlaceholder when neither the instance template
+    // nor the schema defines one.
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/test-page');
@@ -183,15 +190,76 @@ test.describe('Inline Editing - Placeholders', () => {
     const iframe = helper.getIframe();
     const blockId = 'block-4-hero';
 
-    // Select the hero block
     await helper.clickBlockInIframe(blockId);
 
-    // Hero buttonText field has no placeholder in schema
+    // Hero buttonText field has no placeholder in schema — it must still
+    // receive the universal fallback.
     const buttonField = iframe.locator(`[data-block-uid="${blockId}"] [data-edit-text="buttonText"]`);
     await expect(buttonField).toBeVisible();
-    const hasPlaceholder = await buttonField.evaluate(el => el.hasAttribute('data-placeholder'));
-    expect(hasPlaceholder).toBe(false);
+    await expect(buttonField).toHaveAttribute('data-placeholder', 'Click to edit');
   });
+
+  test('field height stays constant across unfocused-empty, focused-empty, and one-line typed states', async ({ page }) => {
+    // The whole point of switching the placeholder ::before to
+    // `:focus::before { visibility: hidden }` (instead of display:none)
+    // is that the bridge stops mutating host CSS to keep the focused-
+    // empty field clickable. The invisible ::before holds the line open
+    // at the natural line-height of the frontend's font — so the height
+    // is the same in all three states:
+    //
+    //   (a) empty + unfocused  → placeholder visible (::before visible)
+    //   (b) empty + focused    → placeholder invisible (::before hidden but in layout)
+    //   (c) one line of typed text → content provides the height
+    //
+    // If a future change re-introduces `display: none` on the focus
+    // pseudo, or adds an unnecessary host-CSS min-height override, the
+    // heights diverge and this test catches it.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+    const blockId = 'block-1-uuid'; // Slate block (plain div wrapper)
+    const editField = iframe.locator(
+      `[data-block-uid="${blockId}"][data-edit-text="value"], [data-block-uid="${blockId}"] [data-edit-text="value"]`,
+    ).first();
+
+    // (a) Empty + unfocused. Clear text, then click ANOTHER block to
+    // blur. updateEmptyState applies data-empty; placeholder ::before
+    // renders the schema-defined "Type text…" hint in normal flow.
+    await helper.clickBlockInIframe(blockId);
+    await editField.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('Backspace');
+    await expect(editField).toHaveText('', { timeout: 3000 });
+    await helper.clickBlockInIframe('block-2-uuid');
+    await expect(editField).toHaveAttribute('data-empty', '', { timeout: 3000 });
+    const unfocusedEmptyBox = await editField.boundingBox();
+    expect(unfocusedEmptyBox).not.toBeNull();
+    expect(unfocusedEmptyBox!.height).toBeGreaterThan(10);
+
+    // (b) Empty + focused. Click back into the field. data-empty stays
+    // set (we no longer toggle it on focus); :focus::before hides the
+    // placeholder TEXT via visibility:hidden but the layout space stays.
+    await editField.click();
+    const focusedEmptyBox = await editField.boundingBox();
+    expect(focusedEmptyBox).not.toBeNull();
+    expect(focusedEmptyBox!.height).toBeGreaterThan(10);
+    // Height must NOT jump between unfocused-empty and focused-empty.
+    expect(Math.abs(focusedEmptyBox!.height - unfocusedEmptyBox!.height)).toBeLessThan(2);
+
+    // (c) After the first keystroke. data-empty toggles off, ::before
+    // disappears, content provides the height. Single-line typed text
+    // sits at the same line-height as the placeholder did.
+    await page.keyboard.type('x');
+    await expect(editField).not.toHaveAttribute('data-empty', '', { timeout: 3000 });
+    const typedBox = await editField.boundingBox();
+    expect(typedBox).not.toBeNull();
+    expect(typedBox!.height).toBeGreaterThan(10);
+    // Height must NOT jump from focused-empty to one-line typed.
+    expect(Math.abs(typedBox!.height - focusedEmptyBox!.height)).toBeLessThan(2);
+  });
+
 
   test('slate block shows Type text placeholder from schema', async ({ page }) => {
     const helper = new AdminUIHelper(page);
