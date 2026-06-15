@@ -132,6 +132,92 @@ test.describe('touch-mode block move via chevron', () => {
   });
 
   /**
+   * Reported regression: chevron-up/down works for the FIRST block the
+   * user taps but does nothing for any block tapped AFTER that. Likely
+   * the chevron's onClick captures the first selectedBlock via React
+   * closure and never updates when the bridge sends a new BLOCK_SELECTED.
+   * Or moveSelectedBlock reads stale selectedBlock from a ref/state.
+   *
+   * Reproduces the exact user gesture: tap block-3 → move it up,
+   * then tap block-2 (now at a different index after the first move)
+   * and try to move it up too.
+   */
+  test('chevron ▲ keeps working after the user switches to a different block', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    const tap = async (uid: string) => {
+      await iframe.locator(`[data-block-uid="${uid}"]`).first().evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const x = r.x + r.width / 2;
+        const y = r.y + r.height / 2;
+        const t = new Touch({ identifier: 1, target: el, clientX: x, clientY: y });
+        el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+        el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+      });
+    };
+    const tapChevronUp = async () => {
+      await page.locator('.quanta-toolbar .chevron-up').evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const x = r.x + r.width / 2;
+        const y = r.y + r.height / 2;
+        const t = new Touch({ identifier: 2, target: el, clientX: x, clientY: y });
+        el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+        el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+      });
+    };
+
+    const initial = await helper.getBlockOrder();
+    expect(initial.length).toBeGreaterThan(3);
+
+    // === 1st block: tap block-3 (slate), move it up. ===
+    await tap('block-3-uuid');
+    await page.waitForTimeout(800);
+    expect(await iframe.locator('body').getAttribute('data-hydra-edit-mode')).toBe('block');
+    await expect(page.locator('.quanta-toolbar .chevron-up')).toBeVisible({ timeout: 5000 });
+    await tapChevronUp();
+    await expect.poll(async () => {
+      const o = await helper.getBlockOrder();
+      return o.indexOf('block-3-uuid');
+    }, { timeout: 5000 }).toBe(initial.indexOf('block-3-uuid') - 1);
+
+    const afterFirstMove = await helper.getBlockOrder();
+
+    // === 2nd block: tap a DIFFERENT block. The bug: chevron does
+    // nothing the second time. ===
+    // Pick a block that exists AND isn't at the very top (so chevron-up
+    // is meaningful).
+    const secondTarget = afterFirstMove.find(
+      (u) => u !== 'block-3-uuid' && afterFirstMove.indexOf(u) > 0,
+    )!;
+    expect(secondTarget).toBeTruthy();
+
+    await tap(secondTarget);
+    await page.waitForTimeout(800);
+    expect(
+      await iframe.locator('body').getAttribute('data-hydra-edit-mode'),
+      'second tap on a different block must still be block mode',
+    ).toBe('block');
+
+    const chevronUp2 = page.locator('.quanta-toolbar .chevron-up');
+    await expect(chevronUp2).toBeVisible({ timeout: 5000 });
+    await expect(chevronUp2).not.toBeDisabled();
+    await tapChevronUp();
+
+    // Bug surface: the second block didn't move.
+    const expectedIdx = afterFirstMove.indexOf(secondTarget) - 1;
+    await expect.poll(async () => {
+      const o = await helper.getBlockOrder();
+      return o.indexOf(secondTarget);
+    }, { timeout: 5000 }).toBe(expectedIdx);
+  });
+
+  /**
    * User-requested behavior: when the block ABOVE is a container that
    * accepts this block's type, chevron-up should put the block INTO the
    * container (as its last child) rather than skipping past it.
