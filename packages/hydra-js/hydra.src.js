@@ -11852,7 +11852,7 @@ export class Bridge {
            selection from there (reported regression on Chrome devtools
            mobile-emulation: only the inner field had the rule, the
            wrapper didn't, the OS picked the wrapper, selection ran).
-           The rule is NOT gated by `@media (pointer: coarse)`. Block
+           The rule is NOT gated by @media (pointer: coarse). Block
            mode is by design a transient state where text-selection
            isn't the user's intent. Gating to coarse pointers also
            missed Chrome devtools mobile-emulation in practice, which
