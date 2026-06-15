@@ -9295,6 +9295,13 @@ export class Bridge {
     };
     document.addEventListener('mousemove', sendActivity);
     document.addEventListener('mousedown', sendActivity);
+    // Touch fires MOUSE_ACTIVITY too. Without this, a real touch tap on
+    // a phone might never trigger mousedown (the browser is free to
+    // delay or skip mouse synthesis), so the Quanta toolbar stays at
+    // opacity:0 after the user taps a block — they can see the toolbar
+    // is mounted but can't aim at the chevron-up / chevron-down buttons.
+    // Reported bug: "in block mode I can't move the block up and down".
+    document.addEventListener('touchstart', sendActivity, { passive: true });
   }
 
   ////////////////////////////////////////////////////////////////////////////////
