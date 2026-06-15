@@ -1225,11 +1225,27 @@ const SyncedSlateToolbar = ({
   const availableWidth = Math.max(100, iframeRight - toolbarLeft); // Min 100px for basic controls
   const constrainedMaxWidth = Math.min(maxToolbarWidth || 400, availableWidth);
 
-  // Calculate how many buttons fit based on constrained width
-  // Measured widths: drag handle ~30px, menu button ~30px, gaps ~10px
+  // Calculate how many buttons fit based on constrained width.
+  // The toolbar reserves fixed-width affordances at both ends:
+  //   - Desktop: drag handle (30) + menu/⋯ button (30) + gaps (10) = 70
+  //   - Mobile  (@media max-width:767px): mobile-tablet.css HIDES the drag
+  //     handle and SHOWS chevron-up/down (~64). And select-parent-btn
+  //     (~32) is rendered when any block is selected. Plus menu/⋯ (30) +
+  //     gaps (10) = 136.
+  // If we use the desktop number on mobile, the slot system thinks more
+  // buttons fit than actually do → inline format buttons spill past the
+  // toolbar's max-width → `overflow: hidden` clips the rightmost ones,
+  // which is the user-reported "icons clipping at the top of the bar"
+  // on phones. Detect coarse-pointer / phone-width and bump FIXED_WIDTH
+  // so the slot system shifts inline buttons into the overflow ⋯ menu
+  // before they fall off the visible canvas.
   const BUTTON_WIDTH = 32;
   const FORMAT_DROPDOWN_WIDTH = 50;
-  const FIXED_WIDTH = 70; // drag handle (30) + menu button (30) + gaps/padding (10)
+  const isPhoneViewport =
+    typeof window !== 'undefined' &&
+    window.matchMedia &&
+    window.matchMedia('(max-width: 767px)').matches;
+  const FIXED_WIDTH = isPhoneViewport ? 136 : 70;
   const availableForButtons = constrainedMaxWidth - FIXED_WIDTH;
 
   // Format dropdown counts as ~1.5 buttons worth of space

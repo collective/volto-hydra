@@ -165,7 +165,22 @@ export class Bridge {
     this.blockTextMutationObserver = null;
     this.attributeMutationObserver = null;
     this.selectedBlockUid = null;
-    this.editMode = 'text'; // 'text' | 'block' — user switches via Escape/Enter/click
+    // 'text' | 'block' — user switches via Escape / Enter / click. Defined
+    // as an accessor so EVERY assignment also writes the body attribute
+    // the injected CSS reads (`body[data-hydra-edit-mode="block"]`) to set
+    // `user-select: none` on data-edit-text fields under
+    // @media (pointer: coarse). That CSS is what stops iOS long-press =
+    // word-select from firing while we're in block mode.
+    let _editMode = 'text';
+    Object.defineProperty(this, 'editMode', {
+      get: () => _editMode,
+      set: (v) => {
+        _editMode = v;
+        this._syncEditModeAttribute();
+      },
+      enumerable: true,
+      configurable: true,
+    });
     this.multiSelectedBlockUids = []; // Array of block UIDs in multi-selection
     this.focusedFieldName = null; // Track which editable field within the block has focus
     this.focusedLinkableField = null; // Track which linkable field has focus (for link editing)
@@ -4080,7 +4095,23 @@ export class Bridge {
           this.multiSelectedBlockUids = [];
         }
 
-        this.editMode = 'text';
+        // Touch-aware mode transition:
+        //   - Mouse (fine pointer)     → text mode immediately (place cursor).
+        //   - Touch (coarse pointer):
+        //       1st tap on a DIFFERENT block → block mode (no contenteditable,
+        //         no cursor). iOS native long-press = word-select can't fire
+        //         because the field is contenteditable=false in this state.
+        //         Block-multi-select long-press has a clean canvas to grab.
+        //       2nd tap on the SAME block    → text mode (cursor in field).
+        // Without this gate, long-press on a freshly selected block races
+        // the OS word-select handles on top of the bridge's multi-select
+        // timer, putting editors into both modes simultaneously.
+        const coarsePointer =
+          typeof matchMedia === 'function' &&
+          matchMedia('(pointer: coarse)').matches;
+        const alreadySelected = blockUid === this.selectedBlockUid;
+        const enterTextMode = !coarsePointer || alreadySelected;
+        this.editMode = enterTextMode ? 'text' : 'block';
         this.selectBlock(blockElement);
       } else {
         // No block - check for page-level fields
@@ -4159,6 +4190,24 @@ export class Bridge {
 
       document.addEventListener('touchstart', (e) => {
         if (this._longPressTimer) clearTimeout(this._longPressTimer);
+
+        // Don't fire the block multi-select long-press while the user is
+        // editing text. The OS-native long-press = word-select gesture
+        // must win cleanly on a focused contenteditable. Without this
+        // gate the timer fires AND the word-select handles appear at the
+        // same time, putting the editor into multi-block-select mode
+        // while they were trying to copy a word.
+        // Test: tap a slate field to focus it, long-press to word-select
+        //   → should ONLY show word-selection, not enter multi-select.
+        const ae = document.activeElement;
+        const inTextMode = !!(
+          ae &&
+          ae !== document.body &&
+          ae.closest &&
+          ae.closest('[contenteditable="true"]')
+        );
+        if (inTextMode) return;
+
         const touch = e.touches[0];
         startX = touch.clientX;
         startY = touch.clientY;
@@ -4208,6 +4257,18 @@ export class Bridge {
     // All keyboard handling (Escape, arrows, delete, Cmd+A, Enter) is
     // consolidated in _documentKeyboardBlocker → _handleKeydown.
     // No separate document-level keydown handlers needed.
+  }
+
+  // Sync `document.body.dataset.hydraEditMode` to the current editMode.
+  // The injected CSS uses this attribute (gated by @media (pointer: coarse))
+  // to set `user-select: none` on data-edit-text fields when in block mode
+  // — which is what actually suppresses the iOS / Android Chrome
+  // OS-level long-press = word-select gesture. contenteditable=false
+  // alone doesn't do it: the browsers happily word-select non-editable
+  // text via long-press.
+  _syncEditModeAttribute() {
+    if (typeof document === 'undefined' || !document.body) return;
+    document.body.dataset.hydraEditMode = this.editMode || 'text';
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -11776,6 +11837,33 @@ export class Bridge {
     style.innerHTML = `
         [contenteditable] {
           outline: 0px solid transparent;
+        }
+        /* In block mode, suppress OS-level long-press = word-select on
+           the selected block AND all of its descendants. iOS Safari and
+           Chrome on Android treat ANY text as long-press-selectable —
+           even when contenteditable=false — so we have to disable text
+           selection at the CSS level. Without this, a long-press on the
+           selected block fires the bridge's multi-select gesture AND
+           the OS word-select handles in the same beat.
+           Scope is intentionally WIDE: every descendant of a
+           [data-block-uid] wrapper as well as of [data-edit-text]
+           in block mode. Anything narrower lets the OS resolve the
+           long-press to an ancestor of the editable field and start
+           selection from there (reported regression on Chrome devtools
+           mobile-emulation: only the inner field had the rule, the
+           wrapper didn't, the OS picked the wrapper, selection ran).
+           The rule is NOT gated by `@media (pointer: coarse)`. Block
+           mode is by design a transient state where text-selection
+           isn't the user's intent. Gating to coarse pointers also
+           missed Chrome devtools mobile-emulation in practice, which
+           reintroduced the bug. */
+        [data-hydra-edit-mode="block"] [data-edit-text],
+        [data-hydra-edit-mode="block"] [data-edit-text] *,
+        [data-hydra-edit-mode="block"] [data-block-uid],
+        [data-hydra-edit-mode="block"] [data-block-uid] * {
+          -webkit-user-select: none !important;
+          user-select: none !important;
+          -webkit-touch-callout: none !important;
         }
         /* Placeholder text for empty editable fields. The ::before is in
            normal flow (no position: absolute) so the placeholder text

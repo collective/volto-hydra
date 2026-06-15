@@ -182,15 +182,27 @@
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
-    /* Leave 44px at the bottom for the bottom toolbar so editors can
-     * still tap More/Add again to dismiss, or tap outside. */
-    bottom: 44px !important;
+    /* Sheet fills to the viewport bottom — the bottom toolbar is
+     * hidden by the `body[data-hydra-submenu-open] #toolbar-body`
+     * rule below while this submenu is open, so editors see the
+     * sheet's own back-arrow (.mobile-submenu-close) sitting where
+     * the bar used to be. */
+    bottom: 0 !important;
     width: 100% !important;
     max-width: none !important;
     background: #fff !important;
     z-index: var(--hydra-z-sidebar-mobile) !important;
     overflow-y: auto !important;
-    padding: 0 !important;
+    /* Room at the bottom for the .mobile-submenu-close back arrow
+     * (44px button + 12+12 px breathing room + iOS safe area). */
+    padding: 0 0 calc(56px + env(safe-area-inset-bottom)) 0 !important;
+  }
+  /* While a submenu sheet is open, replace the bottom toolbar with
+   * the sheet — hide #toolbar-body entirely so editors only ever
+   * see one bottom-anchored surface at a time. The sheet has its
+   * own bottom-left back-arrow (.mobile-submenu-close) to dismiss. */
+  body[data-hydra-submenu-open] #toolbar-body {
+    display: none !important;
   }
   /* The default `.pastanaga-menu` inside .toolbar-content has its own
    * sizing rules that fight the full-viewport layout; let the parent
@@ -325,26 +337,34 @@
     height: 22px !important;
   }
 
-  /* Iframe canvas: fills the area between Quanta top and main toolbar
-   * bottom. 100dvh accounts for iOS Safari's collapsing address bar.
+  /* Iframe canvas: fills the area between top affordances and the
+   * main toolbar at the bottom (44px). The TOP reservation depends on
+   * mode:
+   *   - EDIT mode reserves 44px for the Quanta block toolbar that pins
+   *     to the selected block's top.
+   *   - VIEW mode has no Quanta — there's no block selection state to
+   *     paint a toolbar for. Reserving 44px just leaves an empty gap
+   *     above the page content, which is the user-reported "gap at
+   *     top in view mode" bug.
    *
-   * Literals 44 / 56px are measured values for the toolbar heights —
-   * verified via boundingBox(). Deliberately NOT using CSS
-   * custom-property fallbacks (`var(..., 44px)`); fallback-only vars
-   * hide the literal and violate the project's no-fallback rule. */
-  /* Iframe canvas: fills the area between Quanta (top, 44px) and main
-   * toolbar (bottom, 44px). Both bars now force-clamp to 44px height
-   * via the #toolbar-body rule above, so the iframe gets a predictable
-   * top/bottom offset and the available vertical space is maximised. */
+   * Literal 44px is the measured toolbar height (boundingBox()).
+   * Deliberately NOT using CSS custom-property fallbacks
+   * (`var(--x, 44px)`); fallback-only vars hide the literal and violate
+   * the project's no-fallback rule. */
   #iframeContainer {
     position: fixed !important;
-    top: 44px !important;
     bottom: 44px !important;
     left: 0 !important;
     right: 0 !important;
     width: 100% !important;
     max-width: none !important;
     height: auto !important;
+  }
+  body.view-editview #iframeContainer {
+    top: 44px !important;
+  }
+  body.view-viewview #iframeContainer {
+    top: 0 !important;
   }
   #previewIframe {
     height: 100% !important;
@@ -536,9 +556,15 @@
    * the portaled button sits above it. Leave room for the bottom bar
    * (44px) so the back arrow doesn't sit on top of the editor's
    * toolbar icons. */
+  /* With the bottom toolbar hidden under
+   * `body[data-hydra-submenu-open] #toolbar-body { display:none }`,
+   * the submenu back-arrow sits at the bottom-left of the viewport
+   * — same horizontal position the toolbar's leftmost icon held
+   * before the sheet opened, so the user's finger doesn't have to
+   * travel. */
   .mobile-submenu-close {
     position: fixed !important;
-    bottom: calc(44px + 12px) !important;
+    bottom: calc(12px + env(safe-area-inset-bottom)) !important;
     left: 12px !important;
     top: auto !important;
     right: auto !important;

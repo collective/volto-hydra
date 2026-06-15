@@ -24,37 +24,71 @@ const MobileSubmenuClose = () => {
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
 
-    let target = null;
-    let targetObs = null;
-
-    const attach = (tc) => {
-      target = tc;
-      const sync = () => setOpen(tc.classList.contains('show'));
-      sync();
-      targetObs = new MutationObserver(sync);
-      targetObs.observe(tc, { attributes: true, attributeFilter: ['class'] });
+    // A "submenu sheet" only exists when a toolbar BUTTON is in the
+    // expanded state — that's Add, More, User, etc. opening their
+    // dropdown into the .toolbar-content panel. Full-page routes
+    // (Contents, Users, ⋯) ALSO mount inside .toolbar-content but
+    // without any expanded toolbar button — so the bottom bar must
+    // stay visible for those.
+    const computeOpen = () => {
+      const expanded = document.querySelector(
+        '#toolbar-body .toolbar-button.expanded, ' +
+          '#toolbar-body button.expanded, ' +
+          '#toolbar-body button[aria-expanded="true"]',
+      );
+      const tc = document.querySelector('#toolbar .toolbar-content');
+      return !!expanded && !!tc?.classList.contains('show');
     };
 
-    const initial = document.querySelector('#toolbar .toolbar-content');
+    const sync = () => setOpen(computeOpen());
+
+    // Watch ALL subtree attribute changes inside #toolbar — covers
+    // toolbar-content.show class changes AND toolbar-button.expanded
+    // / aria-expanded changes on the trigger buttons. If #toolbar
+    // hasn't mounted yet, watch <body> until it appears.
+    let toolbarObs = null;
+    const attachObserver = (root) => {
+      toolbarObs = new MutationObserver(sync);
+      toolbarObs.observe(root, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class', 'aria-expanded'],
+        childList: true,
+      });
+      sync();
+    };
+
+    const initial = document.getElementById('toolbar');
     if (initial) {
-      attach(initial);
+      attachObserver(initial);
+    } else {
+      const bodyObs = new MutationObserver(() => {
+        if (toolbarObs) return;
+        const tb = document.getElementById('toolbar');
+        if (tb) {
+          attachObserver(tb);
+          bodyObs.disconnect();
+        }
+      });
+      bodyObs.observe(document.body, { childList: true, subtree: true });
+      return () => bodyObs.disconnect();
     }
 
-    // If AppExtras mounts before Volto's Toolbar paints, the initial
-    // querySelector returns null. Watch the body subtree for the
-    // toolbar-content node appearing, then attach the class observer.
-    const bodyObs = new MutationObserver(() => {
-      if (target) return;
-      const tc = document.querySelector('#toolbar .toolbar-content');
-      if (tc) attach(tc);
-    });
-    bodyObs.observe(document.body, { childList: true, subtree: true });
-
     return () => {
-      bodyObs.disconnect();
-      if (targetObs) targetObs.disconnect();
+      if (toolbarObs) toolbarObs.disconnect();
     };
   }, []);
+
+  // Mark <body> so CSS can hide the bottom toolbar AND extend the
+  // submenu sheet to the bottom of the viewport while a submenu is
+  // open. The mobile design replaces the bottom toolbar with the
+  // submenu (which has its own back-arrow at bottom-left) so the user
+  // never sees two stacked toolbars on a phone.
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    document.body.toggleAttribute('data-hydra-submenu-open', open);
+    return () => document.body.removeAttribute('data-hydra-submenu-open');
+  }, [open]);
 
   if (!open) return null;
   if (typeof document === 'undefined') return null;

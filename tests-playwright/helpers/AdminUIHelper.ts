@@ -799,6 +799,19 @@ export class AdminUIHelper {
       return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     });
 
+    // Blur the active element first. The bridge gates long-press multi-
+    // select when a contenteditable is focused (so iOS native long-press =
+    // word-select can fire cleanly in text mode without us also entering
+    // multi-block-select). Tests that combine clickBlockInIframe → long-
+    // press leave the field focused, which would gate the multi-select
+    // even though the test author wants it to fire. Matches real mobile
+    // UX where a user presses Escape or taps elsewhere to exit text mode
+    // before initiating multi-select.
+    await iframe.locator('body').evaluate(() => {
+      const ae = document.activeElement;
+      if (ae && (ae as HTMLElement).blur) (ae as HTMLElement).blur();
+    });
+
     // Dispatch touchstart
     await iframe.locator('body').evaluate((body, pos) => {
       const el = document.elementFromPoint(pos.x, pos.y) || body;

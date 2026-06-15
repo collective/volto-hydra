@@ -37,7 +37,6 @@ import FrontendSwitcherPlug from './components/Toolbar/FrontendSwitcherPlug';
 import SidebarToggleToolbarPlug from './components/Toolbar/SidebarToggleToolbarPlug';
 import FrontendSwitcherPanel from './components/Toolbar/FrontendSwitcherPanel';
 import MobileSubmenuClose from './components/Toolbar/MobileSubmenuClose';
-import AddInterceptor from './components/Toolbar/AddInterceptor';
 import { getIframeUrlCookieName } from './utils/cookieNames';
 import getSavedURLs, { getURlsFromEnv } from './utils/getSavedURLs';
 import getCurrentFrontendPublicUrl from './utils/getCurrentFrontendPublicUrl';
@@ -157,7 +156,6 @@ const applyConfig = (config) => {
     { match: '/', component: FrontendSwitcherPlug },
     { match: '/', component: SidebarToggleToolbarPlug },
     { match: '/', component: MobileSubmenuClose },
-    { match: '/', component: AddInterceptor },
   ];
 
   // Hide container block fields - ChildBlocksWidget handles their UI

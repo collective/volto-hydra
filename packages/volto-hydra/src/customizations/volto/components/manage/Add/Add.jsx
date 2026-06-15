@@ -54,8 +54,6 @@ import config from '@plone/volto/registry';
 import saveSVG from '@plone/volto/icons/save.svg';
 import clearSVG from '@plone/volto/icons/clear.svg';
 
-import AddTypeChooser from '../../../../../components/AddTypeChooser';
-
 const messages = defineMessages({
   add: {
     id: 'Add {type}',
@@ -170,12 +168,22 @@ class Add extends Component {
       nextProps.content['@type'] === this.props.type
     ) {
       this.props.setFormData({});
-      // HYDRA: drop the user straight into edit mode on the new item — the
-      // bridge's whole point is to edit in place, not view a freshly-created
-      // page first. Append `/edit` to the canonical URL.
+      // HYDRA: drop the user straight into edit mode on the new item — but
+      // ONLY for types that have block editing. For block-bearing types
+      // (Document, NewsItem, Event, …) the bridge's whole point is to edit
+      // in place. For non-block types (Image, File, Link, Folder) the
+      // /edit route is just Volto's flat metadata form, which the bridge
+      // can't drive — sending the user to the canonical view is saner.
+      // Detect via `blocks_layout` on the created content: Plone populates
+      // it on save iff the type has the volto.blocks behavior. This is the
+      // same signal Volto uses elsewhere (e.g. View.jsx routes block-bearing
+      // types to the visual edit view).
+      const newContent = nextProps.content;
+      const hasBlockEditor = !!newContent?.blocks_layout;
+      const newUrl = flattenToAppURL(newContent['@id']);
       this.props.history.push(
         this.props.returnUrl ||
-          `${flattenToAppURL(nextProps.content['@id'])}/edit`,
+          (hasBlockEditor ? `${newUrl}/edit` : newUrl),
       );
     }
 
@@ -266,36 +274,6 @@ class Add extends Component {
    * @returns {string} Markup for the component.
    */
   render() {
-    // HYDRA: when /add is hit WITHOUT a `?type=` query (e.g., the
-    // toolbar Add button click landed here), render the full-screen
-    // type chooser instead of trying to load a 'Default' schema. The
-    // chooser navigates to /add?type=X and this same component then
-    // renders the actual form. Replaces the legacy inline `.menu-more`
-    // dropdown editors used to see.
-    //
-    // Wrap with the same Toolbar / Sidebar chrome the form uses so
-    // editors don't see a bare unstyled page — only the centre column
-    // changes between "pick a type" and "fill the form".
-    const queryType = qs.parse(this.props.location?.search || '').type;
-    if (!queryType) {
-      return (
-        <div id="page-add">
-          <Helmet title="Add Content" />
-          <AddTypeChooser pathname={this.props.pathname} />
-          {this.state.isClient &&
-            createPortal(
-              <Toolbar
-                pathname={this.props.pathname}
-                hideDefaultViewButtons
-                inner={<span />}
-              />,
-              document.getElementById('toolbar'),
-            )}
-          {this.state.isClient &&
-            createPortal(<Sidebar />, document.getElementById('sidebar'))}
-        </div>
-      );
-    }
     if (this.props.schemaRequest.loaded) {
       // HYDRA: force the flat (non-visual) Add form. Hydra owns block editing
       // through the bridge/iframe; Volto's in-page visual mode would compete
