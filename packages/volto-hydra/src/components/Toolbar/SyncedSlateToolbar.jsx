@@ -197,11 +197,19 @@ const SyncedSlateToolbar = ({
   }, [form, blockPathMap]);
 
   // ──────────────────────────────────────────────────────────────
-  // Chevron move buttons (mobile #145).
-  // Within-parent only — ▲ on the top sibling is a no-op (disabled),
-  // ▲/▼ never traverse out to the grandparent. The keyboard arrows in
-  // hydra.src.js handle cursor navigation, not block reorder, so this
-  // helper is net new (~30 lines) — proceed-approved by user.
+  // Chevron move buttons (mobile #145). Three behaviors:
+  //   1. Within-parent: simple swap with prev/next sibling.
+  //   2. INTO a container above/below: if the next sibling is a container
+  //      whose innermost slot accepts our block's @type, absorb into it
+  //      (chevron-▲ lands at the END of the last column / last leaf;
+  //      chevron-▼ at the START of the first leaf). Matches the
+  //      edge-drag absorb plan in hydra.js drag handler.
+  //   3. ESCAPE out: at top/bottom of an inner container, chevron walks
+  //      OUT to the top-level layout, landing just before/after the
+  //      enclosing container. Matches the drag handler's expel plan.
+  //
+  // Existing keyboard arrows in hydra.src.js handle cursor navigation, not
+  // block reorder, so this logic lives only in the toolbar.
   const getSiblingItems = () => {
     const entry = blockPathMap?.[selectedBlock];
     if (!entry) return null;
@@ -213,15 +221,91 @@ const SyncedSlateToolbar = ({
     const items = parentBlock?.[containerField]?.items || [];
     return { items, idx: items.indexOf(selectedBlock), parentBlock, parentId, containerField };
   };
+
+  // Walk DOWN into containerBlockId, picking the first/last child at each
+  // level (matching the chevron direction), until we land on a leaf whose
+  // allowedSiblingTypes accepts sourceType. Returns the MOVE_BLOCKS
+  // payload fields (targetBlockId, insertAfter, targetParentId) to land
+  // there. Returns null if the container is empty or the type isn't
+  // accepted at any reachable leaf.
+  const findAnchorInContainer = (containerBlockId, side, sourceType) => {
+    const directChildren = Object.entries(blockPathMap || {})
+      .filter(([, info]) => info?.parentId === containerBlockId)
+      .map(([id]) => id);
+    if (directChildren.length === 0) return null;
+    const pick = side === 'last' ? directChildren[directChildren.length - 1] : directChildren[0];
+    const pickInfo = blockPathMap[pick];
+    if (!pickInfo) return null;
+    const hasGrandchildren = Object.values(blockPathMap || {}).some(
+      info => info?.parentId === pick,
+    );
+    if (hasGrandchildren) {
+      return findAnchorInContainer(pick, side, sourceType);
+    }
+    const allowed = pickInfo.allowedSiblingTypes;
+    if (sourceType && allowed && !allowed.includes(sourceType)) return null;
+    return {
+      targetBlockId: pick,
+      insertAfter: side === 'last',
+      targetParentId: pickInfo.parentId,
+    };
+  };
+
+  // Walk UP from parentId to find the top-level (page-child) container
+  // that we should escape past. Returns { target, parentOfTarget } or null.
+  const findEscapeAnchor = (parentId) => {
+    if (!parentId || parentId === PAGE_BLOCK_UID) return null;
+    let target = parentId;
+    let parentOfTarget = blockPathMap?.[target]?.parentId;
+    while (parentOfTarget && parentOfTarget !== PAGE_BLOCK_UID) {
+      target = parentOfTarget;
+      parentOfTarget = blockPathMap?.[target]?.parentId;
+    }
+    return { target, parentOfTarget };
+  };
+
   const moveSelectedBlock = (direction) => {
     const sib = getSiblingItems();
-    if (!sib) return;
+    if (!sib || sib.idx < 0) return;
     const newIdx = sib.idx + (direction === 'up' ? -1 : 1);
-    if (sib.idx < 0 || newIdx < 0 || newIdx >= sib.items.length) return;
+
+    // CASE A — at parent boundary: escape OUT past the enclosing container.
+    if (newIdx < 0 || newIdx >= sib.items.length) {
+      const escape = findEscapeAnchor(sib.parentId);
+      if (!escape) return;
+      document.dispatchEvent(
+        new CustomEvent('hydra-move-block', {
+          detail: {
+            blockId: selectedBlock,
+            targetBlockId: escape.target,
+            insertAfter: direction === 'down',
+            targetParentId: escape.parentOfTarget === PAGE_BLOCK_UID ? null : escape.parentOfTarget,
+          },
+        }),
+      );
+      return;
+    }
+
     const targetBlockId = sib.items[newIdx];
-    // Dispatch the hydra-move-block CustomEvent — View.jsx listens for it
-    // (added alongside hydra-copy-blocks et al.) and fans into the existing
-    // MOVE_BLOCKS path. Same path the iframe drag handler ultimately uses.
+    const selectedBlockData = getBlock(selectedBlock);
+    const sourceType = selectedBlockData?.['@type'];
+
+    // CASE B — target sibling is a container that accepts our type: INSERT INTO it.
+    const innerAnchor = findAnchorInContainer(
+      targetBlockId,
+      direction === 'up' ? 'last' : 'first',
+      sourceType,
+    );
+    if (innerAnchor) {
+      document.dispatchEvent(
+        new CustomEvent('hydra-move-block', {
+          detail: { blockId: selectedBlock, ...innerAnchor },
+        }),
+      );
+      return;
+    }
+
+    // CASE C — plain within-parent swap.
     document.dispatchEvent(
       new CustomEvent('hydra-move-block', {
         detail: {
@@ -233,9 +317,18 @@ const SyncedSlateToolbar = ({
       }),
     );
   };
+
   const chevronSib = getSiblingItems();
-  const isAtTopOfParent = !chevronSib || chevronSib.idx <= 0;
-  const isAtBottomOfParent = !chevronSib || chevronSib.idx >= chevronSib.items.length - 1;
+  // Chevron is enabled if we can move within parent OR escape out. Only
+  // disabled when we're at the top/bottom of the OUTERMOST layout (i.e.
+  // top-level and at boundary).
+  const isInInnerContainer = !!(
+    chevronSib?.parentId && chevronSib.parentId !== PAGE_BLOCK_UID
+  );
+  const isAtTopOfParent = !chevronSib || (chevronSib.idx <= 0 && !isInInnerContainer);
+  const isAtBottomOfParent = !chevronSib || (
+    chevronSib.idx >= chevronSib.items.length - 1 && !isInInnerContainer
+  );
 
   // Create Slate editor once using Volto's makeEditor (includes all plugins)
   // Add withEmptyInlineRemoval to clean up empty formatting elements after delete

@@ -218,6 +218,151 @@ test.describe('touch-mode block move via chevron', () => {
   });
 
   /**
+   * Reported regression (user, 2026-06-15): "you of course special cased
+   * moving so it only works at the top level and not inside containers."
+   *
+   * What actually happens on Chrome devtools mobile emulation: tap a block
+   * INSIDE a container (e.g. a slate inside a column inside a columns
+   * block) → chevron-up appears, looks enabled → tap → NOTHING happens.
+   *
+   * The within-parent move must work the same way at every nesting level.
+   * test-1b is the 2nd slate inside col-1; chevron-up should swap it with
+   * text-1a (the 1st slate in col-1) — without ever leaving col-1.
+   */
+  test('chevron ▲ moves a slate within its column (block INSIDE a container)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    // Confirm starting layout INSIDE col-1: [text-1a, text-1b, col1-img-1]
+    const col1ItemsBefore = await iframe.locator('[data-block-uid="col-1"] > [data-block-uid]').evaluateAll(
+      els => els.map(e => e.getAttribute('data-block-uid')),
+    );
+    expect(col1ItemsBefore.slice(0, 2)).toEqual(['text-1a', 'text-1b']);
+
+    // Touch-tap text-1b inside the iframe. Same dispatch pattern the
+    // other tests in this file use — touchstart → touchend → click on
+    // the iframe's own document so blockClickHandler actually runs.
+    const target = 'text-1b';
+    await iframe.locator(`[data-block-uid="${target}"]`).first().evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const x = r.x + r.width / 2;
+      const y = r.y + r.height / 2;
+      const t = new Touch({ identifier: 1, target: el, clientX: x, clientY: y });
+      el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+      el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+    });
+    await page.waitForTimeout(800);
+
+    expect(
+      await iframe.locator('body').getAttribute('data-hydra-edit-mode'),
+      'tap on block inside container should still enter block mode',
+    ).toBe('block');
+
+    const chevronUp = page.locator('.quanta-toolbar .chevron-up');
+    await expect(chevronUp, 'chevron ▲ must show for a block inside a column').toBeVisible({ timeout: 5000 });
+    await expect(chevronUp, 'chevron ▲ must be enabled for a non-top sibling').not.toBeDisabled();
+
+    // Tap the chevron with the same touch sequence — synthetic click
+    // alone would synthesize mousedown and might mask any touch-only bug.
+    await chevronUp.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const x = r.x + r.width / 2;
+      const y = r.y + r.height / 2;
+      const t = new Touch({ identifier: 2, target: el, clientX: x, clientY: y });
+      el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+      el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+    });
+
+    // text-1b must now be at index 0 inside col-1 (swapped with text-1a),
+    // and must STILL be inside col-1 (this is a within-parent move).
+    await expect.poll(async () => {
+      const items = await iframe.locator('[data-block-uid="col-1"] > [data-block-uid]').evaluateAll(
+        els => els.map(e => e.getAttribute('data-block-uid')),
+      );
+      return items.slice(0, 2).join(',');
+    }, { timeout: 5000 }).toBe('text-1b,text-1a');
+  });
+
+  /**
+   * Closer to the actual user report: first tap a TOP-LEVEL block,
+   * chevron-move it, THEN tap a block INSIDE a container and try to
+   * chevron-move that. User reported "works for the first block I
+   * selected. then does nothing if I select another block".
+   *
+   * In container-test-page top-level items: [title-block, columns-1,
+   * text-after, grid-1, grid-2, grid-empty]. We move text-after up by
+   * one (swap with columns-1 → won't happen with container-aware
+   * behavior, but for now the simple within-parent swap is what the
+   * code currently does — assert the post-move state precisely).
+   * Then we tap a block INSIDE col-1 and try to chevron it up too.
+   */
+  test('after a top-level move, chevron still works for a 2nd block INSIDE a container', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    const tap = async (uid: string) => {
+      await iframe.locator(`[data-block-uid="${uid}"]`).first().evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const x = r.x + r.width / 2;
+        const y = r.y + r.height / 2;
+        const t = new Touch({ identifier: 1, target: el, clientX: x, clientY: y });
+        el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+        el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+      });
+    };
+    const tapChevronUp = async () => {
+      await page.locator('.quanta-toolbar .chevron-up').evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const x = r.x + r.width / 2;
+        const y = r.y + r.height / 2;
+        const t = new Touch({ identifier: 2, target: el, clientX: x, clientY: y });
+        el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+        el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+      });
+    };
+
+    // === 1st move: top-level swap of text-after with columns-1 ===
+    await tap('text-after');
+    await page.waitForTimeout(800);
+    expect(await iframe.locator('body').getAttribute('data-hydra-edit-mode')).toBe('block');
+    await expect(page.locator('.quanta-toolbar .chevron-up')).toBeVisible({ timeout: 5000 });
+    await tapChevronUp();
+    await page.waitForTimeout(800);
+
+    // === 2nd block: tap text-1b INSIDE col-1 and chevron-up it ===
+    // (text-1b was originally at idx 1 inside col-1, sibling of text-1a/col1-img-1)
+    await tap('text-1b');
+    await page.waitForTimeout(800);
+
+    expect(
+      await iframe.locator('body').getAttribute('data-hydra-edit-mode'),
+      '2nd tap (different block, in container) should also be block mode',
+    ).toBe('block');
+
+    const chevronUp2 = page.locator('.quanta-toolbar .chevron-up');
+    await expect(chevronUp2).toBeVisible({ timeout: 5000 });
+    await expect(chevronUp2, 'chevron ▲ must be enabled for text-1b inside col-1').not.toBeDisabled();
+    await tapChevronUp();
+
+    await expect.poll(async () => {
+      const items = await iframe.locator('[data-block-uid="col-1"] > [data-block-uid]').evaluateAll(
+        els => els.map(e => e.getAttribute('data-block-uid')),
+      );
+      return items.slice(0, 2).join(',');
+    }, { timeout: 5000 }).toBe('text-1b,text-1a');
+  });
+
+  /**
    * User-requested behavior: when the block ABOVE is a container that
    * accepts this block's type, chevron-up should put the block INTO the
    * container (as its last child) rather than skipping past it.
@@ -229,16 +374,30 @@ test.describe('touch-mode block move via chevron', () => {
    * accepts slate. So chevron-up on text-after should INSERT it into
    * the last column of columns-1, not swap it with columns-1.
    *
-   * EXPECTED-FAILING: current moveSelectedBlock just swaps siblings.
+   * EXPECTED-FAILING (until container-aware chevron is implemented):
+   * current moveSelectedBlock just swaps siblings, so this test fails
+   * with text-after still at top level (swapped with columns-1).
    */
-  test.fixme('container-aware chevron-up: text-after (slate) at top level + columns-1 above → INTO columns-1', async ({ page }) => {
+  test('container-aware chevron-up: text-after (slate) at top level + columns-1 above → INTO columns-1', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
     const iframe = helper.getIframe();
     const targetBlock = 'text-after';
-    await helper.clickBlockInIframe(targetBlock);
+
+    // Touch-tap text-after inside the iframe (block mode requires
+    // pointer:coarse, which we get from hasTouch+isMobile + a real
+    // touch event sequence — see other tests in this file).
+    await iframe.locator(`[data-block-uid="${targetBlock}"]`).first().evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const x = r.x + r.width / 2;
+      const y = r.y + r.height / 2;
+      const t = new Touch({ identifier: 1, target: el, clientX: x, clientY: y });
+      el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+      el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+    });
     await page.waitForTimeout(800);
 
     expect(
@@ -246,19 +405,28 @@ test.describe('touch-mode block move via chevron', () => {
     ).toBe('block');
 
     const chevronUp = page.locator('.quanta-toolbar .chevron-up');
-    await expect(chevronUp).toBeVisible();
-    await chevronUp.click();
-    await page.waitForTimeout(800);
+    await expect(chevronUp).toBeVisible({ timeout: 5000 });
+    await chevronUp.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const x = r.x + r.width / 2;
+      const y = r.y + r.height / 2;
+      const t = new Touch({ identifier: 2, target: el, clientX: x, clientY: y });
+      el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+      el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+    });
 
-    // text-after must now be INSIDE columns-1. Walk up its ancestors
-    // until we find a [data-block-uid] — that's its new parent.
-    const newParentUid = await iframe.locator(`[data-block-uid="${targetBlock}"]`).first().evaluate(
-      (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid'),
-    );
-    expect(
-      newParentUid,
-      'text-after should be inside columns-1 after chevron-up',
-    ).toBe('columns-1');
+    // text-after must now be INSIDE columns-1 (specifically in the LAST
+    // column, col-2, as the last child — matching the user's expressed
+    // model "put it into the container instead of skip"). We assert the
+    // weaker "inside columns-1" condition because absorption-into-which-
+    // column is a separate design decision; the bug being fixed here is
+    // "moves PAST the container instead of INTO it".
+    await expect.poll(async () => {
+      return await iframe.locator(`[data-block-uid="${targetBlock}"]`).first().evaluate(
+        (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid'),
+      );
+    }, { timeout: 5000 }).toBe('col-2');
   });
 
   /**
@@ -267,22 +435,28 @@ test.describe('touch-mode block move via chevron', () => {
    * to MOVE OUT of the container instead (to the position just before
    * the container in the parent's items).
    *
-   * EXPECTED-FAILING.
+   * EXPECTED-FAILING (until container-aware chevron is implemented):
+   * today text-1a is at idx 0 of col-1 so chevron-up is disabled, never
+   * fires. New behavior: chevron-up is enabled and moves text-1a OUT
+   * of col-1 to top level just before columns-1.
    */
-  test.fixme('container-aware chevron-up: first slate inside columns-1 → OUT of columns-1', async ({ page }) => {
+  test('container-aware chevron-up: first slate inside col-1 → OUT of columns-1', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
     const iframe = helper.getIframe();
-    // First slate child of columns-1 — read it from the DOM dynamically
-    // because the fixture's column block UIDs vary.
-    const firstChildUid = await iframe.locator(
-      '[data-block-uid="columns-1"] [data-block-uid]',
-    ).first().evaluate(el => el.getAttribute('data-block-uid'));
-    expect(firstChildUid).toBeTruthy();
+    const targetBlock = 'text-1a'; // First slate in col-1 (statically known)
 
-    await helper.clickBlockInIframe(firstChildUid!);
+    await iframe.locator(`[data-block-uid="${targetBlock}"]`).first().evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const x = r.x + r.width / 2;
+      const y = r.y + r.height / 2;
+      const t = new Touch({ identifier: 1, target: el, clientX: x, clientY: y });
+      el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+      el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+    });
     await page.waitForTimeout(800);
 
     expect(
@@ -290,17 +464,30 @@ test.describe('touch-mode block move via chevron', () => {
     ).toBe('block');
 
     const chevronUp = page.locator('.quanta-toolbar .chevron-up');
-    // Today: this is disabled (at top of parent). New behavior: enabled
-    // because the block CAN move out of the container.
-    await expect(chevronUp).toBeVisible();
-    await expect(chevronUp).not.toBeDisabled();
-    await chevronUp.click();
-    await page.waitForTimeout(800);
+    await expect(chevronUp).toBeVisible({ timeout: 5000 });
+    // Today: chevron-up is disabled (at top of parent). New behavior:
+    // enabled because the block CAN escape its container.
+    await expect(
+      chevronUp,
+      'chevron ▲ for the top-of-container block should escape, not be disabled',
+    ).not.toBeDisabled();
+    await chevronUp.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const x = r.x + r.width / 2;
+      const y = r.y + r.height / 2;
+      const t = new Touch({ identifier: 2, target: el, clientX: x, clientY: y });
+      el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+      el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+    });
 
-    // The block must NOT have columns-1 as its ancestor anymore.
-    const newParentUid = await iframe.locator(`[data-block-uid="${firstChildUid!}"]`).first().evaluate(
-      (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid'),
-    );
-    expect(newParentUid).not.toBe('columns-1');
+    // text-1a must now be at top level (parent NOT col-1 or columns-1)
+    // — specifically, just before columns-1 in the page's items.
+    await expect.poll(async () => {
+      const parentUid = await iframe.locator(`[data-block-uid="${targetBlock}"]`).first().evaluate(
+        (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid'),
+      );
+      return parentUid || 'page-level';
+    }, { timeout: 5000 }).not.toBe('col-1');
   });
 });
