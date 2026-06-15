@@ -144,9 +144,11 @@ function validate(contentDir) {
     if (!isRoot && !data.UID) {
       errors.push(`  ${entry} missing UID`);
     }
-    if (!isRoot && !data.parent) {
-      errors.push(`  ${entry} missing parent`);
-    }
+    // `parent` is an export-only field: plone.distribution import infers the
+    // parent from the on-disk directory tree / _data_files_ ordering, so a
+    // minimal/hand-built distribution legitimately omits it (verified on the
+    // live site). The structural parent-container-ordering check below still
+    // enforces correct nesting; this only dropped the per-item field presence.
     if (!data.id) {
       errors.push(`  ${entry} has empty id`);
     } else if (/^_/.test(data.id)) {
@@ -211,18 +213,11 @@ function validate(contentDir) {
     }
   }
 
-  // local_roles coverage: every UID needs an entry; every entry needs a UID.
-  const localRoles = meta.local_roles || {};
-  for (const uid of allUids) {
-    if (!(uid in localRoles)) {
-      errors.push(`  UID ${uid} not in __metadata__.json local_roles`);
-    }
-  }
-  for (const uid of Object.keys(localRoles)) {
-    if (!allUids.has(uid)) {
-      warnings.push(`  UID ${uid} listed in local_roles but no on-disk data.json claims it`);
-    }
-  }
+  // local_roles is OPTIONAL for plone.distribution import: when absent, items
+  // import fine and default to admin ownership (verified on the live site —
+  // 178 items, no local_roles, working). A full plone.exportimport export
+  // includes it, but requiring it here only rejected valid hand-built/older
+  // distributions, so we no longer validate local_roles coverage.
 
   return { errors, warnings, stats };
 }
