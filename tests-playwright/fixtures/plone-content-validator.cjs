@@ -257,6 +257,12 @@ function checkIntegrity(contentDir) {
     const atId = data['@id'];
     if (atId) pathMap.set(atId, data);
     pathMap.set('/' + rel.split(path.sep).join('/'), data);
+    // The site root is linked to as "/" in content hrefs, but on disk its @id
+    // is "/Plone" and its rel is "plone_site_root" — register "/" too so
+    // homepage links resolve instead of false-flagging as broken.
+    if (data['@type'] === 'Plone Site' || rel === 'plone_site_root' || atId === '/Plone') {
+      pathMap.set('/', data);
+    }
   }
   stats.items = uidMap.size;
 
