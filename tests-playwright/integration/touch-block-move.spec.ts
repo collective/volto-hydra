@@ -430,6 +430,77 @@ test.describe('touch-mode block move via chevron', () => {
   });
 
   /**
+   * Skip-past behavior: when the target container REJECTS the block's
+   * @type at every accessible leaf AND every slot AND every nesting
+   * level, chevron should fall through to a simple swap so the block
+   * skips past the container — not silently no-op.
+   *
+   * Fixture: text-after (slate) is at idx 2 in container-test-page top
+   * level. grid-1 (gridBlock) at idx 3 only accepts @type=teaser at
+   * every leaf. chevron-▼ on text-after should hop past grid-1, ending
+   * up at idx 3 with grid-1 sliding up to idx 2.
+   *
+   * Also exercises "check other slots in the same container and each
+   * container level too": grid-1 has two grid-cells (grid-cell-1,
+   * grid-cell-2), both rejecting slate. The new logic must check BOTH
+   * cells (and any nested levels) before deciding to skip.
+   */
+  test('chevron ▼ skips past a container whose every slot rejects the type', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    const orderBefore = await helper.getBlockOrder();
+    const idxTextBefore = orderBefore.indexOf('text-after');
+    const idxGridBefore = orderBefore.indexOf('grid-1');
+    expect(idxTextBefore, 'text-after must be in fixture').toBeGreaterThan(-1);
+    expect(idxGridBefore, 'grid-1 must be after text-after initially').toBeGreaterThan(idxTextBefore);
+
+    await iframe.locator('[data-block-uid="text-after"]').first().evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const x = r.x + r.width / 2;
+      const y = r.y + r.height / 2;
+      const t = new Touch({ identifier: 1, target: el, clientX: x, clientY: y });
+      el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+      el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+    });
+    await page.waitForTimeout(800);
+    expect(await iframe.locator('body').getAttribute('data-hydra-edit-mode')).toBe('block');
+
+    const chevronDown = page.locator('.quanta-toolbar .chevron-down');
+    await expect(chevronDown).toBeVisible({ timeout: 5000 });
+    await expect(chevronDown).not.toBeDisabled();
+    await chevronDown.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const x = r.x + r.width / 2;
+      const y = r.y + r.height / 2;
+      const t = new Touch({ identifier: 2, target: el, clientX: x, clientY: y });
+      el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+      el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+    });
+
+    // text-after must remain at top level (NOT swallowed into grid-1) and
+    // must now sit BELOW grid-1 in DOM order.
+    await expect.poll(async () => {
+      return await iframe.locator('[data-block-uid="text-after"]').first().evaluate((el) => {
+        const ancestor = el.parentElement && el.parentElement.closest
+          ? el.parentElement.closest('[data-block-uid]')
+          : null;
+        return ancestor ? ancestor.getAttribute('data-block-uid') : 'top-level';
+      });
+    }, { timeout: 5000 }).toBe('top-level');
+
+    const orderAfter = await helper.getBlockOrder();
+    const idxTextAfter = orderAfter.indexOf('text-after');
+    const idxGridAfter = orderAfter.indexOf('grid-1');
+    expect(idxTextAfter, 'text-after should be after grid-1 after the skip').toBeGreaterThan(idxGridAfter);
+  });
+
+  /**
    * Reciprocal: a block inside a container, at the TOP of the container,
    * has no sibling above. Today chevron-up is disabled. User expects it
    * to MOVE OUT of the container instead (to the position just before

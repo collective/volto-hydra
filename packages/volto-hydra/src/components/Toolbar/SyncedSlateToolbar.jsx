@@ -226,29 +226,57 @@ const SyncedSlateToolbar = ({
   // level (matching the chevron direction), until we land on a leaf whose
   // allowedSiblingTypes accepts sourceType. Returns the MOVE_BLOCKS
   // payload fields (targetBlockId, insertAfter, targetParentId) to land
-  // there. Returns null if the container is empty or the type isn't
-  // accepted at any reachable leaf.
-  const findAnchorInContainer = (containerBlockId, side, sourceType) => {
+  // there. Walks EVERY reachable leaf — not just the deepest chevron-
+  // side pick — and tries each in chevron order until one accepts the
+  // source type. Containers can have heterogeneous slot acceptance
+  // (e.g. a tabs block where tab-1 accepts slate but tab-2 only accepts
+  // teaser) and a single-leaf check would silently no-op when the
+  // chosen slot rejects even though a sibling slot would have worked.
+  // Returns null only when EVERY reachable leaf rejects — caller then
+  // falls through to a plain swap, which visually equals "skip past
+  // the container".
+  const collectLeavesInOrder = (containerBlockId, side, visited) => {
+    const seen = visited || new Set();
+    if (seen.has(containerBlockId)) return [];
+    seen.add(containerBlockId);
     const directChildren = Object.entries(blockPathMap || {})
       .filter(([, info]) => info?.parentId === containerBlockId)
       .map(([id]) => id);
-    if (directChildren.length === 0) return null;
-    const pick = side === 'last' ? directChildren[directChildren.length - 1] : directChildren[0];
-    const pickInfo = blockPathMap[pick];
-    if (!pickInfo) return null;
-    const hasGrandchildren = Object.values(blockPathMap || {}).some(
-      info => info?.parentId === pick,
-    );
-    if (hasGrandchildren) {
-      return findAnchorInContainer(pick, side, sourceType);
+    if (directChildren.length === 0) return [];
+    const ordered = side === 'last' ? directChildren.slice().reverse() : directChildren;
+    const result = [];
+    for (const childId of ordered) {
+      const childInfo = blockPathMap[childId];
+      if (!childInfo) continue;
+      const hasGrandchildren = Object.values(blockPathMap || {}).some(
+        info => info?.parentId === childId,
+      );
+      if (hasGrandchildren) {
+        result.push(...collectLeavesInOrder(childId, side, seen));
+      } else {
+        result.push({
+          targetBlockId: childId,
+          insertAfter: side === 'last',
+          targetParentId: childInfo.parentId,
+          allowed: childInfo.allowedSiblingTypes,
+        });
+      }
     }
-    const allowed = pickInfo.allowedSiblingTypes;
-    if (sourceType && allowed && !allowed.includes(sourceType)) return null;
-    return {
-      targetBlockId: pick,
-      insertAfter: side === 'last',
-      targetParentId: pickInfo.parentId,
-    };
+    return result;
+  };
+
+  const findAnchorInContainer = (containerBlockId, side, sourceType) => {
+    const leaves = collectLeavesInOrder(containerBlockId, side);
+    for (const leaf of leaves) {
+      if (!sourceType || !leaf.allowed || leaf.allowed.includes(sourceType)) {
+        return {
+          targetBlockId: leaf.targetBlockId,
+          insertAfter: leaf.insertAfter,
+          targetParentId: leaf.targetParentId,
+        };
+      }
+    }
+    return null;
   };
 
   // Walk UP from parentId to find the top-level (page-child) container
