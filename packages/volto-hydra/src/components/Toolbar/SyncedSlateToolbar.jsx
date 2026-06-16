@@ -197,166 +197,124 @@ const SyncedSlateToolbar = ({
   }, [form, blockPathMap]);
 
   // ──────────────────────────────────────────────────────────────
-  // Chevron move buttons (mobile #145). Three behaviors:
-  //   1. Within-parent: simple swap with prev/next sibling.
-  //   2. INTO a container above/below: if the next sibling is a container
-  //      whose innermost slot accepts our block's @type, absorb into it
-  //      (chevron-▲ lands at the END of the last column / last leaf;
-  //      chevron-▼ at the START of the first leaf). Matches the
-  //      edge-drag absorb plan in hydra.js drag handler.
-  //   3. ESCAPE out: at top/bottom of an inner container, chevron walks
-  //      OUT to the top-level layout, landing just before/after the
-  //      enclosing container. Matches the drag handler's expel plan.
+  // Chevron move buttons (mobile #145).
   //
-  // Existing keyboard arrows in hydra.src.js handle cursor navigation, not
-  // block reorder, so this logic lives only in the toolbar.
-  const getSiblingItems = () => {
-    const entry = blockPathMap?.[selectedBlock];
-    if (!entry) return null;
-    const parentId = entry.parentId;
-    const containerField = entry.containerField || 'blocks_layout';
-    const parentBlock = !parentId || parentId === PAGE_BLOCK_UID
-      ? form
-      : getBlockById(form, blockPathMap, parentId);
-    const items = parentBlock?.[containerField]?.items || [];
-    return { items, idx: items.indexOf(selectedBlock), parentBlock, parentId, containerField };
-  };
-
-  // Walk DOWN into containerBlockId, picking the first/last child at each
-  // level (matching the chevron direction), until we land on a leaf whose
-  // allowedSiblingTypes accepts sourceType. Returns the MOVE_BLOCKS
-  // payload fields (targetBlockId, insertAfter, targetParentId) to land
-  // there. Walks EVERY reachable leaf — not just the deepest chevron-
-  // side pick — and tries each in chevron order until one accepts the
-  // source type. Containers can have heterogeneous slot acceptance
-  // (e.g. a tabs block where tab-1 accepts slate but tab-2 only accepts
-  // teaser) and a single-leaf check would silently no-op when the
-  // chosen slot rejects even though a sibling slot would have worked.
-  // Returns null only when EVERY reachable leaf rejects — caller then
-  // falls through to a plain swap, which visually equals "skip past
-  // the container".
-  const collectLeavesInOrder = (containerBlockId, side, visited) => {
-    const seen = visited || new Set();
-    if (seen.has(containerBlockId)) return [];
-    seen.add(containerBlockId);
-    const directChildren = Object.entries(blockPathMap || {})
-      .filter(([, info]) => info?.parentId === containerBlockId)
-      .map(([id]) => id);
-    if (directChildren.length === 0) return [];
-    const ordered = side === 'last' ? directChildren.slice().reverse() : directChildren;
+  // ONE rule covers every case (within-parent swap, INTO a container,
+  // ESCAPE out, SKIP past a rejecting container):
+  //
+  //   Move the source to the immediately-previous (or immediately-next)
+  //   position in the document's PRE-ORDER traversal that accepts the
+  //   source block's @type. The dispatch is always "insert source
+  //   BEFORE/AFTER the candidate block in the candidate's container".
+  //
+  // Why this is general AND simple:
+  //   - within-parent swap: predecessor in pre-order IS the sibling above
+  //     → insert before sibling = swap.
+  //   - ESCAPE out: when source sits at the top of an inner container,
+  //     pre-order's predecessor is the inner container itself. Its slot
+  //     (in cols/columns object_list) usually rejects the source type,
+  //     so we walk further back to the OUTER container (e.g. columns-1)
+  //     whose slot (at page) DOES accept → land just before that outer
+  //     container at page level.
+  //   - INTO container: when there's a container above, pre-order's
+  //     predecessor walks DOWN into that container to its last leaf.
+  //     That leaf's container accepts our type → insert before leaf =
+  //     enter container at the top.
+  //   - SKIP past rejecting container: every leaf inside rejects, but
+  //     the container's own slot at the outer level accepts → land at
+  //     outer level just past the container.
+  //   - disabled when nowhere to go: no accepting slot exists in that
+  //     direction at all.
+  //
+  // The OLD implementation had three separate cases (CASE A boundary,
+  // CASE B INTO via BFS, CASE C swap) plus a hand-coded enable check.
+  // Each case had its own edge case it could fail on. This is one
+  // walk through one ordered list.
+  const computePreOrder = () => {
     const result = [];
-    for (const childId of ordered) {
-      const childInfo = blockPathMap[childId];
-      if (!childInfo) continue;
-      const hasGrandchildren = Object.values(blockPathMap || {}).some(
-        info => info?.parentId === childId,
-      );
-      if (hasGrandchildren) {
-        result.push(...collectLeavesInOrder(childId, side, seen));
-      } else {
-        result.push({
-          targetBlockId: childId,
-          insertAfter: side === 'last',
-          targetParentId: childInfo.parentId,
-          allowed: childInfo.allowedSiblingTypes,
-        });
+    const visit = (blockId, blockData) => {
+      if (blockId !== PAGE_BLOCK_UID) result.push(blockId);
+      // Group this block's direct children by their containerField, then
+      // iterate each field's items in the order stored on the form data.
+      const childrenByField = {};
+      for (const [childId, childInfo] of Object.entries(blockPathMap || {})) {
+        if (childInfo?.parentId !== blockId) continue;
+        const field = childInfo.containerField;
+        if (!field) continue;
+        if (!childrenByField[field]) childrenByField[field] = new Set();
+        childrenByField[field].add(childId);
       }
-    }
+      for (const [field, childSet] of Object.entries(childrenByField)) {
+        const orderedItems = blockData?.[field]?.items || [];
+        for (const childId of orderedItems) {
+          if (!childSet.has(childId)) continue;
+          const childData = getBlockById(form, blockPathMap, childId);
+          visit(childId, childData);
+        }
+      }
+    };
+    visit(PAGE_BLOCK_UID, form);
     return result;
   };
 
-  const findAnchorInContainer = (containerBlockId, side, sourceType) => {
-    const leaves = collectLeavesInOrder(containerBlockId, side);
-    for (const leaf of leaves) {
-      if (!sourceType || !leaf.allowed || leaf.allowed.includes(sourceType)) {
+  // True if descendantId sits anywhere under ancestorId in the block
+  // tree. Used to skip candidates that are inside source's own subtree
+  // (a container can't be moved into itself).
+  const isDescendantOf = (descendantId, ancestorId) => {
+    let cur = blockPathMap?.[descendantId]?.parentId;
+    while (cur && cur !== PAGE_BLOCK_UID) {
+      if (cur === ancestorId) return true;
+      cur = blockPathMap?.[cur]?.parentId;
+    }
+    return false;
+  };
+
+  // Returns the MOVE_BLOCKS payload for the next accepting slot in
+  // direction, or null if there isn't one (chevron should be disabled).
+  const findMoveTarget = (direction) => {
+    if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) return null;
+    const preOrder = computePreOrder();
+    const sourceIdx = preOrder.indexOf(selectedBlock);
+    if (sourceIdx < 0) return null;
+    const sourceType = getBlock(selectedBlock)?.['@type'];
+    const step = direction === 'up' ? -1 : 1;
+    let i = sourceIdx + step;
+    while (i >= 0 && i < preOrder.length) {
+      const candidateId = preOrder[i];
+      // Don't try to land in source's own subtree.
+      if (candidateId === selectedBlock || isDescendantOf(candidateId, selectedBlock)) {
+        i += step;
+        continue;
+      }
+      const candidateInfo = blockPathMap?.[candidateId];
+      if (!candidateInfo) { i += step; continue; }
+      const allowed = candidateInfo.allowedSiblingTypes;
+      // No allowedSiblingTypes recorded → assume permissive (top-level
+      // page-children commonly have no explicit restriction).
+      if (!sourceType || !allowed || allowed.includes(sourceType)) {
         return {
-          targetBlockId: leaf.targetBlockId,
-          insertAfter: leaf.insertAfter,
-          targetParentId: leaf.targetParentId,
+          targetBlockId: candidateId,
+          insertAfter: direction === 'down',
+          targetParentId: candidateInfo.parentId === PAGE_BLOCK_UID ? null : candidateInfo.parentId,
         };
       }
+      i += step;
     }
     return null;
   };
 
-  // Walk UP from parentId to find the top-level (page-child) container
-  // that we should escape past. Returns { target, parentOfTarget } or null.
-  const findEscapeAnchor = (parentId) => {
-    if (!parentId || parentId === PAGE_BLOCK_UID) return null;
-    let target = parentId;
-    let parentOfTarget = blockPathMap?.[target]?.parentId;
-    while (parentOfTarget && parentOfTarget !== PAGE_BLOCK_UID) {
-      target = parentOfTarget;
-      parentOfTarget = blockPathMap?.[target]?.parentId;
-    }
-    return { target, parentOfTarget };
-  };
-
   const moveSelectedBlock = (direction) => {
-    const sib = getSiblingItems();
-    if (!sib || sib.idx < 0) return;
-    const newIdx = sib.idx + (direction === 'up' ? -1 : 1);
-
-    // CASE A — at parent boundary: escape OUT past the enclosing container.
-    if (newIdx < 0 || newIdx >= sib.items.length) {
-      const escape = findEscapeAnchor(sib.parentId);
-      if (!escape) return;
-      document.dispatchEvent(
-        new CustomEvent('hydra-move-block', {
-          detail: {
-            blockId: selectedBlock,
-            targetBlockId: escape.target,
-            insertAfter: direction === 'down',
-            targetParentId: escape.parentOfTarget === PAGE_BLOCK_UID ? null : escape.parentOfTarget,
-          },
-        }),
-      );
-      return;
-    }
-
-    const targetBlockId = sib.items[newIdx];
-    const selectedBlockData = getBlock(selectedBlock);
-    const sourceType = selectedBlockData?.['@type'];
-
-    // CASE B — target sibling is a container that accepts our type: INSERT INTO it.
-    const innerAnchor = findAnchorInContainer(
-      targetBlockId,
-      direction === 'up' ? 'last' : 'first',
-      sourceType,
-    );
-    if (innerAnchor) {
-      document.dispatchEvent(
-        new CustomEvent('hydra-move-block', {
-          detail: { blockId: selectedBlock, ...innerAnchor },
-        }),
-      );
-      return;
-    }
-
-    // CASE C — plain within-parent swap.
+    const target = findMoveTarget(direction);
+    if (!target) return;
     document.dispatchEvent(
       new CustomEvent('hydra-move-block', {
-        detail: {
-          blockId: selectedBlock,
-          targetBlockId,
-          insertAfter: direction === 'down',
-          targetParentId: sib.parentId,
-        },
+        detail: { blockId: selectedBlock, ...target },
       }),
     );
   };
 
-  const chevronSib = getSiblingItems();
-  // Chevron is enabled if we can move within parent OR escape out. Only
-  // disabled when we're at the top/bottom of the OUTERMOST layout (i.e.
-  // top-level and at boundary).
-  const isInInnerContainer = !!(
-    chevronSib?.parentId && chevronSib.parentId !== PAGE_BLOCK_UID
-  );
-  const isAtTopOfParent = !chevronSib || (chevronSib.idx <= 0 && !isInInnerContainer);
-  const isAtBottomOfParent = !chevronSib || (
-    chevronSib.idx >= chevronSib.items.length - 1 && !isInInnerContainer
-  );
+  const isAtTopOfParent = !findMoveTarget('up');
+  const isAtBottomOfParent = !findMoveTarget('down');
 
   // Create Slate editor once using Volto's makeEditor (includes all plugins)
   // Add withEmptyInlineRemoval to clean up empty formatting elements after delete

@@ -289,6 +289,84 @@ test.describe('touch-mode block move via chevron', () => {
   });
 
   /**
+   * Home-page-style: top-level page with diverse block types — slate,
+   * image, hero, teaser — and NO containers. The user reported
+   * "I click on any frontend on the home page. I can't move it up or
+   * down." This locks chevron-up/down behavior for top-level blocks of
+   * each type the home page typically has.
+   *
+   * test-page top-level items: block-1-uuid (slate), block-2-uuid
+   * (image), block-3-uuid (slate), block-4-hero (hero), ...
+   */
+  test('chevron ▲/▼ moves any top-level block (slate, image, hero) on a page with no containers above', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    const tap = async (uid: string) => {
+      await iframe.locator(`[data-block-uid="${uid}"]`).first().evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const x = r.x + r.width / 2;
+        const y = r.y + r.height / 2;
+        const t = new Touch({ identifier: 1, target: el, clientX: x, clientY: y });
+        el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+        el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+      });
+    };
+    const tapChevron = async (which: 'up' | 'down') => {
+      const cls = which === 'up' ? 'chevron-up' : 'chevron-down';
+      await page.locator(`.quanta-toolbar .${cls}`).evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const x = r.x + r.width / 2;
+        const y = r.y + r.height / 2;
+        const t = new Touch({ identifier: 2, target: el, clientX: x, clientY: y });
+        el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+        el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+      });
+    };
+
+    // Each scenario: select a block, tap chevron, verify the block's
+    // index in the top-level order changed by one in the expected
+    // direction.
+    const scenarios: Array<{ uid: string; dir: 'up' | 'down' }> = [
+      { uid: 'block-2-uuid', dir: 'up' },     // image, idx 1 → 0
+      { uid: 'block-3-uuid', dir: 'up' },     // slate, idx 2 → 1
+      { uid: 'block-4-hero', dir: 'up' },     // hero,  idx 3 → 2
+      { uid: 'block-2-uuid', dir: 'down' },   // image, idx 1 → 2 (after the previous up)
+    ];
+
+    for (const { uid, dir } of scenarios) {
+      const before = await helper.getBlockOrder();
+      const beforeIdx = before.indexOf(uid);
+      expect(beforeIdx, `${uid} must be in DOM order before tap`).toBeGreaterThan(-1);
+
+      await tap(uid);
+      await page.waitForTimeout(800);
+      expect(
+        await iframe.locator('body').getAttribute('data-hydra-edit-mode'),
+        `tap on ${uid} must enter block mode`,
+      ).toBe('block');
+
+      const chev = page.locator(
+        `.quanta-toolbar .${dir === 'up' ? 'chevron-up' : 'chevron-down'}`,
+      );
+      await expect(chev, `chevron ${dir} must be visible for ${uid}`).toBeVisible({ timeout: 5000 });
+      await expect(chev, `chevron ${dir} must be enabled for ${uid}`).not.toBeDisabled();
+
+      await tapChevron(dir);
+      const expectedStep = dir === 'up' ? -1 : 1;
+      await expect.poll(async () => {
+        const after = await helper.getBlockOrder();
+        return after.indexOf(uid) - beforeIdx;
+      }, { timeout: 5000 }).toBe(expectedStep);
+    }
+  });
+
+  /**
    * Closer to the actual user report: first tap a TOP-LEVEL block,
    * chevron-move it, THEN tap a block INSIDE a container and try to
    * chevron-move that. User reported "works for the first block I
