@@ -1,0 +1,31 @@
+---
+/**
+ * Teaser block. If no href is selected, render a placeholder. Otherwise,
+ * fall back through block fields → referenced page fields so unedited
+ * teasers still display the target page's title/description/preview image.
+ * The `overwrite` flag (set when the editor edits the block fields)
+ * pins to block-level values.
+ */
+import { getImageUrl, contentPath } from './utils.js';
+const { block } = Astro.props;
+const hrefObj = block.href?.[0] || null;
+const useBlockData = block.overwrite || !hrefObj?.title;
+const title = useBlockData ? block.title : hrefObj?.title || '';
+const description = useBlockData ? block.description : hrefObj?.description || '';
+const href = contentPath(hrefObj?.['@id'] || '');
+const imageSrc = block.preview_image
+  ? getImageUrl(block.preview_image)
+  : (hrefObj?.hasPreviewImage ? getImageUrl(`${href}/@@images/preview_image`) : '');
+---
+{!href ? (
+  <div class="teaser-placeholder">
+    <p>Select a target page for this teaser</p>
+  </div>
+) : (
+  <div class="teaser-block">
+    {imageSrc && <img data-edit-media="preview_image" src={imageSrc} alt="" />}
+    <h3 data-edit-text="title">{title}</h3>
+    <p data-edit-text="description">{description}</p>
+    <a href={href} data-edit-link="href">Read more</a>
+  </div>
+)}

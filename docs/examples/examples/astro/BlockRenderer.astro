@@ -16,14 +16,64 @@
  * type the example doesn't implement yet.
  */
 import SlateBlock from './SlateBlock.astro';
+import IntroductionBlock from './IntroductionBlock.astro';
+import ImageBlock from './ImageBlock.astro';
+import HeroBlock from './HeroBlock.astro';
+import TeaserBlock from './TeaserBlock.astro';
+import TableBlock from './TableBlock.astro';
+import ColumnsBlock from './ColumnsBlock.astro';
+import GridBlock from './GridBlock.astro';
+import AccordionBlock from './AccordionBlock.astro';
+import SliderBlock from './SliderBlock.astro';
+import ListingBlock from './ListingBlock.astro';
+import SearchBlock from './SearchBlock.astro';
+import FormBlock from './FormBlock.astro';
+import HeadingBlock from './HeadingBlock.astro';
+import SeparatorBlock from './SeparatorBlock.astro';
+import ButtonBlock from './ButtonBlock.astro';
+import HighlightBlock from './HighlightBlock.astro';
+import VideoBlock from './VideoBlock.astro';
+import MapsBlock from './MapsBlock.astro';
+import TocBlock from './TocBlock.astro';
+import CodeExampleBlock from './CodeExampleBlock.astro';
+import SummaryItemBlock from './SummaryItemBlock.astro';
 
 const { block, content } = Astro.props;
 const type = block?.['@type'];
 const uid = block?.['@uid'];
+
+// Types we know about — single source of truth for the "implemented?" check.
+const KNOWN = new Set<string>([
+  'slate', 'introduction', 'image', 'hero', 'teaser', 'slateTable',
+  'columns', 'gridBlock', 'accordion', 'slider', 'listing', 'search',
+  'form', 'heading', 'separator', 'button', 'highlight', 'video',
+  'maps', 'toc', 'codeExample', 'summary', 'default',
+]);
 ---
 <div data-block-uid={uid}>
   {type === 'slate' && <SlateBlock block={block} />}
-  {!['slate'].includes(type) && (
+  {type === 'introduction' && <IntroductionBlock block={block} content={content} />}
+  {type === 'image' && <ImageBlock block={block} />}
+  {type === 'hero' && <HeroBlock block={block} />}
+  {type === 'teaser' && <TeaserBlock block={block} />}
+  {type === 'slateTable' && <TableBlock block={block} />}
+  {type === 'columns' && <ColumnsBlock block={block} />}
+  {type === 'gridBlock' && <GridBlock block={block} />}
+  {type === 'accordion' && <AccordionBlock block={block} />}
+  {type === 'slider' && <SliderBlock block={block} />}
+  {type === 'listing' && <ListingBlock block={block} />}
+  {type === 'search' && <SearchBlock block={block} />}
+  {type === 'form' && <FormBlock block={block} />}
+  {type === 'heading' && <HeadingBlock block={block} />}
+  {type === 'separator' && <SeparatorBlock block={block} />}
+  {type === 'button' && <ButtonBlock block={block} />}
+  {type === 'highlight' && <HighlightBlock block={block} />}
+  {type === 'video' && <VideoBlock block={block} />}
+  {type === 'maps' && <MapsBlock block={block} />}
+  {type === 'toc' && <TocBlock block={block} content={content} />}
+  {type === 'codeExample' && <CodeExampleBlock block={block} />}
+  {(type === 'summary' || type === 'default') && <SummaryItemBlock block={block} />}
+  {!KNOWN.has(type) && (
     <div data-unknown-block-type={type}>[block type "{type}" not implemented in astro example yet]</div>
   )}
 </div>

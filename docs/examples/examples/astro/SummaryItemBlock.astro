@@ -1,0 +1,26 @@
+---
+/**
+ * Listing-item block. The svelte BlockRenderer inlined this for the
+ * 'summary' and 'default' block types; here it lives in its own file so
+ * BlockRenderer.astro stays focused on dispatch.
+ *
+ * No data-block-uid wrapper — BlockRenderer adds it. The internal
+ * data-edit-* hooks let editors retitle / re-link items in place.
+ */
+import { getImageUrl, contentPath } from './utils.js';
+const { block } = Astro.props;
+const img = block.image ? getImageUrl(block.image) : '';
+const dateStr = block.date
+  ? new Date(block.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+  : '';
+---
+<div class="listing-item">
+  {block.image && img && (
+    <img data-edit-media="image" src={img} alt="" />
+  )}
+  {block.date && (
+    <time style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">{dateStr}</time>
+  )}
+  <h4><a href={contentPath(block.href)} data-edit-link="href">{block.title}</a></h4>
+  {block.description && <p data-edit-text="description">{block.description}</p>}
+</div>
