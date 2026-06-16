@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "dev:test": "astro dev --port 3007 --host 127.0.0.1",
+    "dev:test": "astro dev --port 3009",
     "build": "astro build",
     "preview": "astro preview"
   },

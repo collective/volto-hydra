@@ -17,9 +17,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   output: 'server',
   adapter: node({ mode: 'standalone' }),
+  // dev:test in package.json passes --port 3009 to match PORTS.astroDoc;
+  // this is just the default for `astro dev` without args.
   server: {
-    port: 3007,
-    host: '127.0.0.1',
+    port: 3009,
   },
   vite: {
     resolve: {
