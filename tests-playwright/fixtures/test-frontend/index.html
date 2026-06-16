@@ -136,7 +136,8 @@
 
     <script src="/renderer.js"></script>
     <script type="module">
-        import { initBridge, expandListingBlocks, ploneFetchItems, expandTemplates, expandTemplatesSync, getAccessToken, contentPath } from '/hydra.js';
+        import { initBridge, getAccessToken } from '/hydra.js';
+        import { expandListingBlocks, ploneFetchItems, expandTemplates, expandTemplatesSync, contentPath } from '/helpers.js';
         import { sharedBlocksConfig } from '/shared-block-schemas.js';
 
         // Parse page numbers from URL query params (format: ?pg_{blockId}={pageNumber})
