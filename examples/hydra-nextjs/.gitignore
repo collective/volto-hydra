@@ -131,6 +131,3 @@ dist
 
 certificates
 
-# Copied from packages/{hydra-js,helpers} at build time (see copy:hydra script)
-src/utils/hydra.js
-src/utils/helpers.js

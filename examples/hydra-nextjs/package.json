@@ -4,21 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "copy:hydra": "pnpm -F @volto-hydra/hydra-js build && cp ../../packages/hydra-js/hydra.js ./src/utils/hydra.js && cp ../../packages/helpers/index.js ./src/utils/helpers.js",
-    "predev": "pnpm run copy:hydra",
     "dev": "next dev -p 3002",
-    "dev:test": "pnpm run copy:hydra && next dev -p 3007",
+    "dev:test": "next dev -p 3007",
     "build:test": "next build",
     "start:test": "next start -p 3007",
     "dev:https": "next dev --experimental-https -p 3002",
-    "prebuild": "pnpm run copy:hydra",
     "build": "next build",
     "start": "next start -p 3002",
     "lint": "next lint"
   },
   "imports": {
-    "#utils/hydra": "./src/utils/hydra.js",
-    "#utils/helpers": "./src/utils/helpers.js",
     "#utils/*": "./src/utils/*.js"
   },
   "dependencies": {
