@@ -24,29 +24,9 @@ export function canContain(config, blockType, currentCount) {
   return true;
 }
 
-/**
- * Can a container accept every block type in `blockTypes` given its current
- * count? Considers the combined count against maxLength.
- *
- * @param {object} config         Container field config
- * @param {string[]} blockTypes   Block types to add (in order)
- * @param {number} currentCount   Current number of children
- * @returns {boolean}
- */
-export function canContainAll(config, blockTypes, currentCount) {
-  if (blockTypes.length === 0) return true;
-  if (config?.readOnly || config?.fixed) return false;
-  const { allowedBlocks, maxLength } = config || {};
-  if (allowedBlocks != null) {
-    for (const type of blockTypes) {
-      if (!allowedBlocks.includes(type)) return false;
-    }
-  }
-  if (maxLength != null && currentCount + blockTypes.length > maxLength) {
-    return false;
-  }
-  return true;
-}
+// canContainAll moved to @volto-hydra/helpers so SSR template-merge code
+// can call it without dragging in the iframe-only container ops here.
+// containerOps.test.js imports it from @volto-hydra/helpers.
 
 /**
  * Find the shortest conversion path from srcType to any allowedTarget, using

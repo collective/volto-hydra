@@ -30,7 +30,8 @@ import DropdownMenu from '../Toolbar/DropdownMenu';
 import { getBlockById, updateBlockById, getResolvedSchema, getCommonAncestor } from '../../utils/blockPath';
 import { HydraSchemaProvider } from '../../context';
 import { getConvertibleTypes, convertBlockType, findTypeField } from '../../utils/schemaInheritance';
-import { PAGE_BLOCK_UID, isBlockReadonly } from '@volto-hydra/hydra-js';
+import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { isBlockReadonly } from '@volto-hydra/helpers';
 
 /**
  * Get the display title for a block type

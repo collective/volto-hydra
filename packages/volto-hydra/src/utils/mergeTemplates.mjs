@@ -5,7 +5,7 @@
  * @plone/volto) so that unit tests in hydra-js can import it directly.
  */
 
-import { expandTemplates } from '@volto-hydra/hydra-js';
+import { expandTemplates } from '@volto-hydra/helpers';
 import { getBlockSchema } from '../../../hydra-js/buildBlockPathMap.js';
 
 /**

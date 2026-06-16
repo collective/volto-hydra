@@ -16,7 +16,8 @@ const applyBlockInitialValue = (blockData, blocksConfig, intl) => {
   return fn({ id: undefined, value: blockData, formData: undefined, intl });
 };
 import config from '@plone/volto/registry';
-import { PAGE_BLOCK_UID, isBlockReadonly } from '@volto-hydra/hydra-js';
+import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { isBlockReadonly } from '@volto-hydra/helpers';
 import {
   buildBlockPathMap as _buildBlockPathMap,
   getBlockTypeSchema,

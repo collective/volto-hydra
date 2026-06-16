@@ -5,7 +5,8 @@
  * Strict TDD: each `it` below must fail before its implementation exists.
  */
 
-import { canContain, canContainAll, findConversionPath, mapLayoutItems } from './containerOps.js';
+import { canContain, findConversionPath, mapLayoutItems } from './containerOps.js';
+import { canContainAll } from '@volto-hydra/helpers';
 
 describe('containerOps', () => {
   describe('canContain', () => {

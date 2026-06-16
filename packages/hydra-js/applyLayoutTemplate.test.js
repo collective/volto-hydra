@@ -1,4 +1,4 @@
-import { expandTemplates, expandTemplatesSync } from './hydra.src.js';
+import { expandTemplates, expandTemplatesSync } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from './mergeTemplates.js';
 
 // Wrapper to match old applyLayoutTemplate signature for existing tests

@@ -9,8 +9,15 @@ import {
 import { validateAndLog, validateTemplatePlaceholders } from '../../utils/formDataValidation';
 import { toast } from 'react-toastify';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
-import { PAGE_BLOCK_UID, getUniqueTemplateIds, getBlockAddability, isBlockReadonly, isBlockPositionLocked } from '@volto-hydra/hydra-js';
-import { isSlateFieldType, formDataContentEqual } from '@volto-hydra/helpers';
+import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import {
+  isSlateFieldType,
+  formDataContentEqual,
+  getUniqueTemplateIds,
+  getBlockAddability,
+  isBlockReadonly,
+  isBlockPositionLocked,
+} from '@volto-hydra/helpers';
 import Api from '@plone/volto/helpers/Api/Api';
 
 import { setBlocksClipboard, resetBlocksClipboard } from '@plone/volto/actions/blocksClipboard/blocksClipboard';
@@ -232,7 +239,7 @@ import slateTransforms from '../../utils/slateTransforms';
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, _getContainerChildFieldName } from '../../utils/blockPath';
-import { canContainAll } from '@volto-hydra/hydra-js';
+import { canContainAll } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
