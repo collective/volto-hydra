@@ -7,7 +7,7 @@
 
 <script setup>
 import { computed, ref, reactive, watch } from 'vue';
-import { expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';
+import { expandListingBlocks, ploneFetchItems } from '@hydra-js/helpers';
 
 const props = defineProps({
   id: { type: String, required: true },

@@ -52,7 +52,7 @@
 // `ref` from vue; `useRoute` is a Nuxt auto-import composable so no explicit
 // import is needed for it (same pattern as ListingBlock.vue).
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
-import { expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';
+import { expandListingBlocks, ploneFetchItems } from '@hydra-js/helpers';
 
 const props = defineProps({
   blockId: { type: String, required: true },

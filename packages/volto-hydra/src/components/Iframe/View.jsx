@@ -9,7 +9,8 @@ import {
 import { validateAndLog, validateTemplatePlaceholders } from '../../utils/formDataValidation';
 import { toast } from 'react-toastify';
 import { getIframeUrlCookieName } from '../../utils/cookieNames';
-import { isSlateFieldType, formDataContentEqual, PAGE_BLOCK_UID, getUniqueTemplateIds, getBlockAddability, isBlockReadonly, isBlockPositionLocked } from '@volto-hydra/hydra-js';
+import { PAGE_BLOCK_UID, getUniqueTemplateIds, getBlockAddability, isBlockReadonly, isBlockPositionLocked } from '@volto-hydra/hydra-js';
+import { isSlateFieldType, formDataContentEqual } from '@volto-hydra/helpers';
 import Api from '@plone/volto/helpers/Api/Api';
 
 import { setBlocksClipboard, resetBlocksClipboard } from '@plone/volto/actions/blocksClipboard/blocksClipboard';

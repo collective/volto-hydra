@@ -1054,3 +1054,57 @@ function _findChangedInBlock(prevBlock, newBlock) {
   }
   return null;
 }
+
+/**
+ * Convert a Plone image value to a full URL suitable for `<img src>`.
+ *
+ * Handles every shape the Plone REST API hands back:
+ *   - string paths (relative or absolute)
+ *   - objects with an `@id`
+ *   - catalog brains with `image_scales` + `image_field`
+ *   - arrays of the above (first element wins)
+ *
+ * Relative paths are prefixed with `apiUrl`. For paths that don't already
+ * point at a scale URL (no `@@images` / `@@download`), the canonical
+ * `@@images/image` suffix is appended.
+ *
+ * Was previously duplicated in each example's `utils.js`. Centralised
+ * here because every frontend needs the same URL resolution; per-example
+ * copies always drifted from each other.
+ *
+ * `apiUrl` is the base origin (e.g. `'http://localhost:8888'`) — pass it
+ * explicitly so this works in SSR / Node where `window` is undefined.
+ */
+export function getImageUrl(value, apiUrl = '') {
+  if (!value) return '';
+
+  // Catalog brain with image_scales
+  if (value.image_scales && value.image_field) {
+    const field = value.image_field;
+    const scales = value.image_scales[field];
+    if (scales?.[0]?.download) {
+      const baseUrl = value['@id'] || '';
+      const prefix = baseUrl.startsWith('http') ? '' : apiUrl;
+      return `${prefix}${baseUrl}/${scales[0].download}`;
+    }
+  }
+
+  // No image data (catalog brain without image_scales) — return empty
+  if (value.image_scales === null || value.image_field === '') return '';
+
+  // Extract URL from various formats
+  let url = Array.isArray(value) ? value[0]?.['@id'] : value?.['@id'] || value;
+  if (typeof url !== 'string') return '';
+
+  // Add @@images/image for content paths without a scale URL
+  if (url.startsWith('/') && !url.includes('@@images') && !url.includes('@@download')) {
+    url = `${url}/@@images/image`;
+  }
+
+  // Prepend API origin for relative paths
+  if (url.startsWith('/')) {
+    url = `${apiUrl}${url}`;
+  }
+
+  return url;
+}

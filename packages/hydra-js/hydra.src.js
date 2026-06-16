@@ -1,47 +1,20 @@
 import { tabbable } from 'tabbable';
 
-// Pure data helpers were extracted to @volto-hydra/helpers so they can
-// be imported server-side (e.g. from an Astro render endpoint) without
-// dragging in the Bridge class / DOM listeners. We re-export them here
-// for back-compat — existing imports of these names from
-// `@volto-hydra/hydra-js` keep working — AND import them locally
-// because some bridge methods call them directly (deepEqual,
-// findChangedUnit, getFieldTypeString, the field-type predicates).
+// Pure data helpers live in @volto-hydra/helpers — imported here ONLY
+// for internal use by bridge methods (deepEqual, findChangedUnit,
+// getFieldTypeString, the field-type predicates). They are NOT
+// re-exported: callers must import them from @volto-hydra/helpers
+// directly so server-only code can pull them in without the Bridge
+// class / DOM listeners coming along.
 import {
-  expandListingBlocks,
-  ploneFetchItems,
-  contentPath,
-  buildQuerystringSearchBody,
-  calculatePaging,
-  staticBlocks,
-  convertFieldValue,
   getFieldTypeString,
   isSlateFieldType,
   isTextareaFieldType,
   isPlainStringFieldType,
   isTextEditableFieldType,
   deepEqual,
-  formDataContentEqual,
   findChangedUnit,
 } from '@volto-hydra/helpers';
-
-export {
-  expandListingBlocks,
-  ploneFetchItems,
-  contentPath,
-  buildQuerystringSearchBody,
-  calculatePaging,
-  staticBlocks,
-  convertFieldValue,
-  getFieldTypeString,
-  isSlateFieldType,
-  isTextareaFieldType,
-  isPlainStringFieldType,
-  isTextEditableFieldType,
-  deepEqual,
-  formDataContentEqual,
-  findChangedUnit,
-};
 
 /**
  * This IS a large file and it needs to be written in one file so for better understanding and

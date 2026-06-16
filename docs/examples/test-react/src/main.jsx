@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { initBridge, expandListingBlocks, expandTemplatesSync, ploneFetchItems, contentPath } from '$hydra';
+import { initBridge, expandTemplatesSync } from '$hydra';
+import { expandListingBlocks, ploneFetchItems, contentPath } from '$helpers';
 import docPageDefinitions from '$schemas';
 const docBlocksConfig = Object.fromEntries(
   Object.values(docPageDefinitions).flatMap(page => Object.entries(page.blocks))

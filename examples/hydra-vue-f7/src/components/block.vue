@@ -655,7 +655,8 @@
 import { inject, ref, reactive, computed, watch } from 'vue';
 import RichText from './richtext.vue';
 import ListingBlock from './ListingBlock.vue';
-import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, contentPath } from '@hydra-js/hydra.js';
+import { expandTemplatesSync } from '@hydra-js/hydra.js';
+import { expandListingBlocks, ploneFetchItems, contentPath } from '@hydra-js/helpers';
 
 // Social icons SVG map (with name + svg for socialInfo())
 const SOCIAL_ICONS = {
