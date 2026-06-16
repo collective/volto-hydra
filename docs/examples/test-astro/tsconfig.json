@@ -1,0 +1,11 @@
+{
+  "extends": "astro/tsconfigs/base",
+  "compilerOptions": {
+    "moduleResolution": "Bundler",
+    "paths": {
+      "$hydra": ["../../packages/hydra-js/hydra.src.js"],
+      "$examples/*": ["../examples/astro/*"],
+      "$schemas": ["../block-definitions.json"]
+    }
+  }
+}

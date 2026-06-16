@@ -29,7 +29,7 @@ base.beforeEach(async ({}, testInfo) => {
     testInfo.skip(true, `Doc-examples only run on doc-example frontends (not ${project})`);
   }
   // Skip opt-in frontends if their server isn't running
-  if (project === 'nextjs' || project === 'f7') {
+  if (project === 'nextjs' || project === 'f7' || project === 'astro') {
     const url = getFrontendUrl(project);
     if (url) {
       try {

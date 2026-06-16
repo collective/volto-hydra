@@ -1,0 +1,29 @@
+---
+/**
+ * Wrap every block in `<div data-block-uid="X">` and dispatch to its
+ * type-specific component. The wrapper is what makes per-block swaps
+ * reliable: the bridge does `document.querySelector('[data-block-uid=X]')
+ * .outerHTML = newHTML`, and the new HTML carries this same wrapper.
+ *
+ * Block component authors do NOT set `data-block-uid` themselves — the
+ * wrapper is the contract. This is the one architectural rule that the
+ * Astro integration adds on top of the Hydra bridge protocol; it's
+ * Astro-only because Vue/React reconciliation in the other examples
+ * doesn't need a stable DOM swap target.
+ *
+ * Unknown block types render a visible placeholder rather than nothing
+ * so it's obvious during development when a fixture references a block
+ * type the example doesn't implement yet.
+ */
+import SlateBlock from './SlateBlock.astro';
+
+const { block, content } = Astro.props;
+const type = block?.['@type'];
+const uid = block?.['@uid'];
+---
+<div data-block-uid={uid}>
+  {type === 'slate' && <SlateBlock block={block} />}
+  {!['slate'].includes(type) && (
+    <div data-unknown-block-type={type}>[block type "{type}" not implemented in astro example yet]</div>
+  )}
+</div>

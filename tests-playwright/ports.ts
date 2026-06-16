@@ -51,6 +51,8 @@ export const PORTS = {
   nextjs: port('HYDRA_NEXTJS_PORT', 3007),
   /** Vue F7 example frontend (hash-routed). */
   f7: port('HYDRA_F7_PORT', 3008),
+  /** Doc-example: Astro (SSR, Node adapter). */
+  astroDoc: port('HYDRA_ASTRO_DOC_PORT', 3009),
 } as const;
 
 /**
@@ -73,4 +75,5 @@ export const URLS = {
   vueDoc: `http://localhost:${PORTS.vueDoc}`,
   nextjs: `http://localhost:${PORTS.nextjs}`,
   f7: `http://localhost:${PORTS.f7}`,
+  astroDoc: `http://localhost:${PORTS.astroDoc}`,
 } as const;
