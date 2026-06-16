@@ -22,6 +22,10 @@
     "docs-images-listing-edit-001/image/listing-edit.png",
     "docs-images-maps-edit-001/image/maps-edit.png",
     "docs-images-media-empty-placeholder-001/image/media-empty-placeholder.png",
+    "docs-images-mobile-block-selected-001/image/mobile-block-selected.png",
+    "docs-images-mobile-dropdown-menu-001/image/mobile-dropdown-menu.png",
+    "docs-images-mobile-select-parent-001/image/mobile-select-parent.png",
+    "docs-images-mobile-sidebar-fullscreen-001/image/mobile-sidebar-fullscreen.png",
     "docs-images-multi-select-001/image/multi-select.png",
     "docs-images-parent-chain-001/image/parent-chain.png",
     "docs-images-search-edit-001/image/search-edit.png",
@@ -120,6 +124,10 @@
     "docs-images-listing-edit-001/data.json",
     "docs-images-maps-edit-001/data.json",
     "docs-images-media-empty-placeholder-001/data.json",
+    "docs-images-mobile-block-selected-001/data.json",
+    "docs-images-mobile-dropdown-menu-001/data.json",
+    "docs-images-mobile-select-parent-001/data.json",
+    "docs-images-mobile-sidebar-fullscreen-001/data.json",
     "docs-images-multi-select-001/data.json",
     "docs-images-parent-chain-001/data.json",
     "docs-images-search-edit-001/data.json",
@@ -874,6 +882,34 @@
       }
     },
     "docs-images-image-block-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-mobile-block-selected-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-mobile-dropdown-menu-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-mobile-select-parent-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-mobile-sidebar-fullscreen-001": {
       "local_roles": {
         "admin": [
           "Owner"

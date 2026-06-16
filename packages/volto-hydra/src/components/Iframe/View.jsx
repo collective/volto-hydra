@@ -965,17 +965,39 @@ const Iframe = (props) => {
       }
     };
 
+    // Mobile #145 — chevron buttons in the Quanta toolbar dispatch this
+    // CustomEvent to reorder the selected block within its parent. The
+    // existing MOVE_BLOCKS postMessage path is iframe-origin-gated, so
+    // admin-React → admin-React reuse goes through the CustomEvent bus
+    // (same pattern as hydra-paste-blocks, hydra-copy-blocks, etc.).
+    const handleMoveBlock = (e) => {
+      const { blockId, targetBlockId, insertAfter, targetParentId } = e.detail || {};
+      if (!blockId || !targetBlockId) return;
+      // Drop a synthetic MOVE_BLOCKS message in — the same handler in the
+      // window 'message' listener does the path-map rebuild, allowed-types
+      // check, and onChangeFormData call. Origin filter is bypassed by
+      // dispatching directly through MessageEvent on window.
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: { type: 'MOVE_BLOCKS', blockIds: [blockId], targetBlockId, insertAfter, targetParentId },
+          origin: iframeOriginRef.current || (iframeSrc ? new URL(iframeSrc).origin : ''),
+        }),
+      );
+    };
+
     document.addEventListener('hydra-copy-blocks', handleCopy);
     document.addEventListener('hydra-delete-blocks', handleDelete);
     document.addEventListener('hydra-paste-blocks', handlePaste);
     document.addEventListener('hydra-exit-selection-mode', handleExitSelectionMode);
     document.addEventListener('hydra-enter-selection-mode', handleEnterSelectionMode);
+    document.addEventListener('hydra-move-block', handleMoveBlock);
     return () => {
       document.removeEventListener('hydra-copy-blocks', handleCopy);
       document.removeEventListener('hydra-delete-blocks', handleDelete);
       document.removeEventListener('hydra-paste-blocks', handlePaste);
       document.removeEventListener('hydra-exit-selection-mode', handleExitSelectionMode);
       document.removeEventListener('hydra-enter-selection-mode', handleEnterSelectionMode);
+      document.removeEventListener('hydra-move-block', handleMoveBlock);
     };
   }, [blocksClipboard, properties, iframeSyncState?.blockPathMap, onChangeFormData, dispatch, intl]);
 
@@ -4101,6 +4123,17 @@ const Iframe = (props) => {
           >
             Cancel
           </button>
+          {/* Mobile-only back-arrow at bottom-left corner. Hidden on
+           * desktop/tablet via .mobile-sheet-close { display: none } in
+           * mobile-tablet.css. */}
+          <button
+            type="button"
+            className="mobile-sheet-close"
+            aria-label="Close menu"
+            onClick={() => setChooser(null)}
+          >
+            ←
+          </button>
         </div>,
         document.body,
       )}
@@ -4138,6 +4171,7 @@ const Iframe = (props) => {
         createPortal(
           <div
             ref={setPopperElement}
+            className="add-new-block-popup"
             style={styles.popper}
             {...attributes.popper}
           >
@@ -4183,6 +4217,17 @@ const Iframe = (props) => {
               navRoot={navRoot}
               contentType={contentType}
             />
+            {/* Mobile-only back-arrow at bottom-left corner. Hidden on
+             * desktop/tablet via .mobile-sheet-close { display: none } in
+             * mobile-tablet.css. */}
+            <button
+              type="button"
+              className="mobile-sheet-close"
+              aria-label="Close menu"
+              onClick={() => setAddNewBlockOpened(false)}
+            >
+              ←
+            </button>
           </div>,
           document.body,
         )}

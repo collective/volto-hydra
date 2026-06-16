@@ -12,7 +12,7 @@ import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
  * Renders a dropdown menu with:
  * - Overflow buttons (formatting buttons that don't fit in toolbar)
  * - Table actions (add row/column before, delete row/column) when in table mode
- * - Settings, Select Container, and Remove options
+ * - Settings and Remove options
  * Uses React portal to avoid container clipping issues.
  *
  * Overflow buttons are wrapped in a Slate context using the passed editor
@@ -24,8 +24,6 @@ const DropdownMenu = ({
   menuButtonRect,
   onClose,
   onOpenSettings,
-  parentId,
-  onSelectBlock,
   overflowButtons = [], // Array of { name, element } for buttons that overflow
   showFormatDropdown = false, // Whether to show FormatDropdown in overflow
   blockButtons = [], // Block buttons for FormatDropdown
@@ -90,12 +88,6 @@ const DropdownMenu = ({
     }
   };
 
-  const handleSelectContainer = () => {
-    onClose();
-    if (parentId && onSelectBlock) {
-      onSelectBlock(parentId);
-    }
-  };
 
   const handleRemove = () => {
     onClose();
@@ -453,35 +445,6 @@ const DropdownMenu = ({
           <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.1)', margin: '0 10px' }} />
         </>
       )}
-      {/* Select Container option - only shown for nested blocks with a real parent (not page) */}
-      {parentId && parentId !== PAGE_BLOCK_UID && onSelectBlock && (
-        <>
-          <div
-            className="volto-hydra-dropdown-item"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: '10px',
-              cursor: 'pointer',
-              fontSize: '15px',
-              fontWeight: '500',
-            }}
-            onMouseEnter={(e) => (e.target.style.background = '#f0f0f0')}
-            onMouseLeave={(e) => (e.target.style.background = 'transparent')}
-            data-action="select-container"
-            onClick={handleSelectContainer}
-          >
-            ⬆️ Select Container
-          </div>
-          <div
-            style={{
-              height: '1px',
-              background: 'rgba(0, 0, 0, 0.1)',
-              margin: '0 10px',
-            }}
-          />
-        </>
-      )}
       {/* Remove action - label changes based on table mode and add direction */}
       {/* Hide remove for page-level fields and fixed template blocks */}
       {selectedBlock && selectedBlock !== PAGE_BLOCK_UID && !isFixed && (() => {
@@ -532,6 +495,17 @@ const DropdownMenu = ({
           </div>
         );
       })()}
+      {/* Mobile-only back-arrow at bottom-left corner. Hidden on
+       * desktop/tablet via .mobile-sheet-close { display: none } in
+       * mobile-tablet.css. */}
+      <button
+        type="button"
+        className="mobile-sheet-close"
+        aria-label="Close menu"
+        onClick={onClose}
+      >
+        ←
+      </button>
     </div>,
     document.body,
   );

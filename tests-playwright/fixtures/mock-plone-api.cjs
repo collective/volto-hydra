@@ -1290,6 +1290,37 @@ app.post('/*', (req, res, next) => {
     return res.status(201).json(enrichContent(rawDoc, docPath, baseUrl, parseExpand(req)));
   }
 
+  if (contentType === 'Folder') {
+    // Folder is a container without blocks — used to exercise the Hydra
+    // Add-shadow's type-aware post-create redirect: types without the
+    // volto.blocks behavior should land on the canonical view, not
+    // /edit. Same response shape as Document so Volto can transition
+    // off the POST response.
+    const id = body.id || `untitled-folder-${Date.now()}`;
+    const folderPath = `${parentPath === '/' ? '' : parentPath}/${id}`.replace(/\/+/g, '/');
+    const now = new Date().toISOString();
+    const baseUrl = `http://localhost:${PORT}`;
+    const rawFolder = {
+      '@type': 'Folder',
+      id,
+      title: body.title || id,
+      description: body.description || '',
+      created: now,
+      modified: now,
+      effective: now,
+      review_state: 'published',
+    };
+
+    const sessionId = getSessionId(req);
+    setSessionContent(sessionId, folderPath, rawFolder);
+
+    if (process.env.DEBUG) {
+      console.log(`Created Folder: ${folderPath}${sessionId ? ` (session: ${sessionId})` : ''}`);
+    }
+
+    return res.status(201).json(enrichContent(rawFolder, folderPath, baseUrl, parseExpand(req)));
+  }
+
   // Unsupported content type - return 501 instead of passing to next
   return res.status(501).json({ error: `Content type '${contentType}' not supported` });
 });
@@ -1738,6 +1769,11 @@ function listAddableTypes() {
       '@id': `http://localhost:${PORT}/@types/Document`,
       addable: true,
       title: 'Page',
+    },
+    {
+      '@id': `http://localhost:${PORT}/@types/Folder`,
+      addable: true,
+      title: 'Folder',
     },
   ];
 }

@@ -16,6 +16,7 @@ import DropdownMenu from './DropdownMenu';
 import linkSVG from '@plone/volto/icons/link.svg';
 import imageSVG from '@plone/volto/icons/image.svg';
 import clearSVG from '@plone/volto/icons/clear.svg';
+import upSVG from '@plone/volto/icons/up.svg';
 import AddLinkForm from '@plone/volto/components/manage/AnchorPlugin/components/LinkButton/AddLinkForm';
 import { ImageInput } from '@plone/volto/components/manage/Widgets/ImageWidget';
 import { createLog } from '../../utils/log';
@@ -194,6 +195,126 @@ const SyncedSlateToolbar = ({
   const updateBlockInForm = useCallback((blockId, newBlockData) => {
     return updateBlockById(form, blockPathMap, blockId, newBlockData);
   }, [form, blockPathMap]);
+
+  // ──────────────────────────────────────────────────────────────
+  // Chevron move buttons (mobile #145).
+  //
+  // ONE rule covers every case (within-parent swap, INTO a container,
+  // ESCAPE out, SKIP past a rejecting container):
+  //
+  //   Move the source to the immediately-previous (or immediately-next)
+  //   position in the document's PRE-ORDER traversal that accepts the
+  //   source block's @type. The dispatch is always "insert source
+  //   BEFORE/AFTER the candidate block in the candidate's container".
+  //
+  // Why this is general AND simple:
+  //   - within-parent swap: predecessor in pre-order IS the sibling above
+  //     → insert before sibling = swap.
+  //   - ESCAPE out: when source sits at the top of an inner container,
+  //     pre-order's predecessor is the inner container itself. Its slot
+  //     (in cols/columns object_list) usually rejects the source type,
+  //     so we walk further back to the OUTER container (e.g. columns-1)
+  //     whose slot (at page) DOES accept → land just before that outer
+  //     container at page level.
+  //   - INTO container: when there's a container above, pre-order's
+  //     predecessor walks DOWN into that container to its last leaf.
+  //     That leaf's container accepts our type → insert before leaf =
+  //     enter container at the top.
+  //   - SKIP past rejecting container: every leaf inside rejects, but
+  //     the container's own slot at the outer level accepts → land at
+  //     outer level just past the container.
+  //   - disabled when nowhere to go: no accepting slot exists in that
+  //     direction at all.
+  //
+  // The OLD implementation had three separate cases (CASE A boundary,
+  // CASE B INTO via BFS, CASE C swap) plus a hand-coded enable check.
+  // Each case had its own edge case it could fail on. This is one
+  // walk through one ordered list.
+  const computePreOrder = () => {
+    const result = [];
+    const visit = (blockId, blockData) => {
+      if (blockId !== PAGE_BLOCK_UID) result.push(blockId);
+      // Group this block's direct children by their containerField, then
+      // iterate each field's items in the order stored on the form data.
+      const childrenByField = {};
+      for (const [childId, childInfo] of Object.entries(blockPathMap || {})) {
+        if (childInfo?.parentId !== blockId) continue;
+        const field = childInfo.containerField;
+        if (!field) continue;
+        if (!childrenByField[field]) childrenByField[field] = new Set();
+        childrenByField[field].add(childId);
+      }
+      for (const [field, childSet] of Object.entries(childrenByField)) {
+        const orderedItems = blockData?.[field]?.items || [];
+        for (const childId of orderedItems) {
+          if (!childSet.has(childId)) continue;
+          const childData = getBlockById(form, blockPathMap, childId);
+          visit(childId, childData);
+        }
+      }
+    };
+    visit(PAGE_BLOCK_UID, form);
+    return result;
+  };
+
+  // True if descendantId sits anywhere under ancestorId in the block
+  // tree. Used to skip candidates that are inside source's own subtree
+  // (a container can't be moved into itself).
+  const isDescendantOf = (descendantId, ancestorId) => {
+    let cur = blockPathMap?.[descendantId]?.parentId;
+    while (cur && cur !== PAGE_BLOCK_UID) {
+      if (cur === ancestorId) return true;
+      cur = blockPathMap?.[cur]?.parentId;
+    }
+    return false;
+  };
+
+  // Returns the MOVE_BLOCKS payload for the next accepting slot in
+  // direction, or null if there isn't one (chevron should be disabled).
+  const findMoveTarget = (direction) => {
+    if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) return null;
+    const preOrder = computePreOrder();
+    const sourceIdx = preOrder.indexOf(selectedBlock);
+    if (sourceIdx < 0) return null;
+    const sourceType = getBlock(selectedBlock)?.['@type'];
+    const step = direction === 'up' ? -1 : 1;
+    let i = sourceIdx + step;
+    while (i >= 0 && i < preOrder.length) {
+      const candidateId = preOrder[i];
+      // Don't try to land in source's own subtree.
+      if (candidateId === selectedBlock || isDescendantOf(candidateId, selectedBlock)) {
+        i += step;
+        continue;
+      }
+      const candidateInfo = blockPathMap?.[candidateId];
+      if (!candidateInfo) { i += step; continue; }
+      const allowed = candidateInfo.allowedSiblingTypes;
+      // No allowedSiblingTypes recorded → assume permissive (top-level
+      // page-children commonly have no explicit restriction).
+      if (!sourceType || !allowed || allowed.includes(sourceType)) {
+        return {
+          targetBlockId: candidateId,
+          insertAfter: direction === 'down',
+          targetParentId: candidateInfo.parentId === PAGE_BLOCK_UID ? null : candidateInfo.parentId,
+        };
+      }
+      i += step;
+    }
+    return null;
+  };
+
+  const moveSelectedBlock = (direction) => {
+    const target = findMoveTarget(direction);
+    if (!target) return;
+    document.dispatchEvent(
+      new CustomEvent('hydra-move-block', {
+        detail: { blockId: selectedBlock, ...target },
+      }),
+    );
+  };
+
+  const isAtTopOfParent = !findMoveTarget('up');
+  const isAtBottomOfParent = !findMoveTarget('down');
 
   // Create Slate editor once using Volto's makeEditor (includes all plugins)
   // Add withEmptyInlineRemoval to clean up empty formatting elements after delete
@@ -1183,11 +1304,27 @@ const SyncedSlateToolbar = ({
   const availableWidth = Math.max(100, iframeRight - toolbarLeft); // Min 100px for basic controls
   const constrainedMaxWidth = Math.min(maxToolbarWidth || 400, availableWidth);
 
-  // Calculate how many buttons fit based on constrained width
-  // Measured widths: drag handle ~30px, menu button ~30px, gaps ~10px
+  // Calculate how many buttons fit based on constrained width.
+  // The toolbar reserves fixed-width affordances at both ends:
+  //   - Desktop: drag handle (30) + menu/⋯ button (30) + gaps (10) = 70
+  //   - Mobile  (@media max-width:767px): mobile-tablet.css HIDES the drag
+  //     handle and SHOWS chevron-up/down (~64). And select-parent-btn
+  //     (~32) is rendered when any block is selected. Plus menu/⋯ (30) +
+  //     gaps (10) = 136.
+  // If we use the desktop number on mobile, the slot system thinks more
+  // buttons fit than actually do → inline format buttons spill past the
+  // toolbar's max-width → `overflow: hidden` clips the rightmost ones,
+  // which is the user-reported "icons clipping at the top of the bar"
+  // on phones. Detect coarse-pointer / phone-width and bump FIXED_WIDTH
+  // so the slot system shifts inline buttons into the overflow ⋯ menu
+  // before they fall off the visible canvas.
   const BUTTON_WIDTH = 32;
   const FORMAT_DROPDOWN_WIDTH = 50;
-  const FIXED_WIDTH = 70; // drag handle (30) + menu button (30) + gaps/padding (10)
+  const isPhoneViewport =
+    typeof window !== 'undefined' &&
+    window.matchMedia &&
+    window.matchMedia('(max-width: 767px)').matches;
+  const FIXED_WIDTH = isPhoneViewport ? 136 : 70;
   const availableForButtons = constrainedMaxWidth - FIXED_WIDTH;
 
   // Format dropdown counts as ~1.5 buttons worth of space
@@ -1242,6 +1379,33 @@ const SyncedSlateToolbar = ({
           overflow: 'hidden', // Ensure buttons don't extend past maxWidth
         }}
       >
+      {/* Mobile-only chevron move buttons. Hidden on desktop/tablet via
+       * .quanta-toolbar .chevron-buttons { display: none } in
+       * mobile-tablet.css. Within-parent move only. */}
+      {(() => {
+        if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) return null;
+        const block = getBlock(selectedBlock);
+        if (isBlockPositionLocked(block, templateEditMode)) return null;
+        return (
+          <div className="chevron-buttons">
+            <button
+              type="button"
+              className="chevron-up"
+              aria-label="Move block up"
+              disabled={isAtTopOfParent}
+              onClick={() => moveSelectedBlock('up')}
+            >▲</button>
+            <button
+              type="button"
+              className="chevron-down"
+              aria-label="Move block down"
+              disabled={isAtBottomOfParent}
+              onClick={() => moveSelectedBlock('down')}
+            >▼</button>
+          </div>
+        );
+      })()}
+
       {/* Drag handle or lock icon - only show for blocks, not page-level fields */}
       {(() => {
         if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) {
@@ -1426,6 +1590,44 @@ const SyncedSlateToolbar = ({
         );
       })()}
 
+      {/* Step-up button — mobile equivalent of the Escape key.
+       * The state machine (text → block → parent → deselect) lives in
+       * hydra.js's stepUpSelection() method. The button simply posts a
+       * STEP_UP message to the iframe; the SAME code path runs whether
+       * the editor pressed Escape (desktop) or tapped this button
+       * (mobile). Zero duplicated logic.
+       *
+       * Visible whenever ANY block is selected (including top-level)
+       * so a touch editor always has a way back. */}
+      {selectedBlock && (
+        <button
+          type="button"
+          className="select-parent-btn"
+          aria-label="Step up (exit text / select parent / deselect)"
+          title="Step up"
+          onClick={() => {
+            const iframe = document.getElementById('previewIframe');
+            if (iframe?.contentWindow) {
+              iframe.contentWindow.postMessage({ type: 'STEP_UP' }, '*');
+            }
+          }}
+          style={{
+            background: '#fff',
+            border: 'none',
+            padding: '4px 6px',
+            cursor: 'pointer',
+            color: '#222',
+            pointerEvents: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <Icon name={upSVG} size="20px" color="#222" />
+        </button>
+      )}
+
       {/* Three-dots menu button */}
       <button
         className="volto-hydra-menu-trigger"
@@ -1469,8 +1671,6 @@ const SyncedSlateToolbar = ({
             triggerButton?.click();
           }
         }}
-        parentId={parentId}
-        onSelectBlock={onSelectBlock}
         overflowButtons={overflowButtons}
         showFormatDropdown={!showFormatDropdown}
         blockButtons={blockButtons}

@@ -1680,9 +1680,13 @@ test.describe('Parent Block Navigation', () => {
     expect(headerCount).toBe(1); // Only Page header
   });
 
-  test('toolbar menu has Select Container option for nested blocks', async ({
+  test('Quanta has Select Parent (⬆) button for nested blocks', async ({
     page,
   }) => {
+    // The Select Container action was promoted from the ⋯ dropdown to a
+    // first-class ⬆ button in the Quanta toolbar (spec
+    // docs/superpowers/specs/2026-06-09-select-parent-quanta-button-design.md).
+    // Same handler, new placement.
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -1692,17 +1696,12 @@ test.describe('Parent Block Navigation', () => {
     await helper.clickBlockInIframe('text-1a');
     await page.waitForTimeout(300);
 
-    // Open the toolbar menu
-    await helper.openQuantaToolbarMenu('text-1a');
-
-    // Should see "Select Container" option
-    const selectContainerOption = page.locator(
-      '.volto-hydra-dropdown-item:has-text("Select Container")',
-    );
-    await expect(selectContainerOption).toBeVisible();
+    // Should see the Select Parent button in Quanta
+    const selectParentBtn = page.locator('.quanta-toolbar .select-parent-btn');
+    await expect(selectParentBtn).toBeVisible();
 
     // Click it to select the parent
-    await selectContainerOption.click();
+    await selectParentBtn.click();
     await page.waitForTimeout(300);
 
     // Should now have col-1 selected (3 headers: Page, Columns, Column)
@@ -1717,7 +1716,7 @@ test.describe('Parent Block Navigation', () => {
     await expect(currentHeader).toContainText(/column/i);
   });
 
-  test('toolbar menu hides Select Container for top-level blocks', async ({
+  test('Quanta hides Select Parent button for top-level blocks', async ({
     page,
   }) => {
     const helper = new AdminUIHelper(page);
@@ -1729,14 +1728,11 @@ test.describe('Parent Block Navigation', () => {
     await helper.clickContainerBlockInIframe('columns-1');
     await page.waitForTimeout(300);
 
-    // Open the toolbar menu
-    await helper.openQuantaToolbarMenu('columns-1');
-
-    // Should NOT see "Select Container" option (no parent to select)
-    const selectContainerOption = page.locator(
-      '.volto-hydra-dropdown-item:has-text("Select Container")',
-    );
-    await expect(selectContainerOption).not.toBeVisible();
+    // Quanta must be present, but the Select Parent button must not be
+    await expect(page.locator('.quanta-toolbar')).toBeVisible();
+    await expect(
+      page.locator('.quanta-toolbar .select-parent-btn'),
+    ).toHaveCount(0);
   });
 });
 

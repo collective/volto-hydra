@@ -34,7 +34,9 @@ const messages = defineMessages({
 import Cookies from 'js-cookie';
 import frontendPreviewUrl, { viewportPreset } from './reducers';
 import FrontendSwitcherPlug from './components/Toolbar/FrontendSwitcherPlug';
+import SidebarToggleToolbarPlug from './components/Toolbar/SidebarToggleToolbarPlug';
 import FrontendSwitcherPanel from './components/Toolbar/FrontendSwitcherPanel';
+import MobileSubmenuClose from './components/Toolbar/MobileSubmenuClose';
 import { getIframeUrlCookieName } from './utils/cookieNames';
 import getSavedURLs, { getURlsFromEnv } from './utils/getSavedURLs';
 import getCurrentFrontendPublicUrl from './utils/getCurrentFrontendPublicUrl';
@@ -64,6 +66,7 @@ import rowBeforeSVG from '@plone/volto/icons/row-before.svg';
 import rowAfterSVG from '@plone/volto/icons/row-after.svg';
 import rowDeleteSVG from '@plone/volto/icons/row-delete.svg';
 import columnBeforeSVG from '@plone/volto/icons/column-before.svg';
+import './components/mobile-tablet.css';
 import columnAfterSVG from '@plone/volto/icons/column-after.svg';
 import columnDeleteSVG from '@plone/volto/icons/column-delete.svg';
 
@@ -151,6 +154,8 @@ const applyConfig = (config) => {
   config.settings.appExtras = [
     ...(config.settings.appExtras || []),
     { match: '/', component: FrontendSwitcherPlug },
+    { match: '/', component: SidebarToggleToolbarPlug },
+    { match: '/', component: MobileSubmenuClose },
   ];
 
   // Hide container block fields - ChildBlocksWidget handles their UI
