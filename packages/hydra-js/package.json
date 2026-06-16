@@ -21,6 +21,7 @@
     "jsdom": "^22.0.0"
   },
   "dependencies": {
+    "@volto-hydra/helpers": "workspace:*",
     "tabbable": "^6.4.0"
   }
 }

@@ -1,0 +1,13 @@
+{
+  "name": "@volto-hydra/helpers",
+  "version": "1.0.0",
+  "description": "Pure data helpers extracted from hydra-js — safe to import server-side (no DOM / postMessage / Bridge).",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED"
+}

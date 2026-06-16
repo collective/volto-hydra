@@ -1519,8 +1519,13 @@ importers:
         specifier: ^3.5.29
         version: 3.5.29(typescript@5.9.3)
 
+  packages/helpers: {}
+
   packages/hydra-js:
     dependencies:
+      '@volto-hydra/helpers':
+        specifier: workspace:*
+        version: link:../helpers
       tabbable:
         specifier: ^6.4.0
         version: 6.4.0
