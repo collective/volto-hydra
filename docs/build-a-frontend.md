@@ -6,6 +6,18 @@ The actual code you write will depend on the framework you choose. You can look 
 - [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs)
 - [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7)
 
+```{note}
+This guide describes the integration pattern for frameworks with client-side
+reactivity (React, Vue, Svelte, Solid, Next, Nuxt, etc.) — your component
+tree consumes `formData` and re-renders, the framework's virtual DOM
+diff handles the per-block update.
+
+For server-only frameworks without client-side reactivity (Astro, PHP,
+Django, Rails, Laravel, Symfony, Go templates), use the
+[server-render pattern](./server-rendered-frontends.md) instead — one config
+option on `initBridge` plus one small HTTP endpoint.
+```
+
 ## What an integrated frontend looks like
 
 Before you dive into the steps, here's what your frontend ends up doing.

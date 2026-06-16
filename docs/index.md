@@ -17,6 +17,7 @@ A Visual Headless CMS using Plone as a server, providing true visual editing wit
 
 architecture
 build-a-frontend
+server-rendered-frontends
 live-preview
 custom-blocks
 container-blocks
@@ -31,7 +32,7 @@ examples/README
 ## Why Hydra?
 
 - **Visual + True Headless + Open Source** — a unique combination in the CMS space
-- **Framework agnostic** — use Next.js, Nuxt.js, Astro, or any frontend stack
+- **Framework agnostic** — Next.js, Nuxt.js, Astro, plus server-only stacks (PHP, Django, Rails, Laravel) via the [server-render pattern](./server-rendered-frontends.md)
 - **Quick visual editing** — enable it with simple HTML data attributes, no React or Vue required in your frontend
 - **Omni-channel** — switch between multiple frontends mid-edit
 - **Enterprise features** — versioning, i18n, workflow, and automated content rules

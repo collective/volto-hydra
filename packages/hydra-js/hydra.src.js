@@ -208,10 +208,82 @@ export class Bridge {
     window.addEventListener('blur', () => { this._iframeFocused = false; });
     // Register onEditChange callback BEFORE init() sends INIT message.
     // This eliminates the race where INITIAL_DATA arrives before the callback is set.
-    if (options.onEditChange) {
+    //
+    // Two ways to receive form updates, mutually exclusive:
+    //
+    //   - `onEditChange(formData)` — user-supplied callback. Used by
+    //     reactive frontends (React/Vue/Svelte/Solid/Nuxt/Next) that take
+    //     the formData and let their own framework reconcile the DOM.
+    //
+    //   - `renderEndpoint: '/api/render'` — bridge installs its own
+    //     internal callback that diffs prev vs new formData via
+    //     findChangedUnit, POSTs `{ unit, formData }` to the endpoint,
+    //     and swaps the returned HTML in. Used by server-rendered
+    //     frontends (Astro / PHP / Django / Rails) that have no
+    //     client-side reactivity. Optional `renderContainer` selector
+    //     names the DOM node whose innerHTML is replaced when the unit
+    //     is the whole page (default: '#content').
+    //
+    // If both are set, `renderEndpoint` wins — the user's onEditChange is
+    // ignored. (That's a configuration error; we don't try to merge the
+    // semantics.)
+    if (options.renderEndpoint) {
+      this._installRenderEndpoint(options.renderEndpoint, options.renderContainer || '#content');
+    } else if (options.onEditChange) {
       this.onEditChange(options.onEditChange);
     }
     this.init(options); // Initialize the bridge
+  }
+
+  /**
+   * Wire a server-render endpoint to the FORM_DATA pipeline. Each
+   * FORM_DATA arriving from the admin triggers a POST of the smallest
+   * changed unit to the endpoint, then swaps the returned HTML into the
+   * DOM. See findChangedUnit's docstring for the diff semantics.
+   *
+   * Race protection: if a render is already in flight (network round
+   * trip) when the next FORM_DATA arrives, we drop the in-flight one.
+   * The newer formData is what we diff next time — the dropped render
+   * would have been stale anyway.
+   *
+   * Error handling: a non-OK response logs the failure but doesn't throw
+   * — we don't want a transient server hiccup to break the bridge.
+   * The next FORM_DATA will diff against an unchanged lastForm so the
+   * change is retried (same unit, new attempt) implicitly.
+   */
+  _installRenderEndpoint(endpoint, container) {
+    let lastForm = null;
+    let inFlight = null;
+    const swap = async (unit, formData) => {
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unit, formData }),
+      });
+      if (!resp.ok) {
+        console.error('[HYDRA] server-render endpoint failed:', resp.status, await resp.text().catch(() => ''));
+        // Reset lastForm so the next FORM_DATA re-attempts the same
+        // change (otherwise we'd advance the diff baseline past an
+        // unrendered state and the DOM would silently fall out of sync).
+        lastForm = null;
+        return;
+      }
+      const html = await resp.text();
+      if (unit.unit === 'page') {
+        const el = document.querySelector(container);
+        if (el) el.innerHTML = html;
+      } else {
+        const el = document.querySelector(`[data-block-uid="${unit.blockId}"]`);
+        if (el) el.outerHTML = html;
+      }
+    };
+    this.onEditChange((formData) => {
+      const unit = lastForm == null ? { unit: 'page' } : findChangedUnit(lastForm, formData);
+      lastForm = formData;
+      if (!unit) return;
+      if (inFlight) return; // newer FORM_DATA will diff again against current lastForm
+      inFlight = swap(unit, formData).finally(() => { inFlight = null; });
+    });
   }
 
   /**
@@ -13069,6 +13141,105 @@ export function formDataContentEqual(formDataA, formDataB) {
   const { _editSequence: seqA, ...contentA } = formDataA;
   const { _editSequence: seqB, ...contentB } = formDataB;
   return deepEqual(contentA, contentB);
+}
+
+/**
+ * Find the SHALLOWEST changed unit between two formData snapshots.
+ *
+ * Returns one of:
+ *   - null                                — forms are deep-equal, no edit happened.
+ *   - { unit: 'page' }                    — render the whole content area.
+ *   - { unit: 'block', blockId: 'X' }     — render only block X.
+ *
+ * Used by server-rendered frontends (Astro / PHP / Django / Rails — anything
+ * without client-side reactivity). The bridge invokes this internally when
+ * `renderEndpoint` is configured on initBridge; the result tells the bridge
+ * what to POST to the server-render endpoint.
+ *
+ * Algorithm (recursive, walks DOWN from the page):
+ *
+ *   1. If items array at this level differs (add/remove/reorder) → THIS
+ *      level is the unit. Re-render this container, its children come along.
+ *   2. Otherwise find children whose data differs (deep compare):
+ *        - 0 differ → no change here, return null
+ *        - 1 differ AND child is a container → recurse into it. If
+ *          recursion finds a deeper unit, return that; otherwise return
+ *          the child itself.
+ *        - 1 differ, leaf → return that child.
+ *        - 2+ differ → return THIS level (multiple children changed,
+ *          shallowest common parent is here).
+ *
+ * Spans more than one nesting level (e.g. block moved from col-1 to col-2
+ * — both containers' items change) → walks up to PAGE.
+ *
+ * Reactive frontends (Vue/React/Svelte/Solid) don't need this — their
+ * framework reconciliation provides per-block updates implicitly. Pure
+ * server-rendered frontends do: a naive full-page innerHTML swap on every
+ * keystroke would destroy contenteditable cursors, image loads, scroll
+ * state. Diffing to the smallest changed unit makes outerHTML swaps
+ * targeted enough that the unchanged DOM keeps its state.
+ */
+export function findChangedUnit(prevForm, newForm) {
+  if (deepEqual(prevForm, newForm)) return null;
+  const prevItems = prevForm?.blocks_layout?.items || [];
+  const newItems = newForm?.blocks_layout?.items || [];
+  if (!deepEqual(prevItems, newItems)) return { unit: 'page' };
+  const prevBlocks = prevForm?.blocks || {};
+  const newBlocks = newForm?.blocks || {};
+  const changed = [];
+  for (const id of newItems) {
+    if (!deepEqual(prevBlocks[id], newBlocks[id])) changed.push(id);
+  }
+  // No top-level block data changed but forms differ → page-level scalar
+  // (title, description, etc.) changed. Re-render page.
+  if (changed.length === 0) return { unit: 'page' };
+  if (changed.length > 1) return { unit: 'page' };
+  const blockId = changed[0];
+  const inner = _findChangedInBlock(prevBlocks[blockId], newBlocks[blockId]);
+  if (inner?.unit === 'this') return { unit: 'block', blockId };
+  if (inner?.unit === 'block') return inner;
+  return { unit: 'block', blockId };
+}
+
+/**
+ * Container fields on a block worth recursing into. Mirrors the
+ * blockPathMap conventions: `blocks_layout` for slate/image/etc lists,
+ * `columns` for column items in a columns block — both reference ids
+ * in the same sibling `blocks` dict.
+ */
+function _getContainerFields(block) {
+  if (!block || typeof block !== 'object') return [];
+  const fields = [];
+  if (block.blocks_layout?.items && block.blocks) {
+    fields.push({ items: block.blocks_layout.items, blocks: block.blocks });
+  }
+  if (block.columns?.items && block.blocks) {
+    fields.push({ items: block.columns.items, blocks: block.blocks });
+  }
+  return fields;
+}
+
+function _findChangedInBlock(prevBlock, newBlock) {
+  const newFields = _getContainerFields(newBlock);
+  const prevFields = _getContainerFields(prevBlock);
+  if (newFields.length !== prevFields.length) return { unit: 'this' };
+  for (let f = 0; f < newFields.length; f++) {
+    const cur = newFields[f];
+    const old = prevFields[f];
+    if (!deepEqual(cur.items, old.items)) return { unit: 'this' };
+    const changed = [];
+    for (const childId of cur.items) {
+      if (!deepEqual(cur.blocks[childId], old.blocks[childId])) changed.push(childId);
+    }
+    if (changed.length === 0) continue;
+    if (changed.length > 1) return { unit: 'this' };
+    const childId = changed[0];
+    const inner = _findChangedInBlock(old.blocks[childId], cur.blocks[childId]);
+    if (inner?.unit === 'this') return { unit: 'block', blockId: childId };
+    if (inner?.unit === 'block') return inner;
+    return { unit: 'block', blockId: childId };
+  }
+  return null;
 }
 
 /**
