@@ -500,6 +500,7 @@ test.describe('Inline Editing with Mock Parent', () => {
       (window as any).__echoInterval = setInterval(() => {
         if (i >= partials.length) {
           clearInterval((window as any).__echoInterval);
+          (window as any).__echoInterval = null; // signal "scheduler done" for waitForFunction below
           return;
         }
         const formData = JSON.parse(JSON.stringify(window.mockParent.getFormData()));
@@ -520,11 +521,30 @@ test.describe('Inline Editing with Mock Parent', () => {
     await page.keyboard.press('End');
     await page.keyboard.type(' world', { delay: 10 });
 
-    // Verify all characters arrived
-    await expect(async () => {
+    // CRITICAL FOR ROBUSTNESS: the echo interval can still have unflushed
+    // partials when the user finishes typing. If we polled for the text
+    // right away, a late echo could land AFTER our first match and
+    // corrupt the final state — that's the historical flake source on
+    // Firefox / slow CI. Wait for the scheduler to finish AND for any
+    // in-flight FORM_DATA to drain through the bridge before asserting.
+    await page.waitForFunction(
+      () => !(window as any).__echoInterval,
+      { timeout: 3000 },
+    );
+    await page.waitForTimeout(250); // last echo through bridge pipeline
+
+    // Stable-for-N-consecutive-polls gate: text must equal "Hello world"
+    // for 3 polls in a row. Any late race that briefly produces the right
+    // text and then mutates it (the bug the test is designed to detect)
+    // would reset the counter and ultimately time out.
+    let prev = '';
+    let stable = 0;
+    await expect.poll(async () => {
       const text = await helper.getCleanTextContent(editable);
-      expect(text).toBe('Hello world');
-    }).toPass({ timeout: 5000 });
+      if (text === prev && text === 'Hello world') stable++;
+      else { stable = 0; prev = text; }
+      return stable >= 3;
+    }, { timeout: 5000, intervals: [100, 150, 200] }).toBe(true);
 
     // Cleanup
     await page.evaluate(() => {
@@ -612,15 +632,24 @@ test.describe('Inline Editing with Mock Parent', () => {
       }, { partialText });
     }
 
-    // Wait for all renders to settle, then check final DOM.
-    // Use the block element directly — rapid FORM_DATA re-renders may transiently
-    // strip data-edit-text before hydra.js re-adds it.
-    await expect(async () => {
-      const text = await helper.getCleanTextContent(
-        iframe.locator('[data-block-uid="mock-block-1"]')
-      );
-      expect(text).toBe('Make this bold');
-    }).toPass({ timeout: 5000 });
+    // Beat for the LAST postMessage to actually reach the bridge — the
+    // synchronous send loop only delivers them across the message queue
+    // boundary, the bridge's render pipeline processes them async.
+    await page.waitForTimeout(250);
+
+    // Stable-for-N-consecutive-polls gate against the historical flake
+    // where the polling matched a transient "Make this bold" before a
+    // late render landed and reverted to a partial. The text must equal
+    // the expected value AND remain stable for 3 polls in a row.
+    const blockLocator = iframe.locator('[data-block-uid="mock-block-1"]');
+    let prev = '';
+    let stable = 0;
+    await expect.poll(async () => {
+      const seen = await helper.getCleanTextContent(blockLocator);
+      if (seen === prev && seen === 'Make this bold') stable++;
+      else { stable = 0; prev = seen; }
+      return stable >= 3;
+    }, { timeout: 5000, intervals: [100, 150, 200] }).toBe(true);
   });
 
   // NOTE: "should handle selection across node boundaries and delete" test moved to
