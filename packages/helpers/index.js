@@ -1056,6 +1056,130 @@ function _findChangedInBlock(prevBlock, newBlock) {
 }
 
 /**
+ * Decide whether the only differences between two block objects are
+ * `.text` string changes inside slate `value[]` arrays. Used by
+ * `_installRenderEndpoint` (in hydra.src.js) to decide whether a render
+ * is necessary on a server-only frontend like Astro — if the change is
+ * text-only AND the iframe DOM already has the new text (because the
+ * user typed it directly into the contenteditable), we can skip the
+ * POST + outerHTML swap, preserving cursor / focus / IME state.
+ *
+ * Returns `true` when:
+ *   - block @type and all non-slate fields are deepEqual
+ *   - any slate fields (value, description, etc. — heuristic: array of
+ *     {type, children} or {text} nodes) differ only in `.text` strings
+ *     with the SAME node tree structure (same number of nodes at each
+ *     level, same types, same marks, same attrs other than text/nodeId)
+ *
+ * Returns `false` for anything structural (new/removed/reordered nodes,
+ * changed marks like bold, link href changes, image url, slot id, etc.).
+ * False on those forces a render so the bridge's existing cursor
+ * save/restore + blockedBlockId protections kick in for transforms.
+ *
+ * Ignores `nodeId` on every node — the bridge stamps these and they can
+ * legitimately differ between renders without being a "real" change.
+ */
+export function isTextOnlyBlockChange(prevBlock, newBlock) {
+  if (!prevBlock || !newBlock) return false;
+  // Block-level non-slate fields must match exactly. We strip slate-shaped
+  // arrays out so we can compare them separately with the text-only rule.
+  const stripSlateFields = (block) => {
+    const out = {};
+    const slateFieldNames = [];
+    for (const [k, v] of Object.entries(block)) {
+      if (_looksLikeSlateValue(v)) {
+        slateFieldNames.push(k);
+      } else {
+        out[k] = v;
+      }
+    }
+    return { stripped: out, slateFieldNames };
+  };
+  const pa = stripSlateFields(prevBlock);
+  const pb = stripSlateFields(newBlock);
+  if (!deepEqual(pa.stripped, pb.stripped)) return false;
+  if (!deepEqual(pa.slateFieldNames.sort(), pb.slateFieldNames.sort())) return false;
+  for (const field of pa.slateFieldNames) {
+    if (!_slateValuesDifferOnlyInText(prevBlock[field], newBlock[field])) return false;
+  }
+  return true;
+}
+
+function _looksLikeSlateValue(v) {
+  if (!Array.isArray(v) || v.length === 0) return false;
+  return v.every(
+    (n) => n && typeof n === 'object' && (
+      typeof n.text === 'string' || Array.isArray(n.children)
+    ),
+  );
+}
+
+function _slateValuesDifferOnlyInText(prev, next) {
+  if (!Array.isArray(prev) || !Array.isArray(next)) return false;
+  if (prev.length !== next.length) return false;
+  for (let i = 0; i < prev.length; i++) {
+    if (!_slateNodeDiffersOnlyInText(prev[i], next[i])) return false;
+  }
+  return true;
+}
+
+/**
+ * Walk a formData tree and find the block with the given uid anywhere
+ * in the nested blocks dicts (columns -> col-N.blocks -> slate, etc.).
+ * Returns the block data object or null. Pure walk — no use of
+ * blockPathMap, no Bridge dependency.
+ */
+export function findBlockInForm(form, blockId) {
+  if (!form || !blockId) return null;
+  const blocks = form.blocks;
+  if (!blocks) return null;
+  if (blocks[blockId]) return blocks[blockId];
+  for (const child of Object.values(blocks)) {
+    if (child && typeof child === 'object') {
+      const inside = findBlockInForm(child, blockId);
+      if (inside) return inside;
+    }
+  }
+  return null;
+}
+
+/**
+ * Concatenate all text leaves of a slate-style node array, in document
+ * order. Used by the renderEndpoint's text-only-skip heuristic to
+ * compare with the iframe DOM's textContent.
+ */
+export function slateNodesText(nodes) {
+  if (!Array.isArray(nodes)) return '';
+  let out = '';
+  for (const n of nodes) {
+    if (!n) continue;
+    if (typeof n.text === 'string') out += n.text;
+    else if (Array.isArray(n.children)) out += slateNodesText(n.children);
+  }
+  return out;
+}
+
+function _slateNodeDiffersOnlyInText(p, n) {
+  if (!p || !n) return p === n;
+  const pIsText = typeof p.text === 'string';
+  const nIsText = typeof n.text === 'string';
+  if (pIsText !== nIsText) return false;
+  if (pIsText) {
+    // Both text leaves. `text` strings may differ; marks (bold, italic, ...)
+    // must match. nodeId is bridge-stamped, ignore.
+    const { text: _pt, nodeId: _pn, ...prest } = p;
+    const { text: _nt, nodeId: _nn, ...nrest } = n;
+    return deepEqual(prest, nrest);
+  }
+  // Both element nodes. Type, attrs, data must match (ignoring nodeId).
+  // Then recurse into children.
+  const { children: pc, nodeId: _pn, ...prest } = p;
+  const { children: nc, nodeId: _nn, ...nrest } = n;
+  if (!deepEqual(prest, nrest)) return false;
+  return _slateValuesDifferOnlyInText(pc || [], nc || []);
+}
+
+/**
  * Convert a Plone image value to a full URL suitable for `<img src>`.
  *
  * Handles every shape the Plone REST API hands back:

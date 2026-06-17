@@ -17,6 +17,9 @@ import {
   isBlockReadonly,
   isBlockPositionLocked,
   getBlockAddability,
+  isTextOnlyBlockChange,
+  findBlockInForm,
+  slateNodesText,
 } from '@volto-hydra/helpers';
 
 /**
@@ -290,12 +293,74 @@ export class Bridge {
       }
     };
     this.onEditChange((formData) => {
-      const unit = lastForm == null ? { unit: 'page' } : findChangedUnit(lastForm, formData);
+      const prevForm = lastForm;
+      const unit = prevForm == null ? { unit: 'page' } : findChangedUnit(prevForm, formData);
       lastForm = formData;
       if (!unit) return;
+
+      // SKIP for text-only edits when the iframe DOM already shows the
+      // new text. Two cases this catches:
+      //   1. User typed directly into the iframe's contenteditable — the
+      //      browser updated the DOM natively, then admin echoed the
+      //      slate value back; the bridge sees a text-only diff, the DOM
+      //      already has the new text, swap would only destroy cursor.
+      //   2. Selection-induced echoes that don't change visible content.
+      //
+      // Forces a render for:
+      //   - Transforms (bold / link / paragraph type / etc.) — they
+      //     change the slate node structure, not just `.text`, so the
+      //     classifier returns false and we fall through to swap.
+      //     The bridge's existing blockedBlockId / replayBuffer
+      //     mechanism handles cursor preservation across that swap.
+      //   - Admin-side sidebar typing — the iframe DOM doesn't have the
+      //     new text yet, so the DOM-matches check returns false.
+      //
+      // `_isTextOnlyAndDomMatches` is a no-op + falsy for unit='page' or
+      // when prevForm is null (first render), so the first-paint path is
+      // unaffected.
+      if (this._isTextOnlyAndDomMatches(prevForm, formData, unit)) return;
+
       if (inFlight) return; // newer FORM_DATA will diff again against current lastForm
       inFlight = swap(unit, formData).finally(() => { inFlight = null; });
     });
+  }
+
+  /**
+   * Decide whether `unit` represents a text-only change that the iframe
+   * DOM already reflects, in which case the renderEndpoint can skip the
+   * POST + outerHTML swap. See the SKIP comment in
+   * `_installRenderEndpoint` for why this matters.
+   *
+   * Two gates, both must pass:
+   *   - `isTextOnlyBlockChange` (helpers/index.js): the block-level diff
+   *     touches only `.text` strings inside slate values, no node
+   *     structure / marks / attrs / non-slate fields differ.
+   *   - DOM textContent of the live block element equals the
+   *     concatenated text leaves of the new slate value(s).
+   *
+   * Returns false on `unit='page'`, missing data, missing block element,
+   * or any structural difference — i.e. forces the caller to render.
+   */
+  _isTextOnlyAndDomMatches(prevForm, newForm, unit) {
+    if (!unit || unit.unit !== 'block' || !prevForm) return false;
+    const prevBlock = findBlockInForm(prevForm, unit.blockId);
+    const newBlock = findBlockInForm(newForm, unit.blockId);
+    if (!isTextOnlyBlockChange(prevBlock, newBlock)) return false;
+    const el = document.querySelector(`[data-block-uid="${unit.blockId}"]`);
+    if (!el) return false;
+    // Concatenate the new block's expected slate text. If multiple slate
+    // fields, sum them all — the DOM's textContent contains all editable
+    // text in document order, so summing matches.
+    let expected = '';
+    for (const v of Object.values(newBlock)) {
+      if (Array.isArray(v) && v.length > 0 && v.every((n) => n && typeof n === 'object' && (typeof n.text === 'string' || Array.isArray(n.children)))) {
+        expected += slateNodesText(v);
+      }
+    }
+    // Normalise whitespace to be forgiving across rendering differences
+    // (browsers may collapse / preserve in different ways).
+    const normalise = (s) => (s || '').replace(/\s+/g, ' ').trim();
+    return normalise(expected) === normalise(el.textContent || '');
   }
 
   /**
