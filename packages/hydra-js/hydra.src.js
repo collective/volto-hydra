@@ -9180,36 +9180,34 @@ export class Bridge {
             });
           }
         } else {
-          // Block element not found - content may not be rendered yet
-          // Retry after a short delay (happens on initial page load)
-          log('Block element not found for SELECT_BLOCK, retrying in 100ms:', uid);
-          setTimeout(() => {
-            // Re-trigger the same SELECT_BLOCK message
-            window.postMessage(
-              {
-                type: 'SELECT_BLOCK_RETRY',
-                uid: uid,
-              },
-              window.location.origin,
-            );
-          }, 100);
+          // Block element not found — content may not be rendered yet.
+          // Wait for it to appear via MutationObserver instead of a fixed
+          // retry timer. The original 100ms-once retry assumed the
+          // framework re-render is synchronous-fast (React / Vue / Svelte
+          // reconciliation). For server-rendered frontends like Astro
+          // the render is async (POST /api/render network round trip),
+          // can easily exceed 100ms, and a single fixed retry races.
+          // The observer fires the moment the block actually appears,
+          // with a safety timeout to bail out so we don't leak handlers
+          // when a SELECT_BLOCK references a nonexistent uid.
+          log('Block element not found for SELECT_BLOCK, observing for it:', uid);
+          const observer = new MutationObserver(() => {
+            const el = document.querySelector(`[data-block-uid="${uid}"]`);
+            if (el) {
+              observer.disconnect();
+              clearTimeout(safetyTimer);
+              log('Block element appeared via observer, selecting:', uid);
+              this.selectBlock(el);
+            }
+          });
+          observer.observe(document.body, { childList: true, subtree: true });
+          const safetyTimer = setTimeout(() => {
+            observer.disconnect();
+            console.warn('[HYDRA] Block element never appeared after SELECT_BLOCK (5s):', uid);
+          }, 5000);
         }
         // this.isInlineEditing = true;
         // this.observeForBlock(uid);
-      }
-
-      // Handle retry of SELECT_BLOCK when initial attempt failed
-      if (event.data.type === 'SELECT_BLOCK_RETRY') {
-        const { uid } = event.data;
-        const blockElement = document.querySelector(
-          `[data-block-uid="${uid}"]`,
-        );
-        if (blockElement) {
-          log('Block element found on retry, selecting:', uid);
-          this.selectBlock(blockElement);
-        } else {
-          console.warn('[HYDRA] Block element still not found after retry:', uid);
-        }
       }
     };
 
