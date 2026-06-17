@@ -521,22 +521,22 @@ test.describe('Inline Editing with Mock Parent', () => {
     await page.keyboard.press('End');
     await page.keyboard.type(' world', { delay: 10 });
 
-    // CRITICAL FOR ROBUSTNESS: the echo interval can still have unflushed
-    // partials when the user finishes typing. If we polled for the text
-    // right away, a late echo could land AFTER our first match and
-    // corrupt the final state — that's the historical flake source on
-    // Firefox / slow CI. Wait for the scheduler to finish AND for any
-    // in-flight FORM_DATA to drain through the bridge before asserting.
+    // Wait for the echo scheduler to finish posting (real condition,
+    // not a fixed sleep). After this the bridge may still be processing
+    // queued FORM_DATA — the stable gate below handles that.
     await page.waitForFunction(
       () => !(window as any).__echoInterval,
       { timeout: 3000 },
     );
-    await page.waitForTimeout(250); // last echo through bridge pipeline
 
     // Stable-for-N-consecutive-polls gate: text must equal "Hello world"
-    // for 3 polls in a row. Any late race that briefly produces the right
-    // text and then mutates it (the bug the test is designed to detect)
-    // would reset the counter and ultimately time out.
+    // for 3 polls in a row (~300ms of stability). Folds the "wait for
+    // the last echo to drain through the bridge" beat into the same
+    // condition — no separate waitForTimeout needed. If a late echo
+    // arrives after the first correct match and reverts the text (the
+    // bug the test is designed to detect), the counter resets and we
+    // keep waiting; if the bridge's resolution is genuinely broken
+    // the poll times out.
     let prev = '';
     let stable = 0;
     await expect.poll(async () => {
@@ -632,15 +632,13 @@ test.describe('Inline Editing with Mock Parent', () => {
       }, { partialText });
     }
 
-    // Beat for the LAST postMessage to actually reach the bridge — the
-    // synchronous send loop only delivers them across the message queue
-    // boundary, the bridge's render pipeline processes them async.
-    await page.waitForTimeout(250);
-
     // Stable-for-N-consecutive-polls gate against the historical flake
     // where the polling matched a transient "Make this bold" before a
     // late render landed and reverted to a partial. The text must equal
-    // the expected value AND remain stable for 3 polls in a row.
+    // the expected value AND remain stable for 3 polls in a row
+    // (~300ms). This folds the "wait for the last postMessage to drain
+    // through the bridge" beat into the same condition; no separate
+    // waitForTimeout needed.
     const blockLocator = iframe.locator('[data-block-uid="mock-block-1"]');
     let prev = '';
     let stable = 0;
