@@ -886,13 +886,8 @@ test.describe('Template Edit Mode - Block Settings', () => {
     // render reads the stale value and reverts the DOM. Typing one char
     // at a time fires real keydown/keyup/input per char, React handles
     // each deterministically.
-    //
-    // Re-focus right before each step in case a previous step's onChange
-    // triggered a sidebar re-render that moved focus.
-    await slotIdInput.focus();
     await slotIdInput.press('ControlOrMeta+a');
     await slotIdInput.press('Backspace');
-    await slotIdInput.focus();
     await slotIdInput.pressSequentially('new-slot-name', { delay: 20 });
 
     // Stable-for-N-consecutive-polls gate: value must equal
