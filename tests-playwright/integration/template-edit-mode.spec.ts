@@ -859,10 +859,37 @@ test.describe('Template Edit Mode - Block Settings', () => {
     const slotIdInput = page.locator('.field-wrapper-slotId input');
     await expect(slotIdInput).toHaveValue('primary', { timeout: 5000 });
     await helper.expectTemplateSettingsCount(1);
-    // Now clear and fill with new value
-    await slotIdInput.clear();
-    await slotIdInput.fill('new-slot-name');
-    await expect(slotIdInput).toHaveValue('new-slot-name');
+
+    // Clear + type the new value.
+    //
+    // pressSequentially (NOT fill) on purpose. Volto's TextWidget is a
+    // React controlled input whose value flows from Redux. Playwright's
+    // `fill()` sets the DOM `.value` directly and fires ONE 'input'
+    // event — sometimes React's onChange handler doesn't dispatch the
+    // Redux update in time, and the next render reads the stale empty
+    // value from Redux and reverts the DOM to "". That's the historical
+    // flake on this test (`value=""` after 9 polls × 5s in the CI log).
+    // pressSequentially types one character at a time, firing a real
+    // keydown/keyup/input per char so React reconciles deterministically.
+    await slotIdInput.click();
+    await slotIdInput.press('ControlOrMeta+a');
+    await slotIdInput.press('Backspace');
+    await slotIdInput.pressSequentially('new-slot-name', { delay: 10 });
+
+    // Stable-for-N-consecutive-polls gate: value must equal
+    // 'new-slot-name' for 3 polls in a row. If a late re-render of the
+    // sidebar form (from an iframe FORM_DATA echo or schema-inheritance
+    // recompute) reverts the value, the counter resets and we keep
+    // waiting; if the bridge / Redux can't settle on the typed value
+    // the poll times out, surfacing the bug rather than masking it.
+    let prev = '';
+    let stable = 0;
+    await expect.poll(async () => {
+      const v = await slotIdInput.inputValue();
+      if (v === prev && v === 'new-slot-name') stable++;
+      else { stable = 0; prev = v; }
+      return stable >= 3;
+    }, { timeout: 5000, intervals: [100, 150, 200] }).toBe(true);
   });
 
   test('can toggle block fixed mode in edit mode', async ({ page }) => {
