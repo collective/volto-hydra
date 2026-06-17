@@ -125,3 +125,28 @@ const items = computed(() => props.block.blocks_layout?.items || []);
   </div>
 </div>
 ```
+
+### Astro
+
+<!-- file: examples/astro/GridBlock.astro -->
+```astro
+---
+/**
+ * Grid container. Children are arbitrary blocks (each rendered by
+ * BlockRenderer); columns count is derived from the number of items.
+ */
+import BlockRenderer from './BlockRenderer.astro';
+const { block } = Astro.props;
+const subBlocks = block.blocks || {};
+const items = block.blocks_layout?.items || [];
+---
+<div class="grid-block">
+  <div style={`display: grid; grid-template-columns: repeat(${items.length}, 1fr); gap: 1rem`}>
+    {items.map((id: string) => (
+      <div class="grid-cell">
+        <BlockRenderer block={{ ...subBlocks[id], '@uid': id }} />
+      </div>
+    ))}
+  </div>
+</div>
+```

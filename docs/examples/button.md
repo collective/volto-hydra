@@ -114,6 +114,22 @@ const href = computed(() => props.block.href?.[0]?.['@id'] || props.block.href |
 </div>
 ```
 
+### Astro
+
+<!-- file: examples/astro/ButtonBlock.astro -->
+```astro
+---
+const { block } = Astro.props;
+const href = block.href?.[0]?.['@id'] || block.href || '#';
+const title = block.title || 'Button';
+---
+<div class="button-block">
+  <a href={href} data-edit-text="title" data-edit-link="href" class="btn">
+    {title}
+  </a>
+</div>
+```
+
 ### Data Attributes
 
 | Attribute | Purpose |

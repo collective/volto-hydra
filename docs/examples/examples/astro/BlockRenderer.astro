@@ -37,8 +37,9 @@ import MapsBlock from './MapsBlock.astro';
 import TocBlock from './TocBlock.astro';
 import CodeExampleBlock from './CodeExampleBlock.astro';
 import SummaryItemBlock from './SummaryItemBlock.astro';
+import ContextNavigationBlock from './ContextNavigationBlock.astro';
 
-const { block, content } = Astro.props;
+const { block, content, blocks } = Astro.props;
 const type = block?.['@type'];
 const uid = block?.['@uid'];
 
@@ -48,6 +49,7 @@ const KNOWN = new Set<string>([
   'columns', 'gridBlock', 'accordion', 'slider', 'listing', 'search',
   'form', 'heading', 'separator', 'button', 'highlight', 'video',
   'maps', 'toc', 'codeExample', 'summary', 'default',
+  'contextNavigation',
 ]);
 ---
 <div data-block-uid={uid}>
@@ -72,6 +74,7 @@ const KNOWN = new Set<string>([
   {type === 'maps' && <MapsBlock block={block} />}
   {type === 'toc' && <TocBlock block={block} content={content} />}
   {type === 'codeExample' && <CodeExampleBlock block={block} />}
+  {type === 'contextNavigation' && <ContextNavigationBlock block={block} blocks={block?.blocks || blocks} />}
   {(type === 'summary' || type === 'default') && <SummaryItemBlock block={block} />}
   {!KNOWN.has(type) && (
     <div data-unknown-block-type={type}>[block type "{type}" not implemented in astro example yet]</div>

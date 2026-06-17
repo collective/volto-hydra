@@ -743,3 +743,88 @@ defineProps({ block: Object });
   <button type="submit" data-edit-text="submit_label">{block.submit_label || 'Submit'}</button>
 </form>
 ```
+
+### Astro
+
+<!-- file: examples/astro/FormBlock.astro -->
+```astro
+---
+/**
+ * Form block. Renders a sequence of subblocks (form fields) by field_type.
+ * The form is server-rendered with no submit handler — interactivity is
+ * outside the scope of the doc example.
+ *
+ * Each field row carries `data-block-uid={field.field_id}` so the bridge
+ * can target individual fields for selection.
+ */
+const { block } = Astro.props;
+const subblocks = block.subblocks || [];
+---
+<form class="form-block">
+  <h3 data-edit-text="title">{block.title}</h3>
+  {block.description && <p data-edit-text="description">{block.description}</p>}
+
+  {subblocks.map((field: any) => (
+    <div class="form-field" data-block-uid={field.field_id}>
+      {field.field_type === 'text' && (
+        <label><span data-edit-text="label">{field.label}</span> <input type="text" required={field.required} /></label>
+      )}
+      {field.field_type === 'textarea' && (
+        <label><span data-edit-text="label">{field.label}</span> <textarea required={field.required}></textarea></label>
+      )}
+      {field.field_type === 'number' && (
+        <label><span data-edit-text="label">{field.label}</span> <input type="number" required={field.required} /></label>
+      )}
+      {field.field_type === 'from' && (
+        <label><span data-edit-text="label">{field.label}</span> <input type="email" required={field.required} /></label>
+      )}
+      {field.field_type === 'date' && (
+        <label><span data-edit-text="label">{field.label}</span> <input type="date" required={field.required} /></label>
+      )}
+      {field.field_type === 'checkbox' && (
+        <label><input type="checkbox" required={field.required} /> <span data-edit-text="label">{field.label}</span></label>
+      )}
+      {field.field_type === 'select' && (
+        <label><span data-edit-text="label">{field.label}</span>
+          <select required={field.required}>
+            <option value="">Choose...</option>
+            {(field.input_values || []).map((v: string) => (
+              <option value={v}>{v}</option>
+            ))}
+          </select>
+        </label>
+      )}
+      {field.field_type === 'single_choice' && (
+        <fieldset>
+          <legend data-edit-text="label">{field.label}</legend>
+          {(field.input_values || []).map((v: string) => (
+            <label><input type="radio" name={field.field_id} value={v} /> {v}</label>
+          ))}
+        </fieldset>
+      )}
+      {field.field_type === 'multiple_choice' && (
+        <fieldset>
+          <legend data-edit-text="label">{field.label}</legend>
+          {(field.input_values || []).map((v: string) => (
+            <label><input type="checkbox" value={v} /> {v}</label>
+          ))}
+        </fieldset>
+      )}
+      {field.field_type === 'static_text' && (
+        <p data-edit-text="label">{field.label}</p>
+      )}
+      {field.field_type === 'hidden' && (
+        <input type="hidden" name={field.field_id} value={field.value || ''} />
+      )}
+      {field.field_type === 'attachment' && (
+        <label><span data-edit-text="label">{field.label}</span> <input type="file" required={field.required} /></label>
+      )}
+      {!['text','textarea','number','from','date','checkbox','select','single_choice','multiple_choice','static_text','hidden','attachment'].includes(field.field_type) && (
+        <label><span data-edit-text="label">{field.label}</span> <input type="text" /></label>
+      )}
+    </div>
+  ))}
+
+  <button type="submit" data-edit-text="submit_label">{block.submit_label || 'Submit'}</button>
+</form>
+```

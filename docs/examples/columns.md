@@ -188,3 +188,27 @@ defineProps({ block: Object });
   </div>
 </div>
 ```
+
+### Astro
+
+<!-- file: examples/astro/ColumnsBlock.astro -->
+```astro
+---
+/**
+ * Columns container. Each column is a sub-block of @type "column" rendered
+ * by ColumnBlock. The columns themselves get their own data-block-uid
+ * wrapper from ColumnBlock — this outer container is just layout.
+ */
+import ColumnBlock from './ColumnBlock.astro';
+const { block } = Astro.props;
+const items = block.columns?.items || [];
+const subBlocks = block.blocks || {};
+---
+<div class="columns-block">
+  <div style="display: flex; gap: 1rem">
+    {items.map((id: string) => (
+      <ColumnBlock block={{ ...subBlocks[id], '@uid': id }} />
+    ))}
+  </div>
+</div>
+```

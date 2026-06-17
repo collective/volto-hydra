@@ -131,6 +131,32 @@ const imgSrc = computed(() => getImageUrl(props.block.url));
 </div>
 ```
 
+### Astro
+
+<!-- file: examples/astro/ImageBlock.astro -->
+```astro
+---
+/**
+ * Image block. If `href` is set the image is wrapped in a link (and
+ * `data-edit-link="href"` lets the link editor work); otherwise it's a
+ * bare <img>. `data-edit-media="url"` is the media editor hook.
+ */
+import { getImageUrl } from './utils.js';
+const { block } = Astro.props;
+const href = block.href?.[0]?.['@id'] || block.href;
+const imgSrc = getImageUrl(block.url);
+---
+<div>
+  {href ? (
+    <a href={href} data-edit-link="href">
+      <img data-edit-media="url" src={imgSrc} alt={block.alt} />
+    </a>
+  ) : (
+    <img data-edit-media="url" src={imgSrc} alt={block.alt} />
+  )}
+</div>
+```
+
 ### Data Attributes
 
 | Attribute | Purpose |

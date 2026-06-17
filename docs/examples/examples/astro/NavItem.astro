@@ -1,0 +1,40 @@
+---
+/**
+ * Single row of a context-navigation list. The `block` shape mirrors
+ * both manual `navItem` entries and listing-synthesised items: `href` is
+ * the object_browser array `[{ '@id': string }]` and `label` is a string.
+ *
+ * The active row gets `aria-current="page"` and `.current`; an ancestor
+ * of the active row gets `.in-path`. `_level` is set by the parent
+ * ContextNavigationBlock after computing minDepth across siblings.
+ *
+ * Active-row detection runs on the server — the path comparison uses the
+ * request URL when available, falling back to empty (no row active) on
+ * pages where the location can't be known at SSR time. The bridge then
+ * re-evaluates client-side via the standard render-on-edit cycle.
+ */
+const { block } = Astro.props;
+const itemPath = new URL(
+  block.href?.[0]?.['@id'] || '/',
+  'http://localhost',
+).pathname;
+const here = (Astro.url?.pathname || '').replace(/\/edit$/, '');
+const active = itemPath === here;
+const inPath = !active && here.startsWith(itemPath + '/');
+const level = block._level ?? 1;
+const classes = [
+  `nav-item`,
+  `level-${level}`,
+  active ? 'current' : '',
+  inPath ? 'in-path' : '',
+].filter(Boolean).join(' ');
+---
+<a
+  href={itemPath}
+  data-block-uid={block['@uid']}
+  data-edit-link="href"
+  class={classes}
+  aria-current={active ? 'page' : undefined}
+>
+  <span data-edit-text="label">{block.label}</span>
+</a>
