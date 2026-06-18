@@ -179,3 +179,36 @@ function toggle(id) { openPanels[id] = !openPanels[id]; }
   {/each}
 </div>
 ```
+
+### Astro
+
+<!-- file: examples/astro/AccordionBlock.astro -->
+```astro
+---
+/**
+ * Accordion. Server-render shows every panel open (no client interactivity
+ * in the SSR example), matching what the bridge needs to see for
+ * selection sync against `data-edit-text="title"`. The svelte version's
+ * toggle behavior is editor-only ergonomics and isn't required by tests.
+ *
+ * Each panel keeps its own data-block-uid so panel selection works.
+ */
+import BlockRenderer from './BlockRenderer.astro';
+const { block } = Astro.props;
+const panels = block.panels || [];
+---
+<div class="accordion-block">
+  {panels.map((panel: any) => (
+    <div data-block-uid={panel['@id']} class="accordion-panel">
+      <button class="accordion-header">
+        <span data-edit-text="title">{panel.title}</span>
+      </button>
+      <div class="accordion-content">
+        {(panel.blocks_layout?.items || []).map((id: string) => (
+          <BlockRenderer block={{ ...panel.blocks?.[id], '@uid': id }} />
+        ))}
+      </div>
+    </div>
+  ))}
+</div>
+```

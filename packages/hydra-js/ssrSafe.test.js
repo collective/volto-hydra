@@ -1,4 +1,4 @@
-import { expandListingBlocks } from './hydra.src.js';
+import { expandListingBlocks } from '@volto-hydra/helpers';
 
 /**
  * SSR / SSG safety: hydra.js runs server-side during a Nuxt `ssr: true`

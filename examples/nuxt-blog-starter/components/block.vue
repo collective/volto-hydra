@@ -855,7 +855,8 @@
 </template>
 <script setup>
 import { ref, reactive, watch, nextTick, computed, toRefs, inject, onMounted } from 'vue';
-import { expandTemplatesSync, staticBlocks, isEditMode } from '@hydra-js/hydra.js';
+import { isEditMode } from '@hydra-js/hydra.js';
+import { staticBlocks, expandTemplatesSync } from '@hydra-js/helpers';
 import RichText from './richtext.vue';
 
 // Inject page-level context for nested components

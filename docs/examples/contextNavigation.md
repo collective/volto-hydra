@@ -258,6 +258,39 @@ defineProps({ block: Object, blocks: Object });
 </nav>
 ```
 
+### Astro
+
+<!-- file: examples/astro/ContextNavigationBlock.astro -->
+```astro
+---
+/**
+ * Context navigation block: a vertical nav list whose rows are either
+ * hand-added `navItem` blocks or a `listing` block that auto-populates
+ * from a query. Mirrors test-svelte's ContextNavigationBlock minus the
+ * outer `data-block-uid` (BlockRenderer wraps every block in that).
+ *
+ * `blocks` is the sibling map of inner blocks indexed by id — each entry
+ * is the child block, and we splice the id back in as `@uid` so the
+ * NavItem renderer can produce a stable selector.
+ */
+import NavItem from './NavItem.astro';
+const { block, blocks = {} } = Astro.props;
+const items = block?.items?.items || [];
+---
+<nav
+  aria-label={block.ariaLabel || 'Section navigation'}
+  class="context-navigation"
+>
+  <ul role="list" class="context-navigation-list">
+    {items.map((id: string) => (
+      <li>
+        <NavItem block={{ ...blocks[id], '@uid': id }} />
+      </li>
+    ))}
+  </ul>
+</nav>
+```
+
 ## Accessibility
 
 - Outer element is `<nav aria-label="…">` — screen readers announce the region.

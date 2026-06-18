@@ -371,12 +371,21 @@ export async function verifyBlockRendering(
   } = options;
 
   // Listing blocks: expandListingBlocks sets @uid=parentId on all items,
-  // so multiple elements share the same data-block-uid.
+  // so multiple elements share the same data-block-uid. The frontend
+  // resolves items async (fetch + render), so we have to wait for the
+  // count to STABILISE rather than reading it once — otherwise we race
+  // the next item's render and assert on a stale snapshot. Two
+  // consecutive same-value reads = stable.
   if (isListing) {
     const items = iframe.locator(`[data-block-uid="${blockId}"]`);
     await expect(items.first()).toBeVisible({ timeout: 15000 });
-    const count = await items.count();
-    expect(count).toBeGreaterThanOrEqual(2);
+    let prev = -1;
+    await expect.poll(async () => {
+      const n = await items.count();
+      const stable = n === prev && n >= 2;
+      prev = n;
+      return stable;
+    }, { timeout: 15000, intervals: [200, 400, 800] }).toBe(true);
     await checkEditAnnotations(items.first(), blockData);
     return;
   }

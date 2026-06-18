@@ -1,4 +1,4 @@
-import { ploneFetchItems } from './hydra.src.js';
+import { ploneFetchItems } from '@volto-hydra/helpers';
 
 /**
  * ploneFetchItems must return exactly what Plone's @querystring-search

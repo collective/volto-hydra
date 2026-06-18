@@ -1,4 +1,4 @@
-import { loadTemplates } from '#utils/hydra';
+import { loadTemplates } from '#utils/helpers';
 
 // Shared template cache across renders
 const templateCache = {};

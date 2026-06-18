@@ -855,14 +855,65 @@ test.describe('Template Edit Mode - Block Settings', () => {
     await helper.clickBlockInIframe(USER_CONTENT_1);
     await helper.waitForSidebarOpen();
 
-    // slotId input should be visible and have initial value from block data
+    // slotId input should be visible and have initial value from block data.
     const slotIdInput = page.locator('.field-wrapper-slotId input');
     await expect(slotIdInput).toHaveValue('primary', { timeout: 5000 });
     await helper.expectTemplateSettingsCount(1);
-    // Now clear and fill with new value
-    await slotIdInput.clear();
-    await slotIdInput.fill('new-slot-name');
-    await expect(slotIdInput).toHaveValue('new-slot-name');
+
+    // CRITICAL — wait for the sidebar form to STOP re-rendering before
+    // typing. Just-asserting toHaveValue('primary') above only catches
+    // the first poll where the value matches; Volto's TextWidget can
+    // still be receiving Redux dispatches from schema-inheritance
+    // recompute / template state churn for several hundred ms after.
+    // If we start typing during that window the input unmounts and our
+    // keystrokes go nowhere (or land on the next mount with leftover
+    // text). Gate on N consecutive same-value polls of 'primary' before
+    // touching it. (Cheap on the fast path: passes after ~300ms.)
+    {
+      let prev = '', stable = 0;
+      await expect.poll(async () => {
+        const v = await slotIdInput.inputValue();
+        if (v === prev && v === 'primary') stable++;
+        else { stable = 0; prev = v; }
+        return stable >= 3;
+      }, { timeout: 5000, intervals: [100, 150, 200] }).toBe(true);
+    }
+
+    // pressSequentially (NOT fill) on purpose. Volto's TextWidget is a
+    // React controlled input whose value flows from Redux. fill() sets
+    // the DOM `.value` directly and fires ONE 'input' event — React's
+    // onChange may not dispatch the Redux update in time, and the next
+    // render reads the stale value and reverts the DOM. Typing one char
+    // at a time fires real keydown/keyup/input per char, React handles
+    // each deterministically.
+    await slotIdInput.press('ControlOrMeta+a');
+    await slotIdInput.press('Backspace');
+    await slotIdInput.pressSequentially('new-slot-name', { delay: 20 });
+
+    // Stable-for-N-consecutive-polls gate: value must equal
+    // 'new-slot-name' for 3 polls in a row. If a late re-render of the
+    // sidebar form (from an iframe FORM_DATA echo or schema-inheritance
+    // recompute) reverts the value, the counter resets and we keep
+    // waiting; if Redux can't settle on the typed value at all the poll
+    // times out, surfacing the bug rather than masking it.
+    //
+    // Generous timeout (10s) because admin-nuxt is markedly slower than
+    // admin-mock — extra FORM_DATA echoes from the Nuxt iframe extend the
+    // re-render churn window before the form quiets down.
+    const seen: string[] = [];
+    let prev = '';
+    let stable = 0;
+    try {
+      await expect.poll(async () => {
+        const v = await slotIdInput.inputValue();
+        if (seen[seen.length - 1] !== v) seen.push(v);
+        if (v === prev && v === 'new-slot-name') stable++;
+        else { stable = 0; prev = v; }
+        return stable >= 3;
+      }, { timeout: 10000, intervals: [100, 150, 200] }).toBe(true);
+    } catch (e) {
+      throw new Error(`slotId never settled at "new-slot-name". Distinct values seen during poll: ${JSON.stringify(seen)} — last value: "${prev}"`);
+    }
   });
 
   test('can toggle block fixed mode in edit mode', async ({ page }) => {

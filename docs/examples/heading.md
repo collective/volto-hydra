@@ -107,6 +107,22 @@ defineProps({ block: Object });
 </svelte:element>
 ```
 
+### Astro
+
+<!-- file: examples/astro/HeadingBlock.astro -->
+```astro
+---
+/**
+ * Heading block. Tag is dynamic (h1..h6) — astro renders this via a
+ * capitalized `const Tag = ...` then `<Tag>`, mirroring SlateNode's
+ * dynamic-element pattern.
+ */
+const { block } = Astro.props;
+const Tag = (block.tag || 'h2') as any;
+---
+<Tag data-edit-text="heading">{block.heading}</Tag>
+```
+
 ### Data Attributes
 
 | Attribute | Purpose |

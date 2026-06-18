@@ -23,7 +23,8 @@ import rightArrowSVG from '@plone/volto/icons/right-key.svg';
 import config from '@plone/volto/registry';
 import { DragDropList } from '@plone/volto/components';
 import { getAllContainerFields, getBlockById } from '../../utils/blockPath';
-import { PAGE_BLOCK_UID, isBlockPositionLocked } from '@volto-hydra/hydra-js';
+import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { isBlockPositionLocked } from '@volto-hydra/helpers';
 import LayoutSelector from './LayoutSelector';
 
 const messages = defineMessages({

@@ -1,0 +1,35 @@
+---
+// Initial page is intentionally empty — the bridge fires FORM_DATA on
+// INIT with the real content, which triggers the first /api/render POST
+// (unit='page' since lastFormData is null). The architecture treats both
+// "first paint" and "edit" identically: every render goes through the
+// same Container API pipeline, so any rendering bug surfaces immediately
+// rather than living in a separate code path.
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Astro Block Examples</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      #content { margin-top: 20px; }
+      [data-block-uid] { padding: 10px; margin: 10px 0; border: 1px solid #ddd; }
+      img { max-width: 100%; height: auto; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 id="page-title" data-edit-text="title">Loading...</h1>
+      <div id="content"></div>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

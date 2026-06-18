@@ -50,7 +50,7 @@ Selection outlines, the Quanta toolbar, drag handles, edge handles, the empty-bl
 2. Captures pointer events through invisible elements so the admin's chrome stays interactive.
 3. Reports element rects on demand so the chrome can position itself.
 
-The benefit: a frontend's CSS can never break the editing UI, because the editing UI doesn't live in the frontend. Switching frontends mid-edit (Nuxt → Next → Astro) works because the bridge protocol is the same — only the rendered DOM changes.
+The benefit: a frontend's CSS can never break the editing UI, because the editing UI doesn't live in the frontend. Switching frontends mid-edit (Nuxt → Next → Astro) works because the bridge protocol is the same — only the rendered DOM changes. Server-only frameworks without client-side reactivity (Astro, PHP, Django, Rails) participate via the [server-render pattern](./server-rendered-frontends.md) — same bridge protocol, plus a small HTTP endpoint the bridge POSTs to.
 
 ## Slate (rich text) transforms
 

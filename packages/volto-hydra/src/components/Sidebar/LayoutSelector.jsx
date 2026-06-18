@@ -10,7 +10,7 @@
 import React from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 import { v4 as uuid } from 'uuid';
-import { templateIdToPath } from '@volto-hydra/hydra-js';
+import { templateIdToPath } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import Api from '@plone/volto/helpers/Api/Api';
 import config from '@plone/volto/registry';

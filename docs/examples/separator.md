@@ -76,3 +76,16 @@ defineProps({ block: Object });
   <hr />
 </div>
 ```
+
+### Astro
+
+<!-- file: examples/astro/SeparatorBlock.astro -->
+```astro
+---
+const { block } = Astro.props;
+const align = block?.styles?.align || 'full';
+---
+<div class={`separator-block separator-${align}`}>
+  <hr />
+</div>
+```

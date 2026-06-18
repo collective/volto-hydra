@@ -31,7 +31,7 @@
 
 <script>
 import { ref, reactive, watch, defineAsyncComponent } from 'vue';
-import { expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';
+import { expandListingBlocks, ploneFetchItems } from '@hydra-js/helpers';
 
 export default {
   name: 'ListingBlock',

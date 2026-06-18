@@ -1,4 +1,5 @@
-import { getAccessToken, loadTemplates } from '@hydra-js/hydra.js';
+import { getAccessToken } from '@hydra-js/hydra.js';
+import { loadTemplates } from '@hydra-js/helpers';
 
 // Shared template cache across all page renders (survives SSG prerendering)
 const templateCache = {};

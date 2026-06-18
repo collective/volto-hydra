@@ -34,7 +34,8 @@
  */
 import config from '@plone/volto/registry';
 import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds } from './blockPath';
-import { PAGE_BLOCK_UID, convertFieldValue } from '@volto-hydra/hydra-js';
+import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { convertFieldValue } from '@volto-hydra/helpers';
 import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context';
 // Pure validation/default-application logic lives in schemaValidation.js
 // (no dependencies — safe to import from CI scripts and test runners).

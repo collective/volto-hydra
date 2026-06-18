@@ -56,7 +56,8 @@
 <script setup>
 
 import { ref, computed, provide, inject } from 'vue';
-import { initBridge, expandTemplatesSync, isEditMode } from '@hydra-js/hydra.js';
+import { initBridge, isEditMode } from '@hydra-js/hydra.js';
+import { expandTemplatesSync } from '@hydra-js/helpers';
 import { sharedBlocksConfig } from '@test-fixtures/shared-block-schemas.js';
 import { useRuntimeConfig } from "#imports"
 

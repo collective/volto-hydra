@@ -36,7 +36,7 @@
 
 <script setup>
 import { reactive, inject } from 'vue';
-import { expandTemplatesSync } from '@hydra-js/hydra.js';
+import { expandTemplatesSync } from '@hydra-js/helpers';
 
 const props = defineProps({
   block_uid: { type: String, required: true },

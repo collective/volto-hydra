@@ -1,0 +1,43 @@
+---
+/**
+ * Code-example tabs block. Server-render shows the first tab active and
+ * the rest hidden (no client interactivity in this example). Each tab
+ * carries its own data-block-uid so the bridge can target both the tab
+ * button and the tab content.
+ *
+ * `data-block-container` and `data-block-add` are bridge hints for the
+ * sub-block add/insert affordances.
+ */
+const { block } = Astro.props;
+const tabs = block.tabs || [];
+const containerAttr = JSON.stringify({ add: 'horizontal' });
+---
+<div class="code-example" data-block-container={containerAttr}>
+  {tabs.length > 1 && (
+    <div data-tab-bar style="display:flex; background:#1f2937; border-bottom:1px solid #374151">
+      {tabs.map((tab: any, i: number) => (
+        <button
+          data-block-uid={tab['@id']}
+          data-linkable-allow
+          style={`padding:0.5rem 1rem; font-size:0.875rem; font-weight:500; border:none; cursor:pointer; background:${i === 0 ? '#111827' : 'transparent'}; color:${i === 0 ? '#fff' : '#9ca3af'}; border-bottom:${i === 0 ? '2px solid #60a5fa' : '2px solid transparent'}`}
+        >
+          <span data-edit-text="label">{tab.label || tab.language || `Tab ${i + 1}`}</span>
+        </button>
+      ))}
+    </div>
+  )}
+  {tabs.map((tab: any, i: number) => (
+    <div
+      data-block-uid={tab['@id']}
+      data-block-add="right"
+      style={`display:${i === 0 ? 'block' : 'none'}`}
+    >
+      <pre
+        data-edit-text="code"
+        style={`background:#1e1e1e; color:#d4d4d4; padding:1rem; border-radius:${tabs.length > 1 ? '0' : '8px'}; overflow:auto; font-size:0.875rem; margin:0; white-space:pre-wrap`}
+      >
+        <code class={tab.language ? `language-${tab.language}` : undefined}>{tab.code || ''}</code>
+      </pre>
+    </div>
+  ))}
+</div>

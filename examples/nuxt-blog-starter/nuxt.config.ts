@@ -4,6 +4,7 @@ import { dirname, resolve } from 'path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const hydraJsPath = resolve(__dirname, '../../packages/hydra-js')
+const helpersPath = resolve(__dirname, '../../packages/helpers')
 const fixturesPath = resolve(__dirname, '../../tests-playwright/fixtures')
 
 export default defineNuxtConfig({
@@ -200,6 +201,7 @@ export default defineNuxtConfig({
       alias: {
         // Always use workspace source — Vite/Nuxt bundles tabbable automatically
         '@hydra-js/hydra.js': resolve(hydraJsPath, 'hydra.src.js'),
+        '@hydra-js/helpers': resolve(helpersPath, 'index.js'),
         '@hydra-js': hydraJsPath,
         '@test-fixtures': fixturesPath
       }

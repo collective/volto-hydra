@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import SlateBlock, { SlateInline } from "@/components/SlateBlock";
 import CodeExampleBlock from "@/components/CodeExampleBlock/CodeExampleBlock";
-import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, staticBlocks, contentPath } from "#utils/hydra";
+import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, staticBlocks, contentPath } from "#utils/helpers";
 import SwiperSlider from "@/components/SwiperSlider";
 
 // Template context for nested block expansion

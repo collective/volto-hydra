@@ -1,5 +1,6 @@
 import { createApp, reactive } from 'vue';
-import { initBridge, expandListingBlocks, ploneFetchItems, contentPath } from '$hydra';
+import { initBridge } from '$hydra';
+import { expandListingBlocks, ploneFetchItems, contentPath } from '$helpers';
 import docPageDefinitions from '$schemas';
 const docBlocksConfig = Object.fromEntries(
   Object.values(docPageDefinitions).flatMap(page => Object.entries(page.blocks))

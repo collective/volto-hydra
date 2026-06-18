@@ -8,7 +8,7 @@
  * Uses plain JS checks (no external dependencies).
  */
 
-import { isSlateFieldType } from '@volto-hydra/hydra-js';
+import { isSlateFieldType } from '@volto-hydra/helpers';
 
 // Re-export for convenience
 export { isSlateFieldType };

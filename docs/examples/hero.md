@@ -170,3 +170,38 @@ const heroImageSrc = computed(() => getImageUrl(props.block.image));
   </a>
 </div>
 ```
+
+### Astro
+
+<!-- file: examples/astro/HeroBlock.astro -->
+```astro
+---
+/**
+ * Hero block. Heading, subheading (with simple newline→<br> support),
+ * description slate tree, optional image, and a button. Each editable
+ * field carries the relevant `data-edit-*` hook so the bridge can map
+ * iframe edits back to the right field.
+ *
+ * `subheadingHtml` mirrors the svelte version's {@html} interpolation —
+ * astro's `set:html` on a wrapper element fills the same role.
+ */
+import SlateNode from './SlateNode.astro';
+import { getImageUrl } from './utils.js';
+const { block } = Astro.props;
+const subheadingHtml = (block.subheading || '').replace(/\n/g, '<br>');
+const buttonLink = block.buttonLink?.[0]?.['@id'] || '';
+const heroImageSrc = getImageUrl(block.image);
+const description = block.description || [];
+---
+<div class="hero-block">
+  {block.image && <img data-edit-media="image" src={heroImageSrc} alt="Hero image" />}
+  <h1 data-edit-text="heading">{block.heading}</h1>
+  <p data-edit-text="subheading" set:html={subheadingHtml}></p>
+  <div class="hero-description" data-edit-text="description">
+    {description.map((node: any) => <SlateNode node={node} />)}
+  </div>
+  <a data-edit-text="buttonText" data-edit-link="buttonLink" href={buttonLink}>
+    {block.buttonText}
+  </a>
+</div>
+```
