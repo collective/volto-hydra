@@ -1937,6 +1937,89 @@ for (const { imageSlug, exampleSlug } of exampleScreenshots) {
   }
 }
 
+// --- Phase 6b: Sync homepage Quick Start tabs from docs/quickstart/ ---
+// The homepage Quick Start block lives in plone_site_root/data.json and
+// shows one tab per frontend framework. Authoring those snippets inline
+// in the JSON makes them invisible to lint/diff and easy to drift from
+// the actual API. Source the tabs from real .vue/.jsx/.svelte/.html/
+// .astro/.ts files under docs/quickstart/ instead, with a manifest that
+// declares the tab order + per-tab file list. Concatenate files in
+// declared order (joined by a blank line) and write the result into the
+// matching tab's code field.
+//
+// A tab declared in the manifest but missing from the block is created.
+// A tab present in the block but absent from the manifest is left alone
+// (so non-quickstart tabs in the same block, if ever added, won't be
+// touched). Matching is by `@id` — labels/languages are re-synced from
+// the manifest so a manifest edit propagates without manual JSON edits.
+{
+  const QUICKSTART_DIR = join(__dirname, 'quickstart');
+  const QUICKSTART_MANIFEST_PATH = join(QUICKSTART_DIR, 'manifest.json');
+  const SITE_ROOT_JSON_PATH = join(CONTENT_DIR, 'plone_site_root', 'data.json');
+
+  if (!existsSync(QUICKSTART_MANIFEST_PATH)) {
+    console.error(`Quickstart manifest missing: ${QUICKSTART_MANIFEST_PATH}`);
+    process.exit(1);
+  }
+  if (!existsSync(SITE_ROOT_JSON_PATH)) {
+    console.error(`Quickstart sync target missing: ${SITE_ROOT_JSON_PATH}`);
+    process.exit(1);
+  }
+
+  const manifest = JSON.parse(readFileSync(QUICKSTART_MANIFEST_PATH, 'utf-8'));
+  const original = readFileSync(SITE_ROOT_JSON_PATH, 'utf-8');
+  const data = JSON.parse(original);
+
+  const manifestIds = new Set(manifest.tabs.map(t => t.id));
+  let targetBlockId = null;
+  for (const [bId, b] of Object.entries(data.blocks || {})) {
+    if (Array.isArray(b.tabs) && b.tabs.some(t => manifestIds.has(t['@id']))) {
+      targetBlockId = bId;
+      break;
+    }
+  }
+  if (!targetBlockId) {
+    console.error(`Quickstart sync: no block in plone_site_root tabs matches any manifest @id (${[...manifestIds].join(', ')})`);
+    process.exit(1);
+  }
+  const block = data.blocks[targetBlockId];
+
+  for (const spec of manifest.tabs) {
+    const parts = spec.files.map(rel => {
+      const abs = join(QUICKSTART_DIR, rel);
+      if (!existsSync(abs)) {
+        console.error(`Quickstart sync: file referenced by manifest is missing: ${rel}`);
+        process.exit(1);
+      }
+      // Strip trailing blank lines — files conventionally end with a
+      // newline, but the snippet displayed in the tab shouldn't carry
+      // it (the tab UI already adds its own bottom padding).
+      return readFileSync(abs, 'utf-8').replace(/\n+$/, '');
+    });
+    const code = parts.join('\n\n');
+    let tab = block.tabs.find(t => t['@id'] === spec.id);
+    if (!tab) {
+      tab = { '@id': spec.id, label: spec.label, language: spec.language, code };
+      block.tabs.push(tab);
+    } else {
+      tab.code = code;
+      tab.label = spec.label;
+      tab.language = spec.language;
+    }
+  }
+
+  const updated = JSON.stringify(data, null, 2) + '\n';
+  if (updated !== original) {
+    if (checkMode) {
+      outOfSync = true;
+      console.error(`OUT OF SYNC: ${SITE_ROOT_JSON_PATH} (quickstart tabs)`);
+    } else {
+      writeFileSync(SITE_ROOT_JSON_PATH, updated, 'utf-8');
+      console.log(`Updated quickstart tabs in plone_site_root/data.json (${manifest.tabs.length} tabs)`);
+    }
+  }
+}
+
 // --- Phase 7: Validate the resulting Plone tree ---
 // Same canonical validator the mock-api server uses at startup and the
 // deploy script calls in Step 0. Fails fast on the export-shape pitfalls
