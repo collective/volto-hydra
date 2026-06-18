@@ -192,19 +192,10 @@ import SlateNode from './SlateNode.astro';
 const { block } = Astro.props;
 const rows = block?.table?.rows || [];
 ---
-<div>
-  <table>
-    <tbody>
-      {rows.map((row: any) => (
-        <tr data-block-uid={row.key}>
-          {(row.cells || []).map((cell: any) => (
-            <td data-block-uid={cell.key} data-edit-text="value">
-              {(cell.value || []).map((node: any) => <SlateNode node={node} />)}
-            </td>
-          ))}
-        </tr>
-      ))}
-    </tbody>
-  </table>
-</div>
+<div><table><tbody>{rows.map((row: any) => (
+  <tr data-block-uid={row.key}>{(row.cells || []).map((cell: any) => (
+    <td data-block-uid={cell.key} data-edit-text="value"
+    >{(cell.value || []).map((node: any) => <SlateNode node={node} />)}</td>
+  ))}</tr>
+))}</tbody></table></div>
 ```

@@ -170,9 +170,8 @@ import SlateNode from './SlateNode.astro';
 const { block } = Astro.props;
 const value = block?.value || [];
 ---
-<div data-edit-text="value">
-  {value.map((node: any) => <SlateNode node={node} />)}
-</div>
+<div data-edit-text="value"
+>{value.map((node: any) => <SlateNode node={node} />)}</div>
 ```
 
 <!-- file: examples/astro/SlateNode.astro -->

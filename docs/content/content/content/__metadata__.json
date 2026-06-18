@@ -68,6 +68,7 @@
     "docs-images-folder-001/data.json",
     "docs/listings/data.json",
     "docs/live-preview/data.json",
+    "docs/server-rendered-frontends/data.json",
     "docs/static/data.json",
     "docs/templates/data.json",
     "docs/visual-editing/data.json",
@@ -874,6 +875,13 @@
       }
     },
     "docs-images-image-block-edit-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-server-rendered-frontends-001": {
       "local_roles": {
         "admin": [
           "Owner"
