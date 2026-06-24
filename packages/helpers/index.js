@@ -69,7 +69,7 @@ function _getTokenFromCookie() {
  * environments. Order: URL `access_token` param → sessionStorage →
  * cookie. Returns null on server.
  */
-function _getAccessToken() {
+export function getAccessToken() {
   if (typeof window === 'undefined') {
     return null;
   }
@@ -92,7 +92,7 @@ function _getAccessToken() {
  * matching requests.
  */
 function _getAuthHeaders() {
-  const token = _getAccessToken();
+  const token = getAccessToken();
   if (token) {
     return {
       Authorization: `Bearer ${token}`,
