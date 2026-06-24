@@ -17,7 +17,7 @@
 import Cookies from 'js-cookie';
 import config from '@plone/volto/registry';
 import { getSavedUrlsCookieName } from '../../../../utils/cookieNames';
-import { flattenToAppURL, isInternalURL } from './Url';
+import { flattenToAppURL, isInternalURL, flattenScales } from './Url';
 
 beforeEach(() => {
   // Make config.settings deterministic — flattenToAppURL strips these
@@ -72,5 +72,44 @@ describe('isInternalURL (Hydra shadow)', () => {
 
   it('still rejects unknown absolute URLs', () => {
     expect(isInternalURL('https://elsewhere.example.org/x')).toBe(false);
+  });
+});
+
+// Deep-freeze, the way the Redux store hands block/image data to the editor.
+const deepFreeze = (o) => {
+  if (o && typeof o === 'object') {
+    Object.values(o).forEach(deepFreeze);
+    Object.freeze(o);
+  }
+  return o;
+};
+
+describe('flattenScales (Hydra shadow) — frozen image data', () => {
+  // Regression: image-led teasers carry `image_scales`; the data arrives FROZEN
+  // from the store. flattenScales aliased image.scales and then mutated
+  // scales[key].download in place → "Cannot assign to read only property
+  // 'download'", surfaced by react-beautiful-dnd's error boundary when editing
+  // a teaser inside a gridBlock.
+  it('does not mutate the frozen input (no read-only download error)', () => {
+    const image = deepFreeze({
+      'content-type': 'image/jpeg',
+      download: 'http://api.localhost/Plone/work/@@images/image.jpeg',
+      scales: {
+        preview: { download: 'http://api.localhost/Plone/work/@@images/image-400.jpeg' },
+        teaser: { download: 'http://api.localhost/Plone/work/@@images/image-600.jpeg' },
+      },
+    });
+
+    expect(() => flattenScales('/work', image)).not.toThrow();
+
+    const out = flattenScales('/work', image);
+    // download URLs flattened (apiPath stripped) on the OUTPUT...
+    expect(out.download).not.toContain('http://api.localhost');
+    expect(out.scales.preview.download).not.toContain('http://api.localhost');
+    expect(out.scales.teaser.download).not.toContain('http://api.localhost');
+    // ...and the frozen INPUT is left untouched.
+    expect(image.scales.preview.download).toBe(
+      'http://api.localhost/Plone/work/@@images/image-400.jpeg',
+    );
   });
 });

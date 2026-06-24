@@ -1,0 +1,42 @@
+{
+  "@id": "/image-scales-test",
+  "@type": "Document",
+  "id": "image-scales-test",
+  "title": "Image Scales Test",
+  "description": "An image block whose image_scales carry a scales dict, as real Plone serializes them. Regression fixture for the flattenScales frozen-mutation crash.",
+  "UID": "image-scales-test-0000-0000-000000000000",
+  "review_state": "published",
+  "blocks": {
+    "title-block": { "@type": "title" },
+    "image-block-1": {
+      "@type": "image",
+      "url": "/image-scales-test/test-image.png",
+      "alt": "scaled image",
+      "image_field": "image",
+      "image_scales": {
+        "image": [
+          {
+            "content-type": "image/png",
+            "download": "@@images/image",
+            "filename": "test-image.png",
+            "width": 1200,
+            "height": 800,
+            "scales": {
+              "preview": {
+                "download": "@@images/image/preview",
+                "width": 400,
+                "height": 267
+              },
+              "large": {
+                "download": "@@images/image/large",
+                "width": 800,
+                "height": 533
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "blocks_layout": { "items": ["title-block", "image-block-1"] }
+}
