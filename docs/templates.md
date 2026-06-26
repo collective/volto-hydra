@@ -59,6 +59,29 @@ For a fully-fixed branded footer, leave the blocks **field empty** (`{items: []}
 and let the layout content item supply everything — then editing the layout
 updates every page.
 
+### Block structure inside a template (read this before debugging an empty merge)
+
+```{important}
+**Every block in a template must declare a `slotId`** — not just slot blocks, but
+**`fixed` and `fixed+readOnly` blocks too, and every block *nested* inside a
+container.** The recursive merge keeps a nested block only when it has a `slotId`
+(or a `templateId`): `if (nested.slotId || nested.templateId)`. A block without
+one is **silently dropped** — the container survives but renders empty, with no
+error. This is the most common reason a template "half renders".
+```
+
+**Nested containers are fully supported** (e.g. a branded footer built as a
+`columns` block). The merge recurses into any field whose `.items` array lists
+the block's nested block IDs — a `blocks_layout`-widget field of **any name**
+(a `columns` block's `columns` field counts). Two rules for nested content:
+
+- Pair every nested `blocks` map with such a sibling layout field (or the merge throws "no sibling field whose `.items` array lists those block IDs").
+- Give **every** block a `slotId` — the container, each column, and each block inside each column. A unique id per block (e.g. the block's own uid) works.
+
+So a branded footer is, end to end: a `columns` block (`slotId`, `fixed`,
+`readOnly`) → each `column` (`slotId`, `fixed`, `readOnly`) → each leaf block
+(`slotId`, `fixed`, `readOnly`).
+
 ## allowedTemplates vs allowedLayouts
 
 Configure templates in `page.schema.properties` on the blocks field:
