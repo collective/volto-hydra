@@ -1628,12 +1628,13 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
       childBlockType = fieldDef.allowedBlocks[0];
     }
 
-    // No determinable child type - initialize with empty container structure
+    // No determinable child type - initialize an empty list for this blocks
+    // field (a key in the shared blocks_layout dict; preserve sibling fields).
     if (!childBlockType) {
       result = {
         ...result,
         blocks: { ...(result.blocks || {}) },
-        [fieldName]: { items: [] },
+        blocks_layout: { ...(result.blocks_layout || {}), [fieldName]: [] },
       };
       continue;
     }
@@ -1664,14 +1665,15 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
     // Recursively initialize the child if it's also a container
     childBlockData = initializeContainerBlock(childBlockData, blocksConfig, uuidGenerator, { ...options, blockType: childBlockType });
 
-    // Add child to shared blocks dict + layout field
+    // Add child to shared blocks dict + this blocks field's list inside the
+    // shared blocks_layout dict (key = field name; preserve sibling fields).
     result = {
       ...result,
       blocks: {
         ...(result.blocks || {}),
         [childBlockId]: childBlockData,
       },
-      [fieldName]: { items: [childBlockId] },
+      blocks_layout: { ...(result.blocks_layout || {}), [fieldName]: [childBlockId] },
     };
   }
 

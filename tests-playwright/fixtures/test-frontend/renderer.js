@@ -1098,9 +1098,10 @@ function attachFormValidation(formEl, block) {
  * @returns {Promise<string>} HTML string
  */
 async function renderColumnsBlock(block) {
-    // Support both flat (block.blocks) and nested (block.columns.blocks) formats
-    const blocks = block.blocks || block.columns?.blocks || {};
-    const columnsItems = block.columns?.items || [];
+    // 'columns' is a blocks field: its name is the key in the shared blocks_layout
+    // dict, and child blocks live in the shared blocks dict.
+    const blocks = block.blocks || {};
+    const columnsItems = block.blocks_layout?.columns || [];
     const title = block.title || '';
 
     let html = '';

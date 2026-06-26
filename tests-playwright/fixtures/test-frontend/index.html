@@ -487,8 +487,8 @@
                             // hydra.js uses waitForContentReady to know when DOM is ready)
                             if (formData.blocks && formData.blocks_layout) {
                                 // Debug: Log column contents
-                                const col1 = formData.blocks?.['columns-1']?.columns?.['col-1'];
-                                const col2 = formData.blocks?.['columns-1']?.columns?.['col-2'];
+                                const col1 = formData.blocks?.['columns-1']?.blocks?.['col-1'];
+                                const col2 = formData.blocks?.['columns-1']?.blocks?.['col-2'];
                                 if (col1 || col2) {
                                     tfLog('col-1 blocks_layout:', col1?.blocks_layout?.items);
                                     tfLog('col-2 blocks_layout:', col2?.blocks_layout?.items);
