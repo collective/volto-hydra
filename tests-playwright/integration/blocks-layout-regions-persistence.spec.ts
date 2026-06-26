@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * Persistence of layout regions.
  *
- * Layout regions (footer, mobile_footer, …) are stored as SUB-KEYS of the
+ * Layout regions (header, footer, …) are stored as SUB-KEYS of the
  * registered `blocks_layout` field, so they survive a save. The backend (here:
  * the mock, mirroring Plone's deserializer) drops ad-hoc top-level fields that
  * are not registered — which is exactly why a separate `footer_blocks` field

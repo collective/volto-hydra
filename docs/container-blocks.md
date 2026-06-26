@@ -38,24 +38,24 @@ A container can declare more than one **blocks field** — each a schema propert
 
 <!-- codeExample: javascript -->
 ```javascript
-// Schema definition — a page with a main content field, a footer, and a mobile footer
+// Schema definition — a page with a header, main content, and a footer
 properties: {
-    items:         { widget: 'blocks_layout', allowedBlocks: ['slate', 'image'] },
-    footer:        { widget: 'blocks_layout', title: 'Footer', allowedBlocks: ['slate', 'link'] },
-    mobile_footer: { widget: 'blocks_layout', title: 'Mobile footer', allowedBlocks: ['slate'], maxLength: 1 },
+    header: { widget: 'blocks_layout', title: 'Header', allowedBlocks: ['slate', 'image'], maxLength: 3 },
+    items:  { widget: 'blocks_layout', allowedBlocks: ['slate', 'image'] },
+    footer: { widget: 'blocks_layout', title: 'Footer', allowedBlocks: ['slate', 'link'] },
 }
 
 // Resulting data — ONE shared blocks dict, one list per blocks field
 {
   "blocks": {
+    "header-1": { "@type": "image" },
     "hero-1":   { "@type": "slate" },
-    "footer-1": { "@type": "slate" },
-    "m-1":      { "@type": "slate" }
+    "footer-1": { "@type": "slate" }
   },
   "blocks_layout": {
-    "items":         ["hero-1"],
-    "footer":        ["footer-1"],
-    "mobile_footer": ["m-1"]
+    "header": ["header-1"],
+    "items":  ["hero-1"],
+    "footer": ["footer-1"]
   }
 }
 ```

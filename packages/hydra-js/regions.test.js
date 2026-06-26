@@ -34,8 +34,8 @@ describe('getBlocksFieldNames', () => {
 describe('mapLayoutItems — multi-region', () => {
   test('carries every region of the source blocks_layout into the target', () => {
     const sourceBlock = {
-      blocks: { a: {}, f: {}, m: {} },
-      cols: { items: ['a'], footer: ['f'], mobile_footer: ['m'] },
+      blocks: { a: {}, h: {}, f: {} },
+      cols: { items: ['a'], header: ['h'], footer: ['f'] },
     };
     const result = mapLayoutItems(
       { fieldName: 'cols' },
@@ -45,8 +45,8 @@ describe('mapLayoutItems — multi-region', () => {
     expect(result.blocks).toBe(sourceBlock.blocks);
     expect(result.blocks_layout).toEqual({
       items: ['a'],
+      header: ['h'],
       footer: ['f'],
-      mobile_footer: ['m'],
     });
   });
 

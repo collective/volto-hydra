@@ -190,8 +190,8 @@ function setContainerItems(parentBlock, containerConfig, items, blocksObj = null
   }
 
   // blocks container: update shared blocks dict + the region within the layout
-  // field. Spread the existing layout object so SIBLING regions (e.g. footer,
-  // mobile_footer) are preserved — writing { [region]: items } alone would wipe
+  // field. Spread the existing layout object so SIBLING regions (e.g. header,
+  // footer) are preserved — writing { [region]: items } alone would wipe
   // them. (No-op for single-region data, where region is always 'items'.)
   return {
     ...parentBlock,
