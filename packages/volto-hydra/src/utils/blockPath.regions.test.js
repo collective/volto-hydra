@@ -13,6 +13,7 @@ import {
   moveBlockBetweenContainers,
   ensureEmptyBlockIfEmpty,
   getAllContainerFields,
+  listContainerChildren,
 } from './blockPath.js';
 
 const PAGE = '_page';
@@ -180,5 +181,45 @@ describe('empty-region seeding', () => {
     expect(result.blocks_layout.items).toEqual(['a']); // untouched
     expect(result.blocks_layout.footer.length).toBe(1); // seeded
     expect(result.blocks[result.blocks_layout.footer[0]]).toBeTruthy();
+  });
+});
+
+describe('listContainerChildren — storage-agnostic read', () => {
+  test('reads a blocks_layout region from the shared blocks dict', () => {
+    const form = makeForm();
+    const children = listContainerChildren(form, {
+      fieldName: 'blocks_layout',
+      region: 'footer',
+    });
+    expect(children).toEqual([
+      { id: 'f1', type: 'slate', data: form.blocks.f1 },
+      { id: 'f2', type: 'slate', data: form.blocks.f2 },
+    ]);
+  });
+
+  test('defaults to the items region', () => {
+    const form = makeForm();
+    expect(
+      listContainerChildren(form, { fieldName: 'blocks_layout' }).map((c) => c.id),
+    ).toEqual(['a', 'b']);
+  });
+
+  test('reads an object_list container as inline items', () => {
+    const parent = {
+      slides: [
+        { '@id': 's1', '@type': 'slide' },
+        { '@id': 's2', '@type': 'slide' },
+      ],
+    };
+    const children = listContainerChildren(parent, {
+      fieldName: 'slides',
+      isObjectList: true,
+      idField: '@id',
+      typeField: '@type',
+    });
+    expect(children).toEqual([
+      { id: 's1', type: 'slide', data: parent.slides[0] },
+      { id: 's2', type: 'slide', data: parent.slides[1] },
+    ]);
   });
 });

@@ -202,6 +202,43 @@ function setContainerItems(parentBlock, containerConfig, items, blocksObj = null
 }
 
 /**
+ * List the children of a container as storage-agnostic descriptors.
+ *
+ * The single read accessor for "what blocks are in this container" — callers
+ * pass a containerConfig descriptor (from getContainerFieldConfig /
+ * getAllContainerFields) and get back ordered `{ id, type, data }` entries,
+ * without knowing whether the container is a blocks_layout region (ids in a
+ * shared `blocks` dict) or an object_list (inline item array), or which region
+ * / dataPath the items live at. Storage shape stays inside this module.
+ *
+ * Presentation (titles, icons) is intentionally left to the caller.
+ *
+ * @param {Object} parentBlock - The block (or page formData) holding the container
+ * @param {Object} containerConfig - { fieldName, region?, isObjectList?, dataPath?, idField?, typeField? }
+ * @returns {Array<{id: string, type: string, data: Object}>}
+ */
+export function listContainerChildren(parentBlock, containerConfig) {
+  const items = getContainerItems(parentBlock, containerConfig);
+
+  if (containerConfig.isObjectList) {
+    const idField = containerConfig.idField || '@id';
+    const typeField = containerConfig.typeField || null;
+    return items.map((item) => ({
+      id: (idField && item[idField]) || item.key || item['@id'],
+      type: (typeField && item[typeField]) || 'object_list_item',
+      data: item,
+    }));
+  }
+
+  const blocksData = parentBlock?.blocks || {};
+  return items.map((id) => ({
+    id,
+    type: blocksData[id]?.['@type'] || 'unknown',
+    data: blocksData[id],
+  }));
+}
+
+/**
  * Build a map of blockId -> path for all blocks in formData.
  * Delegates to the Volto-free implementation in buildBlockPathMap.js,
  * forwarding the intl object for i18n schema support.
