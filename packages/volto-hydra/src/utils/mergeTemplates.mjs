@@ -84,23 +84,34 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
           }
 
           if (fieldDef.widget === 'blocks_layout') {
-            // blocks_layout container: blocks in shared dict, layout in field.items
-            const layoutItems = processedBlock[fieldName]?.items;
-            if (!layoutItems || !processedBlock.blocks) continue;
+            // blocks_layout container: blocks in shared dict, layout in
+            // field[region]. Process every region so siblings (e.g. footer) are
+            // preserved rather than rebuilt away as { items }.
+            const fieldValue = processedBlock[fieldName];
+            if (!fieldValue || !processedBlock.blocks) continue;
             hasBlocksLayout = true;
-            const fieldBlocks = {};
-            for (const id of layoutItems) {
-              if (processedBlock.blocks[id]) fieldBlocks[id] = processedBlock.blocks[id];
+            const newFieldLayout = { ...fieldValue };
+            for (const region of getFieldRegions(fieldDef, fieldValue)) {
+              const layoutItems = fieldValue[region];
+              if (!Array.isArray(layoutItems) || layoutItems.length === 0) {
+                newFieldLayout[region] = layoutItems || [];
+                continue;
+              }
+              const fieldBlocks = {};
+              for (const id of layoutItems) {
+                if (processedBlock.blocks[id]) fieldBlocks[id] = processedBlock.blocks[id];
+              }
+              const { blocks: newFieldBlocks, layout: newRegionLayout } = await processBlocksRecursive(
+                fieldBlocks,
+                layoutItems,
+                null,
+                templateState,
+                true, // skip template expansion — already done
+              );
+              Object.assign(mergedBlocks, newFieldBlocks);
+              newFieldLayout[region] = newRegionLayout;
             }
-            const { blocks: newFieldBlocks, layout: newFieldLayout } = await processBlocksRecursive(
-              fieldBlocks,
-              layoutItems,
-              null,
-              templateState,
-              true, // skip template expansion — already done
-            );
-            Object.assign(mergedBlocks, newFieldBlocks);
-            processedBlock[fieldName] = { items: newFieldLayout };
+            processedBlock[fieldName] = newFieldLayout;
           } else if (fieldDef.widget === 'object_list') {
             // object_list container: expand templates same as blocks_layout
             const dataPath = fieldDef.dataPath || [fieldName];
@@ -143,25 +154,33 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
           }
           processedBlock.blocks = mergedBlocks;
         }
-      } else if (block.blocks && block.blocks_layout?.items) {
-        // Implicit container (no schema definition, e.g. Grid) — fallback
+      } else if (block.blocks && block.blocks_layout) {
+        // Implicit container (no schema definition, e.g. Grid) — fallback.
+        // A layout field value may hold multiple regions (array sub-keys);
+        // process each and preserve siblings.
         let mergedBlocks = {};
         for (const [key, value] of Object.entries(block)) {
-          if (key !== 'blocks' && value?.items && Array.isArray(value.items)) {
+          if (key === 'blocks' || !value || typeof value !== 'object') continue;
+          const regionKeys = Object.keys(value).filter((r) => Array.isArray(value[r]));
+          if (regionKeys.length === 0) continue;
+          const newFieldLayout = { ...value };
+          for (const region of regionKeys) {
+            const ids = value[region];
             const fieldBlocks = {};
-            for (const id of value.items) {
+            for (const id of ids) {
               if (block.blocks[id]) fieldBlocks[id] = block.blocks[id];
             }
-            const { blocks: newFieldBlocks, layout: newFieldLayout } = await processBlocksRecursive(
+            const { blocks: newFieldBlocks, layout: newRegionLayout } = await processBlocksRecursive(
               fieldBlocks,
-              value.items,
+              ids,
               null,
               templateState,
               true,
             );
             Object.assign(mergedBlocks, newFieldBlocks);
-            processedBlock[key] = { items: newFieldLayout };
+            newFieldLayout[region] = newRegionLayout;
           }
+          processedBlock[key] = newFieldLayout;
         }
         for (const [id, blockData] of Object.entries(block.blocks)) {
           if (!mergedBlocks[id]) mergedBlocks[id] = blockData;

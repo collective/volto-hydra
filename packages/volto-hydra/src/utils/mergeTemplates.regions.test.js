@@ -64,3 +64,47 @@ describe('mergeTemplatesIntoPage — region preservation', () => {
     expect(merged.blocks_layout.footer).toEqual([]);
   });
 });
+
+describe('mergeTemplatesIntoPage — nested container regions', () => {
+  const nestedBlocksConfig = {
+    slate: { id: 'slate' },
+    section: {
+      id: 'section',
+      blockSchema: {
+        properties: {
+          blocks_layout: { widget: 'blocks_layout', regions: { footer: {} } },
+        },
+      },
+    },
+  };
+
+  test('preserves a region inside a nested container block', async () => {
+    const formData = {
+      blocks: {
+        'sec-1': {
+          '@type': 'section',
+          blocks: {
+            'in-1': { '@type': 'slate' },
+            'inf-1': { '@type': 'slate' },
+          },
+          blocks_layout: { items: ['in-1'], footer: ['inf-1'] },
+        },
+      },
+      blocks_layout: { items: ['sec-1'] },
+    };
+
+    const { merged } = await mergeTemplatesIntoPage(formData, {
+      loadTemplate,
+      preloadedTemplates: {},
+      pageBlocksFields: { blocks_layout: {} },
+      uuidGenerator: (() => { let n = 0; return () => `u-${++n}`; })(),
+      blocksConfig: nestedBlocksConfig,
+      intl,
+    });
+
+    const sec = merged.blocks['sec-1'];
+    expect(sec.blocks_layout.items).toEqual(['in-1']);
+    expect(sec.blocks_layout.footer).toEqual(['inf-1']); // preserved
+    expect(sec.blocks['inf-1']).toBeTruthy();
+  });
+});
