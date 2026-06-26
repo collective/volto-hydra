@@ -30,7 +30,47 @@ slides: {
 }
 ```
 
-All `blocks_layout` fields on the same block share the same `blocks` dict. So a block can have multiple container fields (e.g., `header_blocks` and `footer_blocks`) whose children all live in the parent's `blocks`.
+All `blocks_layout` fields on the same block share the same `blocks` dict.
+
+## Regions: multiple lists in one blocks_layout field
+
+A `blocks_layout` value can hold more than one ordered list. Each named list is a **region**. `items` is the implicit default region; declare additional regions with a `regions` map. Every region's children still live in the parent's single shared `blocks` dict — regions only partition *ordering*.
+
+<!-- codeExample: javascript -->
+```javascript
+// Schema definition — a page with a footer and a mobile-only footer region
+blocks_layout: {
+    widget: 'blocks_layout',
+    allowedBlocks: ['slate', 'image'],
+    regions: {
+        // 'items' is implicit; declare it only to relabel or override it
+        footer:        { title: 'Footer', allowedBlocks: ['slate', 'link'] },
+        mobile_footer: { title: 'Mobile footer', allowedBlocks: ['slate'], maxLength: 1 },
+    },
+}
+
+// Resulting data — ONE shared blocks dict, one list per region
+{
+  "blocks": {
+    "hero-1":   { "@type": "slate" },
+    "footer-1": { "@type": "slate" },
+    "m-1":      { "@type": "slate" }
+  },
+  "blocks_layout": {
+    "items":         ["hero-1"],
+    "footer":        ["footer-1"],
+    "mobile_footer": ["m-1"]
+  }
+}
+```
+
+Per-region `allowedBlocks` / `maxLength` override the field-level values; otherwise a region inherits them. A declared region appears in the editor even when empty (it gets a seeded empty block so it is editable and a drop target).
+
+### Why regions persist (and separate fields don't)
+
+Regions live as **sub-keys of `blocks_layout`** rather than as separate top-level fields (the older `header_blocks` / `footer_blocks` style) for one concrete reason: **persistence**.
+
+The backend deserializer only saves values for **registered fields**. `blocks` and `blocks_layout` are registered behavior fields, so the entire `blocks_layout` dict — every region inside it — is stored verbatim. An ad-hoc top-level field like `footer_blocks` is **not** a registered field, so the backend **silently drops it on save**. (A footer might still appear on the live site if a layout template re-injects it on every load — but that footer is never actually persisted.) Putting regions inside the already-registered `blocks_layout` field makes them ride along and persist for real.
 
 ## object_list: Items Sharing One Schema
 

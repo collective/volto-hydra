@@ -219,7 +219,10 @@ export function getPageAllowedBlocksFromRestricted(blocksConfig, context = {}) {
  * - Nested block: ['blocks', 'columns-1', 'columns', 'col-1', 'blocks', 'text-1a']
  * - Object list item: ['blocks', 'slider-1', 'slides', 0]
  * - Nested object list: ['blocks', 'table-1', 'table', 'rows', 0, 'cells', 1]
- * - Multiple page fields: ['header_blocks', 'header-1'], ['footer_blocks', 'footer-1']
+ *
+ * Blocks all live in the shared `blocks` dict (so paths are under 'blocks');
+ * a block's `region` records which list of blocks_layout it is ordered in
+ * (e.g. 'items', 'footer').
  */
 /**
  * Get the resolved schema for a block from its pathInfo entry.
@@ -231,6 +234,62 @@ export function getPageAllowedBlocksFromRestricted(blocksConfig, context = {}) {
 export function getResolvedSchema(pathInfo, pathMap) {
   if (!pathInfo?._schemaRef || !pathMap?._schemas) return null;
   return pathMap._schemas[pathInfo._schemaRef] || null;
+}
+
+/**
+ * Effective region names for a `blocks_layout` field on a given parent value.
+ *
+ * A `blocks_layout` value may hold multiple named ordered lists (regions) as
+ * sub-keys, e.g. `{ items: [...], footer: [...], mobile_footer: [...] }`.
+ * `items` is always present (the implicit default region). Regions declared in
+ * the schema's `regions` map appear even when they hold no data yet, so the
+ * editor can show an empty region. Present-but-undeclared array sub-keys are
+ * tolerated so reading never silently drops persisted data.
+ *
+ * @param {Object} fieldDef - The field schema (may declare `regions`)
+ * @param {Object} fieldValue - The field's current value (the layout dict)
+ * @returns {string[]} Ordered, de-duplicated region names ('items' first)
+ */
+export function getFieldRegions(fieldDef, fieldValue) {
+  const declared = ['items', ...Object.keys(fieldDef?.regions || {})];
+  const present =
+    fieldValue && typeof fieldValue === 'object'
+      ? Object.keys(fieldValue).filter((k) => Array.isArray(fieldValue[k]))
+      : [];
+  return [...new Set([...declared, ...present])];
+}
+
+/**
+ * Resolve per-region constraints with precedence:
+ *   region override → field-level → block-level → default.
+ *
+ * Subsumes the field-vs-block precedence used for single-region containers
+ * (call with region 'items' to get the legacy behaviour).
+ *
+ * @param {Object} fieldDef - The `blocks_layout` field schema
+ * @param {string} region - The region name
+ * @param {Object} parentBlockConfig - The parent block's blocksConfig entry
+ * @returns {{allowedBlocks: ?Array, maxLength: ?number, title: string, defaultBlockType: ?string}}
+ */
+export function resolveRegionConstraints(fieldDef, region, parentBlockConfig) {
+  const r = fieldDef?.regions?.[region] || {};
+  return {
+    allowedBlocks:
+      r.allowedBlocks ??
+      fieldDef?.allowedBlocks ??
+      parentBlockConfig?.allowedBlocks ??
+      null,
+    maxLength:
+      r.maxLength ?? fieldDef?.maxLength ?? parentBlockConfig?.maxLength ?? null,
+    title:
+      r.title ??
+      (region === 'items' ? fieldDef?.title || 'Blocks' : region),
+    defaultBlockType:
+      r.defaultBlockType ??
+      fieldDef?.defaultBlockType ??
+      parentBlockConfig?.defaultBlockType ??
+      null,
+  };
 }
 
 // djb2 hash for schema deduplication
@@ -283,7 +342,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
   const createdTemplateInstances = new Set();
 
   // Get page schema from _page block type (registered at INIT time)
-  // This contains the blocks container fields (blocks, footer_blocks, etc.)
+  // This contains the blocks_layout container field (which may declare regions)
   const rootConfig = blocksConfig?.['_page'];
   const pageSchema = rootConfig?.schema?.({ intl }) || {
     // Fallback before INIT: default to single 'blocks_layout' field
@@ -296,9 +355,13 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
 
   // Check if any page fields have data
   // All layout fields use fieldName.items; blocks are in shared formData.blocks
-  const hasAnyPageData = pageFieldNames.some(
-    fieldName => formData?.[fieldName]?.items?.length > 0
-  );
+  const hasAnyPageData = pageFieldNames.some(fieldName => {
+    const fieldValue = formData?.[fieldName];
+    return (
+      fieldValue &&
+      Object.values(fieldValue).some(v => Array.isArray(v) && v.length > 0)
+    );
+  });
   if (!hasAnyPageData) {
     return pathMap;
   }
@@ -404,31 +467,34 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
    */
   function processBlocksContainer(parent, parentId, parentPath, fieldName, fieldDef) {
     const blocks = parent.blocks;
-    const layout = parent[fieldName]?.items;
-    if (!blocks || !layout) return;
+    const fieldValue = parent[fieldName];
+    if (!blocks || !fieldValue) return;
 
-    // Container constraints (allowedBlocks, maxLength) can be declared either
-    // at the field level (`blockSchema.properties.blocks_layout.maxLength`) or
-    // at Volto's block level (`blockConfig.maxLength` — the existing
-    // convention for built-ins like gridBlock). Field-level wins; otherwise
-    // fall back to the block-level values so adding an explicit blockSchema
-    // doesn't silently drop the legacy block-level constraints.
+    // A blocks_layout value may hold multiple named regions (sub-keys); `items`
+    // is the implicit default. Process each region independently — blocks all
+    // live in the shared `parent.blocks` dict; regions only partition ordering.
     const parentBlockConfig = blocksConfig?.[parent?.['@type']];
-    const effectiveAllowedBlocks =
-      fieldDef.allowedBlocks ?? parentBlockConfig?.allowedBlocks ?? null;
-    const effectiveMaxLength =
-      fieldDef.maxLength ?? parentBlockConfig?.maxLength ?? null;
 
-    // First pass: collect fixed status for all blocks to determine insert restrictions
-    const blockFixedStatus = {};
-    layout.forEach(blockId => {
-      const block = blocks[blockId];
-      if (block) {
-        blockFixedStatus[blockId] = block.fixed === true;
-      }
-    });
+    for (const region of getFieldRegions(fieldDef, fieldValue)) {
+      const layout = fieldValue[region];
+      if (!Array.isArray(layout) || layout.length === 0) continue;
 
-    layout.forEach((blockId, index) => {
+      // Container constraints (allowedBlocks, maxLength) resolve per region:
+      // region override → field-level → block-level → default. Declaring an
+      // explicit blockSchema must not silently drop legacy block-level values.
+      const { allowedBlocks: effectiveAllowedBlocks, maxLength: effectiveMaxLength } =
+        resolveRegionConstraints(fieldDef, region, parentBlockConfig);
+
+      // First pass: collect fixed status for all blocks to determine insert restrictions
+      const blockFixedStatus = {};
+      layout.forEach(blockId => {
+        const block = blocks[blockId];
+        if (block) {
+          blockFixedStatus[blockId] = block.fixed === true;
+        }
+      });
+
+      layout.forEach((blockId, index) => {
       const block = blocks[blockId];
       if (!block) return;
 
@@ -504,6 +570,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
               path: null, // Virtual - no actual storage path
               parentId, // Template instance's parent is the original container
               containerField: fieldName,
+              region, // Which region of the layout field this instance lives in
               blockType: instanceBlockType, // Virtual type for sidebar display
               isTemplateInstance: true,
               ...(isNestedInTemplate && { isNestedTemplateInstance: true }),
@@ -523,6 +590,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         path: blockPath,
         parentId: effectiveParentId,
         containerField: fieldName,
+        region, // Which region of the layout field this block lives in
         blockType, // Block type for uniform lookups (single source of truth)
         _schemaRef: storeSchema(blockSchema), // Deduplicated schema reference
         allowedSiblingTypes: effectiveAllowedBlocks
@@ -545,7 +613,8 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       if (blockSchema) {
         processItem(block, blockId, blockPath, blockSchema);
       }
-    });
+      });
+    }
   }
 
   /**

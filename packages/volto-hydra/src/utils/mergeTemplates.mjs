@@ -6,7 +6,7 @@
  */
 
 import { expandTemplates } from '@volto-hydra/helpers';
-import { getBlockSchema } from '../../../hydra-js/buildBlockPathMap.js';
+import { getBlockSchema, getFieldRegions } from '../../../hydra-js/buildBlockPathMap.js';
 
 /**
  * Merge templates into page data. Expands template references in all blocks fields,
@@ -187,42 +187,58 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
     : { blocks_layout: {} }; // Default to main blocks_layout field
 
   for (const [fieldName, fieldDef] of Object.entries(fieldsToProcess)) {
-    const blocksData = result.blocks || {};
     const layoutData = result[fieldName];
-    const layout = layoutData?.items || [];
-    const allowedLayouts = fieldDef?.allowedLayouts || null;
 
-    if (layout.length === 0 && !allowedLayouts) {
-      // No layout items and no forced layout - skip this field
-      continue;
-    }
+    // A blocks_layout value may hold multiple named regions (sub-keys). Process
+    // each region independently and reassemble the field so sibling regions
+    // (e.g. footer) survive — rebuilding it as { items } would drop them.
+    const newFieldLayout = { ...(layoutData || {}) };
 
-    // Build a blocks subset for this field (only blocks referenced by this field's layout)
-    const fieldBlocks = {};
-    for (const blockId of layout) {
-      if (blocksData[blockId]) {
-        fieldBlocks[blockId] = blocksData[blockId];
+    for (const region of getFieldRegions(fieldDef, layoutData)) {
+      const blocksData = result.blocks || {};
+      const layout = layoutData?.[region] || [];
+      // allowedLayouts may be declared per region; the default region (items)
+      // falls back to the field-level value.
+      const allowedLayouts =
+        (fieldDef?.regions?.[region]?.allowedLayouts) ||
+        (region === 'items' ? fieldDef?.allowedLayouts : null) ||
+        null;
+
+      if (layout.length === 0 && !allowedLayouts) {
+        // No layout items and no forced layout - keep region as-is
+        newFieldLayout[region] = layout;
+        continue;
       }
-    }
 
-    const templateState = {};
-    const { blocks: newBlocks, layout: newLayout } = await processBlocksRecursive(
-      fieldBlocks,
-      layout,
-      allowedLayouts,
-      templateState
-    );
-
-    // Remove old field blocks that were dropped during template processing,
-    // then merge in the new blocks. Other fields' blocks must remain.
-    const updatedBlocks = { ...result.blocks };
-    for (const oldId of Object.keys(fieldBlocks)) {
-      if (!newBlocks[oldId]) {
-        delete updatedBlocks[oldId];
+      // Build a blocks subset for this region (only blocks it references)
+      const fieldBlocks = {};
+      for (const blockId of layout) {
+        if (blocksData[blockId]) {
+          fieldBlocks[blockId] = blocksData[blockId];
+        }
       }
+
+      const templateState = {};
+      const { blocks: newBlocks, layout: newLayout } = await processBlocksRecursive(
+        fieldBlocks,
+        layout,
+        allowedLayouts,
+        templateState
+      );
+
+      // Remove old region blocks dropped during template processing, then merge
+      // in the new blocks. Blocks from other fields/regions must remain.
+      const updatedBlocks = { ...result.blocks };
+      for (const oldId of Object.keys(fieldBlocks)) {
+        if (!newBlocks[oldId]) {
+          delete updatedBlocks[oldId];
+        }
+      }
+      result.blocks = { ...updatedBlocks, ...newBlocks };
+      newFieldLayout[region] = newLayout;
     }
-    result.blocks = { ...updatedBlocks, ...newBlocks };
-    result[fieldName] = { items: newLayout };
+
+    result[fieldName] = newFieldLayout;
   }
 
   return {

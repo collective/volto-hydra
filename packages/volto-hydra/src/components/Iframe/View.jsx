@@ -3123,6 +3123,10 @@ const Iframe = (props) => {
               allowedLayouts: fieldDef.allowedLayouts || null,
               maxLength: fieldDef.maxLength || null,
               title: fieldDef.title || fieldName,
+              // Carry the per-region declaration through. This rebuilt object
+              // drops any key not copied here, so without this line page-level
+              // regions would silently vanish.
+              regions: fieldDef.regions || null,
             };
           }
 
@@ -3156,7 +3160,14 @@ const Iframe = (props) => {
             }
             for (const fieldName of Object.keys(pageBlocksFieldsDef)) {
               if (!formWithPageFields[fieldName]) {
-                formWithPageFields[fieldName] = { items: [] };
+                // Seed the default `items` region plus every declared region as
+                // empty arrays so declared-but-empty regions are addressable.
+                const declaredRegions = Object.keys(
+                  pageBlocksFieldsDef[fieldName]?.regions || {},
+                );
+                formWithPageFields[fieldName] = Object.fromEntries(
+                  ['items', ...declaredRegions].map((r) => [r, []]),
+                );
               }
             }
           }
@@ -3216,7 +3227,8 @@ const Iframe = (props) => {
           );
 
           // 5b. Ensure empty page blocks fields have at least one empty block
-          // No fieldName = process ALL page-level container fields (blocks, footer_blocks, etc.)
+          // No fieldName = process ALL page-level container fields and their regions
+          // (e.g. blocks_layout's items + footer regions)
           const preEnsureForm = formWithPageFields;
           formWithPageFields = ensureEmptyBlockIfEmpty(
             formWithPageFields,

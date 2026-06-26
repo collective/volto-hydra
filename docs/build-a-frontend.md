@@ -24,7 +24,7 @@ Before you dive into the steps, here's what your frontend ends up doing.
 
 To make a site editable with Hydra you break a page into:
 
-- **Blocks layout** — areas of the page that contain a list of blocks that make up your page content.
+- **Blocks layout** — the `blocks_layout` field, which holds one or more **regions**. A region is a named, ordered list of blocks (e.g. the main content `items`, plus `header`, `footer`, `mobile_footer`). Every region's blocks live in the page's single shared `blocks` dict; the region only records ordering.
 - **Blocks** — discrete visual elements with a schema and settings that can be moved and edited.
   - Type, title, icon etc. so the user can pick from a menu.
   - Fields: string, image, link etc. each with their own sidebar widget.
@@ -41,9 +41,16 @@ if (window.name.startsWith('hydra')) {
       page: {
         schema: {
           properties: {
-            blocks_layout: { allowedBlocks: ['slate', 'grid', 'myimage'] },
-            header_blocks: { allowedBlocks: ['slate', 'image'], maxLength: 3 },
-            footer_blocks: { allowedBlocks: ['slate', 'link'] },
+            // Extra regions (header, footer, …) are declared as sub-keys of
+            // blocks_layout via `regions`, each with its own constraints.
+            // `items` is the implicit default region (the main content).
+            blocks_layout: {
+              allowedBlocks: ['slate', 'grid', 'myimage'],
+              regions: {
+                header: { allowedBlocks: ['slate', 'image'], maxLength: 3 },
+                footer: { allowedBlocks: ['slate', 'link'] },
+              },
+            },
           },
         },
       },
@@ -68,7 +75,7 @@ else {
 }
 ```
 
-Page data ends up shaped like this:
+Page data ends up shaped like this — one shared `blocks` dict, and a region per named list inside `blocks_layout`:
 
 ```js
 {
@@ -78,10 +85,16 @@ Page data ends up shaped like this:
     'header-1': { '@type': 'image', ... },
     'footer-1': { '@type': 'slate', ... }
   },
-  blocks_layout: { items: ['text-1'] },
-  header_blocks: { items: ['header-1'] },
-  footer_blocks: { items: ['footer-1'] }
+  blocks_layout: {
+    items: ['text-1'],     // main content region (the default)
+    header: ['header-1'],  // header region
+    footer: ['footer-1']   // footer region
+  }
 }
+```
+
+```{note}
+Regions are sub-keys of `blocks_layout` — **not** separate top-level fields — because that is what makes them persist. `blocks_layout` is a registered backend field (a Plone behavior field), so the whole dict, including every region, is saved verbatim. A separate top-level field such as `footer_blocks` would be **silently dropped** by the backend on save, because it isn't a registered field. See [Container blocks](container-blocks.md) for the data model in full.
 ```
 
 Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -->` comments) so Hydra can find your blocks and editable fields:

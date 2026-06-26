@@ -61,11 +61,22 @@ export function canContain(config, blockType, currentCount) {
 export function mapLayoutItems(sourceConfig, targetConfig, sourceBlock) {
   const sourceField = sourceConfig.fieldName;
   const targetField = targetConfig.fieldName;
-  const items = sourceBlock[sourceField]?.items ?? [];
+  const sourceLayout = sourceBlock[sourceField];
   const blocks = sourceBlock.blocks ?? {};
+
+  // Carry every region (the default `items` plus any named regions) into the
+  // target field. Non-array sub-keys are not regions and are ignored.
+  const regions = {};
+  if (sourceLayout && typeof sourceLayout === 'object') {
+    for (const [region, ids] of Object.entries(sourceLayout)) {
+      if (Array.isArray(ids)) regions[region] = ids;
+    }
+  }
+  if (!regions.items) regions.items = [];
+
   return {
     blocks,
-    [targetField]: { items },
+    [targetField]: regions,
   };
 }
 

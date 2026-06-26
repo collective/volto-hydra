@@ -265,10 +265,8 @@
       "block-9-listing",
       "block-10-listing-no-mapping",
       "skiplogic-test"
-    ]
-  },
-  "footer_blocks": {
-    "items": [
+    ],
+    "footer": [
       "footer-block-1",
       "footer-block-2"
     ]

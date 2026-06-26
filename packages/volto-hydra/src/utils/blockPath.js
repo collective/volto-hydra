@@ -24,6 +24,8 @@ import {
   getBlockSchema,
   getPageAllowedBlocksFromRestricted,
   getResolvedSchema,
+  getFieldRegions,
+  resolveRegionConstraints,
 } from '../../../hydra-js/buildBlockPathMap.js';
 
 /**
@@ -133,7 +135,7 @@ export { getBlockTypeSchema, getBlockSchema, getResolvedSchema };
  * @returns {Array} The items array (copy for object_list, items array for blocks)
  */
 export function getContainerItems(parentBlock, containerConfig) {
-  const { fieldName, isObjectList, dataPath } = containerConfig;
+  const { fieldName, isObjectList, dataPath, region = 'items' } = containerConfig;
 
   if (isObjectList) {
     const effectivePath = dataPath || [fieldName];
@@ -144,8 +146,8 @@ export function getContainerItems(parentBlock, containerConfig) {
     return [...(container || [])];
   }
 
-  // blocks container: layout is in fieldName.items, blocks in shared parent.blocks
-  return [...(parentBlock[fieldName]?.items || [])];
+  // blocks container: layout is in fieldName[region], blocks in shared parent.blocks
+  return [...(parentBlock[fieldName]?.[region] || [])];
 }
 
 /**
@@ -174,7 +176,7 @@ function reorderContainerItems(items, newOrder, containerConfig) {
  * @returns {Object} Updated parent block
  */
 function setContainerItems(parentBlock, containerConfig, items, blocksObj = null) {
-  const { fieldName, isObjectList, dataPath } = containerConfig;
+  const { fieldName, isObjectList, dataPath, region = 'items' } = containerConfig;
 
   if (isObjectList) {
     const effectivePath = dataPath || [fieldName];
@@ -188,11 +190,14 @@ function setContainerItems(parentBlock, containerConfig, items, blocksObj = null
     return updatedParent;
   }
 
-  // blocks container: update shared blocks dict + layout field
+  // blocks container: update shared blocks dict + the region within the layout
+  // field. Spread the existing layout object so SIBLING regions (e.g. footer,
+  // mobile_footer) are preserved — writing { [region]: items } alone would wipe
+  // them. (No-op for single-region data, where region is always 'items'.)
   return {
     ...parentBlock,
     blocks: blocksObj || parentBlock.blocks,
-    [fieldName]: { items },
+    [fieldName]: { ...parentBlock[fieldName], [region]: items },
   };
 }
 
@@ -369,16 +374,21 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
   const parentType = blockPathMap[parentId]?.blockType;
   const parentConfig = blocksConfig?.[parentType];
 
+  // Which region of the layout field this block lives in (default 'items').
+  const region = pathInfo.region || 'items';
+
   // Check schema-defined container field
   if (schema?.properties && fieldName) {
     const fieldDef = schema.properties[fieldName];
     if (fieldDef?.widget === 'blocks_layout') {
+      const rc = resolveRegionConstraints(fieldDef, region, parentConfig);
       return {
         fieldName,
         parentId,
-        allowedBlocks: fieldDef.allowedBlocks || null,
-        defaultBlockType: fieldDef.defaultBlockType || null,
-        maxLength: fieldDef.maxLength || null,
+        region,
+        allowedBlocks: rc.allowedBlocks,
+        defaultBlockType: rc.defaultBlockType,
+        maxLength: rc.maxLength,
       };
     }
   }
@@ -386,12 +396,12 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
   // Fallback: Check for implicit container (blocks/blocks_layout)
   // This handles blocks like gridBlock that have a schema but use implicit blocks/blocks_layout
   const hasBlocks = !!parentBlock.blocks;
-  const layoutItems = parentBlock.blocks_layout?.items;
-  const includesBlock = layoutItems?.includes(blockId);
+  const includesBlock = parentBlock.blocks_layout?.[region]?.includes(blockId);
   if (hasBlocks && includesBlock) {
     return {
       fieldName: 'blocks_layout',
       parentId,
+      region,
       allowedBlocks: parentConfig?.allowedBlocks || null,
       defaultBlockType: parentConfig?.defaultBlockType || null,
       maxLength: parentConfig?.maxLength || null,
@@ -528,25 +538,37 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   if (schema?.properties) {
     for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
       if (fieldDef.widget === 'blocks_layout') {
-        const maxLength = fieldDef.maxLength || blockConfig?.maxLength || null;
-        const currentCount = getFieldCount(fieldName);
-        const maxLengthOk = !maxLength || currentCount < maxLength;
-        // When neither the field nor the block restricts allowedBlocks, the
-        // container inherits the page's allowed list — and so should its
-        // empty-block default. Otherwise null falls through to the picker
-        // 'empty' placeholder.
-        const allowedBlocksInherited = !fieldDef.allowedBlocks && !blockConfig?.allowedBlocks;
-        containerFields.push({
-          fieldName,
-          title: fieldDef.title || fieldName,
-          allowedBlocks: fieldDef.allowedBlocks || blockConfig?.allowedBlocks || defaultAllowedBlocks,
-          allowedTemplates: fieldDef.allowedTemplates || null,
-          allowedLayouts: fieldDef.allowedLayouts || null,
-          defaultBlockType: fieldDef.defaultBlockType || blockConfig?.defaultBlockType || (allowedBlocksInherited ? pageDefaultBlockType : null),
-          maxLength,
-          currentCount,
-          canAdd: !parentIsReadonly && maxLengthOk,
-        });
+        // One entry PER REGION. A blocks_layout field may declare multiple named
+        // regions (sub-keys of its value); each is an independent add/seed target
+        // with its own constraints. Declared regions appear even when empty.
+        const fieldValue = block[fieldName];
+        for (const region of getFieldRegions(fieldDef, fieldValue)) {
+          const rc = resolveRegionConstraints(fieldDef, region, blockConfig);
+          const maxLength = rc.maxLength;
+          const currentCount = Array.isArray(fieldValue?.[region])
+            ? fieldValue[region].length
+            : 0;
+          const maxLengthOk = !maxLength || currentCount < maxLength;
+          // When neither region, field nor block restricts allowedBlocks, the
+          // container inherits the page's allowed list — and so should its
+          // empty-block default. Otherwise null falls through to the picker
+          // 'empty' placeholder.
+          const allowedBlocksInherited = !rc.allowedBlocks;
+          containerFields.push({
+            fieldName,
+            region,
+            title: rc.title,
+            allowedBlocks: rc.allowedBlocks || defaultAllowedBlocks,
+            allowedTemplates: fieldDef.allowedTemplates || null,
+            allowedLayouts: fieldDef.allowedLayouts || null,
+            defaultBlockType:
+              rc.defaultBlockType ||
+              (allowedBlocksInherited ? pageDefaultBlockType : null),
+            maxLength,
+            currentCount,
+            canAdd: !parentIsReadonly && maxLengthOk,
+          });
+        }
       } else if (fieldDef.widget === 'object_list') {
         // object_list: items stored as array
         // Two modes:
@@ -696,9 +718,14 @@ export function wrapBlocksInContainer(
   }
   for (const id of selectedIds.slice(1)) {
     const cc = getContainerFieldConfig(id, blockPathMap, formData, blocksConfig, intl);
-    if (!cc || cc.parentId !== firstCC.parentId || cc.fieldName !== firstCC.fieldName) {
+    if (
+      !cc ||
+      cc.parentId !== firstCC.parentId ||
+      cc.fieldName !== firstCC.fieldName ||
+      (cc.region || 'items') !== (firstCC.region || 'items')
+    ) {
       throw new Error(
-        `[HYDRA] wrapBlocksInContainer: all selected blocks must share a parent field (offender: ${id})`,
+        `[HYDRA] wrapBlocksInContainer: all selected blocks must share a parent field and region (offender: ${id})`,
       );
     }
   }
@@ -1049,7 +1076,7 @@ export function removeTemplateInstance(formData, blockPathMap, templateInstanceI
     throw new Error(`[HYDRA] removeTemplateInstance: ${templateInstanceId} is not a template instance`);
   }
 
-  const { parentId, containerField } = instanceInfo;
+  const { parentId, containerField, region = 'items' } = instanceInfo;
 
   // Get the parent container
   const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
@@ -1058,11 +1085,9 @@ export function removeTemplateInstance(formData, blockPathMap, templateInstanceI
     throw new Error(`[HYDRA] removeTemplateInstance: could not find parent block ${parentId}`);
   }
 
-  // Get current layout
-  // All container fields use fieldName.items for layout; blocks are in shared parent.blocks
-  const layoutPath = containerField === 'blocks_layout'
-    ? 'blocks_layout.items'
-    : `${containerField}.items`;
+  // Get current layout for the instance's region. Blocks are in shared
+  // parent.blocks; the layout list lives at containerField[region].
+  const layoutPath = `${containerField}.${region}`;
   const blocksPath = 'blocks';
 
   const layout = get(parentBlock, layoutPath, []);
@@ -1101,7 +1126,7 @@ export function removeTemplateInstance(formData, blockPathMap, templateInstanceI
   const updatedParentBlock = {
     ...parentBlock,
     blocks: newBlocks,
-    [containerField]: { ...parentBlock[containerField], items: newLayout },
+    [containerField]: { ...parentBlock[containerField], [region]: newLayout },
   };
 
   return setBlockByPath(formData, parentPath, updatedParentBlock);
@@ -1662,12 +1687,18 @@ export function reorderBlocksInContainer(
   const fieldDef = schema?.properties?.[fieldName];
   const isObjectList = fieldDef?.widget === 'object_list';
 
+  // Reorder is scoped to a single region — derive it from the blocks being
+  // reordered (they all live in the same region). Defaults to 'items'.
+  const reorderRegion =
+    blockPathMap[newOrder.find((id) => blockPathMap[id])]?.region || 'items';
+
   // Build containerConfig from fieldDef for helper functions
   const containerConfig = {
     fieldName,
     isObjectList,
     dataPath: fieldDef?.dataPath,
     idField: fieldDef?.idField,
+    region: reorderRegion,
   };
 
   const items = getContainerItems(parentBlock, containerConfig);
@@ -1714,11 +1745,20 @@ export function moveBlockBetweenContainers(
   }
 
   // Same container - just reorder
-  // Check both parentId AND containerField to handle page-level blocks in different fields
-  // (e.g., blocks vs footer_blocks both have parentId=PAGE_BLOCK_UID but different containerField)
+  // Check parentId, containerField AND region to handle page-level blocks in
+  // different fields/regions (e.g. the items region vs the footer region of the
+  // same blocks_layout field both have parentId=PAGE_BLOCK_UID and
+  // containerField='blocks_layout' but different regions). Without the region
+  // check, a cross-region move would be mis-handled as a same-list reorder.
   const sourceContainerField = blockPathMap[blockId]?.containerField;
   const targetContainerField = blockPathMap[targetBlockId]?.containerField;
-  if (sourceParentId === targetParentId && sourceContainerField === targetContainerField) {
+  const sourceRegion = blockPathMap[blockId]?.region || 'items';
+  const targetRegion = blockPathMap[targetBlockId]?.region || 'items';
+  if (
+    sourceParentId === targetParentId &&
+    sourceContainerField === targetContainerField &&
+    sourceRegion === targetRegion
+  ) {
     return reorderBlockInContainer(
       formData,
       blockPathMap,
@@ -1858,12 +1898,13 @@ function getInsertionIndex(formData, blockPathMap, targetBlockId, insertAfter, c
     throw new Error(`[HYDRA] getInsertionIndex: containerConfig required`);
   }
 
-  const { parentId, fieldName } = containerConfig;
+  const { parentId } = containerConfig;
 
   // parentPath is [] for page-level (parentId === PAGE_BLOCK_UID)
   const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
   const parentBlock = getBlockByPath(formData, parentPath);
-  const items = parentBlock?.[fieldName]?.items || [];
+  // Region-scoped read so cross-region inserts index into the right list.
+  const items = parentBlock ? getContainerItems(parentBlock, containerConfig) : [];
 
   const targetIndex = items.indexOf(targetBlockId);
   if (targetIndex === -1) {

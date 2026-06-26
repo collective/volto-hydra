@@ -2645,6 +2645,45 @@ app.get('*', (req, res, next) => {
 });
 
 /**
+ * Standard Plone fields that are "registered" in this mock world — common
+ * dexterity/behavior fields a content type may legitimately expose. Used to
+ * decide which top-level fields survive a PATCH (see dropUnregisteredFields).
+ * Deliberately does NOT include `footer_blocks` / `header_blocks`: layout
+ * regions now live as sub-keys of `blocks_layout`, not as separate fields.
+ */
+const STANDARD_REGISTERED_FIELDS = new Set([
+  'title', 'description', 'blocks', 'blocks_layout', 'id', 'UID',
+  'review_state', 'created', 'modified', 'effective', 'expires',
+  'subjects', 'language', 'rights', 'relatedItems', 'preview_image',
+  'exclude_from_nav', 'allow_discussion', 'layout', 'text',
+  'contact_email', 'contact_name', 'contact_phone', 'event_url',
+  'start', 'end', 'open_end', 'whole_day', 'location', 'image',
+]);
+
+/**
+ * Mirror Plone's deserializer: keep only top-level keys that are registered
+ * fields. A key survives if it is metadata (`@`-prefixed), already present on
+ * the stored object (so it's clearly a real field of this type), or in the
+ * standard registered set. Everything else is dropped, the same way a real
+ * Plone backend ignores values for fields that don't exist on the schema.
+ */
+function dropUnregisteredFields(body, baseline) {
+  const out = {};
+  for (const [key, value] of Object.entries(body || {})) {
+    if (
+      key.startsWith('@') ||
+      (baseline && Object.prototype.hasOwnProperty.call(baseline, key)) ||
+      STANDARD_REGISTERED_FIELDS.has(key)
+    ) {
+      out[key] = value;
+    } else {
+      console.log(`[PATCH] dropping unregistered field: ${key}`);
+    }
+  }
+  return out;
+}
+
+/**
  * PATCH /:path
  * Update content - persists to session storage for authenticated requests.
  * Default session ('_default') does NOT persist to ensure test isolation for
@@ -2664,7 +2703,14 @@ app.patch('*', (req, res) => {
   const content = getContent(cleanPath, sessionId);
 
   if (content) {
-    const mergedContent = { ...content, ...req.body };
+    // Emulate Plone's REST deserializer: only fields backed by a registered
+    // dexterity field / behavior survive a save. Unknown top-level fields (e.g.
+    // an ad-hoc `footer_blocks`) are silently dropped. This is WHY layout
+    // regions must live as sub-keys of the registered `blocks_layout` dict —
+    // they ride along inside a registered field and persist, whereas a separate
+    // top-level region field would be discarded here.
+    const registeredBody = dropUnregisteredFields(req.body, content);
+    const mergedContent = { ...content, ...registeredBody };
 
     // Persist to session storage for test verification when session is provided
     // Default session doesn't persist to maintain backward compatibility
