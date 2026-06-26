@@ -40,7 +40,7 @@
 <script setup>
 // contextNavigation parent renderer.
 //
-// Walks block.items.items; for each navItem, keeps it as-is; for each
+// Walks block.blocks_layout.items; for each navItem, keeps it as-is; for each
 // listing, expands via expandListingBlocks (with the listing's
 // fieldMappings.@default mapping @id→href via type='link' and title→label).
 // Output: a single flat list. Level for each entry is derived from
@@ -90,13 +90,13 @@ const NAV_LISTING_SIZE = 1000;
 // the bridge's data-block-selector `~=` word-list match to open the
 // disclosure when admin selects any of these blocks.
 const exposedUids = computed(() => {
-  const childIds = props.block.items?.items || [];
+  const childIds = props.block.blocks_layout?.items || [];
   return [props.blockId, ...childIds].join(' ');
 });
 
 async function expandChildren() {
   const flat = [];
-  for (const childId of props.block.items.items) {
+  for (const childId of props.block.blocks_layout.items) {
     const child = props.block.blocks[childId];
     if (child['@type'] === 'navItem') {
       flat.push({ block: child, blockId: childId });

@@ -5,7 +5,7 @@
     class="context-navigation"
   >
     <ul role="list" class="context-navigation-list">
-      <li v-for="id in (block.items?.items || [])" :key="id">
+      <li v-for="id in (block.blocks_layout?.items || [])" :key="id">
         <NavItem :block="{ ...blocks[id], '@uid': id }" />
       </li>
     </ul>

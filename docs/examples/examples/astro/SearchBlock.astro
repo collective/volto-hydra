@@ -8,7 +8,7 @@
 import BlockRenderer from './BlockRenderer.astro';
 const { block } = Astro.props;
 const visibleFacets = (block.facets || []).filter((f: any) => !f.hidden);
-const listingId = block.listing?.items?.[0];
+const listingId = block.blocks_layout?.listing?.[0];
 const listingBlock = listingId ? block.blocks?.[listingId] : null;
 ---
 <div class="search-block">

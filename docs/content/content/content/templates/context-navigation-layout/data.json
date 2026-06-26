@@ -51,7 +51,7 @@
           }
         }
       },
-      "items": {
+      "blocks_layout": {
         "items": ["tpl-cnav-listing"]
       }
     },

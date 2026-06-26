@@ -716,7 +716,7 @@ function FormBlock({ id, block, data, apiUrl, contextPath }) {
 function SearchBlock({ id, block, data, apiUrl, contextPath }) {
   const expand = useExpand();
   const facets = expand(block.facets || [], null, "@id");
-  const searchResults = expand(block.listing?.items || [], block.blocks || {});
+  const searchResults = expand(block.blocks_layout?.listing || [], block.blocks || {});
 
   const [searchText, setSearchText] = useState("");
   const [facetValues, setFacetValues] = useState({});
@@ -782,7 +782,7 @@ function SearchBlock({ id, block, data, apiUrl, contextPath }) {
   };
 
   const getListingTotalResults = () => {
-    const listingUid = block.listing?.items?.[0];
+    const listingUid = block.blocks_layout?.listing?.[0];
     if (!listingUid) return null;
     const listingBlock = block.blocks?.[listingUid];
     return listingBlock?._paging?.totalItems || listingBlock?.items_total || null;

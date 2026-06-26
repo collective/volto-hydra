@@ -6,7 +6,7 @@
   let query = '';
 
   $: visibleFacets = (block.facets || []).filter(f => !f.hidden);
-  $: listingId = block.listing?.items?.[0];
+  $: listingId = block.blocks_layout?.listing?.[0];
   $: listingBlock = listingId ? block.blocks?.[listingId] : null;
 </script>
 

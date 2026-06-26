@@ -65,8 +65,8 @@
           }
         }
       },
-      "listing": {
-        "items": [
+      "blocks_layout": {
+        "listing": [
           "facet-listing"
         ]
       }
@@ -106,8 +106,8 @@
           }
         }
       },
-      "listing": {
-        "items": [
+      "blocks_layout": {
+        "listing": [
           "simple-listing"
         ]
       }

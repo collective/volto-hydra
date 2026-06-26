@@ -420,7 +420,7 @@
 
       <!-- Results -->
       <div class="search-results">
-        <Block v-for="item in expand(block.listing?.items || [], block.blocks || {})"
+        <Block v-for="item in expand(block.blocks_layout?.listing || [], block.blocks || {})"
                :key="item['@uid']" :block_uid="item['@uid']" :block="item" :data="data" />
       </div>
     </template>
@@ -494,7 +494,7 @@
               </select>
             </div>
           </div>
-          <Block v-for="item in expand(block.listing?.items || [], block.blocks || {})"
+          <Block v-for="item in expand(block.blocks_layout?.listing || [], block.blocks || {})"
                  :key="item['@uid']" :block_uid="item['@uid']" :block="item" :data="data" />
         </div>
       </div>
@@ -1287,7 +1287,7 @@ const getTeaserDescription = (block) => {
 // Search block helpers
 const getListingTotalResults = (searchBlock) => {
   // Get total results from the listing child block (shared blocks dict)
-  const listingUid = searchBlock.listing?.items?.[0];
+  const listingUid = searchBlock.blocks_layout?.listing?.[0];
   if (!listingUid) return null;
   const listingBlock = searchBlock.blocks?.[listingUid];
   return listingBlock?._paging?.totalItems || listingBlock?.items_total || null;
