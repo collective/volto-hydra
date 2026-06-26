@@ -205,7 +205,7 @@
     },
     "p-6": {
       "@type": "slate",
-      "plaintext": "Defines the **regions of a page** where blocks can live. `page.schema.properties` is keyed by field name; each entry is one region.",
+      "plaintext": "Defines the **blocks fields of a page** where blocks can live. `page.schema.properties` is keyed by field name; each `widget: 'blocks_layout'` entry is one blocks field. The field name is the key inside the page's `blocks_layout` dict (the default field is `items`), so they all persist inside the registered `blocks_layout` field.",
       "value": [
         {
           "type": "p",
@@ -217,7 +217,7 @@
               "type": "strong",
               "children": [
                 {
-                  "text": "regions of a page"
+                  "text": "blocks fields of a page"
                 }
               ]
             },
@@ -233,7 +233,51 @@
               ]
             },
             {
-              "text": " is keyed by field name; each entry is one region."
+              "text": " is keyed by field name; each "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "widget: 'blocks_layout'"
+                }
+              ]
+            },
+            {
+              "text": " entry is one blocks field. The field name is the key inside the page's "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks_layout"
+                }
+              ]
+            },
+            {
+              "text": " dict (the default field is "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "items"
+                }
+              ]
+            },
+            {
+              "text": "), so they all persist inside the registered "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks_layout"
+                }
+              ]
+            },
+            {
+              "text": " field."
             }
           ]
         }
@@ -246,7 +290,7 @@
           "@id": "ce-7-javascript-f817db",
           "label": "Js",
           "language": "js",
-          "code": "page: {\n  schema: {\n    properties: {\n      blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'slider'] },\n      header_blocks: { title: 'Header',  allowedBlocks: ['slate'], maxLength: 3 },\n      footer_blocks: { title: 'Footer',  allowedBlocks: ['slate', 'link'] },\n    },\n  },\n}"
+          "code": "page: {\n  schema: {\n    properties: {\n      items:  { widget: 'blocks_layout', title: 'Content', allowedBlocks: ['slate', 'image', 'slider'] },\n      header: { widget: 'blocks_layout', title: 'Header',  allowedBlocks: ['slate'], maxLength: 3 },\n      footer: { widget: 'blocks_layout', title: 'Footer',  allowedBlocks: ['slate', 'link'] },\n    },\n  },\n}"
         }
       ]
     },

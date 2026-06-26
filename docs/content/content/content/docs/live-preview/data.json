@@ -314,7 +314,7 @@
           "@id": "ce-13-javascript-4aeb0d",
           "label": "Javascript",
           "language": "javascript",
-          "code": "bridge = initBridge({\n    page: {\n        schema: {\n            properties: {\n                blocks_layout: {\n                    title: 'Content',\n                    allowedBlocks: ['slate', 'image', 'hero', 'columns'],\n                },\n                header_blocks: {\n                    title: 'Header',\n                    allowedBlocks: ['slate', 'image'],\n                    maxLength: 3,\n                },\n                footer_blocks: {\n                    title: 'Footer',\n                    allowedBlocks: ['slate', 'link'],\n                },\n            },\n        },\n    },\n});"
+          "code": "bridge = initBridge({\n    page: {\n        schema: {\n            properties: {\n                items: {\n                    widget: 'blocks_layout',\n                    title: 'Content',\n                    allowedBlocks: ['slate', 'image', 'hero', 'columns'],\n                },\n                header: {\n                    widget: 'blocks_layout',\n                    title: 'Header',\n                    allowedBlocks: ['slate', 'image'],\n                    maxLength: 3,\n                },\n                footer: {\n                    widget: 'blocks_layout',\n                    title: 'Footer',\n                    allowedBlocks: ['slate', 'link'],\n                },\n            },\n        },\n    },\n});"
         }
       ]
     }

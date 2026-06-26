@@ -109,7 +109,7 @@ A hand-built nav. Two of the links share a URL depth and render at the same inde
       ]
     }
   },
-  "items": {
+  "blocks_layout": {
     "items": [
       "nav-1",
       "nav-2",
@@ -161,7 +161,7 @@ The block wraps its children in `<nav><ul>`. Each `navItem` (or listing-synthesi
 <!-- file: examples/react/ContextNavigationBlock.jsx -->
 ```jsx
 function ContextNavigationBlock({ block, blocks }) {
-  const items = block.items?.items || [];
+  const items = block.blocks_layout?.items || [];
   return (
     <nav
       data-block-uid={block['@uid']}
@@ -219,7 +219,7 @@ function NavItem({ block }) {
     class="context-navigation"
   >
     <ul role="list" class="context-navigation-list">
-      <li v-for="id in (block.items?.items || [])" :key="id">
+      <li v-for="id in (block.blocks_layout?.items || [])" :key="id">
         <NavItem :block="{ ...blocks[id], '@uid': id }" />
       </li>
     </ul>
@@ -240,7 +240,7 @@ defineProps({ block: Object, blocks: Object });
   import NavItem from './NavItem.svelte';
   export let block;
   export let blocks;
-  $: items = block.items?.items || [];
+  $: items = block.blocks_layout?.items || [];
 </script>
 
 <nav
@@ -275,7 +275,7 @@ defineProps({ block: Object, blocks: Object });
  */
 import NavItem from './NavItem.astro';
 const { block, blocks = {} } = Astro.props;
-const items = block?.items?.items || [];
+const items = block?.blocks_layout?.items || [];
 ---
 <nav
   aria-label={block.ariaLabel || 'Section navigation'}
