@@ -168,7 +168,7 @@
     const mockBlocksConfig = {
       _page: {
         schema: () => ({
-          properties: { blocks_layout: { widget: 'blocks_layout' } },
+          properties: { items: { widget: 'blocks_layout' } },
         }),
       },
       slate: { id: 'slate', blockSchema: { properties: { value: { widget: 'slate' } } } },
@@ -196,7 +196,7 @@
         id: 'column',
         blockSchema: {
           properties: {
-            blocks_layout: { widget: 'blocks_layout' },
+            items: { widget: 'blocks_layout' },
           },
         },
       },
@@ -206,7 +206,7 @@
         id: 'section',
         blockSchema: {
           properties: {
-            blocks_layout: { widget: 'blocks_layout' },
+            items: { widget: 'blocks_layout' },
           },
         },
       },

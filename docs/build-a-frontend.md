@@ -24,7 +24,7 @@ Before you dive into the steps, here's what your frontend ends up doing.
 
 To make a site editable with Hydra you break a page into:
 
-- **Blocks layout** — the `blocks_layout` field, which holds one or more **regions**. A region is a named, ordered list of blocks (e.g. the main content `items`, plus `header`, `footer`, `mobile_footer`). Every region's blocks live in the page's single shared `blocks` dict; the region only records ordering.
+- **Blocks fields** — one or more named, ordered lists of blocks. Each is a schema property with `widget: 'blocks_layout'`; the field name is a key inside the page's `blocks_layout` dict (the default field is `items`, plus e.g. `header`, `footer`). Every field's blocks live in the page's single shared `blocks` dict; the field only records ordering.
 - **Blocks** — discrete visual elements with a schema and settings that can be moved and edited.
   - Type, title, icon etc. so the user can pick from a menu.
   - Fields: string, image, link etc. each with their own sidebar widget.
@@ -40,17 +40,13 @@ if (window.name.startsWith('hydra')) {
     bridge = initBridge({
       page: {
         schema: {
+          // Each blocks field (widget: 'blocks_layout') is a named list of
+          // blocks. The field name is the key inside the `blocks_layout` dict;
+          // the default field is `items`. Each has its own allowedBlocks.
           properties: {
-            // Extra regions (header, footer, …) are declared as sub-keys of
-            // blocks_layout via `regions`, each with its own constraints.
-            // `items` is the implicit default region (the main content).
-            blocks_layout: {
-              allowedBlocks: ['slate', 'grid', 'myimage'],
-              regions: {
-                header: { allowedBlocks: ['slate', 'image'], maxLength: 3 },
-                footer: { allowedBlocks: ['slate', 'link'] },
-              },
-            },
+            items:  { widget: 'blocks_layout', allowedBlocks: ['slate', 'grid', 'myimage'] },
+            header: { widget: 'blocks_layout', allowedBlocks: ['slate', 'image'], maxLength: 3 },
+            footer: { widget: 'blocks_layout', allowedBlocks: ['slate', 'link'] },
           },
         },
       },

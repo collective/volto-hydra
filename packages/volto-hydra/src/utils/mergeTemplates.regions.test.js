@@ -28,9 +28,7 @@ describe('mergeTemplatesIntoPage — region preservation', () => {
     const { merged } = await mergeTemplatesIntoPage(formData, {
       loadTemplate,
       preloadedTemplates: {},
-      pageBlocksFields: {
-        blocks_layout: { regions: { footer: {} } },
-      },
+      pageBlocksFields: { items: {}, footer: {} },
       uuidGenerator: (() => {
         let n = 0;
         return () => `u-${++n}`;
@@ -53,7 +51,7 @@ describe('mergeTemplatesIntoPage — region preservation', () => {
     const { merged } = await mergeTemplatesIntoPage(formData, {
       loadTemplate,
       preloadedTemplates: {},
-      pageBlocksFields: { blocks_layout: { regions: { footer: {} } } },
+      pageBlocksFields: { items: {}, footer: {} },
       uuidGenerator: () => 'u-1',
       blocksConfig,
       intl,
@@ -72,7 +70,7 @@ describe('mergeTemplatesIntoPage — nested container regions', () => {
       id: 'section',
       blockSchema: {
         properties: {
-          blocks_layout: { widget: 'blocks_layout', regions: { footer: {} } },
+          items: { widget: 'blocks_layout' }, footer: { widget: 'blocks_layout' },
         },
       },
     },
@@ -96,7 +94,7 @@ describe('mergeTemplatesIntoPage — nested container regions', () => {
     const { merged } = await mergeTemplatesIntoPage(formData, {
       loadTemplate,
       preloadedTemplates: {},
-      pageBlocksFields: { blocks_layout: {} },
+      pageBlocksFields: { items: {} },
       uuidGenerator: (() => { let n = 0; return () => `u-${++n}`; })(),
       blocksConfig: nestedBlocksConfig,
       intl,

@@ -437,23 +437,21 @@
                     window.bridge = initBridge({
                         page: {
                             schema: {
+                                // Blocks fields: each is a key in the shared blocks_layout dict.
+                                // The default field is 'items'; 'footer' is a second blocks field —
+                                // both persist inside the registered blocks_layout field.
                                 properties: {
-                                    blocks_layout: {
+                                    items: {
                                         title: 'Blocks',
                                         allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest', 'title', 'description', 'section', 'contextNavigation'],
                                         allowedTemplates: ['/_test_data/templates/test-layout'],
                                         allowedLayouts: contextNavLayoutForced
                                             || [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
-                                        // The footer is now a REGION (sub-key) of blocks_layout, not a
-                                        // separate top-level field — so it persists inside the registered
-                                        // blocks_layout field instead of being dropped by the backend.
-                                        regions: {
-                                            footer: {
-                                                title: 'Footer',
-                                                allowedBlocks: ['slate', 'image'],
-                                                ...(forceFooterLayout ? { allowedLayouts: ['/_test_data/templates/footer-layout'] } : {}),
-                                            },
-                                        },
+                                    },
+                                    footer: {
+                                        title: 'Footer',
+                                        allowedBlocks: ['slate', 'image'],
+                                        ...(forceFooterLayout ? { allowedLayouts: ['/_test_data/templates/footer-layout'] } : {}),
                                     },
                                 },
                             },

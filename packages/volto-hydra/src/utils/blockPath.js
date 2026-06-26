@@ -24,8 +24,6 @@ import {
   getBlockSchema,
   getPageAllowedBlocksFromRestricted,
   getResolvedSchema,
-  getFieldRegions,
-  resolveRegionConstraints,
 } from '../../../hydra-js/buildBlockPathMap.js';
 import { mapLayoutItems } from '../../../hydra-js/containerOps.js';
 
@@ -412,21 +410,22 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
   const parentType = blockPathMap[parentId]?.blockType;
   const parentConfig = blocksConfig?.[parentType];
 
-  // Which region of the layout field this block lives in (default 'items').
+  // The blocks field (region) this block lives in. For blocks fields the data
+  // container is always 'blocks_layout' and the schema field is named after the
+  // region (default 'items').
   const region = pathInfo.region || 'items';
 
-  // Check schema-defined container field
-  if (schema?.properties && fieldName) {
-    const fieldDef = schema.properties[fieldName];
-    if (fieldDef?.widget === 'blocks_layout') {
-      const rc = resolveRegionConstraints(fieldDef, region, parentConfig);
+  // Check schema-defined blocks field (looked up by region = schema field name)
+  if (schema?.properties) {
+    const regionFieldDef = schema.properties[region];
+    if (regionFieldDef?.widget === 'blocks_layout') {
       return {
-        fieldName,
+        fieldName: 'blocks_layout',
         parentId,
         region,
-        allowedBlocks: rc.allowedBlocks,
-        defaultBlockType: rc.defaultBlockType,
-        maxLength: rc.maxLength,
+        allowedBlocks: regionFieldDef.allowedBlocks ?? parentConfig?.allowedBlocks ?? null,
+        defaultBlockType: regionFieldDef.defaultBlockType ?? parentConfig?.defaultBlockType ?? null,
+        maxLength: regionFieldDef.maxLength ?? parentConfig?.maxLength ?? null,
       };
     }
   }
@@ -576,37 +575,34 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   if (schema?.properties) {
     for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
       if (fieldDef.widget === 'blocks_layout') {
-        // One entry PER REGION. A blocks_layout field may declare multiple named
-        // regions (sub-keys of its value); each is an independent add/seed target
-        // with its own constraints. Declared regions appear even when empty.
-        const fieldValue = block[fieldName];
-        for (const region of getFieldRegions(fieldDef, fieldValue)) {
-          const rc = resolveRegionConstraints(fieldDef, region, blockConfig);
-          const maxLength = rc.maxLength;
-          const currentCount = Array.isArray(fieldValue?.[region])
-            ? fieldValue[region].length
-            : 0;
-          const maxLengthOk = !maxLength || currentCount < maxLength;
-          // When neither region, field nor block restricts allowedBlocks, the
-          // container inherits the page's allowed list — and so should its
-          // empty-block default. Otherwise null falls through to the picker
-          // 'empty' placeholder.
-          const allowedBlocksInherited = !rc.allowedBlocks;
-          containerFields.push({
-            fieldName,
-            region,
-            title: rc.title,
-            allowedBlocks: rc.allowedBlocks || defaultAllowedBlocks,
-            allowedTemplates: fieldDef.allowedTemplates || null,
-            allowedLayouts: fieldDef.allowedLayouts || null,
-            defaultBlockType:
-              rc.defaultBlockType ||
-              (allowedBlocksInherited ? pageDefaultBlockType : null),
-            maxLength,
-            currentCount,
-            canAdd: !parentIsReadonly && maxLengthOk,
-          });
-        }
+        // A blocks field. Its name IS the region key inside the shared
+        // blocks_layout dict; the data container field is always 'blocks_layout'.
+        // Each blocks field has its own allowedBlocks / maxLength.
+        const region = fieldName;
+        const layoutList = block.blocks_layout?.[region];
+        const currentCount = Array.isArray(layoutList) ? layoutList.length : 0;
+        const maxLength = fieldDef.maxLength ?? blockConfig?.maxLength ?? null;
+        const maxLengthOk = !maxLength || currentCount < maxLength;
+        const allowedBlocks = fieldDef.allowedBlocks ?? blockConfig?.allowedBlocks ?? null;
+        // When neither field nor block restricts allowedBlocks, the container
+        // inherits the page's allowed list — and so should its empty-block
+        // default. Otherwise null falls through to the picker 'empty' placeholder.
+        const allowedBlocksInherited = !allowedBlocks;
+        containerFields.push({
+          fieldName: 'blocks_layout',
+          region,
+          title: fieldDef.title || (region === 'items' ? 'Blocks' : region),
+          allowedBlocks: allowedBlocks || defaultAllowedBlocks,
+          allowedTemplates: fieldDef.allowedTemplates || null,
+          allowedLayouts: fieldDef.allowedLayouts || null,
+          defaultBlockType:
+            fieldDef.defaultBlockType ??
+            blockConfig?.defaultBlockType ??
+            (allowedBlocksInherited ? pageDefaultBlockType : null),
+          maxLength,
+          currentCount,
+          canAdd: !parentIsReadonly && maxLengthOk,
+        });
       } else if (fieldDef.widget === 'object_list') {
         // object_list: items stored as array
         // Two modes:
@@ -644,12 +640,14 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
                               blockConfig?.allowedBlocks || blockConfig?.defaultBlockType;
   if (containerFields.length === 0 && isImplicitContainer) {
     const maxLength = blockConfig?.maxLength || null;
-    const currentCount = getFieldCount('blocks_layout');
+    // Implicit container's default blocks field is 'items' → blocks_layout.items.
+    const currentCount = block.blocks_layout?.items?.length || 0;
     const maxLengthOk = !maxLength || currentCount < maxLength;
     // Same inherited-default rule as the schema-defined branch above.
     const allowedBlocksInherited = !blockConfig?.allowedBlocks;
     containerFields.push({
       fieldName: 'blocks_layout',
+      region: 'items',
       title: 'Blocks',
       allowedBlocks: blockConfig?.allowedBlocks || defaultAllowedBlocks,
       defaultBlockType: blockConfig?.defaultBlockType || (allowedBlocksInherited ? pageDefaultBlockType : null),
@@ -980,16 +978,11 @@ export function convertContainerBlock(
  * Scans the block schema for the first field with widget='blocks_layout'.
  * Falls back to 'blocks_layout' if none is explicitly declared.
  */
-export function _getContainerChildFieldName(blockType, blocksConfig, intl) {
-  const cfg = blocksConfig?.[blockType];
-  if (!cfg?.blockSchema) return 'blocks_layout';
-  const schema = typeof cfg.blockSchema === 'function'
-    ? cfg.blockSchema({ blocksConfig, intl })
-    : cfg.blockSchema;
-  const props = schema?.properties || {};
-  for (const [fieldName, field] of Object.entries(props)) {
-    if (field?.widget === 'blocks_layout') return fieldName;
-  }
+export function _getContainerChildFieldName(/* blockType, blocksConfig, intl */) {
+  // The DATA field holding a blocks container's children is always
+  // 'blocks_layout' — individual blocks fields (items, footer, …) are keys
+  // inside that dict, not separate top-level fields. Callers use this for blocks
+  // containers (wrap/convert/unwrap), not object_list containers.
   return 'blocks_layout';
 }
 

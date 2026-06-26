@@ -25,10 +25,8 @@ const blocksConfig = {
     id: '_page',
     schema: () => ({
       properties: {
-        blocks_layout: {
-          widget: 'blocks_layout',
-          regions: { footer: { title: 'Footer' } },
-        },
+        items: { widget: 'blocks_layout' },
+        footer: { widget: 'blocks_layout', title: 'Footer' },
       },
     }),
   },
@@ -142,14 +140,8 @@ describe('empty-region seeding', () => {
       id: '_page',
       schema: () => ({
         properties: {
-          blocks_layout: {
-            widget: 'blocks_layout',
-            allowedBlocks: ['slate'],
-            defaultBlockType: 'slate',
-            regions: {
-              footer: { title: 'Footer', allowedBlocks: ['slate'], defaultBlockType: 'slate' },
-            },
-          },
+          items: { widget: 'blocks_layout', allowedBlocks: ['slate'], defaultBlockType: 'slate' },
+          footer: { widget: 'blocks_layout', title: 'Footer', allowedBlocks: ['slate'], defaultBlockType: 'slate' },
         },
       }),
     },
@@ -229,18 +221,18 @@ describe('convertContainerBlock — region preservation', () => {
   const cfg = {
     _page: {
       id: '_page',
-      schema: () => ({ properties: { blocks_layout: { widget: 'blocks_layout' } } }),
+      schema: () => ({ properties: { items: { widget: 'blocks_layout' } } }),
     },
     slate: { id: 'slate' },
     colsA: {
       id: 'colsA',
       blockSchema: {
-        properties: { blocks_layout: { widget: 'blocks_layout', regions: { footer: {} } } },
+        properties: { items: { widget: 'blocks_layout' }, footer: { widget: 'blocks_layout' } },
       },
     },
     colsB: {
       id: 'colsB',
-      blockSchema: { properties: { blocks_layout: { widget: 'blocks_layout' } } },
+      blockSchema: { properties: { items: { widget: 'blocks_layout' } } },
     },
   };
 

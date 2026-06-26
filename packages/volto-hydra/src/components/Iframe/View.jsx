@@ -3110,14 +3110,15 @@ const Iframe = (props) => {
           // the cached "type-level" schema.
           populateTypeSchemaCache(config.blocks.blocksConfig, intl);
 
-          // 2. Process page schema — page.schema.properties is an object keyed by fieldName
-          // Default: { blocks_layout: { title: 'Blocks' } }
+          // 2. Process page schema — page.schema.properties lists the page's
+          // BLOCKS FIELDS, keyed by field name. Each field name is a key in the
+          // shared blocks_layout dict; the default field is named 'items'.
           const pageProperties = event.data.page?.schema?.properties || {};
           const pageBlocksFieldsDef = { ...pageProperties };
-          if (!pageBlocksFieldsDef.blocks_layout) {
-            pageBlocksFieldsDef.blocks_layout = { title: 'Blocks' };
+          if (Object.keys(pageBlocksFieldsDef).length === 0) {
+            pageBlocksFieldsDef.items = { title: 'Blocks' };
           }
-          // Ensure each field has widget: 'blocks_layout'
+          // Ensure each field has widget: 'blocks_layout' and its own constraints
           for (const [fieldName, fieldDef] of Object.entries(pageBlocksFieldsDef)) {
             pageBlocksFieldsDef[fieldName] = {
               widget: 'blocks_layout',
@@ -3126,10 +3127,6 @@ const Iframe = (props) => {
               allowedLayouts: fieldDef.allowedLayouts || null,
               maxLength: fieldDef.maxLength || null,
               title: fieldDef.title || fieldName,
-              // Carry the per-region declaration through. This rebuilt object
-              // drops any key not copied here, so without this line page-level
-              // regions would silently vanish.
-              regions: fieldDef.regions || null,
             };
           }
 
@@ -3155,24 +3152,20 @@ const Iframe = (props) => {
             setAllowedBlocksList([...allAllowedBlocks]);
           }
 
-          // 2c. Auto-initialize missing page fields with empty blocks/layout
+          // 2c. Auto-initialize the blocks_layout dict — one empty list per
+          // declared blocks field (so a declared-but-empty field is addressable).
           let formWithPageFields = form ? { ...form } : form;
           if (form) {
             if (!formWithPageFields.blocks) {
               formWithPageFields.blocks = {};
             }
+            const layout = { ...(formWithPageFields.blocks_layout || {}) };
             for (const fieldName of Object.keys(pageBlocksFieldsDef)) {
-              if (!formWithPageFields[fieldName]) {
-                // Seed the default `items` region plus every declared region as
-                // empty arrays so declared-but-empty regions are addressable.
-                const declaredRegions = Object.keys(
-                  pageBlocksFieldsDef[fieldName]?.regions || {},
-                );
-                formWithPageFields[fieldName] = Object.fromEntries(
-                  ['items', ...declaredRegions].map((r) => [r, []]),
-                );
+              if (!Array.isArray(layout[fieldName])) {
+                layout[fieldName] = [];
               }
             }
+            formWithPageFields.blocks_layout = layout;
           }
 
           // 3. Register _page as virtual block type in blocksConfig

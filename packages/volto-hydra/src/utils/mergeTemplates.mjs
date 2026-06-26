@@ -6,7 +6,7 @@
  */
 
 import { expandTemplates } from '@volto-hydra/helpers';
-import { getBlockSchema, getFieldRegions } from '../../../hydra-js/buildBlockPathMap.js';
+import { getBlockSchema } from '../../../hydra-js/buildBlockPathMap.js';
 
 /**
  * Merge templates into page data. Expands template references in all blocks fields,
@@ -84,34 +84,29 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
           }
 
           if (fieldDef.widget === 'blocks_layout') {
-            // blocks_layout container: blocks in shared dict, layout in
-            // field[region]. Process every region so siblings (e.g. footer) are
-            // preserved rather than rebuilt away as { items }.
-            const fieldValue = processedBlock[fieldName];
-            if (!fieldValue || !processedBlock.blocks) continue;
+            // A blocks field: its name is the key under the block's shared
+            // blocks_layout dict. Process its list and write it back, preserving
+            // sibling fields (e.g. footer).
+            if (!processedBlock.blocks || !processedBlock.blocks_layout) continue;
+            const layoutItems = processedBlock.blocks_layout[fieldName];
+            if (!Array.isArray(layoutItems) || layoutItems.length === 0) continue;
             hasBlocksLayout = true;
-            const newFieldLayout = { ...fieldValue };
-            for (const region of getFieldRegions(fieldDef, fieldValue)) {
-              const layoutItems = fieldValue[region];
-              if (!Array.isArray(layoutItems) || layoutItems.length === 0) {
-                newFieldLayout[region] = layoutItems || [];
-                continue;
-              }
-              const fieldBlocks = {};
-              for (const id of layoutItems) {
-                if (processedBlock.blocks[id]) fieldBlocks[id] = processedBlock.blocks[id];
-              }
-              const { blocks: newFieldBlocks, layout: newRegionLayout } = await processBlocksRecursive(
-                fieldBlocks,
-                layoutItems,
-                null,
-                templateState,
-                true, // skip template expansion — already done
-              );
-              Object.assign(mergedBlocks, newFieldBlocks);
-              newFieldLayout[region] = newRegionLayout;
+            const fieldBlocks = {};
+            for (const id of layoutItems) {
+              if (processedBlock.blocks[id]) fieldBlocks[id] = processedBlock.blocks[id];
             }
-            processedBlock[fieldName] = newFieldLayout;
+            const { blocks: newFieldBlocks, layout: newRegionLayout } = await processBlocksRecursive(
+              fieldBlocks,
+              layoutItems,
+              null,
+              templateState,
+              true, // skip template expansion — already done
+            );
+            Object.assign(mergedBlocks, newFieldBlocks);
+            processedBlock.blocks_layout = {
+              ...processedBlock.blocks_layout,
+              [fieldName]: newRegionLayout,
+            };
           } else if (fieldDef.widget === 'object_list') {
             // object_list container: expand templates same as blocks_layout
             const dataPath = fieldDef.dataPath || [fieldName];
@@ -156,32 +151,27 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
         }
       } else if (block.blocks && block.blocks_layout) {
         // Implicit container (no schema definition, e.g. Grid) — fallback.
-        // A layout field value may hold multiple regions (array sub-keys);
-        // process each and preserve siblings.
+        // The blocks_layout dict holds one list per blocks field (array
+        // sub-key); process each and preserve siblings.
         let mergedBlocks = {};
-        for (const [key, value] of Object.entries(block)) {
-          if (key === 'blocks' || !value || typeof value !== 'object') continue;
-          const regionKeys = Object.keys(value).filter((r) => Array.isArray(value[r]));
-          if (regionKeys.length === 0) continue;
-          const newFieldLayout = { ...value };
-          for (const region of regionKeys) {
-            const ids = value[region];
-            const fieldBlocks = {};
-            for (const id of ids) {
-              if (block.blocks[id]) fieldBlocks[id] = block.blocks[id];
-            }
-            const { blocks: newFieldBlocks, layout: newRegionLayout } = await processBlocksRecursive(
-              fieldBlocks,
-              ids,
-              null,
-              templateState,
-              true,
-            );
-            Object.assign(mergedBlocks, newFieldBlocks);
-            newFieldLayout[region] = newRegionLayout;
+        const newLayoutDict = { ...block.blocks_layout };
+        for (const [region, ids] of Object.entries(block.blocks_layout)) {
+          if (!Array.isArray(ids)) continue;
+          const fieldBlocks = {};
+          for (const id of ids) {
+            if (block.blocks[id]) fieldBlocks[id] = block.blocks[id];
           }
-          processedBlock[key] = newFieldLayout;
+          const { blocks: newFieldBlocks, layout: newRegionLayout } = await processBlocksRecursive(
+            fieldBlocks,
+            ids,
+            null,
+            templateState,
+            true,
+          );
+          Object.assign(mergedBlocks, newFieldBlocks);
+          newLayoutDict[region] = newRegionLayout;
         }
+        processedBlock.blocks_layout = newLayoutDict;
         for (const [id, blockData] of Object.entries(block.blocks)) {
           if (!mergedBlocks[id]) mergedBlocks[id] = blockData;
         }
@@ -199,65 +189,50 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
     return { blocks: newBlocks, layout: newLayout };
   }
 
-  // Process each page-level blocks field
-  // All fields share result.blocks; each field has its own layout (fieldName: { items: [...] })
+  // Process each page-level blocks field. A blocks field's name is the key in
+  // the shared `blocks_layout` dict (default 'items'); all share result.blocks.
+  // Writing each field's list back under blocks_layout[fieldName] preserves the
+  // sibling fields (e.g. footer) — rebuilding the whole dict would drop them.
   const fieldsToProcess = Object.keys(pageBlocksFields).length > 0
     ? pageBlocksFields
-    : { blocks_layout: {} }; // Default to main blocks_layout field
+    : { items: {} }; // Default to the main 'items' blocks field
 
   for (const [fieldName, fieldDef] of Object.entries(fieldsToProcess)) {
-    const layoutData = result[fieldName];
+    const blocksData = result.blocks || {};
+    const layout = result.blocks_layout?.[fieldName] || [];
+    const allowedLayouts = fieldDef?.allowedLayouts || null;
 
-    // A blocks_layout value may hold multiple named regions (sub-keys). Process
-    // each region independently and reassemble the field so sibling regions
-    // (e.g. footer) survive — rebuilding it as { items } would drop them.
-    const newFieldLayout = { ...(layoutData || {}) };
-
-    for (const region of getFieldRegions(fieldDef, layoutData)) {
-      const blocksData = result.blocks || {};
-      const layout = layoutData?.[region] || [];
-      // allowedLayouts may be declared per region; the default region (items)
-      // falls back to the field-level value.
-      const allowedLayouts =
-        (fieldDef?.regions?.[region]?.allowedLayouts) ||
-        (region === 'items' ? fieldDef?.allowedLayouts : null) ||
-        null;
-
-      if (layout.length === 0 && !allowedLayouts) {
-        // No layout items and no forced layout - keep region as-is
-        newFieldLayout[region] = layout;
-        continue;
-      }
-
-      // Build a blocks subset for this region (only blocks it references)
-      const fieldBlocks = {};
-      for (const blockId of layout) {
-        if (blocksData[blockId]) {
-          fieldBlocks[blockId] = blocksData[blockId];
-        }
-      }
-
-      const templateState = {};
-      const { blocks: newBlocks, layout: newLayout } = await processBlocksRecursive(
-        fieldBlocks,
-        layout,
-        allowedLayouts,
-        templateState
-      );
-
-      // Remove old region blocks dropped during template processing, then merge
-      // in the new blocks. Blocks from other fields/regions must remain.
-      const updatedBlocks = { ...result.blocks };
-      for (const oldId of Object.keys(fieldBlocks)) {
-        if (!newBlocks[oldId]) {
-          delete updatedBlocks[oldId];
-        }
-      }
-      result.blocks = { ...updatedBlocks, ...newBlocks };
-      newFieldLayout[region] = newLayout;
+    if (layout.length === 0 && !allowedLayouts) {
+      // No layout items and no forced layout - leave this field as-is
+      continue;
     }
 
-    result[fieldName] = newFieldLayout;
+    // Build a blocks subset for this field (only blocks it references)
+    const fieldBlocks = {};
+    for (const blockId of layout) {
+      if (blocksData[blockId]) {
+        fieldBlocks[blockId] = blocksData[blockId];
+      }
+    }
+
+    const templateState = {};
+    const { blocks: newBlocks, layout: newLayout } = await processBlocksRecursive(
+      fieldBlocks,
+      layout,
+      allowedLayouts,
+      templateState
+    );
+
+    // Remove old field blocks dropped during template processing, then merge in
+    // the new blocks. Blocks from other fields must remain.
+    const updatedBlocks = { ...result.blocks };
+    for (const oldId of Object.keys(fieldBlocks)) {
+      if (!newBlocks[oldId]) {
+        delete updatedBlocks[oldId];
+      }
+    }
+    result.blocks = { ...updatedBlocks, ...newBlocks };
+    result.blocks_layout = { ...result.blocks_layout, [fieldName]: newLayout };
   }
 
   return {
