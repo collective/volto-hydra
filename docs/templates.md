@@ -35,6 +35,53 @@ The slot a block lives in is identified by its `slotId`. This is the field name 
 }
 ```
 
+## Which mechanism for which use case?
+
+The two configurations below look similar but solve different problems. Pick by
+**who controls the structure** and **whether it repeats**:
+
+| You want… | Use | How it's applied |
+|-----------|-----|------------------|
+| A reusable snippet the editor **inserts** where they choose — e.g. a contact CTA reused across many pages | **`allowedTemplates`** | Offered in the BlockChooser's "Templates" group and inserted **as a block** (the block carries `templateId`). |
+| A layout **forced across an entire field/region** — a branded header/footer, or a mandated page structure | **`allowedLayouts`** | Applied across the whole blocks field; the field's content is merged into the layout's slots. The editor can't restructure it. |
+| To let the editor **choose** between a few layouts | **`allowedLayouts`** (several, optionally `null`) | Offered in the Layout dropdown; `null` = "no layout". |
+
+A **branded header/footer is the canonical `allowedLayouts` case**, *not*
+`allowedTemplates`: don't make the footer a `templateId` block the editor inserts
+— force a layout across the footer field. Within that layout, each block declares
+how locked it is:
+
+- **`fixed: true, readOnly: true`** — can't be edited or moved (logo, branded chrome).
+- **`fixed: true`** — content-editable but not movable (a required section).
+- **slot** (`fixed` unset, with `slotId`) — a region where editors add their own blocks; the `"default"` slot receives leftover content.
+
+For a fully-fixed branded footer, leave the blocks **field empty** (`{items: []}`)
+and let the layout content item supply everything — then editing the layout
+updates every page.
+
+### Block structure inside a template (read this before debugging an empty merge)
+
+```{important}
+**Every block in a template must declare a `slotId`** — not just slot blocks, but
+**`fixed` and `fixed+readOnly` blocks too, and every block *nested* inside a
+container.** The recursive merge keeps a nested block only when it has a `slotId`
+(or a `templateId`): `if (nested.slotId || nested.templateId)`. A block without
+one is **silently dropped** — the container survives but renders empty, with no
+error. This is the most common reason a template "half renders".
+```
+
+**Nested containers are fully supported** (e.g. a branded footer built as a
+`columns` block). The merge recurses into any field whose `.items` array lists
+the block's nested block IDs — a `blocks_layout`-widget field of **any name**
+(a `columns` block's `columns` field counts). Two rules for nested content:
+
+- Pair every nested `blocks` map with such a sibling layout field (or the merge throws "no sibling field whose `.items` array lists those block IDs").
+- Give **every** block a `slotId` — the container, each column, and each block inside each column. A unique id per block (e.g. the block's own uid) works.
+
+So a branded footer is, end to end: a `columns` block (`slotId`, `fixed`,
+`readOnly`) → each `column` (`slotId`, `fixed`, `readOnly`) → each leaf block
+(`slotId`, `fixed`, `readOnly`).
+
 ## allowedTemplates vs allowedLayouts
 
 Configure templates in `page.schema.properties` on the blocks field:
@@ -73,6 +120,16 @@ Use `expandTemplates` (async) or `expandTemplatesSync` (sync with pre-fetched te
 ## Pre-loading with loadTemplates
 
 **`loadTemplates(data, loadTemplate)`** scans page data for `templateId` references and loads them all in parallel. It follows nested references (templates referencing other templates) and has a 5s per-template timeout. It only loads templates actually in the page data — `allowedLayouts` options are loaded on demand when a forced layout is applied.
+
+```{important}
+**A forced layout (`allowedLayouts`) under `expandTemplatesSync` must be
+pre-loaded.** It isn't referenced from page data, so `loadTemplates` won't
+auto-scan it. The async `expandTemplates` fetches it on demand, but the **sync**
+`expandTemplatesSync` (recommended for SSR / Vue computed) needs it already in
+`templates` — pass its id explicitly:
+`loadTemplates(data, loadTemplate, cache, ['/templates/footer-layout'])`.
+Otherwise you'll hit `Template "…" not found in pre-loaded templates`.
+```
 
 <!-- codeExample: javascript -->
 ```javascript
