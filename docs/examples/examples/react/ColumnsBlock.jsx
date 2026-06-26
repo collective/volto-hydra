@@ -1,5 +1,5 @@
 function ColumnsBlock({ block }) {
-  const items = block.columns?.items || [];
+  const items = block.blocks_layout?.columns || [];
   const blocks = block.blocks || {};
 
   return (
