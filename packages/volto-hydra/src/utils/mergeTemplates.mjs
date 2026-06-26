@@ -27,7 +27,7 @@ import { getBlockSchema } from '../../../hydra-js/buildBlockPathMap.js';
 export async function mergeTemplatesIntoPage(page, options = {}) {
   const {
     loadTemplate,
-    pageBlocksFields = { blocks_layout: {} },
+    pageBlocksFields = { items: {} },
     uuidGenerator,
     filterInstanceId,
     preloadedTemplates = {},
