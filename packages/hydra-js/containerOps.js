@@ -80,6 +80,27 @@ export function mapLayoutItems(sourceConfig, targetConfig, sourceBlock) {
   };
 }
 
+/**
+ * Types allowed for blocks EXPELLED from a container (edge-drag expel).
+ *
+ * Expelled children become siblings of the container, so they must satisfy the
+ * container's OWN region constraints — which buildBlockPathMap already resolved
+ * per region into `allowedSiblingTypes`. The raw field-level `allowedBlocks` of
+ * the parent's container field is only a fallback for the rare case where no
+ * region-resolved types are available; using it directly would ignore a
+ * region's narrower allowedBlocks.
+ *
+ * @param {Object|null} containerInfo - The container's blockPathMap entry
+ * @param {Object|null} [parentFieldDef] - The parent's container field schema (fallback)
+ * @returns {string[]|null}
+ */
+export function expelAllowedTypes(containerInfo, parentFieldDef = null) {
+  if (containerInfo?.allowedSiblingTypes != null) {
+    return containerInfo.allowedSiblingTypes;
+  }
+  return parentFieldDef?.allowedBlocks ?? null;
+}
+
 export function findConversionPath(srcType, allowedTargets, blocksConfig, depth = 3) {
   if (!srcType || !blocksConfig?.[srcType]) return null;
   const targetSet = new Set(allowedTargets);

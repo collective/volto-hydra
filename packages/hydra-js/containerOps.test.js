@@ -5,7 +5,7 @@
  * Strict TDD: each `it` below must fail before its implementation exists.
  */
 
-import { canContain, findConversionPath, mapLayoutItems } from './containerOps.js';
+import { canContain, findConversionPath, mapLayoutItems, expelAllowedTypes } from './containerOps.js';
 import { canContainAll } from '@volto-hydra/helpers';
 
 describe('containerOps', () => {
@@ -178,5 +178,28 @@ describe('containerOps', () => {
       expect(mapLayoutItems(cfg, cfg, block))
         .toEqual({ blocks: { a: {} }, blocks_layout: { items: ['a'] } });
     });
+  });
+});
+
+describe('expelAllowedTypes', () => {
+  // Blocks EXPELLED from a container become siblings of that container, so they
+  // must satisfy the container's REGION constraints (allowedSiblingTypes, already
+  // region-resolved by buildBlockPathMap) — not the raw field-level allowedBlocks.
+  test('prefers the container region types over field-level allowedBlocks', () => {
+    // Container lives in e.g. a footer region that only allows columns, while the
+    // parent field-level list also allows slate. Expel must use the region.
+    const containerInfo = { allowedSiblingTypes: ['columns'] };
+    const parentFieldDef = { widget: 'blocks_layout', allowedBlocks: ['columns', 'slate'] };
+    expect(expelAllowedTypes(containerInfo, parentFieldDef)).toEqual(['columns']);
+  });
+
+  test('falls back to field-level allowedBlocks only when the container has no resolved region types', () => {
+    expect(expelAllowedTypes({}, { allowedBlocks: ['columns', 'slate'] })).toEqual(['columns', 'slate']);
+    expect(expelAllowedTypes(null, { allowedBlocks: ['x'] })).toEqual(['x']);
+  });
+
+  test('returns null when neither is available', () => {
+    expect(expelAllowedTypes(null, null)).toBeNull();
+    expect(expelAllowedTypes({}, null)).toBeNull();
   });
 });
