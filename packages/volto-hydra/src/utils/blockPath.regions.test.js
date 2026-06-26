@@ -14,6 +14,7 @@ import {
   ensureEmptyBlockIfEmpty,
   getAllContainerFields,
   listContainerChildren,
+  convertContainerBlock,
 } from './blockPath.js';
 
 const PAGE = '_page';
@@ -221,5 +222,45 @@ describe('listContainerChildren — storage-agnostic read', () => {
       { id: 's1', type: 'slide', data: parent.slides[0] },
       { id: 's2', type: 'slide', data: parent.slides[1] },
     ]);
+  });
+});
+
+describe('convertContainerBlock — region preservation', () => {
+  const cfg = {
+    _page: {
+      id: '_page',
+      schema: () => ({ properties: { blocks_layout: { widget: 'blocks_layout' } } }),
+    },
+    slate: { id: 'slate' },
+    colsA: {
+      id: 'colsA',
+      blockSchema: {
+        properties: { blocks_layout: { widget: 'blocks_layout', regions: { footer: {} } } },
+      },
+    },
+    colsB: {
+      id: 'colsB',
+      blockSchema: { properties: { blocks_layout: { widget: 'blocks_layout' } } },
+    },
+  };
+
+  test('carries every region when changing a container block @type', () => {
+    const form = {
+      '@type': 'Document',
+      blocks: {
+        'cols-1': {
+          '@type': 'colsA',
+          blocks: { a: { '@type': 'slate' }, f: { '@type': 'slate' } },
+          blocks_layout: { items: ['a'], footer: ['f'] },
+        },
+      },
+      blocks_layout: { items: ['cols-1'] },
+    };
+    const map = buildBlockPathMap(form, cfg, intl);
+    const result = convertContainerBlock(form, map, 'cols-1', 'colsB', cfg, intl);
+    const converted = result.blocks['cols-1'];
+    expect(converted['@type']).toBe('colsB');
+    expect(converted.blocks_layout.items).toEqual(['a']);
+    expect(converted.blocks_layout.footer).toEqual(['f']); // preserved
   });
 });

@@ -27,6 +27,7 @@ import {
   getFieldRegions,
   resolveRegionConstraints,
 } from '../../../hydra-js/buildBlockPathMap.js';
+import { mapLayoutItems } from '../../../hydra-js/containerOps.js';
 
 /**
  * Extract text content from a React element (JSX).
@@ -935,7 +936,13 @@ export function convertContainerBlock(
   const sourceType = sourceBlock['@type'];
   const sourceField = _getContainerChildFieldName(sourceType, blocksConfig, intl);
   const targetField = _getContainerChildFieldName(targetType, blocksConfig, intl);
-  const items = sourceBlock[sourceField]?.items || [];
+  // Map the source container's layout (every region) onto the target field via
+  // the shared interface — no direct region/items indexing here.
+  const { [targetField]: targetLayout } = mapLayoutItems(
+    { fieldName: sourceField },
+    { fieldName: targetField },
+    sourceBlock,
+  );
 
   // Strip ALL known blocks_layout fields from the source so leftover layout
   // fields (e.g. columns has both `columns` and `top_images`) don't linger on
@@ -963,7 +970,7 @@ export function convertContainerBlock(
   const newBlock = {
     ...cleanedRest,
     '@type': targetType,
-    [targetField]: { items: [...items] },
+    [targetField]: targetLayout,
   };
   return updateBlockById(formData, blockPathMap, blockId, newBlock);
 }
