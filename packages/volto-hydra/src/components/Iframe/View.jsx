@@ -1338,7 +1338,7 @@ const Iframe = (props) => {
               if (!response.ok) throw new Error(`Failed to fetch template: ${response.status}`);
               return response.json();
             },
-            pageBlocksFields: { blocks_layout: { allowedLayouts: [templateConfig.templateUrl] } },
+            pageBlocksFields: { [fieldName || 'items']: { allowedLayouts: [templateConfig.templateUrl] } },
             uuidGenerator: uuid,
             blocksConfig: config.blocks.blocksConfig,
             intl,
