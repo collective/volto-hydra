@@ -2318,8 +2318,8 @@
           }
         }
       },
-      "columns": {
-        "items": [
+      "blocks_layout": {
+        "columns": [
           "col-heavy-0-1",
           "col-heavy-0-2"
         ]
@@ -2447,8 +2447,8 @@
           }
         }
       },
-      "columns": {
-        "items": [
+      "blocks_layout": {
+        "columns": [
           "col-heavy-1-1",
           "col-heavy-1-2"
         ]
@@ -2576,8 +2576,8 @@
           }
         }
       },
-      "columns": {
-        "items": [
+      "blocks_layout": {
+        "columns": [
           "col-heavy-2-1",
           "col-heavy-2-2"
         ]
@@ -2705,8 +2705,8 @@
           }
         }
       },
-      "columns": {
-        "items": [
+      "blocks_layout": {
+        "columns": [
           "col-heavy-3-1",
           "col-heavy-3-2"
         ]
@@ -2834,8 +2834,8 @@
           }
         }
       },
-      "columns": {
-        "items": [
+      "blocks_layout": {
+        "columns": [
           "col-heavy-4-1",
           "col-heavy-4-2"
         ]

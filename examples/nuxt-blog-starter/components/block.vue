@@ -121,7 +121,7 @@
 
     <!-- Columns row - horizontal layout -->
     <div class="columns-row flex gap-4">
-      <div v-for="columnId in (block.columns?.items || [])" :key="columnId"
+      <div v-for="columnId in (block.blocks_layout?.columns || [])" :key="columnId"
            :data-block-uid="columnId" data-block-add="right"
            class="column flex-1 p-3 border border-dashed border-gray-300 rounded">
         <!-- Column title -->

@@ -1135,7 +1135,7 @@ function Block({ block, id, data, apiUrl, contextPath }) {
       return (
         <div data-block-uid={id} data-block-container="{allowed:['Column'],add:'horizontal'}" className="columns-block" style={{ display: "flex", gap: "1rem" }}>
           {block.title && <h3 data-edit-text="title">{block.title}</h3>}
-          {(block.columns?.items || []).map((columnId) => {
+          {(block.blocks_layout?.columns || []).map((columnId) => {
             const col = block.blocks?.[columnId];
             if (!col) return null;
             const children = expand(col.blocks_layout?.items || [], col.blocks || {});

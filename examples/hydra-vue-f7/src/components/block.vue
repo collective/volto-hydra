@@ -99,7 +99,7 @@
        class="columns-block">
     <h3 v-if="block.title" data-edit-text="title">{{ block.title }}</h3>
     <div class="row">
-      <div v-for="columnId in (block.columns?.items || [])" :key="columnId"
+      <div v-for="columnId in (block.blocks_layout?.columns || [])" :key="columnId"
            class="col" :data-block-uid="columnId" data-block-add="right">
         <h4 v-if="block.blocks?.[columnId]?.title" data-edit-text="title">{{ block.blocks[columnId].title }}</h4>
         <Block v-for="item in expand(block.blocks?.[columnId]?.blocks_layout?.items || [], block.blocks?.[columnId]?.blocks || {})"

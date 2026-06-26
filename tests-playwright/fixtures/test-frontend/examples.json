@@ -275,8 +275,8 @@
           }
         }
       },
-      "columns": {
-        "items": [
+      "blocks_layout": {
+        "columns": [
           "col-1",
           "col-2"
         ]
