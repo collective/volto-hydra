@@ -22,7 +22,7 @@ import { setUIState } from '@plone/volto/actions';
 import rightArrowSVG from '@plone/volto/icons/right-key.svg';
 import config from '@plone/volto/registry';
 import { DragDropList } from '@plone/volto/components';
-import { getAllContainerFields, getBlockById, listContainerChildren } from '../../utils/blockPath';
+import { getAllContainerFields, getBlockById, listContainerChildren, getContainerItems } from '../../utils/blockPath';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import { isBlockPositionLocked } from '@volto-hydra/helpers';
 import LayoutSelector from './LayoutSelector';
@@ -425,6 +425,7 @@ const ChildBlocksWidget = ({
           const instanceInfo = blockPathMap[selectedBlock];
           const realParentId = instanceInfo?.parentId;
           const realFieldName = instanceInfo?.containerField;
+          const realRegion = instanceInfo?.region || 'items';
 
           return sections.map((section, sectionIdx) => {
             if (section.type === 'fixed') {
@@ -456,7 +457,8 @@ const ChildBlocksWidget = ({
               const realParent = realParentId === PAGE_BLOCK_UID
                 ? formData
                 : getBlockById(formData, blockPathMap, realParentId);
-              const fullLayout = [...(realParent?.[realFieldName]?.items || [])];
+              // Read the instance's region via the funnel — no direct storage indexing.
+              const fullLayout = getContainerItems(realParent, { fieldName: realFieldName, region: realRegion });
               let idx = 0;
               const newLayout = fullLayout.map((id) =>
                 sectionBlockIds.includes(id) ? reorderedIds[idx++] : id,
