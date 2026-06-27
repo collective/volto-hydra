@@ -1198,8 +1198,8 @@ export class Bridge {
     const parentSchema = parentInfo?._schemaRef
       ? this.blockPathMap?._schemas?.[parentInfo._schemaRef] : null;
     let parentAllowed = null;
-    if (parentSchema?.properties && info.containerField) {
-      const fd = parentSchema.properties[info.containerField];
+    if (parentSchema?.properties && info.region) {
+      const fd = parentSchema.properties[info.region];
       if (fd?.widget === 'blocks_layout' || fd?.widget === 'object_list') {
         parentAllowed = fd.allowedBlocks || null;
       }
@@ -1346,8 +1346,8 @@ export class Bridge {
     const parentInfo = this.blockPathMap?.[containerParentId];
     const parentSchema = parentInfo?._schemaRef
       ? this.blockPathMap?._schemas?.[parentInfo._schemaRef] : null;
-    const parentFd = parentSchema?.properties && containerInfo?.containerField
-      ? parentSchema.properties[containerInfo.containerField] : null;
+    const parentFd = parentSchema?.properties && containerInfo?.region
+      ? parentSchema.properties[containerInfo.region] : null;
     const parentFieldDef = (parentFd?.widget === 'blocks_layout' || parentFd?.widget === 'object_list')
       ? parentFd : null;
     const parentAllowed = expelAllowedTypes(containerInfo, parentFieldDef);

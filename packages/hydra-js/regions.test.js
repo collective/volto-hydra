@@ -96,11 +96,14 @@ describe('buildBlockPathMap — page blocks fields', () => {
     expect(map['footer-1'].region).toBe('footer');
   });
 
-  test('containerField is always blocks_layout; blocks share one dict', () => {
+  test('all blocks-field children share the one blocks dict', () => {
     const map = buildBlockPathMap(formData, blocksConfig);
+    // Every blocks-field child (any region) lives in the shared `blocks` dict;
+    // the region (field name) is the single container identifier — there is no
+    // separate `containerField`.
     expect(map['footer-1'].path).toEqual(['blocks', 'footer-1']);
-    expect(map['footer-1'].containerField).toBe('blocks_layout');
-    expect(map['hero-1'].containerField).toBe('blocks_layout');
+    expect(map['hero-1'].path).toEqual(['blocks', 'hero-1']);
+    expect(map['footer-1'].containerField).toBeUndefined();
   });
 
   test('siblingCount is per blocks field', () => {

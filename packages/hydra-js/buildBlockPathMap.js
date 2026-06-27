@@ -212,7 +212,7 @@ export function getPageAllowedBlocksFromRestricted(blocksConfig, context = {}) {
  * @param {Object} formData - The form data with blocks
  * @param {Object} blocksConfig - Block configuration (must have _page registered for multiple page fields)
  * @param {Object} [intl={}] - The intl object from react-intl (optional; only needed for i18n schemas)
- * @returns {Object} Map of blockId -> { path: string[], parentId: string, containerField: string|null, ... }
+ * @returns {Object} Map of blockId -> { path: string[], parentId: string, region: string|null, isObjectListItem?, ... }
  *
  * Path format examples:
  * - Page block: ['blocks', 'text-1']
@@ -528,8 +528,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
             pathMap[instanceId] = {
               path: null, // Virtual - no actual storage path
               parentId, // Template instance's parent is the original container
-              containerField: 'blocks_layout',
-              region, // Which blocks_layout region (field name) this instance lives in
+              region, // The container field (region) this instance lives in
               blockType: instanceBlockType, // Virtual type for sidebar display
               isTemplateInstance: true,
               ...(isNestedInTemplate && { isNestedTemplateInstance: true }),
@@ -548,8 +547,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       pathMap[blockId] = {
         path: blockPath,
         parentId: effectiveParentId,
-        containerField: 'blocks_layout',
-        region, // Which blocks_layout region (field name) this block lives in
+        region, // The container field (region) this block lives in
         blockType, // Block type for uniform lookups (single source of truth)
         _schemaRef: storeSchema(blockSchema), // Deduplicated schema reference
         allowedSiblingTypes: effectiveAllowedBlocks
@@ -691,7 +689,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       pathMap[itemId] = {
         path: itemPath,
         parentId,
-        containerField: fieldName,
+        region: fieldName, // The container field (region) — same concept as blocks fields
         blockType: itemBlockType, // Real type (from typeField) or virtual type (from parent:field)
         isObjectListItem: true,
         idField,
@@ -725,7 +723,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
   pathMap[PAGE_BLOCK_UID] = {
     path: [],
     parentId: null, // Page has no parent
-    containerField: null,
+    region: null, // Page is not itself a container child
     blockType: '_page',
     _schemaRef: storeSchema(pageSchema),
   };

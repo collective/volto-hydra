@@ -64,10 +64,10 @@ describe('getContainerItems — region-scoped read', () => {
   test('reads the requested region, not always items', () => {
     const form = makeForm();
     expect(
-      getContainerItems(form, { fieldName: 'blocks_layout', region: 'footer' }),
+      getContainerItems(form, { region: 'footer' }),
     ).toEqual(['f1', 'f2']);
     expect(
-      getContainerItems(form, { fieldName: 'blocks_layout' }),
+      getContainerItems(form, { region: 'items' }),
     ).toEqual(['a', 'b']); // default region = items
   });
 });
@@ -80,7 +80,7 @@ describe('reorderBlocksInContainer — sibling preservation', () => {
       form,
       map,
       PAGE,
-      'blocks_layout',
+      'footer',
       ['f2', 'f1'],
       blocksConfig,
       intl,
@@ -156,7 +156,7 @@ describe('empty-region seeding', () => {
     };
     const map = buildBlockPathMap(form, cfg, intl);
     const fields = getAllContainerFields(PAGE, map, form, cfg, intl);
-    const regions = fields.filter((f) => f.fieldName === 'blocks_layout').map((f) => f.region);
+    const regions = fields.filter((f) => !f.isObjectList).map((f) => f.region);
     expect(regions).toContain('items');
     expect(regions).toContain('footer');
   });
@@ -181,7 +181,6 @@ describe('listContainerChildren — storage-agnostic read', () => {
   test('reads a blocks_layout region from the shared blocks dict', () => {
     const form = makeForm();
     const children = listContainerChildren(form, {
-      fieldName: 'blocks_layout',
       region: 'footer',
     });
     expect(children).toEqual([
@@ -193,7 +192,7 @@ describe('listContainerChildren — storage-agnostic read', () => {
   test('defaults to the items region', () => {
     const form = makeForm();
     expect(
-      listContainerChildren(form, { fieldName: 'blocks_layout' }).map((c) => c.id),
+      listContainerChildren(form, { region: 'items' }).map((c) => c.id),
     ).toEqual(['a', 'b']);
   });
 
@@ -205,7 +204,7 @@ describe('listContainerChildren — storage-agnostic read', () => {
       ],
     };
     const children = listContainerChildren(parent, {
-      fieldName: 'slides',
+      region: 'slides',
       isObjectList: true,
       idField: '@id',
       typeField: '@type',

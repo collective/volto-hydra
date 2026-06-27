@@ -134,10 +134,10 @@ export { getBlockTypeSchema, getBlockSchema, getResolvedSchema };
  * @returns {Array} The items array (copy for object_list, items array for blocks)
  */
 export function getContainerItems(parentBlock, containerConfig) {
-  const { fieldName, isObjectList, dataPath, region = 'items' } = containerConfig;
+  const { isObjectList, dataPath, region = 'items' } = containerConfig;
 
   if (isObjectList) {
-    const effectivePath = dataPath || [fieldName];
+    const effectivePath = dataPath || [region];
     let container = parentBlock;
     for (const key of effectivePath) {
       container = container?.[key];
@@ -145,8 +145,9 @@ export function getContainerItems(parentBlock, containerConfig) {
     return [...(container || [])];
   }
 
-  // blocks container: layout is in fieldName[region], blocks in shared parent.blocks
-  return [...(parentBlock[fieldName]?.[region] || [])];
+  // blocks container: the region is a key in the shared blocks_layout dict;
+  // child blocks live in the shared parent.blocks.
+  return [...(parentBlock.blocks_layout?.[region] || [])];
 }
 
 /**
@@ -175,10 +176,10 @@ function reorderContainerItems(items, newOrder, containerConfig) {
  * @returns {Object} Updated parent block
  */
 function setContainerItems(parentBlock, containerConfig, items, blocksObj = null) {
-  const { fieldName, isObjectList, dataPath, region = 'items' } = containerConfig;
+  const { isObjectList, dataPath, region = 'items' } = containerConfig;
 
   if (isObjectList) {
-    const effectivePath = dataPath || [fieldName];
+    const effectivePath = dataPath || [region];
     const updatedParent = { ...parentBlock };
     let current = updatedParent;
     for (let i = 0; i < effectivePath.length - 1; i++) {
@@ -189,14 +190,14 @@ function setContainerItems(parentBlock, containerConfig, items, blocksObj = null
     return updatedParent;
   }
 
-  // blocks container: update shared blocks dict + the region within the layout
-  // field. Spread the existing layout object so SIBLING regions (e.g. header,
-  // footer) are preserved — writing { [region]: items } alone would wipe
+  // blocks container: update shared blocks dict + this region's list within the
+  // shared blocks_layout dict. Spread the existing dict so SIBLING regions (e.g.
+  // header, footer) are preserved — writing { [region]: items } alone would wipe
   // them. (No-op for single-region data, where region is always 'items'.)
   return {
     ...parentBlock,
     blocks: blocksObj || parentBlock.blocks,
-    [fieldName]: { ...parentBlock[fieldName], [region]: items },
+    blocks_layout: { ...parentBlock.blocks_layout, [region]: items },
   };
 }
 
@@ -245,7 +246,7 @@ export function listContainerChildren(parentBlock, containerConfig) {
  * @param {Object} formData - The form data with blocks
  * @param {Object} blocksConfig - Block configuration from registry
  * @param {Object} intl - The intl object from react-intl (required for i18n schemas)
- * @returns {Object} Map of blockId -> { path: string[], parentId: string, containerField: string|null, ... }
+ * @returns {Object} Map of blockId -> { path: string[], parentId: string, region: string|null, isObjectListItem?, ... }
  */
 export function buildBlockPathMap(formData, blocksConfig, intl) {
   if (!intl) {
@@ -351,6 +352,38 @@ export function getChildBlockIds(parentId, blockPathMap) {
 }
 
 /**
+ * The container field (region) a child block lives in.
+ *
+ * blocks-layout fields and object_list fields are the same concept — a named
+ * "region" (the schema field name) holding an ordered list of blocks. Both
+ * record it in `region`; storage (the shared blocks_layout dict vs an inline
+ * array) is an orthogonal detail the funnel handles. Callers should never
+ * branch on storage — use this for "which region is this child in".
+ *
+ * @param {string} blockId
+ * @param {Object} blockPathMap
+ * @returns {string|undefined} The region (schema field name), or undefined
+ */
+export function getChildField(blockId, blockPathMap) {
+  return blockPathMap?.[blockId]?.region;
+}
+
+/**
+ * Child block IDs of `parentId` that live in a specific region (container
+ * field), regardless of blocks-layout vs object_list storage.
+ *
+ * @param {string} parentId
+ * @param {string} region - The region / container-field name (schema property)
+ * @param {Object} blockPathMap
+ * @returns {string[]}
+ */
+export function getChildBlockIdsInField(parentId, region, blockPathMap) {
+  return getChildBlockIds(parentId, blockPathMap).filter(
+    (id) => getChildField(id, blockPathMap) === region,
+  );
+}
+
+/**
  * Get the container field configuration for a nested block.
  * Returns the allowedBlocks, defaultBlockType, etc. from the parent's schema.
  *
@@ -368,7 +401,9 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
   }
 
   let parentId = pathInfo.parentId;
-  const fieldName = pathInfo.containerField;
+  // The container field (region) this block lives in — same concept for blocks
+  // and object_list. It is the schema property name.
+  const region = pathInfo.region || 'items';
 
   // If parent is a virtual template instance, use the instance's parent for storage operations
   // Template blocks are stored flat, so the actual container is the instance's parent
@@ -378,12 +413,12 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
   }
 
   const schema = getResolvedSchema(blockPathMap[parentId], blockPathMap);
-  const fieldDef = schema?.properties?.[fieldName];
+  const fieldDef = schema?.properties?.[region];
 
   // For object_list items, we already have most info in pathInfo
   if (pathInfo.isObjectListItem) {
     return {
-      fieldName,
+      region,
       parentId,
       allowedBlocks: pathInfo.allowedSiblingTypes,
       defaultBlockType: pathInfo.blockType,
@@ -410,19 +445,13 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
   const parentType = blockPathMap[parentId]?.blockType;
   const parentConfig = blocksConfig?.[parentType];
 
-  // The blocks field (region) this block lives in. For blocks fields the data
-  // container is always 'blocks_layout' and the schema field is named after the
-  // region (default 'items').
-  const region = pathInfo.region || 'items';
-
   // Check schema-defined blocks field (looked up by region = schema field name)
   if (schema?.properties) {
     const regionFieldDef = schema.properties[region];
     if (regionFieldDef?.widget === 'blocks_layout') {
       return {
-        fieldName: 'blocks_layout',
-        parentId,
         region,
+        parentId,
         allowedBlocks: regionFieldDef.allowedBlocks ?? parentConfig?.allowedBlocks ?? null,
         defaultBlockType: regionFieldDef.defaultBlockType ?? parentConfig?.defaultBlockType ?? null,
         maxLength: regionFieldDef.maxLength ?? parentConfig?.maxLength ?? null,
@@ -436,9 +465,8 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
   const includesBlock = parentBlock.blocks_layout?.[region]?.includes(blockId);
   if (hasBlocks && includesBlock) {
     return {
-      fieldName: 'blocks_layout',
-      parentId,
       region,
+      parentId,
       allowedBlocks: parentConfig?.allowedBlocks || null,
       defaultBlockType: parentConfig?.defaultBlockType || null,
       maxLength: parentConfig?.maxLength || null,
@@ -519,7 +547,7 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
 
     if (childIds.length > 0) {
       return [{
-        fieldName: 'blocks', // Virtual field name for template children
+        region: 'blocks', // Virtual region for template children
         title: 'Blocks',
         isTemplateInstance: true,
         // Template children are managed specially - no add button for now
@@ -555,18 +583,18 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   const pageDefaultBlockType = config.settings.defaultBlockType || null;
 
   // Helper to get current count for a container field
-  const getFieldCount = (fieldName, isObjectList = false, dataPath = null) => {
+  const getFieldCount = (region, isObjectList = false, dataPath = null) => {
     if (isObjectList) {
-      // object_list: navigate via dataPath or fieldName
-      const path = dataPath || [fieldName];
+      // object_list: navigate via dataPath or the region (field name)
+      const path = dataPath || [region];
       let data = block;
       for (const key of path) {
         data = data?.[key];
       }
       return Array.isArray(data) ? data.length : 0;
     }
-    // blocks container: count items in layout (fieldName IS the layout)
-    return block[fieldName]?.items?.length || 0;
+    // blocks container: the region is a key in the shared blocks_layout dict
+    return block.blocks_layout?.[region]?.length || 0;
   };
 
   const containerFields = [];
@@ -589,7 +617,6 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
         // default. Otherwise null falls through to the picker 'empty' placeholder.
         const allowedBlocksInherited = !allowedBlocks;
         containerFields.push({
-          fieldName: 'blocks_layout',
           region,
           title: fieldDef.title || (region === 'items' ? 'Blocks' : region),
           allowedBlocks: allowedBlocks || defaultAllowedBlocks,
@@ -615,7 +642,7 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
         const currentCount = getFieldCount(fieldName, true, dataPath);
         const maxLengthOk = !maxLength || currentCount < maxLength;
         containerFields.push({
-          fieldName,
+          region: fieldName,
           title: fieldDef.title || fieldName,
           allowedBlocks: hasAllowedBlocks ? fieldDef.allowedBlocks : [itemType],
           allowedTemplates: fieldDef.allowedTemplates || null,
@@ -646,7 +673,6 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
     // Same inherited-default rule as the schema-defined branch above.
     const allowedBlocksInherited = !blockConfig?.allowedBlocks;
     containerFields.push({
-      fieldName: 'blocks_layout',
       region: 'items',
       title: 'Blocks',
       allowedBlocks: blockConfig?.allowedBlocks || defaultAllowedBlocks,
@@ -686,7 +712,7 @@ export function insertBlockInContainer(formData, blockPathMap, refBlockId, newBl
     return refIndex + 1; // default to after
   };
 
-  const { parentId, fieldName, isObjectList } = containerConfig;
+  const { parentId, isObjectList } = containerConfig;
 
   // parentPath is [] for page-level (parentId === PAGE_BLOCK_UID)
   const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
@@ -757,7 +783,6 @@ export function wrapBlocksInContainer(
     if (
       !cc ||
       cc.parentId !== firstCC.parentId ||
-      cc.fieldName !== firstCC.fieldName ||
       (cc.region || 'items') !== (firstCC.region || 'items')
     ) {
       throw new Error(
@@ -1001,7 +1026,7 @@ export function deleteBlockFromContainer(formData, blockPathMap, blockId, contai
     throw new Error(`[HYDRA] deleteBlockFromContainer: containerConfig required for block ${blockId}`);
   }
 
-  const { parentId, fieldName, isObjectList } = containerConfig;
+  const { parentId, isObjectList } = containerConfig;
 
   // parentPath is [] for page-level (parentId === PAGE_BLOCK_UID)
   const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
@@ -1113,7 +1138,7 @@ export function removeTemplateInstance(formData, blockPathMap, templateInstanceI
     throw new Error(`[HYDRA] removeTemplateInstance: ${templateInstanceId} is not a template instance`);
   }
 
-  const { parentId, containerField, region = 'items' } = instanceInfo;
+  const { parentId, region = 'items' } = instanceInfo;
 
   // Get the parent container
   const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
@@ -1123,8 +1148,9 @@ export function removeTemplateInstance(formData, blockPathMap, templateInstanceI
   }
 
   // Get current layout for the instance's region. Blocks are in shared
-  // parent.blocks; the layout list lives at containerField[region].
-  const layoutPath = `${containerField}.${region}`;
+  // parent.blocks; the layout list lives at blocks_layout[region]. (Template
+  // instances are always blocks-layout containers.)
+  const layoutPath = `blocks_layout.${region}`;
   const blocksPath = 'blocks';
 
   const layout = get(parentBlock, layoutPath, []);
@@ -1158,12 +1184,12 @@ export function removeTemplateInstance(formData, blockPathMap, templateInstanceI
     }
   }
 
-  // Build updated parent block
-  // All fields use shared parent.blocks + fieldName.items layout
+  // Build updated parent block — shared parent.blocks + the region's list in
+  // the shared blocks_layout dict (siblings preserved).
   const updatedParentBlock = {
     ...parentBlock,
     blocks: newBlocks,
-    [containerField]: { ...parentBlock[containerField], [region]: newLayout },
+    blocks_layout: { ...parentBlock.blocks_layout, [region]: newLayout },
   };
 
   return setBlockByPath(formData, parentPath, updatedParentBlock);
@@ -1360,7 +1386,7 @@ export function mutateBlockInContainer(formData, blockPathMap, blockId, newBlock
     throw new Error(`[HYDRA] mutateBlockInContainer: containerConfig required for block ${blockId}`);
   }
 
-  const { parentId, fieldName, isObjectList } = containerConfig;
+  const { parentId, isObjectList } = containerConfig;
 
   // parentPath is [] for page-level (parentId === PAGE_BLOCK_UID)
   const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
@@ -1439,8 +1465,8 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
     throw new Error('[HYDRA] ensureEmptyBlockIfEmpty: containerConfig required');
   }
 
-  // If no fieldName, process all container fields for this block
-  if (!containerConfig.fieldName) {
+  // If no region given, process all container fields for this block
+  if (!containerConfig.region) {
     const containerFields = getAllContainerFields(containerConfig.parentId, blockPathMap, formData, blocksConfig, intl);
     let result = formData;
     for (const field of containerFields) {
@@ -1456,7 +1482,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
     return result;
   }
 
-  const { parentId, fieldName, isObjectList } = containerConfig;
+  const { parentId, isObjectList } = containerConfig;
 
   // parentPath is [] for page-level (parentId === PAGE_BLOCK_UID)
   const parentPath = parentId === PAGE_BLOCK_UID ? [] : blockPathMap[parentId]?.path;
@@ -1697,7 +1723,7 @@ export function reorderBlocksInContainer(
   formData,
   blockPathMap,
   parentBlockId,
-  fieldName,
+  region,
   newOrder,
   blocksConfig = null,
   intl = null,
@@ -1721,23 +1747,18 @@ export function reorderBlocksInContainer(
     return formData;
   }
 
-  // Detect if this is an object_list field
+  // Detect if this region is an object_list field (the region is the schema
+  // property name).
   const schema = getResolvedSchema(blockPathMap[effectiveParentId], blockPathMap);
-  const fieldDef = schema?.properties?.[fieldName];
+  const fieldDef = schema?.properties?.[region];
   const isObjectList = fieldDef?.widget === 'object_list';
 
-  // Reorder is scoped to a single region — derive it from the blocks being
-  // reordered (they all live in the same region). Defaults to 'items'.
-  const reorderRegion =
-    blockPathMap[newOrder.find((id) => blockPathMap[id])]?.region || 'items';
-
-  // Build containerConfig from fieldDef for helper functions
+  // Build containerConfig from fieldDef for the funnel.
   const containerConfig = {
-    fieldName,
+    region,
     isObjectList,
     dataPath: fieldDef?.dataPath,
     idField: fieldDef?.idField,
-    region: reorderRegion,
   };
 
   const items = getContainerItems(parentBlock, containerConfig);
@@ -1784,18 +1805,14 @@ export function moveBlockBetweenContainers(
   }
 
   // Same container - just reorder
-  // Check parentId, containerField AND region to handle page-level blocks in
-  // different fields/regions (e.g. the items region vs the footer region of the
-  // same blocks_layout field both have parentId=PAGE_BLOCK_UID and
-  // containerField='blocks_layout' but different regions). Without the region
-  // check, a cross-region move would be mis-handled as a same-list reorder.
-  const sourceContainerField = blockPathMap[blockId]?.containerField;
-  const targetContainerField = blockPathMap[targetBlockId]?.containerField;
+  // Check parentId AND region: page-level blocks in different regions (e.g. the
+  // items region vs the footer region) all have parentId=PAGE_BLOCK_UID, so
+  // without the region check a cross-region move would be mis-handled as a
+  // same-list reorder.
   const sourceRegion = blockPathMap[blockId]?.region || 'items';
   const targetRegion = blockPathMap[targetBlockId]?.region || 'items';
   if (
     sourceParentId === targetParentId &&
-    sourceContainerField === targetContainerField &&
     sourceRegion === targetRegion
   ) {
     return reorderBlockInContainer(
@@ -1926,7 +1943,7 @@ function reorderBlockInContainer(
   ids.splice(newIndex, 0, blockId);
 
   // Delegate to reorderBlocksInContainer which handles both formats
-  return reorderBlocksInContainer(formData, blockPathMap, parentId, containerConfig.fieldName, ids, blocksConfig, intl);
+  return reorderBlocksInContainer(formData, blockPathMap, parentId, containerConfig.region, ids, blocksConfig, intl);
 }
 
 /**

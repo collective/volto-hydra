@@ -33,7 +33,7 @@
  * branch can be removed — until then, both branches are load-bearing.
  */
 import config from '@plone/volto/registry';
-import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds } from './blockPath';
+import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField } from './blockPath';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import { convertFieldValue } from '@volto-hydra/helpers';
 import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context';
@@ -1848,14 +1848,12 @@ function createSingleEnhancerLegacy(recipe) {
  */
 function getFirstBlocksField(blockId, blockPathMap) {
   if (!blockPathMap || !blockId) return undefined;
-  for (const pathInfo of Object.values(blockPathMap)) {
-    // Only consider blocks fields, not object_list items.
-    // Return the blocks-field NAME (the region = schema property name, e.g.
-    // 'items'/'columns'), not the shared container field 'blocks_layout' —
-    // callers look it up as a schema property and match it against child region.
-    if (pathInfo.parentId === blockId && pathInfo.containerField && !pathInfo.isObjectListItem) {
-      return pathInfo.region;
-    }
+  // The first container field of this block — its NAME, storage-agnostic
+  // (blocks-layout and object_list act the same here). getChildField hides the
+  // region-vs-containerField detail.
+  for (const childId of getChildBlockIds(blockId, blockPathMap)) {
+    const field = getChildField(childId, blockPathMap);
+    if (field) return field;
   }
   return undefined;
 }
@@ -2299,13 +2297,10 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
   const declaredBlocksField = findBlocksFieldForTypeField(blockConfig, typeField, intl);
   const effectiveBlocksField = declaredBlocksField ?? getFirstBlocksField(blockId, blockPathMap);
 
-  // Get child block IDs, filtered to the effective blocks field.
-  // effectiveBlocksField is the blocks-field NAME (region); a child's region
-  // records which blocks_layout list it lives in.
-  const allChildIds = getChildBlockIds(blockId, blockPathMap);
+  // Child block IDs in the effective container field (storage-agnostic).
   const childIds = effectiveBlocksField
-    ? allChildIds.filter((id) => blockPathMap[id]?.region === effectiveBlocksField)
-    : allChildIds;
+    ? getChildBlockIdsInField(blockId, effectiveBlocksField, blockPathMap)
+    : getChildBlockIds(blockId, blockPathMap);
   if (childIds.length === 0) return result;
 
   // Transform each child

@@ -151,7 +151,7 @@ const groupByPlaceholder = (childBlocks, templateEditMode) => {
  * Single container field section
  */
 const ContainerFieldSection = ({
-  fieldName,
+  region,
   containerConfig,
   fieldTitle,
   childBlocks,
@@ -193,7 +193,7 @@ const ContainerFieldSection = ({
     blockIds.splice(destination.index, 0, movedId);
 
     // Call the move handler with the new order
-    onMoveBlock(parentBlockId, fieldName, blockIds);
+    onMoveBlock(parentBlockId, region, blockIds);
   };
 
   return (
@@ -357,8 +357,8 @@ const ChildBlocksWidget = ({
           const childBlocks = getChildBlocksForPageField(formData, fieldConfig);
           return (
             <ContainerFieldSection
-              key={`${fieldConfig.fieldName}:${fieldConfig.region || 'items'}`}
-              fieldName={fieldConfig.fieldName}
+              key={fieldConfig.region || 'items'}
+              region={fieldConfig.region}
               containerConfig={fieldConfig}
               fieldTitle={fieldConfig.title || intl.formatMessage(messages.blocks)}
               childBlocks={childBlocks}
@@ -424,7 +424,6 @@ const ChildBlocksWidget = ({
           const sections = groupByPlaceholder(childBlocks, templateEditMode);
           const instanceInfo = blockPathMap[selectedBlock];
           const realParentId = instanceInfo?.parentId;
-          const realFieldName = instanceInfo?.containerField;
           const realRegion = instanceInfo?.region || 'items';
 
           return sections.map((section, sectionIdx) => {
@@ -458,12 +457,12 @@ const ChildBlocksWidget = ({
                 ? formData
                 : getBlockById(formData, blockPathMap, realParentId);
               // Read the instance's region via the funnel — no direct storage indexing.
-              const fullLayout = getContainerItems(realParent, { fieldName: realFieldName, region: realRegion });
+              const fullLayout = getContainerItems(realParent, { region: realRegion });
               let idx = 0;
               const newLayout = fullLayout.map((id) =>
                 sectionBlockIds.includes(id) ? reorderedIds[idx++] : id,
               );
-              onMoveBlock(realParentId, realFieldName, newLayout);
+              onMoveBlock(realParentId, realRegion, newLayout);
             };
 
             // Wrap onAddBlock to insert after last block in section (or preceding fixed block)
@@ -480,7 +479,7 @@ const ChildBlocksWidget = ({
             return (
               <ContainerFieldSection
                 key={`slot-${section.name}-${sectionIdx}`}
-                fieldName={realFieldName}
+                region={realRegion}
                 fieldTitle={slotTitle}
                 childBlocks={section.blocks}
                 canAdd={true}
@@ -500,8 +499,8 @@ const ChildBlocksWidget = ({
         const childBlocks = getChildBlocks(blockData, field);
         return (
           <ContainerFieldSection
-            key={`${field.fieldName}:${field.region || 'items'}`}
-            fieldName={field.fieldName}
+            key={field.region || 'items'}
+            region={field.region}
             containerConfig={field}
             fieldTitle={field.title}
             childBlocks={childBlocks}
