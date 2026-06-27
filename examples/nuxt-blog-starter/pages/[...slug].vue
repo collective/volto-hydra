@@ -305,13 +305,25 @@ onMounted(() => {
                 pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
                 // Pass onEditChange before init() sends INIT to avoid race condition
                 onEditChange: (page) => {
-                    if (page) {
-                        // Mark that we have admin data with nodeIds
-                        hasAdminData.value = true;
-                        // Update page data - ListingBlock components will
-                        // re-render and expand listings via their own Suspense
-                        data.value.page = page;
+                    if (!page) return;
+                    // Mark that we have admin data with nodeIds
+                    hasAdminData.value = true;
+                    // Clicking into a field produces a selection-only FORM_DATA
+                    // echo whose content is unchanged. Applying it re-renders
+                    // (and replaces) the focused contenteditable, which races
+                    // with an in-flight keystroke — the typed character lands on
+                    // the old node just before Vue swaps it, and is lost. Skip
+                    // echoes that don't actually change content; real edits
+                    // (different blocks/layout) still apply and re-render.
+                    const cur = data.value.page;
+                    if (cur
+                        && JSON.stringify(page.blocks) === JSON.stringify(cur.blocks)
+                        && JSON.stringify(page.blocks_layout) === JSON.stringify(cur.blocks_layout)) {
+                        return;
                     }
+                    // Update page data - ListingBlock components will
+                    // re-render and expand listings via their own Suspense
+                    data.value.page = page;
                 },
             });
             // Expose bridge so Playwright tests can drive selection programmatically
