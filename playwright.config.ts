@@ -98,8 +98,10 @@ export default defineConfig({
 
   /* Configure projects for different test categories and frontends.
    *
-   * Three test directories:
+   * Test directories:
    *   unit/        — Pure unit tests, run once (no frontend needed)
+   *   api/         — HTTP-contract tests against the mock API, run once
+   *                  (frontend-agnostic, no browser storageState)
    *   bridge/      — Mock-parent tests using hydra.js bridge protocol,
    *                  run on ALL frontends (mock, nuxt, react, svelte, vue)
    *   integration/ — Full Volto admin UI tests, run on mock + nuxt only
@@ -120,6 +122,20 @@ export default defineConfig({
       testDir: 'tests-playwright/unit',
       use: {
         ...devices['Desktop Firefox'],
+        viewport: { width: 1280, height: 720 },
+      },
+    },
+
+    // --- API-contract tests — frontend-agnostic, run once ---
+    // Pure HTTP-contract tests against the mock API (port 8888, always started).
+    // No browser frontend and deliberately NO storageState — these assert a
+    // backend/serializer contract (which blocks fields persist), so they must
+    // not be multiplied across frontend projects or inherit a frontend's cookies.
+    {
+      name: 'api-contract',
+      testDir: 'tests-playwright/api',
+      use: {
+        ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
       },
     },
