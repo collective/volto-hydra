@@ -1849,9 +1849,12 @@ function createSingleEnhancerLegacy(recipe) {
 function getFirstBlocksField(blockId, blockPathMap) {
   if (!blockPathMap || !blockId) return undefined;
   for (const pathInfo of Object.values(blockPathMap)) {
-    // Only consider blocks fields, not object_list items
+    // Only consider blocks fields, not object_list items.
+    // Return the blocks-field NAME (the region = schema property name, e.g.
+    // 'items'/'columns'), not the shared container field 'blocks_layout' —
+    // callers look it up as a schema property and match it against child region.
     if (pathInfo.parentId === blockId && pathInfo.containerField && !pathInfo.isObjectListItem) {
-      return pathInfo.containerField;
+      return pathInfo.region;
     }
   }
   return undefined;
@@ -2296,12 +2299,13 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
   const declaredBlocksField = findBlocksFieldForTypeField(blockConfig, typeField, intl);
   const effectiveBlocksField = declaredBlocksField ?? getFirstBlocksField(blockId, blockPathMap);
 
-  // Get child block IDs, filtered to the effective blocks field
+  // Get child block IDs, filtered to the effective blocks field.
+  // effectiveBlocksField is the blocks-field NAME (region); a child's region
+  // records which blocks_layout list it lives in.
   const allChildIds = getChildBlockIds(blockId, blockPathMap);
   const childIds = effectiveBlocksField
-    ? allChildIds.filter((id) => blockPathMap[id]?.containerField === effectiveBlocksField)
+    ? allChildIds.filter((id) => blockPathMap[id]?.region === effectiveBlocksField)
     : allChildIds;
-  console.log('[syncChildBlockTypes] childIds:', childIds, 'in field:', effectiveBlocksField);
   if (childIds.length === 0) return result;
 
   // Transform each child
