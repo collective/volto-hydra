@@ -70,12 +70,12 @@ function countContainerItems(formData, blockPathMap, containerConfig) {
     getBlockById(formData, blockPathMap, containerConfig.parentId) || formData;
   if (containerConfig.isObjectList) {
     let arr = parent;
-    for (const key of containerConfig.dataPath || [containerConfig.fieldName]) {
+    for (const key of containerConfig.dataPath || [containerConfig.region]) {
       arr = arr?.[key];
     }
     return Array.isArray(arr) ? arr.length : 0;
   }
-  return parent?.[containerConfig.fieldName]?.items?.length ?? 0;
+  return parent?.blocks_layout?.[containerConfig.region || 'items']?.length ?? 0;
 }
 
 /**
@@ -1319,7 +1319,7 @@ const Iframe = (props) => {
    * @returns {string} The new block's ID
    */
   const insertAndSelectBlock = useCallback((blockId, blockType, action, fieldName, options = {}) => {
-    const { blockData: customBlockData, formData: customFormData, blockPathMap: customBlockPathMap, formatRequestId, selectChildIndex, selectFirstLeaf } = options;
+    const { blockData: customBlockData, formData: customFormData, blockPathMap: customBlockPathMap, formatRequestId, selectChildIndex, selectFirstLeaf, region: addRegion } = options;
     const formData = customFormData || properties;
     const blockPathMap = customBlockPathMap || iframeSyncState.blockPathMap;
     const mergedBlocksConfig = config.blocks.blocksConfig;
@@ -1338,7 +1338,7 @@ const Iframe = (props) => {
               if (!response.ok) throw new Error(`Failed to fetch template: ${response.status}`);
               return response.json();
             },
-            pageBlocksFields: { blocks_layout: { allowedLayouts: [templateConfig.templateUrl] } },
+            pageBlocksFields: { [fieldName || 'items']: { allowedLayouts: [templateConfig.templateUrl] } },
             uuidGenerator: uuid,
             blocksConfig: config.blocks.blocksConfig,
             intl,
@@ -1382,7 +1382,7 @@ const Iframe = (props) => {
     if (action === 'inside') {
       // Get field info from blockPathMap (already resolved by buildBlockPathMap, includes schemaEnhancer)
       const childEntry = Object.values(blockPathMap || {}).find(
-        (info) => info.parentId === blockId && info.containerField === fieldName
+        (info) => info.parentId === blockId && info.region === fieldName
       );
       if (childEntry?.isObjectListItem) {
         isObjectList = true;
@@ -1405,7 +1405,9 @@ const Iframe = (props) => {
         fieldDef = parentSchema?.properties?.[fieldName];
         isObjectList = fieldDef?.widget === 'object_list';
       }
-      containerConfig = { parentId: blockId, fieldName, isObjectList };
+      // 'inside' adds to a specific region (default 'items'); the descriptor's
+      // region flows into insertBlockInContainer via the funnel.
+      containerConfig = { parentId: blockId, fieldName, isObjectList, region: addRegion || 'items' };
     } else {
       containerConfig = getContainerFieldConfig(blockId, blockPathMap, formData, mergedBlocksConfig, intl);
       // For before/after, get isObjectList from containerConfig
@@ -1495,8 +1497,8 @@ const Iframe = (props) => {
           const tableBlockSchema = typeof mergedBlocksConfig?.[tableType]?.blockSchema === 'function'
             ? mergedBlocksConfig[tableType].blockSchema({ formData, intl: { formatMessage: (m) => m.defaultMessage } })
             : mergedBlocksConfig?.[tableType]?.blockSchema;
-          const rowsFieldDef = tableBlockSchema?.properties?.[rowPathInfo.containerField];
-          dataPath = rowsFieldDef?.dataPath || [rowPathInfo.containerField];
+          const rowsFieldDef = tableBlockSchema?.properties?.[rowPathInfo.region];
+          dataPath = rowsFieldDef?.dataPath || [rowPathInfo.region];
         }
         let rowsData = tableBlock;
         for (const key of dataPath) {
@@ -1542,9 +1544,9 @@ const Iframe = (props) => {
 
       // Calculate position for context
       const containerId = containerConfig?.parentId || 'page';
-      const containerField = containerConfig?.fieldName || 'blocks_layout';
+      const containerRegion = containerConfig?.region || 'items';
       const container = containerId === 'page' ? formData : getBlockById(formData, blockPathMap, containerId);
-      const layoutItems = container?.[containerField]?.items || [];
+      const layoutItems = container?.blocks_layout?.[containerRegion] || [];
       const refIndex = layoutItems.indexOf(blockId);
       const position = action === 'after' ? refIndex + 1 : refIndex;
 
@@ -1552,7 +1554,7 @@ const Iframe = (props) => {
       // insertAfter tells inheritance logic which neighbor to inherit template membership from
       blockData = applyBlockDefaultsWithContext(blockData, {
         containerId,
-        field: containerField,
+        field: containerRegion,
         position,
         insertAfter: action === 'after',
         layoutItems,
@@ -2334,9 +2336,9 @@ const Iframe = (props) => {
 
               // Find previous block in layout
               const mergeParentId = mergePathInfo?.parentId;
-              const mergeField = mergePathInfo?.containerField || 'blocks_layout';
+              const mergeRegion = mergePathInfo?.region || 'items';
               const mergeParent = mergeParentId === '_page' ? mergeForm : getBlockByPath(mergeForm, mergeBpm[mergeParentId]?.path);
-              const mergeLayout = mergeParent?.[mergeField]?.items || mergeParent?.blocks_layout?.items || [];
+              const mergeLayout = mergeParent?.blocks_layout?.[mergeRegion] || [];
               const mergeIdx = mergeLayout.indexOf(mergeBlockId);
               const prevBlockId = mergeIdx > 0 ? mergeLayout[mergeIdx - 1] : null;
 
@@ -2586,8 +2588,8 @@ const Iframe = (props) => {
             if (currentBlockPathMap[bid]?.isTemplateInstance) {
               const parentId = currentBlockPathMap[bid]?.parentId || 'page';
               const parentBlock = parentId === 'page' ? currentFormData : getBlockById(currentFormData, currentBlockPathMap, parentId);
-              const containerField = currentBlockPathMap[bid]?.containerField || 'blocks_layout';
-              const layoutItems = parentBlock?.[containerField]?.items || [];
+              const region = currentBlockPathMap[bid]?.region || 'items';
+              const layoutItems = parentBlock?.blocks_layout?.[region] || [];
               const childBlocks = layoutItems.filter(id => currentBlockPathMap[id]?.parentId === bid);
               log('MOVE_BLOCKS: template instance', bid, '- expanding to:', childBlocks);
               blocksToMove.push(...childBlocks);
@@ -2667,17 +2669,17 @@ const Iframe = (props) => {
               const targetContainerConfig = getContainerFieldConfig(moveBlockId, updatedPathMap, newFormData, blocksConfig, intl);
               if (!targetContainerConfig) continue;
 
-              const { parentId: containerId, fieldName: containerField } = targetContainerConfig;
+              const { parentId: containerId, region: containerRegion } = targetContainerConfig;
               const containerPath = containerId === PAGE_BLOCK_UID ? [] : updatedPathMap[containerId]?.path;
               const container = containerPath ? getBlockByPath(newFormData, containerPath) : newFormData;
-              const layoutItems = container?.[containerField]?.items || [];
+              const layoutItems = container?.blocks_layout?.[containerRegion || 'items'] || [];
               const position = layoutItems.indexOf(moveBlockId);
 
               // Apply defaults with context - this derives template fields from neighbors
               // insertAfter determines which neighbor's template membership to inherit
               const updatedBlockData = applyBlockDefaultsWithContext(blockData, {
                 containerId,
-                field: containerField,
+                field: containerRegion,
                 position,
                 insertAfter: blockInsertAfterMap[moveBlockId],
                 layoutItems,
@@ -3107,14 +3109,15 @@ const Iframe = (props) => {
           // the cached "type-level" schema.
           populateTypeSchemaCache(config.blocks.blocksConfig, intl);
 
-          // 2. Process page schema — page.schema.properties is an object keyed by fieldName
-          // Default: { blocks_layout: { title: 'Blocks' } }
+          // 2. Process page schema — page.schema.properties lists the page's
+          // BLOCKS FIELDS, keyed by field name. Each field name is a key in the
+          // shared blocks_layout dict; the default field is named 'items'.
           const pageProperties = event.data.page?.schema?.properties || {};
           const pageBlocksFieldsDef = { ...pageProperties };
-          if (!pageBlocksFieldsDef.blocks_layout) {
-            pageBlocksFieldsDef.blocks_layout = { title: 'Blocks' };
+          if (Object.keys(pageBlocksFieldsDef).length === 0) {
+            pageBlocksFieldsDef.items = { title: 'Blocks' };
           }
-          // Ensure each field has widget: 'blocks_layout'
+          // Ensure each field has widget: 'blocks_layout' and its own constraints
           for (const [fieldName, fieldDef] of Object.entries(pageBlocksFieldsDef)) {
             pageBlocksFieldsDef[fieldName] = {
               widget: 'blocks_layout',
@@ -3148,17 +3151,20 @@ const Iframe = (props) => {
             setAllowedBlocksList([...allAllowedBlocks]);
           }
 
-          // 2c. Auto-initialize missing page fields with empty blocks/layout
+          // 2c. Auto-initialize the blocks_layout dict — one empty list per
+          // declared blocks field (so a declared-but-empty field is addressable).
           let formWithPageFields = form ? { ...form } : form;
           if (form) {
             if (!formWithPageFields.blocks) {
               formWithPageFields.blocks = {};
             }
+            const layout = { ...(formWithPageFields.blocks_layout || {}) };
             for (const fieldName of Object.keys(pageBlocksFieldsDef)) {
-              if (!formWithPageFields[fieldName]) {
-                formWithPageFields[fieldName] = { items: [] };
+              if (!Array.isArray(layout[fieldName])) {
+                layout[fieldName] = [];
               }
             }
+            formWithPageFields.blocks_layout = layout;
           }
 
           // 3. Register _page as virtual block type in blocksConfig
@@ -3216,7 +3222,8 @@ const Iframe = (props) => {
           );
 
           // 5b. Ensure empty page blocks fields have at least one empty block
-          // No fieldName = process ALL page-level container fields (blocks, footer_blocks, etc.)
+          // No fieldName = process ALL page-level container fields and their regions
+          // (e.g. blocks_layout's items + footer regions)
           const preEnsureForm = formWithPageFields;
           formWithPageFields = ensureEmptyBlockIfEmpty(
             formWithPageFields,
@@ -3830,21 +3837,29 @@ const Iframe = (props) => {
     };
 
     if (pendingAdd?.mode === 'sidebar') {
-      // Sidebar add appends to container — get allowedSiblingTypes from any existing sibling
-      const { parentBlockId, fieldName } = pendingAdd;
+      // Sidebar add appends to a specific region of a container.
+      const { parentBlockId, region = 'items' } = pendingAdd;
       const effectiveParentId = parentBlockId === null ? '_page' : parentBlockId;
       if (parentBlockId !== null) {
         parentBlockData = getBlockById(properties, iframeSyncState.blockPathMap, parentBlockId);
         parentType = iframeSyncState.blockPathMap?.[parentBlockId]?.blockType;
       }
-      const childIds = getChildBlockIds(effectiveParentId, iframeSyncState.blockPathMap);
-      const siblingInField = childIds.find(
-        id => iframeSyncState.blockPathMap[id].containerField === fieldName
-      );
-      if (siblingInField) {
-        const siblingInfo = iframeSyncState.blockPathMap[siblingInField];
-        allowed = siblingInfo.allowedSiblingTypes || null;
-        allowedTemplates = siblingInfo.allowedTemplates || null;
+      // Prefer the region's resolved constraints (carried on pendingAdd) so an
+      // empty region still offers the right blocks; fall back to a sibling in
+      // the SAME region.
+      allowed = pendingAdd.allowedBlocks || null;
+      allowedTemplates = pendingAdd.allowedTemplates || null;
+      if (!allowed) {
+        const childIds = getChildBlockIds(effectiveParentId, iframeSyncState.blockPathMap);
+        const siblingInField = childIds.find((id) => {
+          const info = iframeSyncState.blockPathMap[id];
+          return (info.region || 'items') === region;
+        });
+        if (siblingInField) {
+          const siblingInfo = iframeSyncState.blockPathMap[siblingInField];
+          allowed = siblingInfo.allowedSiblingTypes || null;
+          allowedTemplates = siblingInfo.allowedTemplates || null;
+        }
       }
     } else {
       // Iframe add: get allowed blocks from blockPathMap (already resolved by buildBlockPathMap)
@@ -3982,28 +3997,37 @@ const Iframe = (props) => {
   // ============================================================================
 
   // Handle sidebar add - adds inside a container's field as last child
-  const handleSidebarAdd = useCallback((parentBlockId, fieldName) => {
+  const handleSidebarAdd = useCallback((parentBlockId, containerConfig) => {
     // Validate parentBlockId - must be PAGE_BLOCK_UID or a valid block ID
     if (parentBlockId == null) {
       throw new Error('[HYDRA] handleSidebarAdd: parentBlockId is required. Use PAGE_BLOCK_UID for page-level blocks.');
     }
-    // Use getAllContainerFields to get container config (handles _page and nested blocks uniformly)
-    const blocksConfig = config.blocks.blocksConfig;
-    const containerFields = getAllContainerFields(parentBlockId, iframeSyncState.blockPathMap, properties, blocksConfig, intl, iframeSyncState.templateEditMode);
-    const fieldConfig = containerFields.find(f => f.fieldName === fieldName);
-
-    const isObjectList = fieldConfig?.isObjectList || false;
-    const containerAllowed = fieldConfig?.allowedBlocks || null;
+    // containerConfig is the descriptor produced by getAllContainerFields
+    // (carries fieldName, region, isObjectList, allowedBlocks). No need to
+    // re-resolve storage here.
+    if (!containerConfig?.region) {
+      throw new Error('[HYDRA] handleSidebarAdd: containerConfig with a fieldName is required.');
+    }
+    const { fieldName, region = 'items', isObjectList = false, allowedBlocks: containerAllowed = null } = containerConfig;
 
     // Auto-insert if single-schema object_list (no allowedBlocks) or single allowedBlock
     if ((isObjectList && (!containerAllowed || containerAllowed.length <= 1)) || (!isObjectList && containerAllowed?.length === 1)) {
       const blockType = isObjectList ? (containerAllowed?.[0] || null) : containerAllowed[0];
-      insertAndSelectBlock(parentBlockId, blockType, 'inside', fieldName);
+      insertAndSelectBlock(parentBlockId, blockType, 'inside', fieldName, { region });
     } else {
-      setPendingAdd({ mode: 'sidebar', parentBlockId, fieldName });
+      setPendingAdd({
+        mode: 'sidebar',
+        parentBlockId,
+        fieldName,
+        region,
+        // Carry the region's resolved constraints so the chooser works even for
+        // an empty region (no existing sibling to read them from).
+        allowedBlocks: containerAllowed,
+        allowedTemplates: containerConfig.allowedTemplates || null,
+      });
       setAddNewBlockOpened(true);
     }
-  }, [properties, iframeSyncState.blockPathMap, iframeSyncState.templateEditMode, insertAndSelectBlock, intl]);
+  }, [insertAndSelectBlock]);
 
   // Handle iframe add - inserts AFTER the selected block (as sibling)
   const handleIframeAdd = useCallback(() => {
@@ -4173,7 +4197,7 @@ const Iframe = (props) => {
                   return (id, value) => {
                     setAddNewBlockOpened(false);
                     if (pendingAdd?.mode === 'sidebar') {
-                      insertAndSelectBlock(pendingAdd.parentBlockId, value['@type'], 'inside', pendingAdd.fieldName);
+                      insertAndSelectBlock(pendingAdd.parentBlockId, value['@type'], 'inside', pendingAdd.region, { region: pendingAdd.region });
                     } else {
                       const afterBlockId = pendingAdd?.afterBlockId || selectedBlock;
                       insertAndSelectBlock(afterBlockId, value['@type'], 'after');
@@ -4705,7 +4729,7 @@ const Iframe = (props) => {
                 const props = schema?.properties || {};
                 let tgtChildField = null;
                 for (const [fn, field] of Object.entries(props)) {
-                  if (field?.widget === 'blocks_layout') { tgtChildField = { fieldName: fn, ...field }; break; }
+                  if (field?.widget === 'blocks_layout') { tgtChildField = { region: fn, ...field }; break; }
                 }
                 if (!tgtChildField) continue;
                 if (!canContainAll(tgtChildField, childTypes, 0)) continue;
@@ -4743,7 +4767,7 @@ const Iframe = (props) => {
                   } catch { continue; }
                   let tgt = null;
                   for (const [fn, field] of Object.entries(schema?.properties || {})) {
-                    if (field?.widget === 'blocks_layout') { tgt = { fieldName: fn, ...field }; break; }
+                    if (field?.widget === 'blocks_layout') { tgt = { region: fn, ...field }; break; }
                   }
                   if (!tgt) continue;
                   if (!canContainAll(tgt, childTypes, 0)) continue;
@@ -4767,7 +4791,7 @@ const Iframe = (props) => {
               if (!firstCC || firstCC.isObjectList) return {};
               for (const id of blockIds.slice(1)) {
                 const cc = getContainerFieldConfig(id, bpm, properties, blocksConfig, intl);
-                if (!cc || cc.parentId !== firstCC.parentId || cc.fieldName !== firstCC.fieldName) {
+                if (!cc || cc.parentId !== firstCC.parentId || cc.region !== firstCC.region) {
                   return {};
                 }
               }
@@ -4792,7 +4816,7 @@ const Iframe = (props) => {
                 } catch { continue; }
                 let childField = null;
                 for (const [fn, fd] of Object.entries(schema?.properties || {})) {
-                  if (fd?.widget === 'blocks_layout') { childField = { fieldName: fn, ...fd }; break; }
+                  if (fd?.widget === 'blocks_layout') { childField = { region: fn, ...fd }; break; }
                 }
                 if (!childField) continue;
                 if (!canContainAll(childField, selectedTypes, 0)) continue;
@@ -5229,7 +5253,7 @@ const Iframe = (props) => {
         formData={properties}
         blockPathMap={iframeSyncState.blockPathMap}
         onSelectBlock={onSelectBlock}
-        onAddBlock={(parentBlockId, fieldName, options) => {
+        onAddBlock={(parentBlockId, containerConfig, options) => {
           if (options?.afterBlockId) {
             // Template slot section: add after specific block
             const afterId = options.afterBlockId;
@@ -5242,15 +5266,15 @@ const Iframe = (props) => {
               setAddNewBlockOpened(true);
             }
           } else {
-            handleSidebarAdd(parentBlockId, fieldName);
+            handleSidebarAdd(parentBlockId, containerConfig);
           }
         }}
-        onMoveBlock={(parentBlockId, fieldName, newOrder) => {
+        onMoveBlock={(parentBlockId, region, newOrder) => {
           const newFormData = reorderBlocksInContainer(
             properties,
             iframeSyncState.blockPathMap,
             parentBlockId,
-            fieldName,
+            region,
             newOrder,
             config.blocks?.blocksConfig,
             intl,

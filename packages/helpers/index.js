@@ -1023,11 +1023,15 @@ export function findChangedUnit(prevForm, newForm) {
 function _getContainerFields(block) {
   if (!block || typeof block !== 'object') return [];
   const fields = [];
-  if (block.blocks_layout?.items && block.blocks) {
-    fields.push({ items: block.blocks_layout.items, blocks: block.blocks });
-  }
-  if (block.columns?.items && block.blocks) {
-    fields.push({ items: block.columns.items, blocks: block.blocks });
+  // Every blocks field is a sub-key of the shared blocks_layout dict (the
+  // default `items`, plus named fields like `columns`, `listing`, `footer`).
+  // Each sub-key is an ordered id list into the same sibling `blocks` dict.
+  if (block.blocks_layout && block.blocks) {
+    for (const ids of Object.values(block.blocks_layout)) {
+      if (Array.isArray(ids)) {
+        fields.push({ items: ids, blocks: block.blocks });
+      }
+    }
   }
   return fields;
 }

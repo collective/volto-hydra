@@ -2,8 +2,8 @@ function SearchBlock({ block, blockId }) {
   const [query, setQuery] = useState('');
 
   const facets = (block.facets || []).filter(f => !f.hidden);
-  const listing = block.listing || {};
-  const listingId = listing.items?.[0];
+  const listing = block.blocks_layout?.listing || [];
+  const listingId = listing[0];
   const listingBlock = listingId ? (block.blocks?.[listingId]) : null;
 
   return (

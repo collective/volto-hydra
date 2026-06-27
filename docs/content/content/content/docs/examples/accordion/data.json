@@ -2245,7 +2245,7 @@
           "@id": "ref-accordion-schema-javascript-105cd5",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  \"accordion\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"panels\": {\n          \"title\": \"Panels\",\n          \"widget\": \"object_list\",\n          \"schema\": {\n            \"properties\": {\n              \"title\": {\n                \"title\": \"Title\"\n              },\n              \"blocks_layout\": {\n                \"title\": \"Content\",\n                \"widget\": \"blocks_layout\",\n                \"allowedBlocks\": [\n                  \"slate\",\n                  \"image\"\n                ],\n                \"defaultBlockType\": \"slate\"\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}"
+          "code": "{\n  \"accordion\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"panels\": {\n          \"title\": \"Panels\",\n          \"widget\": \"object_list\",\n          \"schema\": {\n            \"properties\": {\n              \"title\": {\n                \"title\": \"Title\"\n              },\n              \"items\": {\n                \"title\": \"Content\",\n                \"widget\": \"blocks_layout\",\n                \"allowedBlocks\": [\n                  \"slate\",\n                  \"image\"\n                ],\n                \"defaultBlockType\": \"slate\"\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },

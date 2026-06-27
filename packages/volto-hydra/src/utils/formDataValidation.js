@@ -195,7 +195,7 @@ export function validateFormData(formData, blockFieldTypes = {}) {
   }
 
   const blocks = formData.blocks || {};
-  const blocksLayout = formData.blocks_layout?.items || [];
+  const blocksLayout = formData.blocks_layout || {};
 
   // Validate each block
   for (const blockId of Object.keys(blocks)) {
@@ -203,13 +203,18 @@ export function validateFormData(formData, blockFieldTypes = {}) {
     errors.push(...validateBlock(blockId, blockData, blockFieldTypes));
   }
 
-  // Check blocks_layout references valid blocks
-  for (const blockId of blocksLayout) {
-    if (!blocks[blockId]) {
-      errors.push(new ValidationError(
-        `blocks_layout references non-existent block`,
-        { blockId, field: 'blocks_layout' }
-      ));
+  // Check every region of blocks_layout references valid blocks. A blocks_layout
+  // value may hold multiple named regions (sub-keys) — `items`, `footer`, etc.
+  for (const region of Object.keys(blocksLayout)) {
+    const ids = blocksLayout[region];
+    if (!Array.isArray(ids)) continue;
+    for (const blockId of ids) {
+      if (!blocks[blockId]) {
+        errors.push(new ValidationError(
+          `blocks_layout region references non-existent block`,
+          { blockId, field: 'blocks_layout', region }
+        ));
+      }
     }
   }
 

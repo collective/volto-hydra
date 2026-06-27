@@ -157,8 +157,8 @@ This is a **built-in** block. The facet types are custom sub-blocks.
       }
     }
   },
-  "listing": {
-    "items": [
+  "blocks_layout": {
+    "listing": [
       "listing-1"
     ]
   }
@@ -175,8 +175,8 @@ function SearchBlock({ block, blockId }) {
   const [query, setQuery] = useState('');
 
   const facets = (block.facets || []).filter(f => !f.hidden);
-  const listing = block.listing || {};
-  const listingId = listing.items?.[0];
+  const listing = block.blocks_layout?.listing || [];
+  const listingId = listing[0];
   const listingBlock = listingId ? (block.blocks?.[listingId]) : null;
 
   return (
@@ -262,7 +262,7 @@ import { ref, computed } from 'vue';
 const props = defineProps({ block: Object, blockId: String });
 const query = ref('');
 const visibleFacets = computed(() => (props.block.facets || []).filter(f => !f.hidden));
-const listingId = computed(() => props.block.listing?.items?.[0]);
+const listingId = computed(() => props.block.blocks_layout?.listing?.[0]);
 const listingBlock = computed(() => listingId.value ? props.block.blocks?.[listingId.value] : null);
 </script>
 ```
@@ -279,7 +279,7 @@ const listingBlock = computed(() => listingId.value ? props.block.blocks?.[listi
   let query = '';
 
   $: visibleFacets = (block.facets || []).filter(f => !f.hidden);
-  $: listingId = block.listing?.items?.[0];
+  $: listingId = block.blocks_layout?.listing?.[0];
   $: listingBlock = listingId ? block.blocks?.[listingId] : null;
 </script>
 
@@ -324,7 +324,7 @@ const listingBlock = computed(() => listingId.value ? props.block.blocks?.[listi
 import BlockRenderer from './BlockRenderer.astro';
 const { block } = Astro.props;
 const visibleFacets = (block.facets || []).filter((f: any) => !f.hidden);
-const listingId = block.listing?.items?.[0];
+const listingId = block.blocks_layout?.listing?.[0];
 const listingBlock = listingId ? block.blocks?.[listingId] : null;
 ---
 <div class="search-block">

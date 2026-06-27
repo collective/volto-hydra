@@ -5,7 +5,7 @@
 
 <div data-block-uid={block['@uid']} class="columns-block">
   <div style="display: flex; gap: 1rem">
-    {#each block.columns?.items || [] as id (id)}
+    {#each block.blocks_layout?.columns || [] as id (id)}
       <ColumnBlock block={{ ...block.blocks?.[id], '@uid': id }} />
     {/each}
   </div>

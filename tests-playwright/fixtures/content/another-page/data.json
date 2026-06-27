@@ -33,17 +33,23 @@
       "value": [
         {
           "type": "p",
-          "children": [{ "text": "Footer user content - no layout markers" }]
+          "children": [
+            {
+              "text": "Footer user content - no layout markers"
+            }
+          ]
         }
       ],
       "plaintext": "Footer user content - no layout markers"
     }
   },
   "blocks_layout": {
-    "items": ["block-1-uuid"]
-  },
-  "footer_blocks": {
-    "items": ["footer-user-content"]
+    "items": [
+      "block-1-uuid"
+    ],
+    "footer": [
+      "footer-user-content"
+    ]
   },
   "allow_discussion": false,
   "is_folderish": false,

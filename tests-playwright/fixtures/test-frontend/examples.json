@@ -275,8 +275,8 @@
           }
         }
       },
-      "columns": {
-        "items": [
+      "blocks_layout": {
+        "columns": [
           "col-1",
           "col-2"
         ]
@@ -399,8 +399,8 @@
           }
         }
       },
-      "listing": {
-        "items": [
+      "blocks_layout": {
+        "listing": [
           "listing-1"
         ]
       }
@@ -661,7 +661,7 @@
           ]
         }
       },
-      "items": {
+      "blocks_layout": {
         "items": [
           "nav-1",
           "nav-2",

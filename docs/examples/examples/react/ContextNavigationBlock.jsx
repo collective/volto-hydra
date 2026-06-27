@@ -1,5 +1,5 @@
 function ContextNavigationBlock({ block, blocks }) {
-  const items = block.items?.items || [];
+  const items = block.blocks_layout?.items || [];
   return (
     <nav
       data-block-uid={block['@uid']}

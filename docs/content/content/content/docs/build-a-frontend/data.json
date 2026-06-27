@@ -174,7 +174,7 @@
     },
     "ul-6": {
       "@type": "slate",
-      "plaintext": "Blocks layout — areas of the page that contain a list of blocks that make up your page content. Blocks — discrete visual elements with a schema and settings that can be moved and edited.",
+      "plaintext": "Blocks fields — one or more named, ordered lists of blocks. Each is a schema property with widget: 'blocks_layout'; the field name is a key inside the page's blocks_layout dict (the default field is items, plus e.g. header, footer). Every field's blocks live in the page's single shared blocks dict; the field only records ordering. Blocks — discrete visual elements with a schema and settings that can be moved and edited.",
       "value": [
         {
           "type": "ul",
@@ -186,12 +186,78 @@
                   "type": "strong",
                   "children": [
                     {
-                      "text": "Blocks layout"
+                      "text": "Blocks fields"
                     }
                   ]
                 },
                 {
-                  "text": " — areas of the page that contain a list of blocks that make up your page content."
+                  "text": " — one or more named, ordered lists of blocks. Each is a schema property with "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "widget: 'blocks_layout'"
+                    }
+                  ]
+                },
+                {
+                  "text": "; the field name is a key inside the page's "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "blocks_layout"
+                    }
+                  ]
+                },
+                {
+                  "text": " dict (the default field is "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "items"
+                    }
+                  ]
+                },
+                {
+                  "text": ", plus e.g. "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "header"
+                    }
+                  ]
+                },
+                {
+                  "text": ", "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "footer"
+                    }
+                  ]
+                },
+                {
+                  "text": "). Every field's blocks live in the page's single shared "
+                },
+                {
+                  "type": "code",
+                  "children": [
+                    {
+                      "text": "blocks"
+                    }
+                  ]
+                },
+                {
+                  "text": " dict; the field only records ordering."
                 }
               ]
             },
@@ -272,19 +338,41 @@
           "@id": "ce-9-js-912029",
           "label": "Js",
           "language": "js",
-          "code": "let bridge;\n\nif (window.name.startsWith('hydra')) {\n    bridge = initBridge({\n      page: {\n        schema: {\n          properties: {\n            blocks_layout: { allowedBlocks: ['slate', 'grid', 'myimage'] },\n            header_blocks: { allowedBlocks: ['slate', 'image'], maxLength: 3 },\n            footer_blocks: { allowedBlocks: ['slate', 'link'] },\n          },\n        },\n      },\n      blocks: {\n        // we can add custom blocks (or alter builtin ones)\n        myimage: {\n          blockSchema: {\n            properties: {\n              image: { widget: 'image' },\n              url: { widget: 'url' },\n              caption: { type: 'string' },\n            }\n          }\n        }\n      },\n      onEditChange: (formData) => renderPage(formData),\n    });\n}\nelse {\n    // When not editing, render from the server api\n    renderPage(await fetchContent(path));\n}"
+          "code": "let bridge;\n\nif (window.name.startsWith('hydra')) {\n    bridge = initBridge({\n      page: {\n        schema: {\n          // Each blocks field (widget: 'blocks_layout') is a named list of\n          // blocks. The field name is the key inside the `blocks_layout` dict;\n          // the default field is `items`. Each has its own allowedBlocks.\n          properties: {\n            items:  { widget: 'blocks_layout', allowedBlocks: ['slate', 'grid', 'myimage'] },\n            header: { widget: 'blocks_layout', allowedBlocks: ['slate', 'image'], maxLength: 3 },\n            footer: { widget: 'blocks_layout', allowedBlocks: ['slate', 'link'] },\n          },\n        },\n      },\n      blocks: {\n        // we can add custom blocks (or alter builtin ones)\n        myimage: {\n          blockSchema: {\n            properties: {\n              image: { widget: 'image' },\n              url: { widget: 'url' },\n              caption: { type: 'string' },\n            }\n          }\n        }\n      },\n      onEditChange: (formData) => renderPage(formData),\n    });\n}\nelse {\n    // When not editing, render from the server api\n    renderPage(await fetchContent(path));\n}"
         }
       ]
     },
     "p-10": {
       "@type": "slate",
-      "plaintext": "Page data ends up shaped like this:",
+      "plaintext": "Page data ends up shaped like this — one shared `blocks` dict, and a region per named list inside `blocks_layout`:",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "Page data ends up shaped like this:"
+              "text": "Page data ends up shaped like this — one shared "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks"
+                }
+              ]
+            },
+            {
+              "text": " dict, and a region per named list inside "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks_layout"
+                }
+              ]
+            },
+            {
+              "text": ":"
             }
           ]
         }
@@ -297,7 +385,7 @@
           "@id": "ce-11-js-c500c8",
           "label": "Js",
           "language": "js",
-          "code": "{\n  ...\n  blocks: {\n    'text-1': { '@type': 'slate', ... },\n    'header-1': { '@type': 'image', ... },\n    'footer-1': { '@type': 'slate', ... }\n  },\n  blocks_layout: { items: ['text-1'] },\n  header_blocks: { items: ['header-1'] },\n  footer_blocks: { items: ['footer-1'] }\n}"
+          "code": "{\n  ...\n  blocks: {\n    'text-1': { '@type': 'slate', ... },\n    'header-1': { '@type': 'image', ... },\n    'footer-1': { '@type': 'slate', ... }\n  },\n  blocks_layout: {\n    items: ['text-1'],     // main content region (the default)\n    header: ['header-1'],  // header region\n    footer: ['footer-1']   // footer region\n  }\n}"
         }
       ]
     },

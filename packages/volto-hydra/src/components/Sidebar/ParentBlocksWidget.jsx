@@ -49,9 +49,9 @@ const getBlockTypeTitle = (blockType, blockPathMap, blockId) => {
       if (itemConfig?.title) return itemConfig.title;
     }
 
-    // Fallback: derive from containerField (e.g., "subblocks" -> "Subblock")
-    if (pathInfo.containerField) {
-      const singular = pathInfo.containerField.replace(/s$/, '');
+    // Fallback: derive from the region/field name (e.g., "subblocks" -> "Subblock")
+    if (pathInfo.region) {
+      const singular = pathInfo.region.replace(/s$/, '');
       return singular.charAt(0).toUpperCase() + singular.slice(1);
     }
   }

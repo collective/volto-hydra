@@ -22,7 +22,7 @@ import { setUIState } from '@plone/volto/actions';
 import rightArrowSVG from '@plone/volto/icons/right-key.svg';
 import config from '@plone/volto/registry';
 import { DragDropList } from '@plone/volto/components';
-import { getAllContainerFields, getBlockById } from '../../utils/blockPath';
+import { getAllContainerFields, getBlockById, listContainerChildren, getContainerItems } from '../../utils/blockPath';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import { isBlockPositionLocked } from '@volto-hydra/helpers';
 import LayoutSelector from './LayoutSelector';
@@ -43,67 +43,27 @@ const messages = defineMessages({
  * Supports both standard containers (blocks + blocks_layout) and object_list (array with @id)
  * @param {Array|null} dataPath - Path to actual data location (e.g., ['table', 'rows'])
  */
-const getChildBlocks = (blockData, fieldName, formData, isObjectList = false, dataPath = null, idField = null, typeField = null) => {
-  // Navigate to data using dataPath if provided, otherwise use fieldName
-  let data = blockData;
-  if (dataPath) {
-    for (const key of dataPath) {
-      data = data?.[key];
-    }
-  } else {
-    data = blockData?.[fieldName];
-  }
-
-  if (!data) return [];
-
+// Presentation: derive a display title from a storage-agnostic child
+// descriptor ({ id, type, data }) produced by listContainerChildren.
+const childDisplayTitle = (child, isObjectList, index) => {
+  const blockConfig = config.blocks?.blocksConfig?.[child.type];
   if (isObjectList) {
-    // object_list: items stored as array with @id or custom idField
-    if (!Array.isArray(data)) return [];
-
-    return data.map((item, index) => {
-      // Use custom idField, then fall back to 'key' (slateTable), then '@id'
-      const blockId = (idField && item[idField]) || item['key'] || item['@id'];
-
-      // Determine title:
-      // - Typed object_list: look up block config title from typeField
-      // - Single-schema: use item.title or generic
-      let title;
-      if (typeField && item[typeField]) {
-        const itemBlockType = item[typeField];
-        const blockConfig = config.blocks?.blocksConfig?.[itemBlockType];
-        title = item.title || item.plaintext || blockConfig?.title || itemBlockType;
-      } else {
-        title = item.title || item.plaintext || `Item ${index + 1}`;
-      }
-
-      return {
-        id: blockId,
-        type: (typeField && item[typeField]) || 'object_list_item',
-        title: title,
-        data: item,
-      };
-    });
+    // Typed items carry a real @type; single-schema items get 'object_list_item'.
+    if (child.type !== 'object_list_item') {
+      return child.data?.title || child.data?.plaintext || blockConfig?.title || child.type;
+    }
+    return child.data?.title || child.data?.plaintext || `Item ${index + 1}`;
   }
-
-  // Standard container: shared blocks dict + layout field
-  const items = blockData[fieldName]?.items || [];
-  const blocksData = blockData.blocks || {};
-
-  return items.map((blockId) => {
-    const childBlock = blocksData[blockId];
-    const blockType = childBlock?.['@type'] || 'unknown';
-    const blockConfig = config.blocks?.blocksConfig?.[blockType];
-    // Use plaintext if available, otherwise fall back to block type title
-    const title = childBlock?.plaintext || blockConfig?.title || blockType;
-
-    return {
-      id: blockId,
-      type: blockType,
-      title: title,
-      data: childBlock,
-    };
-  });
+  return child.data?.plaintext || blockConfig?.title || child.type;
 };
+
+// Children of a selected block's container. Storage shape (region / object_list
+// / dataPath) is hidden by listContainerChildren; we only add the display title.
+const getChildBlocks = (blockData, containerConfig) =>
+  listContainerChildren(blockData, containerConfig).map((child, index) => ({
+    ...child,
+    title: childDisplayTitle(child, containerConfig.isObjectList, index),
+  }));
 
 /**
  * Get the display title for a block
@@ -191,7 +151,8 @@ const groupByPlaceholder = (childBlocks, templateEditMode) => {
  * Single container field section
  */
 const ContainerFieldSection = ({
-  fieldName,
+  region,
+  containerConfig,
   fieldTitle,
   childBlocks,
   allowedBlocks,
@@ -232,7 +193,7 @@ const ContainerFieldSection = ({
     blockIds.splice(destination.index, 0, movedId);
 
     // Call the move handler with the new order
-    onMoveBlock(parentBlockId, fieldName, blockIds);
+    onMoveBlock(parentBlockId, region, blockIds);
   };
 
   return (
@@ -250,7 +211,7 @@ const ContainerFieldSection = ({
           )}
           {canAdd && (
             <button
-              onClick={() => onAddBlock(parentBlockId, fieldName)}
+              onClick={() => onAddBlock(parentBlockId, containerConfig)}
               title={intl.formatMessage(messages.addBlock)}
               aria-label={intl.formatMessage(messages.addBlock)}
             >
@@ -349,21 +310,13 @@ const ContainerFieldSection = ({
 /**
  * Get child blocks for a page-level field
  */
-const getChildBlocksForPageField = (formData, fieldConfig) => {
-  const { fieldName } = fieldConfig;
-  const pageBlocks = formData?.[fieldName]?.items || [];
-  const blocksData = formData?.blocks || {};
-
-  return pageBlocks.map((blockId) => {
-    const blockData = blocksData[blockId];
-    return {
-      id: blockId,
-      type: blockData?.['@type'] || 'unknown',
-      title: getBlockTitle(blockData),
-      data: blockData,
-    };
-  });
-};
+// Page-level container children. The page formData is the "parent block"
+// (its shared `blocks` dict holds every region's blocks).
+const getChildBlocksForPageField = (formData, fieldConfig) =>
+  listContainerChildren(formData, fieldConfig).map((child) => ({
+    ...child,
+    title: getBlockTitle(child.data),
+  }));
 
 /**
  * ChildBlocksWidget - Main component
@@ -404,8 +357,9 @@ const ChildBlocksWidget = ({
           const childBlocks = getChildBlocksForPageField(formData, fieldConfig);
           return (
             <ContainerFieldSection
-              key={fieldConfig.fieldName}
-              fieldName={fieldConfig.fieldName}
+              key={fieldConfig.region || 'items'}
+              region={fieldConfig.region}
+              containerConfig={fieldConfig}
               fieldTitle={fieldConfig.title || intl.formatMessage(messages.blocks)}
               childBlocks={childBlocks}
               allowedBlocks={fieldConfig.allowedBlocks}
@@ -470,7 +424,7 @@ const ChildBlocksWidget = ({
           const sections = groupByPlaceholder(childBlocks, templateEditMode);
           const instanceInfo = blockPathMap[selectedBlock];
           const realParentId = instanceInfo?.parentId;
-          const realFieldName = instanceInfo?.containerField;
+          const realRegion = instanceInfo?.region || 'items';
 
           return sections.map((section, sectionIdx) => {
             if (section.type === 'fixed') {
@@ -502,12 +456,13 @@ const ChildBlocksWidget = ({
               const realParent = realParentId === PAGE_BLOCK_UID
                 ? formData
                 : getBlockById(formData, blockPathMap, realParentId);
-              const fullLayout = [...(realParent?.[realFieldName]?.items || [])];
+              // Read the instance's region via the funnel — no direct storage indexing.
+              const fullLayout = getContainerItems(realParent, { region: realRegion });
               let idx = 0;
               const newLayout = fullLayout.map((id) =>
                 sectionBlockIds.includes(id) ? reorderedIds[idx++] : id,
               );
-              onMoveBlock(realParentId, realFieldName, newLayout);
+              onMoveBlock(realParentId, realRegion, newLayout);
             };
 
             // Wrap onAddBlock to insert after last block in section (or preceding fixed block)
@@ -524,7 +479,7 @@ const ChildBlocksWidget = ({
             return (
               <ContainerFieldSection
                 key={`slot-${section.name}-${sectionIdx}`}
-                fieldName={realFieldName}
+                region={realRegion}
                 fieldTitle={slotTitle}
                 childBlocks={section.blocks}
                 canAdd={true}
@@ -541,11 +496,12 @@ const ChildBlocksWidget = ({
         }
 
         // Standard container field
-        const childBlocks = getChildBlocks(blockData, field.fieldName, formData, field.isObjectList, field.dataPath, field.idField, field.typeField);
+        const childBlocks = getChildBlocks(blockData, field);
         return (
           <ContainerFieldSection
-            key={field.fieldName}
-            fieldName={field.fieldName}
+            key={field.region || 'items'}
+            region={field.region}
+            containerConfig={field}
             fieldTitle={field.title}
             childBlocks={childBlocks}
             allowedBlocks={field.allowedBlocks}

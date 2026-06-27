@@ -125,7 +125,7 @@ const LayoutSelector = ({
       // This forces that layout to be applied (or removed if null)
       const { merged: newFormData } = await mergeTemplatesIntoPage(formData, {
         loadTemplate: async (templateId) => api.get(templateId),
-        pageBlocksFields: { blocks_layout: { allowedLayouts: [layoutToApply] } },
+        pageBlocksFields: { items: { allowedLayouts: [layoutToApply] } },
         uuidGenerator: uuid,
         blocksConfig: config.blocks.blocksConfig,
         intl,

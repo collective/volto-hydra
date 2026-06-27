@@ -44,7 +44,7 @@
     </main>
     <footer class="bg-white rounded-lg shadow m-4 dark:bg-gray-800">
         <div id="footer-content" class="w-full mx-auto max-w-screen-xl p-4 text-center text-sm text-gray-500 dark:text-gray-400">
-            <template v-if="(data.page?.footer_blocks || footerAllowedLayouts) && shouldRenderBlocks">
+            <template v-if="(data.page?.blocks_layout?.footer?.length || footerAllowedLayouts) && shouldRenderBlocks">
                 <Block v-for="item in footerExpandedItems" :key="item['@uid']"
                        :block_uid="item['@uid']" :block="item" :data="data.page" :api-url="apiUrl" />
             </template>
@@ -148,10 +148,10 @@ const mainExpandedItems = computed(() => {
 const mainStyleGroups = computed(() => groupByStyle(mainExpandedItems.value));
 
 const footerExpandedItems = computed(() => {
-    const layout = data.value?.page?.footer_blocks?.items || [];
+    const layout = data.value?.page?.blocks_layout?.footer || [];
     const blocks = data.value?.page?.blocks || {};
     // Don't early-return on empty layout — allowedLayouts forces a template
-    // even when the page has no footer_blocks content yet.
+    // even when the page has no footer region content yet.
     if (!layout.length && !footerAllowedLayouts.value) return [];
     return expandTemplatesSync(layout, {
         blocks,
@@ -283,7 +283,7 @@ onMounted(() => {
                 page: {
                     schema: {
                         properties: {
-                            blocks_layout: {
+                            items: {
                                 title: 'Blocks',
                                 allowedBlocks: [...new Set(['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', 'summary', 'default', 'section', 'contextNavigation', ...pageLevelBlocks])],
                                 allowedTemplates: ['/_test_data/templates/test-layout'],
@@ -291,7 +291,7 @@ onMounted(() => {
                                     || contextNavLayoutForced.value
                                     || [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
                             },
-                            footer_blocks: {
+                            footer: {
                                 title: 'Footer',
                                 allowedBlocks: ['slate', 'image', 'socialLinks'],
                                 allowedLayouts: route.path === '/_test_data/another-page'
@@ -305,13 +305,25 @@ onMounted(() => {
                 pathToApiPath: (path) => path.replace(/\/@pg_[^/]+_\d+/, ''),
                 // Pass onEditChange before init() sends INIT to avoid race condition
                 onEditChange: (page) => {
-                    if (page) {
-                        // Mark that we have admin data with nodeIds
-                        hasAdminData.value = true;
-                        // Update page data - ListingBlock components will
-                        // re-render and expand listings via their own Suspense
-                        data.value.page = page;
+                    if (!page) return;
+                    // Mark that we have admin data with nodeIds
+                    hasAdminData.value = true;
+                    // Clicking into a field produces a selection-only FORM_DATA
+                    // echo whose content is unchanged. Applying it re-renders
+                    // (and replaces) the focused contenteditable, which races
+                    // with an in-flight keystroke — the typed character lands on
+                    // the old node just before Vue swaps it, and is lost. Skip
+                    // echoes that don't actually change content; real edits
+                    // (different blocks/layout) still apply and re-render.
+                    const cur = data.value.page;
+                    if (cur
+                        && JSON.stringify(page.blocks) === JSON.stringify(cur.blocks)
+                        && JSON.stringify(page.blocks_layout) === JSON.stringify(cur.blocks_layout)) {
+                        return;
                     }
+                    // Update page data - ListingBlock components will
+                    // re-render and expand listings via their own Suspense
+                    data.value.page = page;
                 },
             });
             // Expose bridge so Playwright tests can drive selection programmatically

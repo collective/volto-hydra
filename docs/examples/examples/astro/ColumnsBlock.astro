@@ -6,7 +6,7 @@
  */
 import ColumnBlock from './ColumnBlock.astro';
 const { block } = Astro.props;
-const items = block.columns?.items || [];
+const items = block.blocks_layout?.columns || [];
 const subBlocks = block.blocks || {};
 ---
 <div class="columns-block">

@@ -35,6 +35,6 @@ import { ref, computed } from 'vue';
 const props = defineProps({ block: Object, blockId: String });
 const query = ref('');
 const visibleFacets = computed(() => (props.block.facets || []).filter(f => !f.hidden));
-const listingId = computed(() => props.block.listing?.items?.[0]);
+const listingId = computed(() => props.block.blocks_layout?.listing?.[0]);
 const listingBlock = computed(() => listingId.value ? props.block.blocks?.[listingId.value] : null);
 </script>

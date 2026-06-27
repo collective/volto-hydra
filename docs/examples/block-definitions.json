@@ -387,7 +387,7 @@
             "title": {
               "title": "Title"
             },
-            "blocks_layout": {
+            "items": {
               "title": "Content",
               "widget": "blocks_layout",
               "allowedBlocks": [
@@ -454,8 +454,8 @@
             }
           }
         },
-        "columns": {
-          "items": [
+        "blocks_layout": {
+          "columns": [
             "col-1",
             "col-2"
           ]
@@ -476,7 +476,7 @@
                   "title": {
                     "title": "Title"
                   },
-                  "blocks_layout": {
+                  "items": {
                     "title": "Content",
                     "widget": "blocks_layout",
                     "allowedBlocks": [
@@ -880,8 +880,8 @@
             }
           }
         },
-        "listing": {
-          "items": [
+        "blocks_layout": {
+          "listing": [
             "listing-1"
           ]
         }
@@ -1531,7 +1531,20 @@
             "inneralign": {
               "title": "Alignment",
               "widget": "select",
-              "choices": [["left", "Left"], ["center", "Center"], ["right", "Right"]],
+              "choices": [
+                [
+                  "left",
+                  "Left"
+                ],
+                [
+                  "center",
+                  "Center"
+                ],
+                [
+                  "right",
+                  "Right"
+                ]
+              ],
               "default": "left"
             }
           }
@@ -1780,7 +1793,7 @@
               "widget": "object_list",
               "schema": {
                 "properties": {
-                  "blocks_layout": {
+                  "items": {
                     "title": "Content",
                     "widget": "blocks_layout",
                     "defaultBlockType": "slate"
@@ -1894,7 +1907,10 @@
             "items": {
               "title": "Items",
               "widget": "blocks_layout",
-              "allowedBlocks": ["navItem", "listing"]
+              "allowedBlocks": [
+                "navItem",
+                "listing"
+              ]
             }
           }
         }
@@ -1922,31 +1938,57 @@
           "nav-1": {
             "@type": "navItem",
             "label": "Introduction",
-            "href": [{ "@id": "/docs/introduction" }]
+            "href": [
+              {
+                "@id": "/docs/introduction"
+              }
+            ]
           },
           "nav-2": {
             "@type": "navItem",
             "label": "Custom blocks",
-            "href": [{ "@id": "/docs/custom-blocks" }]
+            "href": [
+              {
+                "@id": "/docs/custom-blocks"
+              }
+            ]
           },
           "nav-2a": {
             "@type": "navItem",
             "label": "Schema",
-            "href": [{ "@id": "/docs/custom-blocks/schema" }]
+            "href": [
+              {
+                "@id": "/docs/custom-blocks/schema"
+              }
+            ]
           },
           "nav-2b": {
             "@type": "navItem",
             "label": "Rendering",
-            "href": [{ "@id": "/docs/custom-blocks/rendering" }]
+            "href": [
+              {
+                "@id": "/docs/custom-blocks/rendering"
+              }
+            ]
           },
           "nav-3": {
             "@type": "navItem",
             "label": "Listings",
-            "href": [{ "@id": "/docs/listings" }]
+            "href": [
+              {
+                "@id": "/docs/listings"
+              }
+            ]
           }
         },
-        "items": {
-          "items": ["nav-1", "nav-2", "nav-2a", "nav-2b", "nav-3"]
+        "blocks_layout": {
+          "items": [
+            "nav-1",
+            "nav-2",
+            "nav-2a",
+            "nav-2b",
+            "nav-3"
+          ]
         }
       }
     }

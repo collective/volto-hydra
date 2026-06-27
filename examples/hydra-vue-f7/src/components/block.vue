@@ -99,7 +99,7 @@
        class="columns-block">
     <h3 v-if="block.title" data-edit-text="title">{{ block.title }}</h3>
     <div class="row">
-      <div v-for="columnId in (block.columns?.items || [])" :key="columnId"
+      <div v-for="columnId in (block.blocks_layout?.columns || [])" :key="columnId"
            class="col" :data-block-uid="columnId" data-block-add="right">
         <h4 v-if="block.blocks?.[columnId]?.title" data-edit-text="title">{{ block.blocks[columnId].title }}</h4>
         <Block v-for="item in expand(block.blocks?.[columnId]?.blocks_layout?.items || [], block.blocks?.[columnId]?.blocks || {})"
@@ -250,7 +250,7 @@
       </div>
 
       <div class="search-results">
-        <Block v-for="item in expand(block.listing?.items || [], block.blocks || {})"
+        <Block v-for="item in expand(block.blocks_layout?.listing || [], block.blocks || {})"
                :key="item['@uid']" :block_uid="item['@uid']" :block="item" :data="data" />
       </div>
     </template>
@@ -324,7 +324,7 @@
               </select>
             </div>
           </div>
-          <Block v-for="item in expand(block.listing?.items || [], block.blocks || {})"
+          <Block v-for="item in expand(block.blocks_layout?.listing || [], block.blocks || {})"
                  :key="item['@uid']" :block_uid="item['@uid']" :block="item" :data="data" />
         </div>
       </div>
@@ -976,7 +976,7 @@ export default {
     },
     // Search block helpers
     getListingTotalResults(searchBlock) {
-      const listingUid = searchBlock.listing?.items?.[0];
+      const listingUid = searchBlock.blocks_layout?.listing?.[0];
       if (!listingUid) return null;
       const listingBlock = searchBlock.blocks?.[listingUid];
       return listingBlock?._paging?.totalItems || listingBlock?.items_total || null;

@@ -1098,9 +1098,10 @@ function attachFormValidation(formEl, block) {
  * @returns {Promise<string>} HTML string
  */
 async function renderColumnsBlock(block) {
-    // Support both flat (block.blocks) and nested (block.columns.blocks) formats
-    const blocks = block.blocks || block.columns?.blocks || {};
-    const columnsItems = block.columns?.items || [];
+    // 'columns' is a blocks field: its name is the key in the shared blocks_layout
+    // dict, and child blocks live in the shared blocks dict.
+    const blocks = block.blocks || {};
+    const columnsItems = block.blocks_layout?.columns || [];
     const title = block.title || '';
 
     let html = '';
@@ -1227,7 +1228,7 @@ async function renderSectionBlock(block) {
 async function renderContextNavigationBlock(block, blockId) {
     const ariaLabel = block.ariaLabel;
     const blocks = block.blocks;
-    const items = block.items.items;
+    const items = block.blocks_layout?.items || [];
     const uid = blockId;
 
 
@@ -2008,7 +2009,7 @@ async function renderSearchBlock(block, blockId) {
     const facets = block.facets || [];
     const sortOnOptions = block.sortOnOptions || [];
     const blocks = block.blocks || {};
-    const listingLayout = block.listing?.items || [];
+    const listingLayout = block.blocks_layout?.listing || [];
 
     let html = '<div class="search-block" style="padding: 20px; border: 1px solid #ddd; border-radius: 8px;">';
 

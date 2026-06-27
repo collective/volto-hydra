@@ -21,6 +21,7 @@ import {
   findBlockInForm,
   slateNodesText,
 } from '@volto-hydra/helpers';
+import { expelAllowedTypes } from './containerOps.js';
 
 /**
  * This IS a large file and it needs to be written in one file so for better understanding and
@@ -1197,8 +1198,8 @@ export class Bridge {
     const parentSchema = parentInfo?._schemaRef
       ? this.blockPathMap?._schemas?.[parentInfo._schemaRef] : null;
     let parentAllowed = null;
-    if (parentSchema?.properties && info.containerField) {
-      const fd = parentSchema.properties[info.containerField];
+    if (parentSchema?.properties && info.region) {
+      const fd = parentSchema.properties[info.region];
       if (fd?.widget === 'blocks_layout' || fd?.widget === 'object_list') {
         parentAllowed = fd.allowedBlocks || null;
       }
@@ -1337,18 +1338,19 @@ export class Bridge {
     const ownChildren = this._getSiblingsByDomOrder(null, containerUid);
     const firstChildInfo = this.blockPathMap?.[ownChildren[0]];
     const childAllowed = firstChildInfo?.allowedSiblingTypes || null;
-    let parentAllowed = null;
+    // Expelled children become siblings of the container, so they must satisfy
+    // the container's REGION (allowedSiblingTypes, already region-resolved by
+    // buildBlockPathMap) — not the raw field-level allowedBlocks, which would
+    // ignore a region's narrower allowed list. expelAllowedTypes encodes that
+    // precedence; the field def is only a fallback.
     const parentInfo = this.blockPathMap?.[containerParentId];
     const parentSchema = parentInfo?._schemaRef
       ? this.blockPathMap?._schemas?.[parentInfo._schemaRef] : null;
-    if (parentSchema?.properties && containerInfo?.containerField) {
-      const fd = parentSchema.properties[containerInfo.containerField];
-      if (fd?.widget === 'blocks_layout' || fd?.widget === 'object_list') {
-        parentAllowed = fd.allowedBlocks || null;
-      }
-    } else if (containerParentId === PAGE_BLOCK_UID) {
-      parentAllowed = containerInfo?.allowedSiblingTypes || null;
-    }
+    const parentFd = parentSchema?.properties && containerInfo?.region
+      ? parentSchema.properties[containerInfo.region] : null;
+    const parentFieldDef = (parentFd?.widget === 'blocks_layout' || parentFd?.widget === 'object_list')
+      ? parentFd : null;
+    const parentAllowed = expelAllowedTypes(containerInfo, parentFieldDef);
 
     const blockMid = (el, axis) => {
       const r = el.getBoundingClientRect();

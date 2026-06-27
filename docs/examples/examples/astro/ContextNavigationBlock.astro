@@ -11,7 +11,7 @@
  */
 import NavItem from './NavItem.astro';
 const { block, blocks = {} } = Astro.props;
-const items = block?.items?.items || [];
+const items = block?.blocks_layout?.items || [];
 ---
 <nav
   aria-label={block.ariaLabel || 'Section navigation'}

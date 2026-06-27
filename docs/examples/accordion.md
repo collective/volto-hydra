@@ -19,7 +19,7 @@ This is a **custom** block — register it via `initBridge`.
               "title": {
                 "title": "Title"
               },
-              "blocks_layout": {
+              "items": {
                 "title": "Content",
                 "widget": "blocks_layout",
                 "allowedBlocks": [

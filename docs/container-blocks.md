@@ -1,16 +1,23 @@
 # Container Blocks
 
-Container blocks hold other blocks inside them — sliders with slides, grids with columns, accordions with panels. Define them in your `blockSchema` using `blocks_layout` or `object_list` widgets.
+A block — or the page itself — is divided into **regions**, and each region holds an ordered list of blocks. Sliders have a slides region, grids have columns, accordions have panels; a page has its main `items` region (and optionally a header, footer, …).
+
+You declare regions in your `blockSchema` (or the page schema), and **you choose how each region is stored in the JSON**:
+
+- **`blocks_layout`** — the region's *ordering* is a named list inside the parent's shared `blocks_layout` dict, and the blocks themselves live in the parent's shared `blocks` dict. This is the default, and it's what persists through the backend (see [Why these persist](#why-these-persist-and-separate-top-level-fields-dont)).
+- **`object_list`** — the region is stored inline, as an array of objects on the field itself.
+
+Both look and behave the same in the editor — selecting, dragging, nesting — and blocks can be dragged from one to the other; only the JSON storage differs.
 
 ---
 
-## blocks_layout: Typed Child Blocks
+## blocks_layout: a region in the shared dict
 
-Each child has its own `@type` and schema (from `blocks`). Children are stored in a shared `blocks` dict on the parent, with the field holding `{ items: [...] }` for ordering:
+Each child has its own `@type` and schema (from `blocks`). The blocks live in the parent's shared `blocks` dict; the region's name is a key in the parent's shared `blocks_layout` dict that holds the ordering:
 
 <!-- codeExample: javascript -->
 ```javascript
-// Schema definition
+// Schema definition — a 'slides' region on a slider block
 slides: {
     title: 'Slides',
     widget: 'blocks_layout',
@@ -19,22 +26,58 @@ slides: {
     maxLength: 10,
 }
 
-// Resulting data
+// Resulting data — blocks in the shared dict, ordering under blocks_layout.slides
 {
   "@type": "slider",
   "blocks": {
     "slide-1": { "@type": "slide", "title": "First" },
     "slide-2": { "@type": "image", "url": "..." }
   },
-  "slides": { "items": ["slide-1", "slide-2"] }
+  "blocks_layout": { "slides": ["slide-1", "slide-2"] }
 }
 ```
 
-All `blocks_layout` fields on the same block share the same `blocks` dict. So a block can have multiple container fields (e.g., `header_blocks` and `footer_blocks`) whose children all live in the parent's `blocks`.
+A block can declare several `blocks_layout` regions; they all share the one `blocks` dict, and each region gets its own list under `blocks_layout`.
 
-## object_list: Items Sharing One Schema
+## Multiple regions
 
-All items share one inline schema, stored as an array with an ID field. Use `dataPath` when the data is nested within the block:
+A container (or the page) can declare more than one **region** — each a schema property with `widget: 'blocks_layout'`, with its own `allowedBlocks`. The region name is the key inside the shared `blocks_layout` dict; the default region is `items`. Every region's children still live in the single shared `blocks` dict — the regions only partition *ordering*.
+
+<!-- codeExample: javascript -->
+```javascript
+// Schema definition — a page with a header, main content, and a footer
+properties: {
+    header: { widget: 'blocks_layout', title: 'Header', allowedBlocks: ['slate', 'image'], maxLength: 3 },
+    items:  { widget: 'blocks_layout', allowedBlocks: ['slate', 'image'] },
+    footer: { widget: 'blocks_layout', title: 'Footer', allowedBlocks: ['slate', 'link'] },
+}
+
+// Resulting data — ONE shared blocks dict, one list per blocks field
+{
+  "blocks": {
+    "header-1": { "@type": "image" },
+    "hero-1":   { "@type": "slate" },
+    "footer-1": { "@type": "slate" }
+  },
+  "blocks_layout": {
+    "header": ["header-1"],
+    "items":  ["hero-1"],
+    "footer": ["footer-1"]
+  }
+}
+```
+
+Each blocks field has its own `allowedBlocks` / `maxLength`. A declared field appears in the editor even when empty (it gets a seeded empty block so it is editable and a drop target).
+
+### Why these persist (and separate top-level fields don't)
+
+`blocks_layout` regions live as **keys inside the registered `blocks_layout` dict** rather than as separate top-level fields (the older `header_blocks` / `footer_blocks` style) for one concrete reason: **persistence**.
+
+The backend deserializer only saves values for **registered fields**. `blocks` and `blocks_layout` are registered behavior fields, so the entire `blocks_layout` dict — every list inside it — is stored verbatim. An ad-hoc top-level field like `footer_blocks` is **not** a registered field, so the backend **silently drops it on save**. (A footer might still appear on the live site if a layout template re-injects it on every load — but that footer is never actually persisted.) Keeping every region inside the registered `blocks_layout` dict makes them all persist for real.
+
+## object_list: a region stored inline
+
+The other storage choice for a region. Instead of ordering in the shared `blocks_layout` dict, all items share one inline schema and are stored as an array with an ID field on the field itself. Use `dataPath` when the data is nested within the block:
 
 <!-- codeExample: javascript -->
 ```javascript

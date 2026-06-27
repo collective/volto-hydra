@@ -125,7 +125,7 @@ jobs:
           done
           echo "All servers ready"
       - name: Run tests
-        run: pnpm exec playwright test --project=unit --project=unit-firefox --project=mock --project=react --project=svelte --project=vue --project=astro --reporter=github,list,html
+        run: pnpm exec playwright test --project=unit --project=unit-firefox --project=api-contract --project=mock --project=react --project=svelte --project=vue --project=astro --reporter=github,list,html
         env:
           CI: true
           NO_WEBSERVER: true

@@ -28,18 +28,30 @@ test.describe('Block Drag and Drop', () => {
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
     const iframe = helper.getIframe();
+    await helper.getStableBlockCount();
 
-    // grid-empty starts with no children; ensureEmptyBlockIfEmpty may have
-    // injected a synthetic placeholder. Either way, no real teaser inside.
-    const initialChildren = await iframe
-      .locator('[data-block-uid="grid-empty"] [data-block-uid]').count();
-    expect(initialChildren).toBeLessThanOrEqual(1); // 0 or 1 (placeholder)
+    // An empty container must RENDER its synthetic 'empty' placeholder so it
+    // stays "open" as a visible drop zone. ensureAllContainersHaveBlocks seeds
+    // the placeholder on load (into every empty container, including nested),
+    // and the frontend renders it with a data-block-uid.
+    await expect.poll(async () =>
+      iframe.locator('[data-block-uid="grid-empty"] [data-block-uid]').count(),
+      { timeout: 5000 },
+    ).toBe(1); // exactly the placeholder — no real content yet
 
     // DIAG: dump grid-empty's children + their pathMap entries.
     const diag = await iframe.locator('html').first().evaluate(() => {
       const bridge: any = (window as any).bridge;
       const pathMap = bridge?.blockPathMap || {};
-      const out: any = { childrenInDOM: [], childrenInPathMap: {} };
+      const fd: any = (window as any)._currentFormData;
+      const ge = fd?.blocks?.['grid-empty'];
+      const out: any = {
+        childrenInDOM: [],
+        childrenInPathMap: {},
+        // What the RENDERER's formData actually holds for grid-empty:
+        renderLayoutItems: ge?.blocks_layout?.items ?? null,
+        renderBlocks: ge?.blocks ? Object.keys(ge.blocks) : null,
+      };
       const grid = document.querySelector('[data-block-uid="grid-empty"]');
       if (grid) {
         for (const c of grid.querySelectorAll('[data-block-uid]')) {

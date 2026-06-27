@@ -27,7 +27,7 @@ import { getBlockSchema } from '../../../hydra-js/buildBlockPathMap.js';
 export async function mergeTemplatesIntoPage(page, options = {}) {
   const {
     loadTemplate,
-    pageBlocksFields = { blocks_layout: {} },
+    pageBlocksFields = { items: {} },
     uuidGenerator,
     filterInstanceId,
     preloadedTemplates = {},
@@ -84,15 +84,18 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
           }
 
           if (fieldDef.widget === 'blocks_layout') {
-            // blocks_layout container: blocks in shared dict, layout in field.items
-            const layoutItems = processedBlock[fieldName]?.items;
-            if (!layoutItems || !processedBlock.blocks) continue;
+            // A blocks field: its name is the key under the block's shared
+            // blocks_layout dict. Process its list and write it back, preserving
+            // sibling fields (e.g. footer).
+            if (!processedBlock.blocks || !processedBlock.blocks_layout) continue;
+            const layoutItems = processedBlock.blocks_layout[fieldName];
+            if (!Array.isArray(layoutItems) || layoutItems.length === 0) continue;
             hasBlocksLayout = true;
             const fieldBlocks = {};
             for (const id of layoutItems) {
               if (processedBlock.blocks[id]) fieldBlocks[id] = processedBlock.blocks[id];
             }
-            const { blocks: newFieldBlocks, layout: newFieldLayout } = await processBlocksRecursive(
+            const { blocks: newFieldBlocks, layout: newRegionLayout } = await processBlocksRecursive(
               fieldBlocks,
               layoutItems,
               null,
@@ -100,7 +103,10 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
               true, // skip template expansion — already done
             );
             Object.assign(mergedBlocks, newFieldBlocks);
-            processedBlock[fieldName] = { items: newFieldLayout };
+            processedBlock.blocks_layout = {
+              ...processedBlock.blocks_layout,
+              [fieldName]: newRegionLayout,
+            };
           } else if (fieldDef.widget === 'object_list') {
             // object_list container: expand templates same as blocks_layout
             const dataPath = fieldDef.dataPath || [fieldName];
@@ -143,26 +149,29 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
           }
           processedBlock.blocks = mergedBlocks;
         }
-      } else if (block.blocks && block.blocks_layout?.items) {
-        // Implicit container (no schema definition, e.g. Grid) — fallback
+      } else if (block.blocks && block.blocks_layout) {
+        // Implicit container (no schema definition, e.g. Grid) — fallback.
+        // The blocks_layout dict holds one list per blocks field (array
+        // sub-key); process each and preserve siblings.
         let mergedBlocks = {};
-        for (const [key, value] of Object.entries(block)) {
-          if (key !== 'blocks' && value?.items && Array.isArray(value.items)) {
-            const fieldBlocks = {};
-            for (const id of value.items) {
-              if (block.blocks[id]) fieldBlocks[id] = block.blocks[id];
-            }
-            const { blocks: newFieldBlocks, layout: newFieldLayout } = await processBlocksRecursive(
-              fieldBlocks,
-              value.items,
-              null,
-              templateState,
-              true,
-            );
-            Object.assign(mergedBlocks, newFieldBlocks);
-            processedBlock[key] = { items: newFieldLayout };
+        const newLayoutDict = { ...block.blocks_layout };
+        for (const [region, ids] of Object.entries(block.blocks_layout)) {
+          if (!Array.isArray(ids)) continue;
+          const fieldBlocks = {};
+          for (const id of ids) {
+            if (block.blocks[id]) fieldBlocks[id] = block.blocks[id];
           }
+          const { blocks: newFieldBlocks, layout: newRegionLayout } = await processBlocksRecursive(
+            fieldBlocks,
+            ids,
+            null,
+            templateState,
+            true,
+          );
+          Object.assign(mergedBlocks, newFieldBlocks);
+          newLayoutDict[region] = newRegionLayout;
         }
+        processedBlock.blocks_layout = newLayoutDict;
         for (const [id, blockData] of Object.entries(block.blocks)) {
           if (!mergedBlocks[id]) mergedBlocks[id] = blockData;
         }
@@ -180,24 +189,25 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
     return { blocks: newBlocks, layout: newLayout };
   }
 
-  // Process each page-level blocks field
-  // All fields share result.blocks; each field has its own layout (fieldName: { items: [...] })
+  // Process each page-level blocks field. A blocks field's name is the key in
+  // the shared `blocks_layout` dict (default 'items'); all share result.blocks.
+  // Writing each field's list back under blocks_layout[fieldName] preserves the
+  // sibling fields (e.g. footer) — rebuilding the whole dict would drop them.
   const fieldsToProcess = Object.keys(pageBlocksFields).length > 0
     ? pageBlocksFields
-    : { blocks_layout: {} }; // Default to main blocks_layout field
+    : { items: {} }; // Default to the main 'items' blocks field
 
   for (const [fieldName, fieldDef] of Object.entries(fieldsToProcess)) {
     const blocksData = result.blocks || {};
-    const layoutData = result[fieldName];
-    const layout = layoutData?.items || [];
+    const layout = result.blocks_layout?.[fieldName] || [];
     const allowedLayouts = fieldDef?.allowedLayouts || null;
 
     if (layout.length === 0 && !allowedLayouts) {
-      // No layout items and no forced layout - skip this field
+      // No layout items and no forced layout - leave this field as-is
       continue;
     }
 
-    // Build a blocks subset for this field (only blocks referenced by this field's layout)
+    // Build a blocks subset for this field (only blocks it references)
     const fieldBlocks = {};
     for (const blockId of layout) {
       if (blocksData[blockId]) {
@@ -213,8 +223,8 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
       templateState
     );
 
-    // Remove old field blocks that were dropped during template processing,
-    // then merge in the new blocks. Other fields' blocks must remain.
+    // Remove old field blocks dropped during template processing, then merge in
+    // the new blocks. Blocks from other fields must remain.
     const updatedBlocks = { ...result.blocks };
     for (const oldId of Object.keys(fieldBlocks)) {
       if (!newBlocks[oldId]) {
@@ -222,7 +232,7 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
       }
     }
     result.blocks = { ...updatedBlocks, ...newBlocks };
-    result[fieldName] = { items: newLayout };
+    result.blocks_layout = { ...result.blocks_layout, [fieldName]: newLayout };
   }
 
   return {
