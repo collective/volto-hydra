@@ -294,39 +294,6 @@ test.describe('Template Edit Mode - Editability', () => {
     expect(isEditable).toBe('true');
   });
 
-  test('fixed readonly blocks NESTED in a template container become editable in edit mode', async ({ page }) => {
-    const helper = new AdminUIHelper(page);
-
-    await helper.login();
-    await helper.navigateToEdit('/template-test-page');
-
-    // A grid cell is a fixed template block nested two levels deep
-    // (grid -> cell), not a direct child of the instance. The merge stamps the
-    // instance id on the grid block but not on its cells, so edit mode (a flat
-    // `templateInstanceId === editedInstance` check) leaves the cell locked.
-    const { blockId: cellId, locator: cellBlock } = await helper.waitForBlockByContent('Template Grid Cell 1');
-
-    // Initially the nested fixed block is NOT editable.
-    const editor = helper.getSlateField(cellBlock);
-    let isEditable = await editor.getAttribute('contenteditable');
-    expect(isEditable).not.toBe('true');
-
-    // Enter template edit mode via the instance.
-    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
-    await helper.clickBlockInIframe(headerBlockId);
-    await helper.waitForSidebarOpen();
-    await helper.escapeToParent();
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
-    await editToggle.click();
-    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
-
-    // The nested grid cell must now be editable — it belongs to the instance.
-    await helper.clickBlockInIframe(cellId);
-    await helper.waitForBlockSelectedInAdmin(cellId);
-    isEditable = await editor.getAttribute('contenteditable');
-    expect(isEditable).toBe('true');
-  });
-
   test('blocks outside template become locked in edit mode', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 

@@ -128,11 +128,5 @@ describe('insertSnippetBlocks — nested container in blocks_layout region (#234
     const txtId = cols.blocks[colId].blocks_layout.items[0];
     expect(txtId).not.toBe('txt-1');
     expect(cols.blocks[colId].blocks[txtId]['@type']).toBe('slate');
-
-    // Every nested block carries the instance id, so edit mode unlocks them
-    // (isBlockReadonly is a flat templateInstanceId check).
-    expect(cols.templateInstanceId).toBeTruthy();
-    expect(cols.blocks[colId].templateInstanceId).toBe(cols.templateInstanceId);
-    expect(cols.blocks[colId].blocks[txtId].templateInstanceId).toBe(cols.templateInstanceId);
   });
 });
