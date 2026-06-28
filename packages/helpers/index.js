@@ -1857,29 +1857,19 @@ function isBlocksMap(obj) {
 }
 
 /**
- * Find the field on `tplBlock` that holds the blocks_layout widget's layout
- * array. The widget can be declared under any field name in a schema —
- * `blocks_layout` for section/grid, `items` for contextNavigation, etc. —
- * so we recognise the data shape rather than hardcoding a name:
- *
- *   { items: [stringId, ...] } where every id is a key in tplBlock.blocks.
- *
- * Returns the field name or null if none matches. Caller decides what to
- * do with null (throw, or treat as "no nested layout").
+ * Whether `tplBlock` is a container whose children need merging. Post-#234 a
+ * container's child ordering always lives in its own `blocks_layout` dict, as
+ * one or more named regions ({ <region>: [stringId, ...], ... } — e.g. a columns
+ * block's `columns` region, a column's default `items` region). Returns true for
+ * a container (has a `blocks` map + a `blocks_layout` dict), false otherwise.
+ * Callers iterate every region in `tplBlock.blocks_layout`.
  */
-function findBlocksLayoutField(tplBlock) {
-  if (!tplBlock || !tplBlock.blocks || !isBlocksMap(tplBlock.blocks)) return null;
-  for (const [fieldName, fieldVal] of Object.entries(tplBlock)) {
-    if (fieldName === 'blocks') continue;
-    if (
-      fieldVal && typeof fieldVal === 'object' && !Array.isArray(fieldVal) &&
-      Array.isArray(fieldVal.items) && fieldVal.items.length > 0 &&
-      fieldVal.items.every((id) => typeof id === 'string' && id in tplBlock.blocks)
-    ) {
-      return fieldName;
-    }
-  }
-  return null;
+function hasNestedBlocksLayout(tplBlock) {
+  return !!(
+    tplBlock && tplBlock.blocks && isBlocksMap(tplBlock.blocks) &&
+    tplBlock.blocks_layout && typeof tplBlock.blocks_layout === 'object' &&
+    !Array.isArray(tplBlock.blocks_layout)
+  );
 }
 
 /**
@@ -2005,20 +1995,20 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
         if (nextTplBlock?.fixed) break;
       }
 
-      // childSlotIds for nested containers. The layout field name comes
-      // from the data (any blocks_layout widget field, not hardcoded to
-      // `blocks_layout`); we throw if `blocks` is present but no matching
-      // field exists, surfacing malformed templates loudly.
+      // childSlotIds for nested containers. A container's children are ordered
+      // by the named regions in its `blocks_layout` dict (#234); we throw if
+      // `blocks` is present but `blocks_layout` isn't, surfacing malformed
+      // templates loudly.
       let childSlotIds = undefined;
-      const innerLayoutField = findBlocksLayoutField(tplBlock);
+      const isContainer = hasNestedBlocksLayout(tplBlock);
       if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
-        if (!innerLayoutField) {
+        if (!isContainer) {
           throw new Error(
             `processNestedTemplateLevel: template block "${tplBlockId}" has nested ` +
-            `\`blocks\` but no sibling field whose \`.items\` array lists those block IDs.`,
+            `\`blocks\` but no \`blocks_layout\` dict listing them by region.`,
           );
         }
-        const innerLayout = tplBlock[innerLayoutField].items;
+        const innerLayout = Object.values(tplBlock.blocks_layout).filter(Array.isArray).flat();
         for (const nestedId of innerLayout) {
           const nested = tplBlock.blocks[nestedId];
           if (nested && !nested.fixed && nested.slotId) {
@@ -2045,12 +2035,12 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
       }
       addItem(fixedBlock, blockId);
 
-      // Register further nested containers (blocks_layout and object_list)
-      if (innerLayoutField) {
+      // Register further nested containers (blocks_layout regions and object_list)
+      if (isContainer) {
         templateState.nestedContainers.set(tplBlock.blocks, {
           templateBlockId: tplBlockId,
           templateBlocks: tplBlock.blocks,
-          templateLayout: tplBlock[innerLayoutField].items,
+          templateLayout: Object.values(tplBlock.blocks_layout).filter(Array.isArray).flat(),
         });
       }
       for (const val of Object.values(tplBlock)) {
@@ -2625,45 +2615,48 @@ export function expandTemplatesSync(inputItems, options = {}) {
 
       // For container blocks, filter nested blocks to only those with
       // template markers (slotId or templateId). Blocks without these are
-      // template-internal details that should not be synced to pages.
-      // Field name for the layout is taken from the data (see
-      // findBlocksLayoutField), so we don't assume a canonical name.
+      // template-internal details that should not be synced to pages. A
+      // container's children are ordered by the named regions in its
+      // `blocks_layout` dict (#234); filter each region and preserve them all.
       let childSlotIds = undefined;
       let filteredBlocks = blockContent.blocks;
       let filteredLayout = undefined;
-      const layoutField = findBlocksLayoutField(tplBlock);
+      const isContainer = hasNestedBlocksLayout(tplBlock);
       if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
-        if (!layoutField) {
+        if (!isContainer) {
           throw new Error(
             `expandTemplatesSync: template block "${tplBlockId}" has nested ` +
-            `\`blocks\` but no sibling field whose \`.items\` array lists those block IDs. ` +
-            `A blocks_layout widget field (any name) is required.`,
+            `\`blocks\` but no \`blocks_layout\` dict listing them by region.`,
           );
         }
-        const nestedLayout = tplBlock[layoutField].items;
         const newNestedBlocks = {};
-        const newNestedLayout = [];
-        for (const nestedId of nestedLayout) {
-          const nested = tplBlock.blocks[nestedId];
-          if (!nested) continue;
-          if (nested.slotId || nested.templateId) {
-            newNestedBlocks[nestedId] = nested;
-            newNestedLayout.push(nestedId);
-            if (!nested.fixed && nested.slotId) {
-              if (!childSlotIds) childSlotIds = {};
-              if (!childSlotIds['blocks']) childSlotIds['blocks'] = nested.slotId;
+        const newBlocksLayout = {};
+        for (const [region, arr] of Object.entries(tplBlock.blocks_layout)) {
+          if (!Array.isArray(arr)) { newBlocksLayout[region] = arr; continue; }
+          const newArr = [];
+          for (const nestedId of arr) {
+            const nested = tplBlock.blocks[nestedId];
+            if (!nested) continue;
+            if (nested.slotId || nested.templateId) {
+              newNestedBlocks[nestedId] = nested;
+              newArr.push(nestedId);
+              if (!nested.fixed && nested.slotId) {
+                if (!childSlotIds) childSlotIds = {};
+                if (!childSlotIds['blocks']) childSlotIds['blocks'] = nested.slotId;
+              }
             }
           }
+          newBlocksLayout[region] = newArr;
         }
         filteredBlocks = newNestedBlocks;
-        filteredLayout = { items: newNestedLayout };
+        filteredLayout = newBlocksLayout;
       }
 
       addItem(
         {
           ...blockContent,
           blocks: filteredBlocks,
-          ...(layoutField && { [layoutField]: filteredLayout }),
+          ...(isContainer && { blocks_layout: filteredLayout }),
           templateId: templateId,
           templateInstanceId: instanceId,
           ...(nextSlotId && { nextSlotId }),
@@ -2672,11 +2665,11 @@ export function expandTemplatesSync(inputItems, options = {}) {
         blockId
       );
 
-      if (layoutField) {
+      if (isContainer) {
         templateState.nestedContainers.set(filteredBlocks, {
           templateBlockId: tplBlockId,
           templateBlocks: filteredBlocks,
-          templateLayout: filteredLayout.items,
+          templateLayout: Object.values(filteredLayout).filter(Array.isArray).flat(),
         });
       }
       // Register object_list arrays (arrays of objects with templateId)
