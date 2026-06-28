@@ -187,4 +187,11 @@ test('reverse merge captures a nested edit when the forced footer is in the FOOT
   const col = cols.blocks[colId];
   const cellId = col.blocks_layout.items[0];
   expect(col.blocks[cellId].value[0].children[0].text).toBe('EDITED NESTED CELL');
+
+  // The merge keeps the TARGET's instance id and strips the SOURCE's. Saving is
+  // merge(template, page): the result is the template, so it must NOT carry the
+  // page's (source) instance id — that id belongs to one page's instance, not the
+  // template. Leaking it poisons the template (and the "reuse the instance already
+  // in the page" path) for every other page.
+  expect(cols.templateInstanceId).not.toBe(instanceId);
 });

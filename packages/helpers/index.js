@@ -2519,10 +2519,17 @@ export function expandTemplatesSync(inputItems, options = {}) {
     return items;
   }
 
-  // Get or generate instanceId
+  // Get or generate instanceId.
+  // A merge keeps the TARGET's instance id and strips the SOURCE's. `existingInstanceId`
+  // doubles as the SOURCE-content filter (= filterInstanceId when merging INTO a
+  // template), so it must NOT be stamped onto the result — that id belongs to the
+  // source page's instance, not the template. When merging into a template, the
+  // result (target) gets its own fresh id; the source filter still uses
+  // existingInstanceId below. (Forward apply has no filterInstanceId, so the
+  // target's own id — reused from the page or generated — is used as before.)
   // For forced layouts (no existing instanceId), we use a WeakMap keyed by blocksDict
   // to ensure idempotency - same blocks object returns same generated instanceId
-  let instanceId = existingInstanceId;
+  let instanceId = filterInstanceId ? null : existingInstanceId;
   if (!instanceId) {
     if (blocksDict && templateState.generatedInstanceIds.has(blocksDict)) {
       instanceId = templateState.generatedInstanceIds.get(blocksDict);

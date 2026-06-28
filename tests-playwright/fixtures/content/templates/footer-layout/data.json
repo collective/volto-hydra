@@ -11,7 +11,6 @@
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/footer-layout-uid",
-      "templateInstanceId": "footer-layout-def-instance",
       "slotId": "branding",
       "value": [
         {
@@ -24,7 +23,6 @@
     "default-slot": {
       "@type": "slate",
       "templateId": "resolveuid/footer-layout-uid",
-      "templateInstanceId": "footer-layout-def-instance",
       "slotId": "default",
       "value": [
         {
@@ -39,7 +37,6 @@
       "fixed": true,
       "readOnly": true,
       "templateId": "resolveuid/footer-layout-uid",
-      "templateInstanceId": "footer-layout-def-instance",
       "slotId": "footer-cols",
       "blocks": {
         "footer-col-1": {
