@@ -1559,7 +1559,9 @@ export function insertSnippetBlocks(pageFormData, templateData, position, uuidGe
       }
     }
 
-    result.blocks[newId] = block;
+    // Stamp the instance id at every depth so a snippet's nested blocks unlock
+    // in edit mode too (not just its top-level blocks).
+    result.blocks[newId] = stampInstanceDeep(block, templateId, instanceId);
   }
 
   // Insert at position
@@ -1901,6 +1903,28 @@ function blocksLayoutRegions(blocksLayout) {
  */
 function allRegionIds(blocksLayout) {
   return blocksLayoutRegions(blocksLayout).flatMap(([, ids]) => ids);
+}
+
+/**
+ * Stamp `templateId` / `templateInstanceId` on a block AND on every block nested
+ * inside it at any depth (walking blocks_layout regions). Edit-mode unlocking is
+ * a flat `templateInstanceId === editedInstance` check (`isBlockReadonly`), so a
+ * block deep inside a template container (e.g. a grid cell, or a column's slate)
+ * must carry the instance id too — otherwise it stays locked when the instance
+ * is edited, even though it belongs to it.
+ */
+function stampInstanceDeep(block, templateId, instanceId) {
+  const stamped = { ...block, templateId, templateInstanceId: instanceId };
+  if (hasNestedBlocksLayout(stamped)) {
+    const newBlocks = { ...stamped.blocks };
+    for (const id of allRegionIds(stamped.blocks_layout)) {
+      if (newBlocks[id]) {
+        newBlocks[id] = stampInstanceDeep(newBlocks[id], templateId, instanceId);
+      }
+    }
+    stamped.blocks = newBlocks;
+  }
+  return stamped;
 }
 
 /**
@@ -2668,7 +2692,9 @@ export function expandTemplatesSync(inputItems, options = {}) {
             const nested = tplBlock.blocks[nestedId];
             if (!nested) continue;
             if (nested.slotId || nested.templateId) {
-              newNestedBlocks[nestedId] = nested;
+              // Stamp the instance id at every depth so edit mode unlocks this
+              // block and anything nested inside it (not just the top level).
+              newNestedBlocks[nestedId] = stampInstanceDeep(nested, templateId, instanceId);
               newArr.push(nestedId);
               if (!nested.fixed && nested.slotId) {
                 if (!childSlotIds) childSlotIds = {};
