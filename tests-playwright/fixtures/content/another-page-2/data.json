@@ -7,7 +7,7 @@
   "description": "A second page that also forces the footer layout, to prove template saves propagate",
   "effective": "2024-11-01T00:00:00+00:00",
   "review_state": "published",
-  "preview_image": true,
+  "preview_image": false,
   "parent": {
     "@id": "http://localhost:8888",
     "@type": "Plone Site",
@@ -53,7 +53,7 @@
   },
   "allow_discussion": false,
   "is_folderish": false,
-  "exclude_from_nav": false,
+  "exclude_from_nav": true,
   "created": "2025-01-02T12:00:00+00:00",
   "modified": "2025-01-02T12:00:00+00:00",
   "lock": {
