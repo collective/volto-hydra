@@ -1931,26 +1931,6 @@ function isBlocksMap(obj) {
 }
 
 /**
- * Recursively clone a template block subtree, stamping `templateInstanceId` on
- * EVERY block (at any depth). Template edit mode unlocks a block only when its
- * `templateInstanceId` matches the edited instance (isBlockInEditedTemplate), so
- * a deeply-nested template block (a slate inside a column inside a columns block)
- * stays readonly unless it too carries the instance id. Clones so the cached
- * template isn't mutated.
- */
-function stampInstanceId(block, instanceId) {
-  const out = { ...block, templateInstanceId: instanceId };
-  if (out.blocks && isBlocksMap(out.blocks)) {
-    const tagged = {};
-    for (const [id, child] of Object.entries(out.blocks)) {
-      tagged[id] = stampInstanceId(child, instanceId);
-    }
-    out.blocks = tagged;
-  }
-  return out;
-}
-
-/**
  * Whether `tplBlock` is a container whose children need merging. Post-#234 a
  * container's child ordering always lives in its own `blocks_layout` dict, as
  * one or more named regions ({ <region>: [stringId, ...], ... } — e.g. a columns
@@ -2751,7 +2731,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
             const nested = tplBlock.blocks[nestedId];
             if (!nested) continue;
             if (nested.slotId || nested.templateId) {
-              newNestedBlocks[nestedId] = stampInstanceId(nested, instanceId);
+              newNestedBlocks[nestedId] = nested;
               newArr.push(nestedId);
               if (!nested.fixed && nested.slotId) {
                 if (!childSlotIds) childSlotIds = {};
