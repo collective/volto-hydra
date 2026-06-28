@@ -994,13 +994,17 @@ export function formDataContentEqual(formDataA, formDataB) {
  */
 export function findChangedUnit(prevForm, newForm) {
   if (deepEqual(prevForm, newForm)) return null;
-  const prevItems = prevForm?.blocks_layout?.items || [];
-  const newItems = newForm?.blocks_layout?.items || [];
-  if (!deepEqual(prevItems, newItems)) return { unit: 'page' };
+  // Compare ids across EVERY region of blocks_layout (items, footer, …), not
+  // just `items`: a change in a non-items region would otherwise fall through to
+  // a full-page swap, destroying the contenteditable cursor mid-edit in that
+  // region — the exact thing this targeted-diff exists to avoid.
+  const prevIds = allRegionIds(prevForm?.blocks_layout);
+  const newIds = allRegionIds(newForm?.blocks_layout);
+  if (!deepEqual(prevIds, newIds)) return { unit: 'page' };
   const prevBlocks = prevForm?.blocks || {};
   const newBlocks = newForm?.blocks || {};
   const changed = [];
-  for (const id of newItems) {
+  for (const id of newIds) {
     if (!deepEqual(prevBlocks[id], newBlocks[id])) changed.push(id);
   }
   // No top-level block data changed but forms differ → page-level scalar
@@ -1573,7 +1577,7 @@ export function insertSnippetBlocks(pageFormData, templateData, position, uuidGe
  */
 export function getTemplateBlocks(formData, tplId) {
   const blockIds = [];
-  for (const blockId of formData.blocks_layout?.items || []) {
+  for (const blockId of allRegionIds(formData.blocks_layout)) {
     const block = formData.blocks?.[blockId];
     if (block?.templateId === tplId) {
       blockIds.push(blockId);
