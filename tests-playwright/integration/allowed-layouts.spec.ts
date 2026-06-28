@@ -542,6 +542,14 @@ test.describe('allowedLayouts', () => {
       const brandingBlock = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Branding - Forced Layout' });
       await expect(brandingBlock).toBeVisible({ timeout: 10000 });
 
+      // The forced layout also contains a nested `columns` container whose
+      // children live in a non-`items` region — the regions shape (#234) the
+      // template merge must walk. Its cell must render (dropped/threw before the
+      // helpers' expandTemplates iterated every region).
+      // innermost [data-block-uid] (the cell slate) — ancestors also contain the text
+      const columnCell = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Column Cell' }).last();
+      await expect(columnCell).toBeVisible({ timeout: 10000 });
+
       // User content should still be there (moved to default placeholder)
       const userContent = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer user content' });
       await expect(userContent).toBeVisible();
@@ -568,6 +576,11 @@ test.describe('allowedLayouts', () => {
       // Verify the forced layout was applied
       const brandingBlock = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Branding - Forced Layout' });
       await expect(brandingBlock).toBeVisible({ timeout: 10000 });
+
+      // Nested columns container (non-items region) must render too (#234).
+      // innermost [data-block-uid] (the cell slate) — ancestors also contain the text
+      const columnCell = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Column Cell' }).last();
+      await expect(columnCell).toBeVisible({ timeout: 10000 });
 
       // User content should still be there
       const userContent = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer user content' });
