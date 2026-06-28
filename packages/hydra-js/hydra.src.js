@@ -15,6 +15,7 @@ import {
   deepEqual,
   findChangedUnit,
   isBlockReadonly,
+  isBlockInEditedTemplateDeep,
   isBlockPositionLocked,
   getBlockAddability,
   isTextOnlyBlockChange,
@@ -393,16 +394,20 @@ export class Bridge {
   isBlockReadonly(blockUid) {
     const blockData = this.getBlockData(blockUid);
 
-    // Use shared utility for template edit mode and block.readOnly checks
-    const readonlyFromShared = isBlockReadonly(blockData, this.templateEditMode);
-
-    // In template edit mode, the shared function handles everything
+    // In template edit mode, the flat shared check (templateInstanceId match)
+    // only unlocks the instance's DIRECT children. A block nested in a container
+    // (a grid cell, a column's slate) belongs to a nested level with a different
+    // id, so walk the path map ancestry instead: editable if it's inside the
+    // edited instance's subtree at any depth, stopping at a foreign embedded
+    // template. No id mutation, so the instance hierarchy stays intact.
     if (this.templateEditMode) {
-      log('isBlockReadonly:', readonlyFromShared ? 'TRUE' : 'FALSE', '(template edit mode) for:', blockUid);
-      return readonlyFromShared;
+      const readonly = !isBlockInEditedTemplateDeep(blockUid, this.blockPathMap, this.templateEditMode);
+      log('isBlockReadonly:', readonly ? 'TRUE' : 'FALSE', '(template edit mode) for:', blockUid);
+      return readonly;
     }
 
-    // Normal mode: also check Bridge-specific registry
+    // Normal mode: shared block.readOnly check + Bridge-specific registry
+    const readonlyFromShared = isBlockReadonly(blockData, this.templateEditMode);
     if (this._readonlyBlocks.has(blockUid)) {
       log('isBlockReadonly: TRUE (registry) for:', blockUid);
       return true;

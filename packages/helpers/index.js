@@ -1624,6 +1624,47 @@ export function isBlockInEditedTemplate(blockData, templateEditMode) {
 }
 
 /**
+ * Ancestry-aware version of {@link isBlockInEditedTemplate}: is `blockId`
+ * anywhere inside the edited instance's subtree, at any container depth?
+ *
+ * The flat check above only matches a block whose OWN `templateInstanceId` is
+ * the edited instance — true for the instance's direct children, but a block
+ * nested in a container (a grid cell, a column's slate) belongs to a separate
+ * nested level and keeps a different id, so it would be missed. We instead walk
+ * the path map's `parentId` chain and:
+ *   - return true once we reach the edited instance entry;
+ *   - STOP (return false) if we first cross a *foreign* embedded template
+ *     instance (`isTemplateInstance` but not `isNestedTemplateInstance`) — that
+ *     block belongs to its own template and is its own edit unit;
+ *   - pass transparently through nested-same-template levels
+ *     (`isNestedTemplateInstance`, the "Template blocks" grouping).
+ *
+ * No id mutation, so the instance hierarchy (and the sidebar that reads it)
+ * stays intact.
+ *
+ * @param {string} blockId
+ * @param {Object} blockPathMap
+ * @param {string|null} templateEditMode
+ * @returns {boolean}
+ */
+export function isBlockInEditedTemplateDeep(blockId, blockPathMap, templateEditMode) {
+  if (!templateEditMode || !blockPathMap) return false;
+  let cur = blockId;
+  const seen = new Set();
+  while (cur && !seen.has(cur)) {
+    seen.add(cur);
+    const info = blockPathMap[cur];
+    if (!info) break;
+    if (info.isTemplateInstance) {
+      if (cur === templateEditMode) return true;
+      if (!info.isNestedTemplateInstance) return false;
+    }
+    cur = info.parentId;
+  }
+  return false;
+}
+
+/**
  * Check if a block should be readonly based on template edit mode.
  * This is the shared utility for both admin (sidebar/toolbar) and hydra.js Bridge.
  *
