@@ -69,6 +69,27 @@ describe('expandTemplatesSync — nested container in blocks_layout region (#234
     expect(cols.blocks['col-1'].blocks?.['txt-1']).toBeDefined();
     expect(cols.blocks['col-1'].blocks_layout?.items).toEqual(['txt-1']);
   });
+
+  test('every nested block carries the templateInstanceId (so template edit mode unlocks them)', () => {
+    const result = expandTemplatesSync([], {
+      blocks: {},
+      templates: { '/templates/footer-layout': template },
+      templateState: {},
+      allowedLayouts: ['/templates/footer-layout'],
+    });
+    const cols = result.find((b) => b['@type'] === 'columns');
+    const iid = cols.templateInstanceId;
+    expect(iid).toBeTruthy();
+
+    // Template edit mode unlocks a block only when
+    // blockData.templateInstanceId === the edited instance
+    // (isBlockReadonly -> isBlockInEditedTemplate). So EVERY nested block — not
+    // just the top — must carry the instance id, else deeply-nested template
+    // content (a slate inside a column inside the columns block) stays readonly
+    // in template edit mode and can't be edited centrally.
+    expect(cols.blocks['col-1'].templateInstanceId).toBe(iid);
+    expect(cols.blocks['col-1'].blocks['txt-1'].templateInstanceId).toBe(iid);
+  });
 });
 
 /**
