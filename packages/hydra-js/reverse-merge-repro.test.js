@@ -123,3 +123,68 @@ test('reverse merge captures an edit to a DEEPLY-nested template block (columns 
   const cellId = col.blocks_layout.items[0];
   expect(col.blocks[cellId].value[0].children[0].text).toBe('EDITED NESTED CELL');
 });
+
+/**
+ * Faithful repro of the FORCED-FOOTER save bug. The real forced footer lives in
+ * the page's `footer` REGION (blocks_layout.footer), not `items` — the test
+ * above (items) gave a false green. With the footer-layout instance's blocks in
+ * the footer region, the reverse merge returned an EMPTY template
+ * ("Updated template blocks: []"), so a centrally-edited branded footer lost the
+ * edit on save.
+ */
+test('reverse merge captures a nested edit when the forced footer is in the FOOTER region', async () => {
+  const template = load('tests-playwright/fixtures/content/templates/footer-layout/data.json');
+  let c = 0;
+  const uuidGenerator = () => `uuid-${++c}`;
+  const intl = { formatMessage: (m) => m?.defaultMessage || m?.id || '' };
+  const instanceId = 'footer-inst-1';
+
+  const tplBranding = template.blocks['fixed-branding'];
+  const tplCols = template.blocks['footer-cols'];
+  const tplCol = tplCols.blocks['footer-col-1'];
+  const tplCell = tplCol.blocks['footer-col-cell'];
+
+  // The merged page: the footer-layout instance lives in the FOOTER region, with
+  // the deeply-nested cell edited. Only the top-level slot blocks carry the
+  // instance id (post-forward-merge shape, no stamping).
+  const formData = {
+    blocks: {
+      'main-1': { '@type': 'slate', value: [{ type: 'p', children: [{ text: 'main' }] }] },
+      branding: { ...tplBranding, templateInstanceId: instanceId },
+      fcols: {
+        ...tplCols,
+        templateInstanceId: instanceId,
+        blocks: {
+          fc1: {
+            ...tplCol,
+            blocks: {
+              fcell: {
+                ...tplCell,
+                value: [{ type: 'p', children: [{ text: 'EDITED NESTED CELL' }] }],
+                plaintext: 'EDITED NESTED CELL',
+              },
+            },
+            blocks_layout: { items: ['fcell'] },
+          },
+        },
+        blocks_layout: { columns: ['fc1'] },
+      },
+    },
+    blocks_layout: { items: ['main-1'], footer: ['branding', 'fcols'] },
+  };
+
+  const { merged: updatedTemplate } = await mergeTemplatesIntoPage(template, {
+    loadTemplate: async () => formData,
+    filterInstanceId: instanceId,
+    blocksConfig: sharedBlocksConfig,
+    intl,
+    uuidGenerator,
+  });
+
+  const cols = Object.values(updatedTemplate.blocks || {}).find((b) => b['@type'] === 'columns');
+  expect(cols).toBeDefined(); // EMPTY before the fix
+  const colId = cols.blocks_layout.columns[0];
+  const col = cols.blocks[colId];
+  const cellId = col.blocks_layout.items[0];
+  expect(col.blocks[cellId].value[0].children[0].text).toBe('EDITED NESTED CELL');
+});

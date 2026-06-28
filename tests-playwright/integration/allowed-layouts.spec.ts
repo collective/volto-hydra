@@ -587,6 +587,68 @@ test.describe('allowedLayouts', () => {
       await expect(userContent).toBeVisible();
     });
 
+    test('editing a nested columns cell in a forced footer persists after save', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
+
+      await helper.login();
+      await helper.navigateToEdit('/another-page');
+      await helper.waitForIframeReady();
+
+      const footerContent = iframe.locator('#footer-content');
+      // The forced footer's branding block is a direct child of the footer
+      // instance (used to enter template edit mode); the columns cell is nested
+      // 3 levels deep (columns -> column -> slate) — the block we actually edit.
+      const branding = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Branding' }).last();
+      await expect(branding).toBeVisible({ timeout: 10000 });
+      const brandingId = await branding.getAttribute('data-block-uid');
+      const cell = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Column Cell' }).last();
+      await expect(cell).toBeVisible({ timeout: 10000 });
+      const cellId = await cell.getAttribute('data-block-uid');
+
+      // Enter template edit mode via the instance (branding -> parent instance).
+      await helper.clickBlockInIframe(brandingId);
+      await helper.waitForSidebarOpen();
+      await helper.escapeToParent();
+      const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+      await expect(editToggle).toBeVisible({ timeout: 5000 });
+      await editToggle.click();
+      const checkbox = page.locator('.field-wrapper-editTemplate input[type="checkbox"]');
+      await expect(checkbox).toBeChecked({ timeout: 5000 });
+
+      // Select the deeply-nested columns cell — it must unlock in edit mode
+      // (approach B ancestry unlock; the bridge sets contenteditable on selection).
+      await helper.clickBlockInIframe(cellId);
+      await helper.waitForBlockSelectedInAdmin(cellId);
+      const cellEditor = helper.getSlateField(iframe.locator(`[data-block-uid="${cellId}"]`));
+      await expect(cellEditor).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
+
+      // Edit the nested cell with a unique marker.
+      await cellEditor.click();
+      await expect(cellEditor).toBeFocused({ timeout: 2000 });
+      await page.keyboard.press('End');
+      await page.keyboard.type(' FOOTEREDIT');
+      await expect(iframe.locator(`[data-block-uid="${cellId}"]`)).toContainText('FOOTEREDIT', { timeout: 5000 });
+
+      // Exit edit mode.
+      await helper.clickBlockInIframe(brandingId);
+      await helper.escapeToParent();
+      await editToggle.click();
+      await expect(checkbox).not.toBeChecked({ timeout: 5000 });
+
+      // Save.
+      await page.keyboard.press('Control+s');
+      const pencilIcon = page.locator('.toolbar-actions .edit, [aria-label="Edit"]');
+      await expect(pencilIcon).toBeVisible({ timeout: 10000 });
+
+      // The nested forced-footer edit must survive a reload (it was saved back into
+      // the forced footer-layout template and re-applied on load).
+      await helper.navigateToView('/another-page');
+      await helper.waitForIframeReady();
+      const persistedCell = iframe.locator('#footer-content [data-block-uid]').filter({ hasText: 'FOOTEREDIT' }).last();
+      await expect(persistedCell).toBeVisible({ timeout: 15000 });
+    });
+
     test('fixed block from forced layout is locked', async ({ page }) => {
       const helper = new AdminUIHelper(page);
       const iframe = helper.getIframe();

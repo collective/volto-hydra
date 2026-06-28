@@ -2647,8 +2647,14 @@ export function expandTemplatesSync(inputItems, options = {}) {
 
   const { template, emittedSlotIds, pendingContent, leadingStandaloneBlocks, trailingStandaloneBlocks, existingFixedBlockIds } = ctx;
 
-  // Process template (same as async version from here)
-  const templateLayout = template.blocks_layout?.items || [];
+  // Process template (same as async version from here).
+  // In the REVERSE merge `template` is the edited page (loaded via loadTemplate),
+  // whose instance blocks can live in any region — a branded footer in
+  // `blocks_layout.footer`, not just `items`. Walk every region via the shared
+  // region API, or reverse-merging a non-items forced layout harvests nothing
+  // and returns an empty template. (Forward templates only have `items`, so this
+  // is a no-op there.)
+  const templateLayout = allRegionIds(template.blocks_layout);
   let firstFixedIndex = -1;
   let lastFixedIndex = -1;
   const slotPositions = {};
