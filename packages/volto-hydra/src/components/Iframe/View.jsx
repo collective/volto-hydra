@@ -16,6 +16,7 @@ import {
   getUniqueTemplateIds,
   getBlockAddability,
   isBlockReadonly,
+  isBlockReadonlyDeep,
   isBlockPositionLocked,
 } from '@volto-hydra/helpers';
 import Api from '@plone/volto/helpers/Api/Api';
@@ -889,7 +890,7 @@ const Iframe = (props) => {
       const safeIds = blockIds.filter((uid) => {
         const block = getBlockById(properties, bpm, uid);
         if (!block) return false;
-        return !isBlockReadonly(block, templateMode)
+        return !isBlockReadonlyDeep(uid, bpm, block, templateMode)
             && !isBlockPositionLocked(block, templateMode);
       });
       log('hydra-delete-blocks:', safeIds.length, '/', blockIds.length, 'blocks (after lock filter)');
@@ -985,7 +986,10 @@ const Iframe = (props) => {
       document.removeEventListener('hydra-exit-selection-mode', handleExitSelectionMode);
       document.removeEventListener('hydra-enter-selection-mode', handleEnterSelectionMode);
     };
-  }, [blocksClipboard, properties, iframeSyncState?.blockPathMap, onChangeFormData, dispatch, intl]);
+    // NOTE: templateEditMode must be a dep — these handlers (handleDelete) gate
+    // on it via isBlockReadonlyDeep; without it the listener closure keeps a
+    // stale edit mode and refuses to mutate template blocks while editing.
+  }, [blocksClipboard, properties, iframeSyncState?.blockPathMap, iframeSyncState?.templateEditMode, onChangeFormData, dispatch, intl]);
 
   // Template cache: stores loaded template documents keyed by templateId
   // Used for comparison on save to detect template changes

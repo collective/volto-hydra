@@ -1692,6 +1692,28 @@ export function isBlockReadonly(blockData, templateEditMode) {
 }
 
 /**
+ * Ancestry-aware {@link isBlockReadonly}. In template edit mode, a block is
+ * editable if it lives anywhere inside the edited instance's subtree (any
+ * container depth) — see {@link isBlockInEditedTemplateDeep} — rather than only
+ * matching its own (direct-child) `templateInstanceId`. Normal mode is identical
+ * to the flat version (block.readOnly). Use this wherever the path map is
+ * available so nested template blocks (grid cells, column slates) aren't treated
+ * as readonly while the instance is being edited.
+ *
+ * @param {string} blockId
+ * @param {Object} blockPathMap
+ * @param {Object} blockData
+ * @param {string|null} templateEditMode
+ * @returns {boolean}
+ */
+export function isBlockReadonlyDeep(blockId, blockPathMap, blockData, templateEditMode) {
+  if (templateEditMode) {
+    return !isBlockInEditedTemplateDeep(blockId, blockPathMap, templateEditMode);
+  }
+  return !!blockData?.readOnly;
+}
+
+/**
  * Check if a block's position is locked (cannot be moved/dragged).
  * This is the shared utility for both admin (toolbar) and hydra.js Bridge.
  *

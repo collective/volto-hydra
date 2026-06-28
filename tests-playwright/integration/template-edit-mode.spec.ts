@@ -327,6 +327,41 @@ test.describe('Template Edit Mode - Editability', () => {
     expect(isEditable).toBe('true');
   });
 
+  test('a nested template block can be deleted in edit mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    const iframe = helper.getIframe();
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const cellLocator = iframe.locator('[data-block-uid]').filter({ hasText: 'Template Grid Cell 1' });
+    const { blockId: cellId } = await helper.waitForBlockByContent('Template Grid Cell 1');
+
+    // Enter template edit mode via the instance.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    await editToggle.click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+
+    // Delete the nested cell. handleDelete filters out blocks isBlockReadonlyDeep
+    // flags as readonly — this guards two fixes together: (1) the ancestry-aware
+    // unlock (the flat templateInstanceId check treated the nested cell as
+    // readonly), and (2) handleDelete depending on templateEditMode (a stale
+    // listener closure otherwise saw edit mode as null and refused to mutate any
+    // template block at all).
+    await helper.clickBlockInIframe(cellId);
+    await helper.waitForBlockSelectedInAdmin(cellId);
+    await page.evaluate((id) => {
+      document.dispatchEvent(new CustomEvent('hydra-delete-blocks', { detail: { blockIds: [id] } }));
+    }, cellId);
+
+    // The nested cell must be gone — it belongs to the edited instance.
+    await expect(cellLocator).toHaveCount(0, { timeout: 5000 });
+  });
+
   test('blocks outside template become locked in edit mode', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
