@@ -1,4 +1,4 @@
-import { expandTemplatesSync } from '@volto-hydra/helpers';
+import { expandTemplatesSync, insertSnippetBlocks } from '@volto-hydra/helpers';
 
 /**
  * Regression test for the gap that let #234 (blocks_layout regions) merge green
@@ -68,5 +68,65 @@ describe('expandTemplatesSync — nested container in blocks_layout region (#234
     // And the column's own content must survive.
     expect(cols.blocks['col-1'].blocks?.['txt-1']).toBeDefined();
     expect(cols.blocks['col-1'].blocks_layout?.items).toEqual(['txt-1']);
+  });
+});
+
+/**
+ * The render-merge path (above) is not the only one that walks a container's
+ * children. Inserting a snippet goes through cloneBlocksWithNewIds ->
+ * cloneBlockFilteringNested, which (pre-fix) only recognised a `.items` region.
+ * A nested-region container (a columns block) therefore kept its template
+ * blocks AND their original ids — an id collision waiting to happen on the
+ * second insert. This is the gap a region-only fix to expandTemplatesSync left
+ * behind; both paths must walk every region.
+ */
+describe('insertSnippetBlocks — nested container in blocks_layout region (#234)', () => {
+  const snippet = {
+    '@id': '/snippets/cols-snippet',
+    blocks: {
+      cols: {
+        '@type': 'columns',
+        slotId: 'cols',
+        blocks: {
+          'col-1': {
+            '@type': 'column',
+            slotId: 'col-1',
+            blocks: {
+              'txt-1': { '@type': 'slate', slotId: 'txt-1', value: [{ text: 'Snippet text' }] },
+            },
+            blocks_layout: { items: ['txt-1'] },
+          },
+        },
+        // regions shape: children live under the `columns` region, not `.items`
+        blocks_layout: { columns: ['col-1'] },
+      },
+    },
+    blocks_layout: { items: ['cols'] },
+  };
+
+  test('preserves and re-ids the nested column content', () => {
+    const page = { blocks: {}, blocks_layout: { items: [] } };
+    let n = 0;
+    const uuid = () => `new-${++n}`;
+
+    const result = insertSnippetBlocks(page, snippet, 0, uuid);
+
+    // The columns block lands in the page with a fresh id.
+    expect(result.blocks_layout.items).toHaveLength(1);
+    const cols = result.blocks[result.blocks_layout.items[0]];
+    expect(cols['@type']).toBe('columns');
+
+    // The `columns` region survives — and is re-ided (pre-fix it kept 'col-1',
+    // because cloneBlockFilteringNested only walked `.items`).
+    expect(cols.blocks_layout.columns).toHaveLength(1);
+    const colId = cols.blocks_layout.columns[0];
+    expect(colId).not.toBe('col-1');
+    expect(cols.blocks[colId]['@type']).toBe('column');
+
+    // The column's own content survives and is re-ided too.
+    expect(cols.blocks[colId].blocks_layout.items).toHaveLength(1);
+    const txtId = cols.blocks[colId].blocks_layout.items[0];
+    expect(txtId).not.toBe('txt-1');
+    expect(cols.blocks[colId].blocks[txtId]['@type']).toBe('slate');
   });
 });

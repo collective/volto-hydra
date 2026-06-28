@@ -1467,26 +1467,33 @@ function cloneBlockFilteringNested(block, uuidGenerator) {
   // Start with a shallow clone
   const cloned = { ...block };
 
-  // Check for nested blocks field (blocks + blocks_layout pattern)
-  if (cloned.blocks && cloned.blocks_layout?.items) {
+  // Container: filter + re-id every region of its blocks_layout dict (#234),
+  // not just `items`. Without iterating all regions a nested-region container
+  // (e.g. a columns block, whose children live under a `columns` region) keeps
+  // its template-internal blocks and original ids on insert.
+  if (hasNestedBlocksLayout(cloned)) {
     const nestedBlocks = {};
-    const nestedLayout = [];
+    const newBlocksLayout = {};
 
-    for (const nestedId of cloned.blocks_layout.items) {
-      const nestedBlock = cloned.blocks[nestedId];
-      if (!nestedBlock) continue;
+    for (const [region, ids] of blocksLayoutRegions(cloned.blocks_layout)) {
+      const newArr = [];
+      for (const nestedId of ids) {
+        const nestedBlock = cloned.blocks[nestedId];
+        if (!nestedBlock) continue;
 
-      // Only include nested blocks that have template markers
-      if (nestedBlock.slotId || nestedBlock.templateId) {
-        const newNestedId = uuidGenerator();
-        // Recursively filter this nested block's children too
-        nestedBlocks[newNestedId] = cloneBlockFilteringNested(nestedBlock, uuidGenerator);
-        nestedLayout.push(newNestedId);
+        // Only include nested blocks that have template markers
+        if (nestedBlock.slotId || nestedBlock.templateId) {
+          const newNestedId = uuidGenerator();
+          // Recursively filter this nested block's children too
+          nestedBlocks[newNestedId] = cloneBlockFilteringNested(nestedBlock, uuidGenerator);
+          newArr.push(newNestedId);
+        }
       }
+      newBlocksLayout[region] = newArr;
     }
 
     cloned.blocks = nestedBlocks;
-    cloned.blocks_layout = { ...cloned.blocks_layout, items: nestedLayout };
+    cloned.blocks_layout = newBlocksLayout;
   }
 
   return cloned;
@@ -1873,6 +1880,26 @@ function hasNestedBlocksLayout(tplBlock) {
 }
 
 /**
+ * The named regions of a `blocks_layout` dict, as `[region, ids[]]` entries
+ * (post-#234: every blocks field is an id-list under one shared dict — `items`,
+ * `columns`, `footer`, …). Non-array sub-keys are skipped. The single place that
+ * knows the regions shape, so no caller re-implements `.items`-style walking.
+ */
+function blocksLayoutRegions(blocksLayout) {
+  if (!blocksLayout || typeof blocksLayout !== 'object' || Array.isArray(blocksLayout)) {
+    return [];
+  }
+  return Object.entries(blocksLayout).filter(([, ids]) => Array.isArray(ids));
+}
+
+/**
+ * Every child id across all regions of a `blocks_layout` dict, in region order.
+ */
+function allRegionIds(blocksLayout) {
+  return blocksLayoutRegions(blocksLayout).flatMap(([, ids]) => ids);
+}
+
+/**
  * Recursively scan for blocks with matching templateInstanceId.
  * Handles arbitrary nesting - looks for blocks maps (values have @type)
  * and corresponding layout arrays.
@@ -2008,7 +2035,7 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
             `\`blocks\` but no \`blocks_layout\` dict listing them by region.`,
           );
         }
-        const innerLayout = Object.values(tplBlock.blocks_layout).filter(Array.isArray).flat();
+        const innerLayout = allRegionIds(tplBlock.blocks_layout);
         for (const nestedId of innerLayout) {
           const nested = tplBlock.blocks[nestedId];
           if (nested && !nested.fixed && nested.slotId) {
@@ -2040,7 +2067,7 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
         templateState.nestedContainers.set(tplBlock.blocks, {
           templateBlockId: tplBlockId,
           templateBlocks: tplBlock.blocks,
-          templateLayout: Object.values(tplBlock.blocks_layout).filter(Array.isArray).flat(),
+          templateLayout: allRegionIds(tplBlock.blocks_layout),
         });
       }
       for (const val of Object.values(tplBlock)) {
@@ -2631,10 +2658,9 @@ export function expandTemplatesSync(inputItems, options = {}) {
         }
         const newNestedBlocks = {};
         const newBlocksLayout = {};
-        for (const [region, arr] of Object.entries(tplBlock.blocks_layout)) {
-          if (!Array.isArray(arr)) { newBlocksLayout[region] = arr; continue; }
+        for (const [region, ids] of blocksLayoutRegions(tplBlock.blocks_layout)) {
           const newArr = [];
-          for (const nestedId of arr) {
+          for (const nestedId of ids) {
             const nested = tplBlock.blocks[nestedId];
             if (!nested) continue;
             if (nested.slotId || nested.templateId) {
@@ -2669,7 +2695,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
         templateState.nestedContainers.set(filteredBlocks, {
           templateBlockId: tplBlockId,
           templateBlocks: filteredBlocks,
-          templateLayout: Object.values(filteredLayout).filter(Array.isArray).flat(),
+          templateLayout: allRegionIds(filteredLayout),
         });
       }
       // Register object_list arrays (arrays of objects with templateId)
