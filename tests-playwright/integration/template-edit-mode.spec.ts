@@ -892,6 +892,61 @@ test.describe('Template Edit Mode - Validation', () => {
     const { locator: page2Header } = await helper.waitForBlockByContent('edited');
     await expect(page2Header).toContainText('edited', { timeout: 15000 });
   });
+
+  test('saved NESTED template changes (a block inside a container) persist to other pages', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // A grid cell is nested inside the grid container (and inside a nested
+    // "Template blocks" instance level) — not a direct child of the instance.
+    // The top-level save test above only edits the header; the reverse merge that
+    // captures edits back into the template must also walk into containers, or a
+    // nested edit is silently dropped on save.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: cellId, locator: cellLocator } = await helper.waitForBlockByContent('Template Grid Cell 1');
+
+    // Enter template edit mode
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    await editToggle.click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+
+    // Edit the NESTED grid cell with a unique marker
+    await helper.clickBlockInIframe(cellId);
+    const editor = helper.getSlateField(cellLocator);
+    await expect(editor).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
+    await editor.click();
+    await expect(editor).toBeFocused({ timeout: 2000 });
+    await page.keyboard.press('End');
+    await page.keyboard.type(' NESTEDSAVE');
+    const cellBlock = iframe.locator(`[data-block-uid="${cellId}"]`);
+    await expect(cellBlock).toContainText('NESTEDSAVE', { timeout: 5000 });
+
+    // Exit edit mode
+    await helper.escapeToParent();
+    const editToggle2 = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    await editToggle2.click();
+    const checkbox = page.locator('.field-wrapper-editTemplate input[type="checkbox"]');
+    await expect(checkbox).not.toBeChecked({ timeout: 5000 });
+    await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
+
+    // Save
+    await page.keyboard.press('Control+s');
+    const pencilIcon = page.locator('.toolbar-actions .edit, [aria-label="Edit"]');
+    await expect(pencilIcon).toBeVisible({ timeout: 10000 });
+    await helper.getStableBlockCount();
+
+    // The nested edit must persist to another page using the same template.
+    await helper.navigateToView('/template-test-page-2');
+    const { locator: page2Cell } = await helper.waitForBlockByContent('NESTEDSAVE');
+    await expect(page2Cell).toContainText('NESTEDSAVE', { timeout: 15000 });
+  });
 });
 
 test.describe('Template Edit Mode - Block Settings', () => {
