@@ -641,10 +641,15 @@ test.describe('allowedLayouts', () => {
       const pencilIcon = page.locator('.toolbar-actions .edit, [aria-label="Edit"]');
       await expect(pencilIcon).toBeVisible({ timeout: 10000 });
 
-      // The nested forced-footer edit must survive a reload (it was saved back into
-      // the forced footer-layout template and re-applied on load).
-      await helper.navigateToView('/another-page');
+      // PROOF OF SAVE: navigate to a DIFFERENT page (/another-page-2) that
+      // independently forces the SAME footer-layout. The edit can only appear
+      // there if it was saved back into the footer-layout TEMPLATE and re-applied
+      // on load — reloading the same page we edited would not distinguish a real
+      // template save from this page's own local/footer state.
+      await helper.navigateToView('/another-page-2');
       await helper.waitForIframeReady();
+      // Sanity: page-2's own content rules out a stale /another-page render.
+      await expect(iframe.locator('[data-block-uid]').filter({ hasText: 'second forced-footer page' }).first()).toBeVisible({ timeout: 15000 });
       const persistedCell = iframe.locator('#footer-content [data-block-uid]').filter({ hasText: 'FOOTEREDIT' }).last();
       await expect(persistedCell).toBeVisible({ timeout: 15000 });
     });
