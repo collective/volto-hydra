@@ -2037,6 +2037,39 @@ function collectContentFromTree(container, instanceId, pendingContent, standalon
 }
 
 /**
+ * Stamp the RESOLVED instance id on every block in a nested subtree (clones).
+ *
+ * Boundary rule: a child keeps the parent's instance id while its `templateId`
+ * matches (same-template nesting = one instance at every depth); a child whose
+ * `templateId` differs starts a NEW instance (a nested template). This is what
+ * lets consumers use the flat `templateInstanceId === editedInstance` check with
+ * no ancestry walk, and what locks an inner template when editing the outer.
+ *
+ * @param {Object} blocksDict - nested blocks dict to stamp (not mutated)
+ * @param {string} parentInstanceId - the enclosing instance's id
+ * @param {string} parentTemplateId - the enclosing instance's templateId
+ * @returns {Object} a new blocks dict with every block stamped
+ */
+function stampNestedResolved(blocksDict, parentInstanceId, parentTemplateId) {
+  const out = {};
+  for (const [id, child] of Object.entries(blocksDict)) {
+    const sameTemplate = !child.templateId || child.templateId === parentTemplateId;
+    const childTemplateId = child.templateId || parentTemplateId;
+    const childInstanceId = sameTemplate ? parentInstanceId : generateUUID();
+    const stamped = {
+      ...child,
+      templateId: childTemplateId,
+      templateInstanceId: childInstanceId,
+    };
+    if (stamped.blocks && isBlocksMap(stamped.blocks)) {
+      stamped.blocks = stampNestedResolved(stamped.blocks, childInstanceId, childTemplateId);
+    }
+    out[id] = stamped;
+  }
+  return out;
+}
+
+/**
  * Process blocks at a nested level inside a fixed template container.
  * Called when expandTemplates recognizes we're inside a registered nested container.
  *
@@ -2120,6 +2153,13 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
         ...(nextSlotId && { nextSlotId }),
         ...(childSlotIds && { childSlotIds }),
       };
+      // Every block carries its RESOLVED instance id — stamp the nested subtree
+      // too: a child keeps THIS instance id while its templateId matches, and
+      // starts a new id when it differs (see the design block at the head of
+      // expandTemplatesSync). Clones, so the cached template isn't mutated.
+      if (fixedBlock.blocks && isBlocksMap(fixedBlock.blocks)) {
+        fixedBlock.blocks = stampNestedResolved(fixedBlock.blocks, instanceId, templateId);
+      }
       // Fixed but editable blocks: store content as placeholders on first insert
       if (firstInsert && !tplBlock.readOnly) {
         const placeholders = extractFieldPlaceholders(tplBlock);
@@ -2821,7 +2861,10 @@ export function expandTemplatesSync(inputItems, options = {}) {
           }
           newBlocksLayout[region] = newArr;
         }
-        filteredBlocks = newNestedBlocks;
+        // Stamp the nested subtree with resolved instance ids (same-template
+        // nesting keeps this instance id; a different nested templateId starts
+        // its own). Every block then carries its true instance id.
+        filteredBlocks = stampNestedResolved(newNestedBlocks, instanceId, templateId);
         filteredLayout = newBlocksLayout;
       }
 
