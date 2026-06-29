@@ -2344,6 +2344,73 @@ export async function expandTemplates(inputItems, options = {}) {
 }
 
 /**
+ * =============================================================================
+ * TEMPLATE MERGE — the single merge used for BOTH applying and saving templates.
+ * =============================================================================
+ *
+ * There is ONE merge (this file's expandTemplates / expandTemplatesSync). The
+ * admin-side `mergeTemplatesIntoPage` is a thin wrapper that calls THIS merge for
+ * BOTH directions — load (apply) and save — and only adds what a pure helper
+ * can't: async loading of referenced templates (loadTemplates). Region walking,
+ * nested containers, and instance-id stamping all live here and must NOT be
+ * re-implemented there (no separate `processBlocksRecursive`).
+ *
+ * ── WHAT A TEMPLATE MUST CONTAIN ──────────────────────────────────────────────
+ *  - `blocks`: one flat dict of blocks, shared by every region.
+ *  - `blocks_layout`: a dict of REGIONS (named ordered id lists). `items` is the
+ *    default region; others (e.g. `footer`) are declared in the schema. How a
+ *    region is stored is a choice; the merge treats all regions uniformly.
+ *  - Every template block carries:
+ *      • `slotId`     — stable identity used to MATCH a template slot to the
+ *                       corresponding instance block (matching is by slotId, not
+ *                       by block id — ids are regenerated on apply).
+ *      • `templateId` — which template the block belongs to (its source).
+ *      • `fixed` / `readOnly` — Volto flags; fixed blocks are template-owned.
+ *  - A template NEEDN'T carry a `templateInstanceId`, but it's fine if it does —
+ *    save is merge(template, page), so a saved template ends up with one. The id
+ *    is generated on apply (or reused if the page already holds an instance of
+ *    this template).
+ *  - EVERY block carries its RESOLVED instance id, stamped by the merge: walking
+ *    down, a child keeps the PARENT's id while its `templateId` matches, and
+ *    starts a NEW id the moment its `templateId` differs. So same-template
+ *    nesting is one instance; a different nested `templateId` is a nested
+ *    instance. Consumers then use the plain flat check
+ *    (`block.templateInstanceId === editedInstance`) — no ancestry walk needed.
+ *  - SLOT CONSTRAINT: slot blocks sharing a `slotId` must be CONTIGUOUS in their
+ *    region and that `slotId` must not be reused elsewhere in the same template
+ *    unless consecutive — so a slot maps to one unambiguous run of content.
+ *  - Nested containers are detected from DATA, never schema:
+ *      • blocks_layout container: a block with its own `blocks` + `blocks_layout`.
+ *      • object_list container: a block field holding an array whose items carry
+ *        `templateId` (idField defaults to `@id`).
+ *  - A template MAY embed a DIFFERENT template (a nested block whose `templateId`
+ *    differs from the one being applied). It is re-instanced as a SEPARATE
+ *    instance — a template-in-a-template. [NOT YET SUPPORTED: the merge currently
+ *    flattens it into the parent; see tnt tests.]
+ *
+ * ── HOW THE MERGE IS PERFORMED — merge(target, source) ────────────────────────
+ *  Overlay the SOURCE's slot content onto the TARGET's structure, matching by
+ *  `slotId`, recursing into every nested container and region, and:
+ *      • KEEP the TARGET's instance id (reuse the target's existing instance of
+ *        this template, else generate a fresh one),
+ *      • STRIP the SOURCE's instance id (it is never carried into the result).
+ *
+ *  There is no separate "forward" and "reverse" merge — same op, swapped roles:
+ *      APPLY = merge(page,     template)  page is target → page's instance id;
+ *                                         template content fills the slots.
+ *      SAVE  = merge(template, page)      template is target → its own fresh id;
+ *                                         the page's edits fill the slots; the
+ *                                         editing page's instance id is dropped.
+ *
+ *  A nested block whose `templateId` differs from the one being applied is a
+ *  foreign template: re-instanced with its own id. Because every block then
+ *  carries its true instance id, the plain flat unlock check naturally locks the
+ *  inner template when editing the outer (inner id !== edited id) — editing the
+ *  outer does not unlock the inner, which may have different edit permissions.
+ * =============================================================================
+ */
+
+/**
  * Synchronous version of expandTemplates.
  * Requires all templates to be pre-loaded in options.templates.
  * Falls back to options.loadTemplate (must be synchronous) if a required template
