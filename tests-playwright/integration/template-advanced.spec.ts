@@ -438,7 +438,7 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     expect(idxNew).toBe(idxContent2 + 1);
   });
 
-  test('nested template instance in grid shows simplified sidebar without settings form', async ({ page }) => {
+  test('same-template nesting folds into one instance — no Template-blocks virtual level, per-block settings on the nested block', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -449,26 +449,22 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
     await expect(headerBlock).toBeVisible({ timeout: 15000 });
 
-    // Click the grid cell to select it, then Escape to parent levels
+    // Click the grid cell to select it
     const { locator: gridCell } = await helper.waitForBlockByContent('Template Grid Cell 1');
     await gridCell.click();
     await helper.waitForSidebarOpen();
 
-    // The sidebar parent hierarchy should show both template levels:
-    // - "Template: test-layout" (top-level, with settings form)
-    // - "Template blocks" (nested inside grid, no settings form)
-
-    // Verify both labels are visible in the parent hierarchy
-    const nestedLabel = page.locator('button').filter({ hasText: /Template blocks/ });
+    // The grid is SAME-template nesting (grid block shares test-layout's templateId),
+    // so after recursive stamping it folds into the ONE test-layout instance: there is
+    // a single "Template: test-layout" level at the top (name + editTemplate live here),
+    // and NO separate "Template blocks" virtual level below it. The nested grid cell is
+    // a normal block carrying its own per-block fixed/readOnly settings.
     const topLabel = page.locator('button').filter({ hasText: /Template: test-layout/ });
-    await expect(nestedLabel).toBeVisible({ timeout: 5000 });
+    const nestedLabel = page.locator('button').filter({ hasText: /Template blocks/ });
     await expect(topLabel).toBeVisible({ timeout: 5000 });
+    await expect(nestedLabel).toHaveCount(0); // virtual sub-level is gone — that's correct
 
-    // The nested "Template blocks" section should NOT have template settings fields
-    expect(await helper.hasSidebarField('title', 'Template blocks')).toBe(false);
-    expect(await helper.hasSidebarField('editTemplate', 'Template blocks')).toBe(false);
-
-    // The top-level "Template: test-layout" section SHOULD have template settings fields
+    // The single instance level carries the template settings; nothing virtual below it.
     expect(await helper.hasSidebarField('title', 'Template: test-layout')).toBe(true);
     expect(await helper.hasSidebarField('editTemplate', 'Template: test-layout')).toBe(true);
   });

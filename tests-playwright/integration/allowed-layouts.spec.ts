@@ -654,6 +654,52 @@ test.describe('allowedLayouts', () => {
       await expect(persistedCell).toBeVisible({ timeout: 15000 });
     });
 
+    test('editing a forced-footer template lets you add + remove columns in the footer container (footer region)', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
+
+      await helper.login();
+      await helper.navigateToEdit('/another-page');
+      await helper.waitForIframeReady();
+
+      const footerContent = iframe.locator('#footer-content');
+      const branding = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Branding' }).last();
+      await expect(branding).toBeVisible({ timeout: 10000 });
+      const brandingId = await branding.getAttribute('data-block-uid');
+      const cell = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Column Cell' }).last();
+      await expect(cell).toBeVisible({ timeout: 10000 });
+      const cellId = await cell.getAttribute('data-block-uid');
+
+      // Enter template edit mode via the instance (branding -> parent instance).
+      await helper.clickBlockInIframe(brandingId);
+      await helper.waitForSidebarOpen();
+      await helper.escapeToParent();
+      const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+      await expect(editToggle).toBeVisible({ timeout: 5000 });
+      await editToggle.click();
+      await expect(page.locator('.field-wrapper-editTemplate input[type="checkbox"]')).toBeChecked({ timeout: 5000 });
+
+      // Navigate up to the columns container (cell -> column -> columns). This is a
+      // container in the FOOTER region — the forced-region canAdd case the recursive
+      // stamping fixes (the nested columns now carry the footer instance id).
+      await helper.clickBlockInIframe(cellId);
+      await helper.waitForBlockSelectedInAdmin(cellId);
+      await helper.escapeToParent(); // -> column
+      await helper.escapeToParent(); // -> columns
+
+      // Add + remove a COLUMN in the forced-footer columns container.
+      const columns = footerContent.locator('.columns-row > [data-block-uid]');
+      await expect(columns).toHaveCount(1);
+      await helper.addBlockViaSidebar('Columns'); // columns slot allowedBlocks: ['column'] → auto-insert
+      await expect(columns).toHaveCount(2);
+
+      const firstColId = await columns.first().getAttribute('data-block-uid');
+      await page.evaluate((id) => {
+        document.dispatchEvent(new CustomEvent('hydra-delete-blocks', { detail: { blockIds: [id] } }));
+      }, firstColId);
+      await expect(columns).toHaveCount(1);
+    });
+
     test('fixed block from forced layout is locked', async ({ page }) => {
       const helper = new AdminUIHelper(page);
       const iframe = helper.getIframe();

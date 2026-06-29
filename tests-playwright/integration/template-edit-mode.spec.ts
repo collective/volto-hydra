@@ -362,6 +362,46 @@ test.describe('Template Edit Mode - Editability', () => {
     await expect(cellLocator).toHaveCount(0, { timeout: 5000 });
   });
 
+  test('editing a template lets you add + remove children in a container (items region)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Enter template edit mode via the instance.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    await page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]').click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+
+    // Select a grid cell, then escape up to the grid container.
+    const { blockId: cellId } = await helper.waitForBlockByContent('Template Grid Cell 1');
+    await helper.clickBlockInIframe(cellId);
+    await helper.waitForBlockSelectedInAdmin(cellId);
+    await helper.escapeToParent();
+
+    // canAdd must resolve for the nested grid in edit mode — before recursive
+    // stamping the cells had no instance id and the Add control never showed.
+    // Assert against the iframe (render = source of truth, selection-independent).
+    // The merged grid has ONE real cell (fixture's tpl-grid-cell-2 is a markerless
+    // default the merge drops).
+    const gridCells = helper.getIframe().locator('.grid-row > [data-block-uid]');
+    await expect(gridCells).toHaveCount(1);
+
+    // ADD a child to the nested container while editing the template.
+    // (gridBlock allowedBlocks = ['teaser','image'].)
+    await helper.addBlockViaSidebar('Blocks', 'Teaser');
+    await expect(gridCells).toHaveCount(2);
+
+    // REMOVE a child from the nested container while editing the template.
+    await page.evaluate((id) => {
+      document.dispatchEvent(new CustomEvent('hydra-delete-blocks', { detail: { blockIds: [id] } }));
+    }, cellId);
+    await expect(gridCells).toHaveCount(1);
+  });
+
   test('blocks outside template become locked in edit mode', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
