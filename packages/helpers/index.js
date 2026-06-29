@@ -2549,6 +2549,23 @@ export async function expandTemplates(inputItems, options = {}) {
  *  inner template when editing the outer (inner id !== edited id) — editing the
  *  outer does not unlock the inner, which may have different edit permissions.
  *
+ * ── FILLING SLOTS, INCLUDING DEEP ONES ────────────────────────────────────────
+ *  A non-fixed slot is a PLACEHOLDER: it is filled with the source blocks sharing
+ *  its `slotId`, and the content MOVES to wherever the slot sits in the target —
+ *  even deep inside a fixed container. To make that work at any depth, the source
+ *  content is collected ONCE, deeply, by slotId into the instance state
+ *  (`ctx.pendingContent`, via collectContentFromTree) when the template is
+ *  encountered. Both the top-level emission and `buildNestedFilled` (which builds a
+ *  fixed container's nested subtree at EMIT time, recursing into deeper containers)
+ *  pull each slot's content from that one state by slotId — regardless of where in
+ *  the source it lived. A fixed-but-NON-readOnly nested block takes the source's
+ *  edited value + block id (the editable-fixed flow); readOnly keeps the template's
+ *  content. Crucially the deep slot is filled at emit time, NOT deferred to the
+ *  per-level re-entry — and filled content is stamped with the instance id ONLY
+ *  (never templateId, see above), so the re-entry passes it through rather than
+ *  re-applying. (Earlier the nested subtree was copied empty and the page's deep
+ *  content was dropped, because nothing consulted `ctx.pendingContent` at depth.)
+ *
  * ── RECOGNIZING NESTED CONTAINERS (the ONE non-JSON dependency — read this) ────
  *  This merge is otherwise pure JSON-in / JSON-out. The single exception: across
  *  the per-level (recursive) calls it remembers which dicts are nested containers
