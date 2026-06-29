@@ -10,7 +10,7 @@ import slateTransforms, { withEmptyInlineRemoval } from '../../utils/slateTransf
 import { syncCreateSlateBlock } from '@plone/volto-slate/utils/volto-blocks';
 import { getBlockById, updateBlockById } from '../../utils/blockPath';
 import { calculateDragHandlePosition, PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
-import { isSlateFieldType, isBlockPositionLocked, isBlockReadonly, isBlockReadonlyDeep } from '@volto-hydra/helpers';
+import { isSlateFieldType, isBlockPositionLocked, isBlockReadonly } from '@volto-hydra/helpers';
 import { useDispatch, useSelector } from 'react-redux';
 import FormatDropdown from './FormatDropdown';
 import DropdownMenu from './DropdownMenu';
@@ -1121,7 +1121,7 @@ const SyncedSlateToolbar = ({
   const blockType = block?.['@type'];
   const blockTypeFields = blockFieldTypes?.[blockType] || {};
   const fieldType = blockTypeFields[fieldName];
-  const blockIsReadonly = isBlockReadonlyDeep(selectedBlock, blockPathMap, block, templateEditMode);
+  const blockIsReadonly = isBlockReadonly(block, templateEditMode);
   const showFormatButtons = isSlateFieldType(fieldType) && !blockIsReadonly && !isMultiSelected;
 
   // CRITICAL: Only show Slate if we actually have a valid field value array
@@ -1338,7 +1338,7 @@ const SyncedSlateToolbar = ({
 
       {/* Field-specific buttons for linkable/media fields */}
       {/* Skip for readonly blocks */}
-      {(blockUI?.focusedLinkableField || blockUI?.focusedMediaField) && !isBlockReadonlyDeep(selectedBlock, blockPathMap, getBlock(selectedBlock), templateEditMode) && (
+      {(blockUI?.focusedLinkableField || blockUI?.focusedMediaField) && !isBlockReadonly(getBlock(selectedBlock), templateEditMode) && (
         <div style={{ pointerEvents: 'auto', display: 'flex', gap: '1px', alignItems: 'center', position: 'relative' }}>
           {blockUI?.focusedLinkableField && (
             <button
@@ -1558,7 +1558,7 @@ const SyncedSlateToolbar = ({
 
     {/* Media Field Overlays - show when block is selected, for each media field */}
     {/* Skip for readonly blocks - they shouldn't show media editing UI */}
-    {blockUI?.mediaFields && !isBlockReadonlyDeep(selectedBlock, blockPathMap, getBlock(selectedBlock), templateEditMode) && Object.entries(blockUI.mediaFields).map(([fieldName, fieldData]) => {
+    {blockUI?.mediaFields && !isBlockReadonly(getBlock(selectedBlock), templateEditMode) && Object.entries(blockUI.mediaFields).map(([fieldName, fieldData]) => {
       const mediaValue = getBlock(selectedBlock)?.[fieldName];
       const hasMediaValue = mediaValue && (
         (Array.isArray(mediaValue) && mediaValue.length > 0) ||

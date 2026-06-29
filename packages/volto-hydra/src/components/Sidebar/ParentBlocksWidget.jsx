@@ -31,7 +31,7 @@ import { getBlockById, updateBlockById, getResolvedSchema, getCommonAncestor } f
 import { HydraSchemaProvider } from '../../context';
 import { getConvertibleTypes, convertBlockType, findTypeField } from '../../utils/schemaInheritance';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
-import { isBlockReadonly, isBlockReadonlyDeep } from '@volto-hydra/helpers';
+import { isBlockReadonly } from '@volto-hydra/helpers';
 
 /**
  * Get the display title for a block type
@@ -269,7 +269,7 @@ const ParentBlockSection = ({
   // Use shared isBlockReadonly to handle template edit mode correctly
   const blockConfig = config.blocks?.blocksConfig?.[blockType];
   const useSchemaOnly = blockConfig?.disableCustomSidebarEditForm;
-  const isReadonly = isBlockReadonlyDeep(blockId, blockPathMap, blockData, templateEditMode);
+  const isReadonly = isBlockReadonly(blockData, templateEditMode);
   const BlockEdit = useSchemaOnly ? null : (isReadonly ? blockConfig?.view : blockConfig?.edit);
 
   // Get schema for fallback rendering (when no Edit component or disableCustomSidebarEditForm)

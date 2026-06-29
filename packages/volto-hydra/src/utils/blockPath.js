@@ -17,7 +17,7 @@ const applyBlockInitialValue = (blockData, blocksConfig, intl) => {
 };
 import config from '@plone/volto/registry';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
-import { isBlockReadonly, isBlockReadonlyDeep } from '@volto-hydra/helpers';
+import { isBlockReadonly } from '@volto-hydra/helpers';
 import {
   buildBlockPathMap as _buildBlockPathMap,
   getBlockTypeSchema,
@@ -566,7 +566,7 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   if (!block) return [];
 
   // Check if parent block is readonly (can't add to readonly containers)
-  const parentIsReadonly = isBlockReadonlyDeep(blockId, blockPathMap, block, templateEditMode);
+  const parentIsReadonly = isBlockReadonly(block, templateEditMode);
 
   const blockType = blockId === PAGE_BLOCK_UID ? '_page' : pathInfo?.blockType;
   if (!blockType) return [];
