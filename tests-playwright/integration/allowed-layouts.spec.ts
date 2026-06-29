@@ -690,10 +690,31 @@ test.describe('allowedLayouts', () => {
       // Add + remove a COLUMN in the forced-footer columns container.
       const columns = footerContent.locator('.columns-row > [data-block-uid]');
       await expect(columns).toHaveCount(1);
+      const firstColId = await columns.first().getAttribute('data-block-uid');
       await helper.addBlockViaSidebar('Columns'); // columns slot allowedBlocks: ['column'] → auto-insert
       await expect(columns).toHaveCount(2);
 
-      const firstColId = await columns.first().getAttribute('data-block-uid');
+      // The added column must be a REAL member of the slot region: the slotId stored
+      // on it (shown + editable in the sidebar as #field-slotId) must equal its
+      // neighbour's inherited value — not undefined or a fresh slot. A count-only
+      // assertion would still pass if the store-on-add path wrote the wrong slot.
+      // Clicking a column selects its inner cell, so select a cell and escape up to
+      // the column (the same nav the test uses above) to read the column's slotId.
+      await helper.clickBlockInIframe(cellId); // neighbour column's known cell
+      await helper.escapeToParent(); // -> neighbour column
+      await helper.waitForSidebarOpen();
+      const neighbourSlotId = await page.locator('#field-slotId').inputValue();
+
+      const newCellId = await columns.nth(1).locator('[data-block-uid]').first().getAttribute('data-block-uid');
+      await helper.clickBlockInIframe(newCellId); // new column's placeholder cell
+      await helper.escapeToParent(); // -> new column
+      await helper.waitForSidebarOpen();
+      const newSlotId = await page.locator('#field-slotId').inputValue();
+
+      expect(newSlotId).toBeTruthy();
+      expect(newSlotId).toBe(neighbourSlotId);
+
+      // Remove the column.
       await page.evaluate((id) => {
         document.dispatchEvent(new CustomEvent('hydra-delete-blocks', { detail: { blockIds: [id] } }));
       }, firstColId);
