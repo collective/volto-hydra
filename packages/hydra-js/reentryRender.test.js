@@ -261,6 +261,40 @@ const cases = [
       expect(h.value?.[0]?.text).toBe('PAGE H EDITED');
     },
   },
+  {
+    // Multiple page blocks sharing one slotId must ALL fill the deep slot, in order,
+    // between the fixed neighbours — the deep analogue of the flat "collects multiple
+    // blocks per slot" rule.
+    name: 'multiple per slot (deep): two page blocks with the same slotId fill the deep slot in order',
+    layout: ['pc'],
+    blocks: {
+      pc: {
+        '@type': 'columns', fixed: true, slotId: 'cols',
+        templateId: '/t/deepslot', templateInstanceId: 'm-1',
+        blocks: {
+          pcol: {
+            '@type': 'column', fixed: true, slotId: 'col', templateInstanceId: 'm-1',
+            blocks: {
+              ph: { '@type': 'slate', slotId: 'ch', templateInstanceId: 'm-1', value: [{ text: 'old H' }] },
+              pu1: { '@type': 'slate', slotId: 'default', templateInstanceId: 'm-1', value: [{ text: 'U1' }] },
+              pu2: { '@type': 'slate', slotId: 'default', templateInstanceId: 'm-1', value: [{ text: 'U2' }] },
+              pf: { '@type': 'slate', slotId: 'cf', templateInstanceId: 'm-1', value: [{ text: 'old F' }] },
+            },
+            blocks_layout: { items: ['ph', 'pu1', 'pu2', 'pf'] },
+          },
+        },
+        blocks_layout: { columns: ['pcol'] },
+      },
+    },
+    templates: { '/t/deepslot': deepSlotTemplate },
+    allowedLayouts: ['/t/deepslot'],
+    check: (out) => {
+      const cols = out.find((b) => b['@type'] === 'columns');
+      const col = cols.blocks[cols.blocks_layout.columns[0]];
+      const texts = col.blocks_layout.items.map((id) => col.blocks[id].value?.[0]?.text);
+      expect(texts).toEqual(['H', 'U1', 'U2', 'F']);
+    },
+  },
 ];
 
 describe('re-entry render harness', () => {
@@ -274,4 +308,12 @@ describe('re-entry render harness', () => {
       c.check(out);
     });
   }
+
+  test('idempotent: re-entering the deep-slot tree twice yields identical output', () => {
+    const opts = { templates: { '/t/deepslot': deepSlotTemplate }, allowedLayouts: ['/t/deepslot'] };
+    const once = renderReentry(['pc'], deepSlotPageBlocks, opts);
+    const twice = renderReentry(['pc'], deepSlotPageBlocks, opts);
+    // Deterministic ids (no foreign-template UUIDs) + same content → identical tree.
+    expect(twice).toEqual(once);
+  });
 });

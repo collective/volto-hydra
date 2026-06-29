@@ -107,4 +107,47 @@ describe('expandTemplatesSync: object_list arrays in template blocks', () => {
     expect(slideItems[1].fixed).toBe(true);
     expect(slideItems[1].readOnly).toBe(true);
   });
+
+  // KNOWN GAP (test.failing → flips to a failure when fixed): object_list re-entry
+  // re-applies the template on a recognition miss (proxy/clone). blocks_layout was
+  // fixed by NOT stamping templateId on nested content; object_list items must KEEP
+  // templateId for detection (val[0]?.templateId), so the fix is data-driven
+  // recognition — recognise an already-instanced object_list array as content to
+  // render, not a reference to re-apply — not the don't-stamp approach.
+  test.failing('object_list re-entry with a CLONED array (recognition miss) renders the items, not the whole template', () => {
+    const pageBlocks = {
+      'my-slider': {
+        '@type': 'slider', fixed: true, readOnly: true,
+        templateId: '/templates/with-slider', templateInstanceId: 'page-inst-1',
+        slides: [
+          { '@id': 's1', '@type': 'slide', title: 'Page Slide 1',
+            templateId: '/templates/with-slider', templateInstanceId: 'page-inst-1' },
+          { '@id': 's2', '@type': 'slide', title: 'Page Slide 2',
+            templateId: '/templates/with-slider', templateInstanceId: 'page-inst-1' },
+        ],
+      },
+    };
+    const templates = { '/templates/with-slider': templateData };
+    const templateState = {};
+
+    const items = expandTemplatesSync(['my-slider'], {
+      blocks: pageBlocks, templates, templateState, uuidGenerator,
+    });
+    const slider = items.find((i) => i['@type'] === 'slider');
+    expect(slider.slides.length).toBe(2);
+
+    // The renderer re-enters the slides, but across the per-level call boundary the
+    // array arrives as a Vue proxy / serialized copy, so the reference-keyed
+    // nestedContainers lookup MISSES (the same class of bug as the blocks_layout
+    // loop). Model that with a clone + the SAME templateState.
+    const clonedSlides = JSON.parse(JSON.stringify(slider.slides));
+    const slideItems = expandTemplatesSync(clonedSlides, {
+      templates, templateState, uuidGenerator, idField: '@id',
+    });
+
+    // Must render the two SLIDES — not re-apply the whole with-slider template
+    // (which would emit header/slider/default and recurse).
+    expect(slideItems.length).toBe(2);
+    expect(slideItems.every((s) => s['@type'] === 'slide')).toBe(true);
+  });
 });
