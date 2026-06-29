@@ -854,7 +854,7 @@
 
 </template>
 <script setup>
-import { ref, reactive, watch, nextTick, computed, toRefs, inject, onMounted } from 'vue';
+import { ref, reactive, watch, nextTick, computed, toRefs, inject, onMounted, unref } from 'vue';
 import { isEditMode } from '@hydra-js/hydra.js';
 import { staticBlocks, expandTemplatesSync } from '@hydra-js/helpers';
 import RichText from './richtext.vue';
@@ -991,8 +991,11 @@ function socialInfo(url) {
 // Expand child blocks: wraps expandTemplatesSync with injected context
 // For blocks dicts: expand(layout, blocks)
 // For object_list arrays: expand(items, null, '@id')
+// unref: `templates` is provided as a computed ref ([...slug].vue); the Vue-free
+// merge does Object.keys(templates), which on a raw ref yields ComputedRefImpl
+// internals → "template not found" 500. Unwrap to the plain object.
 const expand = (layout, blocks, idField) => expandTemplatesSync(layout, {
-  blocks, templateState, templates: injectedTemplates,
+  blocks, templateState, templates: unref(injectedTemplates),
   ...(idField && { idField }),
 });
 
