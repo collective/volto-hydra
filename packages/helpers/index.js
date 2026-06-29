@@ -2646,6 +2646,25 @@ export function expandTemplatesSync(inputItems, options = {}) {
     return processNestedTemplateLevel(blocks, layout, nestedInfo, templateState, options, addItem, items);
   }
 
+  // Data-driven object_list recognition — complements the reference-keyed
+  // nestedContainers check above, which MISSES when the caller passes a proxy /
+  // clone / deserialized copy of the array. An object_list array (idField set)
+  // whose items are already INSTANCED (carry templateInstanceId) is already-expanded
+  // CONTENT: the top-level expansion already applied the template, so render the
+  // items as-is rather than re-deriving a templateId from val[0] and re-applying the
+  // whole template (which re-produces the container → infinite recursion). This is
+  // the object_list analogue of blocks_layout's pass-through. allowedLayouts present
+  // means a forced apply / switch, which must still re-apply — so it's excluded.
+  if (idField && !allowedLayouts?.length && layout.length > 0) {
+    const firstItem = blocks[layout[0]];
+    if (firstItem?.templateId && firstItem?.templateInstanceId) {
+      for (const id of layout) {
+        if (blocks[id]) addItem(blocks[id], id);
+      }
+      return items;
+    }
+  }
+
   if (layout.length === 0 && !allowedLayouts?.length) {
     return items;
   }

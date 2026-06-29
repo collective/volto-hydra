@@ -108,13 +108,12 @@ describe('expandTemplatesSync: object_list arrays in template blocks', () => {
     expect(slideItems[1].readOnly).toBe(true);
   });
 
-  // KNOWN GAP (test.failing → flips to a failure when fixed): object_list re-entry
-  // re-applies the template on a recognition miss (proxy/clone). blocks_layout was
-  // fixed by NOT stamping templateId on nested content; object_list items must KEEP
-  // templateId for detection (val[0]?.templateId), so the fix is data-driven
-  // recognition — recognise an already-instanced object_list array as content to
-  // render, not a reference to re-apply — not the don't-stamp approach.
-  test.failing('object_list re-entry with a CLONED array (recognition miss) renders the items, not the whole template', () => {
+  // object_list re-entry must NOT re-apply the template on a recognition miss
+  // (proxy/clone). blocks_layout was fixed by not stamping templateId on nested
+  // content; object_list items must KEEP templateId for detection (val[0]?.templateId),
+  // so the fix is DATA-DRIVEN recognition: recognise an already-instanced object_list
+  // array as content to render, not a reference to re-apply.
+  test('object_list re-entry with a CLONED array (recognition miss) renders the items, not the whole template', () => {
     const pageBlocks = {
       'my-slider': {
         '@type': 'slider', fixed: true, readOnly: true,
