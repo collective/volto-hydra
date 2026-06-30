@@ -515,10 +515,12 @@ const ParentBlockSection = ({
 
       {/* Template block settings form - shown when editing a block inside a template during edit mode */}
       {(() => {
-        // Check if this block is inside the template being edited
+        // Check if this block is inside the template being edited. object_list items
+        // (slides, rows) are template members too — every block in a template can set
+        // fixed/readOnly, so they show this panel as well. Only the template-instance
+        // host block itself is excluded (it's the container, not a member).
         const isBlockInEditedTemplate = templateEditMode &&
           !pathInfo?.isTemplateInstance &&
-          !pathInfo?.isObjectListItem &&
           blockData &&
           blockData.templateId &&
           blockData.templateInstanceId === templateEditMode;
