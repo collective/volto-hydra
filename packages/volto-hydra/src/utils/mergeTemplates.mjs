@@ -91,16 +91,17 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
             const layoutItems = processedBlock.blocks_layout[fieldName];
             if (!Array.isArray(layoutItems) || layoutItems.length === 0) continue;
             hasBlocksLayout = true;
-            const fieldBlocks = {};
-            for (const id of layoutItems) {
-              if (processedBlock.blocks[id]) fieldBlocks[id] = processedBlock.blocks[id];
-            }
+            // Re-enter the nested level via the PUBLIC expand on the EMITTED dict
+            // (registered in nestedContainers when the container was emitted) with the
+            // SAME state — recognition hits and processNestedTemplateLevel fills this
+            // level's slots. (skipExpand=true on a subset left deep slots unfilled and
+            // missed recognition.) The admin just re-enters; the fill lives in expand.
             const { blocks: newFieldBlocks, layout: newRegionLayout } = await processBlocksRecursive(
-              fieldBlocks,
+              processedBlock.blocks,
               layoutItems,
               null,
               templateState,
-              true, // skip template expansion — already done
+              false,
             );
             Object.assign(mergedBlocks, newFieldBlocks);
             processedBlock.blocks_layout = {
@@ -157,16 +158,12 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
         const newLayoutDict = { ...block.blocks_layout };
         for (const [region, ids] of Object.entries(block.blocks_layout)) {
           if (!Array.isArray(ids)) continue;
-          const fieldBlocks = {};
-          for (const id of ids) {
-            if (block.blocks[id]) fieldBlocks[id] = block.blocks[id];
-          }
           const { blocks: newFieldBlocks, layout: newRegionLayout } = await processBlocksRecursive(
-            fieldBlocks,
+            block.blocks,
             ids,
             null,
             templateState,
-            true,
+            false,
           );
           Object.assign(mergedBlocks, newFieldBlocks);
           newLayoutDict[region] = newRegionLayout;

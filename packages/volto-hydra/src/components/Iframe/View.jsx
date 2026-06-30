@@ -239,7 +239,7 @@ import slateTransforms from '../../utils/slateTransforms';
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, _getContainerChildFieldName } from '../../utils/blockPath';
-import { canContainAll } from '@volto-hydra/helpers';
+import { canContainAll, getChildBlockEntries } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
@@ -1459,6 +1459,36 @@ const Iframe = (props) => {
 
     // Create block data (use custom data if provided)
     let blockData;
+
+    // Inherit template membership (templateId/slotId) for a block inserted into a
+    // container region — uniform across blocks_layout and object_list. Both are just an
+    // ordered region of child blocks; getChildBlockEntries (public helper) normalises the
+    // storage so this never branches on it. The neighbour is the LAST existing child for
+    // 'inside' (append at end), else the sibling blockId we insert relative to.
+    const inheritTemplateMembership = (bd) => {
+      const region = containerConfig?.region || 'items';
+      const containerId = action === 'inside' ? blockId : blockPathMap[blockId]?.parentId;
+      const container = containerId === PAGE_BLOCK_UID
+        ? formData
+        : getBlockById(formData, blockPathMap, containerId);
+      const entries = getChildBlockEntries(container, containerConfig);
+      const refIndex = entries.findIndex((entry) => entry.id === blockId);
+      const position = action === 'inside' ? entries.length
+        : action === 'after' ? refIndex + 1
+        : refIndex;
+      const insertAfter = action === 'after' || action === 'inside';
+      return applyBlockDefaultsWithContext(bd, {
+        items: entries.map((entry) => entry.block),
+        position,
+        insertAfter,
+        parentBlock: container,
+        containerId,
+        field: region,
+        blocksConfig: mergedBlocksConfig,
+        intl,
+      });
+    };
+
     if (customBlockData) {
       blockData = customBlockData;
     } else if (isObjectList) {
@@ -1513,25 +1543,8 @@ const Iframe = (props) => {
       // Initialize nested containers (e.g., cells in a row)
       blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, { intl, metadata, properties, siblingData, blockType: effectiveType });
 
-      // Inherit template fields from neighbors (same logic as blocks_layout)
-      if (action !== 'inside') {
-        const parentId = blockPathMap[blockId]?.parentId;
-        const parentBlock = parentId === PAGE_BLOCK_UID
-          ? formData
-          : getBlockById(formData, blockPathMap, parentId);
-        const existingItems = parentBlock ? getContainerItems(parentBlock, containerConfig) : [];
-        const idFld = containerConfig?.idField || fieldDef?.idField || '@id';
-        const refIndex = existingItems.findIndex(item => item[idFld] === blockId);
-        const position = action === 'after' ? refIndex + 1 : refIndex;
-
-          blockData = applyBlockDefaultsWithContext(blockData, {
-          position,
-          insertAfter: action === 'after',
-          items: existingItems,
-          blocksConfig: mergedBlocksConfig,
-          intl,
-        });
-      }
+      // Inherit template membership from the neighbour (uniform read; see helper above).
+      blockData = inheritTemplateMembership(blockData);
 
       // Store type in typeField, clean up @type if typeField is different
       blockData[typeFieldName] = effectiveType;
@@ -1545,27 +1558,8 @@ const Iframe = (props) => {
         blockData.value = [{ type: 'p', children: [{ text: '' }] }];
       }
 
-      // Calculate position for context
-      const containerId = containerConfig?.parentId || 'page';
-      const containerRegion = containerConfig?.region || 'items';
-      const container = containerId === 'page' ? formData : getBlockById(formData, blockPathMap, containerId);
-      const layoutItems = container?.blocks_layout?.[containerRegion] || [];
-      const refIndex = layoutItems.indexOf(blockId);
-      const position = action === 'after' ? refIndex + 1 : refIndex;
-
-      // Apply defaults with extended context for dynamic defaults
-      // insertAfter tells inheritance logic which neighbor to inherit template membership from
-      blockData = applyBlockDefaultsWithContext(blockData, {
-        containerId,
-        field: containerRegion,
-        position,
-        insertAfter: action === 'after',
-        layoutItems,
-        allBlocks: formData.blocks,
-        blockPathMap,
-        blocksConfig: mergedBlocksConfig,
-        intl,
-      });
+      // Inherit template membership from the neighbour (uniform read; see helper above).
+      blockData = inheritTemplateMembership(blockData);
 
       // Also apply regular applyBlockDefaults for non-context-aware schemas
       blockData = applyBlockDefaults({ data: blockData, formData: blockData, intl, metadata, properties });

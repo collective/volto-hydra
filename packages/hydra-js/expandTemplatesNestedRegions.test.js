@@ -21,18 +21,21 @@ describe('expandTemplatesSync — nested container in blocks_layout region (#234
         '@type': 'columns',
         fixed: true,
         readOnly: true,
+        templateId: '/templates/footer-layout',
         slotId: 'cols',
         blocks: {
           'col-1': {
             '@type': 'column',
             fixed: true,
             readOnly: true,
+            templateId: '/templates/footer-layout',
             slotId: 'col-1',
             blocks: {
               'txt-1': {
                 '@type': 'slate',
                 fixed: true,
                 readOnly: true,
+                templateId: '/templates/footer-layout',
                 slotId: 'txt-1',
                 value: [{ text: 'Footer text' }],
               },

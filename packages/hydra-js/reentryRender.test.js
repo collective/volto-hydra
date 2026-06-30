@@ -27,15 +27,15 @@ const isContainer = (b) =>
   b && b.blocks && typeof b.blocks === 'object' && !Array.isArray(b.blocks) && b.blocks_layout;
 
 function renderReentry(layout, blocks, { templates = {}, allowedLayouts } = {}) {
-  // ONE shared templateState — the renderer injects a single one. Across the
-  // per-level call boundary the data arrives as Vue reactive proxies / serialized
-  // copies, so we CLONE each level's blocks: that breaks the reference-keyed
-  // nestedContainers recognition (reproducing the renderer's miss, so a regression
-  // still loops) while the instance ctx — keyed by instanceId — survives, exactly
-  // like the real frontend. The result is assembled back into a tree so callers can
-  // assert the fully-rendered output (deep slots included).
+  // ONE shared templateState — the renderer injects a single one and passes it to
+  // every expand call (top-level + every nested re-entry). The re-entry is given the
+  // SAME blocks object the merge emitted (the frontend must pass raw data — toRaw,
+  // not a Vue proxy or a clone), so the reference-keyed nestedContainers lookup HITS
+  // and the container is recognised as already-expanded content (rendered, not
+  // re-applied). Passing a clone/proxy here would miss recognition and re-apply —
+  // that's the frontend-usage bug this models the CORRECT side of. The result is
+  // assembled back into a tree so callers can assert the fully-rendered output.
   const ts = {};
-  const clone = (o) => JSON.parse(JSON.stringify(o));
 
   const renderLevel = (lay, blks, allowed, depth) => {
     if (depth > DEPTH_CAP) {
@@ -56,7 +56,8 @@ function renderReentry(layout, blocks, { templates = {}, allowedLayouts } = {}) 
       const newLayout = {};
       for (const [region, ids] of Object.entries(block.blocks_layout)) {
         if (!Array.isArray(ids)) { newLayout[region] = ids; continue; }
-        const children = renderLevel(ids, clone(block.blocks), null, depth + 1);
+        // Same object the merge emitted — no clone (the frontend toRaw's its data).
+        const children = renderLevel(ids, block.blocks, null, depth + 1);
         newLayout[region] = children.map((c) => c['@uid']);
         for (const c of children) newBlocks[c['@uid']] = c;
       }
@@ -76,11 +77,11 @@ const footerTemplate = {
   '@id': '/t/footer',
   blocks: {
     cols: {
-      '@type': 'columns', fixed: true, readOnly: true, slotId: 'cols',
+      '@type': 'columns', fixed: true, readOnly: true, templateId: '/t/footer', slotId: 'cols',
       blocks: {
         'col-1': {
-          '@type': 'column', fixed: true, readOnly: true, slotId: 'col-1',
-          blocks: { 'txt-1': { '@type': 'slate', fixed: true, readOnly: true, slotId: 'txt-1', value: [{ text: 'Footer text' }] } },
+          '@type': 'column', fixed: true, readOnly: true, templateId: '/t/footer', slotId: 'col-1',
+          blocks: { 'txt-1': { '@type': 'slate', fixed: true, readOnly: true, templateId: '/t/footer', slotId: 'txt-1', value: [{ text: 'Footer text' }] } },
           blocks_layout: { items: ['txt-1'] },
         },
       },
@@ -111,14 +112,14 @@ const deepSlotTemplate = {
   '@id': '/t/deepslot',
   blocks: {
     cols: {
-      '@type': 'columns', fixed: true, slotId: 'cols',
+      '@type': 'columns', fixed: true, templateId: '/t/deepslot', slotId: 'cols',
       blocks: {
         col: {
-          '@type': 'column', fixed: true, slotId: 'col',
+          '@type': 'column', fixed: true, templateId: '/t/deepslot', slotId: 'col',
           blocks: {
-            h: { '@type': 'slate', fixed: true, readOnly: true, slotId: 'ch', value: [{ text: 'H' }] },
-            d: { '@type': 'slate', slotId: 'default' },
-            f: { '@type': 'slate', fixed: true, readOnly: true, slotId: 'cf', value: [{ text: 'F' }] },
+            h: { '@type': 'slate', fixed: true, readOnly: true, templateId: '/t/deepslot', slotId: 'ch', value: [{ text: 'H' }] },
+            d: { '@type': 'slate', templateId: '/t/deepslot', slotId: 'default' },
+            f: { '@type': 'slate', fixed: true, readOnly: true, templateId: '/t/deepslot', slotId: 'cf', value: [{ text: 'F' }] },
           },
           blocks_layout: { items: ['h', 'd', 'f'] },
         },
@@ -160,12 +161,12 @@ const fixedEditableTemplate = {
   '@id': '/t/fixededit',
   blocks: {
     cols: {
-      '@type': 'columns', fixed: true, slotId: 'cols',
+      '@type': 'columns', fixed: true, templateId: '/t/fixededit', slotId: 'cols',
       blocks: {
         col: {
-          '@type': 'column', fixed: true, slotId: 'col',
+          '@type': 'column', fixed: true, templateId: '/t/fixededit', slotId: 'col',
           blocks: {
-            h: { '@type': 'slate', fixed: true, slotId: 'ch', value: [{ text: 'TEMPLATE H' }] },
+            h: { '@type': 'slate', fixed: true, templateId: '/t/fixededit', slotId: 'ch', value: [{ text: 'TEMPLATE H' }] },
           },
           blocks_layout: { items: ['h'] },
         },
@@ -209,11 +210,13 @@ const cases = [
       const txt1 = col1.blocks[col1.blocks_layout.items[0]];
       expect(txt1.value).toEqual([{ text: 'Footer text' }]);
 
-      // Model invariant: nested CONTENT carries an instance id (attribution) but
-      // NO templateId; only the top instance block carries templateId.
-      expect(cols.templateId).toBeTruthy();
-      expect(col1.templateId).toBeUndefined();
-      expect(txt1.templateId).toBeUndefined();
+      // Model invariant: EVERY block keeps templateId (same-template nesting shares
+      // the instance's templateId + instanceId at every depth). Recognition of an
+      // already-expanded re-entry is via the shared templateState, not the absence
+      // of templateId.
+      expect(cols.templateId).toBe('/t/footer');
+      expect(col1.templateId).toBe('/t/footer');
+      expect(txt1.templateId).toBe('/t/footer');
       expect(col1.templateInstanceId).toBe(cols.templateInstanceId);
       expect(txt1.templateInstanceId).toBe(cols.templateInstanceId);
     },

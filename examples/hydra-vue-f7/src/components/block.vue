@@ -736,7 +736,8 @@ export default {
   },
   setup() {
     const templates = inject('templates', {});
-    const templateState = inject('templateState', {});
+    // No default — must be the one shared state provided at the page root.
+    const templateState = inject('templateState');
     const apiBase = inject('apiBase', '');
     const contextPath = inject('contextPath', '/');
     const activeCodeTab = ref(0);

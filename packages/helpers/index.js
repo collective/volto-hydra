@@ -1479,12 +1479,10 @@ function cloneBlockFilteringNested(block, uuidGenerator) {
     const nestedBlocks = {};
     const newBlocksLayout = {};
 
-    for (const [region, ids] of blocksLayoutRegions(cloned.blocks_layout)) {
+    for (const [region] of blocksLayoutRegions(cloned.blocks_layout)) {
       const newArr = [];
-      for (const nestedId of ids) {
-        const nestedBlock = cloned.blocks[nestedId];
-        if (!nestedBlock) continue;
-
+      // Shared, storage-agnostic child read (ids → blocks, drops dangling).
+      for (const { block: nestedBlock } of getChildBlockEntries(cloned, { region })) {
         // Only include nested blocks that have template markers
         if (nestedBlock.slotId || nestedBlock.templateId) {
           const newNestedId = uuidGenerator();
@@ -1608,6 +1606,38 @@ export function isFixedTemplateBlock(block) {
 export function isPlaceholderContent(block) {
   // Placeholder if it has templateId but is NOT fixed
   return block?.templateId && !block?.fixed;
+}
+
+/**
+ * The child blocks at a container's region, as ordered {id, block} entries — uniform
+ * across BOTH storages. blocks_layout and object_list are just two ways to lay out the
+ * same thing (a container's ordered region of child blocks); any caller that needs the
+ * actual child blocks (inheriting template membership, re-entering a container, …)
+ * should use this and never branch on storage.
+ *
+ * The caller supplies a descriptor — knowing WHICH fields are containers stays its job
+ * (the admin derives it from the schema, the merge data-drivenly), but the read shape
+ * is shared here so it isn't duplicated.
+ *
+ * @param {Object} parentBlock - the container block
+ * @param {Object} descriptor - { isObjectList, dataPath, region='items', idField='@id' }
+ * @returns {Array<{id: string, block: Object}>}
+ */
+export function getChildBlockEntries(parentBlock, descriptor = {}) {
+  const { isObjectList, dataPath, region = 'items', idField = '@id' } = descriptor;
+  if (isObjectList) {
+    // object_list: an array of block objects, possibly at a nested dataPath.
+    let arr = parentBlock;
+    for (const key of (dataPath || [region])) {
+      arr = arr?.[key];
+    }
+    return [...(arr || [])].map((block) => ({ id: block[idField], block }));
+  }
+  // blocks_layout: the region lists ids into the shared parent.blocks dict.
+  const ids = parentBlock?.blocks_layout?.[region] || [];
+  return ids
+    .map((id) => ({ id, block: parentBlock?.blocks?.[id] }))
+    .filter((entry) => entry.block);
 }
 
 /**
@@ -1990,114 +2020,35 @@ function collectContentFromTree(container, instanceId, pendingContent, standalon
 function stampNestedResolved(blocksDict, parentInstanceId, parentTemplateId) {
   const out = {};
   for (const [id, child] of Object.entries(blocksDict)) {
-    const sameTemplate = !child.templateId || child.templateId === parentTemplateId;
-    const childTemplateId = child.templateId || parentTemplateId;
+    // A well-formed template stores templateId on EVERY block. A nested block with
+    // none is malformed — it doesn't belong to the template — so DROP it rather than
+    // invent one. (`child.templateId || parentTemplateId` used to paper over malformed
+    // templates, e.g. a column/cell saved without templateId.) The ONLY block the
+    // merge adds templateId to is fresh user content placed into a slot (the slot
+    // fill), never the template structure here.
+    if (!child.templateId) continue;
+    // Same-template nesting shares ONE instance id at every depth; a foreign nested
+    // template (different templateId) starts a NEW instance. The flat
+    // templateInstanceId === editedInstance check relies on this, and it locks an
+    // inner template when editing the outer.
+    const sameTemplate = child.templateId === parentTemplateId;
     const childInstanceId = sameTemplate ? parentInstanceId : generateUUID();
-    // Stamp ONLY the resolved instance id (attribution). Do NOT write `templateId`:
-    // nested template CONTENT has none in the source template — only the top
-    // instance block carries templateId. expandTemplatesSync decides PER CALL
-    // whether to APPLY a template by scanning its blocks for a `templateId` (the
-    // re-entry "case 2"); content with no templateId is passed through ("case 3"),
-    // which is what TERMINATES the frontend's per-level recursion. Inventing a
-    // templateId here flips nested content from pass-through into
-    // re-apply-the-whole-template → infinite recursion. `childTemplateId` is used
-    // ONLY to drive boundary detection in the recursion below; a genuinely foreign
-    // nested template keeps its own templateId via the spread.
+    // Keep the child's OWN templateId (via the spread) — never overwrite or invent.
+    // The renderer re-enters each container's contents, and the merge recognises an
+    // already-expanded level via the SHARED templateState (nestedContainers, keyed by
+    // object reference) — so the frontend must pass the SAME object back (toRaw, not a
+    // clone/proxy). A re-entry that misses recognition re-applies the template; that
+    // is a frontend-usage bug, not a reason to strip templateId.
     const stamped = {
       ...child,
       templateInstanceId: childInstanceId,
     };
     if (stamped.blocks && isBlocksMap(stamped.blocks)) {
-      stamped.blocks = stampNestedResolved(stamped.blocks, childInstanceId, childTemplateId);
+      stamped.blocks = stampNestedResolved(stamped.blocks, childInstanceId, child.templateId);
     }
     out[id] = stamped;
   }
   return out;
-}
-
-/**
- * Build a fixed container's nested subtree for emission. Like stampNestedResolved
- * (keep fixed blocks, stamp the resolved instance id, recurse into deeper
- * containers) but ALSO fill every non-fixed slot from the instance-wide collected
- * state (`pendingContent`) by matching slotId — so a slot at ANY depth is filled
- * with content from anywhere in the page, exactly like the top-level slot branch
- * (~the `pendingContent.get(slotId)` emit below). The collection is done once when
- * the template is encountered (`collectContentFromTree`); here we consume it. An
- * empty slot keeps the template's slot block as a placeholder so the slot survives.
- * `emittedSlotIds` is shared with the top level so the same content is never reused
- * by two slots.
- *
- * @param {Object} tplBlocks - template blocks dict at this level
- * @param {Object} blocksLayout - template blocks_layout (regions dict) at this level
- * @param {string} instanceId - the enclosing instance's id
- * @param {string} templateId - the enclosing instance's templateId
- * @param {Map} pendingContent - slotId -> [{blockId, block}] collected page content
- * @param {Set} emittedSlotIds - slotIds already consumed (shared across the merge)
- * @returns {{blocks: Object, layout: Object}} filled + stamped subtree
- */
-function buildNestedFilled(tplBlocks, blocksLayout, instanceId, templateId, pendingContent, emittedSlotIds, existingFixedBlockIds) {
-  const blocks = {};
-  const layout = {};
-  for (const [region, ids] of blocksLayoutRegions(blocksLayout)) {
-    const arr = [];
-    for (const nestedId of ids) {
-      const nested = tplBlocks[nestedId];
-      if (!nested) continue;
-      if (!nested.fixed && nested.slotId) {
-        // Non-fixed slot placeholder — fill from the collected state by slotId.
-        const content = pendingContent.get(nested.slotId);
-        if (content && content.length > 0 && !emittedSlotIds.has(nested.slotId)) {
-          emittedSlotIds.add(nested.slotId);
-          for (const { blockId, block } of content) {
-            // Stamp the resolved instance id only, NEVER templateId: this content
-            // lives inside a container that the renderer re-enters, and a templateId
-            // here would make that re-entry re-apply the whole template → infinite
-            // recursion (same rule as stampNestedResolved).
-            blocks[blockId] = {
-              ...block,
-              templateInstanceId: instanceId,
-              slotId: nested.slotId,
-            };
-            arr.push(blockId);
-          }
-          pendingContent.delete(nested.slotId);
-        } else {
-          // No collected content — keep the template's slot block as a placeholder.
-          blocks[nestedId] = { ...nested, templateInstanceId: instanceId };
-          arr.push(nestedId);
-        }
-      } else if (nested.slotId || nested.templateId) {
-        // Fixed block (or a nested template reference): keep it, stamp the resolved
-        // instance id, and recurse into deeper containers to fill their slots too.
-        const sameTemplate = !nested.templateId || nested.templateId === templateId;
-        const childTemplateId = nested.templateId || templateId;
-        const childInstanceId = sameTemplate ? instanceId : generateUUID();
-        // Fixed but NOT readOnly: the position is locked but the content belongs to
-        // the page — reuse the page's block id + edited value (the editable-fixed
-        // flow, same as the top-level fixed branch). readOnly keeps the template's.
-        const existing = (nested.fixed && !nested.readOnly && nested.slotId)
-          ? existingFixedBlockIds?.get(nested.slotId)
-          : undefined;
-        const outId = existing?.blockId || nestedId;
-        const stamped = { ...nested, templateInstanceId: childInstanceId };
-        if (existing?.block) {
-          stamped.value = existing.block.value;
-        }
-        if (stamped.blocks && isBlocksMap(stamped.blocks)) {
-          const sub = buildNestedFilled(
-            stamped.blocks, stamped.blocks_layout,
-            childInstanceId, childTemplateId, pendingContent, emittedSlotIds, existingFixedBlockIds,
-          );
-          stamped.blocks = sub.blocks;
-          stamped.blocks_layout = sub.layout;
-        }
-        blocks[outId] = stamped;
-        arr.push(outId);
-      }
-    }
-    layout[region] = arr;
-  }
-  return { blocks, layout };
 }
 
 /**
@@ -2117,6 +2068,10 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
   const { templateBlocks, templateLayout } = nestedInfo;
   const { templateId, instanceId } = templateState;
   const { uuidGenerator, firstInsert } = options;
+  // Shared instance state: collected once at the instance (collectContentFromTree)
+  // and shared across every re-entry. Slots fill from ctx.pendingContent; fixed-but-
+  // editable blocks take their value from ctx.existingFixedBlockIds.
+  const ctx = templateState.instances?.[instanceId];
 
   // Build a map of document blocks by slotId for user content lookup
   const docBlocksBySlotId = new Map();
@@ -2138,8 +2093,14 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
     if (!tplBlock) continue;
 
     if (tplBlock.fixed) {
-      // Fixed block - emit template version
-      const blockId = uuidGenerator ? uuidGenerator() : `${instanceId}::${tplBlockId}`;
+      // Fixed block. If it's editable (not readOnly), reuse the page's block id +
+      // value from the shared collected state (the editable-fixed flow); readOnly
+      // keeps the template's content + a synthetic id.
+      const existingFixed = (!tplBlock.readOnly && tplBlock.slotId)
+        ? ctx?.existingFixedBlockIds?.get(tplBlock.slotId)
+        : undefined;
+      const blockId = existingFixed?.blockId
+        || (uuidGenerator ? uuidGenerator() : `${instanceId}::${tplBlockId}`);
 
       // Look ahead for next non-fixed slot at this nested level
       const tplIdx = templateLayout.indexOf(tplBlockId);
@@ -2181,6 +2142,7 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
         ...tplBlock,
         templateId: templateId,
         templateInstanceId: instanceId,
+        ...(existingFixed?.block ? { value: existingFixed.block.value } : {}),
         ...(nextSlotId && { nextSlotId }),
         ...(childSlotIds && { childSlotIds }),
       };
@@ -2200,9 +2162,12 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
       }
       addItem(fixedBlock, blockId);
 
-      // Register further nested containers (blocks_layout regions and object_list)
+      // Register further nested containers (blocks_layout regions and object_list).
+      // Key by the EMITTED dict (fixedBlock.blocks, stamped at line ~2192) — that's
+      // the object the renderer re-enters. Keying by tplBlock.blocks (the template's
+      // dict) would miss on re-entry, since the emitted block carries the stamped one.
       if (isContainer) {
-        templateState.nestedContainers.set(tplBlock.blocks, {
+        templateState.nestedContainers.set(fixedBlock.blocks, {
           templateBlockId: tplBlockId,
           templateBlocks: tplBlock.blocks,
           templateLayout: allRegionIds(tplBlock.blocks_layout),
@@ -2219,9 +2184,19 @@ function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateSt
         }
       }
     } else if (tplBlock.slotId) {
-      // Slot block - emit document content that goes here
+      // Slot block - emit content that goes here. Fill from the SHARED instance
+      // state (ctx.pendingContent: collected once at the instance via
+      // collectContentFromTree, shared across every re-entry) so a slot is filled by
+      // its slotId content from anywhere in the page; consume it so it isn't reused.
+      // Fall back to this level's own blocks if there's no instance ctx.
       const slotId = tplBlock.slotId;
-      const userContent = docBlocksBySlotId.get(slotId) || [];
+      const ctx = templateState.instances?.[instanceId];
+      let userContent = ctx?.pendingContent?.get(slotId);
+      if (userContent && userContent.length > 0) {
+        ctx.pendingContent.delete(slotId);
+      } else {
+        userContent = docBlocksBySlotId.get(slotId) || [];
+      }
       if (userContent.length > 0) {
         for (const { blockId, block } of userContent) {
           addItem(
@@ -2489,19 +2464,17 @@ export async function expandTemplates(inputItems, options = {}) {
  * ── FILLING SLOTS, INCLUDING DEEP ONES ────────────────────────────────────────
  *  A non-fixed slot is a PLACEHOLDER: it is filled with the source blocks sharing
  *  its `slotId`, and the content MOVES to wherever the slot sits in the target —
- *  even deep inside a fixed container. To make that work at any depth, the source
- *  content is collected ONCE, deeply, by slotId into the instance state
- *  (`ctx.pendingContent`, via collectContentFromTree) when the template is
- *  encountered. Both the top-level emission and `buildNestedFilled` (which builds a
- *  fixed container's nested subtree at EMIT time, recursing into deeper containers)
- *  pull each slot's content from that one state by slotId — regardless of where in
- *  the source it lived. A fixed-but-NON-readOnly nested block takes the source's
- *  edited value + block id (the editable-fixed flow); readOnly keeps the template's
- *  content. Crucially the deep slot is filled at emit time, NOT deferred to the
- *  per-level re-entry — and filled content is stamped with the instance id ONLY
- *  (never templateId, see above), so the re-entry passes it through rather than
- *  re-applying. (Earlier the nested subtree was copied empty and the page's deep
- *  content was dropped, because nothing consulted `ctx.pendingContent` at depth.)
+ *  even deep inside a fixed container. The source content is collected ONCE, deeply,
+ *  by slotId into the instance state (`ctx.pendingContent`, via collectContentFromTree)
+ *  when the template is encountered. Each expand call then fills only the slots AT
+ *  ITS LEVEL from that one shared state (consuming them): the top-level call fills
+ *  the top slots; each nested re-entry (processNestedTemplateLevel — expand called on
+ *  a container's children with the SAME state) fills that level's slots. A
+ *  fixed-but-NON-readOnly block takes the source's edited value + block id from
+ *  `ctx.existingFixedBlockIds` (the editable-fixed flow); readOnly keeps the
+ *  template's content. The fill happens PER LEVEL in the re-entry — never in-call for
+ *  deeper levels — so a slot is filled exactly once (filling both in-call and on
+ *  re-entry would duplicate the content).
  *
  * ── RECOGNIZING NESTED CONTAINERS (the ONE non-JSON dependency — read this) ────
  *  This merge is otherwise pure JSON-in / JSON-out. The single exception: across
@@ -2561,7 +2534,7 @@ export async function expandTemplates(inputItems, options = {}) {
 export function expandTemplatesSync(inputItems, options = {}) {
   const {
     blocks: blocksDict,
-    templateState = {},
+    templateState,
     templates,
     allowedLayouts,
     uuidGenerator,
@@ -2597,6 +2570,16 @@ export function expandTemplatesSync(inputItems, options = {}) {
 
   if (!templates) {
     throw new Error('expandTemplatesSync requires options.templates with pre-loaded templates');
+  }
+
+  // templateState is REQUIRED, with no default. It carries the cross-call
+  // recognition state (nestedContainers, instance ctx). It must be created ONCE per
+  // render and passed to EVERY expand call (top-level + every nested re-entry). A
+  // default {} would silently hand each call its own state, so a nested re-entry
+  // couldn't see what the top-level registered → it would re-apply the template →
+  // infinite recursion. Failing loudly forces callers to share one state.
+  if (!templateState) {
+    throw new Error('expandTemplatesSync requires options.templateState — create ONE per render and pass the same object to every expand call (top-level and every nested re-entry). There is no default on purpose.');
   }
 
   // Normalize items
@@ -2951,27 +2934,36 @@ export function expandTemplatesSync(inputItems, options = {}) {
             `\`blocks\` but no \`blocks_layout\` dict listing them by region.`,
           );
         }
-        // Build the nested subtree: keep fixed blocks (stamped, recursing) AND
-        // fill non-fixed slots from the collected state by slotId at every depth
-        // (a deep slot is otherwise emitted as the template's empty placeholder and
-        // the page's content for it is dropped).
-        const built = buildNestedFilled(
-          tplBlock.blocks, tplBlock.blocks_layout,
-          instanceId, templateId, pendingContent, emittedSlotIds, existingFixedBlockIds,
-        );
-        filteredBlocks = built.blocks;
-        filteredLayout = built.layout;
-        // childSlotIds hint: the first non-fixed direct-child slot.
-        for (const [, ids] of blocksLayoutRegions(tplBlock.blocks_layout)) {
-          for (const nestedId of ids) {
-            const nested = tplBlock.blocks[nestedId];
-            if (nested && !nested.fixed && nested.slotId) {
-              childSlotIds = { blocks: nested.slotId };
-              break;
+        // Emit ONE level of the template's nested structure: keep blocks that carry
+        // templateId (a well-formed template has it on EVERY block; a sub-block with
+        // none is malformed and is DROPPED, from both blocks and layout), stamp the
+        // resolved instance ids, and register the result for re-entry (below). Do NOT
+        // fill slots here — the
+        // renderer (and the admin) call expand on this container's children with the
+        // SAME shared state, and that re-entry fills the slots from ctx.pendingContent.
+        // Filling here too would double-process (the re-entry would re-emit what we
+        // already filled → duplicated slot content).
+        const newNestedBlocks = {};
+        const newBlocksLayout = {};
+        for (const [region] of blocksLayoutRegions(tplBlock.blocks_layout)) {
+          const newArr = [];
+          // Read this region's children through the shared, storage-agnostic helper
+          // (resolves ids → blocks and drops any dangling id) — the same reader the
+          // admin add-path uses, so the two sides don't duplicate container access.
+          for (const { id: nestedId, block: nested } of getChildBlockEntries(tplBlock, { region })) {
+            if (nested.templateId) {
+              newNestedBlocks[nestedId] = nested;
+              newArr.push(nestedId);
+              if (!nested.fixed && nested.slotId) {
+                if (!childSlotIds) childSlotIds = {};
+                if (!childSlotIds['blocks']) childSlotIds['blocks'] = nested.slotId;
+              }
             }
           }
-          if (childSlotIds) break;
+          newBlocksLayout[region] = newArr;
         }
+        filteredBlocks = stampNestedResolved(newNestedBlocks, instanceId, templateId);
+        filteredLayout = newBlocksLayout;
       }
 
       addItem(

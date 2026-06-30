@@ -46,7 +46,8 @@ const props = defineProps({
 
 // Inject template context for child block expansion (same as Block.vue)
 const injectedTemplates = inject('templates', {});
-const templateState = inject('templateState', {});
+// No default — must be the one shared state provided at the page root (see block.vue).
+const templateState = inject('templateState');
 
 // unref: `templates` is provided as a computed ref; the Vue-free merge does
 // Object.keys(templates), which on a raw ref yields ref internals → 500.

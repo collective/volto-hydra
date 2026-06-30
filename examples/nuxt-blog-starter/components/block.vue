@@ -863,7 +863,10 @@ import RichText from './richtext.vue';
 const injectedApiUrl = inject('apiUrl', '');
 const injectedContextPath = inject('contextPath', '/');
 const injectedTemplates = inject('templates', {});
-const templateState = inject('templateState', {});
+// No default: templateState MUST be provided once at the page root and shared by
+// every Block (top-level + nested). A default {} would give each component its own
+// state, breaking nested-container recognition (the merge throws if it's missing).
+const templateState = inject('templateState');
 const injectedPages = inject('pages', {});
 
 const props = defineProps({

@@ -664,7 +664,7 @@ describe('expandTemplates preserves untouched blocks', () => {
     };
     const layout = ['block-abc-123'];
 
-    const items = await expandTemplates(layout, { blocks });
+    const items = await expandTemplates(layout, { blocks, templateState: {} });
 
     expect(items.length).toBe(1);
     expect(items[0]['@uid']).toBe('block-abc-123');
@@ -703,6 +703,7 @@ describe('expandTemplates preserves untouched blocks', () => {
 
     const items = await expandTemplates(layout, {
       blocks,
+      templateState: {},
       loadTemplate: async () => templateData,
       allowedLayouts: ['/templates/test'], // Same template as already applied
     });
@@ -1092,14 +1093,15 @@ describe('nextSlotId and childSlotIds on fixed blocks', () => {
         'container': {
           '@type': 'gridBlock',
           fixed: true,
+          templateId: '/templates/t1',
           slotId: 'container',
           blocks: {
-            'cell-1': { '@type': 'slate', fixed: true, slotId: 'cell-1', value: [{ text: 'Cell 1' }] },
-            'cell-2': { '@type': 'slate', slotId: 'sidebar', value: [{ text: 'Sidebar content' }] },
+            'cell-1': { '@type': 'slate', fixed: true, templateId: '/templates/t1', slotId: 'cell-1', value: [{ text: 'Cell 1' }] },
+            'cell-2': { '@type': 'slate', templateId: '/templates/t1', slotId: 'sidebar', value: [{ text: 'Sidebar content' }] },
           },
           blocks_layout: { items: ['cell-1', 'cell-2'] },
         },
-        'slot': { '@type': 'slate', slotId: 'default', value: [] },
+        'slot': { '@type': 'slate', templateId: '/templates/t1', slotId: 'default', value: [] },
       },
       blocks_layout: { items: ['container', 'slot'] },
     };

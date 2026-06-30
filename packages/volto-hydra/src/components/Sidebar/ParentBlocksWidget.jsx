@@ -548,8 +548,14 @@ const ParentBlockSection = ({
             />
           </HydraSchemaProvider>
         );
-        // Portal to sidebar-template-settings (appears after block's regular settings)
-        const targetElement = document.getElementById('sidebar-template-settings');
+        // Portal each block's template settings to ITS OWN target — the current
+        // block's dedicated #sidebar-template-settings area, a parent's into its own
+        // #parent-sidebar-{id} section — the same per-block routing the regular
+        // settings use above. A single shared target stacked EVERY hierarchy block's
+        // template settings into the current block's area (showing it twice).
+        const targetElement = document.getElementById(
+          isCurrentBlock ? 'sidebar-template-settings' : `parent-sidebar-${blockId}`,
+        );
         return targetElement ? createPortal(formContent, targetElement) : null;
       })()}
     </div>

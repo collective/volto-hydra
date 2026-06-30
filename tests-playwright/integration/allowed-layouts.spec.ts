@@ -694,25 +694,30 @@ test.describe('allowedLayouts', () => {
       await helper.addBlockViaSidebar('Columns'); // columns slot allowedBlocks: ['column'] → auto-insert
       await expect(columns).toHaveCount(2);
 
-      // The added column must be a REAL member of the slot region: the slotId stored
-      // on it (shown + editable in the sidebar as #field-slotId) must equal its
-      // neighbour's inherited value — not undefined or a fresh slot. A count-only
-      // assertion would still pass if the store-on-add path wrote the wrong slot.
+      // The added column must be a REAL member of the slot region. Each column is its
+      // OWN slot (like the fixed footer-col-1), so the new column gets its own distinct
+      // stored slotId — not undefined, and not a copy of the neighbour's. Reading it
+      // from #sidebar-template-settings only succeeds when the new column IS a template
+      // member: that panel renders only for a block carrying templateId + the edited
+      // instanceId, so a truthy read here proves membership (store-on-add inherited
+      // template membership from its neighbour). A count-only assertion would still pass
+      // if store-on-add produced a non-member.
       // Clicking a column selects its inner cell, so select a cell and escape up to
       // the column (the same nav the test uses above) to read the column's slotId.
       await helper.clickBlockInIframe(cellId); // neighbour column's known cell
       await helper.escapeToParent(); // -> neighbour column
       await helper.waitForSidebarOpen();
-      const neighbourSlotId = await page.locator('#field-slotId').inputValue();
+      const neighbourSlotId = await page.locator('#sidebar-template-settings #field-slotId').inputValue();
 
       const newCellId = await columns.nth(1).locator('[data-block-uid]').first().getAttribute('data-block-uid');
       await helper.clickBlockInIframe(newCellId); // new column's placeholder cell
       await helper.escapeToParent(); // -> new column
       await helper.waitForSidebarOpen();
-      const newSlotId = await page.locator('#field-slotId').inputValue();
+      const newSlotId = await page.locator('#sidebar-template-settings #field-slotId').inputValue();
 
-      expect(newSlotId).toBeTruthy();
-      expect(newSlotId).toBe(neighbourSlotId);
+      expect(neighbourSlotId).toBeTruthy(); // the existing fixed column is a member
+      expect(newSlotId).toBeTruthy();       // the new column is ALSO a member (own stored slotId)
+      expect(newSlotId).not.toBe(neighbourSlotId); // each column is its OWN distinct slot
 
       // Remove the column.
       await page.evaluate((id) => {
