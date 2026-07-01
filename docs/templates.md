@@ -105,7 +105,7 @@ for (const item of items) {
 Options:
 
 - **`blocks`**: Map of blockId -> block data
-- **`templateState`**: Pass `{}` and share across calls — tracks state for nested containers
+- **`templateState`**: Pass a fresh `{}` per page render and share it across **every** `expandTemplatesSync` call (top-level and every nested container re-entry). It records the template instances minted this render so a container's re-entry is recognized as already-expanded content and passed through. Recognition is **data-derived** (by `templateInstanceId`), so it is safe to hand blocks back as a Vue reactive value, a clone, or a `postMessage` copy — no `toRaw` needed.
 - **`templates`**: (sync only) Pre-fetched map of templateId -> template data
 - **`loadTemplate(id)`**: (async only) Function to fetch template content
 - **`allowedLayouts`**: Force a layout when container has no template applied

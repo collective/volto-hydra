@@ -41,7 +41,7 @@ describe('expandTemplatesSync: object_list arrays in template blocks', () => {
     blocks_layout: { items: ['header', 'slider-block', 'default-slot'] },
   };
 
-  test('object_list arrays are registered in nestedContainers for nested expansion', () => {
+  test('object_list arrays are fully expanded + instanced at apply time (data-derived re-entry)', () => {
     const pageBlocks = {
       'my-header': {
         '@type': 'slate', fixed: true,
@@ -83,8 +83,10 @@ describe('expandTemplatesSync: object_list arrays in template blocks', () => {
     expect(sliderItem.slides).toBeDefined();
     expect(sliderItem.slides.length).toBe(2);
 
-    // The slides array should be registered in nestedContainers
-    expect(templateState.nestedContainers.has(sliderItem.slides)).toBe(true);
+    // Data-derived model: the slides are fully expanded + instanced at apply time —
+    // each item carries the minted templateInstanceId, which is how re-entry (Step 2)
+    // recognizes them. No object-identity nestedContainers registration.
+    expect(sliderItem.slides[0].templateInstanceId).toBe('page-inst-1');
 
     // Step 2: Expand the slides (like a child BlocksRenderer for the object_list)
     const slideItems = expandTemplatesSync(sliderItem.slides, {

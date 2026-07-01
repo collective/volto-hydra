@@ -889,6 +889,63 @@ describe('multiple template instances with shared templateState', () => {
     expect(wrongHeader).toBeUndefined();
   });
 
+  test('two containers of the SAME template on one page keep separate instanceIds + content', async () => {
+    // The data-derived recognition (by minted templateInstanceId) must keep two
+    // instances of the same template independent — no cross-contamination of slot
+    // content, distinct instance ids, each container re-enters as ITS own instance.
+    const cardTemplate = {
+      '@id': '/templates/card',
+      blocks: {
+        'card': {
+          '@type': 'columns', fixed: true, readOnly: true,
+          templateId: '/templates/card', slotId: 'card',
+          blocks: {
+            'card-body': { '@type': 'slate', templateId: '/templates/card', slotId: 'body' },
+          },
+          blocks_layout: { items: ['card-body'] },
+        },
+      },
+      blocks_layout: { items: ['card'] },
+    };
+    // A loaded page with TWO card instances (e.g. the user inserted the card twice),
+    // each carrying its own instanceId and its own body content.
+    const page = {
+      blocks: {
+        'cardA': {
+          '@type': 'columns', fixed: true, readOnly: true,
+          templateId: '/templates/card', templateInstanceId: 'inst-A', slotId: 'card',
+          blocks: { 'bodyA': { '@type': 'slate', templateId: '/templates/card', templateInstanceId: 'inst-A', slotId: 'body', value: [{ text: 'Body A' }] } },
+          blocks_layout: { items: ['bodyA'] },
+        },
+        'cardB': {
+          '@type': 'columns', fixed: true, readOnly: true,
+          templateId: '/templates/card', templateInstanceId: 'inst-B', slotId: 'card',
+          blocks: { 'bodyB': { '@type': 'slate', templateId: '/templates/card', templateInstanceId: 'inst-B', slotId: 'body', value: [{ text: 'Body B' }] } },
+          blocks_layout: { items: ['bodyB'] },
+        },
+      },
+      blocks_layout: { items: ['cardA', 'cardB'] },
+    };
+    const { merged } = await mergeTemplatesIntoPage(page, {
+      loadTemplate: async () => cardTemplate,
+      pageBlocksFields: { items: {} },
+      uuidGenerator: (() => { let c = 0; return () => `u-${++c}`; })(),
+    });
+
+    const cards = Object.values(merged.blocks).filter((b) => b.slotId === 'card');
+    expect(cards.length).toBe(2); // both instances survive
+    expect(new Set(cards.map((c) => c.templateInstanceId)).size).toBe(2); // distinct
+
+    const bodyText = (card) =>
+      Object.values(card.blocks || {}).find((b) => b.slotId === 'body')?.value?.[0]?.text;
+    const cardWith = (text) => cards.find((c) => bodyText(c) === text);
+    const cA = cardWith('Body A');
+    const cB = cardWith('Body B');
+    expect(cA).toBeDefined(); // Body A stayed in its own card
+    expect(cB).toBeDefined(); // Body B stayed in its own card
+    expect(cA.templateInstanceId).not.toBe(cB.templateInstanceId);
+  });
+
   test('expandTemplatesSync: blocks field without template passes through unchanged', () => {
     // Main blocks - has forced layout
     const mainBlocks = {

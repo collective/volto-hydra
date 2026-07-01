@@ -2003,234 +2003,101 @@ function collectContentFromTree(container, instanceId, pendingContent, standalon
   }
 }
 
+
 /**
- * Stamp the RESOLVED instance id on every block in a nested subtree (clones).
- *
- * Boundary rule: a child keeps the parent's instance id while its `templateId`
- * matches (same-template nesting = one instance at every depth); a child whose
- * `templateId` differs starts a NEW instance (a nested template). This is what
- * lets consumers use the flat `templateInstanceId === editedInstance` check with
- * no ancestry walk, and what locks an inner template when editing the outer.
- *
- * @param {Object} blocksDict - nested blocks dict to stamp (not mutated)
- * @param {string} parentInstanceId - the enclosing instance's id
- * @param {string} parentTemplateId - the enclosing instance's templateId
- * @returns {Object} a new blocks dict with every block stamped
+ * Fill ONE region's ordered template blocks — the SAME logic for a blocks_layout
+ * region and an object_list array (they are one concept: an ordered list of blocks,
+ * differing only in storage). Drops orphans (no templateId — never invents one), keeps
+ * fixed blocks (preserving the template id, or the page's id+value when the page
+ * overrode an editable one), replaces slot placeholders with the page's content from
+ * the shared ctx (consumed so it isn't reused), and recurses into nested containers.
+ * Returns filled [{ id, block }] in order.
  */
-function stampNestedResolved(blocksDict, parentInstanceId, parentTemplateId) {
-  const out = {};
-  for (const [id, child] of Object.entries(blocksDict)) {
-    // A well-formed template stores templateId on EVERY block. A nested block with
-    // none is malformed — it doesn't belong to the template — so DROP it rather than
-    // invent one. (`child.templateId || parentTemplateId` used to paper over malformed
-    // templates, e.g. a column/cell saved without templateId.) The ONLY block the
-    // merge adds templateId to is fresh user content placed into a slot (the slot
-    // fill), never the template structure here.
-    if (!child.templateId) continue;
-    // Same-template nesting shares ONE instance id at every depth; a foreign nested
-    // template (different templateId) starts a NEW instance. The flat
-    // templateInstanceId === editedInstance check relies on this, and it locks an
-    // inner template when editing the outer.
-    const sameTemplate = child.templateId === parentTemplateId;
-    const childInstanceId = sameTemplate ? parentInstanceId : generateUUID();
-    // Keep the child's OWN templateId (via the spread) — never overwrite or invent.
-    // The renderer re-enters each container's contents, and the merge recognises an
-    // already-expanded level via the SHARED templateState (nestedContainers, keyed by
-    // object reference) — so the frontend must pass the SAME object back (toRaw, not a
-    // clone/proxy). A re-entry that misses recognition re-applies the template; that
-    // is a frontend-usage bug, not a reason to strip templateId.
-    const stamped = {
-      ...child,
-      templateInstanceId: childInstanceId,
-    };
-    if (stamped.blocks && isBlocksMap(stamped.blocks)) {
-      stamped.blocks = stampNestedResolved(stamped.blocks, childInstanceId, child.templateId);
+function fillRegionEntries(entries, templateState, options) {
+  const { instanceId, templateId } = templateState;
+  const ctx = templateState.instances?.[instanceId];
+  const { uuidGenerator, firstInsert } = options;
+  const out = [];
+  for (let idx = 0; idx < entries.length; idx++) {
+    const { id: tplChildId, block: child } = entries[idx];
+    if (!child || !child.templateId) continue; // orphan / missing → drop
+
+    if (child.fixed) {
+      const editable = !child.readOnly && !!child.slotId;
+      const existingFixed = editable ? ctx?.existingFixedBlockIds?.get(child.slotId) : undefined;
+      const outId = existingFixed?.blockId || tplChildId;
+      // Look ahead for the next non-fixed slot in this region (add-path hint).
+      let nextSlotId = undefined;
+      for (let i = idx + 1; i < entries.length; i++) {
+        const nb = entries[i].block;
+        if (nb && !nb.fixed && nb.slotId) { nextSlotId = nb.slotId; break; }
+        if (nb?.fixed) break;
+      }
+      const stamped = {
+        ...child,
+        templateInstanceId: instanceId,
+        ...(existingFixed?.block ? { value: existingFixed.block.value } : {}),
+        ...(nextSlotId && { nextSlotId }),
+      };
+      if (firstInsert && editable) {
+        const placeholders = extractFieldPlaceholders(child);
+        if (Object.keys(placeholders).length > 0) stamped.fieldPlaceholders = placeholders;
+      }
+      fillContainerInto(stamped, child, templateState, options);
+      out.push({ id: outId, block: stamped });
+    } else if (child.slotId) {
+      const slotId = child.slotId;
+      const userContent = ctx?.pendingContent?.get(slotId);
+      if (userContent && userContent.length > 0) {
+        ctx.pendingContent.delete(slotId);
+        for (const { blockId, block } of userContent) {
+          out.push({ id: blockId, block: { ...block, templateId, templateInstanceId: instanceId, slotId } });
+        }
+      } else if (firstInsert) {
+        const nid = uuidGenerator ? uuidGenerator() : `${instanceId}::${tplChildId}`;
+        const nb = { ...child, templateInstanceId: instanceId };
+        const placeholders = extractFieldPlaceholders(child);
+        if (Object.keys(placeholders).length > 0) nb.fieldPlaceholders = placeholders;
+        out.push({ id: nid, block: nb });
+      }
     }
-    out[id] = stamped;
   }
   return out;
 }
 
 /**
- * Process blocks at a nested level inside a fixed template container.
- * Called when expandTemplates recognizes we're inside a registered nested container.
- *
- * @param {Object} docBlocks - The document's blocks at this nested level
- * @param {Array} docLayout - The document's layout at this nested level
- * @param {Object} nestedInfo - Info about the template structure at this level
- * @param {Object} templateState - Shared template state
- * @param {Object} options - Original options passed to expandTemplates
- * @param {Function} addItem - Helper to add items to result
- * @param {Array} items - Result array to populate
- * @returns {Array} Items with @uid field
+ * Fully expand a container's child regions IN PLACE onto `stamped` at APPLY time —
+ * every blocks_layout region AND every object_list array field, through ONE path
+ * (fillRegionEntries). After this the children are COMPLETE, so the renderer's
+ * re-entry only recognizes the minted templateInstanceId and passes them through — no
+ * deferred re-derivation and no object-identity Map (which missed whenever the caller
+ * handed back a Vue reactive proxy / clone / postMessage copy of the dict → infinite
+ * re-application). blocks_layout and object_list differ only in storage, not meaning.
  */
-function processNestedTemplateLevel(docBlocks, docLayout, nestedInfo, templateState, options, addItem, items) {
-  const { templateBlocks, templateLayout } = nestedInfo;
-  const { templateId, instanceId } = templateState;
-  const { uuidGenerator, firstInsert } = options;
-  // Shared instance state: collected once at the instance (collectContentFromTree)
-  // and shared across every re-entry. Slots fill from ctx.pendingContent; fixed-but-
-  // editable blocks take their value from ctx.existingFixedBlockIds.
-  const ctx = templateState.instances?.[instanceId];
-
-  // Build a map of document blocks by slotId for user content lookup
-  const docBlocksBySlotId = new Map();
-  for (const blockId of docLayout) {
-    const block = docBlocks[blockId];
-    if (block?.slotId) {
-      if (!docBlocksBySlotId.has(block.slotId)) {
-        docBlocksBySlotId.set(block.slotId, []);
-      }
-      docBlocksBySlotId.get(block.slotId).push({ blockId, block });
+function fillContainerInto(stamped, tplBlock, templateState, options) {
+  if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
+    const outBlocks = {};
+    const outLayout = {};
+    for (const [region] of blocksLayoutRegions(tplBlock.blocks_layout)) {
+      const entries = (tplBlock.blocks_layout?.[region] || []).map(
+        (id) => ({ id, block: tplBlock.blocks?.[id] }),
+      );
+      const filled = fillRegionEntries(entries, templateState, options);
+      for (const { id, block } of filled) outBlocks[id] = block;
+      outLayout[region] = filled.map((e) => e.id);
+    }
+    stamped.blocks = outBlocks;
+    stamped.blocks_layout = outLayout;
+  }
+  for (const [key, val] of Object.entries(tplBlock)) {
+    if (Array.isArray(val) && val.length > 0 && val[0]?.templateId) {
+      const entries = val.map((item) => ({ id: item['@id'], block: item }));
+      const filled = fillRegionEntries(entries, templateState, options);
+      stamped[key] = filled.map((e) => ({ ...e.block, '@id': e.id }));
     }
   }
-
-  // Process the template layout at this nested level
-  // Only emit blocks that have template markers (fixed or slotId)
-  // Blocks without markers are just defaults and should NOT be synced
-  for (const tplBlockId of templateLayout) {
-    const tplBlock = templateBlocks[tplBlockId];
-    if (!tplBlock) continue;
-
-    if (tplBlock.fixed) {
-      // Fixed block. If it's editable (not readOnly), reuse the page's block id +
-      // value from the shared collected state (the editable-fixed flow); readOnly
-      // keeps the template's content + a synthetic id.
-      const existingFixed = (!tplBlock.readOnly && tplBlock.slotId)
-        ? ctx?.existingFixedBlockIds?.get(tplBlock.slotId)
-        : undefined;
-      const blockId = existingFixed?.blockId
-        || (uuidGenerator ? uuidGenerator() : `${instanceId}::${tplBlockId}`);
-
-      // Look ahead for next non-fixed slot at this nested level
-      const tplIdx = templateLayout.indexOf(tplBlockId);
-      let nextSlotId = undefined;
-      for (let i = tplIdx + 1; i < templateLayout.length; i++) {
-        const nextTplBlock = templateBlocks[templateLayout[i]];
-        if (nextTplBlock && !nextTplBlock.fixed && nextTplBlock.slotId) {
-          nextSlotId = nextTplBlock.slotId;
-          break;
-        }
-        if (nextTplBlock?.fixed) break;
-      }
-
-      // childSlotIds for nested containers. A container's children are ordered
-      // by the named regions in its `blocks_layout` dict (#234); we throw if
-      // `blocks` is present but `blocks_layout` isn't, surfacing malformed
-      // templates loudly.
-      let childSlotIds = undefined;
-      const isContainer = hasNestedBlocksLayout(tplBlock);
-      if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
-        if (!isContainer) {
-          throw new Error(
-            `processNestedTemplateLevel: template block "${tplBlockId}" has nested ` +
-            `\`blocks\` but no \`blocks_layout\` dict listing them by region.`,
-          );
-        }
-        const innerLayout = allRegionIds(tplBlock.blocks_layout);
-        for (const nestedId of innerLayout) {
-          const nested = tplBlock.blocks[nestedId];
-          if (nested && !nested.fixed && nested.slotId) {
-            if (!childSlotIds) childSlotIds = {};
-            childSlotIds['blocks'] = nested.slotId;
-            break;
-          }
-        }
-      }
-
-      const fixedBlock = {
-        ...tplBlock,
-        templateId: templateId,
-        templateInstanceId: instanceId,
-        ...(existingFixed?.block ? { value: existingFixed.block.value } : {}),
-        ...(nextSlotId && { nextSlotId }),
-        ...(childSlotIds && { childSlotIds }),
-      };
-      // Every block carries its RESOLVED instance id — stamp the nested subtree
-      // too: a child keeps THIS instance id while its templateId matches, and
-      // starts a new id when it differs (see the design block at the head of
-      // expandTemplatesSync). Clones, so the cached template isn't mutated.
-      if (fixedBlock.blocks && isBlocksMap(fixedBlock.blocks)) {
-        fixedBlock.blocks = stampNestedResolved(fixedBlock.blocks, instanceId, templateId);
-      }
-      // Fixed but editable blocks: store content as placeholders on first insert
-      if (firstInsert && !tplBlock.readOnly) {
-        const placeholders = extractFieldPlaceholders(tplBlock);
-        if (Object.keys(placeholders).length > 0) {
-          fixedBlock.fieldPlaceholders = placeholders;
-        }
-      }
-      addItem(fixedBlock, blockId);
-
-      // Register further nested containers (blocks_layout regions and object_list).
-      // Key by the EMITTED dict (fixedBlock.blocks, stamped at line ~2192) — that's
-      // the object the renderer re-enters. Keying by tplBlock.blocks (the template's
-      // dict) would miss on re-entry, since the emitted block carries the stamped one.
-      if (isContainer) {
-        templateState.nestedContainers.set(fixedBlock.blocks, {
-          templateBlockId: tplBlockId,
-          templateBlocks: tplBlock.blocks,
-          templateLayout: allRegionIds(tplBlock.blocks_layout),
-        });
-      }
-      for (const val of Object.values(tplBlock)) {
-        if (Array.isArray(val) && val.length > 0 && val[0]?.templateId) {
-          const itemIdField = '@id';
-          templateState.nestedContainers.set(val, {
-            templateBlockId: tplBlockId,
-            templateBlocks: Object.fromEntries(val.map(item => [item[itemIdField], item])),
-            templateLayout: val.map(item => item[itemIdField]),
-          });
-        }
-      }
-    } else if (tplBlock.slotId) {
-      // Slot block - emit content that goes here. Fill from the SHARED instance
-      // state (ctx.pendingContent: collected once at the instance via
-      // collectContentFromTree, shared across every re-entry) so a slot is filled by
-      // its slotId content from anywhere in the page; consume it so it isn't reused.
-      // Fall back to this level's own blocks if there's no instance ctx.
-      const slotId = tplBlock.slotId;
-      const ctx = templateState.instances?.[instanceId];
-      let userContent = ctx?.pendingContent?.get(slotId);
-      if (userContent && userContent.length > 0) {
-        ctx.pendingContent.delete(slotId);
-      } else {
-        userContent = docBlocksBySlotId.get(slotId) || [];
-      }
-      if (userContent.length > 0) {
-        for (const { blockId, block } of userContent) {
-          addItem(
-            {
-              ...block,
-              templateId: templateId,
-              templateInstanceId: instanceId,
-              slotId: slotId,
-            },
-            blockId
-          );
-        }
-      } else if (firstInsert) {
-        // First insert with no user content — copy template slot block
-        // with its content values stored as fieldPlaceholders
-        const blockId = uuidGenerator ? uuidGenerator() : `${instanceId}::${tplBlockId}`;
-        const newBlock = {
-          ...tplBlock,
-          templateId: templateId,
-          templateInstanceId: instanceId,
-        };
-        const placeholders = extractFieldPlaceholders(tplBlock);
-        if (Object.keys(placeholders).length > 0) {
-          newBlock.fieldPlaceholders = placeholders;
-        }
-        addItem(newBlock, blockId);
-      }
-    }
-    // Skip blocks without fixed or slotId - they're just template defaults
-    // and should NOT be synced to the document
-  }
-
-  return items;
 }
+
 
 /**
  * Load all templates referenced in data, including nested templates.
@@ -2466,44 +2333,38 @@ export async function expandTemplates(inputItems, options = {}) {
  *  its `slotId`, and the content MOVES to wherever the slot sits in the target —
  *  even deep inside a fixed container. The source content is collected ONCE, deeply,
  *  by slotId into the instance state (`ctx.pendingContent`, via collectContentFromTree)
- *  when the template is encountered. Each expand call then fills only the slots AT
- *  ITS LEVEL from that one shared state (consuming them): the top-level call fills
- *  the top slots; each nested re-entry (processNestedTemplateLevel — expand called on
- *  a container's children with the SAME state) fills that level's slots. A
- *  fixed-but-NON-readOnly block takes the source's edited value + block id from
- *  `ctx.existingFixedBlockIds` (the editable-fixed flow); readOnly keeps the
- *  template's content. The fill happens PER LEVEL in the re-entry — never in-call for
- *  deeper levels — so a slot is filled exactly once (filling both in-call and on
- *  re-entry would duplicate the content).
+ *  when the template is encountered, then the WHOLE template is expanded in that ONE
+ *  pass: the top-level call fills the top slots and, for every nested container,
+ *  recurses (fillContainerInto → fillRegionEntries) to fill that container's slots
+ *  too — ALL levels, up front. A fixed-but-NON-readOnly block takes the source's
+ *  edited value + block id from `ctx.existingFixedBlockIds` (the editable-fixed flow);
+ *  readOnly keeps the template's content. Each slot's content is consumed as it fills,
+ *  so it lands exactly once. The renderer's per-container re-entry then only RECOGNIZES
+ *  the already-expanded children (below) and passes them through — no second fill.
  *
- * ── RECOGNIZING NESTED CONTAINERS (the ONE non-JSON dependency — read this) ────
- *  This merge is otherwise pure JSON-in / JSON-out. The single exception: across
- *  the per-level (recursive) calls it remembers which dicts are nested containers
- *  via `templateState.nestedContainers` — a Map KEYED BY THE blocks-dict OBJECT
- *  REFERENCE. A call whose `blocks`/`inputItems` IS a registered dict is handled
- *  by processNestedTemplateLevel: recurse WITHIN the already-applied template
- *  (rule 3), which is BOUNDED. A call whose dict is NOT recognized falls to the
- *  main path, which RE-APPLIES the template for any block carrying a `templateId`.
- *  Since every block carries the parent's templateId, re-applying the SAME
- *  template re-produces the same nested block → INFINITE RECURSION (seen as a Vue
- *  `block.vue` setupStatefulComponent stack overflow / blank iframe).
+ * ── RECOGNIZING ALREADY-EXPANDED CONTENT (pure data, no object identity) ───────
+ *  This merge is pure JSON-in / JSON-out. On the first encounter of a fresh
+ *  `templateId` reference it mints ONE `templateInstanceId`, records it in
+ *  `templateState.instances`, and stamps every emitted block (all levels) with it.
+ *  Recognition on re-entry is then trivial and DATA-DERIVED: a level whose first block
+ *  carries a `templateInstanceId` present in `templateState.instances` (i.e. minted
+ *  THIS pass) is finished CONTENT → emit as-is. A `templateId` that is not a live
+ *  instance is an unexpanded reference → apply. blocks_layout and object_list are ONE
+ *  concept (an ordered list of blocks, differing only in storage) and share this single
+ *  path — no special-casing.
  *
- *  Object-reference keying is FRAGILE: it misses the instant the caller passes a
- *  different-but-data-equal object — a Vue REACTIVE PROXY of the dict, a clone, or
- *  a postMessage-deserialized copy. THAT is why "Vue" can break a pure-JSON merge:
- *  the frontend hands back reactive proxies, the Map misses, recognition fails,
- *  re-application loops. `toRaw` at the boundary is a band-aid. The real fix is to
- *  recognize nested containers FROM THE DATA — every block now carries
- *  `templateId` + `templateInstanceId`, so a container's children are identifiable
- *  without object identity. TODO: replace the reference Map with data-derived
- *  recognition (then cloning/proxying/serialization all become irrelevant).
+ *  Why data and not object identity: an earlier design kept a Map keyed by the
+ *  blocks-dict OBJECT REFERENCE. It missed the instant the caller passed a
+ *  different-but-equal object — a Vue REACTIVE PROXY, a clone, or a postMessage copy —
+ *  so recognition failed and the template re-applied forever (a Vue `block.vue`
+ *  setupStatefulComponent stack overflow / blank iframe). Recognizing from the
+ *  instanceId every block already carries makes cloning / proxying / serialization
+ *  irrelevant.
  *
- *  Corollary for any consumer: an already-instanced block (has a
- *  `templateInstanceId`) is CONTENT to render, not an unexpanded reference to
- *  re-apply — but you cannot fix the loop by simply skipping instanced blocks in
- *  the main path, because switch-layout legitimately RE-APPLIES over old instances
- *  to replace them. The discriminator is "is this dict a known nested container",
- *  i.e. the recognition above — not the presence of an instance id.
+ *  The discriminator is "minted THIS pass" (in templateState.instances), NOT merely
+ *  "has an instanceId": switch-layout legitimately RE-APPLIES over blocks that still
+ *  carry a PRIOR instanceId (not in this pass's set), so those correctly fall to the
+ *  main path and are replaced.
  * =============================================================================
  */
 
@@ -2516,9 +2377,9 @@ export async function expandTemplates(inputItems, options = {}) {
  *
  * This function is called recursively: the top-level BlocksRenderer calls it for
  * the page layout, and the expanded result may contain container blocks (columns,
- * accordions, etc.) whose child BlocksRenderers call it again. Nested containers
- * are detected via templateState.nestedContainers (keyed by blocksDict reference)
- * and handled by processNestedTemplateLevel instead of the main path.
+ * accordions, etc.) whose child BlocksRenderers call it again. The apply pass expands
+ * every level up front; each re-entry is recognized by its minted templateInstanceId
+ * (present in templateState.instances) and passed through as-is — no re-derivation.
  *
  * templateState is shared across all BlocksRenderer instances on the page (via
  * Vue provide/inject or similar). It must be a fresh {} for each page render to
@@ -2573,7 +2434,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
   }
 
   // templateState is REQUIRED, with no default. It carries the cross-call
-  // recognition state (nestedContainers, instance ctx). It must be created ONCE per
+  // recognition state (instances minted this pass + their ctx). It must be created ONCE per
   // render and passed to EVERY expand call (top-level + every nested re-entry). A
   // default {} would silently hand each call its own state, so a nested re-entry
   // couldn't see what the top-level registered → it would re-apply the template →
@@ -2607,40 +2468,20 @@ export function expandTemplatesSync(inputItems, options = {}) {
   if (!templateState.instances) {
     templateState.instances = {};
   }
-  if (!templateState.nestedContainers) {
-    templateState.nestedContainers = new Map();
-  }
-  if (!templateState.generatedInstanceIds) {
-    templateState.generatedInstanceIds = new WeakMap(); // blocksDict -> generated instanceId
-  }
 
-  // Check if inside a registered nested container (blocks_layout or object_list).
-  // NB: this Map is keyed by OBJECT REFERENCE — if the caller passed a Vue reactive
-  // proxy / clone / deserialized copy of the registered dict this MISSES, the
-  // container goes unrecognized, and the main path below re-applies the template →
-  // infinite recursion for same-template nesting. See "RECOGNIZING NESTED
-  // CONTAINERS" in the design block above. This is the one non-JSON dependency.
-  if (blocksDict && templateState.nestedContainers.has(blocksDict)) {
-    const nestedInfo = templateState.nestedContainers.get(blocksDict);
-    return processNestedTemplateLevel(blocks, layout, nestedInfo, templateState, options, addItem, items);
-  }
-  if (inputItems && templateState.nestedContainers.has(inputItems)) {
-    const nestedInfo = templateState.nestedContainers.get(inputItems);
-    return processNestedTemplateLevel(blocks, layout, nestedInfo, templateState, options, addItem, items);
-  }
-
-  // Data-driven object_list recognition — complements the reference-keyed
-  // nestedContainers check above, which MISSES when the caller passes a proxy /
-  // clone / deserialized copy of the array. An object_list array (idField set)
-  // whose items are already INSTANCED (carry templateInstanceId) is already-expanded
-  // CONTENT: the top-level expansion already applied the template, so render the
-  // items as-is rather than re-deriving a templateId from val[0] and re-applying the
-  // whole template (which re-produces the container → infinite recursion). This is
-  // the object_list analogue of blocks_layout's pass-through. allowedLayouts present
-  // means a forced apply / switch, which must still re-apply — so it's excluded.
-  if (idField && !allowedLayouts?.length && layout.length > 0) {
-    const firstItem = blocks[layout[0]];
-    if (firstItem?.templateId && firstItem?.templateInstanceId) {
+  // Re-entry recognized from DATA (no object identity) — the SAME check for
+  // blocks_layout and object_list, which are one concept (an ordered list of blocks,
+  // differing only in storage). A level whose first block already carries a
+  // templateInstanceId we minted THIS pass (present in templateState.instances) is
+  // finished content → emit as-is. This survives the caller handing back a Vue
+  // reactive proxy / clone / postMessage copy of the dict — exactly what broke the
+  // object-reference Map (nuxt block.vue overflow). A fresh already-instanced page
+  // from storage is NOT in this pass's instances, so it falls through to the main
+  // path and re-applies (correct top-level behaviour). allowedLayouts present = a
+  // forced apply / switch, which must still re-apply.
+  if (!allowedLayouts?.length && layout.length > 0) {
+    const firstBlock = blocks[layout[0]];
+    if (firstBlock?.templateInstanceId && templateState.instances?.[firstBlock.templateInstanceId]) {
       for (const id of layout) {
         if (blocks[id]) addItem(blocks[id], id);
       }
@@ -2650,6 +2491,35 @@ export function expandTemplatesSync(inputItems, options = {}) {
 
   if (layout.length === 0 && !allowedLayouts?.length) {
     return items;
+  }
+
+  // Recognise a DIFFERENT templateInstanceId as a different instance. The apply below
+  // uses ONE instance per call (the first block's), so a layout spanning several
+  // instances — e.g. two of the same template inserted separately — would process only
+  // the first and drop the rest. Expand each instance's contiguous run on its own
+  // (sharing this templateState) and concatenate in order. Skipped for a forced layout /
+  // reverse merge, which intentionally re-home everything into one instance.
+  if (!allowedLayouts?.length && !filterInstanceId) {
+    const seenInstances = new Set();
+    for (const id of layout) {
+      const b = blocks[id];
+      if (b?.templateId && b?.templateInstanceId) seenInstances.add(b.templateInstanceId);
+    }
+    if (seenInstances.size > 1) {
+      let run = null;
+      const flushRun = () => {
+        if (!run) return;
+        for (const it of expandTemplatesSync(run.ids, { ...options, blocks })) items.push(it);
+        run = null;
+      };
+      for (const id of layout) {
+        const key = blocks[id]?.templateInstanceId ?? null;
+        if (!run || run.key !== key) { flushRun(); run = { key, ids: [] }; }
+        run.ids.push(id);
+      }
+      flushRun();
+      return items;
+    }
   }
 
   // Determine templateId and instanceId for this call
@@ -2725,21 +2595,27 @@ export function expandTemplatesSync(inputItems, options = {}) {
   // result (target) gets its own fresh id; the source filter still uses
   // existingInstanceId below. (Forward apply has no filterInstanceId, so the
   // target's own id — reused from the page or generated — is used as before.)
-  // For forced layouts (no existing instanceId), we use a WeakMap keyed by blocksDict
-  // to ensure idempotency - same blocks object returns same generated instanceId
+  // For forced layouts (no existing instanceId), mint one — but re-expanding the SAME
+  // input in one pass must reuse it so generated block ids (`${instanceId}::tplId`)
+  // stay stable (idempotency, e.g. a React/StrictMode double render). Key that by a
+  // DATA id (the first block id, a string), NOT the dict object — so it survives a Vue
+  // proxy / clone / postMessage copy, unlike the WeakMap it replaces.
   let instanceId = filterInstanceId ? null : existingInstanceId;
   if (!instanceId) {
-    if (blocksDict && templateState.generatedInstanceIds.has(blocksDict)) {
-      instanceId = templateState.generatedInstanceIds.get(blocksDict);
+    const idemKey = layout[0];
+    if (idemKey && templateState.generatedInstanceIds?.[idemKey]) {
+      instanceId = templateState.generatedInstanceIds[idemKey];
     } else {
       instanceId = generateUUID();
-      if (blocksDict) {
-        templateState.generatedInstanceIds.set(blocksDict, instanceId);
+      if (idemKey) {
+        if (!templateState.generatedInstanceIds) templateState.generatedInstanceIds = {};
+        templateState.generatedInstanceIds[idemKey] = instanceId;
       }
     }
   }
 
-  // Store for processNestedTemplateLevel (called from nested expandTemplatesSync calls)
+  // Shared on templateState so the apply-time recursion (fillContainerInto) sees the
+  // current template + instance while filling nested containers.
   templateState.templateId = templateId;
   templateState.instanceId = instanceId;
 
@@ -2923,80 +2799,37 @@ export function expandTemplatesSync(inputItems, options = {}) {
       // template-internal details that should not be synced to pages. A
       // container's children are ordered by the named regions in its
       // `blocks_layout` dict (#234); filter each region and preserve them all.
-      let childSlotIds = undefined;
-      let filteredBlocks = blockContent.blocks;
-      let filteredLayout = undefined;
       const isContainer = hasNestedBlocksLayout(tplBlock);
-      if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
-        if (!isContainer) {
-          throw new Error(
-            `expandTemplatesSync: template block "${tplBlockId}" has nested ` +
-            `\`blocks\` but no \`blocks_layout\` dict listing them by region.`,
-          );
-        }
-        // Emit ONE level of the template's nested structure: keep blocks that carry
-        // templateId (a well-formed template has it on EVERY block; a sub-block with
-        // none is malformed and is DROPPED, from both blocks and layout), stamp the
-        // resolved instance ids, and register the result for re-entry (below). Do NOT
-        // fill slots here — the
-        // renderer (and the admin) call expand on this container's children with the
-        // SAME shared state, and that re-entry fills the slots from ctx.pendingContent.
-        // Filling here too would double-process (the re-entry would re-emit what we
-        // already filled → duplicated slot content).
-        const newNestedBlocks = {};
-        const newBlocksLayout = {};
-        for (const [region] of blocksLayoutRegions(tplBlock.blocks_layout)) {
-          const newArr = [];
-          // Read this region's children through the shared, storage-agnostic helper
-          // (resolves ids → blocks and drops any dangling id) — the same reader the
-          // admin add-path uses, so the two sides don't duplicate container access.
-          for (const { id: nestedId, block: nested } of getChildBlockEntries(tplBlock, { region })) {
-            if (nested.templateId) {
-              newNestedBlocks[nestedId] = nested;
-              newArr.push(nestedId);
-              if (!nested.fixed && nested.slotId) {
-                if (!childSlotIds) childSlotIds = {};
-                if (!childSlotIds['blocks']) childSlotIds['blocks'] = nested.slotId;
-              }
-            }
+      if (tplBlock.blocks && isBlocksMap(tplBlock.blocks) && !isContainer) {
+        throw new Error(
+          `expandTemplatesSync: template block "${tplBlockId}" has nested ` +
+          `\`blocks\` but no \`blocks_layout\` dict listing them by region.`,
+        );
+      }
+      // childSlotIds hint: first non-fixed slot per region (add-path anchor).
+      let childSlotIds = undefined;
+      for (const [region] of blocksLayoutRegions(tplBlock.blocks_layout)) {
+        for (const { block: child } of getChildBlockEntries(tplBlock, { region })) {
+          if (child && !child.fixed && child.slotId) {
+            if (!childSlotIds) childSlotIds = {};
+            if (!childSlotIds['blocks']) childSlotIds['blocks'] = child.slotId;
+            break;
           }
-          newBlocksLayout[region] = newArr;
-        }
-        filteredBlocks = stampNestedResolved(newNestedBlocks, instanceId, templateId);
-        filteredLayout = newBlocksLayout;
-      }
-
-      addItem(
-        {
-          ...blockContent,
-          blocks: filteredBlocks,
-          ...(isContainer && { blocks_layout: filteredLayout }),
-          templateId: templateId,
-          templateInstanceId: instanceId,
-          ...(nextSlotId && { nextSlotId }),
-          ...(childSlotIds && { childSlotIds }),
-        },
-        blockId
-      );
-
-      if (isContainer) {
-        templateState.nestedContainers.set(filteredBlocks, {
-          templateBlockId: tplBlockId,
-          templateBlocks: filteredBlocks,
-          templateLayout: allRegionIds(filteredLayout),
-        });
-      }
-      // Register object_list arrays (arrays of objects with templateId)
-      for (const val of Object.values(tplBlock)) {
-        if (Array.isArray(val) && val.length > 0 && val[0]?.templateId) {
-          const itemIdField = '@id';
-          templateState.nestedContainers.set(val, {
-            templateBlockId: tplBlockId,
-            templateBlocks: Object.fromEntries(val.map(item => [item[itemIdField], item])),
-            templateLayout: val.map(item => item[itemIdField]),
-          });
         }
       }
+
+      // Emit the container, then fully expand its child regions IN PLACE — every
+      // blocks_layout region AND object_list array field, one path (fillContainerInto).
+      // Re-entry recognizes the children by minted instanceId and passes them through.
+      const emitted = {
+        ...blockContent,
+        templateId: templateId,
+        templateInstanceId: instanceId,
+        ...(nextSlotId && { nextSlotId }),
+        ...(childSlotIds && { childSlotIds }),
+      };
+      fillContainerInto(emitted, tplBlock, templateState, options);
+      addItem(emitted, blockId);
     } else {
       const slotId = tplBlock.slotId || 'default';
       const insertIndex = items.length;
