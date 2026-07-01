@@ -74,4 +74,38 @@ describe('applyBlockDefaultsWithContext — slotId inheritance on add', () => {
     expect(result.templateId).toBeUndefined();
     expect(result.templateInstanceId).toBeUndefined();
   });
+
+  test('a block added after a FIXED neighbour with nextSlotId inherits that slot + membership', () => {
+    // The grid is fixed; the slot after it ("primary") is empty, so the grid carries
+    // nextSlotId: "primary". A block added after the grid fills that slot — it must
+    // inherit slotId "primary" + the template membership (this is the template-advanced
+    // :203 scenario: add into an emptied slot via the fixed neighbour's nextSlotId).
+    const allBlocks = {
+      'grid-1': {
+        '@type': 'gridBlock',
+        fixed: true,
+        slotId: 'grid',
+        nextSlotId: 'primary',
+        templateId: '/t/test-layout',
+        templateInstanceId: 'inst-1',
+      },
+    };
+    const context = {
+      blocksConfig: { slate: {} },
+      intl,
+      allBlocks,
+      items: [allBlocks['grid-1']],
+      layoutItems: ['grid-1'],
+      position: 1, // inserting AFTER the grid (index 0)
+      insertAfter: true,
+      containerId: 'page',
+      field: 'items',
+    };
+
+    const result = applyBlockDefaultsWithContext({ '@type': 'slate' }, context);
+
+    expect(result.slotId).toBe('primary');
+    expect(result.templateId).toBe('/t/test-layout');
+    expect(result.templateInstanceId).toBe('inst-1');
+  });
 });

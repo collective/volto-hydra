@@ -279,6 +279,46 @@ test.describe('Template Placeholder Replacement', () => {
     await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Header' }).first()).toBeVisible();
     await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Footer' }).first()).toBeVisible();
   });
+
+  // Parity with containers (the root behind :203): when the template primary slot is
+  // emptied it must seed its own empty placeholder IN the slot (between the grid and
+  // the slider) — the same way a container seeds one for an emptied region (see
+  // container-blocks.spec.ts 'emptied container seeds an in-place empty ... (no
+  // template)'). Without it there is nothing in the slot to click and the add falls
+  // back to the iframe add-button path, which hangs.
+  test('emptied template primary slot seeds an in-slot empty (parity with containers)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+    await helper.waitForIframeReady();
+    const iframe = helper.getIframe();
+
+    await expect(
+      iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Header - From Template' }),
+    ).toBeVisible({ timeout: 15000 });
+
+    // Empty the primary slot.
+    for (const b of ['user-content-1', 'user-content-2']) {
+      await helper.clickBlockInIframe(b);
+      await helper.openQuantaToolbarMenu(b);
+      await helper.clickQuantaToolbarMenuOption(b, 'Remove');
+      await helper.waitForBlockToDisappear(b);
+    }
+    await helper.getStableBlockCount();
+
+    // The emptied primary slot seeds its own empty placeholder (there is also a
+    // separate page-level empty for the footer region). The in-slot empty is
+    // first in DOM order and must sit between the grid and the slider.
+    const emptyBlock = iframe.locator('[data-hydra-empty]');
+    await expect(emptyBlock.first()).toBeVisible({ timeout: 5000 });
+
+    const gridY = await iframe.locator('[data-block-uid]').filter({ hasText: 'Template Grid Cell 1' }).last().boundingBox().then((box) => box?.y ?? -1);
+    const sliderY = await iframe.locator('[data-block-uid]').filter({ hasText: 'Template Slide 1' }).first().boundingBox().then((box) => box?.y ?? -1);
+    const emptyY = await emptyBlock.first().boundingBox().then((box) => box?.y ?? -1);
+
+    expect(emptyY, `in-slot empty should be in the primary slot (grid y=${gridY}, slider y=${sliderY}) but is at y=${emptyY}`).toBeGreaterThan(gridY);
+    expect(emptyY).toBeLessThan(sliderY);
+  });
 });
 
 test.describe('Template Sidebar Placeholder Sections', () => {

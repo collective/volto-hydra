@@ -1467,8 +1467,12 @@ const Iframe = (props) => {
     // 'inside' (append at end), else the sibling blockId we insert relative to.
     const inheritTemplateMembership = (bd) => {
       const region = containerConfig?.region || 'items';
-      const containerId = action === 'inside' ? blockId : blockPathMap[blockId]?.parentId;
-      const container = containerId === PAGE_BLOCK_UID
+      // The REAL container the new block lands in: containerConfig.parentId (the page,
+      // or the container for a nested/inside add). NOT blockPathMap[blockId].parentId —
+      // for a template-member block that is the VIRTUAL templateInstanceId, not a real
+      // block, so getChildBlockEntries finds no siblings and nothing is inherited.
+      const containerId = action === 'inside' ? blockId : (containerConfig?.parentId || PAGE_BLOCK_UID);
+      const container = (containerId === PAGE_BLOCK_UID || containerId === 'page')
         ? formData
         : getBlockById(formData, blockPathMap, containerId);
       const entries = getChildBlockEntries(container, containerConfig);

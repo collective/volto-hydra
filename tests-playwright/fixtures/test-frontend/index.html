@@ -196,6 +196,13 @@
         async function renderContentWithListings(content) {
             const myGeneration = ++window._renderGeneration;
 
+            // ONE shared template-merge state for this whole render cycle. Every expand
+            // call (main, footer, and the renderer's object_list re-entries) MUST use
+            // this same object so nested-container recognition hits instead of
+            // re-applying the template. No per-call default {} — a fresh state per call
+            // misses recognition and re-applies forever (infinite loop).
+            window._templateState = {};
+
             // Extract path from @id
             let contextPath = content['@id'] || '/';
             if (contextPath.startsWith('http')) {
@@ -245,7 +252,7 @@
                 const footerLayout = content.blocks_layout?.footer || [];
 
                 // Expand templates (handles both existing content and forced layouts)
-                const templateState = {};
+                const templateState = window._templateState;
                 const loadTemplate = async (templateId) => {
                     const headers = { 'Accept': 'application/json' };
                     const token = getAccessToken();
@@ -369,8 +376,12 @@
                     return res.json();
                 };
 
-                // Expand templates in main blocks field
-                const templateState = {};
+                // Expand templates in main blocks field. Seed the ONE shared
+                // template-merge state for this render cycle (parity with
+                // renderContentWithListings:204) so nested re-entries reuse the
+                // same object instead of getting undefined — no per-call default.
+                window._templateState = {};
+                const templateState = window._templateState;
                 const expandedItems = await expandTemplates(
                     content.blocks_layout?.items || [],
                     {
@@ -389,7 +400,6 @@
 
                 // Expose template expansion for renderer.js (object_list arrays)
                 window._expandTemplatesSync = expandTemplatesSync;
-                window._templateState = templateState;
 
                 // Render navigation from @components.navigation.items
                 const navItems = content['@components']?.navigation?.items || [];

@@ -1688,7 +1688,7 @@ async function renderSliderBlock(block, blockId) {
     // Expand slides through template system (handles templateInstanceId, fixed, etc.)
     const rawSlides = block.slides || [];
     const slides = window._expandTemplatesSync
-        ? window._expandTemplatesSync(rawSlides, { templateState: window._templateState || {}, templates: {}, idField: '@id' })
+        ? window._expandTemplatesSync(rawSlides, { templateState: window._templateState, templates: {}, idField: '@id' })
         : rawSlides;
 
     // Convert object_list items to blocks dict + layout for expandItems

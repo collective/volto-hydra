@@ -1493,6 +1493,46 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
   }
 
   const items = getContainerItems(parentBlock, containerConfig);
+
+  // [slot-aware] A fixed block carrying `nextSlotId` marks a template slot region
+  // that follows it. If the block immediately after it does not carry that slotId,
+  // the slot is empty and needs a clickable empty placeholder — the same parity a
+  // container gets when its region empties (otherwise there is nothing in the slot
+  // to click, and adding falls back to a path that hangs). Seed it in place,
+  // carrying the slot membership. Idempotent: a slot that already has content
+  // (including a previously-seeded empty) is skipped.
+  if (!isObjectList && Array.isArray(items) && items.length > 0) {
+    const blocksObj = parentBlock.blocks || {};
+    let newItems = null;
+    let newBlocks = null;
+    for (let i = 0; i < items.length; i++) {
+      const cur = blocksObj[items[i]];
+      const slot = cur?.nextSlotId;
+      if (!slot) continue;
+      const next = blocksObj[items[i + 1]];
+      if (next?.slotId === slot) continue; // slot already filled
+      const emptyId = uuidGenerator();
+      let emptyBlock = { '@type': 'empty' };
+      if (intl && blocksConfig) {
+        emptyBlock = applyBlockDefaults({ data: emptyBlock, intl, metadata, properties }, blocksConfig);
+      }
+      emptyBlock = {
+        ...emptyBlock,
+        slotId: slot,
+        templateId: cur.templateId,
+        templateInstanceId: cur.templateInstanceId,
+      };
+      newItems = newItems || [...items];
+      newBlocks = newBlocks || { ...blocksObj };
+      newItems.splice(newItems.indexOf(items[i]) + 1, 0, emptyId);
+      newBlocks[emptyId] = emptyBlock;
+    }
+    if (newItems) {
+      const updated = setContainerItems(parentBlock, containerConfig, newItems, newBlocks);
+      return setBlockByPath(formData, parentPath, updated);
+    }
+  }
+
   if (items.length > 0) {
     return formData;
   }
