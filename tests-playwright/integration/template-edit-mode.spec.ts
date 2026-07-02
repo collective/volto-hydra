@@ -1536,4 +1536,65 @@ test.describe('Template Edit Mode - Permissions', () => {
     await expect(editWrapper).toContainText(/permission|Modify portal content/i);
     await expect(editWrapper.locator('input')).toBeDisabled();
   });
+
+  test('creating a template in a folder without Add permission is blocked at save', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    // Force the templates folder (the default save location) to report no Add permission,
+    // so the save-time can_add check blocks the create. Fulfilling here works regardless of
+    // whether the folder exists in the fixtures.
+    await page.route(
+      (u) => u.pathname.endsWith('/templates'),
+      async (route) => {
+        if (route.request().method() !== 'GET') return route.continue();
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ '@id': 'templates', '@type': 'Folder', can_add: false }),
+        });
+      },
+    );
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // A new template create is a POST with @type Document — must NOT happen when denied.
+    const templatePosts: Array<any> = [];
+    page.on('request', (req) => {
+      if (req.method() !== 'POST') return;
+      let body: any = null;
+      try {
+        body = req.postDataJSON();
+      } catch {
+        /* not JSON */
+      }
+      if (body?.['@type'] === 'Document') templatePosts.push(body);
+    });
+
+    // Make a template on a regular block, then attempt to save.
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelectedInAdmin('block-1-uuid');
+    await helper.openQuantaToolbarMenu('block-1-uuid');
+    await page
+      .locator('.volto-hydra-dropdown-menu .volto-hydra-dropdown-item')
+      .filter({ hasText: /make.*template/i })
+      .click();
+    await helper.waitForSidebarOpen();
+
+    // The save's can_add check GETs the folder; can_add=false blocks the create.
+    const folderCheck = page.waitForRequest(
+      (r) => r.method() === 'GET' && new URL(r.url()).pathname.endsWith('/templates'),
+      { timeout: 15000 },
+    );
+    await page.locator('#toolbar-save, button:has-text("Save")').first().click();
+    await folderCheck;
+
+    // Create is blocked: the page stays in edit mode (a successful save redirects away),
+    // and no template document was POSTed.
+    await expect(page).toHaveURL(/\/edit$/, { timeout: 5000 });
+    expect(
+      templatePosts.length,
+      'template POST must be blocked when the target folder denies Add',
+    ).toBe(0);
+  });
 });
