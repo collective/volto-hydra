@@ -1231,6 +1231,19 @@ async function renderContextNavigationBlock(block, blockId) {
     const items = block.blocks_layout?.items || [];
     const uid = blockId;
 
+    // Hydra seeds an '@type: empty' placeholder when a container has no defaultBlockType and
+    // multiple allowedBlocks (getEmptyBlockType returns 'empty'). A custom container renderer
+    // MUST tolerate that transient type — render it as a plain, selectable placeholder (not
+    // throw). The admin then shows a '+' on the selected empty to pick its type; the renderer
+    // doesn't need to make it clickable itself.
+    const emptyChildId = items.find((id) => blocks[id]?.['@type'] === 'empty');
+    if (emptyChildId) {
+        return `<nav data-block-uid="${escapeAttr(uid)}" aria-label="${escapeHtml(ariaLabel)}" class="context-navigation">` +
+            `<div data-block-uid="${escapeAttr(emptyChildId)}" style="display:block;min-height:40px;padding:0.5rem;color:#999;">` +
+            `Empty navigation — pick a type` +
+            `</div>` +
+            `</nav>`;
+    }
 
     // First pass: walk children and collect a flat list of {block, blockId}
     // entries. listing children are expanded inline so all their items

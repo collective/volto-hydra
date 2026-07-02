@@ -968,8 +968,12 @@ export class Bridge {
     const blockData = this.getBlockData(blockUid);
     const addability = getBlockAddability(blockUid, this.blockPathMap, blockData, this.templateEditMode);
 
-    // Hide add button if can't insert after (add button only adds after the selected block)
-    if (!addability.canInsertAfter) {
+    // Hide the add button only if the block can neither take a sibling after it NOR be
+    // replaced. An '@type: empty' placeholder can't take siblings (canInsertAfter is false)
+    // but CAN be replaced (canReplace) — the + then opens the chooser to pick its type in
+    // place. Without this, a seeded empty (no defaultBlockType + multiple allowedBlocks) is
+    // stranded with no + and no way to be typed.
+    if (!addability.canInsertAfter && !addability.canReplace) {
       return 'hidden';
     }
 
