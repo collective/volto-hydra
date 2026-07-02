@@ -1702,6 +1702,38 @@ export function setChildBlockEntries(parentBlock, descriptor, entries) {
 }
 
 /**
+ * Enforce fixed-XOR-inside-slot. A slot is a template region that is neither fixed nor
+ * readOnly — a per-page user-fillable area. A propagating/locked block can't live inside a
+ * per-page region, so any descendant of a slot can itself only be a slot: recursively strip
+ * `fixed`/`readOnly` from every block inside a slot. Call on save so malformed data from
+ * paste/programmatic paths (which bypass the sidebar dropdown) is normalized. Returns a new
+ * tree only when something changed; a no-op outside template instances.
+ *
+ * @param {Object} node - a block (or page) with a nested `blocks` map
+ * @param {boolean} [insideSlot=false] - whether `node` is already inside a slot
+ * @returns {Object} the node, with fixed/readOnly stripped from slot descendants
+ */
+export function stripFixedInsideSlots(node, insideSlot = false) {
+  if (!node?.blocks || typeof node.blocks !== 'object') return node;
+  let changed = false;
+  const newBlocks = {};
+  for (const [id, block] of Object.entries(node.blocks)) {
+    let b = block;
+    if (insideSlot && (b?.fixed || b?.readOnly)) {
+      b = { ...b, fixed: false, readOnly: false };
+      changed = true;
+    }
+    // A block is a slot when it belongs to a template instance and is neither fixed nor
+    // readOnly. Its descendants are "inside a slot".
+    const isSlot = !!b?.templateInstanceId && !b?.fixed && !b?.readOnly;
+    const recursed = stripFixedInsideSlots(b, insideSlot || isSlot);
+    if (recursed !== b) { b = recursed; changed = true; }
+    newBlocks[id] = b;
+  }
+  return changed ? { ...node, blocks: newBlocks } : node;
+}
+
+/**
  * Check if a block is inside the template currently being edited.
  * A block is inside if its templateInstanceId matches the templateEditMode.
  *
