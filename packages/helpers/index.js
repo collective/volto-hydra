@@ -1833,6 +1833,17 @@ export function getBlockAddability(blockId, blockPathMap, blockData, templateEdi
     return result;
   }
 
+  // A seeded '@type: empty' placeholder is ALWAYS replaceable in template edit mode — you're
+  // building the template, so its type must be pickable (canReplace → the '+' appears). A
+  // field seeded inside a template-edit context may not carry the edited template's
+  // instanceId yet, so isBlockInEditedTemplate is false and the template-mode gate below
+  // would return early with canReplace=false, stranding it. Short-circuit that here (before
+  // the maxReached + template-mode gates: replacing an empty mutates in place, it never adds
+  // a sibling).
+  if (templateEditMode && blockData?.['@type'] === 'empty') {
+    return { ...result, canReplace: true };
+  }
+
   // Get static insert restrictions from pathMap (based on fixed blocks)
   const staticCanInsertBefore = pathInfo.canInsertBefore !== false;
   const staticCanInsertAfter = pathInfo.canInsertAfter !== false;
