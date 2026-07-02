@@ -2469,16 +2469,18 @@ export function expandTemplatesSync(inputItems, options = {}) {
     templateState.instances = {};
   }
 
-  // Re-entry recognized from DATA (no object identity) — the SAME check for
-  // blocks_layout and object_list, which are one concept (an ordered list of blocks,
-  // differing only in storage). A level whose first block already carries a
-  // templateInstanceId we minted THIS pass (present in templateState.instances) is
-  // finished content → emit as-is. This survives the caller handing back a Vue
-  // reactive proxy / clone / postMessage copy of the dict — exactly what broke the
-  // object-reference Map (nuxt block.vue overflow). A fresh already-instanced page
-  // from storage is NOT in this pass's instances, so it falls through to the main
-  // path and re-applies (correct top-level behaviour). allowedLayouts present = a
-  // forced apply / switch, which must still re-apply.
+  // Re-entry recognized from DATA (no object identity) — the SAME check for object_list
+  // and blocks_layout. Templates can start at ANY level (a snippet carrying its own
+  // templateId + instanceId, or a forced layout that mints one), so there is nothing
+  // special about the top level and the two storages are treated equally. A level whose
+  // first block carries a templateInstanceId minted THIS render pass (present in
+  // templateState.instances) is already-expanded content → emit as-is. It survives the
+  // caller handing the dict back as a Vue reactive proxy / clone / postMessage copy —
+  // what broke the object-reference Map (nuxt block.vue overflow). A templateId that is
+  // NOT a live instance (a fresh reference, or a prior-pass instance on reload) falls
+  // through and is applied; allowedLayouts = a forced apply / switch, must re-apply.
+  // Relies on templateState being ONE object for the whole render (never reset
+  // mid-render), so a top-level apply's instances are visible to every re-entry.
   if (!allowedLayouts?.length && layout.length > 0) {
     const firstBlock = blocks[layout[0]];
     if (firstBlock?.templateInstanceId && templateState.instances?.[firstBlock.templateInstanceId]) {

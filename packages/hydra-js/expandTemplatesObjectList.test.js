@@ -151,4 +151,25 @@ describe('expandTemplatesSync: object_list arrays in template blocks', () => {
     expect(slideItems.length).toBe(2);
     expect(slideItems.every((s) => s['@type'] === 'slide')).toBe(true);
   });
+
+  // Regression for template-advanced :203, via the UNIFORM data-derived check (no
+  // idField special-casing). templateState is ONE object for the whole render and is
+  // never reset mid-render, so by the time the slider re-enters, the top-level apply's
+  // instance is still live in templateState.instances — the SAME "minted this pass"
+  // recognition blocks_layout uses. It passes through as content, without re-applying.
+  test('object_list re-entry passes through when its instance is live in templateState (no re-apply)', () => {
+    const slides = [
+      { '@id': 's1', '@type': 'slide', templateId: '/t/slider', templateInstanceId: 'inst-1', title: 'Slide 1' },
+      { '@id': 's2', '@type': 'slide', templateId: '/t/slider', templateInstanceId: 'inst-1', title: 'Slide 2' },
+    ];
+    // Instance minted this pass and the shared state was NOT wiped. NO templates: a
+    // re-apply would throw "not found" — so passing through is what's asserted.
+    const templateState = { instances: { 'inst-1': {} } };
+    const result = expandTemplatesSync(slides, {
+      templates: {}, templateState, idField: '@id',
+    });
+    expect(result.length).toBe(2);
+    expect(result.every((s) => s['@type'] === 'slide')).toBe(true);
+    expect(result[0].templateInstanceId).toBe('inst-1');
+  });
 });
