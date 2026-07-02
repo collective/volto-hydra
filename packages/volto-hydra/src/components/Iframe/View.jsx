@@ -1149,8 +1149,6 @@ const Iframe = (props) => {
         loadTemplate: async () => formData,
         filterInstanceId: prevInstanceId,
         uuidGenerator: uuid,
-        blocksConfig: config.blocks.blocksConfig,
-        intl,
       }).then(({ merged: updatedTemplate }) => {
         log('REVERSE MERGE: Updated template blocks:', Object.keys(updatedTemplate.blocks || {}));
         // Log first block's value to check if edit is captured
@@ -3491,8 +3489,6 @@ const Iframe = (props) => {
             preloadedTemplates: templateCacheRef.current,
             pageBlocksFields,
             uuidGenerator: uuid,
-            blocksConfig: config.blocks.blocksConfig,
-            intl,
           });
           let blockPathMap = buildBlockPathMap(mergedFormData, config.blocks.blocksConfig, intl);
 

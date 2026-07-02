@@ -127,8 +127,6 @@ const LayoutSelector = ({
         loadTemplate: async (templateId) => api.get(templateId),
         pageBlocksFields: { items: { allowedLayouts: [layoutToApply] } },
         uuidGenerator: uuid,
-        blocksConfig: config.blocks.blocksConfig,
-        intl,
         firstInsert: true,
       });
 
