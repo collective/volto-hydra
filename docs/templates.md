@@ -252,7 +252,12 @@ After:   [Fixed Header] [User Block A] [User Block B] [Fixed Footer]
 
 ## Forcing Layouts
 
-Your frontend might want to force a layout to apply regardless of whether one is saved, for example to ensure a footer layout. Pass `allowedLayouts`:
+A **forced layout** (`allowedLayouts`) is applied **automatically across a whole blocks
+field** — unlike a **snippet** (`allowedTemplates`), which the *editor* inserts as a block
+where they choose (see the decision table above). Forcing is **your frontend's** call: you
+pass `allowedLayouts`, so you decide **which** layout to force and **when**.
+
+Pass a static layout to always force one (e.g. a footer):
 
 <!-- codeExample: javascript -->
 ```javascript
@@ -266,6 +271,29 @@ const items = expandTemplatesSync(layout, {
 const items = await expandTemplates(layout, {
     blocks, templateState, loadTemplate,
     allowedLayouts: ['/templates/footer-layout'],
+});
+```
+
+### Choosing the layout with your own rules
+
+`allowedLayouts` is just a value you compute, so apply whatever rule you like — content
+type, metadata, route, A/B bucket — then pass the result. Pass `undefined` (or omit it) to
+force nothing; pass **several** to let the editor pick from the Layout dropdown (include
+`null` for a "no layout" option).
+
+<!-- codeExample: javascript -->
+```javascript
+// Decide the forced layout from your own rules; force nothing when none match.
+const forced =
+    pageData['@type'] === 'News Item' ? '/templates/news-layout' :
+    pageData.section === 'marketing' ? '/templates/campaign-layout' :
+    null;
+
+// Async loads the chosen layout on demand (the sync path needs it pre-loaded — see
+// "Pre-loading with loadTemplates" above).
+const items = await expandTemplates(layout, {
+    blocks, templateState, loadTemplate,
+    allowedLayouts: forced ? [forced] : undefined,
 });
 ```
 
