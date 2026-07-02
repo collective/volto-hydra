@@ -1111,21 +1111,21 @@ test.describe('Template Edit Mode - Block Settings', () => {
     const sidebar = page.locator('#sidebar-template-settings');
     await sidebar.scrollIntoViewIfNeeded();
 
-    // Fixed checkbox should be visible and toggleable
-    const fixedLabel = page.locator('.field-wrapper-fixed label[for="field-fixed"]');
-    const fixedCheckbox = page.locator('.field-wrapper-fixed input[type="checkbox"]');
-    await expect(fixedLabel).toBeVisible({ timeout: 5000 });
+    // The kind dropdown replaces the fixed/readOnly checkboxes. A user-content block that is
+    // neither fixed nor readOnly starts as "Slot"; changing it to a fixed kind must take.
+    const kindField = page.locator('#sidebar-template-settings .field-wrapper-kind');
+    await expect(kindField).toBeVisible({ timeout: 5000 });
     await helper.expectTemplateSettingsCount(1);
 
-    const wasChecked = await fixedCheckbox.isChecked();
-    await fixedLabel.click();
+    const kindValue = kindField.locator('.react-select__single-value');
+    await expect(kindValue).toContainText('Slot');
 
-    // Verify checkbox state changed
-    if (wasChecked) {
-      await expect(fixedCheckbox).not.toBeChecked({ timeout: 5000 });
-    } else {
-      await expect(fixedCheckbox).toBeChecked({ timeout: 5000 });
-    }
+    // Open the dropdown and pick a fixed kind; verify the selection took.
+    await kindField.locator('.react-select__control').click();
+    await page
+      .locator('.react-select__menu .react-select__option', { hasText: 'Fixed, read-only' })
+      .click();
+    await expect(kindValue).toContainText('Fixed, read-only', { timeout: 5000 });
   });
 });
 
@@ -1290,11 +1290,11 @@ test.describe('Template Edit Mode - Object List Items', () => {
     const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]), #sidebar-properties textarea, #sidebar-properties [contenteditable="true"]');
     await expect(sidebarInputs.first()).toBeVisible({ timeout: 5000 });
 
-    // The new slide should inherit template settings from its neighbor (fixed, readOnly)
-    // so it should have a template settings section with fixed=true
+    // The new slide should inherit template settings from its neighbor (fixed, readOnly),
+    // so the kind dropdown shows "Fixed, read-only".
     await helper.expectTemplateSettingsCount(1);
-    const fixedCheckbox = page.locator('#sidebar-template-settings .field-wrapper-fixed input[type="checkbox"]');
-    await expect(fixedCheckbox).toBeChecked({ timeout: 5000 });
+    const kindValue = page.locator('#sidebar-template-settings .field-wrapper-kind .react-select__single-value');
+    await expect(kindValue).toContainText('Fixed, read-only', { timeout: 5000 });
 
     // The iframe [+] add button should still be visible on the new slide
     const addButton = page.locator('.volto-hydra-add-button');

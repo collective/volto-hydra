@@ -18,7 +18,12 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
-import { getTemplateInstanceSchema } from './templateSettingsSchema';
+import {
+  getTemplateInstanceSchema,
+  getTemplateBlockSettingsSchema,
+  blockKindFromFlags,
+  blockKindFlags,
+} from './templateSettingsSchema';
 import { useIntl } from 'react-intl';
 import { useLocation } from 'react-router-dom';
 import { set, cloneDeep, isEqual } from 'lodash';
@@ -147,43 +152,9 @@ const getFilteredBlockSchema = (blockType, intl, blockPathMap, blockId, blockDat
   return filterBlocksFields(schema);
 };
 
-/**
- * Schema for block settings in template edit mode
- * Adds slotId, fixed, and readOnly fields to control template behavior
- */
-const getTemplateBlockSettingsSchema = () => ({
-  title: 'Template Block Settings',
-  fieldsets: [
-    {
-      id: 'default',
-      title: 'Default',
-      fields: [],
-    },
-    {
-      id: 'template',
-      title: 'Template Settings',
-      fields: ['slotId', 'fixed', 'readOnly'],
-    },
-  ],
-  properties: {
-    slotId: {
-      title: 'Slot ID',
-      description: 'Identifies where user content goes in the template (e.g., "header", "primary")',
-      type: 'string',
-    },
-    fixed: {
-      title: 'Fixed Position',
-      description: 'Disable drag & drop on this block',
-      type: 'boolean',
-    },
-    readOnly: {
-      title: 'Read-only',
-      description: 'Disable editing on this block (content comes from template)',
-      type: 'boolean',
-    },
-  },
-  required: ['slotId'],
-});
+// getTemplateBlockSettingsSchema (a single `kind` dropdown replacing the fixed + readOnly
+// checkboxes, with the inside-slot restriction) lives in the pure ./templateSettingsSchema
+// module so it can be unit-tested without the React tree. Imported at the top of this file.
 
 /**
  * Single parent block section with header and settings
@@ -505,21 +476,41 @@ const ParentBlockSection = ({
 
         if (!isBlockInEditedTemplate) return null;
 
-        // Build form data with current template block settings
+        // fixed-XOR-inside-slot: a block is "inside a slot" when any ancestor is a slot
+        // (a template block that is neither fixed nor readOnly). Inside a slot the only
+        // allowed kind is `slot`, so the dropdown drops the fixed-bearing options.
+        const isInsideSlot = (bid) => {
+          let pid = blockPathMap[bid]?.parentId;
+          while (pid) {
+            const anc = getBlockById(formData, blockPathMap, pid);
+            if (!anc) break;
+            if (anc.templateInstanceId && !anc.fixed && !anc.readOnly) return true;
+            pid = blockPathMap[pid]?.parentId;
+          }
+          return false;
+        };
+        const insideSlot = isInsideSlot(blockId);
+        // Build form data with current template block settings — `kind` is derived from the
+        // block's fixed/readOnly flags (the single dropdown replaces the two checkboxes).
         const templateBlockFormData = {
           slotId: blockData.slotId || '',
-          fixed: blockData.fixed || false,
-          readOnly: blockData.readOnly || false,
+          kind: blockKindFromFlags(blockData.fixed, blockData.readOnly),
         };
-        const templateBlockSchema = getTemplateBlockSettingsSchema();
+        const templateBlockSchema = getTemplateBlockSettingsSchema({ insideSlot });
         const formContent = (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
             <BlockDataForm
               schema={templateBlockSchema}
               onChangeField={(fieldId, value) => {
                 const newBlockData = cloneDeep(blockData);
-                // All fields are now top-level (placeholder, fixed, readOnly)
-                newBlockData[fieldId] = value;
+                if (fieldId === 'kind') {
+                  // Map the chosen kind back to its fixed/readOnly flags.
+                  const { fixed, readOnly } = blockKindFlags(value);
+                  newBlockData.fixed = fixed;
+                  newBlockData.readOnly = readOnly;
+                } else {
+                  newBlockData[fieldId] = value;
+                }
                 onChangeBlock(blockId, newBlockData);
               }}
               formData={templateBlockFormData}
