@@ -21,6 +21,7 @@ import { createPortal } from 'react-dom';
 import {
   getTemplateInstanceSchema,
   getTemplateBlockSettingsSchema,
+  getTemplateEditButtonState,
   blockKindFromFlags,
   blockKindFlags,
 } from './templateSettingsSchema';
@@ -430,28 +431,16 @@ const ParentBlockSection = ({
 
       {/* Template instance settings form — only for top-level, not nested */}
       {pathInfo?.isTemplateInstance && !pathInfo?.isNestedTemplateInstance && onChangeTemplateSettings && (() => {
-        // Build form data with editTemplate reflecting current state
-        const templateFormData = {
-          ...blockData,
-          editTemplate: templateEditMode === blockId,
-        };
-        // Key by pathInfo.templateId — the resolved template path, which matches the
-        // templateCacheRef key (blockData.templateId is not populated at this level).
-        const canEditTemplate =
-          templatePermissions?.[pathInfo?.templateId]?.can_edit ?? true;
-        const templateSchema = getTemplateInstanceSchema(contextIntl, { canEdit: canEditTemplate });
+        // Template instance settings: name / save location. Entering edit mode is the
+        // prominent button at the top of the panel (see the main render), not a field here.
+        const templateFormData = { ...blockData };
+        const templateSchema = getTemplateInstanceSchema(contextIntl);
         const formContent = (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
             <BlockDataForm
               schema={templateSchema}
               onChangeField={(fieldId, value) => {
-                if (fieldId === 'editTemplate') {
-                  // Toggle template edit mode
-                  onToggleTemplateEditMode(value ? blockId : null);
-                } else {
-                  // Update template settings
-                  onChangeTemplateSettings(blockId, { [fieldId]: value });
-                }
+                onChangeTemplateSettings(blockId, { [fieldId]: value });
               }}
               formData={templateFormData}
               block={blockId}
@@ -707,6 +696,20 @@ const ParentBlocksWidget = ({
   // Get parent chain
   const parentIds = getParentChain(selectedBlock, blockPathMap);
 
+  // The (non-nested) template instance the selection belongs to — drives the Edit-template
+  // button at the top of the panel. Walk up the selection's parent chain to find it.
+  const findTemplateInstance = (bid) => {
+    let cur = bid;
+    while (cur) {
+      const pi = blockPathMap[cur];
+      if (!pi) break;
+      if (pi.isTemplateInstance && !pi.isNestedTemplateInstance) return cur;
+      cur = pi.parentId;
+    }
+    return null;
+  };
+  const templateInstanceBlockId = findTemplateInstance(selectedBlock);
+
   // Get current block data and type from blockPathMap (single source of truth)
   // For virtual blocks (like template instances), use blockData from pathMap
   const pathInfo = blockPathMap[selectedBlock];
@@ -723,6 +726,41 @@ const ParentBlocksWidget = ({
     <>
       {createPortal(
         <>
+          {/* Edit-template button — first in the virtual-blocks panel; the obvious,
+              permission-gated way to enter/exit template edit mode (replaces the buried
+              editTemplate checkbox). */}
+          {templateInstanceBlockId && (() => {
+            const tplInfo = blockPathMap[templateInstanceBlockId];
+            const canEdit = templatePermissions?.[tplInfo?.templateId]?.can_edit ?? true;
+            const isEditing = templateEditMode === templateInstanceBlockId;
+            const btn = getTemplateEditButtonState({ canEdit, isEditing });
+            return (
+              <button
+                type="button"
+                className={`edit-template-toggle${isEditing ? ' edit-template-toggle--active' : ''}`}
+                aria-pressed={isEditing}
+                disabled={btn.disabled}
+                title={btn.title}
+                onClick={() =>
+                  onToggleTemplateEditMode(isEditing ? null : templateInstanceBlockId)
+                }
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  marginBottom: '8px',
+                  border: '1px solid',
+                  borderColor: isEditing ? '#0b78d0' : '#ccc',
+                  borderRadius: '4px',
+                  background: isEditing ? '#0b78d0' : '#fff',
+                  color: btn.disabled ? '#999' : isEditing ? '#fff' : '#0b78d0',
+                  fontWeight: 600,
+                  cursor: btn.disabled ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {btn.label}
+              </button>
+            );
+          })()}
           {/* Parent blocks with headers + settings */}
           {parentIds.map((parentId, index) => {
             // For virtual blocks (like template instances), use blockData from pathMap

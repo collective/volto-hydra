@@ -1,20 +1,15 @@
 /**
- * Schema for the "Template Settings" form (title / save location / edit toggle) shown for
- * a top-level template instance in the sidebar. Kept in its own dependency-free module so
- * the permission gating is unit-testable without importing the React/Volto component tree.
- *
- * `canEdit` gates the editTemplate toggle: a template maps to a Plone document, and
- * entering template edit mode edits that document, so it requires "Modify portal content"
- * on it (the doc's `can_edit`). When the user lacks it, the toggle is disabled with a
- * permission tooltip rather than hidden, so the capability stays discoverable.
+ * Schema for the "Template Settings" form (template name / save location) shown for a
+ * top-level template instance in the sidebar. Entering edit mode is no longer a field here —
+ * it's a prominent button at the top of the parent-blocks panel (see getTemplateEditButtonState).
  */
-export const getTemplateInstanceSchema = (intl, { canEdit = true } = {}) => ({
+export const getTemplateInstanceSchema = (intl) => ({
   title: 'Template Settings',
   fieldsets: [
     {
       id: 'default',
       title: 'Default',
-      fields: ['title', 'folder', 'editTemplate'],
+      fields: ['title', 'folder'],
     },
   ],
   properties: {
@@ -31,18 +26,33 @@ export const getTemplateInstanceSchema = (intl, { canEdit = true } = {}) => ({
       selectableTypes: ['Folder'],
       allowExternals: false,
     },
-    editTemplate: {
-      title: 'Edit Template',
-      description: canEdit
-        ? 'When enabled, you can edit the template structure. Fixed blocks become editable.'
-        : "You don't have permission to modify this template (requires “Modify portal content”).",
-      type: 'boolean',
-      // Volto's CheckboxWidget disables on `isDisabled` (not `disabled`); schema props are
-      // spread to the widget, so this is what actually greys out the toggle.
-      ...(canEdit ? {} : { isDisabled: true }),
-    },
   },
   required: ['title'],
+});
+
+/**
+ * State for the "Edit template" toggle button (the prominent, obvious replacement for the
+ * old editTemplate checkbox). Kept as a pure function so its permission gating is unit-
+ * testable without the React tree.
+ *
+ * `canEdit` gates it: a template maps to a Plone document, and entering edit mode edits that
+ * document, so it requires "Modify portal content" (the doc's `can_edit`). When the user
+ * lacks it, the button is disabled with a permission tooltip rather than hidden, so the
+ * capability stays discoverable. `isEditing` flips the label between enter/exit.
+ *
+ * @param {Object} [opts]
+ * @param {boolean} [opts.canEdit=true]
+ * @param {boolean} [opts.isEditing=false]
+ * @returns {{ label: string, disabled: boolean, title: string }}
+ */
+export const getTemplateEditButtonState = ({ canEdit = true, isEditing = false } = {}) => ({
+  label: isEditing ? 'Done editing template' : 'Edit template',
+  disabled: !canEdit,
+  title: canEdit
+    ? isEditing
+      ? 'Exit template edit mode'
+      : 'Edit this template’s structure — fixed blocks become editable'
+    : 'You don’t have permission to modify this template (requires “Modify portal content”).',
 });
 
 /**
