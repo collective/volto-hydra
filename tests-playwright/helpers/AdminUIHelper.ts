@@ -914,6 +914,19 @@ export class AdminUIHelper {
   }
 
   /**
+   * Resolve a full (instance-scoped) block id from its template-child suffix. Forced-layout
+   * nested template blocks are emitted as `${instanceId}::${templateChildId}` so two
+   * instances of the same template don't collide in the blockPathMap; a test knows the
+   * template child id (e.g. 'tpl-slide-1') and resolves the actual rendered id here.
+   */
+  async resolveBlockId(suffix: string, timeout: number = 10000): Promise<string> {
+    const iframe = this.getIframe();
+    const loc = iframe.locator(`[data-block-uid$="${suffix}"]`).first();
+    await loc.waitFor({ state: 'attached', timeout });
+    return (await loc.getAttribute('data-block-uid')) as string;
+  }
+
+  /**
    * Assert that the sidebar shows exactly `expected` template settings sections.
    * Each block in the hierarchy can portal a "Template Settings" form into
    * #sidebar-template-settings. Object_list items should NOT render one.

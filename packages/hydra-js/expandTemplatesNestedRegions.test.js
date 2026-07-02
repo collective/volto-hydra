@@ -65,12 +65,16 @@ describe('expandTemplatesSync — nested container in blocks_layout region (#234
 
     // The nested `columns` region must survive the merge (currently it's dropped
     // / throws because findBlocksLayoutField only recognizes a `.items` field).
-    expect(cols.blocks_layout?.columns).toEqual(['col-1']);
-    expect(cols.blocks?.['col-1']).toBeDefined();
+    // Nested ids are instance-scoped, so assert structure, not the exact template ids.
+    const colIds = cols.blocks_layout?.columns;
+    expect(colIds).toHaveLength(1);
+    const col = cols.blocks?.[colIds[0]];
+    expect(col).toBeDefined();
 
     // And the column's own content must survive.
-    expect(cols.blocks['col-1'].blocks?.['txt-1']).toBeDefined();
-    expect(cols.blocks['col-1'].blocks_layout?.items).toEqual(['txt-1']);
+    const txtIds = col.blocks_layout?.items;
+    expect(txtIds).toHaveLength(1);
+    expect(col.blocks?.[txtIds[0]]?.['@type']).toBe('slate');
   });
 });
 

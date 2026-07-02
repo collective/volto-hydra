@@ -39,9 +39,12 @@ describe('expandTemplatesSync — a template sub-block without templateId is dro
     });
     const cols = out.find((b) => b['@type'] === 'columns');
     expect(cols).toBeDefined();
-    expect(cols.blocks.good).toBeDefined();
-    expect(cols.blocks.good.templateId).toBe('/t/drop'); // kept, not invented
-    expect(cols.blocks.orphan).toBeUndefined();           // dropped
-    expect(cols.blocks_layout.items).toEqual(['good']);   // and removed from the layout
+    // Nested ids are instance-scoped (`${instanceId}::good`), so assert structurally:
+    // exactly one child survives, it's the good one (kept, not invented), orphan gone.
+    expect(cols.blocks_layout.items).toHaveLength(1);
+    const kept = cols.blocks[cols.blocks_layout.items[0]];
+    expect(kept.slotId).toBe('good');
+    expect(kept.templateId).toBe('/t/drop'); // kept, not invented
+    expect(Object.values(cols.blocks).some((b) => b.slotId === 'orphan')).toBe(false); // dropped
   });
 });

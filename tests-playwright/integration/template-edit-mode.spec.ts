@@ -1136,8 +1136,10 @@ test.describe('Template Edit Mode - Object List Items', () => {
   // Carousel slides: only the first slide is visible by default.
   // Use carousel next button (data-block-selector="+1") to navigate to subsequent slides.
   const SLIDER_BLOCK_ID = 'template-slider';
-  const SLIDE_1_ID = 'tpl-slide-1';
-  const SLIDE_2_ID = 'tpl-slide-2';
+  // Forced-layout nested template blocks are instance-scoped (`${instanceId}::tpl-slide-1`)
+  // so two instances don't collide; resolve the actual rendered id from this suffix.
+  const SLIDE_1_SUFFIX = 'tpl-slide-1';
+  const SLIDE_2_SUFFIX = 'tpl-slide-2';
 
   test('object_list items inside readOnly template block are locked', async ({ page }) => {
     const helper = new AdminUIHelper(page);
@@ -1150,6 +1152,8 @@ test.describe('Template Edit Mode - Object List Items', () => {
     // Wait for slider container to be visible
     await expect(iframe.locator(`[data-block-uid="${SLIDER_BLOCK_ID}"]`)).toBeVisible({ timeout: 10000 });
 
+    const SLIDE_1_ID = await helper.resolveBlockId(SLIDE_1_SUFFIX);
+    const SLIDE_2_ID = await helper.resolveBlockId(SLIDE_2_SUFFIX);
     // Verify slides have hydra-locked class (readOnly from template)
     await helper.waitForBlockReadonly(SLIDE_1_ID);
 
@@ -1182,6 +1186,7 @@ test.describe('Template Edit Mode - Object List Items', () => {
     await expect(iframe.locator(`[data-block-uid="${SLIDER_BLOCK_ID}"]`)).toBeVisible({ timeout: 10000 });
 
     // Use carousel indicator to select slide 1
+    const SLIDE_1_ID = await helper.resolveBlockId(SLIDE_1_SUFFIX);
     const slide1Indicator = iframe.locator(`[data-block-selector="${SLIDE_1_ID}"]`);
     await slide1Indicator.click();
     await helper.waitForSidebarCurrentBlock('Slide');
@@ -1208,6 +1213,8 @@ test.describe('Template Edit Mode - Object List Items', () => {
     const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
     const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
 
+    const SLIDE_1_ID = await helper.resolveBlockId(SLIDE_1_SUFFIX);
+    const SLIDE_2_ID = await helper.resolveBlockId(SLIDE_2_SUFFIX);
     // Initially locked
     await helper.waitForBlockReadonly(SLIDE_1_ID);
 
@@ -1269,6 +1276,7 @@ test.describe('Template Edit Mode - Object List Items', () => {
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
     // Select slide 1 via carousel indicator, then click the [+] to add a new slide
+    const SLIDE_1_ID = await helper.resolveBlockId(SLIDE_1_SUFFIX);
     await helper.waitForBlockEditable(SLIDE_1_ID);
     const slide1Indicator = iframe.locator(`[data-block-selector="${SLIDE_1_ID}"]`);
     await slide1Indicator.click();

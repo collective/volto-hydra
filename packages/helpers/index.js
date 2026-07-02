@@ -2086,7 +2086,13 @@ function fillRegionEntries(entries, templateState, options) {
     if (child.fixed) {
       const editable = !child.readOnly && !!child.slotId;
       const existingFixed = editable ? ctx?.existingFixedBlockIds?.get(child.slotId) : undefined;
-      const outId = existingFixed?.blockId || tplChildId;
+      // Instance-scope the id so two instances of the same template don't reuse the
+      // template's child id and collide in the blockPathMap (snippet insertion already
+      // re-ids nested blocks; the forced-layout apply must too). Kept DETERMINISTIC
+      // (`${instanceId}::${tplChildId}`, not uuidGenerator) so the id is stable across
+      // re-renders and preserves the template child id as a suffix. Editable fixed blocks
+      // reuse the page's own (already-unique) id when the page overrode them.
+      const outId = existingFixed?.blockId || `${instanceId}::${tplChildId}`;
       // Look ahead for the next non-fixed slot in this region (add-path hint).
       let nextSlotId = undefined;
       for (let i = idx + 1; i < entries.length; i++) {
