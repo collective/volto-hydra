@@ -239,7 +239,7 @@ import slateTransforms from '../../utils/slateTransforms';
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, _getContainerChildFieldName } from '../../utils/blockPath';
-import { canContainAll } from '@volto-hydra/helpers';
+import { canContainAll, getChildBlockEntries } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
@@ -985,7 +985,10 @@ const Iframe = (props) => {
       document.removeEventListener('hydra-exit-selection-mode', handleExitSelectionMode);
       document.removeEventListener('hydra-enter-selection-mode', handleEnterSelectionMode);
     };
-  }, [blocksClipboard, properties, iframeSyncState?.blockPathMap, onChangeFormData, dispatch, intl]);
+    // NOTE: templateEditMode must be a dep — these handlers (handleDelete) gate
+    // on it via isBlockReadonly; without it the listener closure keeps a
+    // stale edit mode and refuses to mutate template blocks while editing.
+  }, [blocksClipboard, properties, iframeSyncState?.blockPathMap, iframeSyncState?.templateEditMode, onChangeFormData, dispatch, intl]);
 
   // Template cache: stores loaded template documents keyed by templateId
   // Used for comparison on save to detect template changes
@@ -1069,6 +1072,24 @@ const Iframe = (props) => {
             const lastSlash = templateId.lastIndexOf('/');
             const parentFolder = lastSlash > 0 ? templateId.slice(0, lastSlash) : '/';
             const id = templateId.slice(lastSlash + 1);
+            // Creating a template requires "Add portal content" on the CHOSEN save folder
+            // (never a hardcoded path — the author picks the location). Check it before
+            // POSTing so an unauthorized location blocks the save loudly instead of silently
+            // dropping the template; the backend 403 is the final word.
+            let targetFolder = null;
+            try {
+              targetFolder = await api.get(parentFolder);
+            } catch {
+              // Couldn't read the folder's permissions — don't block on that; proceed and
+              // let the backend be the authority (a real 403 will surface on POST).
+            }
+            if (targetFolder?.can_add === false) {
+              const err = new Error(
+                `You don't have permission to add templates in "${parentFolder}" (requires “Add portal content”).`,
+              );
+              err.isPermissionError = true;
+              throw err;
+            }
             await api.post(parentFolder, {
               data: {
                 '@type': 'Document',
@@ -1095,6 +1116,8 @@ const Iframe = (props) => {
           }
         } catch (error) {
           console.error(`[HYDRA] Failed to save template ${templateId}:`, error);
+          // A permission failure must block the save, not silently drop the template.
+          if (error?.isPermissionError) throw error;
         }
       }));
     };
@@ -1146,8 +1169,6 @@ const Iframe = (props) => {
         loadTemplate: async () => formData,
         filterInstanceId: prevInstanceId,
         uuidGenerator: uuid,
-        blocksConfig: config.blocks.blocksConfig,
-        intl,
       }).then(({ merged: updatedTemplate }) => {
         log('REVERSE MERGE: Updated template blocks:', Object.keys(updatedTemplate.blocks || {}));
         // Log first block's value to check if edit is captured
@@ -1456,6 +1477,40 @@ const Iframe = (props) => {
 
     // Create block data (use custom data if provided)
     let blockData;
+
+    // Inherit template membership (templateId/slotId) for a block inserted into a
+    // container region — uniform across blocks_layout and object_list. Both are just an
+    // ordered region of child blocks; getChildBlockEntries (public helper) normalises the
+    // storage so this never branches on it. The neighbour is the LAST existing child for
+    // 'inside' (append at end), else the sibling blockId we insert relative to.
+    const inheritTemplateMembership = (bd) => {
+      const region = containerConfig?.region || 'items';
+      // The REAL container the new block lands in: containerConfig.parentId (the page,
+      // or the container for a nested/inside add). NOT blockPathMap[blockId].parentId —
+      // for a template-member block that is the VIRTUAL templateInstanceId, not a real
+      // block, so getChildBlockEntries finds no siblings and nothing is inherited.
+      const containerId = action === 'inside' ? blockId : (containerConfig?.parentId || PAGE_BLOCK_UID);
+      const container = (containerId === PAGE_BLOCK_UID || containerId === 'page')
+        ? formData
+        : getBlockById(formData, blockPathMap, containerId);
+      const entries = getChildBlockEntries(container, containerConfig);
+      const refIndex = entries.findIndex((entry) => entry.id === blockId);
+      const position = action === 'inside' ? entries.length
+        : action === 'after' ? refIndex + 1
+        : refIndex;
+      const insertAfter = action === 'after' || action === 'inside';
+      return applyBlockDefaultsWithContext(bd, {
+        items: entries.map((entry) => entry.block),
+        position,
+        insertAfter,
+        parentBlock: container,
+        containerId,
+        field: region,
+        blocksConfig: mergedBlocksConfig,
+        intl,
+      });
+    };
+
     if (customBlockData) {
       blockData = customBlockData;
     } else if (isObjectList) {
@@ -1510,25 +1565,8 @@ const Iframe = (props) => {
       // Initialize nested containers (e.g., cells in a row)
       blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, { intl, metadata, properties, siblingData, blockType: effectiveType });
 
-      // Inherit template fields from neighbors (same logic as blocks_layout)
-      if (action !== 'inside') {
-        const parentId = blockPathMap[blockId]?.parentId;
-        const parentBlock = parentId === PAGE_BLOCK_UID
-          ? formData
-          : getBlockById(formData, blockPathMap, parentId);
-        const existingItems = parentBlock ? getContainerItems(parentBlock, containerConfig) : [];
-        const idFld = containerConfig?.idField || fieldDef?.idField || '@id';
-        const refIndex = existingItems.findIndex(item => item[idFld] === blockId);
-        const position = action === 'after' ? refIndex + 1 : refIndex;
-
-          blockData = applyBlockDefaultsWithContext(blockData, {
-          position,
-          insertAfter: action === 'after',
-          items: existingItems,
-          blocksConfig: mergedBlocksConfig,
-          intl,
-        });
-      }
+      // Inherit template membership from the neighbour (uniform read; see helper above).
+      blockData = inheritTemplateMembership(blockData);
 
       // Store type in typeField, clean up @type if typeField is different
       blockData[typeFieldName] = effectiveType;
@@ -1542,27 +1580,8 @@ const Iframe = (props) => {
         blockData.value = [{ type: 'p', children: [{ text: '' }] }];
       }
 
-      // Calculate position for context
-      const containerId = containerConfig?.parentId || 'page';
-      const containerRegion = containerConfig?.region || 'items';
-      const container = containerId === 'page' ? formData : getBlockById(formData, blockPathMap, containerId);
-      const layoutItems = container?.blocks_layout?.[containerRegion] || [];
-      const refIndex = layoutItems.indexOf(blockId);
-      const position = action === 'after' ? refIndex + 1 : refIndex;
-
-      // Apply defaults with extended context for dynamic defaults
-      // insertAfter tells inheritance logic which neighbor to inherit template membership from
-      blockData = applyBlockDefaultsWithContext(blockData, {
-        containerId,
-        field: containerRegion,
-        position,
-        insertAfter: action === 'after',
-        layoutItems,
-        allBlocks: formData.blocks,
-        blockPathMap,
-        blocksConfig: mergedBlocksConfig,
-        intl,
-      });
+      // Inherit template membership from the neighbour (uniform read; see helper above).
+      blockData = inheritTemplateMembership(blockData);
 
       // Also apply regular applyBlockDefaults for non-context-aware schemas
       blockData = applyBlockDefaults({ data: blockData, formData: blockData, intl, metadata, properties });
@@ -3490,8 +3509,6 @@ const Iframe = (props) => {
             preloadedTemplates: templateCacheRef.current,
             pageBlocksFields,
             uuidGenerator: uuid,
-            blocksConfig: config.blocks.blocksConfig,
-            intl,
           });
           let blockPathMap = buildBlockPathMap(mergedFormData, config.blocks.blocksConfig, intl);
 
@@ -5021,6 +5038,7 @@ const Iframe = (props) => {
         multiSelected={multiSelected}
         formData={properties}
         blockPathMap={iframeSyncState.blockPathMap}
+        templatePermissions={templateCacheRef.current}
         onSelectBlock={onSelectBlock}
         onDeleteBlock={onDeleteBlock}
         onBlockAction={(actionId, blockId) => {

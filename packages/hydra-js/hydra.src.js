@@ -15,6 +15,7 @@ import {
   deepEqual,
   findChangedUnit,
   isBlockReadonly,
+  isBlockInEditedTemplate,
   isBlockPositionLocked,
   getBlockAddability,
   isTextOnlyBlockChange,
@@ -393,16 +394,19 @@ export class Bridge {
   isBlockReadonly(blockUid) {
     const blockData = this.getBlockData(blockUid);
 
-    // Use shared utility for template edit mode and block.readOnly checks
-    const readonlyFromShared = isBlockReadonly(blockData, this.templateEditMode);
-
-    // In template edit mode, the shared function handles everything
+    // In template edit mode the flat shared check (templateInstanceId match) is
+    // sufficient at any depth: the merge stamps every block with its resolved
+    // instance id, so same-template nested content carries the instance's id and a
+    // foreign embedded template carries its own — editable iff the stamped id
+    // matches the edited instance.
     if (this.templateEditMode) {
-      log('isBlockReadonly:', readonlyFromShared ? 'TRUE' : 'FALSE', '(template edit mode) for:', blockUid);
-      return readonlyFromShared;
+      const readonly = !isBlockInEditedTemplate(blockData, this.templateEditMode);
+      log('isBlockReadonly:', readonly ? 'TRUE' : 'FALSE', '(template edit mode) for:', blockUid);
+      return readonly;
     }
 
-    // Normal mode: also check Bridge-specific registry
+    // Normal mode: shared block.readOnly check + Bridge-specific registry
+    const readonlyFromShared = isBlockReadonly(blockData, this.templateEditMode);
     if (this._readonlyBlocks.has(blockUid)) {
       log('isBlockReadonly: TRUE (registry) for:', blockUid);
       return true;
@@ -964,8 +968,12 @@ export class Bridge {
     const blockData = this.getBlockData(blockUid);
     const addability = getBlockAddability(blockUid, this.blockPathMap, blockData, this.templateEditMode);
 
-    // Hide add button if can't insert after (add button only adds after the selected block)
-    if (!addability.canInsertAfter) {
+    // Hide the add button only if the block can neither take a sibling after it NOR be
+    // replaced. An '@type: empty' placeholder can't take siblings (canInsertAfter is false)
+    // but CAN be replaced (canReplace) — the + then opens the chooser to pick its type in
+    // place. Without this, a seeded empty (no defaultBlockType + multiple allowedBlocks) is
+    // stranded with no + and no way to be typed.
+    if (!addability.canInsertAfter && !addability.canReplace) {
       return 'hidden';
     }
 

@@ -196,6 +196,15 @@
         async function renderContentWithListings(content) {
             const myGeneration = ++window._renderGeneration;
 
+            // ONE shared template-merge state for the WHOLE page render — created by the
+            // page-load entry and NEVER reset mid-render. Every expand call (top-level,
+            // footer, and every object_list / blocks_layout re-entry) reuses this one
+            // object, so instances minted by the top-level apply survive to every
+            // re-entry and recognition hits (data-derived) instead of re-applying. Reuse
+            // it here; only create it if we are the entry point (wiping it mid-render
+            // would drop the minted instances and re-apply → infinite loop).
+            if (!window._templateState) window._templateState = {};
+
             // Extract path from @id
             let contextPath = content['@id'] || '/';
             if (contextPath.startsWith('http')) {
@@ -235,7 +244,7 @@
             // Render footer_blocks if present (or if forced layout will inject content)
             // Determine if we should force footer layout based on page path (same logic as bridge init)
             const pagePath = contextPath.replace(/\/edit$/, '');
-            const forceFooterLayout = pagePath === '/_test_data/another-page';
+            const forceFooterLayout = pagePath.startsWith('/_test_data/another-page');
             const footerAllowedLayouts = forceFooterLayout ? ['/_test_data/templates/footer-layout'] : null;
 
             if (myGeneration !== window._renderGeneration) return; // stale render
@@ -245,7 +254,7 @@
                 const footerLayout = content.blocks_layout?.footer || [];
 
                 // Expand templates (handles both existing content and forced layouts)
-                const templateState = {};
+                const templateState = window._templateState;
                 const loadTemplate = async (templateId) => {
                     const headers = { 'Accept': 'application/json' };
                     const token = getAccessToken();
@@ -369,8 +378,12 @@
                     return res.json();
                 };
 
-                // Expand templates in main blocks field
-                const templateState = {};
+                // Expand templates in main blocks field. Seed the ONE shared
+                // template-merge state for this render cycle (parity with
+                // renderContentWithListings:204) so nested re-entries reuse the
+                // same object instead of getting undefined — no per-call default.
+                window._templateState = {};
+                const templateState = window._templateState;
                 const expandedItems = await expandTemplates(
                     content.blocks_layout?.items || [],
                     {
@@ -389,7 +402,6 @@
 
                 // Expose template expansion for renderer.js (object_list arrays)
                 window._expandTemplatesSync = expandTemplatesSync;
-                window._templateState = templateState;
 
                 // Render navigation from @components.navigation.items
                 const navItems = content['@components']?.navigation?.items || [];
@@ -428,7 +440,7 @@
 
                     // Determine if we should force footer layout based on page path
                     const pagePath = window.location.pathname.replace(/\/edit$/, '');
-                    const forceFooterLayout = pagePath === '/_test_data/another-page';
+                    const forceFooterLayout = pagePath.startsWith('/_test_data/another-page');
 
                     // Listen for changes from the admin UI and update blocks
                     // Return promise from async render so hydra.js can wait for DOM updates

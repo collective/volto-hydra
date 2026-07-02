@@ -1282,6 +1282,51 @@ test.describe('Empty Block Behavior', () => {
     expect(blockContent).not.toContain('Empty block');
   });
 
+  // Baseline (NO template): emptying a container seeds an empty placeholder
+  // INSIDE the container, and adding into it clears that empty. This is the
+  // behaviour parity that the template primary-slot case violates (see
+  // template-advanced.spec.ts 'emptied template primary slot has no in-slot empty').
+  test('emptied container seeds an in-place empty and adding into it clears it (no template)', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+    await helper.getStableBlockCount();
+    const iframe = helper.getIframe();
+
+    // Empty grid-1 by removing both of its cells.
+    for (const cell of ['grid-cell-2', 'grid-cell-1']) {
+      await helper.clickBlockInIframe(cell);
+      await helper.openQuantaToolbarMenu(cell);
+      await helper.clickQuantaToolbarMenuOption(cell, 'Remove');
+      await helper.waitForBlockToDisappear(cell);
+      await helper.getStableBlockCount();
+    }
+
+    // The emptied container gets an empty placeholder INSIDE it (data-hydra-empty).
+    const inContainerEmpty = iframe.locator(
+      '[data-block-uid="grid-1"] > .grid-row > [data-hydra-empty]',
+    );
+    await expect(inContainerEmpty).toBeVisible({ timeout: 5000 });
+
+    // Adding into that empty (click → chooser → Teaser) clears the empty and
+    // places the new block inside the container.
+    await inContainerEmpty.click();
+    const chooser = page.locator('.blocks-chooser');
+    await expect(chooser).toBeVisible({ timeout: 5000 });
+    await chooser.getByRole('button', { name: 'Teaser' }).click();
+
+    const newChild = iframe
+      .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
+      .first();
+    await expect(newChild.locator('a').first()).toBeVisible({ timeout: 5000 });
+    // The empty is gone — the add replaced it in place.
+    await expect(
+      iframe.locator('[data-block-uid="grid-1"] [data-hydra-empty]'),
+    ).toHaveCount(0);
+  });
+
   test('empty blocks are stripped on save and restored on re-edit', async ({
     page,
   }) => {

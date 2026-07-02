@@ -104,6 +104,53 @@ test.describe('Adding Blocks', () => {
     await expect(warning).toHaveCount(0);
   });
 
+  // Repro (the gap the section test above doesn't cover): a container with NO
+  // defaultBlockType and MULTIPLE allowed types. contextNavigation.items has
+  // allowedBlocks ['navItem','listing'] and no default, so it seeds a bare '@type: empty'
+  // child (not a resolvable slate). That seeded empty is born outside View.jsx's add-flow,
+  // so it never gets typed by the chooser — and getAddDirection returns 'hidden' for an
+  // empty, so no '+' appears either. The admin must still surface a '+' on the selected
+  // empty (getBlockAddability marks it canReplace) so its type can be picked in place;
+  // otherwise the container is stuck empty with no way to add the first child.
+  test('a seeded empty in a no-default multi-allowed container gets a + to pick its type', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Add a contextNavigation; initializeContainerBlock seeds an 'empty' subblock.
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.clickAddBlockButton();
+    await helper.selectBlockType('contextNavigation');
+
+    // The seeded empty renders as a plain, selectable placeholder inside the new nav.
+    const emptyChild = iframe.locator('.context-navigation [data-block-uid]').first();
+    await expect(emptyChild).toBeVisible({ timeout: 5000 });
+
+    // Select it — the admin must show a '+' so its type (navItem/listing) can be picked
+    // (the BlockChooser mutates the empty in place). This is the bug: no '+' appeared.
+    await emptyChild.click();
+    const addBtn = page.locator('.volto-hydra-add-button');
+    await expect(addBtn).toBeVisible({ timeout: 5000 });
+
+    // The '+' opens the BlockChooser, offering the container's allowed types (navItem/
+    // listing) so the empty can be typed in place (View.jsx routes an empty's pick through
+    // onMutateBlock). The empty is no longer stranded.
+    await addBtn.click();
+    const chooser = page.locator('.blocks-chooser');
+    await expect(chooser).toBeVisible({ timeout: 5000 });
+    // The chooser offers the container's allowed types (navItem present) — so the empty is
+    // pickable in place (not stranded).
+    await expect(chooser.locator('button.navItem')).toBeAttached({ timeout: 5000 });
+
+    // Pick navItem: the empty mutates in place into a navItem, which must render. A fresh
+    // navItem has no href yet, so the renderer must show an editable placeholder, not crash.
+    await helper.selectBlockType('navItem');
+    await expect(iframe.locator('.context-navigation a[data-block-uid]')).toBeVisible({ timeout: 5000 });
+  });
+
   test('can add an Image block to the page', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 

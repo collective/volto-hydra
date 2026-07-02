@@ -17,7 +17,11 @@ const applyBlockInitialValue = (blockData, blocksConfig, intl) => {
 };
 import config from '@plone/volto/registry';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
-import { isBlockReadonly } from '@volto-hydra/helpers';
+import {
+  isBlockReadonly,
+  getChildBlockEntries,
+  setChildBlockEntries,
+} from '@volto-hydra/helpers';
 import {
   buildBlockPathMap as _buildBlockPathMap,
   getBlockTypeSchema,
@@ -129,25 +133,20 @@ export { getBlockTypeSchema, getBlockSchema, getResolvedSchema };
 
 /**
  * Get items array from a container (works for both object_list and blocks containers).
+ *
+ * Thin shim over the public reader getChildBlockEntries so there is ONE storage-agnostic
+ * read implementation shared by the admin and the template merge. Preserves this
+ * function's return shape: block OBJECTS for object_list, block IDs for blocks_layout.
+ *
  * @param {Object} parentBlock - The parent block containing the container
  * @param {Object} containerConfig - Container configuration with fieldName, isObjectList, dataPath
  * @returns {Array} The items array (copy for object_list, items array for blocks)
  */
 export function getContainerItems(parentBlock, containerConfig) {
-  const { isObjectList, dataPath, region = 'items' } = containerConfig;
-
-  if (isObjectList) {
-    const effectivePath = dataPath || [region];
-    let container = parentBlock;
-    for (const key of effectivePath) {
-      container = container?.[key];
-    }
-    return [...(container || [])];
-  }
-
-  // blocks container: the region is a key in the shared blocks_layout dict;
-  // child blocks live in the shared parent.blocks.
-  return [...(parentBlock.blocks_layout?.[region] || [])];
+  const entries = getChildBlockEntries(parentBlock, containerConfig);
+  return containerConfig.isObjectList
+    ? entries.map((e) => e.block)
+    : entries.map((e) => e.id);
 }
 
 /**
@@ -168,37 +167,32 @@ function reorderContainerItems(items, newOrder, containerConfig) {
 }
 
 /**
- * Set items array on a container (returns updated parent block).
+ * Set items array on a container (returns updated parent block — immutable).
+ *
+ * Thin shim over the public writer setChildBlockEntries so there is ONE storage-agnostic
+ * write implementation shared by the admin and the template merge. For blocks_layout the
+ * admin owns the shared dict (blocksObj already reflects adds/deletes), so items are ids
+ * and `block` is omitted — the writer just sets this region's id list and preserves
+ * sibling regions. For object_list, items are the block objects.
+ *
  * @param {Object} parentBlock - The parent block containing the container
  * @param {Object} containerConfig - Container configuration
- * @param {Array} items - New items array
- * @param {Object} [blocksObj] - For blocks containers, the blocks object to merge
+ * @param {Array} items - New items array (block objects for object_list, ids for blocks)
+ * @param {Object} [blocksObj] - For blocks containers, the blocks object to set
  * @returns {Object} Updated parent block
  */
 function setContainerItems(parentBlock, containerConfig, items, blocksObj = null) {
-  const { isObjectList, dataPath, region = 'items' } = containerConfig;
-
-  if (isObjectList) {
-    const effectivePath = dataPath || [region];
-    const updatedParent = { ...parentBlock };
-    let current = updatedParent;
-    for (let i = 0; i < effectivePath.length - 1; i++) {
-      current[effectivePath[i]] = { ...current[effectivePath[i]] };
-      current = current[effectivePath[i]];
-    }
-    current[effectivePath[effectivePath.length - 1]] = items;
-    return updatedParent;
+  const { isObjectList, idField = '@id' } = containerConfig;
+  const updatedParent = { ...parentBlock };
+  if (!isObjectList) {
+    // Full-dict replace; setChildBlockEntries leaves it alone (block omitted below).
+    updatedParent.blocks = blocksObj || parentBlock.blocks;
   }
-
-  // blocks container: update shared blocks dict + this region's list within the
-  // shared blocks_layout dict. Spread the existing dict so SIBLING regions (e.g.
-  // header, footer) are preserved — writing { [region]: items } alone would wipe
-  // them. (No-op for single-region data, where region is always 'items'.)
-  return {
-    ...parentBlock,
-    blocks: blocksObj || parentBlock.blocks,
-    blocks_layout: { ...parentBlock.blocks_layout, [region]: items },
-  };
+  const entries = isObjectList
+    ? items.map((block) => ({ id: block[idField], block }))
+    : items.map((id) => ({ id }));
+  setChildBlockEntries(updatedParent, containerConfig, entries);
+  return updatedParent;
 }
 
 /**
@@ -452,9 +446,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
       return {
         region,
         parentId,
-        allowedBlocks: regionFieldDef.allowedBlocks ?? parentConfig?.allowedBlocks ?? null,
-        defaultBlockType: regionFieldDef.defaultBlockType ?? parentConfig?.defaultBlockType ?? null,
-        maxLength: regionFieldDef.maxLength ?? parentConfig?.maxLength ?? null,
+        ...resolveRegionConstraints(regionFieldDef, parentConfig, getPageDefaults(blocksConfig, formData)),
       };
     }
   }
@@ -467,9 +459,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
     return {
       region,
       parentId,
-      allowedBlocks: parentConfig?.allowedBlocks || null,
-      defaultBlockType: parentConfig?.defaultBlockType || null,
-      maxLength: parentConfig?.maxLength || null,
+      ...resolveRegionConstraints(null, parentConfig, getPageDefaults(blocksConfig, formData)),
     };
   }
 
@@ -609,24 +599,21 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
         const region = fieldName;
         const layoutList = block.blocks_layout?.[region];
         const currentCount = Array.isArray(layoutList) ? layoutList.length : 0;
-        const maxLength = fieldDef.maxLength ?? blockConfig?.maxLength ?? null;
-        const maxLengthOk = !maxLength || currentCount < maxLength;
-        const allowedBlocks = fieldDef.allowedBlocks ?? blockConfig?.allowedBlocks ?? null;
-        // When neither field nor block restricts allowedBlocks, the container
-        // inherits the page's allowed list — and so should its empty-block
-        // default. Otherwise null falls through to the picker 'empty' placeholder.
-        const allowedBlocksInherited = !allowedBlocks;
+        // Same field → block → page precedence as getContainerFieldConfig (a container that
+        // restricts nothing inherits the page's allowed list + default block type).
+        const rc = resolveRegionConstraints(fieldDef, blockConfig, {
+          allowedBlocks: defaultAllowedBlocks,
+          defaultBlockType: pageDefaultBlockType,
+        });
+        const maxLengthOk = !rc.maxLength || currentCount < rc.maxLength;
         containerFields.push({
           region,
           title: fieldDef.title || (region === 'items' ? 'Blocks' : region),
-          allowedBlocks: allowedBlocks || defaultAllowedBlocks,
+          allowedBlocks: rc.allowedBlocks,
           allowedTemplates: fieldDef.allowedTemplates || null,
           allowedLayouts: fieldDef.allowedLayouts || null,
-          defaultBlockType:
-            fieldDef.defaultBlockType ??
-            blockConfig?.defaultBlockType ??
-            (allowedBlocksInherited ? pageDefaultBlockType : null),
-          maxLength,
+          defaultBlockType: rc.defaultBlockType,
+          maxLength: rc.maxLength,
           currentCount,
           canAdd: !parentIsReadonly && maxLengthOk,
         });
@@ -666,18 +653,20 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   const isImplicitContainer = (block.blocks && block.blocks_layout?.items) ||
                               blockConfig?.allowedBlocks || blockConfig?.defaultBlockType;
   if (containerFields.length === 0 && isImplicitContainer) {
-    const maxLength = blockConfig?.maxLength || null;
     // Implicit container's default blocks field is 'items' → blocks_layout.items.
     const currentCount = block.blocks_layout?.items?.length || 0;
-    const maxLengthOk = !maxLength || currentCount < maxLength;
-    // Same inherited-default rule as the schema-defined branch above.
-    const allowedBlocksInherited = !blockConfig?.allowedBlocks;
+    // Same field → block → page precedence as the schema-defined branch above.
+    const rc = resolveRegionConstraints(null, blockConfig, {
+      allowedBlocks: defaultAllowedBlocks,
+      defaultBlockType: pageDefaultBlockType,
+    });
+    const maxLengthOk = !rc.maxLength || currentCount < rc.maxLength;
     containerFields.push({
       region: 'items',
       title: 'Blocks',
-      allowedBlocks: blockConfig?.allowedBlocks || defaultAllowedBlocks,
-      defaultBlockType: blockConfig?.defaultBlockType || (allowedBlocksInherited ? pageDefaultBlockType : null),
-      maxLength,
+      allowedBlocks: rc.allowedBlocks,
+      defaultBlockType: rc.defaultBlockType,
+      maxLength: rc.maxLength,
       currentCount,
       canAdd: !parentIsReadonly && maxLengthOk,
     });
@@ -725,15 +714,20 @@ export function insertBlockInContainer(formData, blockPathMap, refBlockId, newBl
   const items = getContainerItems(parentBlock, containerConfig);
   let updatedParentBlock;
 
+  // A block added into a container that is part of a template instance joins that
+  // instance (inherit from the ref sibling, else the container) — otherwise it renders
+  // read-only in template edit mode, the same failure as unstamped seeded auto-content.
   if (isObjectList) {
     const idField = containerConfig.idField || '@id';
     const refIndex = items.findIndex(item => item[idField] === refBlockId);
     const insertIndex = getInsertIndex(items, refIndex);
-    items.splice(insertIndex, 0, { [idField]: newBlockId, ...newBlockData });
+    const stamped = inheritTemplateMembership(newBlockData, items[refIndex] || parentBlock, { inheritFixed: !!parentBlock?.templateInstanceId });
+    items.splice(insertIndex, 0, { [idField]: newBlockId, ...stamped });
     updatedParentBlock = setContainerItems(parentBlock, containerConfig, items);
   } else {
     // Standard container: shared blocks dict + layout field
-    const newContainerBlocks = { ...parentBlock.blocks, [newBlockId]: newBlockData };
+    const stamped = inheritTemplateMembership(newBlockData, parentBlock.blocks?.[refBlockId] || parentBlock, { inheritFixed: !!parentBlock?.templateInstanceId });
+    const newContainerBlocks = { ...parentBlock.blocks, [newBlockId]: stamped };
     const refIndex = items.indexOf(refBlockId);
     const insertIndex = getInsertIndex(items, refIndex);
     items.splice(insertIndex, 0, newBlockId);
@@ -1443,6 +1437,79 @@ export function getEmptyBlockType(containerConfig) {
 }
 
 /**
+ * Page-level fallback constraints — the allowed list + default block type a container
+ * inherits when it restricts nothing.
+ */
+function getPageDefaults(blocksConfig, formData) {
+  return {
+    allowedBlocks: getPageAllowedBlocksFromRestricted(blocksConfig, { properties: formData }),
+    defaultBlockType: config.settings.defaultBlockType || null,
+  };
+}
+
+/**
+ * The single field → block → page precedence for a container region's constraints, shared by
+ * getContainerFieldConfig (the per-block add/insert path) and getAllContainerFields (the
+ * sidebar enumeration) so the two can't diverge. They used to: only getAllContainerFields
+ * inherited the page default, so getEmptyBlockType seeded a different empty-block type
+ * depending on which builder ran. When neither the field nor the block restricts
+ * allowedBlocks, the region inherits the page's allowed list — and its defaultBlockType
+ * inherits the page default too.
+ *
+ * @param {Object|null} fieldDef - the blocks_layout schema field def, or null (implicit container)
+ * @param {Object|null} blockConfig - the parent block's blocksConfig entry
+ * @param {{ allowedBlocks?: Array, defaultBlockType?: string|null }} [pageDefaults]
+ * @returns {{ allowedBlocks: Array|null, defaultBlockType: string|null, maxLength: number|null }}
+ */
+export function resolveRegionConstraints(fieldDef, blockConfig, pageDefaults = {}) {
+  const ownAllowed = fieldDef?.allowedBlocks ?? blockConfig?.allowedBlocks ?? null;
+  const inherited = !ownAllowed; // neither field nor block restricts → inherit the page
+  return {
+    allowedBlocks: ownAllowed || pageDefaults.allowedBlocks || null,
+    defaultBlockType:
+      fieldDef?.defaultBlockType ??
+      blockConfig?.defaultBlockType ??
+      (inherited ? pageDefaults.defaultBlockType ?? null : null),
+    maxLength: fieldDef?.maxLength ?? blockConfig?.maxLength ?? null,
+  };
+}
+
+/**
+ * Stamp a block being seeded/added into a container with that container's template
+ * membership. When a container is part of a template instance, a block added into it must
+ * join the same instance — otherwise the flat readonly check
+ * (isBlockReadonly: block.templateInstanceId === templateEditMode) treats the new block as
+ * read-only in template edit mode, so no add-after "+" appears and you can't build it out.
+ * Centralized so every add/seed path stamps consistently. No-op when the source block
+ * isn't part of a template instance.
+ *
+ * When the added block is TEMPLATE CONTENT (a block added after a template sibling, or the
+ * default child of a template container), pass `inheritFixed: true` so it also inherits
+ * `fixed`/`readOnly` from the source. That makes it real template content: captured by the
+ * reverse merge and propagated to other pages (it stays editable in template edit mode via
+ * the templateInstanceId, and is read-only in normal mode like any template block). Slot
+ * placeholders (the in-slot-empty seed) must NOT inherit fixed — they're user-fillable
+ * regions — so they call this without the flag.
+ *
+ * @param {Object} childBlock - the block being added/seeded
+ * @param {Object} sourceBlock - the container (or a template sibling) to inherit from
+ * @param {Object} [opts]
+ * @param {boolean} [opts.inheritFixed=false] - also inherit fixed/readOnly (template content)
+ * @returns {Object} childBlock, stamped when the source is a template instance
+ */
+export function inheritTemplateMembership(childBlock, sourceBlock, { inheritFixed = false } = {}) {
+  if (!sourceBlock?.templateInstanceId) return childBlock;
+  return {
+    ...childBlock,
+    templateInstanceId: sourceBlock.templateInstanceId,
+    ...(sourceBlock.templateId ? { templateId: sourceBlock.templateId } : {}),
+    ...(inheritFixed
+      ? { fixed: sourceBlock.fixed || false, readOnly: sourceBlock.readOnly || false }
+      : {}),
+  };
+}
+
+/**
  * Ensure a container has at least one block (empty block if container is empty).
  * Call this after deleting a block to ensure empty containers get an empty block.
  *
@@ -1493,6 +1560,41 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
   }
 
   const items = getContainerItems(parentBlock, containerConfig);
+
+  // [slot-aware] A fixed block carrying `nextSlotId` marks a template slot region
+  // that follows it. If the block immediately after it does not carry that slotId,
+  // the slot is empty and needs a clickable empty placeholder — the same parity a
+  // container gets when its region empties (otherwise there is nothing in the slot
+  // to click, and adding falls back to a path that hangs). Seed it in place,
+  // carrying the slot membership. Idempotent: a slot that already has content
+  // (including a previously-seeded empty) is skipped.
+  if (!isObjectList && Array.isArray(items) && items.length > 0) {
+    const blocksObj = parentBlock.blocks || {};
+    let newItems = null;
+    let newBlocks = null;
+    for (let i = 0; i < items.length; i++) {
+      const cur = blocksObj[items[i]];
+      const slot = cur?.nextSlotId;
+      if (!slot) continue;
+      const next = blocksObj[items[i + 1]];
+      if (next?.slotId === slot) continue; // slot already filled
+      const emptyId = uuidGenerator();
+      let emptyBlock = { '@type': 'empty' };
+      if (intl && blocksConfig) {
+        emptyBlock = applyBlockDefaults({ data: emptyBlock, intl, metadata, properties }, blocksConfig);
+      }
+      emptyBlock = { ...inheritTemplateMembership(emptyBlock, cur), slotId: slot };
+      newItems = newItems || [...items];
+      newBlocks = newBlocks || { ...blocksObj };
+      newItems.splice(newItems.indexOf(items[i]) + 1, 0, emptyId);
+      newBlocks[emptyId] = emptyBlock;
+    }
+    if (newItems) {
+      const updated = setContainerItems(parentBlock, containerConfig, newItems, newBlocks);
+      return setBlockByPath(formData, parentPath, updated);
+    }
+  }
+
   if (items.length > 0) {
     return formData;
   }
@@ -1524,6 +1626,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
       delete blockData['@type'];
     }
 
+    blockData = inheritTemplateMembership(blockData, parentBlock, { inheritFixed: !!parentBlock?.templateInstanceId });
     const updatedParentBlock = setContainerItems(parentBlock, containerConfig, [blockData]);
     return setBlockByPath(formData, parentPath, updatedParentBlock);
   }
@@ -1537,6 +1640,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
     blockData = applyBlockInitialValue(blockData, blocksConfig, intl);
   }
 
+  blockData = inheritTemplateMembership(blockData, parentBlock);
   const blocksObj = { ...parentBlock.blocks, [newBlockId]: blockData };
   const updatedParentBlock = setContainerItems(parentBlock, containerConfig, [newBlockId], blocksObj);
   return setBlockByPath(formData, parentPath, updatedParentBlock);
@@ -1591,11 +1695,13 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
       const typeFieldName = fieldDef.typeField || null;
       const hasAllowedBlocks = !!fieldDef.allowedBlocks;
 
-      // Determine child type:
-      // - Typed mode (allowedBlocks): use defaultBlockType or first allowed
-      // - Single-schema mode: use virtual type for applyBlockDefaults
+      // Determine child type. Typed mode (allowedBlocks): the SAME centralized decision as
+      // the blocks_layout branch below — getEmptyBlockType (default → single allowed →
+      // 'empty' picker). Presuming allowedBlocks[0] here silently seeded the first allowed
+      // type instead of letting the author choose. Single-schema mode (no allowedBlocks): a
+      // synthetic per-field type so applyBlockDefaults can find the item schema.
       const childType = hasAllowedBlocks
-        ? (fieldDef.defaultBlockType || fieldDef.allowedBlocks?.[0] || `${blockType}:${fieldName}`)
+        ? getEmptyBlockType(fieldDef)
         : `${blockType}:${fieldName}`;
 
       // For table mode: copy child count from sibling rows
@@ -1646,17 +1752,14 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
       continue;
     }
 
-    // Determine the initial child block type for this container field
-    let childBlockType = null;
-    if (fieldDef.defaultBlockType) {
-      childBlockType = fieldDef.defaultBlockType;
-    } else if (fieldDef.allowedBlocks?.length === 1) {
-      childBlockType = fieldDef.allowedBlocks[0];
-    }
+    // The SAME centralized type decision as the object_list branch above (getEmptyBlockType):
+    // default → single allowed → 'empty'. Here 'empty' means "no determinable type" → seed
+    // an empty list; ensureEmptyBlockIfEmpty seeds the 'empty' placeholder on demand.
+    const childBlockType = getEmptyBlockType(fieldDef);
 
     // No determinable child type - initialize an empty list for this blocks
     // field (a key in the shared blocks_layout dict; preserve sibling fields).
-    if (!childBlockType) {
+    if (childBlockType === 'empty') {
       result = {
         ...result,
         blocks: { ...(result.blocks || {}) },
