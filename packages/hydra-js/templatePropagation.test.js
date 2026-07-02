@@ -73,3 +73,56 @@ test('template edit propagates to another page — real fixtures (integration :8
   expect(rerendered1.blocks_layout.items).toContain(h1Id); // in the rendered layout
   expect(textOf(h1)).toContain('EDITED'); // page 1 shows the edit in view mode
 });
+
+/**
+ * Structural add + cross-page: adding a NEW column whose content is a new block
+ * (a newsletter form) on one page must propagate that content to other pages.
+ * Edit-propagation (above) works; this ADD-new-content case does not — the
+ * reverse merge drops a block added inside a freshly-added column, so the form
+ * never reaches the template and never shows on another page. Reproduces the
+ * "/blog footer has the extra column but no form" symptom.
+ */
+test('a form added inside a NEW column propagates to another page (footer columns)', async () => {
+  const template = load('tests-playwright/fixtures/content/templates/footer-layout/data.json');
+  let c = 0;
+  const uuidGenerator = () => `u-${++c}`;
+  const pbf = { items: {}, footer: { allowedLayouts: ['/templates/footer-layout'] } };
+  const freshPage = () => ({
+    blocks: { main: { '@type': 'slate', value: [{ type: 'p', children: [{ text: 'x' }] }] } },
+    blocks_layout: { items: ['main'], footer: [] },
+  });
+  const findCols = (fd) => Object.values(fd.blocks).find((b) => b['@type'] === 'columns');
+  const hasForm = (cols) =>
+    Object.values(cols.blocks || {}).some(
+      (col) => col.blocks && Object.values(col.blocks).some((b) => b['@type'] === 'form'),
+    );
+
+  // 1. Apply the footer template to the home page.
+  const { merged: home } = await mergeTemplatesIntoPage(freshPage(), {
+    loadTemplate: async () => template, pageBlocksFields: pbf, uuidGenerator,
+  });
+  const cols = findCols(home);
+  const iid = cols.templateInstanceId;
+
+  // 2. Add a column (clone an existing column's shape) whose content is a form.
+  const firstCol = cols.blocks[cols.blocks_layout.columns[0]];
+  cols.blocks['add-col'] = {
+    ...firstCol,
+    slotId: 'add-col', templateId: template['@id'], templateInstanceId: iid,
+    blocks: { 'add-form': { '@type': 'form', templateId: template['@id'], templateInstanceId: iid, slotId: 'add-form' } },
+    blocks_layout: { items: ['add-form'] },
+  };
+  cols.blocks_layout.columns = [...cols.blocks_layout.columns, 'add-col'];
+
+  // 3. SAVE: reverse-merge the edited home back into the template.
+  const { merged: saved } = await mergeTemplatesIntoPage(template, {
+    loadTemplate: async () => home, filterInstanceId: iid, uuidGenerator,
+  });
+  expect(hasForm(findCols(saved))).toBe(true); // reverse merge must capture the form
+
+  // 4. VIEW another page: forward-merge the updated template — the form must appear.
+  const { merged: other } = await mergeTemplatesIntoPage(freshPage(), {
+    loadTemplate: async () => saved, pageBlocksFields: pbf, uuidGenerator,
+  });
+  expect(hasForm(findCols(other))).toBe(true); // form propagates to the other page
+});
