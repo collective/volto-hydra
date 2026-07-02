@@ -721,12 +721,12 @@ export function insertBlockInContainer(formData, blockPathMap, refBlockId, newBl
     const idField = containerConfig.idField || '@id';
     const refIndex = items.findIndex(item => item[idField] === refBlockId);
     const insertIndex = getInsertIndex(items, refIndex);
-    const stamped = inheritTemplateMembership(newBlockData, items[refIndex] || parentBlock, { inheritFixed: true });
+    const stamped = inheritTemplateMembership(newBlockData, items[refIndex] || parentBlock, { inheritFixed: !!parentBlock?.templateInstanceId });
     items.splice(insertIndex, 0, { [idField]: newBlockId, ...stamped });
     updatedParentBlock = setContainerItems(parentBlock, containerConfig, items);
   } else {
     // Standard container: shared blocks dict + layout field
-    const stamped = inheritTemplateMembership(newBlockData, parentBlock.blocks?.[refBlockId] || parentBlock, { inheritFixed: true });
+    const stamped = inheritTemplateMembership(newBlockData, parentBlock.blocks?.[refBlockId] || parentBlock, { inheritFixed: !!parentBlock?.templateInstanceId });
     const newContainerBlocks = { ...parentBlock.blocks, [newBlockId]: stamped };
     const refIndex = items.indexOf(refBlockId);
     const insertIndex = getInsertIndex(items, refIndex);
@@ -1626,7 +1626,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
       delete blockData['@type'];
     }
 
-    blockData = inheritTemplateMembership(blockData, parentBlock, { inheritFixed: true });
+    blockData = inheritTemplateMembership(blockData, parentBlock, { inheritFixed: !!parentBlock?.templateInstanceId });
     const updatedParentBlock = setContainerItems(parentBlock, containerConfig, [blockData]);
     return setBlockByPath(formData, parentPath, updatedParentBlock);
   }
