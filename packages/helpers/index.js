@@ -1641,6 +1641,60 @@ export function getChildBlockEntries(parentBlock, descriptor = {}) {
 }
 
 /**
+ * Every child region/field of a container, as descriptors for getChildBlockEntries /
+ * setChildBlockEntries — data-driven, no schema. A container's children live either in
+ * blocks_layout regions (ids into the shared blocks dict) or in object_list array fields
+ * (inline arrays of blocks carrying a templateId). Returns one descriptor per region/
+ * field so callers iterate uniformly and never branch on storage.
+ *
+ * @param {Object} block - the container block
+ * @returns {Array<{ region?: string, isObjectList?: boolean, dataPath?: string[] }>}
+ */
+export function getChildFields(block) {
+  const fields = [];
+  if (block?.blocks && isBlocksMap(block.blocks)) {
+    for (const [region] of blocksLayoutRegions(block.blocks_layout)) {
+      fields.push({ region });
+    }
+  }
+  for (const [key, val] of Object.entries(block || {})) {
+    if (Array.isArray(val) && val.length > 0 && val[0]?.templateId) {
+      fields.push({ isObjectList: true, dataPath: [key] });
+    }
+  }
+  return fields;
+}
+
+/**
+ * Write ordered {id, block} entries back into a container's region/field — the writer
+ * paired with getChildBlockEntries, uniform across BOTH storages (the public mutator the
+ * merge and the admin can share). For blocks_layout it ADDS the blocks to the shared
+ * dict and sets the region's id list (call once per region — regions accumulate in the
+ * one dict). For object_list it writes the array at the (possibly nested) dataPath,
+ * cloning each level (INITIAL_DATA arrives deep-frozen).
+ *
+ * @param {Object} parentBlock - the container block to mutate
+ * @param {Object} descriptor - { isObjectList, dataPath, region='items', idField='@id' }
+ * @param {Array<{id: string, block: Object}>} entries
+ */
+export function setChildBlockEntries(parentBlock, descriptor, entries) {
+  const { isObjectList, dataPath, region = 'items', idField = '@id' } = descriptor;
+  if (isObjectList) {
+    const path = dataPath || [region];
+    let target = parentBlock;
+    for (let i = 0; i < path.length - 1; i++) {
+      target[path[i]] = { ...(target[path[i]] || {}) };
+      target = target[path[i]];
+    }
+    target[path[path.length - 1]] = entries.map((e) => ({ ...e.block, [idField]: e.id }));
+    return;
+  }
+  if (!parentBlock.blocks) parentBlock.blocks = {};
+  for (const { id, block } of entries) parentBlock.blocks[id] = block;
+  parentBlock.blocks_layout = { ...(parentBlock.blocks_layout || {}), [region]: entries.map((e) => e.id) };
+}
+
+/**
  * Check if a block is inside the template currently being edited.
  * A block is inside if its templateInstanceId matches the templateEditMode.
  *
@@ -2066,35 +2120,27 @@ function fillRegionEntries(entries, templateState, options) {
 }
 
 /**
- * Fully expand a container's child regions IN PLACE onto `stamped` at APPLY time —
- * every blocks_layout region AND every object_list array field, through ONE path
- * (fillRegionEntries). After this the children are COMPLETE, so the renderer's
- * re-entry only recognizes the minted templateInstanceId and passes them through — no
- * deferred re-derivation and no object-identity Map (which missed whenever the caller
- * handed back a Vue reactive proxy / clone / postMessage copy of the dict → infinite
- * re-application). blocks_layout and object_list differ only in storage, not meaning.
+ * Fully expand a container's child regions IN PLACE onto `stamped` at APPLY time.
+ * Storage-agnostic: enumerate every child field (getChildFields), read each (
+ * getChildBlockEntries), fill it (fillRegionEntries), and write it back
+ * (setChildBlockEntries) — ONE loop, no branch on blocks_layout vs object_list. After
+ * this the children are COMPLETE, so the renderer's re-entry only recognizes the minted
+ * templateInstanceId and passes them through — no deferred re-derivation and no
+ * object-identity Map (which missed whenever the caller handed back a Vue reactive
+ * proxy / clone / postMessage copy of the dict → infinite re-application).
  */
 function fillContainerInto(stamped, tplBlock, templateState, options) {
-  if (tplBlock.blocks && isBlocksMap(tplBlock.blocks)) {
-    const outBlocks = {};
-    const outLayout = {};
-    for (const [region] of blocksLayoutRegions(tplBlock.blocks_layout)) {
-      const entries = (tplBlock.blocks_layout?.[region] || []).map(
-        (id) => ({ id, block: tplBlock.blocks?.[id] }),
-      );
-      const filled = fillRegionEntries(entries, templateState, options);
-      for (const { id, block } of filled) outBlocks[id] = block;
-      outLayout[region] = filled.map((e) => e.id);
-    }
-    stamped.blocks = outBlocks;
-    stamped.blocks_layout = outLayout;
+  const fields = getChildFields(tplBlock);
+  if (fields.length === 0) return;
+  // blocks_layout regions share stamped.blocks — reset it once so stale template blocks
+  // don't linger (object_list fields are independent arrays, written in place).
+  if (fields.some((f) => !f.isObjectList)) {
+    stamped.blocks = {};
+    stamped.blocks_layout = {};
   }
-  for (const [key, val] of Object.entries(tplBlock)) {
-    if (Array.isArray(val) && val.length > 0 && val[0]?.templateId) {
-      const entries = val.map((item) => ({ id: item['@id'], block: item }));
-      const filled = fillRegionEntries(entries, templateState, options);
-      stamped[key] = filled.map((e) => ({ ...e.block, '@id': e.id }));
-    }
+  for (const field of fields) {
+    const filled = fillRegionEntries(getChildBlockEntries(tplBlock, field), templateState, options);
+    setChildBlockEntries(stamped, field, filled);
   }
 }
 
