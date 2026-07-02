@@ -464,8 +464,10 @@ const ParentBlockSection = ({
           ...blockData,
           editTemplate: templateEditMode === blockId,
         };
+        // Key by pathInfo.templateId — the resolved template path, which matches the
+        // templateCacheRef key (blockData.templateId is not populated at this level).
         const canEditTemplate =
-          templatePermissions?.[blockData?.templateId]?.can_edit ?? true;
+          templatePermissions?.[pathInfo?.templateId]?.can_edit ?? true;
         const templateSchema = getTemplateInstanceSchema(contextIntl, { canEdit: canEditTemplate });
         const formContent = (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>

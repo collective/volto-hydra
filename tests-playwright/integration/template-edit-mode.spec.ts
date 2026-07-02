@@ -1499,3 +1499,41 @@ test.describe('Template Edit Mode - UI Restrictions', () => {
     await expect(addButton).toHaveCount(0);
   });
 });
+
+test.describe('Template Edit Mode - Permissions', () => {
+  test('editTemplate toggle is disabled when the user lacks Modify permission on the template', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    // Deny "Modify portal content" on the template document: force can_edit=false on every
+    // test-layout template response. Isolated to this test — no fixture change, no effect
+    // on other tests. Verifies the edit gate end to end (threading + key match + rendering).
+    await page.route('**/*test-layout*', async (route) => {
+      const res = await route.fetch();
+      let body;
+      try {
+        body = await res.json();
+      } catch {
+        return route.fulfill({ response: res });
+      }
+      body.can_edit = false;
+      return route.fulfill({ response: res, json: body });
+    });
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+    await helper.getStableBlockCount();
+
+    // Enter the template instance (select a template block, then escape to its parent).
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+
+    // The editTemplate toggle is present but DISABLED (permission-gated), with a tooltip.
+    const editWrapper = page.locator('.field-wrapper-editTemplate');
+    await expect(editWrapper).toBeVisible({ timeout: 10000 });
+    // Tooltip first: confirms can_edit=false reached the schema (threading + key match).
+    await expect(editWrapper).toContainText(/permission|Modify portal content/i);
+    await expect(editWrapper.locator('input')).toBeDisabled();
+  });
+});

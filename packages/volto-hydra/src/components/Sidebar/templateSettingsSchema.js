@@ -37,7 +37,9 @@ export const getTemplateInstanceSchema = (intl, { canEdit = true } = {}) => ({
         ? 'When enabled, you can edit the template structure. Fixed blocks become editable.'
         : "You don't have permission to modify this template (requires “Modify portal content”).",
       type: 'boolean',
-      ...(canEdit ? {} : { disabled: true }),
+      // Volto's CheckboxWidget disables on `isDisabled` (not `disabled`); schema props are
+      // spread to the widget, so this is what actually greys out the toggle.
+      ...(canEdit ? {} : { isDisabled: true }),
     },
   },
   required: ['title'],
