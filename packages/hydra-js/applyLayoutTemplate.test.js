@@ -593,6 +593,56 @@ describe('reverse merge - page to template (for saving)', () => {
     expect(footerBlock.value[0].text).toBe('User Edited Footer');
   });
 
+  // The admin SAVE path (View.jsx "REVERSE MERGE") uses filterInstanceId — NOT
+  // allowedLayouts — to merge the edited instance back into the template, so a
+  // fixed+readOnly edit made in template edit mode propagates to OTHER pages using the
+  // template. This is integration :866 ("saved template changes … appear on other
+  // pages") at the unit level; the allowedLayouts reverse test above does not cover it.
+  test('a fixed+readOnly template edit propagates to another page (reverse capture + forward apply)', async () => {
+    let counter2 = 0;
+    const uuidGen = () => `rev-${++counter2}`;
+    const template = {
+      '@id': '/templates/hf',
+      blocks: {
+        header: { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/hf', templateInstanceId: 'inst-1', slotId: 'header', value: [{ text: 'Original Header' }] },
+        'default-slot': { '@type': 'slate', templateId: '/templates/hf', templateInstanceId: 'inst-1', slotId: 'default', value: [] },
+      },
+      blocks_layout: { items: ['header', 'default-slot'] },
+    };
+    // The page as edited in template edit mode: the fixed+readOnly header was changed.
+    const pageWithEdits = {
+      blocks: {
+        'page-header': { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/hf', templateInstanceId: 'inst-1', slotId: 'header', value: [{ text: 'Edited Header' }] },
+        'user-block-1': { '@type': 'slate', templateId: '/templates/hf', templateInstanceId: 'inst-1', slotId: 'default', value: [{ text: 'User content' }] },
+      },
+      blocks_layout: { items: ['page-header', 'user-block-1'] },
+    };
+    // 1. SAVE: reverse-merge (filterInstanceId) captures the edit into the template.
+    const { merged: updatedTemplate } = await mergeTemplatesIntoPage(template, {
+      loadTemplate: async () => pageWithEdits,
+      filterInstanceId: 'inst-1',
+      uuidGenerator: uuidGen,
+    });
+    const header = Object.values(updatedTemplate.blocks).find((b) => b.slotId === 'header' && b.fixed);
+    expect(header?.value?.[0]?.text).toBe('Edited Header'); // captured into the template
+
+    // 2. VIEW another page: a DIFFERENT page (its own instanceId) forward-merges the
+    // UPDATED template and must show the edit — this is integration :866's assertion.
+    const page2 = {
+      blocks: {
+        'p2-header': { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/hf', templateInstanceId: 'inst-2', slotId: 'header', value: [{ text: 'Original Header' }] },
+        'p2-user': { '@type': 'slate', templateId: '/templates/hf', templateInstanceId: 'inst-2', slotId: 'default', value: [{ text: 'Page 2 content' }] },
+      },
+      blocks_layout: { items: ['p2-header', 'p2-user'] },
+    };
+    const { merged: page2Merged } = await mergeTemplatesIntoPage(page2, {
+      loadTemplate: async () => updatedTemplate,
+      uuidGenerator: uuidGen,
+    });
+    const p2Header = Object.values(page2Merged.blocks).find((b) => b.slotId === 'header' && b.fixed);
+    expect(p2Header?.value?.[0]?.text).toBe('Edited Header'); // propagated to page 2
+  });
+
   test('fixed+readOnly transfers to template, fixed+editable stays on page', async () => {
     // When saving to template:
     // - Fixed + readOnly block edits → transfer to template (template-owned content)
