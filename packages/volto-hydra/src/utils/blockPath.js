@@ -446,9 +446,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
       return {
         region,
         parentId,
-        allowedBlocks: regionFieldDef.allowedBlocks ?? parentConfig?.allowedBlocks ?? null,
-        defaultBlockType: regionFieldDef.defaultBlockType ?? parentConfig?.defaultBlockType ?? null,
-        maxLength: regionFieldDef.maxLength ?? parentConfig?.maxLength ?? null,
+        ...resolveRegionConstraints(regionFieldDef, parentConfig, getPageDefaults(blocksConfig, formData)),
       };
     }
   }
@@ -461,9 +459,7 @@ export function getContainerFieldConfig(blockId, blockPathMap, formData, blocksC
     return {
       region,
       parentId,
-      allowedBlocks: parentConfig?.allowedBlocks || null,
-      defaultBlockType: parentConfig?.defaultBlockType || null,
-      maxLength: parentConfig?.maxLength || null,
+      ...resolveRegionConstraints(null, parentConfig, getPageDefaults(blocksConfig, formData)),
     };
   }
 
@@ -603,24 +599,21 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
         const region = fieldName;
         const layoutList = block.blocks_layout?.[region];
         const currentCount = Array.isArray(layoutList) ? layoutList.length : 0;
-        const maxLength = fieldDef.maxLength ?? blockConfig?.maxLength ?? null;
-        const maxLengthOk = !maxLength || currentCount < maxLength;
-        const allowedBlocks = fieldDef.allowedBlocks ?? blockConfig?.allowedBlocks ?? null;
-        // When neither field nor block restricts allowedBlocks, the container
-        // inherits the page's allowed list — and so should its empty-block
-        // default. Otherwise null falls through to the picker 'empty' placeholder.
-        const allowedBlocksInherited = !allowedBlocks;
+        // Same field → block → page precedence as getContainerFieldConfig (a container that
+        // restricts nothing inherits the page's allowed list + default block type).
+        const rc = resolveRegionConstraints(fieldDef, blockConfig, {
+          allowedBlocks: defaultAllowedBlocks,
+          defaultBlockType: pageDefaultBlockType,
+        });
+        const maxLengthOk = !rc.maxLength || currentCount < rc.maxLength;
         containerFields.push({
           region,
           title: fieldDef.title || (region === 'items' ? 'Blocks' : region),
-          allowedBlocks: allowedBlocks || defaultAllowedBlocks,
+          allowedBlocks: rc.allowedBlocks,
           allowedTemplates: fieldDef.allowedTemplates || null,
           allowedLayouts: fieldDef.allowedLayouts || null,
-          defaultBlockType:
-            fieldDef.defaultBlockType ??
-            blockConfig?.defaultBlockType ??
-            (allowedBlocksInherited ? pageDefaultBlockType : null),
-          maxLength,
+          defaultBlockType: rc.defaultBlockType,
+          maxLength: rc.maxLength,
           currentCount,
           canAdd: !parentIsReadonly && maxLengthOk,
         });
@@ -660,18 +653,20 @@ export function getAllContainerFields(blockId, blockPathMap, formData, blocksCon
   const isImplicitContainer = (block.blocks && block.blocks_layout?.items) ||
                               blockConfig?.allowedBlocks || blockConfig?.defaultBlockType;
   if (containerFields.length === 0 && isImplicitContainer) {
-    const maxLength = blockConfig?.maxLength || null;
     // Implicit container's default blocks field is 'items' → blocks_layout.items.
     const currentCount = block.blocks_layout?.items?.length || 0;
-    const maxLengthOk = !maxLength || currentCount < maxLength;
-    // Same inherited-default rule as the schema-defined branch above.
-    const allowedBlocksInherited = !blockConfig?.allowedBlocks;
+    // Same field → block → page precedence as the schema-defined branch above.
+    const rc = resolveRegionConstraints(null, blockConfig, {
+      allowedBlocks: defaultAllowedBlocks,
+      defaultBlockType: pageDefaultBlockType,
+    });
+    const maxLengthOk = !rc.maxLength || currentCount < rc.maxLength;
     containerFields.push({
       region: 'items',
       title: 'Blocks',
-      allowedBlocks: blockConfig?.allowedBlocks || defaultAllowedBlocks,
-      defaultBlockType: blockConfig?.defaultBlockType || (allowedBlocksInherited ? pageDefaultBlockType : null),
-      maxLength,
+      allowedBlocks: rc.allowedBlocks,
+      defaultBlockType: rc.defaultBlockType,
+      maxLength: rc.maxLength,
       currentCount,
       canAdd: !parentIsReadonly && maxLengthOk,
     });
@@ -1439,6 +1434,44 @@ export function getEmptyBlockType(containerConfig) {
     return containerConfig.allowedBlocks[0];
   }
   return 'empty';
+}
+
+/**
+ * Page-level fallback constraints — the allowed list + default block type a container
+ * inherits when it restricts nothing.
+ */
+function getPageDefaults(blocksConfig, formData) {
+  return {
+    allowedBlocks: getPageAllowedBlocksFromRestricted(blocksConfig, { properties: formData }),
+    defaultBlockType: config.settings.defaultBlockType || null,
+  };
+}
+
+/**
+ * The single field → block → page precedence for a container region's constraints, shared by
+ * getContainerFieldConfig (the per-block add/insert path) and getAllContainerFields (the
+ * sidebar enumeration) so the two can't diverge. They used to: only getAllContainerFields
+ * inherited the page default, so getEmptyBlockType seeded a different empty-block type
+ * depending on which builder ran. When neither the field nor the block restricts
+ * allowedBlocks, the region inherits the page's allowed list — and its defaultBlockType
+ * inherits the page default too.
+ *
+ * @param {Object|null} fieldDef - the blocks_layout schema field def, or null (implicit container)
+ * @param {Object|null} blockConfig - the parent block's blocksConfig entry
+ * @param {{ allowedBlocks?: Array, defaultBlockType?: string|null }} [pageDefaults]
+ * @returns {{ allowedBlocks: Array|null, defaultBlockType: string|null, maxLength: number|null }}
+ */
+export function resolveRegionConstraints(fieldDef, blockConfig, pageDefaults = {}) {
+  const ownAllowed = fieldDef?.allowedBlocks ?? blockConfig?.allowedBlocks ?? null;
+  const inherited = !ownAllowed; // neither field nor block restricts → inherit the page
+  return {
+    allowedBlocks: ownAllowed || pageDefaults.allowedBlocks || null,
+    defaultBlockType:
+      fieldDef?.defaultBlockType ??
+      blockConfig?.defaultBlockType ??
+      (inherited ? pageDefaults.defaultBlockType ?? null : null),
+    maxLength: fieldDef?.maxLength ?? blockConfig?.maxLength ?? null,
+  };
 }
 
 /**
