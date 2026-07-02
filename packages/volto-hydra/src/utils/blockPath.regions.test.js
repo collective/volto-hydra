@@ -177,6 +177,49 @@ describe('empty-region seeding', () => {
   });
 });
 
+describe('ensureEmptyBlockIfEmpty — auto-content joins the template instance', () => {
+  // A container that IS a template instance, with an empty items region. When the
+  // editor seeds its default child (e.g. a new column's auto-slate), that child
+  // must join the SAME instance so it stays editable in template edit mode — the
+  // flat readonly check is `isBlockReadonly = block.templateInstanceId === templateEditMode`.
+  // If it isn't stamped, the seeded slate is read-only → no add-after "+" → you
+  // can't add anything into a freshly-added column.
+  const cfgTpl = {
+    _page: { id: '_page', schema: () => ({ properties: { items: { widget: 'blocks_layout' } } }) },
+    column: { id: 'column', schema: () => ({ properties: { items: { widget: 'blocks_layout', allowedBlocks: ['slate'], defaultBlockType: 'slate' } } }) },
+    slate: { id: 'slate' },
+  };
+
+  test('a default block seeded into an empty template-instance container carries templateInstanceId', () => {
+    const form = {
+      '@type': 'Document',
+      blocks: {
+        col1: {
+          '@type': 'column',
+          templateId: 'resolveuid/x',
+          templateInstanceId: 'inst-1',
+          slotId: 'col1',
+          blocks: {},
+          blocks_layout: { items: [] },
+        },
+      },
+      blocks_layout: { items: ['col1'] },
+    };
+    const map = buildBlockPathMap(form, cfgTpl, intl);
+    let n = 0;
+    const uuid = () => `seed-${++n}`;
+    const result = ensureEmptyBlockIfEmpty(form, { parentId: 'col1' }, map, uuid, cfgTpl, { intl });
+
+    const col = result.blocks.col1;
+    const childId = col.blocks_layout.items[0];
+    const child = col.blocks[childId];
+    expect(child, 'empty template-instance column should be seeded with a default child').toBeTruthy();
+    // Reproduces the bug: the seeded child currently has NO templateInstanceId, so
+    // it renders read-only in template edit mode (no add-after "+").
+    expect(child.templateInstanceId).toBe('inst-1');
+  });
+});
+
 describe('listContainerChildren — storage-agnostic read', () => {
   test('reads a blocks_layout region from the shared blocks dict', () => {
     const form = makeForm();
