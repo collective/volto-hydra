@@ -610,11 +610,11 @@ test.describe('allowedLayouts', () => {
       await helper.clickBlockInIframe(brandingId);
       await helper.waitForSidebarOpen();
       await helper.escapeToParent();
-      const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+      const editToggle = page.locator('.edit-template-toggle');
       await expect(editToggle).toBeVisible({ timeout: 5000 });
       await editToggle.click();
-      const checkbox = page.locator('.field-wrapper-editTemplate input[type="checkbox"]');
-      await expect(checkbox).toBeChecked({ timeout: 5000 });
+      const checkbox = page.locator('.edit-template-toggle');
+      await expect(checkbox).toHaveAttribute('aria-pressed', 'true', { timeout: 5000 });
 
       // Select the deeply-nested columns cell — it must unlock in edit mode
       // (approach B ancestry unlock; the bridge sets contenteditable on selection).
@@ -634,7 +634,7 @@ test.describe('allowedLayouts', () => {
       await helper.clickBlockInIframe(brandingId);
       await helper.escapeToParent();
       await editToggle.click();
-      await expect(checkbox).not.toBeChecked({ timeout: 5000 });
+      await expect(checkbox).toHaveAttribute('aria-pressed', 'false', { timeout: 5000 });
 
       // Save.
       await page.keyboard.press('Control+s');
@@ -674,10 +674,10 @@ test.describe('allowedLayouts', () => {
       await helper.clickBlockInIframe(brandingId);
       await helper.waitForSidebarOpen();
       await helper.escapeToParent();
-      const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+      const editToggle = page.locator('.edit-template-toggle');
       await expect(editToggle).toBeVisible({ timeout: 5000 });
       await editToggle.click();
-      await expect(page.locator('.field-wrapper-editTemplate input[type="checkbox"]')).toBeChecked({ timeout: 5000 });
+      await expect(page.locator('.edit-template-toggle')).toHaveAttribute('aria-pressed', 'true', { timeout: 5000 });
 
       // Navigate up to the columns container (cell -> column -> columns). This is a
       // container in the FOOTER region — the forced-region canAdd case the recursive
@@ -864,7 +864,7 @@ test.describe('allowedLayouts', () => {
       await helper.waitForBlockSelectedInAdmin(headerBlockId!);
 
       // Enter template edit mode — blocks outside the template become readonly
-      const editTemplateLabel = page.getByText('Edit Template', { exact: true });
+      const editTemplateLabel = page.locator('.edit-template-toggle');
       await editTemplateLabel.click();
 
       // Footer block should be locked (outside the template)

@@ -496,17 +496,17 @@ test.describe('Template Sidebar Placeholder Sections', () => {
 
     // The grid is SAME-template nesting (grid block shares test-layout's templateId),
     // so after recursive stamping it folds into the ONE test-layout instance: there is
-    // a single "Template: test-layout" level at the top (name + editTemplate live here),
-    // and NO separate "Template blocks" virtual level below it. The nested grid cell is
-    // a normal block carrying its own per-block fixed/readOnly settings.
+    // a single "Template: test-layout" level at the top (the template name lives here;
+    // entering edit mode is the "Edit template" button at the top of the panel), and NO
+    // separate "Template blocks" virtual level below it. The nested grid cell is a normal
+    // block carrying its own per-block fixed/readOnly settings.
     const topLabel = page.locator('button').filter({ hasText: /Template: test-layout/ });
     const nestedLabel = page.locator('button').filter({ hasText: /Template blocks/ });
     await expect(topLabel).toBeVisible({ timeout: 5000 });
     await expect(nestedLabel).toHaveCount(0); // virtual sub-level is gone — that's correct
 
-    // The single instance level carries the template settings; nothing virtual below it.
+    // The single instance level carries the template name; nothing virtual below it.
     expect(await helper.hasSidebarField('title', 'Template: test-layout')).toBe(true);
-    expect(await helper.hasSidebarField('editTemplate', 'Template: test-layout')).toBe(true);
   });
 });
 
