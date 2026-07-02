@@ -109,7 +109,10 @@ test('a form added inside a NEW column propagates to another page (footer column
   cols.blocks['add-col'] = {
     ...firstCol,
     slotId: 'add-col', templateId: template['@id'], templateInstanceId: iid,
-    blocks: { 'add-form': { '@type': 'form', templateId: template['@id'], templateInstanceId: iid, slotId: 'add-form' } },
+    // The form is template content the author places (fixed) — as the add flow now stamps
+    // it (inheritTemplateMembership inheritFixed). A slot would be per-page user content and
+    // correctly would NOT propagate.
+    blocks: { 'add-form': { '@type': 'form', fixed: true, templateId: template['@id'], templateInstanceId: iid, slotId: 'add-form' } },
     blocks_layout: { items: ['add-form'] },
   };
   cols.blocks_layout.columns = [...cols.blocks_layout.columns, 'add-col'];

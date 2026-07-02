@@ -726,12 +726,12 @@ export function insertBlockInContainer(formData, blockPathMap, refBlockId, newBl
     const idField = containerConfig.idField || '@id';
     const refIndex = items.findIndex(item => item[idField] === refBlockId);
     const insertIndex = getInsertIndex(items, refIndex);
-    const stamped = inheritTemplateMembership(newBlockData, items[refIndex] || parentBlock);
+    const stamped = inheritTemplateMembership(newBlockData, items[refIndex] || parentBlock, { inheritFixed: true });
     items.splice(insertIndex, 0, { [idField]: newBlockId, ...stamped });
     updatedParentBlock = setContainerItems(parentBlock, containerConfig, items);
   } else {
     // Standard container: shared blocks dict + layout field
-    const stamped = inheritTemplateMembership(newBlockData, parentBlock.blocks?.[refBlockId] || parentBlock);
+    const stamped = inheritTemplateMembership(newBlockData, parentBlock.blocks?.[refBlockId] || parentBlock, { inheritFixed: true });
     const newContainerBlocks = { ...parentBlock.blocks, [newBlockId]: stamped };
     const refIndex = items.indexOf(refBlockId);
     const insertIndex = getInsertIndex(items, refIndex);
@@ -1450,16 +1450,29 @@ export function getEmptyBlockType(containerConfig) {
  * Centralized so every add/seed path stamps consistently. No-op when the source block
  * isn't part of a template instance.
  *
+ * When the added block is TEMPLATE CONTENT (a block added after a template sibling, or the
+ * default child of a template container), pass `inheritFixed: true` so it also inherits
+ * `fixed`/`readOnly` from the source. That makes it real template content: captured by the
+ * reverse merge and propagated to other pages (it stays editable in template edit mode via
+ * the templateInstanceId, and is read-only in normal mode like any template block). Slot
+ * placeholders (the in-slot-empty seed) must NOT inherit fixed — they're user-fillable
+ * regions — so they call this without the flag.
+ *
  * @param {Object} childBlock - the block being added/seeded
  * @param {Object} sourceBlock - the container (or a template sibling) to inherit from
+ * @param {Object} [opts]
+ * @param {boolean} [opts.inheritFixed=false] - also inherit fixed/readOnly (template content)
  * @returns {Object} childBlock, stamped when the source is a template instance
  */
-export function inheritTemplateMembership(childBlock, sourceBlock) {
+export function inheritTemplateMembership(childBlock, sourceBlock, { inheritFixed = false } = {}) {
   if (!sourceBlock?.templateInstanceId) return childBlock;
   return {
     ...childBlock,
     templateInstanceId: sourceBlock.templateInstanceId,
     ...(sourceBlock.templateId ? { templateId: sourceBlock.templateId } : {}),
+    ...(inheritFixed
+      ? { fixed: sourceBlock.fixed || false, readOnly: sourceBlock.readOnly || false }
+      : {}),
   };
 }
 
@@ -1580,7 +1593,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
       delete blockData['@type'];
     }
 
-    blockData = inheritTemplateMembership(blockData, parentBlock);
+    blockData = inheritTemplateMembership(blockData, parentBlock, { inheritFixed: true });
     const updatedParentBlock = setContainerItems(parentBlock, containerConfig, [blockData]);
     return setBlockByPath(formData, parentPath, updatedParentBlock);
   }

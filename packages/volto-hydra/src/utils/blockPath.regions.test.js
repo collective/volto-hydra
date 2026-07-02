@@ -254,6 +254,42 @@ describe('insertBlockInContainer — add-after joins the template instance', () 
     expect(col.blocks_layout.items).toEqual(['a', 'b']);
     expect(col.blocks.b.templateInstanceId).toBe('inst-1'); // added block joins the instance
   });
+
+  test('a block added after a FIXED template sibling inherits fixed/readOnly (template content)', () => {
+    const form = {
+      '@type': 'Document',
+      blocks: {
+        col1: {
+          '@type': 'column',
+          templateId: 'resolveuid/x',
+          templateInstanceId: 'inst-1',
+          slotId: 'col1',
+          blocks: {
+            a: {
+              '@type': 'slate',
+              fixed: true,
+              readOnly: true,
+              templateId: 'resolveuid/x',
+              templateInstanceId: 'inst-1',
+              slotId: 'a',
+            },
+          },
+          blocks_layout: { items: ['a'] },
+        },
+      },
+      blocks_layout: { items: ['col1'] },
+    };
+    const map = buildBlockPathMap(form, cfg, intl);
+    const cc = getContainerFieldConfig('a', map, form, cfg, intl);
+    const result = insertBlockInContainer(form, map, 'a', 'b', { '@type': 'slate' }, cc, 'after');
+
+    // Template content inherits fixed/readOnly so the reverse merge captures it and it
+    // propagates to other pages (mirrors the templatePropagation "new column" test).
+    const b = result.blocks.col1.blocks.b;
+    expect(b.templateInstanceId).toBe('inst-1');
+    expect(b.fixed).toBe(true);
+    expect(b.readOnly).toBe(true);
+  });
 });
 
 describe('listContainerChildren — storage-agnostic read', () => {
