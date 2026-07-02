@@ -1662,11 +1662,13 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
       const typeFieldName = fieldDef.typeField || null;
       const hasAllowedBlocks = !!fieldDef.allowedBlocks;
 
-      // Determine child type:
-      // - Typed mode (allowedBlocks): use defaultBlockType or first allowed
-      // - Single-schema mode: use virtual type for applyBlockDefaults
+      // Determine child type. Typed mode (allowedBlocks): the SAME centralized decision as
+      // the blocks_layout branch below — getEmptyBlockType (default → single allowed →
+      // 'empty' picker). Presuming allowedBlocks[0] here silently seeded the first allowed
+      // type instead of letting the author choose. Single-schema mode (no allowedBlocks): a
+      // synthetic per-field type so applyBlockDefaults can find the item schema.
       const childType = hasAllowedBlocks
-        ? (fieldDef.defaultBlockType || fieldDef.allowedBlocks?.[0] || `${blockType}:${fieldName}`)
+        ? getEmptyBlockType(fieldDef)
         : `${blockType}:${fieldName}`;
 
       // For table mode: copy child count from sibling rows
@@ -1717,17 +1719,14 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
       continue;
     }
 
-    // Determine the initial child block type for this container field
-    let childBlockType = null;
-    if (fieldDef.defaultBlockType) {
-      childBlockType = fieldDef.defaultBlockType;
-    } else if (fieldDef.allowedBlocks?.length === 1) {
-      childBlockType = fieldDef.allowedBlocks[0];
-    }
+    // The SAME centralized type decision as the object_list branch above (getEmptyBlockType):
+    // default → single allowed → 'empty'. Here 'empty' means "no determinable type" → seed
+    // an empty list; ensureEmptyBlockIfEmpty seeds the 'empty' placeholder on demand.
+    const childBlockType = getEmptyBlockType(fieldDef);
 
     // No determinable child type - initialize an empty list for this blocks
     // field (a key in the shared blocks_layout dict; preserve sibling fields).
-    if (!childBlockType) {
+    if (childBlockType === 'empty') {
       result = {
         ...result,
         blocks: { ...(result.blocks || {}) },
