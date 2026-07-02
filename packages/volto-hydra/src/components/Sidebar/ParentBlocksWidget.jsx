@@ -18,6 +18,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
+import { getTemplateInstanceSchema } from './templateSettingsSchema';
 import { useIntl } from 'react-intl';
 import { useLocation } from 'react-router-dom';
 import { set, cloneDeep, isEqual } from 'lodash';
@@ -192,37 +193,9 @@ const getTemplateBlockSettingsSchema = () => ({
  * Schema for template instance settings
  * Used by BlockDataForm to render a consistent form
  */
-const getTemplateInstanceSchema = (intl) => ({
-  title: 'Template Settings',
-  fieldsets: [
-    {
-      id: 'default',
-      title: 'Default',
-      fields: ['title', 'folder', 'editTemplate'],
-    },
-  ],
-  properties: {
-    title: {
-      title: 'Template Name',
-      description: 'Display name for this template',
-      type: 'string',
-    },
-    folder: {
-      title: 'Save Location',
-      description: 'Folder where this template will be saved',
-      widget: 'object_browser',
-      mode: 'link',
-      selectableTypes: ['Folder'],
-      allowExternals: false,
-    },
-    editTemplate: {
-      title: 'Edit Template',
-      description: 'When enabled, you can edit the template structure. Fixed blocks become editable.',
-      type: 'boolean',
-    },
-  },
-  required: ['title'],
-});
+// getTemplateInstanceSchema (with editTemplate permission gating) lives in the pure,
+// dependency-free ./templateSettingsSchema module so it can be unit-tested without the
+// React/Volto component tree. Imported at the top of this file.
 
 const ParentBlockSection = ({
   blockId,
@@ -243,6 +216,7 @@ const ParentBlockSection = ({
   templateEditMode,
   onChangeTemplateSettings,
   onToggleTemplateEditMode,
+  templatePermissions,
 }) => {
   // Get intl from context if not passed (needed for getTemplateInstanceSchema)
   const contextIntl = useIntl();
@@ -490,7 +464,9 @@ const ParentBlockSection = ({
           ...blockData,
           editTemplate: templateEditMode === blockId,
         };
-        const templateSchema = getTemplateInstanceSchema(contextIntl);
+        const canEditTemplate =
+          templatePermissions?.[blockData?.templateId]?.can_edit ?? true;
+        const templateSchema = getTemplateInstanceSchema(contextIntl, { canEdit: canEditTemplate });
         const formContent = (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
             <BlockDataForm
@@ -580,6 +556,7 @@ const ParentBlocksWidget = ({
   templateEditMode,
   onChangeTemplateSettings,
   onToggleTemplateEditMode,
+  templatePermissions,
 }) => {
   const isMultiSelected = multiSelected.length > 1;
   const [isClient, setIsClient] = React.useState(false);
@@ -768,6 +745,7 @@ const ParentBlocksWidget = ({
                 blockId={parentId}
                 blockType={parentType}
                 blockData={parentData}
+                templatePermissions={templatePermissions}
                 parentId={grandparentId}
                 index={index}
                 isCurrentBlock={false}
@@ -793,6 +771,7 @@ const ParentBlocksWidget = ({
             blockId={selectedBlock}
             blockType={currentBlockType}
             blockData={currentBlockData}
+            templatePermissions={templatePermissions}
             parentId={parentIds.length > 0 ? parentIds[parentIds.length - 1] : null}
             index={parentIds.length}
             isCurrentBlock={true}

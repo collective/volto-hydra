@@ -5018,6 +5018,7 @@ const Iframe = (props) => {
         multiSelected={multiSelected}
         formData={properties}
         blockPathMap={iframeSyncState.blockPathMap}
+        templatePermissions={templateCacheRef.current}
         onSelectBlock={onSelectBlock}
         onDeleteBlock={onDeleteBlock}
         onBlockAction={(actionId, blockId) => {
