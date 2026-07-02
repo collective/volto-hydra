@@ -35,6 +35,36 @@ The slot a block lives in is identified by its `slotId`. This is the field name 
 }
 ```
 
+## Editing a template (central control)
+
+The point of a template is that its locked parts are authored **once** and update
+**everywhere**. Templates are stored as their own normal content documents; a page only
+*references* one — its blocks carry the `templateId`. On render the merge injects the
+template's `fixed` / `fixed+readOnly` blocks and fills the slots with the page's own
+content.
+
+To change a template for every page that uses it:
+
+1. On a page using the template, toggle **template edit mode** (the `editTemplate`
+   control on the block).
+2. Edit the `fixed` / `fixed+readOnly` blocks — in template edit mode these become
+   editable; normally they're locked.
+3. Save. The edits are written **back into the template document**, so every page that
+   uses that template shows the change on its next render.
+
+What propagates and what doesn't:
+
+- **`fixed` / `fixed+readOnly` blocks edited in template edit mode** → propagate to all
+  pages using the template (template-controlled).
+- **Slot content** (blocks editors add into a slot) is **per-page** — it lives on the page
+  and is never written back to the template.
+- Editing a `fixed` block's content in *normal* mode overrides it for **that page only**;
+  the template's version stays the default for other pages.
+
+**Reusing a template multiple times:** a page may apply the same template more than once
+(e.g. two of the same layout or snippet). Each use is a distinct *instance*; the merge
+gives every instance its own block ids, so they never collide.
+
 ## Which mechanism for which use case?
 
 The two configurations below look similar but solve different problems. Pick by
@@ -81,6 +111,32 @@ the block's nested block IDs — a `blocks_layout`-widget field of **any name**
 So a branded footer is, end to end: a `columns` block (`slotId`, `fixed`,
 `readOnly`) → each `column` (`slotId`, `fixed`, `readOnly`) → each leaf block
 (`slotId`, `fixed`, `readOnly`).
+
+### object_list containers (sliders, tables)
+
+A container lays out its children one of two ways, and the merge treats **both the same** —
+as an ordered region of child blocks:
+
+- **`blocks_layout`** (columns, grid): children live in the block's shared `blocks` map,
+  ordered by a `blocks_layout` region (as above).
+- **`object_list`** (a slider's slides, a table's rows): children are an **inline array**
+  of block objects, each identified by an **id field** (`@id` by default).
+
+Everything else is identical: every object_list item still needs a `slotId` (plus
+`templateId` / `fixed` / `readOnly` as appropriate), and a slot item fills from the page's
+content just like a `blocks_layout` slot.
+
+The merge identifies object_list items by their id field. For a **top-level** object_list
+field whose id field isn't `@id`, pass it explicitly; nested object_list arrays are assumed
+to key on `@id`:
+
+<!-- codeExample: javascript -->
+```javascript
+const items = expandTemplatesSync(layout, {
+    blocks, templateState, templates,
+    idField: 'key', // this object_list keys its items by `key`, not `@id`
+});
+```
 
 ## allowedTemplates vs allowedLayouts
 
