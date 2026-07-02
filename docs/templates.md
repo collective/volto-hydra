@@ -82,17 +82,21 @@ import { loadTemplates, expandTemplatesSync, expandTemplates }
 const loadTemplate = async (id) =>
     fetch(`${apiBase}${id}`).then(r => r.json());
 
+// Create the shared state ONCE per page render. Every expand call (top-level AND
+// every nested container / object_list re-entry) must reuse this SAME object.
+// Never reset or recreate it mid-render.
+const templateState = {};
+
 // Sync approach: pre-fetch templates, use in computed properties
 const templates = await loadTemplates(pageData, loadTemplate);
-const templateState = {};  // Share across all expandTemplatesSync calls
 const items = expandTemplatesSync(layout, {
     blocks, templateState, templates,
 });
 
-// Async approach: load templates on demand
+// Async approach: load templates on demand — reuse the SAME templateState
 const items = await expandTemplates(layout, {
     blocks,
-    templateState: {},
+    templateState,
     loadTemplate: async (id) => fetch(id).then(r => r.json()),
 });
 
@@ -105,7 +109,7 @@ for (const item of items) {
 Options:
 
 - **`blocks`**: Map of blockId -> block data
-- **`templateState`**: Pass a fresh `{}` per page render and share it across **every** `expandTemplatesSync` call (top-level and every nested container re-entry). It records the template instances minted this render so a container's re-entry is recognized as already-expanded content and passed through. Recognition is **data-derived** (by `templateInstanceId`), so it is safe to hand blocks back as a Vue reactive value, a clone, or a `postMessage` copy — no `toRaw` needed.
+- **`templateState`**: Create a fresh `{}` **once per page render** and share it across **every** `expandTemplatesSync`/`expandTemplates` call — top-level and every nested container / object_list re-entry. It records the template instances minted this render so a re-entry is recognized as already-expanded content and passed through. **Never reset or recreate it mid-render** (e.g. don't `templateState = {}` again before rendering, and don't pass a fresh `{}` per call): wiping it drops the minted instances, so re-entries re-apply the template instead of passing through — infinite recursion / blank page. Recognition is **data-derived** (by `templateInstanceId`), so it is safe to hand blocks back as a Vue reactive value, a clone, or a `postMessage` copy — no `toRaw` needed. (In Vue/React, provide it once at the page root via provide/inject or context; see `examples/nuxt-blog-starter` and `examples/hydra-nextjs`.)
 - **`templates`**: (sync only) Pre-fetched map of templateId -> template data
 - **`loadTemplate(id)`**: (async only) Function to fetch template content
 - **`allowedLayouts`**: Force a layout when container has no template applied
@@ -145,9 +149,9 @@ const items = expandTemplatesSync(layout, {
     allowedLayouts: ['/templates/footer-layout'],
 });
 
-// Async
+// Async — reuse the SAME shared templateState, never a fresh {}
 const items = await expandTemplates(layout, {
-    blocks, templateState: {}, loadTemplate,
+    blocks, templateState, loadTemplate,
     allowedLayouts: ['/templates/footer-layout'],
 });
 ```
