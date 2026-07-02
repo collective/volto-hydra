@@ -1689,8 +1689,15 @@ export function setChildBlockEntries(parentBlock, descriptor, entries) {
     target[path[path.length - 1]] = entries.map((e) => ({ ...e.block, [idField]: e.id }));
     return;
   }
-  if (!parentBlock.blocks) parentBlock.blocks = {};
-  for (const { id, block } of entries) parentBlock.blocks[id] = block;
+  for (const { id, block } of entries) {
+    // Callers that manage the shared blocks dict themselves (e.g. the admin's
+    // full-dict setContainerItems, whose blocksObj already reflects adds/deletes)
+    // omit `block` — only write into the dict when a block is actually provided.
+    if (block !== undefined) {
+      if (!parentBlock.blocks) parentBlock.blocks = {};
+      parentBlock.blocks[id] = block;
+    }
+  }
   parentBlock.blocks_layout = { ...(parentBlock.blocks_layout || {}), [region]: entries.map((e) => e.id) };
 }
 

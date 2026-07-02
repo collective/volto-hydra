@@ -17,7 +17,11 @@ const applyBlockInitialValue = (blockData, blocksConfig, intl) => {
 };
 import config from '@plone/volto/registry';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
-import { isBlockReadonly } from '@volto-hydra/helpers';
+import {
+  isBlockReadonly,
+  getChildBlockEntries,
+  setChildBlockEntries,
+} from '@volto-hydra/helpers';
 import {
   buildBlockPathMap as _buildBlockPathMap,
   getBlockTypeSchema,
@@ -129,25 +133,20 @@ export { getBlockTypeSchema, getBlockSchema, getResolvedSchema };
 
 /**
  * Get items array from a container (works for both object_list and blocks containers).
+ *
+ * Thin shim over the public reader getChildBlockEntries so there is ONE storage-agnostic
+ * read implementation shared by the admin and the template merge. Preserves this
+ * function's return shape: block OBJECTS for object_list, block IDs for blocks_layout.
+ *
  * @param {Object} parentBlock - The parent block containing the container
  * @param {Object} containerConfig - Container configuration with fieldName, isObjectList, dataPath
  * @returns {Array} The items array (copy for object_list, items array for blocks)
  */
 export function getContainerItems(parentBlock, containerConfig) {
-  const { isObjectList, dataPath, region = 'items' } = containerConfig;
-
-  if (isObjectList) {
-    const effectivePath = dataPath || [region];
-    let container = parentBlock;
-    for (const key of effectivePath) {
-      container = container?.[key];
-    }
-    return [...(container || [])];
-  }
-
-  // blocks container: the region is a key in the shared blocks_layout dict;
-  // child blocks live in the shared parent.blocks.
-  return [...(parentBlock.blocks_layout?.[region] || [])];
+  const entries = getChildBlockEntries(parentBlock, containerConfig);
+  return containerConfig.isObjectList
+    ? entries.map((e) => e.block)
+    : entries.map((e) => e.id);
 }
 
 /**
@@ -168,37 +167,32 @@ function reorderContainerItems(items, newOrder, containerConfig) {
 }
 
 /**
- * Set items array on a container (returns updated parent block).
+ * Set items array on a container (returns updated parent block — immutable).
+ *
+ * Thin shim over the public writer setChildBlockEntries so there is ONE storage-agnostic
+ * write implementation shared by the admin and the template merge. For blocks_layout the
+ * admin owns the shared dict (blocksObj already reflects adds/deletes), so items are ids
+ * and `block` is omitted — the writer just sets this region's id list and preserves
+ * sibling regions. For object_list, items are the block objects.
+ *
  * @param {Object} parentBlock - The parent block containing the container
  * @param {Object} containerConfig - Container configuration
- * @param {Array} items - New items array
- * @param {Object} [blocksObj] - For blocks containers, the blocks object to merge
+ * @param {Array} items - New items array (block objects for object_list, ids for blocks)
+ * @param {Object} [blocksObj] - For blocks containers, the blocks object to set
  * @returns {Object} Updated parent block
  */
 function setContainerItems(parentBlock, containerConfig, items, blocksObj = null) {
-  const { isObjectList, dataPath, region = 'items' } = containerConfig;
-
-  if (isObjectList) {
-    const effectivePath = dataPath || [region];
-    const updatedParent = { ...parentBlock };
-    let current = updatedParent;
-    for (let i = 0; i < effectivePath.length - 1; i++) {
-      current[effectivePath[i]] = { ...current[effectivePath[i]] };
-      current = current[effectivePath[i]];
-    }
-    current[effectivePath[effectivePath.length - 1]] = items;
-    return updatedParent;
+  const { isObjectList, idField = '@id' } = containerConfig;
+  const updatedParent = { ...parentBlock };
+  if (!isObjectList) {
+    // Full-dict replace; setChildBlockEntries leaves it alone (block omitted below).
+    updatedParent.blocks = blocksObj || parentBlock.blocks;
   }
-
-  // blocks container: update shared blocks dict + this region's list within the
-  // shared blocks_layout dict. Spread the existing dict so SIBLING regions (e.g.
-  // header, footer) are preserved — writing { [region]: items } alone would wipe
-  // them. (No-op for single-region data, where region is always 'items'.)
-  return {
-    ...parentBlock,
-    blocks: blocksObj || parentBlock.blocks,
-    blocks_layout: { ...parentBlock.blocks_layout, [region]: items },
-  };
+  const entries = isObjectList
+    ? items.map((block) => ({ id: block[idField], block }))
+    : items.map((id) => ({ id }));
+  setChildBlockEntries(updatedParent, containerConfig, entries);
+  return updatedParent;
 }
 
 /**
