@@ -1072,6 +1072,24 @@ const Iframe = (props) => {
             const lastSlash = templateId.lastIndexOf('/');
             const parentFolder = lastSlash > 0 ? templateId.slice(0, lastSlash) : '/';
             const id = templateId.slice(lastSlash + 1);
+            // Creating a template requires "Add portal content" on the CHOSEN save folder
+            // (never a hardcoded path — the author picks the location). Check it before
+            // POSTing so an unauthorized location blocks the save loudly instead of silently
+            // dropping the template; the backend 403 is the final word.
+            let targetFolder = null;
+            try {
+              targetFolder = await api.get(parentFolder);
+            } catch {
+              // Couldn't read the folder's permissions — don't block on that; proceed and
+              // let the backend be the authority (a real 403 will surface on POST).
+            }
+            if (targetFolder?.can_add === false) {
+              const err = new Error(
+                `You don't have permission to add templates in "${parentFolder}" (requires “Add portal content”).`,
+              );
+              err.isPermissionError = true;
+              throw err;
+            }
             await api.post(parentFolder, {
               data: {
                 '@type': 'Document',
@@ -1098,6 +1116,8 @@ const Iframe = (props) => {
           }
         } catch (error) {
           console.error(`[HYDRA] Failed to save template ${templateId}:`, error);
+          // A permission failure must block the save, not silently drop the template.
+          if (error?.isPermissionError) throw error;
         }
       }));
     };
