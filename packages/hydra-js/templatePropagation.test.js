@@ -179,3 +179,51 @@ test('an empty slot added inside a NEW column propagates as a slot definition', 
   });
   expect(hasSlot(findCols(other))).toBe(true);
 });
+
+/**
+ * Malformed input: a `fixed` block placed inside a slot is a category error — a propagating
+ * template block can't live in a per-page user region. The reverse merge must capture the
+ * slot DEFINITION only (never its contents), so the misplaced fixed block does NOT ride
+ * along into the template.
+ */
+test('a fixed block wrongly placed inside a slot does not propagate (definition only)', async () => {
+  const template = load('tests-playwright/fixtures/content/templates/footer-layout/data.json');
+  let c = 0;
+  const uuidGenerator = () => `u-${++c}`;
+  const pbf = { items: {}, footer: { allowedLayouts: ['/templates/footer-layout'] } };
+  const freshPage = () => ({
+    blocks: { main: { '@type': 'slate', value: [{ type: 'p', children: [{ text: 'x' }] }] } },
+    blocks_layout: { items: ['main'], footer: [] },
+  });
+  const findCols = (fd) => Object.values(fd.blocks).find((b) => b['@type'] === 'columns');
+
+  const { merged: home } = await mergeTemplatesIntoPage(freshPage(), {
+    loadTemplate: async () => template, pageBlocksFields: pbf, uuidGenerator,
+  });
+  const cols = findCols(home);
+  const iid = cols.templateInstanceId;
+
+  // A new column that is a SLOT (not fixed) but wrongly contains a FIXED block.
+  const firstCol = cols.blocks[cols.blocks_layout.columns[0]];
+  cols.blocks['bad-slot'] = {
+    ...firstCol,
+    fixed: false,
+    slotId: 'bad-slot', templateId: template['@id'], templateInstanceId: iid,
+    blocks: { 'bad-fixed': { '@type': 'form', fixed: true, templateId: template['@id'], templateInstanceId: iid, slotId: 'bad-fixed' } },
+    blocks_layout: { items: ['bad-fixed'] },
+  };
+  cols.blocks_layout.columns = [...cols.blocks_layout.columns, 'bad-slot'];
+
+  const { merged: saved } = await mergeTemplatesIntoPage(template, {
+    loadTemplate: async () => home, filterInstanceId: iid, uuidGenerator,
+  });
+
+  const savedCols = findCols(saved);
+  // The slot definition survives...
+  expect(Object.values(savedCols.blocks || {}).some((b) => b.slotId === 'bad-slot')).toBe(true);
+  // ...but the fixed block wrongly placed inside it did NOT propagate.
+  const anyForm = Object.values(savedCols.blocks || {}).some(
+    (b) => b.blocks && Object.values(b.blocks).some((n) => n['@type'] === 'form'),
+  );
+  expect(anyForm).toBe(false);
+});

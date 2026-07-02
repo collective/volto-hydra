@@ -2124,9 +2124,13 @@ function fillRegionEntries(entries, templateState, options) {
         // No page content matches this slot. Emit the slot itself instead of dropping it —
         // a slot whose slotId matches no page content is a slot DEFINITION (e.g. one the
         // author just added to the template), not a filled slot, so it must survive and be
-        // captured by the reverse merge. Field placeholders only matter on first insert.
+        // captured by the reverse merge. Emit the DEFINITION only — strip any nested content
+        // (a slot's contents are per-page user content, never template content; a fixed
+        // block placed inside a slot is malformed and must not ride along). Field
+        // placeholders only matter on first insert.
         const nid = uuidGenerator ? uuidGenerator() : `${instanceId}::${tplChildId}`;
-        const nb = { ...child, templateInstanceId: instanceId };
+        const { blocks: _slotBlocks, blocks_layout: _slotLayout, ...childDef } = child;
+        const nb = { ...childDef, templateInstanceId: instanceId };
         if (firstInsert) {
           const placeholders = extractFieldPlaceholders(child);
           if (Object.keys(placeholders).length > 0) nb.fieldPlaceholders = placeholders;
