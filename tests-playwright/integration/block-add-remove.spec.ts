@@ -144,6 +144,11 @@ test.describe('Adding Blocks', () => {
     // The chooser offers the container's allowed types (navItem present) — so the empty is
     // pickable in place (not stranded).
     await expect(chooser.locator('button.navItem')).toBeAttached({ timeout: 5000 });
+
+    // Pick navItem: the empty mutates in place into a navItem, which must render. A fresh
+    // navItem has no href yet, so the renderer must show an editable placeholder, not crash.
+    await helper.selectBlockType('navItem');
+    await expect(iframe.locator('.context-navigation a[data-block-uid]')).toBeVisible({ timeout: 5000 });
   });
 
   test('can add an Image block to the page', async ({ page }) => {

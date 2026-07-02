@@ -1304,9 +1304,11 @@ async function renderContextNavigationBlock(block, blockId) {
     // passes so it gets level-1 and is treated as "current path ancestor"
     // by the smart-expansion filter.
     if (block.includeTop && flat.length > 0) {
-        const pathSegsOf2 = (entry) =>
-            new URL(entry.block.href[0]['@id'], window.location.origin)
-                .pathname.split('/').filter(Boolean);
+        const pathSegsOf2 = (entry) => {
+            const h = Array.isArray(entry.block.href) && entry.block.href.length > 0
+                ? entry.block.href[0]['@id'] : null;
+            return h ? new URL(h, window.location.origin).pathname.split('/').filter(Boolean) : [];
+        };
         const segsList = flat.map(pathSegsOf2);
         const minDepthForRoot = Math.min(...segsList.map((s) => s.length));
         const shallow = segsList.find((s) => s.length === minDepthForRoot);
@@ -1329,9 +1331,13 @@ async function renderContextNavigationBlock(block, blockId) {
     }
 
     // Second pass: compute level = depth(href) - minDepth + 1, clamped to 1..3.
-    const pathSegsOf = (entry) =>
-        new URL(entry.block.href[0]['@id'], window.location.origin)
-            .pathname.split('/').filter(Boolean);
+    const pathSegsOf = (entry) => {
+        // A fresh navItem has no href yet — treat it as depth 0 (a new top-level item)
+        // rather than crashing on href[0].
+        const h = Array.isArray(entry.block.href) && entry.block.href.length > 0
+            ? entry.block.href[0]['@id'] : null;
+        return h ? new URL(h, window.location.origin).pathname.split('/').filter(Boolean) : [];
+    };
     let allSegs = flat.map(pathSegsOf);
     const depths = allSegs.map((s) => s.length);
     const minDepth = Math.min(...depths);
@@ -1444,15 +1450,19 @@ function filterByCurrentPath(flat, allSegs, minDepth) {
  * renderContextNavigationBlock after collecting all sibling depths).
  */
 function renderNavItemBlock(block, blockId) {
-    const label = block.label;
-    const href = block.href[0]['@id'];
+    // A freshly-typed navItem (e.g. picked for a seeded empty) has no href/label yet —
+    // render an editable placeholder instead of crashing on block.href[0].
+    const hrefObj = Array.isArray(block.href) && block.href.length > 0 ? block.href[0] : null;
+    const label = block.label || 'New navigation item';
     const level = block._level;
     const uid = blockId;
 
-    const itemPath = new URL(href, window.location.origin).pathname;
+    const itemPath = hrefObj?.['@id']
+        ? new URL(hrefObj['@id'], window.location.origin).pathname
+        : '';
     const currentPath = window.location.pathname.replace(/\/edit$/, '');
-    const active = itemPath === currentPath;
-    const inPath = !active && currentPath.startsWith(itemPath.replace(/\/$/, '') + '/');
+    const active = !!itemPath && itemPath === currentPath;
+    const inPath = !active && !!itemPath && currentPath.startsWith(itemPath.replace(/\/$/, '') + '/');
 
     const classes = [
         'nav-item',
@@ -1468,7 +1478,7 @@ function renderNavItemBlock(block, blockId) {
     //   data-edit-text="label"  — clicking the label text inline-edits it
     // No data-linkable-allow: that would steal the click before either edit
     // annotation could fire — block-sanity flags that contradiction.
-    return `<a href="${escapeAttr(itemPath)}" data-block-uid="${escapeAttr(uid)}" class="${classes}"${ariaCurrent} data-edit-link="href">` +
+    return `<a href="${escapeAttr(itemPath || '#')}" data-block-uid="${escapeAttr(uid)}" class="${classes}"${ariaCurrent} data-edit-link="href">` +
         `<span data-edit-text="label">${escapeHtml(label)}</span>` +
         `</a>`;
 }
