@@ -12,6 +12,7 @@ import {
   reorderBlocksInContainer,
   moveBlockBetweenContainers,
   ensureEmptyBlockIfEmpty,
+  insertBlockInContainer,
   getAllContainerFields,
   listContainerChildren,
   convertContainerBlock,
@@ -217,6 +218,41 @@ describe('ensureEmptyBlockIfEmpty — auto-content joins the template instance',
     // Reproduces the bug: the seeded child currently has NO templateInstanceId, so
     // it renders read-only in template edit mode (no add-after "+").
     expect(child.templateInstanceId).toBe('inst-1');
+  });
+});
+
+describe('insertBlockInContainer — add-after joins the template instance', () => {
+  // Adding a block after a template-instance sibling must stamp it into the same instance
+  // (centralized via inheritTemplateMembership) — else the added block renders read-only
+  // in template edit mode, the same failure as the seeded auto-content.
+  const cfg = {
+    _page: { id: '_page', schema: () => ({ properties: { items: { widget: 'blocks_layout' } } }) },
+    column: { id: 'column', schema: () => ({ properties: { items: { widget: 'blocks_layout', allowedBlocks: ['slate'] } } }) },
+    slate: { id: 'slate' },
+  };
+
+  test('a block added after a template-instance sibling carries templateInstanceId', () => {
+    const form = {
+      '@type': 'Document',
+      blocks: {
+        col1: {
+          '@type': 'column',
+          templateId: 'resolveuid/x',
+          templateInstanceId: 'inst-1',
+          slotId: 'col1',
+          blocks: { a: { '@type': 'slate', templateId: 'resolveuid/x', templateInstanceId: 'inst-1', slotId: 'a' } },
+          blocks_layout: { items: ['a'] },
+        },
+      },
+      blocks_layout: { items: ['col1'] },
+    };
+    const map = buildBlockPathMap(form, cfg, intl);
+    const cc = getContainerFieldConfig('a', map, form, cfg, intl);
+    const result = insertBlockInContainer(form, map, 'a', 'b', { '@type': 'slate' }, cc, 'after');
+
+    const col = result.blocks.col1;
+    expect(col.blocks_layout.items).toEqual(['a', 'b']);
+    expect(col.blocks.b.templateInstanceId).toBe('inst-1'); // added block joins the instance
   });
 });
 

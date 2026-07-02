@@ -719,15 +719,20 @@ export function insertBlockInContainer(formData, blockPathMap, refBlockId, newBl
   const items = getContainerItems(parentBlock, containerConfig);
   let updatedParentBlock;
 
+  // A block added into a container that is part of a template instance joins that
+  // instance (inherit from the ref sibling, else the container) — otherwise it renders
+  // read-only in template edit mode, the same failure as unstamped seeded auto-content.
   if (isObjectList) {
     const idField = containerConfig.idField || '@id';
     const refIndex = items.findIndex(item => item[idField] === refBlockId);
     const insertIndex = getInsertIndex(items, refIndex);
-    items.splice(insertIndex, 0, { [idField]: newBlockId, ...newBlockData });
+    const stamped = inheritTemplateMembership(newBlockData, items[refIndex] || parentBlock);
+    items.splice(insertIndex, 0, { [idField]: newBlockId, ...stamped });
     updatedParentBlock = setContainerItems(parentBlock, containerConfig, items);
   } else {
     // Standard container: shared blocks dict + layout field
-    const newContainerBlocks = { ...parentBlock.blocks, [newBlockId]: newBlockData };
+    const stamped = inheritTemplateMembership(newBlockData, parentBlock.blocks?.[refBlockId] || parentBlock);
+    const newContainerBlocks = { ...parentBlock.blocks, [newBlockId]: stamped };
     const refIndex = items.indexOf(refBlockId);
     const insertIndex = getInsertIndex(items, refIndex);
     items.splice(insertIndex, 0, newBlockId);
@@ -1437,6 +1442,28 @@ export function getEmptyBlockType(containerConfig) {
 }
 
 /**
+ * Stamp a block being seeded/added into a container with that container's template
+ * membership. When a container is part of a template instance, a block added into it must
+ * join the same instance — otherwise the flat readonly check
+ * (isBlockReadonly: block.templateInstanceId === templateEditMode) treats the new block as
+ * read-only in template edit mode, so no add-after "+" appears and you can't build it out.
+ * Centralized so every add/seed path stamps consistently. No-op when the source block
+ * isn't part of a template instance.
+ *
+ * @param {Object} childBlock - the block being added/seeded
+ * @param {Object} sourceBlock - the container (or a template sibling) to inherit from
+ * @returns {Object} childBlock, stamped when the source is a template instance
+ */
+export function inheritTemplateMembership(childBlock, sourceBlock) {
+  if (!sourceBlock?.templateInstanceId) return childBlock;
+  return {
+    ...childBlock,
+    templateInstanceId: sourceBlock.templateInstanceId,
+    ...(sourceBlock.templateId ? { templateId: sourceBlock.templateId } : {}),
+  };
+}
+
+/**
  * Ensure a container has at least one block (empty block if container is empty).
  * Call this after deleting a block to ensure empty containers get an empty block.
  *
@@ -1510,12 +1537,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
       if (intl && blocksConfig) {
         emptyBlock = applyBlockDefaults({ data: emptyBlock, intl, metadata, properties }, blocksConfig);
       }
-      emptyBlock = {
-        ...emptyBlock,
-        slotId: slot,
-        templateId: cur.templateId,
-        templateInstanceId: cur.templateInstanceId,
-      };
+      emptyBlock = { ...inheritTemplateMembership(emptyBlock, cur), slotId: slot };
       newItems = newItems || [...items];
       newBlocks = newBlocks || { ...blocksObj };
       newItems.splice(newItems.indexOf(items[i]) + 1, 0, emptyId);
@@ -1558,6 +1580,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
       delete blockData['@type'];
     }
 
+    blockData = inheritTemplateMembership(blockData, parentBlock);
     const updatedParentBlock = setContainerItems(parentBlock, containerConfig, [blockData]);
     return setBlockByPath(formData, parentPath, updatedParentBlock);
   }
@@ -1571,6 +1594,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
     blockData = applyBlockInitialValue(blockData, blocksConfig, intl);
   }
 
+  blockData = inheritTemplateMembership(blockData, parentBlock);
   const blocksObj = { ...parentBlock.blocks, [newBlockId]: blockData };
   const updatedParentBlock = setContainerItems(parentBlock, containerConfig, [newBlockId], blocksObj);
   return setBlockByPath(formData, parentPath, updatedParentBlock);
