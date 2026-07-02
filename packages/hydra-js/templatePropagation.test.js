@@ -110,8 +110,8 @@ test('a form added inside a NEW column propagates to another page (footer column
     ...firstCol,
     slotId: 'add-col', templateId: template['@id'], templateInstanceId: iid,
     // The form is template content the author places (fixed) — as the add flow now stamps
-    // it (inheritTemplateMembership inheritFixed). A slot would be per-page user content and
-    // correctly would NOT propagate.
+    // it (inheritTemplateMembership inheritFixed) — so it propagates. (An empty slot the
+    // author adds also propagates, as a slot definition — see the next test.)
     blocks: { 'add-form': { '@type': 'form', fixed: true, templateId: template['@id'], templateInstanceId: iid, slotId: 'add-form' } },
     blocks_layout: { items: ['add-form'] },
   };
@@ -128,4 +128,54 @@ test('a form added inside a NEW column propagates to another page (footer column
     loadTemplate: async () => saved, pageBlocksFields: pbf, uuidGenerator,
   });
   expect(hasForm(findCols(other))).toBe(true); // form propagates to the other page
+});
+
+/**
+ * The mirror of the form case: an empty SLOT the author adds (a region for end-users to
+ * fill) must also propagate — as a slot DEFINITION. The reverse merge used to DROP a slot
+ * whose slotId matched no page content; now it emits the slot itself, so the definition
+ * reaches the template and shows (empty, fillable) on other pages.
+ */
+test('an empty slot added inside a NEW column propagates as a slot definition', async () => {
+  const template = load('tests-playwright/fixtures/content/templates/footer-layout/data.json');
+  let c = 0;
+  const uuidGenerator = () => `u-${++c}`;
+  const pbf = { items: {}, footer: { allowedLayouts: ['/templates/footer-layout'] } };
+  const freshPage = () => ({
+    blocks: { main: { '@type': 'slate', value: [{ type: 'p', children: [{ text: 'x' }] }] } },
+    blocks_layout: { items: ['main'], footer: [] },
+  });
+  const findCols = (fd) => Object.values(fd.blocks).find((b) => b['@type'] === 'columns');
+  const hasSlot = (cols) =>
+    Object.values(cols.blocks || {}).some(
+      (col) => col.blocks && Object.values(col.blocks).some((b) => b.slotId === 'add-slot' && !b.fixed),
+    );
+
+  const { merged: home } = await mergeTemplatesIntoPage(freshPage(), {
+    loadTemplate: async () => template, pageBlocksFields: pbf, uuidGenerator,
+  });
+  const cols = findCols(home);
+  const iid = cols.templateInstanceId;
+
+  // Add a new column whose content is an empty SLOT (no `fixed`) — a fillable user region.
+  const firstCol = cols.blocks[cols.blocks_layout.columns[0]];
+  cols.blocks['add-col'] = {
+    ...firstCol,
+    slotId: 'add-col', templateId: template['@id'], templateInstanceId: iid,
+    blocks: { 'add-slot': { '@type': 'slate', slotId: 'add-slot', templateId: template['@id'], templateInstanceId: iid } },
+    blocks_layout: { items: ['add-slot'] },
+  };
+  cols.blocks_layout.columns = [...cols.blocks_layout.columns, 'add-col'];
+
+  // SAVE: the slot definition must be captured (not dropped).
+  const { merged: saved } = await mergeTemplatesIntoPage(template, {
+    loadTemplate: async () => home, filterInstanceId: iid, uuidGenerator,
+  });
+  expect(hasSlot(findCols(saved))).toBe(true);
+
+  // VIEW another page: the slot appears (empty, fillable by that page's users).
+  const { merged: other } = await mergeTemplatesIntoPage(freshPage(), {
+    loadTemplate: async () => saved, pageBlocksFields: pbf, uuidGenerator,
+  });
+  expect(hasSlot(findCols(other))).toBe(true);
 });
