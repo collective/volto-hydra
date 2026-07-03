@@ -21,6 +21,8 @@ import {
   isBlockReadonly,
   getChildBlockEntries,
   setChildBlockEntries,
+  getBlockType,
+  setBlockType,
 } from '@volto-hydra/helpers';
 import {
   buildBlockPathMap as _buildBlockPathMap,
@@ -219,7 +221,7 @@ export function listContainerChildren(parentBlock, containerConfig) {
     const typeField = containerConfig.typeField || null;
     return items.map((item) => ({
       id: (idField && item[idField]) || item.key || item['@id'],
-      type: (typeField && item[typeField]) || 'object_list_item',
+      type: getBlockType(item, typeField) || 'object_list_item',
       data: item,
     }));
   }
@@ -1607,12 +1609,10 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
     const typeFieldName = containerConfig.typeField || null;
     let blockData = { [idField]: newBlockId };
 
-    // For typed object_list, add the type attribute
+    // @type set temporarily so applyBlockDefaults/initializeContainerBlock can resolve the
+    // schema; the type is moved into the typeField below (shared setBlockType).
     if (typeFieldName && containerConfig.defaultBlockType) {
-      const emptyType = getEmptyBlockType(containerConfig);
-      blockData[typeFieldName] = emptyType;
-      // Also set @type temporarily for applyBlockDefaults to find the config
-      blockData['@type'] = emptyType;
+      blockData['@type'] = getEmptyBlockType(containerConfig);
     }
 
     // Initialize nested containers
@@ -1621,9 +1621,9 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
       blockData = initializeContainerBlock(blockData, blocksConfig, uuidGenerator, { intl, metadata, properties, blockType: emptyBlockType });
     }
 
-    // For typed object_list, clean up @type if typeField is different
-    if (typeFieldName && typeFieldName !== '@type') {
-      delete blockData['@type'];
+    // Typed object_list: move the type from the temp @type into the typeField.
+    if (typeFieldName && blockData['@type']) {
+      blockData = setBlockType(blockData, blockData['@type'], typeFieldName);
     }
 
     blockData = inheritTemplateMembership(blockData, parentBlock, { inheritFixed: !!parentBlock?.templateInstanceId });
@@ -1727,14 +1727,10 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
         childData = initializeContainerBlock(childData, blocksConfig, uuidGenerator, { ...options, blockType: childType });
 
         if (hasAllowedBlocks && typeFieldName) {
-          // Typed object_list: store type in the specified typeField attribute
-          childData[typeFieldName] = childType;
-          // Remove @type if typeField is different (don't duplicate)
-          if (typeFieldName !== '@type') {
-            delete childData['@type'];
-          }
+          // Typed object_list: store the type in the typeField (dropping @type).
+          childData = setBlockType(childData, childType, typeFieldName);
         } else {
-          // Single-schema object_list: remove @type, items don't store it in data
+          // Single-schema object_list: items store no type — drop the @type used for defaults.
           delete childData['@type'];
         }
 
@@ -1976,13 +1972,9 @@ export function moveBlockBetweenContainers(
     adaptedBlockData['@type'] = blockType;
   }
 
-  // When moving TO typed object_list, ensure typeField is set
+  // When moving TO a typed object_list, write the type into the typeField (dropping @type).
   if (targetContainerConfig.isObjectList && targetContainerConfig.typeField && blockType) {
-    adaptedBlockData[targetContainerConfig.typeField] = blockType;
-    // If typeField is not @type, remove @type to avoid duplication
-    if (targetContainerConfig.typeField !== '@type') {
-      delete adaptedBlockData['@type'];
-    }
+    adaptedBlockData = setBlockType(adaptedBlockData, blockType, targetContainerConfig.typeField);
   }
 
   // Use insertBlockInContainer for the target insertion (handles both formats)

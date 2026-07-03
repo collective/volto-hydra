@@ -1568,11 +1568,9 @@ const Iframe = (props) => {
       // Inherit template membership from the neighbour (uniform read; see helper above).
       blockData = inheritTemplateMembership(blockData);
 
-      // Store type in typeField, clean up @type if typeField is different
-      blockData[typeFieldName] = effectiveType;
-      if (typeFieldName !== '@type') {
-        delete blockData['@type']; // @type was only used for schema resolution
-      }
+      // Store the type in the typeField (dropping the @type used only for schema
+      // resolution) — the shared setBlockType.
+      blockData = setBlockType(blockData, effectiveType, typeFieldName);
     } else {
       // Standard block with @type
       blockData = { '@type': blockType };
