@@ -23,6 +23,7 @@ import {
   setChildBlockEntries,
   getBlockType,
   setBlockType,
+  clearBlockType,
 } from '@volto-hydra/helpers';
 import {
   buildBlockPathMap as _buildBlockPathMap,
@@ -1731,7 +1732,7 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
           childData = setBlockType(childData, childType, typeFieldName);
         } else {
           // Single-schema object_list: items store no type — drop the @type used for defaults.
-          delete childData['@type'];
+          childData = clearBlockType(childData);
         }
 
         children.push(childData);

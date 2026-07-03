@@ -239,7 +239,7 @@ import slateTransforms from '../../utils/slateTransforms';
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, _getContainerChildFieldName } from '../../utils/blockPath';
-import { canContainAll, getChildBlockEntries, setBlockType } from '@volto-hydra/helpers';
+import { canContainAll, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
@@ -1446,7 +1446,7 @@ const Iframe = (props) => {
       let cellData = { '@type': virtualType };
       cellData = applyBlockDefaults({ data: cellData, formData: cellData, intl, metadata, properties }, mergedBlocksConfig);
       cellData = initializeContainerBlock(cellData, mergedBlocksConfig, uuid, { intl, metadata, properties, blockType: virtualType });
-      delete cellData['@type'];
+      cellData = clearBlockType(cellData);
 
       const result = insertTableColumn(
         formData,

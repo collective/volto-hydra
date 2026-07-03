@@ -1802,6 +1802,16 @@ export function setBlockType(blockData, type, typeField = null) {
 }
 
 /**
+ * Drop a block's type entirely. A single-schema object_list item's type is virtual (derived
+ * from the parent field schema, e.g. 'slateTable:rows:cells') and never stored, so the
+ * temporary @type used for schema resolution must be removed. Returns a new object.
+ */
+export function clearBlockType(blockData) {
+  const { '@type': _drop, ...rest } = blockData;
+  return rest;
+}
+
+/**
  * Check if a block's position is locked (cannot be moved/dragged).
  * This is the shared utility for both admin (toolbar) and hydra.js Bridge.
  *

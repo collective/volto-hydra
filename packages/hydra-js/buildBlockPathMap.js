@@ -10,6 +10,10 @@
  * to use it via the same import path as before.
  */
 
+// @volto-hydra/helpers is pure (no @plone/volto), so importing from it keeps this module
+// free of Volto deps — unlike @volto-hydra/hydra-js, which is why PAGE_BLOCK_UID is inlined.
+import { getBlockType } from '@volto-hydra/helpers';
+
 // Same value as PAGE_BLOCK_UID in hydra.js — defined locally to avoid
 // importing from @volto-hydra/hydra-js (which would pull in Volto deps).
 const PAGE_BLOCK_UID = '_page';
@@ -637,7 +641,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       // - If typed mode and type missing, fall back to defaultBlockType (e.g., old data without @type)
       // - Otherwise, use virtual type like 'slateTable:rows' (single-schema object_list)
       const itemBlockType = typeField
-        ? (item[typeField] || (hasAllowedBlocks && fieldDef.defaultBlockType) || virtualType)
+        ? (getBlockType(item, typeField) || (hasAllowedBlocks && fieldDef.defaultBlockType) || virtualType)
         : virtualType;
 
       // Determine schema for this item:
