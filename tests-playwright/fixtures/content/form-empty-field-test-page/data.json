@@ -1,0 +1,23 @@
+{
+  "@id": "/form-empty-field-test-page",
+  "@type": "Document",
+  "UID": "form-empty-field-test-page-uid",
+  "id": "form-empty-field-test-page",
+  "title": "Form Empty Field Test",
+  "description": "A form whose only field is a seeded empty (field_type: empty) — the typed object_list case.",
+  "review_state": "published",
+  "is_folderish": false,
+  "type_title": "Page",
+  "blocks": {
+    "title-block": { "@type": "title" },
+    "form-1": {
+      "@type": "form",
+      "title": "Contact",
+      "submit_label": "Submit",
+      "subblocks": [
+        { "@id": "empty-1", "field_id": "empty-1", "field_type": "empty", "label": "" }
+      ]
+    }
+  },
+  "blocks_layout": { "items": ["title-block", "form-1"] }
+}

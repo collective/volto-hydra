@@ -992,7 +992,11 @@ function renderFormBlock(block) {
         const required = field.required || false;
         html += `<div class="form-field" data-block-uid="${fieldId}" data-block-add="bottom" style="margin-bottom: 12px;">`;
         html += `<label data-edit-text="label" style="display: block; margin-bottom: 4px; font-weight: bold;">${label}${required ? ' *' : ''}</label>`;
-        if (fieldType === 'textarea') {
+        if (fieldType === 'empty') {
+            // A typed object_list item seeded as 'empty' (type in field_type, no @type).
+            // Render a selectable placeholder; the admin supplies the '+' to pick its type.
+            html += `<span data-edit-text="placeholder" style="color:#999;">Empty field — pick a type</span>`;
+        } else if (fieldType === 'textarea') {
             html += `<textarea name="${fieldId}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;" rows="3"></textarea>`;
         } else if (fieldType === 'select') {
             const values = field.input_values || [];
