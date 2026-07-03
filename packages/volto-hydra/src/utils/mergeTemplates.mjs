@@ -29,6 +29,7 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
     filterInstanceId,
     preloadedTemplates = {},
     firstInsert,
+    idFieldMap,
   } = options;
 
   let result = { ...page };
@@ -49,6 +50,7 @@ export async function mergeTemplatesIntoPage(page, options = {}) {
       uuidGenerator,
       filterInstanceId,
       firstInsert,
+      idFieldMap, // { blockType: { field: idField } } — admin-resolved from the schema
     });
 
     const newBlocks = {};

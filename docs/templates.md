@@ -126,17 +126,27 @@ Everything else is identical: every object_list item still needs a `slotId` (plu
 `templateId` / `fixed` / `readOnly` as appropriate), and a slot item fills from the page's
 content just like a `blocks_layout` slot.
 
-The merge identifies object_list items by their id field. For a **top-level** object_list
-field whose id field isn't `@id`, pass it explicitly; nested object_list arrays are assumed
-to key on `@id`:
+The merge identifies object_list items by their **id field**, and it varies per field — a
+form's `subblocks` key on `field_id`, a slider's `slides` on `@id`, a table's `rows` on `key`.
+A frontend has no schema, so whenever you expand a template or layout that contains an
+object_list container you MUST tell the merge each field's id field via an **`idFieldMap`**
+(`{ blockType: { field: idField } }`). Without it the merge falls back to `@id` — and for a
+`field_id`-keyed field that mints a broken id and the item is dropped on the next merge.
 
 <!-- codeExample: javascript -->
 ```javascript
 const items = expandTemplatesSync(layout, {
     blocks, templateState, templates,
-    idField: 'key', // this object_list keys its items by `key`, not `@id`
+    idFieldMap: {
+        form: { subblocks: 'field_id' }, // a form's fields key on field_id, not @id
+        slider: { slides: '@id' },
+    },
 });
 ```
+
+(On the admin this map is derived from the block schema automatically. When you re-enter to
+expand a **single** object_list array on its own, the `idField` shorthand is enough:
+`expandTemplatesSync(block.slides, { templateState, templates, idField: '@id' })`.)
 
 ## allowedTemplates vs allowedLayouts
 

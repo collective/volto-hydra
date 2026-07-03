@@ -238,7 +238,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, _getContainerChildFieldName } from '../../utils/blockPath';
+import { buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, _getContainerChildFieldName } from '../../utils/blockPath';
 import { canContainAll, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
@@ -997,6 +997,14 @@ const Iframe = (props) => {
   // Pending template edit exit - stores { requestId, prevInstanceId } when waiting for flush
   const pendingTemplateEditExitRef = useRef(null);
 
+  // Resolve each object_list field's idField ONCE from the schema (a form's subblocks are keyed
+  // by field_id, not @id) and pass it to every merge — so the merge stamps item ids into the
+  // right field instead of minting a bogus @id. A frontend passes this same shape as a hint.
+  const idFieldMap = useMemo(
+    () => buildIdFieldMap(config.blocks.blocksConfig, intl),
+    [intl],
+  );
+
 
   // Trigger for template sync effect - INIT increments this when templates need loading
   // This causes the effect to run and fetch templates, then send deferred INITIAL_DATA
@@ -1169,6 +1177,7 @@ const Iframe = (props) => {
         loadTemplate: async () => formData,
         filterInstanceId: prevInstanceId,
         uuidGenerator: uuid,
+        idFieldMap,
       }).then(({ merged: updatedTemplate }) => {
         log('REVERSE MERGE: Updated template blocks:', Object.keys(updatedTemplate.blocks || {}));
         // Log first block's value to check if edit is captured
@@ -1361,6 +1370,7 @@ const Iframe = (props) => {
             },
             pageBlocksFields: { [fieldName || 'items']: { allowedLayouts: [templateConfig.templateUrl] } },
             uuidGenerator: uuid,
+            idFieldMap,
             blocksConfig: config.blocks.blocksConfig,
             intl,
           });
@@ -3517,6 +3527,7 @@ const Iframe = (props) => {
             preloadedTemplates: templateCacheRef.current,
             pageBlocksFields,
             uuidGenerator: uuid,
+            idFieldMap,
           });
           let blockPathMap = buildBlockPathMap(mergedFormData, config.blocks.blocksConfig, intl);
 
@@ -3602,6 +3613,7 @@ const Iframe = (props) => {
           uuidGenerator: uuid,
           blocksConfig: config.blocks.blocksConfig,
           intl,
+          idFieldMap,
         });
         if (moreTemplateIds.length > 0) {
           log('[INITIAL_DATA] Discovered nested templates:', moreTemplateIds);

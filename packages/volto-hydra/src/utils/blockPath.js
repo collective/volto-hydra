@@ -31,6 +31,7 @@ import {
   getBlockSchema,
   getPageAllowedBlocksFromRestricted,
   getResolvedSchema,
+  buildIdFieldMap,
 } from '../../../hydra-js/buildBlockPathMap.js';
 import { mapLayoutItems } from '../../../hydra-js/containerOps.js';
 
@@ -132,7 +133,7 @@ export function stripBlockPathMapForPostMessage(blockPathMap) {
 
 // getBlockTypeSchema, getBlockSchema, getPageAllowedBlocksFromRestricted are imported
 // from buildBlockPathMap.js (Volto-free shared module) above.
-export { getBlockTypeSchema, getBlockSchema, getResolvedSchema };
+export { getBlockTypeSchema, getBlockSchema, getResolvedSchema, buildIdFieldMap };
 
 /**
  * Get items array from a container (works for both object_list and blocks containers).
@@ -1665,7 +1666,7 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
  * @returns {Object} Block data with container fields initialized (if applicable)
  */
 export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator, options = {}, schema) {
-  const { intl, metadata, properties, siblingData, blockType } = options;
+  const { intl, siblingData, blockType } = options;
 
   // Get schema from block type if not provided (e.g., recursing into widget: 'object')
   // Use type-level cache since we're initializing an empty new block — no instance data yet.
@@ -1717,15 +1718,12 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
       const children = [];
       for (let i = 0; i < childCount; i++) {
         const childId = uuidGenerator();
-
-        // Start with ID and type
-        let childData = { [idField]: childId, '@type': childType };
-
-        // Apply schema defaults (e.g., slate fields get empty paragraph)
-        childData = applyBlockDefaults({ data: childData, intl }, blocksConfig);
-
-        // Recursively initialize nested containers
-        childData = initializeContainerBlock(childData, blocksConfig, uuidGenerator, { ...options, blockType: childType });
+        // Seed via the shared storage-agnostic path (defaults → initialValue → membership →
+        // recurse); this branch then stores the child's type + pushes it into the array.
+        let childData = seedTemplateChild(
+          { [idField]: childId, '@type': childType }, childType, childId, blockData,
+          blocksConfig, uuidGenerator, options,
+        );
 
         if (hasAllowedBlocks && typeFieldName) {
           // Typed object_list: store the type in the typeField (dropping @type).
@@ -1765,31 +1763,14 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
       continue;
     }
 
-    // Create child block and apply defaults (like Volto's BlocksForm does)
+    // Create + seed the child via the SAME storage-agnostic path as the object_list branch
+    // above (defaults → initialValue → membership → recurse); this branch then places it in the
+    // shared blocks dict + the field's layout list.
     const childBlockId = uuidGenerator();
-    let childBlockData = { '@type': childBlockType };
-
-    // Apply block defaults to get proper initial values (e.g., slate's value field)
-    if (intl) {
-      childBlockData = applyBlockDefaults({
-        data: childBlockData,
-        intl,
-        metadata,
-        properties,
-      }, blocksConfig);
-    }
-
-    // Call initialValue if defined (like Volto's _applyBlockInitialValue)
-    const childBlockConfig = blocksConfig?.[childBlockType];
-    if (childBlockConfig?.initialValue) {
-      childBlockData = childBlockConfig.initialValue({
-        id: childBlockId,
-        value: childBlockData,
-      });
-    }
-
-    // Recursively initialize the child if it's also a container
-    childBlockData = initializeContainerBlock(childBlockData, blocksConfig, uuidGenerator, { ...options, blockType: childBlockType });
+    const childBlockData = seedTemplateChild(
+      { '@type': childBlockType }, childBlockType, childBlockId, blockData,
+      blocksConfig, uuidGenerator, options,
+    );
 
     // Add child to shared blocks dict + this blocks field's list inside the
     // shared blocks_layout dict (key = field name; preserve sibling fields).
@@ -1804,6 +1785,38 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
   }
 
   return result;
+}
+
+/**
+ * Seed ONE default child of a container — STORAGE-AGNOSTIC. The object_list (array) and
+ * blocks_layout (shared dict) branches of initializeContainerBlock used to duplicate this exact
+ * sequence; now they share it and differ only in how they PLACE the result (array push vs dict +
+ * layout) and store the child's id/type. The sequence: schema defaults → the block's initialValue
+ * → inherit the container's template membership → recurse to seed grandchildren.
+ *
+ * Membership is stamped CONTAINER-DIRECT (from the container's own templateInstanceId) via
+ * inheritTemplateMembership — deliberately NOT via the ADD path's applyBlockDefaultsWithContext,
+ * which derives it from the container's childSlotIds. A freshly-added container has no childSlotIds
+ * yet, so routing seeds through that initializer would leave them unstamped and the merge would
+ * drop them (the "field disappears" bug). Stamped before the recursion so grandchildren inherit.
+ *
+ * @param {Object} childData - initial child data ({ [idField]/@type } already set by the caller)
+ * @param {string} childType - the child's block type (used for defaults + initialValue + recursion)
+ * @param {string} childId - the child's id (passed to initialValue)
+ * @param {Object} container - the parent container block (source of template membership)
+ * @returns {Object} the fully seeded child
+ */
+function seedTemplateChild(childData, childType, childId, container, blocksConfig, uuidGenerator, options) {
+  const { intl, metadata, properties } = options;
+  if (intl) {
+    childData = applyBlockDefaults({ data: childData, intl, metadata, properties }, blocksConfig);
+  }
+  const childConfig = blocksConfig?.[childType];
+  if (childConfig?.initialValue) {
+    childData = childConfig.initialValue({ id: childId, value: childData });
+  }
+  childData = inheritTemplateMembership(childData, container, { inheritFixed: !!container?.templateInstanceId });
+  return initializeContainerBlock(childData, blocksConfig, uuidGenerator, { ...options, blockType: childType });
 }
 
 /**

@@ -90,6 +90,25 @@ export function getBlockTypeSchema(blockType, intl, blocksConfig) {
 }
 
 /**
+ * Resolve the object_list idField for every block type ONCE, so the merge can stamp item ids
+ * without re-walking schemas per block. Returns { blockType: { field: idField } }. The admin
+ * builds this from blocksConfig; a frontend passes the same shape as a literal hint.
+ */
+export function buildIdFieldMap(blocksConfig, intl) {
+  const map = {};
+  for (const type of Object.keys(blocksConfig || {})) {
+    let schema = null;
+    try { schema = getBlockTypeSchema(type, intl, blocksConfig); } catch { schema = null; }
+    for (const [field, def] of Object.entries(schema?.properties || {})) {
+      if (def?.widget === 'object_list') {
+        (map[type] || (map[type] = {}))[field] = def.idField || '@id';
+      }
+    }
+  }
+  return map;
+}
+
+/**
  * Get the full enhanced schema for a specific block instance.
  * Runs blockSchema + schemaEnhancer with the block's actual data.
  * The result depends on formData (e.g., selected variation), so it's NOT

@@ -1650,16 +1650,23 @@ export function getChildBlockEntries(parentBlock, descriptor = {}) {
  * @param {Object} block - the container block
  * @returns {Array<{ region?: string, isObjectList?: boolean, dataPath?: string[] }>}
  */
-export function getChildFields(block) {
+export function getChildFields(block, idFieldMap = null) {
   const fields = [];
   if (block?.blocks && isBlocksMap(block.blocks)) {
     for (const [region] of blocksLayoutRegions(block.blocks_layout)) {
       fields.push({ region });
     }
   }
+  // An object_list field is keyed by its idField (a form's subblocks by `field_id`, a table's
+  // rows by `key`, …) — NOT `@id`. The idField is a per-(blockType, field) fact the CALLER
+  // resolves once and passes as `idFieldMap` ({ type: { field: idField } }): the admin derives
+  // it from the schema, a frontend passes it as a literal hint. Read + write both key off the
+  // descriptor's idField, so a missing hint (fallback `@id`) mints a bogus id — hence the hint
+  // is required whenever a template contains an object_list keyed by anything but `@id`.
+  const typeIds = block?.['@type'] ? idFieldMap?.[block['@type']] : null;
   for (const [key, val] of Object.entries(block || {})) {
     if (Array.isArray(val) && val.length > 0 && val[0]?.templateId) {
-      fields.push({ isObjectList: true, dataPath: [key] });
+      fields.push({ isObjectList: true, dataPath: [key], idField: typeIds?.[key] || '@id' });
     }
   }
   return fields;
@@ -2237,7 +2244,7 @@ function fillRegionEntries(entries, templateState, options) {
  * proxy / clone / postMessage copy of the dict → infinite re-application).
  */
 function fillContainerInto(stamped, tplBlock, templateState, options) {
-  const fields = getChildFields(tplBlock);
+  const fields = getChildFields(tplBlock, options?.idFieldMap);
   if (fields.length === 0) return;
   // blocks_layout regions share stamped.blocks — reset it once so stale template blocks
   // don't linger (object_list fields are independent arrays, written in place).
@@ -2556,6 +2563,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
     loadTemplate,
     idField,  // For object_list arrays: field name used as item ID (e.g. '@id', 'key')
     firstInsert,  // When true, copy slot block defaults as fieldPlaceholders
+    idFieldMap,  // { blockType: { field: idField } } — caller-resolved, so the merge never walks schemas
   } = options;
 
   const items = [];
