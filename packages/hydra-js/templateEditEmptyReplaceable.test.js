@@ -20,4 +20,15 @@ describe('template-edit-mode empty is replaceable so the + appears', () => {
     expect(getBlockAddability('e1', map, { '@type': 'empty' }, null).canReplace).toBe(true);
     expect(getBlockAddability('e1', map, { '@type': 'empty', readOnly: true }, null).canReplace).toBe(false);
   });
+
+  test('a typed object_list empty (type in typeField, no @type) is also replaceable', () => {
+    // object_list items store their type in a typeField (e.g. field_type) and DELETE @type
+    // (initializeContainerBlock). Detecting 'empty' via @type alone misses the form's field —
+    // it must read the typeField too (e.g. the E-mail field could never get its '+').
+    const objMap = { e1: { blockType: 'empty', typeField: 'field_type' } };
+    expect(getBlockAddability('e1', objMap, { field_type: 'empty' }, 'inst-1').canReplace).toBe(true);
+    // Normal mode: same, and readOnly still blocks it.
+    expect(getBlockAddability('e1', objMap, { field_type: 'empty' }, null).canReplace).toBe(true);
+    expect(getBlockAddability('e1', objMap, { field_type: 'empty', readOnly: true }, null).canReplace).toBe(false);
+  });
 });

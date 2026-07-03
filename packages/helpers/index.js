@@ -1833,14 +1833,21 @@ export function getBlockAddability(blockId, blockPathMap, blockData, templateEdi
     return result;
   }
 
-  // A seeded '@type: empty' placeholder is ALWAYS replaceable in template edit mode — you're
+  // A block's type lives in @type for blocks_layout, but a typed object_list item stores it
+  // in a typeField and DELETES @type (initializeContainerBlock). Detect 'empty' from either —
+  // otherwise the form's typed field (e.g. the E-mail field) is missed and never gets a '+'.
+  const effectiveType =
+    blockData?.['@type'] ?? (pathInfo.typeField ? blockData?.[pathInfo.typeField] : undefined);
+  const isEmptyBlock = effectiveType === 'empty';
+
+  // A seeded 'empty' placeholder is ALWAYS replaceable in template edit mode — you're
   // building the template, so its type must be pickable (canReplace → the '+' appears). A
   // field seeded inside a template-edit context may not carry the edited template's
   // instanceId yet, so isBlockInEditedTemplate is false and the template-mode gate below
   // would return early with canReplace=false, stranding it. Short-circuit that here (before
   // the maxReached + template-mode gates: replacing an empty mutates in place, it never adds
   // a sibling).
-  if (templateEditMode && blockData?.['@type'] === 'empty') {
+  if (templateEditMode && isEmptyBlock) {
     return { ...result, canReplace: true };
   }
 
@@ -1890,9 +1897,8 @@ export function getBlockAddability(blockId, blockPathMap, blockData, templateEdi
     result.canInsertAfter = staticCanInsertAfter;
   }
 
-  // For empty blocks: can replace (unless readonly), but NOT add before/after
-  // Empty blocks are meant to be replaced via block chooser
-  const isEmptyBlock = blockData?.['@type'] === 'empty';
+  // For empty blocks (isEmptyBlock computed above, storage-agnostic): can replace (unless
+  // readonly), but NOT add before/after — empty blocks are replaced via the block chooser.
   if (isEmptyBlock) {
     // In template edit mode, check if block is in the edited template for replace permission
     const blockIsReadonly = isBlockReadonly(blockData, templateEditMode);
