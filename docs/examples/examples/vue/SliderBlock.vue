@@ -1,7 +1,7 @@
 <template>
   <div :data-block-uid="block['@uid']" class="slider-block">
     <div
-      v-for="(slide, i) in block.slides || []"
+      v-for="(slide, i) in slides"
       :key="slide['@id']"
       :data-block-uid="slide['@id']"
       class="slide"
@@ -20,7 +20,7 @@
     </div>
     <div class="slider-dots">
       <button
-        v-for="(_, i) in block.slides || []"
+        v-for="(_, i) in slides"
         :key="i"
         @click="current = i"
         :class="{ active: i === current }"
@@ -30,8 +30,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { getImageUrl } from './utils.js';
-defineProps({ block: Object });
+const props = defineProps({ block: Object });
 const current = ref(0);
+// Expand the slides object_list (keyed by @id). Edit-mode pass-through sets each slide's @uid.
+const slides = computed(() => expandTemplatesSync(props.block.slides || [], { idField: '@id' }));
 </script>

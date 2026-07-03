@@ -7,8 +7,13 @@
  * Each field row carries `data-block-uid={field.field_id}` so the bridge
  * can target individual fields for selection.
  */
-const { block } = Astro.props;
-const subblocks = block.subblocks || [];
+import { expandTemplatesSync } from '$helpers';
+// astro renders ONLY via the edit render API (SSR has no window.name), so default to edit mode.
+// The default also covers a form nested in a container, whose BlockRenderer doesn't thread editMode.
+const { block, editMode = true } = Astro.props;
+// Expand the subblocks object_list (idField field_id). Edit mode makes this a pass-through that
+// sets each field's @uid from field_id (a view render would need pre-loaded templates instead).
+const subblocks = expandTemplatesSync(block.subblocks || [], { idField: 'field_id', editMode });
 ---
 <form class="form-block">
   <h3 data-edit-text="title">{block.title}</h3>

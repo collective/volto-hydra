@@ -2564,6 +2564,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
     idField,  // For object_list arrays: field name used as item ID (e.g. '@id', 'key')
     firstInsert,  // When true, copy slot block defaults as fieldPlaceholders
     idFieldMap,  // { blockType: { field: idField } } — caller-resolved, so the merge never walks schemas
+    editMode: editModeOverride,  // explicit edit-mode signal for SSR frontends that have no window.name
   } = options;
 
   const items = [];
@@ -2574,7 +2575,10 @@ export function expandTemplatesSync(inputItems, options = {}) {
   // In edit mode, admin handles template merging - pass blocks through as-is.
   // Templates option is only needed for view-mode expansion, so the check
   // for it runs after this early return.
-  const editMode = _isEditMode();
+  // A server-rendered frontend (Astro/Nuxt render API) has no window.name, so _isEditMode() can't
+  // see the edit iframe — it signals edit mode explicitly instead. Fall back to the window-based
+  // detector when no override is given (the browser edit iframe + view render).
+  const editMode = editModeOverride !== undefined ? editModeOverride : _isEditMode();
   if (editMode) {
     return (inputItems || []).map(item => {
       if (typeof item === 'string') {

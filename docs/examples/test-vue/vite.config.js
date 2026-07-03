@@ -47,6 +47,9 @@ function vueExamplesPlugin() {
       if (code.includes('expandListingBlocks') && !code.includes('expandListingBlocks =')) {
         neededImports.push(`const expandListingBlocks = (...a) => window.expandListingBlocks(...a);`);
       }
+      if (code.includes('expandTemplatesSync') && !code.includes('expandTemplatesSync =')) {
+        neededImports.push(`const expandTemplatesSync = (...a) => window.expandTemplatesSync(...a);`);
+      }
       if (code.includes('ploneFetchItems') && !code.includes('ploneFetchItems =')) {
         neededImports.push(`const ploneFetchItems = (...a) => window.ploneFetchItems(...a);`);
       }

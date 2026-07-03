@@ -33,8 +33,11 @@ export const POST: APIRoute = async ({ request }) => {
   const container = await AstroContainer.create();
 
   if (unit.unit === 'page') {
+    // Every render through this endpoint is bridge-triggered = edit mode. SSR has no window.name,
+    // so we signal edit mode explicitly; blocks pass it to expandTemplatesSync (pass-through +
+    // @uid), which would otherwise try to expand and throw for want of pre-loaded templates.
     const html = await container.renderToString(Content as any, {
-      props: { formData },
+      props: { formData, editMode: true },
     });
     return new Response(html, {
       status: 200,
@@ -53,7 +56,7 @@ export const POST: APIRoute = async ({ request }) => {
     return new Response(`Block not found: ${unit.blockId}`, { status: 404 });
   }
   const html = await container.renderToString(BlockRenderer as any, {
-    props: { block, content: formData },
+    props: { block, content: formData, editMode: true },
   });
   return new Response(html, {
     status: 200,
