@@ -239,7 +239,7 @@ import slateTransforms from '../../utils/slateTransforms';
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, _getContainerChildFieldName } from '../../utils/blockPath';
-import { canContainAll, getChildBlockEntries } from '@volto-hydra/helpers';
+import { canContainAll, getChildBlockEntries, setBlockType } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
@@ -1708,6 +1708,16 @@ const Iframe = (props) => {
       mergedBlocksConfig,
       intl,
     );
+
+    // A typed object_list item carries its type in the typeField, not @type — the same field
+    // getBlockAddability reads (dcd3114). Everything above ran with @type so applyBlockDefaults
+    // / initializeContainerBlock could find the schema; now write the type where it lives (and
+    // drop @type), or a form field's pick would land in @type (which FormBlock ignores) and
+    // field_type would stay 'empty'.
+    const targetTypeField = iframeSyncState.blockPathMap?.[id]?.typeField;
+    if (targetTypeField) {
+      blockData = setBlockType(blockData, blockData['@type'], targetTypeField);
+    }
 
     // Use container-aware mutation for nested blocks
     const newFormData = mutateBlockInContainer(

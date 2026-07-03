@@ -1774,6 +1774,34 @@ export function isBlockReadonly(blockData, templateEditMode) {
 }
 
 /**
+ * A block's type, storage-agnostic. blocks_layout blocks carry it in `@type`; a typed
+ * object_list item carries it in a `typeField` (e.g. `field_type`) and has NO `@type`
+ * (initializeContainerBlock deletes it). This pair is the ONE place that knows both, so
+ * callers never hardcode `@type` for a block that could be either — the recurring
+ * object_list-vs-blocks_layout asymmetry (dcd3114 = read, the mutate path = write).
+ *
+ * @param {Object} blockData
+ * @param {string|null} [typeField] - the object_list item's type field, from pathInfo.typeField
+ * @returns {string|undefined}
+ */
+export function getBlockType(blockData, typeField = null) {
+  return blockData?.['@type'] ?? (typeField ? blockData?.[typeField] : undefined);
+}
+
+/**
+ * Write a block's type to the right place: `@type` for blocks_layout, or the `typeField`
+ * (dropping `@type`) for a typed object_list item. Returns a new object.
+ */
+export function setBlockType(blockData, type, typeField = null) {
+  if (typeField && typeField !== '@type') {
+    const next = { ...blockData, [typeField]: type };
+    delete next['@type'];
+    return next;
+  }
+  return { ...blockData, '@type': type };
+}
+
+/**
  * Check if a block's position is locked (cannot be moved/dragged).
  * This is the shared utility for both admin (toolbar) and hydra.js Bridge.
  *
@@ -1833,12 +1861,9 @@ export function getBlockAddability(blockId, blockPathMap, blockData, templateEdi
     return result;
   }
 
-  // A block's type lives in @type for blocks_layout, but a typed object_list item stores it
-  // in a typeField and DELETES @type (initializeContainerBlock). Detect 'empty' from either —
+  // Detect 'empty' storage-agnostically (blocks_layout @type OR object_list typeField),
   // otherwise the form's typed field (e.g. the E-mail field) is missed and never gets a '+'.
-  const effectiveType =
-    blockData?.['@type'] ?? (pathInfo.typeField ? blockData?.[pathInfo.typeField] : undefined);
-  const isEmptyBlock = effectiveType === 'empty';
+  const isEmptyBlock = getBlockType(blockData, pathInfo.typeField) === 'empty';
 
   // A seeded 'empty' placeholder is ALWAYS replaceable in template edit mode — you're
   // building the template, so its type must be pickable (canReplace → the '+' appears). A
