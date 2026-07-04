@@ -83,7 +83,27 @@ async function globalSetup() {
     fs.writeFileSync(outPath, JSON.stringify(blocks, null, 2));
     console.log(`[SETUP] Wrote ${blocks.length} discovered blocks to ${outPath}`);
 
-    const emptyRegions = buildEmptyRegionCases(blocksConfig, blocks);
+    // The empty-region sweep needs block schemas (allowedBlocks/defaultBlockType)
+    // to know which regions seed an `empty`. block-sanity deliberately runs
+    // schema-less in CI (MOCK_PARENT_URL unset) to skip its strict schema checks,
+    // so fetch schemas JUST for this sweep — from the always-present mock
+    // test-frontend — without turning block-sanity's checks on. Best-effort: on
+    // failure the sweep is simply empty (its tests skip) rather than failing setup.
+    let ecConfig = blocksConfig;
+    if (Object.keys(ecConfig).length === 0) {
+      try {
+        ({ blocksConfig: ecConfig } = await fetchBlocksConfig(
+          `${URLS.testFrontend}/mock-parent.html`,
+          URLS.testFrontend,
+          discoverApi,
+        ));
+        console.log(`[SETUP] Fetched ${Object.keys(ecConfig).length} schemas from the mock frontend for empty-region detection`);
+      } catch (err) {
+        console.warn(`[SETUP] empty-region schema fetch failed (sweep will be empty): ${err}`);
+        ecConfig = {};
+      }
+    }
+    const emptyRegions = buildEmptyRegionCases(ecConfig, blocks);
     const emptyOutPath = path.resolve(__dirname, '../.discovered-empty-regions.json');
     fs.writeFileSync(emptyOutPath, JSON.stringify(emptyRegions, null, 2));
     console.log(`[SETUP] Wrote ${emptyRegions.length} empty-seeding container region(s) to ${emptyOutPath}`);
