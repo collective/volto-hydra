@@ -1174,6 +1174,9 @@ async function renderColumnContent(column, columnId) {
             case 'teaser':
                 html += renderTeaserBlock(block, null);
                 break;
+            case 'form':
+                html += renderFormBlock(block);
+                break;
             default:
                 html += `<p data-unknown-block-type="${block['@type']}">[not implemented]</p>`;
         }

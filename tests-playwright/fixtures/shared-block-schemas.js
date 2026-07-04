@@ -162,7 +162,7 @@ export const sharedBlocksConfig = {
                 items: {
                     title: 'Content',
                     widget: 'blocks_layout',
-                    allowedBlocks: ['slate', 'image'],
+                    allowedBlocks: ['slate', 'image', 'form'],
                     defaultBlockType: 'slate',
                 },
             },
