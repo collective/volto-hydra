@@ -3,7 +3,7 @@
   export let block;
   let current = 0;
   // Expand the slides object_list (keyed by @id). Edit-mode pass-through sets each slide's @uid.
-  $: slides = expandTemplatesSync(slides, { idField: '@id' });
+  $: slides = expandTemplatesSync(block.slides || [], { idField: '@id' });
 </script>
 
 <div data-block-uid={block['@uid']} class="slider-block">
