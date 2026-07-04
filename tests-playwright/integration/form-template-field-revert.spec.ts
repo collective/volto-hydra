@@ -10,7 +10,11 @@ import { AdminUIHelper } from '../helpers/AdminUIHelper';
  * in initializeContainerBlock (seeded children of a template-member container inherit its membership).
  */
 test.describe('forced footer — add column → add form → convert field', () => {
-  test('a field converted inside a freshly-added form/column survives', async ({ page }) => {
+  test('a field converted inside a freshly-added form/column survives', async ({ page }, testInfo) => {
+    // The mock test-frontend renders a form inside a column (renderColumnContent has a 'form'
+    // case); the nuxt frontend doesn't, so `.form-block` never appears there. The bug this guards
+    // (seed-time template membership) is admin-side and is fully exercised on admin-mock.
+    test.skip(testInfo.project.name.includes('nuxt'), 'mock-frontend rendering (form-in-column)');
     const helper = new AdminUIHelper(page);
     const iframe = helper.getIframe();
 
