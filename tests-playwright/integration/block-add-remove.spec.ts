@@ -901,11 +901,19 @@ test.describe('Enter Key to Add/Navigate', () => {
     // Now the block should be empty — backspace again should trigger delete
     await editor.press('Backspace');
 
-    // The original block should be gone, replaced by a new default (slate) block.
-    // Page-level uses the global defaultBlockType ('slate'), not 'empty'.
+    // The delete is an iframe→admin→iframe round-trip. Wait on the POSITIVE condition first — a
+    // NEW default block (a data-block-uid that isn't the deleted one) rendered in main — which is
+    // what actually signals the re-render completed. Without this, the negative assertions below
+    // race the round-trip on slower CI: the deleted uid lingers in the DOM for a frame (the
+    // "[ParentBlocksWidget] Block data undefined for block-1-uuid" log is that stale frame).
+    await expect(
+      iframe.locator(`main [data-block-uid]:not([data-block-uid="${blockId}"])`),
+    ).toBeVisible({ timeout: 15000 });
+
+    // Now the original block is gone (page-level uses defaultBlockType 'slate', not 'empty')...
     await expect(iframe.locator(`[data-block-uid="${blockId}"]`)).not.toBeVisible({ timeout: 5000 });
 
-    // A new block should exist in the main content area (not footer)
+    // ...and main holds exactly the one new default block.
     const mainBlocks = iframe.locator('main [data-block-uid]');
     await expect(mainBlocks).toHaveCount(1, { timeout: 5000 });
   });
