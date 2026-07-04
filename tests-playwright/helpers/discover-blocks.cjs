@@ -57,6 +57,55 @@ function buildAllowedBlocksList(blocksConfig) {
 }
 
 /**
+ * A blocks_layout region seeds an `@type: "empty"` placeholder — rather than a
+ * concrete default/single type — exactly when it has no `defaultBlockType` and
+ * more than one `allowedBlocks`. Mirrors getEmptyBlockType() in
+ * packages/volto-hydra/src/utils/blockPath.js (a 3-line predicate kept in sync
+ * here because that module imports Volto's `config`, which this CJS discovery
+ * can't load). Only these regions need the "renders when empty" sanity check —
+ * default/single-type regions seed a normal block that block-sanity already
+ * exercises.
+ * @returns {Array<{parentType: string, field: string}>}
+ */
+function emptySeedingRegions(blocksConfig) {
+  const out = [];
+  for (const [blockType, blockDef] of Object.entries(blocksConfig || {})) {
+    const props = blockDef?.blockSchema?.properties;
+    if (!props) continue;
+    for (const [fieldName, fieldDef] of Object.entries(props)) {
+      if (fieldDef?.widget !== 'blocks_layout') continue;
+      if (fieldDef?.defaultBlockType) continue; // seeds the default type
+      const allowed = fieldDef?.allowedBlocks;
+      if (!Array.isArray(allowed) || allowed.length <= 1) continue; // seeds the single type
+      out.push({ parentType: blockType, field: fieldName });
+    }
+  }
+  return out;
+}
+
+/**
+ * Pair each empty-seeding region with a real discovered container example so
+ * the sanity test has a page + block to load and strip. Regions whose parent
+ * container has no content example anywhere are skipped (nothing to strip).
+ * @param {Object} blocksConfig
+ * @param {DiscoveredBlock[]} blocks - discoverBlocks() output
+ * @returns {Array<{parentType: string, field: string, pagePath: string, blockId: string}>}
+ */
+function buildEmptyRegionCases(blocksConfig, blocks) {
+  const exampleByType = new Map();
+  for (const b of blocks || []) {
+    if (!exampleByType.has(b.blockType)) exampleByType.set(b.blockType, b);
+  }
+  const cases = [];
+  for (const { parentType, field } of emptySeedingRegions(blocksConfig)) {
+    const example = exampleByType.get(parentType);
+    if (!example) continue;
+    cases.push({ parentType, field, pagePath: example.pagePath, blockId: example.blockId });
+  }
+  return cases;
+}
+
+/**
  * For a parent block's data, return the set of sub-block types present in
  * the given container field. Handles both object_list shape (array of items
  * with field_type/@type) and blocks_layout shape (ids in {items:[]} that
@@ -702,4 +751,4 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   return result;
 }
 
-module.exports = { discoverBlocks, extractBlocks, buildObjectListFieldsMap };
+module.exports = { discoverBlocks, extractBlocks, buildObjectListFieldsMap, buildEmptyRegionCases };

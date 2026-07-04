@@ -10,7 +10,7 @@ import { chromium } from '@playwright/test';
 import { URLS } from './ports';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
-const { discoverBlocks } = require('./helpers/discover-blocks.cjs');
+const { discoverBlocks, buildEmptyRegionCases } = require('./helpers/discover-blocks.cjs');
 
 /**
  * Fetch the frontend's registered blocksConfig by loading mock-parent in a
@@ -82,6 +82,11 @@ async function globalSetup() {
     const outPath = path.resolve(__dirname, '../.discovered-blocks.json');
     fs.writeFileSync(outPath, JSON.stringify(blocks, null, 2));
     console.log(`[SETUP] Wrote ${blocks.length} discovered blocks to ${outPath}`);
+
+    const emptyRegions = buildEmptyRegionCases(blocksConfig, blocks);
+    const emptyOutPath = path.resolve(__dirname, '../.discovered-empty-regions.json');
+    fs.writeFileSync(emptyOutPath, JSON.stringify(emptyRegions, null, 2));
+    console.log(`[SETUP] Wrote ${emptyRegions.length} empty-seeding container region(s) to ${emptyOutPath}`);
   }
 
   // Bridge-only CI jobs don't run Volto — skip the health check
