@@ -573,11 +573,12 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         region, // The container field (region) this block lives in
         blockType, // Block type for uniform lookups (single source of truth)
         _schemaRef: storeSchema(blockSchema), // Deduplicated schema reference
-        allowedSiblingTypes: effectiveAllowedBlocks
-          ? (parentId === PAGE_BLOCK_UID
-            ? effectiveAllowedBlocks.filter(t => defaultPageAllowedBlocks.includes(t))
-            : effectiveAllowedBlocks)
-          : defaultPageAllowedBlocks,
+        // A field's own allowedBlocks is authoritative at every level (same as the object_list
+        // path). We deliberately do NOT intersect page-level fields against a page-wide allowed
+        // set: that set is the UNION of all page regions' allowedBlocks, so it can't express
+        // per-region restrictions (footer vs items may allow different blocks). effectiveAllowedBlocks
+        // already IS the region's field def; the old intersection was a no-op (region ⊆ union).
+        allowedSiblingTypes: effectiveAllowedBlocks || defaultPageAllowedBlocks,
         allowedTemplates: fieldDef.allowedTemplates || null,
         maxSiblings: effectiveMaxLength,
         siblingCount: layout.length, // Total siblings in this container
