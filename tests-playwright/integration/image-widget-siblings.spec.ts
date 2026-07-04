@@ -76,9 +76,15 @@ test.describe('ImageWidget sibling preservation', () => {
     // `footer_blocks` and we can't observe whether the siblings survive.)
     const iframe = helper.getIframe();
     const heading = iframe.locator(`[data-block-uid="${BLOCK_UID}"] [data-edit-text="heading"]`);
+    const originalHeading = (await heading.textContent()) ?? '';
     await heading.click();
     await page.keyboard.press('End');
     await page.keyboard.type(' x');
+    // Wait for the typed edit to round-trip to the admin (block registered dirty) BEFORE the
+    // backspaces + save. The net text change is zero, but that round-trip is what marks the
+    // block dirty; on slower CI the save otherwise races the edit sync and the hero drops out
+    // of the PATCH. Waiting on the observable ' x' guarantees the edit landed.
+    await expect(heading).not.toHaveText(originalHeading);
     await page.keyboard.press('Backspace');
     await page.keyboard.press('Backspace');
     // Heading is now back to its original text — but the block is dirty
