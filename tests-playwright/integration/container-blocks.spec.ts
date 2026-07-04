@@ -1164,18 +1164,22 @@ test.describe('Empty Block Behavior', () => {
     // CSS content property wraps the value in quotes, so we check for '"+"'
     expect(pseudoContent).toBe('"+"');
 
-    // Empty block should NOT have an add button next to it
-    // Empty blocks are meant to be replaced via block chooser, not have blocks added after them
-    // Use direct click since empty blocks don't show a toolbar (clickBlockInIframe expects toolbar)
+    // A seeded 'empty' placeholder can't take a sibling AFTER it, but it CAN be typed in place: it
+    // now shows the '+' add button, which opens the block chooser to pick the empty's type
+    // (hydra.src.js getAddDirection keeps the '+' when canReplace is true; branch commit 9abb4a3 —
+    // "a seeded empty in a no-default multi-allowed container can pick its type"). Use a direct
+    // click since empty blocks don't show a toolbar (clickBlockInIframe expects one).
     await emptyBlock.click();
 
-    // Wait for block chooser to open (empty blocks open chooser on click)
+    // Clicking the empty block opens the chooser to pick its type.
     const blockChooser = page.locator('.block-add-button-menu, .blocks-chooser');
     await expect(blockChooser).toBeVisible({ timeout: 5000 });
 
-    // Verify the add button is NOT visible in the admin UI
+    // The '+' add button IS visible for the empty — the type-in-place affordance. (This test
+    // previously asserted it hidden; 9abb4a3 intentionally changed that so a no-default,
+    // multi-allowed empty isn't stranded with no way to be typed.)
     const addButton = page.locator('.volto-hydra-add-button');
-    await expect(addButton).not.toBeVisible();
+    await expect(addButton).toBeVisible({ timeout: 5000 });
   });
 
   test('clicking empty block opens block chooser', async ({ page }) => {
