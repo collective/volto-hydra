@@ -153,6 +153,8 @@ In your page template, fill title etc. from the content metadata.
 4. In your page, iterate down the `blocks_layout` list and render a `Block` component for each
 5. Rendering Slate — split into a separate component as it's used in many blocks and is also recursive
 
+Give `Block` an `@type: "empty"` case: a container region with no `defaultBlockType` and more than one `allowedBlocks` seeds an `empty` placeholder for the user to type in place, and any custom container renderer must route its children through `Block` so `empty` is handled rather than rejected. See [Empty Blocks](container-blocks.md#empty-blocks).
+
 ## 7. Helper Functions
 
 Several helper functions get reused in many blocks:

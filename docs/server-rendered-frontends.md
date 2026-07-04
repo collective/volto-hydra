@@ -75,6 +75,8 @@ your templating language that puts the `<div data-block-uid={id}>` around
 every block before dispatching to the block's own template. Then block
 authors don't think about it — the wrapper IS the contract.
 
+That dispatch must also handle `@type: "empty"` — the placeholder Hydra seeds into any container region with no `defaultBlockType` and more than one `allowedBlocks` — by rendering an empty, selectable slot (with its `data-block-uid`) rather than erroring. See [Empty Blocks](container-blocks.md#empty-blocks).
+
 ## Worked example: Astro
 
 ```js

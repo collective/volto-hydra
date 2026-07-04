@@ -191,9 +191,38 @@ rows: {
 
 ## Empty Blocks
 
-A container can never be empty. When the last child is deleted, either the `defaultBlockType` is added, or a special block with `@type: "empty"` is inserted. Empty blocks are stripped before saving. Render them as empty space — Hydra puts a '+' button in the middle for the user to replace it.
+A container region can never be truly empty. When its last child is deleted, Hydra fills it back in — but *what* it inserts depends on the region's config:
 
-You can override the look of the '+' button by rendering something inside the empty block and adding `data-block-add="button"` to it.
+- If the region has a **`defaultBlockType`**, that type is added.
+- If the region allows exactly **one** `allowedBlocks` type, that type is added.
+- Only when the region has **no `defaultBlockType` and more than one `allowedBlocks`** is the choice ambiguous — so Hydra inserts a placeholder child with `@type: "empty"` and shows a '+' for the user to pick a type in place.
+
+So the simplest way to never deal with empty placeholders in a region is to give it a `defaultBlockType` (or a single-entry `allowedBlocks`). Otherwise your frontend must render `empty`.
+
+Empty blocks are stripped before saving. Render them as empty space; Hydra puts a '+' button in the middle for the user to pick a real type in place. You can override the look of that '+' by rendering something inside the empty block and adding `data-block-add="button"` to it.
+
+### `empty` is a universal placeholder — renderers must tolerate it
+
+In a no-default, multi-allowed region, `@type: "empty"` can appear in **any** container — including transiently, the moment a child is deleted and before the user picks a replacement. You never list `"empty"` in `allowedBlocks`; it isn't a type you opt into. So every container renderer has to render an `empty` child without erroring.
+
+If your container renders its children by delegating each one to your central block dispatch (the function or component that switches on `@type`), you get this for free — just give that dispatch an `empty` case that renders a selectable placeholder.
+
+The trap is a **custom** container renderer that only expects specific child types — a `contextNavigation` that walks `navItem`/`listing` children, say. Don't hand-roll an allow-list that rejects anything else, or a seeded `empty` will throw and break the whole container. Route non-special children through your central dispatch instead of throwing:
+
+<!-- codeExample: javascript -->
+```javascript
+for (const childId of items) {
+    const child = blocks[childId];
+    if (child['@type'] === 'navItem') { /* nav-specific rendering */ }
+    else if (child['@type'] === 'listing') { /* expand listing */ }
+    else renderBlock(childId, child);   // empty (or anything else) → central dispatch, never throw
+}
+```
+
+Two more things a renderer must survive once the user picks a type for a seeded empty:
+
+- **Re-render on the type change.** The child's `@type` flips from `empty` to the picked type in place (same `data-block-uid`). If your renderer memoises or does its work once (e.g. an async setup), make sure it re-runs when a child's type changes — otherwise it keeps showing the stale `empty`.
+- **Tolerate a freshly-typed child with no data yet.** A just-picked `navItem` has no `href`; a just-picked form field has no value — render a placeholder, don't crash on the missing field.
 
 ## Synchronised Block Types in a Container
 
