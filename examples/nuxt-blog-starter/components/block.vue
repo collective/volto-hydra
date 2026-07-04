@@ -155,7 +155,12 @@
        inline (no recursive Block render for navItems). Wrapped in
        <Suspense> because expandListingBlocks fetches asynchronously. -->
   <Suspense v-else-if="block['@type'] == 'contextNavigation'">
+    <!-- Key on child ids+types so the async setup re-runs when children change structurally
+         (e.g. a seeded 'empty' is typed into a navItem in place). Without this the async
+         setup's one-time result goes stale and the nav keeps showing the old children.
+         ariaLabel/href edits stay reactive via props, so they don't force a re-mount. -->
     <ContextNavigationBlock :block-id="block_uid"
+                            :key="(block.blocks_layout?.items || []).map((id) => (block.blocks?.[id]?.['@type'] || '?') + id).join('|')"
                             :block="block"
                             :api-url="effectiveApiUrl"
                             :context-path="effectiveContextPath" />
@@ -615,7 +620,7 @@
   </div>
 
   <!-- Form block: renders subblocks as form fields, POSTs to /@submit-form -->
-  <div v-else-if="block['@type'] == 'form'" :data-block-uid="block_uid" class="my-6">
+  <div v-else-if="block['@type'] == 'form'" :data-block-uid="block_uid" class="form-block my-6">
     <h3 v-if="block.title" data-edit-text="title" class="text-xl font-semibold mb-4">{{ block.title }}</h3>
     <div v-if="formState[block_uid]?.success" class="form-success p-4 bg-green-50 text-green-800 rounded-lg mb-4">
       {{ block.send_message || 'Form submitted successfully.' }}
