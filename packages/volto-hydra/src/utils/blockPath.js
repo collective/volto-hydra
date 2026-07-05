@@ -1609,26 +1609,24 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
   if (isObjectList) {
     const idField = containerConfig.idField || 'key';
     const typeFieldName = containerConfig.typeField || null;
-    let blockData = { [idField]: newBlockId };
+    const childType = getEmptyBlockType(containerConfig);
 
-    // @type set temporarily so applyBlockDefaults/initializeContainerBlock can resolve the
-    // schema; the type is moved into the typeField below (shared setBlockType).
-    if (typeFieldName && containerConfig.defaultBlockType) {
-      blockData['@type'] = getEmptyBlockType(containerConfig);
-    }
+    // Seed through the SAME shared path as initializeContainerBlock and the blocks_layout
+    // branch below (seedTemplateChild): applyBlockDefaults for typed items, the field's item
+    // schema for single-schema items, plus initialValue, template membership, and nested-
+    // container init. This branch used to inline a bare { [idField] } and apply NONE of that,
+    // so a re-seeded object_list item silently lost its type's defaults (the blocks_layout
+    // branch already applied them — the divergence this collapses).
+    let blockData = seedTemplateChild(
+      { [idField]: newBlockId, '@type': childType }, childType, newBlockId, parentBlock,
+      blocksConfig, uuidGenerator,
+      { intl, metadata, properties, itemSchema: typeFieldName ? null : containerConfig.itemSchema },
+    );
+    // Typed object_list stores the type in its typeField; single-schema items store no type.
+    blockData = typeFieldName
+      ? setBlockType(blockData, childType, typeFieldName)
+      : clearBlockType(blockData);
 
-    // Initialize nested containers
-    if (intl && blocksConfig && containerConfig.defaultBlockType) {
-      const emptyBlockType = getEmptyBlockType(containerConfig);
-      blockData = initializeContainerBlock(blockData, blocksConfig, uuidGenerator, { intl, metadata, properties, blockType: emptyBlockType });
-    }
-
-    // Typed object_list: move the type from the temp @type into the typeField.
-    if (typeFieldName && blockData['@type']) {
-      blockData = setBlockType(blockData, blockData['@type'], typeFieldName);
-    }
-
-    blockData = inheritTemplateMembership(blockData, parentBlock, { inheritFixed: !!parentBlock?.templateInstanceId });
     const updatedParentBlock = setContainerItems(parentBlock, containerConfig, [blockData]);
     return setBlockByPath(formData, parentPath, updatedParentBlock);
   }
@@ -1642,6 +1640,10 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
     blockData = applyBlockInitialValue(blockData, blocksConfig, intl);
   }
 
+  // NOTE: deliberately WITHOUT inheritFixed, unlike the object_list branch (via
+  // seedTemplateChild). This asymmetry is load-bearing: making a blocks_layout seed inherit
+  // fixed/readOnly breaks editing a template directly (blocks become non-selectable) — see
+  // template-edit-mode "a template page loads + edits like a normal page". So it stays.
   blockData = inheritTemplateMembership(blockData, parentBlock);
   const blocksObj = { ...parentBlock.blocks, [newBlockId]: blockData };
   const updatedParentBlock = setContainerItems(parentBlock, containerConfig, [newBlockId], blocksObj);

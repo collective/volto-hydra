@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { initializeContainerBlock } from './blockPath';
+import { initializeContainerBlock, ensureEmptyBlockIfEmpty } from './blockPath';
 
 /**
  * An object_list container's seeded child type must use the SAME decision as a blocks_layout
@@ -59,5 +59,45 @@ describe('initializeContainerBlock — object_list seed type mirrors getEmptyBlo
     const result = initializeContainerBlock(withDefault, {}, uuid, { intl, blockType: 'codeExample' }, schema);
     expect(result.tabs).toHaveLength(1);
     expect(result.tabs[0].label).toBe('JavaScript');
+  });
+});
+
+/**
+ * ensureEmptyBlockIfEmpty seeds a placeholder when a container region empties. Its
+ * blocks_layout branch runs applyBlockDefaults + applyBlockInitialValue; its object_list
+ * branch used to inline a bare seed and apply NEITHER — so a re-seeded typed object_list item
+ * (form field, slide, panel) silently lost its block type's defaults. This pins both seed
+ * sites to the same shared path (seedTemplateChild), same divergence class as the
+ * initializeContainerBlock field-default bug.
+ */
+describe('ensureEmptyBlockIfEmpty — object_list seed applies item defaults (parity with blocks_layout)', () => {
+  let c = 0;
+  const uuid = () => `u-${++c}`;
+  const intl = { formatMessage: (m) => m?.defaultMessage || m?.id || '' };
+
+  test('typed object_list seeds the default item type WITH its schema defaults', () => {
+    const formData = {
+      blocks: { 'parent-1': { '@type': 'container', rows: [] } },
+      blocks_layout: { items: ['parent-1'] },
+    };
+    const blocksConfig = {
+      thing: { id: 'thing', blockSchema: { properties: { color: { default: 'red' } } } },
+    };
+    const blockPathMap = { 'parent-1': { path: ['blocks', 'parent-1'] } };
+    const containerConfig = {
+      parentId: 'parent-1',
+      region: 'rows',
+      isObjectList: true,
+      idField: '@id',
+      typeField: '@type',
+      defaultBlockType: 'thing',
+    };
+
+    const result = ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap, uuid, blocksConfig, { intl });
+    const seeded = result.blocks['parent-1'].rows[0];
+    expect(seeded).toBeTruthy();
+    expect(seeded['@type']).toBe('thing');
+    // The item type's scalar default must be applied — as it already is for blocks_layout.
+    expect(seeded.color).toBe('red');
   });
 });
