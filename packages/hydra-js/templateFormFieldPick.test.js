@@ -2,13 +2,18 @@ import { buildBlockPathMap } from './buildBlockPathMap.js';
 
 /**
  * Template-context bug: picking a type for a seeded empty form field leaves it empty — but ONLY
- * inside a forced template (the normal-page e2e is green). There is no per-edit forward re-merge
- * in View.jsx, so the reset isn't a re-merge. onMutateBlock writes the picked type via setBlockType
- * only when blockPathMap[id].typeField is set; otherwise it writes @type, which the form ignores,
- * so field_type stays 'empty'. This pins the one uncovered axis: does a form field NESTED IN A
- * TEMPLATE INSTANCE still carry its typeField in the path map?
+ * when the form is nested inside container blocks of a forced template (a real footer:
+ * columns → column → form). onMutateBlock writes the picked type via setBlockType only when
+ * blockPathMap[id].typeField is set; otherwise it writes @type, which the form ignores, so
+ * field_type stays 'empty'.
+ *
+ * The ORIGINAL version of this test put the form at the PAGE TOP LEVEL (blocks_layout.items:
+ * ['form-1']) and only toggled templateInstanceId/fixed — so it passed and never reproduced the
+ * bug. The real uncovered axis is CONTAINER NESTING: buildBlockPathMap does not descend into a
+ * nested block's object_list (subblocks) when the block is reached through blocks_layout regions
+ * (columns → column), so the deeply-nested field never lands in the path map and gets no typeField.
  */
-describe('template-instance form field keeps its typeField in the blockPathMap', () => {
+describe('form field keeps its typeField in the blockPathMap — nested + top-level', () => {
   const blocksConfig = {
     form: {
       id: 'form',
@@ -23,31 +28,67 @@ describe('template-instance form field keeps its typeField in the blockPathMap',
         },
       },
     },
-  };
-  const page = (formExtra, fieldExtra) => ({
-    '@type': 'Document',
-    blocks: {
-      'form-1': {
-        '@type': 'form',
-        ...formExtra,
-        subblocks: [{ field_id: 'fld-1', field_type: 'empty', ...fieldExtra }],
-      },
+    columns: {
+      id: 'columns',
+      blockSchema: { properties: { columns: { widget: 'blocks_layout', allowedBlocks: ['column'] } } },
     },
+    column: {
+      id: 'column',
+      blockSchema: { properties: { items: { widget: 'blocks_layout', allowedBlocks: ['slate', 'form'] } } },
+    },
+  };
+
+  const formBlock = (formExtra, fieldExtra) => ({
+    '@type': 'form',
+    ...formExtra,
+    subblocks: [{ field_id: 'fld-1', field_type: 'empty', ...fieldExtra }],
+  });
+
+  // form as a top-level page block (the shape the original test covered)
+  const topLevelPage = (formExtra, fieldExtra) => ({
+    '@type': 'Document',
+    blocks: { 'form-1': formBlock(formExtra, fieldExtra) },
     blocks_layout: { items: ['form-1'] },
   });
 
-  test('control: a normal form field gets typeField (this is the case the e2e proves works)', () => {
-    expect(buildBlockPathMap(page({}, {}), blocksConfig)['fld-1']?.typeField).toBe('field_type');
+  // form nested inside columns → column (the REAL forced-footer shape)
+  const nestedPage = (formExtra, fieldExtra) => ({
+    '@type': 'Document',
+    blocks: {
+      'cols-1': {
+        '@type': 'columns',
+        blocks: {
+          'col-1': {
+            '@type': 'column',
+            blocks: { 'form-1': formBlock(formExtra, fieldExtra) },
+            blocks_layout: { items: ['form-1'] },
+          },
+        },
+        blocks_layout: { columns: ['col-1'] },
+      },
+    },
+    blocks_layout: { items: ['cols-1'] },
   });
 
-  test('a form field inside a template instance ALSO gets typeField (else the pick writes @type, not field_type)', () => {
-    const map = buildBlockPathMap(
-      page(
-        { templateInstanceId: 'inst-1', templateId: '/templates/x', slotId: 'form-1', fixed: true },
-        { templateInstanceId: 'inst-1', fixed: true },
-      ),
-      blocksConfig,
-    );
-    expect(map['fld-1']?.typeField).toBe('field_type');
+  const tmpl = [
+    { templateInstanceId: 'inst-1', templateId: '/templates/footer', slotId: 'form-1', fixed: true },
+    { templateInstanceId: 'inst-1', fixed: true },
+  ];
+
+  test('control: a top-level form field gets typeField (this case already worked)', () => {
+    expect(buildBlockPathMap(topLevelPage({}, {}), blocksConfig)['fld-1']?.typeField).toBe('field_type');
+  });
+
+  test('control: a top-level form field in a template instance gets typeField (also already worked)', () => {
+    expect(buildBlockPathMap(topLevelPage(...tmpl), blocksConfig)['fld-1']?.typeField).toBe('field_type');
+  });
+
+  // THE REAL REPRODUCTION: form nested in columns → column of a forced template.
+  test('a form field nested in columns → column (real footer) gets typeField', () => {
+    expect(buildBlockPathMap(nestedPage(...tmpl), blocksConfig)['fld-1']?.typeField).toBe('field_type');
+  });
+
+  test('a form field nested in a plain (non-template) columns → column also gets typeField', () => {
+    expect(buildBlockPathMap(nestedPage({}, {}), blocksConfig)['fld-1']?.typeField).toBe('field_type');
   });
 });

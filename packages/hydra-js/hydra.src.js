@@ -4337,6 +4337,15 @@ export class Bridge {
           if (isInPopup) return;
 
           e.preventDefault();
+          // Also stop propagation so this editor key (escape-to-parent) does not
+          // reach the FRONTEND's own window/document keydown handlers. Otherwise an
+          // app-level ESC shortcut — e.g. a slide-out menu that closes on ESC —
+          // fires too, dismissing UI mid-edit. The blocker is capture-phase, so
+          // this halts the event before it bubbles to the page's listeners. Safe
+          // here: this branch only runs with a block selected (the no-block / popup
+          // / slash cases already returned). Matches the block-mode / blocked
+          // branches which already stopPropagation.
+          e.stopPropagation();
           if (activeEditField) {
             // Text mode → Block mode
             log('Escape key - entering block mode from text editing:', this.selectedBlockUid);
