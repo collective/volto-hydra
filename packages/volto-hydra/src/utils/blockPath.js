@@ -1691,6 +1691,18 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
       continue;
     }
 
+    // Respect an already-populated container field — object_list OR blocks_layout — e.g. a
+    // field-level `default` applied by applyBlockDefaults (the codeExample block's `tabs`
+    // defaults to one JavaScript tab). Both seed branches below overwrite unconditionally, so
+    // this ONE guard (not per-branch) leaves a populated field alone. Storage shapes differ:
+    // object_list stores an item array; blocks_layout stores { items: [ids] }.
+    if (fieldDef.widget === 'object_list' || fieldDef.widget === 'blocks_layout') {
+      const existing = fieldDef.widget === 'object_list' ? result[fieldName] : result[fieldName]?.items;
+      if (Array.isArray(existing) && existing.length > 0) {
+        continue;
+      }
+    }
+
     // Handle object_list containers (like cells in a row)
     if (fieldDef.widget === 'object_list') {
       const idField = fieldDef.idField || '@id';

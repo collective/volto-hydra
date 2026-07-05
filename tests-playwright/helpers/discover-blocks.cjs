@@ -420,6 +420,26 @@ function collectWidgetShapeIssues(blockData, blockSchema, pagePath, blockId, out
       // object — tolerate that. Just check it's not a primitive.
       if (typeof value !== 'object' || value === null) {
         issues.push(describe('object_list array/object', value));
+      } else if (Array.isArray(value) && Array.isArray(def.default) && def.default.length) {
+        // The field declares a `default` (e.g. codeExample.tabs → one JavaScript
+        // tab). A content item carrying only its idField dropped every field the
+        // default supplies — the signature of a seed that clobbered the schema
+        // default with a blank item (initializeContainerBlock used to overwrite
+        // the already-applied default). Missing optional fields are otherwise
+        // skipped above, so this default-aware check is what catches it.
+        const idField = def.idField || '@id';
+        const defaultFields = Object.keys(def.default[0] || {}).filter((k) => k !== idField);
+        if (defaultFields.length) {
+          for (const item of value) {
+            if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+            if (Object.keys(item).filter((k) => k !== idField).length === 0) {
+              issues.push(
+                `field "${field}": item ${JSON.stringify(item[idField])} has only its id — the ` +
+                  `schema default supplies ${JSON.stringify(defaultFields)}, so a bare item means the default was lost`,
+              );
+            }
+          }
+        }
       }
     } else if (widget === 'blocks_layout') {
       // blocks_layout field holds `{items: [...]}` pointing at sibling

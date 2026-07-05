@@ -38,4 +38,26 @@ describe('initializeContainerBlock — object_list seed type mirrors getEmptyBlo
     const result = initializeContainerBlock({ '@type': 'form' }, {}, uuid, { intl, blockType: 'form' }, schema);
     expect(result.subblocks[0].field_type).toBe('textarea');
   });
+
+  // A real object_list field can carry a field-level `default` (an array of items) — e.g. the
+  // codeExample block's `tabs` field defaults to one JavaScript tab. applyBlockDefaults
+  // populates the field with that default; the container initializer must then leave a
+  // populated field alone rather than replacing it with a single blank item.
+  test('object_list field default is preserved, not replaced by a blank seed', () => {
+    const schema = {
+      properties: {
+        tabs: {
+          widget: 'object_list',
+          idField: '@id',
+          schema: { properties: { label: { type: 'string' }, language: { widget: 'select' } } },
+          default: [{ '@id': 'tab-1', label: 'JavaScript', language: 'javascript', code: '' }],
+        },
+      },
+    };
+    // applyBlockDefaults has already applied the field default:
+    const withDefault = { '@type': 'codeExample', tabs: [{ '@id': 'tab-1', label: 'JavaScript', language: 'javascript', code: '' }] };
+    const result = initializeContainerBlock(withDefault, {}, uuid, { intl, blockType: 'codeExample' }, schema);
+    expect(result.tabs).toHaveLength(1);
+    expect(result.tabs[0].label).toBe('JavaScript');
+  });
 });
