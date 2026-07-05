@@ -5272,7 +5272,32 @@ const Iframe = (props) => {
             return;
           }
 
-          // Entering template edit mode
+          // Entering template edit mode — invalidate the cached template and
+          // re-fetch it fresh. templateCacheRef persists across page navigations
+          // (a useRef that's never reset), so without this we'd edit + save a
+          // stale copy left over from another page. It also guarantees the
+          // template is IN the cache: the reverse-merge (on exit) and the save
+          // are both gated on `templateCacheRef.current[id]` being present, so a
+          // forced/snippet template that wasn't cache-loaded here would otherwise
+          // be silently skipped and never persisted.
+          {
+            const enterFormData = iframeSyncState.formData;
+            let editTemplateId = null;
+            for (const block of Object.values(enterFormData?.blocks || {})) {
+              if (block.templateInstanceId === instanceId && block.templateId) {
+                editTemplateId = block.templateId;
+                break;
+              }
+            }
+            if (editTemplateId) {
+              try {
+                templateCacheRef.current[editTemplateId] = await new Api().get(editTemplateId);
+              } catch {
+                // Re-fetch failed (offline / 404) — keep whatever's cached rather
+                // than dropping it, so the save still has something to persist.
+              }
+            }
+          }
           setIframeSyncState(prev => ({
             ...prev,
             templateEditMode: instanceId,

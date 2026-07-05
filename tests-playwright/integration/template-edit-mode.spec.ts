@@ -252,6 +252,140 @@ test.describe('Template Creation', () => {
   });
 });
 
+test.describe('Template Edit Mode - Save', () => {
+  // TDD reproducer: entering template edit mode and saving the page WITHOUT
+  // making any edits should still persist the template (a PATCH/POST to the
+  // template document, not just the page).
+  test('saving in template edit mode without editing still saves the template', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Capture every content-shaped write (PATCH updates a template, POST creates
+    // one); body carries blocks_layout for a template/page write.
+    const writes: Array<{ method: string; url: string }> = [];
+    page.on('request', (req) => {
+      const m = req.method();
+      if (m !== 'PATCH' && m !== 'POST') return;
+      if (!req.url().startsWith(URLS.mockApi)) return;
+      let body: any = null;
+      try { body = req.postDataJSON(); } catch { /* not JSON */ }
+      if (!body || !body.blocks_layout) return;
+      writes.push({ method: m, url: req.url() });
+    });
+
+    // Select the template instance and enter template edit mode.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    const editTemplateToggle = page.locator('.edit-template-toggle');
+    await expect(editTemplateToggle).toBeVisible();
+    await editTemplateToggle.click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1); // edit mode active
+
+    // Save WITHOUT editing anything.
+    await helper.saveContent();
+
+    // A write whose URL is NOT the page itself = the template document being saved.
+    const pageEnds = (u: string) => u.replace(/\/$/, '').endsWith('/template-test-page');
+    const templateWrites = writes.filter((w) => !pageEnds(w.url));
+    expect(
+      templateWrites.length,
+      `expected the template document to be saved when saving in edit mode; observed: ${JSON.stringify(writes)}`,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  // TDD: templateCacheRef (View.jsx:995) is a useRef that's never reset — it
+  // leaks across page navigations, so a template cached while editing is reused
+  // verbatim instead of re-fetched. Entering template edit mode must invalidate
+  // that cache (re-fetch the template) so edits + the save operate on the current
+  // backend copy, and other pages sharing the template load the fresh copy.
+  test('entering template edit mode re-fetches the template (invalidates the cache)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Wait for the initial load (template fetched + cached) to settle.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+
+    // From here, count GETs that fetch the shared template document.
+    const templateGets: string[] = [];
+    page.on('request', (req) => {
+      if (req.method() !== 'GET') return;
+      const u = req.url();
+      if (u.startsWith(URLS.mockApi) && /test-layout/.test(u)) templateGets.push(u);
+    });
+
+    // Enter template edit mode.
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    const editTemplateToggle = page.locator('.edit-template-toggle');
+    await expect(editTemplateToggle).toBeVisible();
+    await editTemplateToggle.click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1); // edit mode active
+
+    // Entering edit mode must invalidate the cache and re-fetch the template.
+    await expect
+      .poll(() => templateGets.length, {
+        message: 'entering template edit mode should invalidate the cache and re-fetch the template',
+        timeout: 5000,
+      })
+      .toBeGreaterThanOrEqual(1);
+  });
+
+  // End-to-end guard for the real symptom: without invalidating the cache on
+  // entry, saving in edit mode writes the STALE page-load copy back to the
+  // backend — clobbering whatever the template had become since (another page's
+  // save, a concurrent edit). Here we simulate the backend template having
+  // changed after page-load; the fix must re-fetch it on entry so the save
+  // persists the fresh copy, not the stale one.
+  test('saving in edit mode persists the re-fetched template, not a stale cached copy', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+    // Initial load fetches + caches the template (the copy that would go stale).
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+
+    const MARKER = 'FRESH-BACKEND-COPY';
+    // From now, any GET of the template returns a marked copy — i.e. the backend
+    // moved on after page-load. (Set up AFTER the initial load so only the
+    // edit-mode re-fetch sees it.) PATCH/etc. pass through untouched.
+    await page.route(/test-layout/, async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      const resp = await route.fetch();
+      const json = await resp.json();
+      const firstId = json.blocks_layout?.items?.[0];
+      if (firstId && json.blocks?.[firstId]) {
+        json.blocks[firstId] = { ...json.blocks[firstId], value: [{ type: 'p', children: [{ text: MARKER }] }] };
+      }
+      await route.fulfill({ response: resp, json });
+    });
+
+    // Capture the template's save body (the template PATCH, not the page PATCH).
+    const templatePatchBodies: string[] = [];
+    page.on('request', (req) => {
+      if (req.method() !== 'PATCH' || !/test-layout/.test(req.url())) return;
+      try { templatePatchBodies.push(JSON.stringify(req.postDataJSON())); } catch { /* not JSON */ }
+    });
+
+    // Enter edit mode (must re-fetch the marked copy) + save without editing.
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    await expect(page.locator('.edit-template-toggle')).toBeVisible();
+    await page.locator('.edit-template-toggle').click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1); // edit mode active
+    await helper.saveContent();
+
+    expect(
+      templatePatchBodies.join('\n'),
+      'the save must persist the freshly re-fetched template (marker present), not the stale page-load cache',
+    ).toContain(MARKER);
+  });
+});
+
 test.describe('Template Edit Mode - Editability', () => {
   test('fixed readonly blocks inside template become editable in edit mode', async ({ page }) => {
     const helper = new AdminUIHelper(page);
