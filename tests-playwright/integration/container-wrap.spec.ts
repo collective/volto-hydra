@@ -97,19 +97,26 @@ test.describe('Container UX: Wrap', () => {
         );
     await expect.poll(parentOfB2, { timeout: 5000 }).not.toBeNull();
     const sliderUid = await parentOfB2();
-    // The slider rendered its slides (object_list) as a carousel.
+    // BOTH wrapped images are now slides of that same slider (object_list children), nested
+    // under its data-block-uid. Asserted structurally (not via a frontend-specific carousel
+    // class) so it holds on the mock AND the real Nuxt renderer.
     await expect(
-      iframe.locator(`[data-block-uid="${sliderUid}"] .carousel-container`),
-    ).toBeAttached();
+      iframe.locator(
+        `[data-block-uid="${sliderUid}"] [data-block-uid="block-5-linked-image"]`,
+      ),
+    ).toBeAttached({ timeout: 5000 });
 
     // The wrap auto-selected the new slider, so its quanta toolbar is already up. Open the
     // menu → unwrap; the slides return to the page.
     const unwrapMenu = page.locator('.quanta-toolbar .volto-hydra-menu-trigger');
     await expect(unwrapMenu).toBeVisible({ timeout: 5000 });
-    await unwrapMenu.click();
+    // Dispatch the click via JS (same technique as selectBlockType): the Nuxt slider is
+    // async-setup and re-renders on its `:key`, so the admin toolbar that tracks its rect can
+    // jitter enough that Playwright's actionability click never settles.
+    await unwrapMenu.evaluate((el) => (el as HTMLElement).click());
     const unwrapButton = page.locator('[data-testid="unwrap-container"]');
     await expect(unwrapButton).toBeVisible({ timeout: 3000 });
-    await unwrapButton.click();
+    await unwrapButton.evaluate((el) => (el as HTMLElement).click());
 
     // Slider gone; the image is back at page level.
     await expect(
