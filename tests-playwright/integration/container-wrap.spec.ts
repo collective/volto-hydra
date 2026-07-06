@@ -56,4 +56,75 @@ test.describe('Container UX: Wrap', () => {
       iframe.locator(`[data-block-uid="${newParentUid}"] .section-body`),
     ).toBeVisible();
   });
+
+  // End-to-end guard for the object_list-CHILD dimension: wrap page blocks INTO a slider (whose
+  // child field is the object_list `slides`, not blocks_layout), then unwrap it back. Exercises
+  // the descriptor/funnel path + the region-aware wrap-eligibility and unwrap UI gates.
+  test('Wrap two page slates into a slider (object_list child), then unwrap back', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/section-test-page');
+    const iframe = helper.getIframe();
+
+    // Multi-select two adjacent page-level slates (the slider now accepts slate slides).
+    await helper.clickBlockInIframe('slate-before');
+    await helper.waitForIframeBlockHandle('slate-before');
+    await helper.escapeFromEditing();
+    const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+    await iframe
+      .locator('[data-block-uid="slate-after"]')
+      .click({ modifiers: [modifier] });
+    await helper.waitForMultiSelectOutlines(2);
+
+    // Wrap → slider. It's offered because its object_list `slides` region accepts slate.
+    await page.locator('.quanta-toolbar .volto-hydra-menu-trigger').click();
+    const wrapButton = page.locator('[data-testid="wrap-selected"]');
+    await expect(wrapButton).toBeVisible({ timeout: 3000 });
+    await wrapButton.click();
+    await helper.selectBlockType('slider');
+
+    // The slates are now slides of a new slider — their parent is the slider, not the page.
+    await expect(
+      iframe.locator('[data-block-uid="slate-before"]'),
+    ).toBeAttached({ timeout: 5000 });
+    const sliderUid = await iframe
+      .locator('[data-block-uid="slate-before"]')
+      .evaluate((el) =>
+        el.parentElement
+          ?.closest('[data-block-uid]')
+          ?.getAttribute('data-block-uid'),
+      );
+    expect(sliderUid).toBeTruthy();
+    // The slider rendered its slides (object_list) as a carousel.
+    await expect(
+      iframe.locator(`[data-block-uid="${sliderUid}"] .carousel-container`),
+    ).toBeAttached();
+
+    // Unwrap the slider — its slides return to the page.
+    await iframe
+      .locator(`[data-block-uid="${sliderUid}"]`)
+      .first()
+      .evaluate((el) => (window as any).bridge?.selectBlock(el));
+    await helper.waitForIframeBlockHandle(sliderUid);
+    await page.locator('.quanta-toolbar .volto-hydra-menu-trigger').click();
+    const unwrapButton = page.locator('[data-testid="unwrap-container"]');
+    await expect(unwrapButton).toBeVisible({ timeout: 3000 });
+    await unwrapButton.click();
+
+    // Slider gone; the slate is back at page level.
+    await expect(
+      iframe.locator(`[data-block-uid="${sliderUid}"]`),
+    ).toHaveCount(0, { timeout: 5000 });
+    await expect(
+      iframe.locator('[data-block-uid="slate-before"]'),
+    ).toBeAttached();
+    const parentAfter = await iframe
+      .locator('[data-block-uid="slate-before"]')
+      .evaluate((el) =>
+        el.parentElement
+          ?.closest('[data-block-uid]')
+          ?.getAttribute('data-block-uid'),
+      );
+    expect(parentAfter).not.toBe(sliderUid);
+  });
 });

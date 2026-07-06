@@ -310,7 +310,7 @@ export const sharedBlocksConfig = {
                     title: 'Slides',
                     widget: 'object_list',
                     itemTypeField: 'variation',  // sync trigger — names the sibling field
-                    allowedBlocks: ['slide', 'image', 'listing', 'teaser'],
+                    allowedBlocks: ['slide', 'image', 'listing', 'teaser', 'slate'],
                     typeField: '@type',
                     defaultBlockType: 'slide',
                 },
