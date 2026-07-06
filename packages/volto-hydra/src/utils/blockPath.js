@@ -6,15 +6,6 @@
 import { produce } from 'immer';
 import { get } from 'lodash';
 import { applyBlockDefaults } from '@plone/volto/helpers';
-// Block-level initialiser hook (e.g. slate registers one to populate
-// `value: [{type:'p',children:[{text:''}]}]`). Schema-level defaults via
-// applyBlockDefaults don't cover this — initialValue is the per-block escape.
-const applyBlockInitialValue = (blockData, blocksConfig, intl) => {
-  const type = blockData?.['@type'];
-  const fn = type && blocksConfig?.[type]?.initialValue;
-  if (typeof fn !== 'function') return blockData;
-  return fn({ id: undefined, value: blockData, formData: undefined, intl });
-};
 import config from '@plone/volto/registry';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import {
@@ -1631,20 +1622,16 @@ export function ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap,
     return setBlockByPath(formData, parentPath, updatedParentBlock);
   }
 
-  // Standard blocks container
+  // Standard blocks container — seed through the SAME shared seedTemplateChild as the
+  // object_list branch and initializeContainerBlock. inheritFixed:false because this is a
+  // load-time PLACEHOLDER, not an add: a blocks_layout block is edited inline, so inheriting
+  // readOnly would freeze editing a template directly (template-edit-mode "a template page
+  // loads + edits like a normal page"). Add-time seeds (initializeContainerBlock) DO inherit.
   const blockType = getEmptyBlockType(containerConfig);
-  let blockData = { '@type': blockType };
-
-  if (intl && blocksConfig) {
-    blockData = applyBlockDefaults({ data: blockData, intl, metadata, properties }, blocksConfig);
-    blockData = applyBlockInitialValue(blockData, blocksConfig, intl);
-  }
-
-  // NOTE: deliberately WITHOUT inheritFixed, unlike the object_list branch (via
-  // seedTemplateChild). This asymmetry is load-bearing: making a blocks_layout seed inherit
-  // fixed/readOnly breaks editing a template directly (blocks become non-selectable) — see
-  // template-edit-mode "a template page loads + edits like a normal page". So it stays.
-  blockData = inheritTemplateMembership(blockData, parentBlock);
+  const blockData = seedTemplateChild(
+    { '@type': blockType }, blockType, newBlockId, parentBlock,
+    blocksConfig, uuidGenerator, { intl, metadata, properties, inheritFixed: false },
+  );
   const blocksObj = { ...parentBlock.blocks, [newBlockId]: blockData };
   const updatedParentBlock = setContainerItems(parentBlock, containerConfig, [newBlockId], blocksObj);
   return setBlockByPath(formData, parentPath, updatedParentBlock);
@@ -1821,15 +1808,21 @@ export function initializeContainerBlock(blockData, blocksConfig, uuidGenerator,
  * @returns {Object} the fully seeded child
  */
 function seedTemplateChild(childData, childType, childId, container, blocksConfig, uuidGenerator, options) {
-  const { intl, metadata, properties } = options;
+  // inheritFixed defaults to deriving from the container (add-time seeds join fixed content).
+  // A caller may force it off — e.g. ensureEmptyBlockIfEmpty seeding an editable *placeholder*
+  // in a template being edited directly, where inheriting readOnly would freeze inline editing.
+  const { intl, metadata, properties, inheritFixed } = options;
   if (intl) {
     childData = applyBlockDefaults({ data: childData, intl, metadata, properties }, blocksConfig);
   }
   const childConfig = blocksConfig?.[childType];
   if (childConfig?.initialValue) {
-    childData = childConfig.initialValue({ id: childId, value: childData });
+    // Full initialValue signature (id + value + intl). No block's initialValue reads intl
+    // today (verified), so intl here is alignment/future-proofing, not a behaviour change —
+    // but it means every seed path (object_list + blocks_layout) drives initialValue the same.
+    childData = childConfig.initialValue({ id: childId, value: childData, formData: undefined, intl });
   }
-  childData = inheritTemplateMembership(childData, container, { inheritFixed: !!container?.templateInstanceId });
+  childData = inheritTemplateMembership(childData, container, { inheritFixed: inheritFixed ?? !!container?.templateInstanceId });
   return initializeContainerBlock(childData, blocksConfig, uuidGenerator, { ...options, blockType: childType });
 }
 

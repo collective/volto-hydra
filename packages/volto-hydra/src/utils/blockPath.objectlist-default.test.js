@@ -100,4 +100,37 @@ describe('ensureEmptyBlockIfEmpty — object_list seed applies item defaults (pa
     // The item type's scalar default must be applied — as it already is for blocks_layout.
     expect(seeded.color).toBe('red');
   });
+
+  test('blocks_layout PLACEHOLDER seed applies defaults but does NOT inherit fixed (inline-editable)', () => {
+    // Parent is a fixed template instance; its blocks_layout region is empty. The seeded
+    // placeholder must inherit membership (so the merge keeps it) but NOT fixed/readOnly — a
+    // blocks_layout block is edited inline, so freezing it breaks editing a template directly.
+    // Guards the load-bearing add-vs-placeholder asymmetry the unified seedTemplateChild path
+    // preserves via inheritFixed:false.
+    const formData = {
+      blocks: {
+        'inst-1': {
+          '@type': 'section',
+          templateInstanceId: 'tmpl-1',
+          fixed: true,
+          readOnly: true,
+          blocks: {},
+          blocks_layout: { items: [] },
+        },
+      },
+      blocks_layout: { items: ['inst-1'] },
+    };
+    const blocksConfig = { slate: { id: 'slate', blockSchema: { properties: { foo: { default: 'bar' } } } } };
+    const blockPathMap = { 'inst-1': { path: ['blocks', 'inst-1'] } };
+    const containerConfig = { parentId: 'inst-1', region: 'items', isObjectList: false, defaultBlockType: 'slate' };
+
+    const result = ensureEmptyBlockIfEmpty(formData, containerConfig, blockPathMap, uuid, blocksConfig, { intl });
+    const seededId = result.blocks['inst-1'].blocks_layout.items[0];
+    const seeded = result.blocks['inst-1'].blocks[seededId];
+    expect(seeded).toBeTruthy();
+    expect(seeded.templateInstanceId).toBe('tmpl-1'); // membership inherited (merge keeps it)
+    expect(seeded.fixed).toBeFalsy(); // but NOT frozen — stays inline-editable
+    expect(seeded.readOnly).toBeFalsy();
+    expect(seeded.foo).toBe('bar'); // defaults applied via the unified seedTemplateChild path
+  });
 });
