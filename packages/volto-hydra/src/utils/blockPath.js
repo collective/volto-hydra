@@ -24,7 +24,6 @@ import {
   getResolvedSchema,
   buildIdFieldMap,
 } from '../../../hydra-js/buildBlockPathMap.js';
-import { mapLayoutItems } from '../../../hydra-js/containerOps.js';
 
 /**
  * Extract text content from a React element (JSX).
@@ -1001,13 +1000,14 @@ export function unwrapContainer(
       `[HYDRA] unwrapContainer: cannot read block ${containerId}`,
     );
   }
-  // Read the container's children through the funnel via its child-field descriptor, so a
-  // container that stores children in an object_list (a slider's `slides`) unwraps the same as
-  // one that uses blocks_layout (section, columns) — no branch on storage.
-  const childEntries = getChildBlockEntries(
+  // Read the container's children from ALL its regions through the funnel — blocks_layout AND
+  // object_list, schema AND data — so a multi-region or mixed container promotes everything, not
+  // just its default region. No branch on storage; each region carries its own.
+  const childEntries = getBlockChildRegions(
     containerBlock,
-    getChildFieldDescriptor(containerBlock['@type'], blocksConfig, intl) || {},
-  );
+    blocksConfig,
+    intl,
+  ).flatMap((desc) => getChildBlockEntries(containerBlock, desc));
   const childIds = childEntries.map((e) => e.id);
   const childData = Object.fromEntries(
     childEntries.map((e) => [e.id, e.block]),
@@ -1115,54 +1115,48 @@ export function convertContainerBlock(
     );
   }
   const sourceType = sourceBlock['@type'];
-  const sourceField = _getContainerChildFieldName(
-    sourceType,
-    blocksConfig,
-    intl,
-  );
-  const targetField = _getContainerChildFieldName(
+
+  // Regions are per-field, each with its own storage (object_list or blocks_layout) — a
+  // container may mix them. Carry each source region's children through the funnel; the region's
+  // storage lives in its descriptor, so nothing here branches on it. Mapping source region →
+  // target region: prefer the SAME-NAMED target region (preserve `items`/`footer`/… by name,
+  // even regions the target doesn't declare); the PRIMARY region falls back to the target's
+  // first region to cover a rename/re-storage (a blocks_layout `items` → an object_list
+  // `slides`); anything else is preserved as-is with its own descriptor.
+  // Source regions come from the schema AND the data (schema-derived containers hold regions
+  // only in block.blocks_layout); target regions from the schema (a type, no instance yet).
+  const sourceRegions = getBlockChildRegions(sourceBlock, blocksConfig, intl);
+  const targetRegions = getContainerRegionDescriptors(
     targetType,
     blocksConfig,
     intl,
   );
-  // Map the source container's layout (every region) onto the target field via
-  // the shared interface — no direct region/items indexing here.
-  const { [targetField]: targetLayout } = mapLayoutItems(
-    { fieldName: sourceField },
-    { fieldName: targetField },
-    sourceBlock,
-  );
 
-  // Strip ALL known blocks_layout fields from the source so leftover layout
-  // fields (e.g. columns has both `columns` and `top_images`) don't linger on
-  // the converted block. Keep `blocks` and non-layout fields.
-  const sourceSchema = (() => {
-    const cfg = blocksConfig?.[sourceType];
-    if (!cfg?.blockSchema) return null;
-    try {
-      return typeof cfg.blockSchema === 'function'
-        ? cfg.blockSchema({ blocksConfig, intl })
-        : cfg.blockSchema;
-    } catch {
-      return null;
-    }
-  })();
-  const layoutFields = new Set();
-  if (sourceSchema?.properties) {
-    for (const [fn, field] of Object.entries(sourceSchema.properties)) {
-      if (field?.widget === 'blocks_layout') layoutFields.add(fn);
-    }
+  // Strip the source's child storage from the carried-over block (shared blocks dict + every
+  // object_list region field); keep non-container fields. Target storage is rebuilt below.
+  const cleaned = { ...sourceBlock };
+  delete cleaned.blocks;
+  delete cleaned.blocks_layout;
+  for (const r of sourceRegions) if (r.isObjectList) delete cleaned[r.region];
+
+  const newBlock = { ...cleaned, '@type': targetType };
+  const perTargetRegion = new Map();
+  sourceRegions.forEach((sourceRegion, i) => {
+    const targetRegion =
+      targetRegions.find((t) => t.region === sourceRegion.region) ||
+      (i === 0 ? targetRegions[0] : null) ||
+      sourceRegion;
+    const acc = perTargetRegion.get(targetRegion.region) || {
+      descriptor: targetRegion,
+      entries: [],
+    };
+    acc.entries.push(...getChildBlockEntries(sourceBlock, sourceRegion));
+    perTargetRegion.set(targetRegion.region, acc);
+  });
+  for (const { descriptor, entries } of perTargetRegion.values()) {
+    setChildBlockEntries(newBlock, descriptor, entries);
   }
-  layoutFields.add(sourceField); // belt-and-braces
 
-  const cleanedRest = { ...sourceBlock };
-  for (const fn of layoutFields) delete cleanedRest[fn];
-
-  const newBlock = {
-    ...cleanedRest,
-    '@type': targetType,
-    [targetField]: targetLayout,
-  };
   return updateBlockById(formData, blockPathMap, blockId, newBlock);
 }
 
@@ -1171,49 +1165,70 @@ export function convertContainerBlock(
  * Scans the block schema for the first field with widget='blocks_layout'.
  * Falls back to 'blocks_layout' if none is explicitly declared.
  */
-export function _getContainerChildFieldName(/* blockType, blocksConfig, intl */) {
-  // The DATA field holding a blocks container's children is always
-  // 'blocks_layout' — individual blocks fields (items, footer, …) are keys
-  // inside that dict, not separate top-level fields. Callers use this for blocks
-  // containers (wrap/convert/unwrap), not object_list containers.
-  return 'blocks_layout';
-}
-
 /**
- * Resolve a container TYPE's child field as a storage-agnostic descriptor — the ONE
- * storage-aware boundary for wrap/unwrap. Scans the block's schema for the first child field
- * (object_list OR blocks_layout) and returns a descriptor that getChildBlockEntries /
- * setChildBlockEntries understand, so those callers never branch on storage.
+ * ALL child regions of a container type, in schema order — the storage-agnostic unit for every
+ * container op. Storage (object_list vs blocks_layout) is a property of each REGION, not the
+ * container: one container may have some object_list regions and some blocks_layout regions.
+ * So this returns a LIST of per-region descriptors that getChildBlockEntries /
+ * setChildBlockEntries understand; callers iterate regions and never branch on a
+ * container-level storage — there is no such thing.
  *
- *   object_list  → { region, isObjectList: true, idField, typeField, allowedBlocks }
- *   blocks_layout → { region, isObjectList: false, allowedBlocks }  (region = the field name)
- *   leaf (no child field) → null
- *
- * @returns {{region: string, isObjectList: boolean, idField?: string, typeField?: string|null, allowedBlocks?: string[]}|null}
+ *   object_list region  → { region, isObjectList: true, idField, typeField, allowedBlocks }
+ *   blocks_layout region → { region, isObjectList: false, allowedBlocks }  (region = field name)
  */
-export function getChildFieldDescriptor(blockType, blocksConfig, intl) {
+export function getContainerRegionDescriptors(blockType, blocksConfig, intl) {
   const schema = getBlockTypeSchema(blockType, intl, blocksConfig);
+  const regions = [];
   for (const [fieldName, fieldDef] of Object.entries(
     schema?.properties || {},
   )) {
     if (fieldDef?.widget === 'object_list') {
-      return {
+      regions.push({
         region: fieldName,
         isObjectList: true,
         idField: fieldDef.idField || '@id',
         typeField: fieldDef.typeField || null,
         allowedBlocks: fieldDef.allowedBlocks || null,
-      };
-    }
-    if (fieldDef?.widget === 'blocks_layout') {
-      return {
+      });
+    } else if (fieldDef?.widget === 'blocks_layout') {
+      regions.push({
         region: fieldName,
         isObjectList: false,
         allowedBlocks: fieldDef.allowedBlocks || null,
-      };
+      });
     }
   }
-  return null;
+  return regions;
+}
+
+/**
+ * The DEFAULT (first) child region of a container type, or null for a leaf. Used by wrap, which
+ * fills a new container's default region.
+ */
+export function getChildFieldDescriptor(blockType, blocksConfig, intl) {
+  return (
+    getContainerRegionDescriptors(blockType, blocksConfig, intl)[0] || null
+  );
+}
+
+/**
+ * All child regions of a container INSTANCE — schema-declared regions PLUS any blocks_layout
+ * regions present only in the data. A schema-DERIVED container (e.g. a gridBlock built via
+ * inheritSchemaFrom) holds its regions in block.blocks_layout, not as static schema fields, so
+ * enumerating from the schema alone would miss them. Callers that must see EVERY region of an
+ * existing block (unwrap, convert-source, canUnwrap) use this; each region carries its storage.
+ */
+export function getBlockChildRegions(block, blocksConfig, intl) {
+  const schemaRegions = getContainerRegionDescriptors(
+    block?.['@type'],
+    blocksConfig,
+    intl,
+  );
+  const known = new Set(schemaRegions.map((r) => r.region));
+  const dataRegions = Object.keys(block?.blocks_layout || {})
+    .filter((r) => Array.isArray(block.blocks_layout[r]) && !known.has(r))
+    .map((r) => ({ region: r, isObjectList: false }));
+  return [...schemaRegions, ...dataRegions];
 }
 
 /**

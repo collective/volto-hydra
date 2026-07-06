@@ -41,7 +41,9 @@ A block can declare several `blocks_layout` regions; they all share the one `blo
 
 ## Multiple regions
 
-A container (or the page) can declare more than one **region** — each a schema property with `widget: 'blocks_layout'`, with its own `allowedBlocks`. The region name is the key inside the shared `blocks_layout` dict; the default region is `items`. Every region's children still live in the single shared `blocks` dict — the regions only partition *ordering*.
+A container (or the page) can declare more than one **region** — each a schema property with its own `allowedBlocks`. The default region is `items`.
+
+Storage is a property of **each region, not the container**: every region independently chooses `widget: 'blocks_layout'` or `widget: 'object_list'`, and a single container may **mix** them — e.g. a `blocks_layout` region for body content alongside an `object_list` region for a set of inline cards. A blocks_layout region keys its ordering inside the shared `blocks_layout` dict (its children in the shared `blocks` dict); an object_list region stores its items inline on its own field. So "is this container object_list or blocks_layout?" is never a meaningful question — you look at the region. Every blocks_layout region's children still share the one `blocks` dict; the regions only partition *ordering*.
 
 <!-- codeExample: javascript -->
 ```javascript

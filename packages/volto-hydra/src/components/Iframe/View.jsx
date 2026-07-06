@@ -238,7 +238,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, _getContainerChildFieldName, getChildFieldDescriptor } from '../../utils/blockPath';
+import { buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, getChildFieldDescriptor, getBlockChildRegions } from '../../utils/blockPath';
 import { canContainAll, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
@@ -4092,9 +4092,12 @@ const Iframe = (props) => {
         const blockData = getBlockById(properties, bpm, chooser.blockId);
         if (blockData) {
           const blockType = blockData['@type'];
-          const childField = blockType
-            ? _getContainerChildFieldName(blockType, blocksConfig, intl) : null;
-          const hasChildren = childField && (blockData?.[childField]?.items?.length > 0);
+          // Children across ALL regions (blocks_layout + object_list), not just the default.
+          const hasChildren = blockType
+            ? getBlockChildRegions(blockData, blocksConfig, intl).some(
+                (d) => getChildBlockEntries(blockData, d).length > 0,
+              )
+            : false;
           let updatedProperties;
           if (hasChildren) {
             updatedProperties = convertContainerBlock(
@@ -4745,12 +4748,16 @@ const Iframe = (props) => {
               // children, offer it as a target. The existing getConvertibleTypes
               // doesn't cover this because it relies on fieldMappings, which are
               // content-level.
-              const childField = blockType ? _getContainerChildFieldName(blockType, blocksConfig, intl) : null;
-              const childIds = childField ? (blockData?.[childField]?.items || []) : [];
-              if (childIds.length === 0) return contentTargets;
+              // Child types across ALL regions (blocks_layout + object_list), not just default.
+              const childEntries = blockType
+                ? getBlockChildRegions(blockData, blocksConfig, intl).flatMap((d) =>
+                    getChildBlockEntries(blockData, d),
+                  )
+                : [];
+              if (childEntries.length === 0) return contentTargets;
 
-              const childTypes = childIds
-                .map((id) => blockData.blocks?.[id]?.['@type'])
+              const childTypes = childEntries
+                .map((e) => e.block?.['@type'])
                 .filter(Boolean);
               const containerTargets = [];
               const existingTypes = new Set(contentTargets.map(t => t.type));
@@ -4787,13 +4794,16 @@ const Iframe = (props) => {
               const allowedTypes = bpm?.[selectedBlock]?.allowedSiblingTypes;
               const contentTargets = getConvertibleTypes(blockType, blocksConfig, allowedTypes);
 
-              const childField = blockType
-                ? _getContainerChildFieldName(blockType, blocksConfig, intl) : null;
-              const childIds = childField ? (blockData?.[childField]?.items || []) : [];
+              // Child types across ALL regions (blocks_layout + object_list), not just default.
+              const childEntries = blockType
+                ? getBlockChildRegions(blockData, blocksConfig, intl).flatMap((d) =>
+                    getChildBlockEntries(blockData, d),
+                  )
+                : [];
               const containerTargets = [];
-              if (childIds.length > 0) {
-                const childTypes = childIds
-                  .map((id) => blockData.blocks?.[id]?.['@type']).filter(Boolean);
+              if (childEntries.length > 0) {
+                const childTypes = childEntries
+                  .map((e) => e.block?.['@type']).filter(Boolean);
                 const existing = new Set(contentTargets.map(t => t.type));
                 for (const [type, cfg] of Object.entries(blocksConfig || {})) {
                   if (!cfg?.blockSchema || type === blockType || existing.has(type)) continue;
@@ -4873,10 +4883,13 @@ const Iframe = (props) => {
               if (!selectedBlock || !bpm?.[selectedBlock]) return {};
               const block = getBlockById(properties, bpm, selectedBlock);
               if (!block) return {};
-              // Read children via the child-field descriptor + funnel, so a slider (children in
-              // `slides`) is unwrappable the same as a section (blocks_layout children).
-              const childDesc = getChildFieldDescriptor(block['@type'], blocksConfig, intl);
-              const childEntries = childDesc ? getChildBlockEntries(block, childDesc) : [];
+              // Read children from ALL regions + funnel, so a slider (children in `slides`) and a
+              // multi-region/mixed container are unwrappable the same as a section.
+              const childEntries = getBlockChildRegions(
+                block,
+                blocksConfig,
+                intl,
+              ).flatMap((d) => getChildBlockEntries(block, d));
               if (childEntries.length === 0) return {}; // not a container with children
 
               const childTypes = childEntries
