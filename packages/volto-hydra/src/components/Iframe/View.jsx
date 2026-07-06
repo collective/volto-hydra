@@ -238,7 +238,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, getChildFieldDescriptor, getBlockChildRegions } from '../../utils/blockPath';
+import { buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
 import { canContainAll, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
@@ -4094,7 +4094,7 @@ const Iframe = (props) => {
           const blockType = blockData['@type'];
           // Children across ALL regions (blocks_layout + object_list), not just the default.
           const hasChildren = blockType
-            ? getBlockChildRegions(blockData, blocksConfig, intl).some(
+            ? getContainerRegionDescriptors(blockData['@type'], blocksConfig, intl, blockData).some(
                 (d) => getChildBlockEntries(blockData, d).length > 0,
               )
             : false;
@@ -4750,7 +4750,7 @@ const Iframe = (props) => {
               // content-level.
               // Child types across ALL regions (blocks_layout + object_list), not just default.
               const childEntries = blockType
-                ? getBlockChildRegions(blockData, blocksConfig, intl).flatMap((d) =>
+                ? getContainerRegionDescriptors(blockData['@type'], blocksConfig, intl, blockData).flatMap((d) =>
                     getChildBlockEntries(blockData, d),
                   )
                 : [];
@@ -4796,7 +4796,7 @@ const Iframe = (props) => {
 
               // Child types across ALL regions (blocks_layout + object_list), not just default.
               const childEntries = blockType
-                ? getBlockChildRegions(blockData, blocksConfig, intl).flatMap((d) =>
+                ? getContainerRegionDescriptors(blockData['@type'], blocksConfig, intl, blockData).flatMap((d) =>
                     getChildBlockEntries(blockData, d),
                   )
                 : [];
@@ -4860,7 +4860,7 @@ const Iframe = (props) => {
                 // object_list (a slider's `slides`). One descriptor covers both, so a slider is
                 // now offered as a wrap target too.
                 let childField;
-                try { childField = getChildFieldDescriptor(type, blocksConfig, intl); } catch { continue; }
+                try { childField = getContainerRegionDescriptors(type, blocksConfig, intl)[0] || null; } catch { continue; }
                 if (!childField) continue;
                 if (!canContainAll(childField, selectedTypes, 0)) continue;
                 if (!parentAllows(type)) continue;
@@ -4885,10 +4885,11 @@ const Iframe = (props) => {
               if (!block) return {};
               // Read children from ALL regions + funnel, so a slider (children in `slides`) and a
               // multi-region/mixed container are unwrappable the same as a section.
-              const childEntries = getBlockChildRegions(
-                block,
+              const childEntries = getContainerRegionDescriptors(
+                block['@type'],
                 blocksConfig,
                 intl,
+                block,
               ).flatMap((d) => getChildBlockEntries(block, d));
               if (childEntries.length === 0) return {}; // not a container with children
 

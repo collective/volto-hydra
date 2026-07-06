@@ -931,7 +931,7 @@ export function wrapBlocksInContainer(
   const newContainer = { '@type': newContainerType };
   setChildBlockEntries(
     newContainer,
-    getChildFieldDescriptor(newContainerType, blocksConfig, intl),
+    getContainerRegionDescriptors(newContainerType, blocksConfig, intl)[0],
     sortedIds.map((id) => ({ id, block: nestedBlocks[id] })),
   );
 
@@ -1003,10 +1003,11 @@ export function unwrapContainer(
   // Read the container's children from ALL its regions through the funnel — blocks_layout AND
   // object_list, schema AND data — so a multi-region or mixed container promotes everything, not
   // just its default region. No branch on storage; each region carries its own.
-  const childEntries = getBlockChildRegions(
-    containerBlock,
+  const childEntries = getContainerRegionDescriptors(
+    containerBlock['@type'],
     blocksConfig,
     intl,
+    containerBlock,
   ).flatMap((desc) => getChildBlockEntries(containerBlock, desc));
   const childIds = childEntries.map((e) => e.id);
   const childData = Object.fromEntries(
@@ -1125,7 +1126,12 @@ export function convertContainerBlock(
   // `slides`); anything else is preserved as-is with its own descriptor.
   // Source regions come from the schema AND the data (schema-derived containers hold regions
   // only in block.blocks_layout); target regions from the schema (a type, no instance yet).
-  const sourceRegions = getBlockChildRegions(sourceBlock, blocksConfig, intl);
+  const sourceRegions = getContainerRegionDescriptors(
+    sourceType,
+    blocksConfig,
+    intl,
+    sourceBlock,
+  );
   const targetRegions = getContainerRegionDescriptors(
     targetType,
     blocksConfig,
@@ -1161,22 +1167,26 @@ export function convertContainerBlock(
 }
 
 /**
- * Resolve the child field name a container uses for its blocks_layout children.
- * Scans the block schema for the first field with widget='blocks_layout'.
- * Falls back to 'blocks_layout' if none is explicitly declared.
- */
-/**
- * ALL child regions of a container type, in schema order — the storage-agnostic unit for every
+ * ALL child regions of a container, in schema order — the storage-agnostic unit for every
  * container op. Storage (object_list vs blocks_layout) is a property of each REGION, not the
- * container: one container may have some object_list regions and some blocks_layout regions.
- * So this returns a LIST of per-region descriptors that getChildBlockEntries /
- * setChildBlockEntries understand; callers iterate regions and never branch on a
- * container-level storage — there is no such thing.
+ * container: one container may mix object_list and blocks_layout regions. Returns a LIST of
+ * per-region descriptors that getChildBlockEntries / setChildBlockEntries understand; callers
+ * iterate regions and never branch on a container-level storage — there is no such thing.
+ *
+ * Pass `block` (an instance) to ALSO include blocks_layout regions present only in the DATA — a
+ * schema-DERIVED container (e.g. a gridBlock via inheritSchemaFrom) holds its regions in
+ * block.blocks_layout, not as static schema fields. Omit it for a type with no instance yet (a
+ * convert/wrap TARGET). `[0]` is the default region (what wrap fills).
  *
  *   object_list region  → { region, isObjectList: true, idField, typeField, allowedBlocks }
  *   blocks_layout region → { region, isObjectList: false, allowedBlocks }  (region = field name)
  */
-export function getContainerRegionDescriptors(blockType, blocksConfig, intl) {
+export function getContainerRegionDescriptors(
+  blockType,
+  blocksConfig,
+  intl,
+  block = null,
+) {
   const schema = getBlockTypeSchema(blockType, intl, blocksConfig);
   const regions = [];
   for (const [fieldName, fieldDef] of Object.entries(
@@ -1198,37 +1208,16 @@ export function getContainerRegionDescriptors(blockType, blocksConfig, intl) {
       });
     }
   }
+  // Instance-only: blocks_layout regions present in the DATA but not the (unresolved) schema.
+  if (block) {
+    const known = new Set(regions.map((r) => r.region));
+    for (const r of Object.keys(block.blocks_layout || {})) {
+      if (Array.isArray(block.blocks_layout[r]) && !known.has(r)) {
+        regions.push({ region: r, isObjectList: false });
+      }
+    }
+  }
   return regions;
-}
-
-/**
- * The DEFAULT (first) child region of a container type, or null for a leaf. Used by wrap, which
- * fills a new container's default region.
- */
-export function getChildFieldDescriptor(blockType, blocksConfig, intl) {
-  return (
-    getContainerRegionDescriptors(blockType, blocksConfig, intl)[0] || null
-  );
-}
-
-/**
- * All child regions of a container INSTANCE — schema-declared regions PLUS any blocks_layout
- * regions present only in the data. A schema-DERIVED container (e.g. a gridBlock built via
- * inheritSchemaFrom) holds its regions in block.blocks_layout, not as static schema fields, so
- * enumerating from the schema alone would miss them. Callers that must see EVERY region of an
- * existing block (unwrap, convert-source, canUnwrap) use this; each region carries its storage.
- */
-export function getBlockChildRegions(block, blocksConfig, intl) {
-  const schemaRegions = getContainerRegionDescriptors(
-    block?.['@type'],
-    blocksConfig,
-    intl,
-  );
-  const known = new Set(schemaRegions.map((r) => r.region));
-  const dataRegions = Object.keys(block?.blocks_layout || {})
-    .filter((r) => Array.isArray(block.blocks_layout[r]) && !known.has(r))
-    .map((r) => ({ region: r, isObjectList: false }));
-  return [...schemaRegions, ...dataRegions];
 }
 
 /**
