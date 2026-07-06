@@ -781,7 +781,74 @@ export function wrapBlocksInContainer(
   }
 
   if (firstCC.isObjectList) {
-    throw new Error('[HYDRA] wrapBlocksInContainer: object_list parents not yet supported');
+    // A typed object_list is a general child region (like blocks_layout), just stored as an
+    // inline array of block objects. Wrap: the selected items become blocks_layout children of
+    // a new container, which itself becomes a single object_list item in their place. Routed
+    // through the funnel (getContainerItems/setContainerItems), so no branch on storage below.
+    const idField = firstCC.idField || '@id';
+    const typeField = firstCC.typeField || null;
+    // Only a TYPED object_list (has a typeField, so its items can be different types) can hold a
+    // container item. A non-typed single-schema list has one fixed item shape — no slot for a
+    // container — so wrapping there is invalid.
+    if (!typeField) {
+      throw new Error('[HYDRA] wrapBlocksInContainer: single-schema (non-typed) object_list cannot hold a container item');
+    }
+    const targetFieldName = _getContainerChildFieldName(newContainerType, blocksConfig, intl);
+    const parentPath = firstCC.parentId === PAGE_BLOCK_UID ? [] : blockPathMap[firstCC.parentId]?.path;
+    const parentBlock = getBlockByPath(formData, parentPath);
+    if (!parentBlock) {
+      throw new Error(`[HYDRA] wrapBlocksInContainer: missing parent ${firstCC.parentId}`);
+    }
+    const items = getContainerItems(parentBlock, firstCC); // block objects
+    const selectedSet = new Set(selectedIds);
+    const sortedItems = items.filter((it) => selectedSet.has(it[idField]));
+    if (sortedItems.length !== selectedIds.length) {
+      throw new Error('[HYDRA] wrapBlocksInContainer: some selected ids not found in parent layout');
+    }
+
+    // The wrapped items become blocks_layout children of the new container. A blocks_layout
+    // child carries its type in @type, so move it there if the object_list keyed it elsewhere.
+    const nestedBlocks = {};
+    const childIds = [];
+    for (const it of sortedItems) {
+      const cid = it[idField];
+      childIds.push(cid);
+      let child = { ...it };
+      if (typeField && typeField !== '@type') {
+        child = { ...child, '@type': getBlockType(it, typeField) };
+        delete child[typeField];
+      }
+      nestedBlocks[cid] = child;
+    }
+
+    const newContainerId = uuidGen();
+    let newContainer = {
+      [idField]: newContainerId,
+      blocks: nestedBlocks,
+      [targetFieldName]: { items: childIds },
+    };
+    // The new container is itself an object_list item — set its type where the field expects it.
+    if (typeField && typeField !== '@type') {
+      newContainer = setBlockType(newContainer, newContainerType, typeField);
+    } else {
+      newContainer['@type'] = newContainerType;
+    }
+
+    // Splice the container in at the first selected item's position; drop the wrapped items.
+    const newArray = [];
+    let inserted = false;
+    for (const it of items) {
+      if (selectedSet.has(it[idField])) {
+        if (!inserted) {
+          newArray.push(newContainer);
+          inserted = true;
+        }
+      } else {
+        newArray.push(it);
+      }
+    }
+    const updatedParent = setContainerItems(parentBlock, firstCC, newArray);
+    return { formData: setBlockByPath(formData, parentPath, updatedParent), newContainerId };
   }
 
   // Determine the new container's child field name from its schema.
@@ -884,7 +951,45 @@ export function unwrapContainer(
     throw new Error(`[HYDRA] unwrapContainer: no parent config for ${containerId}`);
   }
   if (containerCC.isObjectList) {
-    throw new Error('[HYDRA] unwrapContainer: object_list parents not yet supported');
+    // The container is itself an object_list item; promote its blocks_layout children back into
+    // the parent object_list as items (the inverse of the wrap branch above). Funnel-routed.
+    const idField = containerCC.idField || '@id';
+    const typeField = containerCC.typeField || null;
+    // Mirror the wrap guard: only a typed object_list can have held a container item to unwrap.
+    if (!typeField) {
+      throw new Error('[HYDRA] unwrapContainer: single-schema (non-typed) object_list cannot hold a container item');
+    }
+    const parentPath = containerCC.parentId === PAGE_BLOCK_UID
+      ? [] : blockPathMap[containerCC.parentId]?.path;
+    const parentBlock = getBlockByPath(formData, parentPath);
+    if (!parentBlock) {
+      throw new Error(`[HYDRA] unwrapContainer: cannot find parent ${containerCC.parentId}`);
+    }
+    const items = getContainerItems(parentBlock, containerCC); // block objects
+    const containerIdx = items.findIndex((it) => it[idField] === containerId);
+    if (containerIdx < 0) {
+      throw new Error(`[HYDRA] unwrapContainer: ${containerId} not in parent layout`);
+    }
+
+    // Each blocks_layout child becomes an object_list item: carry the idField and, if the list
+    // keys type in a non-@type field, move @type → that field (dropping @type).
+    const promotedItems = childIds.map((id) => {
+      const item = { ...childData[id], [idField]: id };
+      return typeField && typeField !== '@type'
+        ? setBlockType(item, item['@type'], typeField)
+        : item;
+    });
+
+    const newArray = [
+      ...items.slice(0, containerIdx),
+      ...promotedItems,
+      ...items.slice(containerIdx + 1),
+    ];
+    const updatedParent = setContainerItems(parentBlock, containerCC, newArray);
+    return {
+      formData: setBlockByPath(formData, parentPath, updatedParent),
+      promotedIds: [...childIds],
+    };
   }
 
   const parentPath = containerCC.parentId === PAGE_BLOCK_UID
