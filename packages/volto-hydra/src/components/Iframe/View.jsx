@@ -238,7 +238,7 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, _getContainerChildFieldName } from '../../utils/blockPath';
+import { buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, _getContainerChildFieldName, getChildFieldDescriptor } from '../../utils/blockPath';
 import { canContainAll, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
@@ -4846,15 +4846,11 @@ const Iframe = (props) => {
               const eligibleTypes = [];
               for (const [type, cfg] of Object.entries(blocksConfig || {})) {
                 if (!cfg?.blockSchema) continue;
-                let schema;
-                try {
-                  schema = typeof cfg.blockSchema === 'function'
-                    ? cfg.blockSchema({ blocksConfig, intl }) : cfg.blockSchema;
-                } catch { continue; }
-                let childField = null;
-                for (const [fn, fd] of Object.entries(schema?.properties || {})) {
-                  if (fd?.widget === 'blocks_layout') { childField = { region: fn, ...fd }; break; }
-                }
+                // A container's child field may be blocks_layout (section, columns) OR an
+                // object_list (a slider's `slides`). One descriptor covers both, so a slider is
+                // now offered as a wrap target too.
+                let childField;
+                try { childField = getChildFieldDescriptor(type, blocksConfig, intl); } catch { continue; }
                 if (!childField) continue;
                 if (!canContainAll(childField, selectedTypes, 0)) continue;
                 if (!parentAllows(type)) continue;
@@ -4877,12 +4873,14 @@ const Iframe = (props) => {
               if (!selectedBlock || !bpm?.[selectedBlock]) return {};
               const block = getBlockById(properties, bpm, selectedBlock);
               if (!block) return {};
-              const childField = _getContainerChildFieldName(block['@type'], blocksConfig, intl);
-              const childIds = block?.[childField]?.items || [];
-              if (childIds.length === 0) return {}; // not a container with children
+              // Read children via the child-field descriptor + funnel, so a slider (children in
+              // `slides`) is unwrappable the same as a section (blocks_layout children).
+              const childDesc = getChildFieldDescriptor(block['@type'], blocksConfig, intl);
+              const childEntries = childDesc ? getChildBlockEntries(block, childDesc) : [];
+              if (childEntries.length === 0) return {}; // not a container with children
 
-              const childTypes = childIds
-                .map((id) => block.blocks?.[id]?.['@type'])
+              const childTypes = childEntries
+                .map((e) => e.block?.['@type'])
                 .filter(Boolean);
               const parentCC = getContainerFieldConfig(selectedBlock, bpm, properties, blocksConfig, intl);
               let canUnwrap = false;
