@@ -59,67 +59,67 @@ test.describe('Container UX: Wrap', () => {
 
   // End-to-end guard for the object_list-CHILD dimension: wrap page blocks INTO a slider (whose
   // child field is the object_list `slides`, not blocks_layout), then unwrap it back. Exercises
-  // the descriptor/funnel path + the region-aware wrap-eligibility and unwrap UI gates.
-  test('Wrap two page slates into a slider (object_list child), then unwrap back', async ({ page }) => {
+  // the descriptor/funnel path + the region-aware wrap-eligibility and unwrap UI gates. Uses
+  // real images (already an allowed slide type) — no schema change needed.
+  test('Wrap two page images into a slider (object_list child), then unwrap back', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await helper.navigateToEdit('/section-test-page');
+    await helper.navigateToEdit('/test-page');
     const iframe = helper.getIframe();
 
-    // Multi-select two adjacent page-level slates (the slider now accepts slate slides).
-    await helper.clickBlockInIframe('slate-before');
-    await helper.waitForIframeBlockHandle('slate-before');
-    await helper.escapeFromEditing();
+    // Multi-select two page-level images (valid slider slide type). Images select on click
+    // (no text-editing mode), so no escapeFromEditing — an Escape would deselect the image.
+    await helper.clickBlockInIframe('block-2-uuid');
+    await helper.waitForIframeBlockHandle('block-2-uuid');
     const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
     await iframe
-      .locator('[data-block-uid="slate-after"]')
+      .locator('[data-block-uid="block-5-linked-image"]')
       .click({ modifiers: [modifier] });
     await helper.waitForMultiSelectOutlines(2);
 
-    // Wrap → slider. It's offered because its object_list `slides` region accepts slate.
+    // Wrap → slider. It's offered because its object_list `slides` region accepts image.
     await page.locator('.quanta-toolbar .volto-hydra-menu-trigger').click();
     const wrapButton = page.locator('[data-testid="wrap-selected"]');
     await expect(wrapButton).toBeVisible({ timeout: 3000 });
     await wrapButton.click();
     await helper.selectBlockType('slider');
 
-    // The slates are now slides of a new slider — their parent is the slider, not the page.
-    await expect(
-      iframe.locator('[data-block-uid="slate-before"]'),
-    ).toBeAttached({ timeout: 5000 });
-    const sliderUid = await iframe
-      .locator('[data-block-uid="slate-before"]')
-      .evaluate((el) =>
-        el.parentElement
-          ?.closest('[data-block-uid]')
-          ?.getAttribute('data-block-uid'),
-      );
-    expect(sliderUid).toBeTruthy();
+    // The wrap re-renders asynchronously; block-2 was already a page block, so poll until it
+    // actually has a PARENT block — that parent is the new slider it now lives inside.
+    const parentOfB2 = () =>
+      iframe
+        .locator('[data-block-uid="block-2-uuid"]')
+        .evaluate(
+          (el) =>
+            el.parentElement
+              ?.closest('[data-block-uid]')
+              ?.getAttribute('data-block-uid') || null,
+        );
+    await expect.poll(parentOfB2, { timeout: 5000 }).not.toBeNull();
+    const sliderUid = await parentOfB2();
     // The slider rendered its slides (object_list) as a carousel.
     await expect(
       iframe.locator(`[data-block-uid="${sliderUid}"] .carousel-container`),
     ).toBeAttached();
 
-    // Unwrap the slider — its slides return to the page.
-    await iframe
-      .locator(`[data-block-uid="${sliderUid}"]`)
-      .first()
-      .evaluate((el) => (window as any).bridge?.selectBlock(el));
-    await helper.waitForIframeBlockHandle(sliderUid);
-    await page.locator('.quanta-toolbar .volto-hydra-menu-trigger').click();
+    // The wrap auto-selected the new slider, so its quanta toolbar is already up. Open the
+    // menu → unwrap; the slides return to the page.
+    const unwrapMenu = page.locator('.quanta-toolbar .volto-hydra-menu-trigger');
+    await expect(unwrapMenu).toBeVisible({ timeout: 5000 });
+    await unwrapMenu.click();
     const unwrapButton = page.locator('[data-testid="unwrap-container"]');
     await expect(unwrapButton).toBeVisible({ timeout: 3000 });
     await unwrapButton.click();
 
-    // Slider gone; the slate is back at page level.
+    // Slider gone; the image is back at page level.
     await expect(
       iframe.locator(`[data-block-uid="${sliderUid}"]`),
     ).toHaveCount(0, { timeout: 5000 });
     await expect(
-      iframe.locator('[data-block-uid="slate-before"]'),
+      iframe.locator('[data-block-uid="block-2-uuid"]'),
     ).toBeAttached();
     const parentAfter = await iframe
-      .locator('[data-block-uid="slate-before"]')
+      .locator('[data-block-uid="block-2-uuid"]')
       .evaluate((el) =>
         el.parentElement
           ?.closest('[data-block-uid]')
