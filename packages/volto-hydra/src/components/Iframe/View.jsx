@@ -4886,7 +4886,10 @@ const Iframe = (props) => {
                 .filter(Boolean);
               const parentCC = getContainerFieldConfig(selectedBlock, bpm, properties, blocksConfig, intl);
               let canUnwrap = false;
-              if (parentCC && !parentCC.isObjectList) {
+              // Symmetric with wrap: works for object_list parents too. getContainerItems +
+              // canContainAll + unwrapContainer are all storage-agnostic (funnel), so the
+              // old `!parentCC.isObjectList` gate was the last blocks_layout-only assumption.
+              if (parentCC) {
                 const parentPath = parentCC.parentId === PAGE_BLOCK_UID ? [] : bpm[parentCC.parentId]?.path;
                 const parentBlock = getBlockByPath(properties, parentPath);
                 const currentCount = parentBlock ? (getContainerItems(parentBlock, parentCC).length - 1) : 0;
