@@ -151,3 +151,46 @@ test('cloneBlockFilteringNested still filters + re-ids a blocks_layout region', 
   expect(keptId).not.toBe('keep-1'); // re-id'd
   expect(cloned.blocks[keptId].value).toBe('templated');
 });
+
+/**
+ * Region-completeness guard for the funnel consolidation: collectContentFromTree now enumerates
+ * regions via getChildFields (the same read the apply path uses), so it captures EVERY region of
+ * a nested container. The old bespoke walk read only the `items` sibling for ordering, so a
+ * populated `items` region masked a second region — its slot content was silently dropped.
+ */
+test('collectContentFromTree captures slot content in a SECOND region of a nested container', () => {
+  const instanceId = 'inst-3';
+  const slot = (id, sid, txt) => ({
+    '@type': 'slate',
+    templateId: '/tpl',
+    templateInstanceId: instanceId,
+    slotId: sid,
+    fixed: false,
+    value: [{ type: 'p', children: [{ text: txt }] }],
+  });
+  const tree = {
+    blocks: {
+      'cols-1': {
+        '@type': 'columns',
+        templateId: '/tpl',
+        templateInstanceId: instanceId,
+        blocks: {
+          'main-slot': slot('main-slot', 'main', 'main'),
+          'foot-slot': slot('foot-slot', 'foot', 'footer content'),
+        },
+        // TWO regions; the old walk read only `.items` for ordering, so `footer` was dropped.
+        blocks_layout: { items: ['main-slot'], footer: ['foot-slot'] },
+      },
+    },
+    blocks_layout: { items: ['cols-1'] },
+  };
+
+  const pendingContent = new Map();
+  collectContentFromTree(tree, instanceId, pendingContent, [], new Map());
+
+  expect(pendingContent.has('main')).toBe(true);
+  expect(pendingContent.has('foot')).toBe(true); // second region — dropped by the old walk
+  expect(pendingContent.get('foot')[0].block.value[0].children[0].text).toBe(
+    'footer content',
+  );
+});

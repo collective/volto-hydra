@@ -2323,42 +2323,13 @@ export function collectContentFromTree(
     return;
   }
 
-  for (const [fieldName, value] of Object.entries(container)) {
-    // object_list region: a field holding an inline array of block objects (a slider's `slides`).
-    // isBlocksMap() is false for arrays, so without this branch slot content inside an object_list
-    // container is never captured — the apply path fills it, but the reverse capture would drop it
-    // (empty template on save). Each item carries its own `@id`.
-    if (
-      Array.isArray(value) &&
-      value.some((v) => v && typeof v === 'object' && v['@type'])
-    ) {
-      for (const block of value) {
-        if (block && typeof block === 'object' && block['@type']) {
-          processBlock(block['@id'], block);
-        }
-      }
-      continue;
-    }
-
-    // Look for blocks maps (shared blocks format: one "blocks" dict + named layout fields)
-    if (!isBlocksMap(value)) continue;
-
-    // Collect block IDs from all layout fields ({ items: [...] }) in this container.
-    // In shared blocks format, layout fields are named (columns, top_images, blocks_layout, etc.)
-    // — there is no ${fieldName}_layout convention.
-    const layoutBlockIds = new Set();
-    for (const [key, val] of Object.entries(container)) {
-      if (key !== fieldName && val?.items && Array.isArray(val.items)) {
-        for (const id of val.items) layoutBlockIds.add(id);
-      }
-    }
-    // Fall back to all keys if no layout fields found
-    const blockLayout =
-      layoutBlockIds.size > 0 ? layoutBlockIds : Object.keys(value);
-
-    // Process in order
-    for (const blockId of blockLayout) {
-      processBlock(blockId, value[blockId]);
+  // Enumerate every child region (blocks_layout regions AND object_list arrays) through the SAME
+  // shared funnel the apply path uses (getChildFields + getChildBlockEntries) — one region-aware
+  // read, not a bespoke isBlocksMap scan with an all-keys fallback and a divergent object_list
+  // heuristic. processBlock captures each child (by slot/instance) and recurses into it.
+  for (const field of getChildFields(container)) {
+    for (const { id, block } of getChildBlockEntries(container, field)) {
+      processBlock(id, block);
     }
   }
 }
