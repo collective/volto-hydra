@@ -101,7 +101,12 @@ export function expelAllowedTypes(containerInfo, parentFieldDef = null) {
   return parentFieldDef?.allowedBlocks ?? null;
 }
 
-export function findConversionPath(srcType, allowedTargets, blocksConfig, depth = 3) {
+export function findConversionPath(
+  srcType,
+  allowedTargets,
+  blocksConfig,
+  depth = 3,
+) {
   if (!srcType || !blocksConfig?.[srcType]) return null;
   const targetSet = new Set(allowedTargets);
   if (targetSet.has(srcType)) return [srcType];
@@ -133,4 +138,26 @@ export function findConversionPath(srcType, allowedTargets, blocksConfig, depth 
     frontier = next;
   }
   return null;
+}
+
+/**
+ * The only child of a container that is a synthetic 'empty' placeholder — or null. Region-aware
+ * via blockPathMap (which records parentId for EVERY child, blocks_layout AND object_list), so it
+ * also spots an empty object_list container (a slider seeded with one placeholder slide). The drag
+ * "drop into an empty container's whitespace" gesture uses this; the earlier `blocks_layout.items`
+ * read missed object_list containers entirely.
+ *
+ * @param {Object} blockPathMap - uid -> { parentId, blockType, ... }
+ * @param {string} containerUid - the drop-target container's uid
+ * @returns {string|null} the placeholder child's uid, or null
+ */
+export function findOnlyEmptyChildUid(blockPathMap, containerUid) {
+  if (!blockPathMap) return null;
+  const childUids = Object.keys(blockPathMap).filter(
+    (uid) => blockPathMap[uid]?.parentId === containerUid,
+  );
+  return childUids.length === 1 &&
+    blockPathMap[childUids[0]]?.blockType === 'empty'
+    ? childUids[0]
+    : null;
 }

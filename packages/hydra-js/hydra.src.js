@@ -22,7 +22,7 @@ import {
   findBlockInForm,
   slateNodesText,
 } from '@volto-hydra/helpers';
-import { expelAllowedTypes } from './containerOps.js';
+import { expelAllowedTypes, findOnlyEmptyChildUid } from './containerOps.js';
 
 /**
  * This IS a large file and it needs to be written in one file so for better understanding and
@@ -8843,14 +8843,12 @@ export class Bridge {
           if (validTargetInfo?.blockType === 'empty') {
             emptyTargetUid = closestBlockUid;
           } else {
-            const targetData = this.getBlockData(closestBlockUid);
-            const layoutItems = targetData?.blocks_layout?.items;
-            if (Array.isArray(layoutItems) && layoutItems.length === 1) {
-              const onlyChildUid = layoutItems[0];
-              if (this.blockPathMap?.[onlyChildUid]?.blockType === 'empty') {
-                emptyTargetUid = onlyChildUid;
-              }
-            }
+            // Region-aware: find the container's only child via blockPathMap (covers an
+            // object_list container's `slides`, which a blocks_layout.items read missed).
+            emptyTargetUid = findOnlyEmptyChildUid(
+              this.blockPathMap,
+              closestBlockUid,
+            );
           }
           if (emptyTargetUid) {
             const lineIndicator = document.querySelector('.volto-hydra-drop-indicator');
