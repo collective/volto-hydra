@@ -3275,15 +3275,20 @@ export function expandTemplatesSync(inputItems, options = {}) {
             `\`blocks\` but no \`blocks_layout\` dict listing them by region.`,
         );
       }
-      // childSlotIds hint: first non-fixed slot per region (add-path anchor).
+      // childSlotIds hint: first non-fixed slot per field (add-path anchor). getChildFields
+      // covers blocks_layout regions AND object_list array fields, so an object_list slot
+      // container (a slider's `slides`) gets an anchor too — not just blocks_layout containers.
+      // Keyed by the consumer's `field`: the shared 'blocks' dict for blocks_layout, or the
+      // object_list field name (e.g. 'slides') — schemaInheritance reads childSlotIds[field].
       let childSlotIds = undefined;
-      for (const [region] of blocksLayoutRegions(tplBlock.blocks_layout)) {
-        for (const { block: child } of getChildBlockEntries(tplBlock, {
-          region,
-        })) {
+      for (const field of getChildFields(tplBlock)) {
+        const key = field.isObjectList
+          ? field.dataPath[field.dataPath.length - 1]
+          : 'blocks';
+        for (const { block: child } of getChildBlockEntries(tplBlock, field)) {
           if (child && !child.fixed && child.slotId) {
             if (!childSlotIds) childSlotIds = {};
-            if (!childSlotIds['blocks']) childSlotIds['blocks'] = child.slotId;
+            if (!childSlotIds[key]) childSlotIds[key] = child.slotId;
             break;
           }
         }

@@ -1224,6 +1224,38 @@ describe('nextSlotId and childSlotIds on fixed blocks', () => {
     // Container should also have nextSlotId for the top-level slot
     expect(containerBlock.nextSlotId).toBe('default');
   });
+
+  // Same as above, but the container's slot lives in an OBJECT_LIST region (a slider's `slides`),
+  // not blocks_layout. The childSlotIds add-path anchor was computed via blocksLayoutRegions only,
+  // so an object_list slot container got no anchor. It must be keyed by the field name (`slides`),
+  // matching schemaInheritance's parentBlock.childSlotIds[field] lookup.
+  test('childSlotIds set on a fixed container whose slot lives in an object_list region (slider slides)', async () => {
+    const pageData = { blocks: {}, blocks_layout: { items: [] } };
+
+    const templateData = {
+      '@id': '/templates/t2',
+      blocks: {
+        'slider-c': {
+          '@type': 'slider',
+          fixed: true,
+          templateId: '/templates/t2',
+          slotId: 'slider-c',
+          slides: [
+            { '@id': 'slide-1', '@type': 'slate', fixed: true, templateId: '/templates/t2', slotId: 'slide-1', value: [{ text: 'Fixed slide' }] },
+            { '@id': 'slide-2', '@type': 'slate', templateId: '/templates/t2', slotId: 'caption', value: [{ text: 'Caption slot' }] },
+          ],
+        },
+        'slot': { '@type': 'slate', templateId: '/templates/t2', slotId: 'default', value: [] },
+      },
+      blocks_layout: { items: ['slider-c', 'slot'] },
+    };
+
+    const result = await applyLayoutTemplate(pageData, templateData, uuidGenerator);
+    const containerBlock = result.blocks[result.blocks_layout.items[0]];
+    expect(containerBlock.fixed).toBe(true);
+    // The first non-fixed slot inside the object_list `slides` is captured, keyed by field name.
+    expect(containerBlock.childSlotIds).toEqual({ slides: 'caption' });
+  });
 });
 
 describe('mergeTemplatesIntoPage: object_list write-back on frozen input', () => {
