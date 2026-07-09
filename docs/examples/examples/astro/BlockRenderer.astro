@@ -39,7 +39,7 @@ import CodeExampleBlock from './CodeExampleBlock.astro';
 import SummaryItemBlock from './SummaryItemBlock.astro';
 import ContextNavigationBlock from './ContextNavigationBlock.astro';
 
-const { block, content, blocks } = Astro.props;
+const { block, content, blocks, editMode } = Astro.props;
 const type = block?.['@type'];
 const uid = block?.['@uid'];
 
@@ -62,10 +62,10 @@ const KNOWN = new Set<string>([
   {type === 'columns' && <ColumnsBlock block={block} />}
   {type === 'gridBlock' && <GridBlock block={block} />}
   {type === 'accordion' && <AccordionBlock block={block} />}
-  {type === 'slider' && <SliderBlock block={block} />}
+  {type === 'slider' && <SliderBlock block={block} editMode={editMode} />}
   {type === 'listing' && <ListingBlock block={block} />}
   {type === 'search' && <SearchBlock block={block} />}
-  {type === 'form' && <FormBlock block={block} />}
+  {type === 'form' && <FormBlock block={block} editMode={editMode} />}
   {type === 'heading' && <HeadingBlock block={block} />}
   {type === 'separator' && <SeparatorBlock block={block} />}
   {type === 'button' && <ButtonBlock block={block} />}

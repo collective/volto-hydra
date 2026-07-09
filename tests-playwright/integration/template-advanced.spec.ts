@@ -279,6 +279,46 @@ test.describe('Template Placeholder Replacement', () => {
     await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Header' }).first()).toBeVisible();
     await expect(iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Footer' }).first()).toBeVisible();
   });
+
+  // Parity with containers (the root behind :203): when the template primary slot is
+  // emptied it must seed its own empty placeholder IN the slot (between the grid and
+  // the slider) — the same way a container seeds one for an emptied region (see
+  // container-blocks.spec.ts 'emptied container seeds an in-place empty ... (no
+  // template)'). Without it there is nothing in the slot to click and the add falls
+  // back to the iframe add-button path, which hangs.
+  test('emptied template primary slot seeds an in-slot empty (parity with containers)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+    await helper.waitForIframeReady();
+    const iframe = helper.getIframe();
+
+    await expect(
+      iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Header - From Template' }),
+    ).toBeVisible({ timeout: 15000 });
+
+    // Empty the primary slot.
+    for (const b of ['user-content-1', 'user-content-2']) {
+      await helper.clickBlockInIframe(b);
+      await helper.openQuantaToolbarMenu(b);
+      await helper.clickQuantaToolbarMenuOption(b, 'Remove');
+      await helper.waitForBlockToDisappear(b);
+    }
+    await helper.getStableBlockCount();
+
+    // The emptied primary slot seeds its own empty placeholder (there is also a
+    // separate page-level empty for the footer region). The in-slot empty is
+    // first in DOM order and must sit between the grid and the slider.
+    const emptyBlock = iframe.locator('[data-hydra-empty]');
+    await expect(emptyBlock.first()).toBeVisible({ timeout: 5000 });
+
+    const gridY = await iframe.locator('[data-block-uid]').filter({ hasText: 'Template Grid Cell 1' }).last().boundingBox().then((box) => box?.y ?? -1);
+    const sliderY = await iframe.locator('[data-block-uid]').filter({ hasText: 'Template Slide 1' }).first().boundingBox().then((box) => box?.y ?? -1);
+    const emptyY = await emptyBlock.first().boundingBox().then((box) => box?.y ?? -1);
+
+    expect(emptyY, `in-slot empty should be in the primary slot (grid y=${gridY}, slider y=${sliderY}) but is at y=${emptyY}`).toBeGreaterThan(gridY);
+    expect(emptyY).toBeLessThan(sliderY);
+  });
 });
 
 test.describe('Template Sidebar Placeholder Sections', () => {
@@ -438,7 +478,7 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     expect(idxNew).toBe(idxContent2 + 1);
   });
 
-  test('nested template instance in grid shows simplified sidebar without settings form', async ({ page }) => {
+  test('same-template nesting folds into one instance — no Template-blocks virtual level, per-block settings on the nested block', async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -449,28 +489,24 @@ test.describe('Template Sidebar Placeholder Sections', () => {
     const { locator: headerBlock } = await helper.waitForBlockByContent('Template Header');
     await expect(headerBlock).toBeVisible({ timeout: 15000 });
 
-    // Click the grid cell to select it, then Escape to parent levels
+    // Click the grid cell to select it
     const { locator: gridCell } = await helper.waitForBlockByContent('Template Grid Cell 1');
     await gridCell.click();
     await helper.waitForSidebarOpen();
 
-    // The sidebar parent hierarchy should show both template levels:
-    // - "Template: test-layout" (top-level, with settings form)
-    // - "Template blocks" (nested inside grid, no settings form)
-
-    // Verify both labels are visible in the parent hierarchy
-    const nestedLabel = page.locator('button').filter({ hasText: /Template blocks/ });
+    // The grid is SAME-template nesting (grid block shares test-layout's templateId),
+    // so after recursive stamping it folds into the ONE test-layout instance: there is
+    // a single "Template: test-layout" level at the top (the template name lives here;
+    // entering edit mode is the "Edit template" button at the top of the panel), and NO
+    // separate "Template blocks" virtual level below it. The nested grid cell is a normal
+    // block carrying its own per-block fixed/readOnly settings.
     const topLabel = page.locator('button').filter({ hasText: /Template: test-layout/ });
-    await expect(nestedLabel).toBeVisible({ timeout: 5000 });
+    const nestedLabel = page.locator('button').filter({ hasText: /Template blocks/ });
     await expect(topLabel).toBeVisible({ timeout: 5000 });
+    await expect(nestedLabel).toHaveCount(0); // virtual sub-level is gone — that's correct
 
-    // The nested "Template blocks" section should NOT have template settings fields
-    expect(await helper.hasSidebarField('title', 'Template blocks')).toBe(false);
-    expect(await helper.hasSidebarField('editTemplate', 'Template blocks')).toBe(false);
-
-    // The top-level "Template: test-layout" section SHOULD have template settings fields
+    // The single instance level carries the template name; nothing virtual below it.
     expect(await helper.hasSidebarField('title', 'Template: test-layout')).toBe(true);
-    expect(await helper.hasSidebarField('editTemplate', 'Template: test-layout')).toBe(true);
   });
 });
 

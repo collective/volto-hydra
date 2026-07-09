@@ -536,6 +536,36 @@ test.describe('Block Mode (Escape state machine)', () => {
     await expect(page.locator('.volto-hydra-block-outline')).not.toBeVisible({ timeout: 3000 });
   });
 
+  test('Escape (an editor key) does NOT leak to the frontend page keydown listeners', async ({ page }) => {
+    // Regression guard: the capture-phase _documentKeyboardBlocker consumes ESC
+    // (escape-to-parent / to-block-mode) and MUST stopPropagation, so an editor
+    // keystroke never reaches the frontend app's own window handlers — otherwise
+    // an app-level ESC shortcut (e.g. a slide-out menu that closes on ESC) fires
+    // mid-edit. Without the stopPropagation this test fails (esc reaches the page).
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Select a block → any Escape with a block selected hits the consume branch.
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
+
+    // Install a bubble-phase window keydown listener INSIDE the iframe — the exact
+    // shape a frontend app uses (PGHeader closes its mobile menu on window ESC).
+    const iframeHandle = await page.waitForSelector('#previewIframe');
+    const frame = await iframeHandle.contentFrame();
+    await frame.evaluate(() => {
+      window.__escReachedPage = false;
+      window.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.__escReachedPage = true; }, false);
+    });
+
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    const reached = await frame.evaluate(() => window.__escReachedPage);
+    expect(reached, 'editor Escape leaked to a frontend window keydown listener').toBe(false);
+  });
+
   test('Escape from container block to page level hides outline', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();

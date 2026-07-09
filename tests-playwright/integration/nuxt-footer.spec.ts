@@ -105,7 +105,7 @@ test.describe('Nuxt site footer', () => {
     await helper.escapeToParent();
 
     // Toggle "Edit Template" in the sidebar
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await expect(editToggle).toBeVisible({ timeout: 10000 });
     await editToggle.click();
 
@@ -156,7 +156,7 @@ test.describe('Nuxt site footer', () => {
     await helper.waitForSidebarOpen();
     await helper.escapeToParent();
 
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await expect(editToggle).toBeVisible({ timeout: 10000 });
     await editToggle.click();
 

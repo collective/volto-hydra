@@ -8,7 +8,11 @@
  * Uses plain JS checks (no external dependencies).
  */
 
-import { isSlateFieldType } from '@volto-hydra/helpers';
+import {
+  isSlateFieldType,
+  getChildFields,
+  getChildBlockEntries,
+} from '@volto-hydra/helpers';
 
 // Re-export for convenience
 export { isSlateFieldType };
@@ -59,27 +63,36 @@ export function isSlateElementNode(node) {
  * Validate a Slate node recursively.
  * @returns {Array<ValidationError>}
  */
-export function validateSlateNode(node, path = [], blockId = null, field = null) {
+export function validateSlateNode(
+  node,
+  path = [],
+  blockId = null,
+  field = null,
+) {
   const errors = [];
   const context = { blockId, field, path };
 
   if (!node || typeof node !== 'object') {
-    errors.push(new ValidationError(
-      `Invalid Slate node: expected object, got ${typeof node}`,
-      { ...context, node }
-    ));
+    errors.push(
+      new ValidationError(
+        `Invalid Slate node: expected object, got ${typeof node}`,
+        { ...context, node },
+      ),
+    );
     return errors;
   }
 
   // CRITICAL: Detect corruption where node has BOTH text AND (type OR children)
   // This is the exact bug pattern: { text: "", type: "li", children: [...] }
   if ('text' in node && ('type' in node || 'children' in node)) {
-    errors.push(new ValidationError(
-      `Corrupted Slate node: has 'text' property but also '${
-        'type' in node ? 'type' : 'children'
-      }'. Text leaves must not have type/children.`,
-      { ...context, node }
-    ));
+    errors.push(
+      new ValidationError(
+        `Corrupted Slate node: has 'text' property but also '${
+          'type' in node ? 'type' : 'children'
+        }'. Text leaves must not have type/children.`,
+        { ...context, node },
+      ),
+    );
   }
 
   // Validate element nodes recursively
@@ -89,7 +102,7 @@ export function validateSlateNode(node, path = [], blockId = null, field = null)
         node.children[i],
         [...path, i],
         blockId,
-        field
+        field,
       );
       errors.push(...childErrors);
     }
@@ -104,10 +117,13 @@ export function validateSlateNode(node, path = [], blockId = null, field = null)
  */
 export function validateSlateValue(value, blockId = null, field = 'value') {
   if (!Array.isArray(value)) {
-    return [new ValidationError(
-      `Slate value must be an array, got ${typeof value}`,
-      { blockId, field, node: value }
-    )];
+    return [
+      new ValidationError(`Slate value must be an array, got ${typeof value}`, {
+        blockId,
+        field,
+        node: value,
+      }),
+    ];
   }
 
   const errors = [];
@@ -210,10 +226,12 @@ export function validateFormData(formData, blockFieldTypes = {}) {
     if (!Array.isArray(ids)) continue;
     for (const blockId of ids) {
       if (!blocks[blockId]) {
-        errors.push(new ValidationError(
-          `blocks_layout region references non-existent block`,
-          { blockId, field: 'blocks_layout', region }
-        ));
+        errors.push(
+          new ValidationError(
+            `blocks_layout region references non-existent block`,
+            { blockId, field: 'blocks_layout', region },
+          ),
+        );
       }
     }
   }
@@ -238,7 +256,7 @@ export function logValidationErrors(errors, source = '') {
   if (errors.length === 0) return;
 
   console.error(
-    `[VALIDATION] ${source ? `${source}: ` : ''}${errors.length} error(s) found:`
+    `[VALIDATION] ${source ? `${source}: ` : ''}${errors.length} error(s) found:`,
   );
 
   for (const error of errors) {
@@ -247,7 +265,9 @@ export function logValidationErrors(errors, source = '') {
       ctx.blockId && `block=${ctx.blockId}`,
       ctx.field && `field=${ctx.field}`,
       ctx.path?.length && `path=[${ctx.path.join(',')}]`,
-    ].filter(Boolean).join(' ');
+    ]
+      .filter(Boolean)
+      .join(' ');
 
     console.error(`  ${location}: ${error.message}`);
     if (ctx.node) {
@@ -277,27 +297,19 @@ export function validateAndLog(formData, source, blockFieldTypes = {}) {
 // ============================================================================
 
 /**
- * Validate template slot structure.
+ * The slot-grouping rules for ONE ordered region of blocks — same-slotId contiguous, different
+ * slot groups separated by a fixed block. Adds any violations to `blocksErrors`. Shared by every
+ * region (page + nested container, blocks_layout + object_list) so the rules apply everywhere.
  *
- * Rules:
- * 1. Blocks with the same slotId must be adjacent (contiguous)
- * 2. Different slot groups must be separated by a fixed block
- *
- * @param {Object} formData - Page data with blocks and blocks_layout
- * @returns {{ valid: boolean, blocksErrors: Object }} Validation result with Volto-compatible blocksErrors
+ * @param {Array<{id: string, block: Object}>} entries - the region's ordered child blocks
+ * @param {Object} blocksErrors - accumulator, keyed by block id
  */
-export function validateTemplatePlaceholders(formData) {
-  const blocksErrors = {};
-  const layout = formData.blocks_layout?.items || [];
-  const blocks = formData.blocks || {};
-
-  // Track slot groups and their positions
+function validateRegionSlots(entries, blocksErrors) {
   const slotGroups = new Map(); // slotId -> [{ blockId, index }]
   let lastSlotId = null;
 
-  for (let i = 0; i < layout.length; i++) {
-    const blockId = layout[i];
-    const block = blocks[blockId];
+  for (let i = 0; i < entries.length; i++) {
+    const { id: blockId, block } = entries[i];
     const isFixed = block?.fixed === true;
 
     if (isFixed) {
@@ -316,7 +328,6 @@ export function validateTemplatePlaceholders(formData) {
 
     // Check: different slot groups adjacent without fixed block between
     if (lastSlotId !== null && lastSlotId !== slotId) {
-      // We transitioned from one slot group to another without a fixed block
       blocksErrors[blockId] = {
         _layout: {
           title: 'Missing Fixed Block',
@@ -329,25 +340,53 @@ export function validateTemplatePlaceholders(formData) {
   }
 
   // Check: same slotId blocks must be contiguous
-  for (const [slotId, entries] of slotGroups) {
-    if (entries.length > 1) {
-      for (let i = 1; i < entries.length; i++) {
-        if (entries[i].index !== entries[i - 1].index + 1) {
-          // This block breaks contiguity
-          const blockId = entries[i].blockId;
-          // Don't overwrite if already has an error
-          if (!blocksErrors[blockId]) {
-            blocksErrors[blockId] = {
-              _layout: {
-                title: 'Placeholder Position',
-                message: `This slot block is not adjacent to others in the "${slotId}" group. Move this block or the previous one to make them contiguous.`,
-              },
-            };
-          }
+  for (const [slotId, group] of slotGroups) {
+    for (let i = 1; i < group.length; i++) {
+      if (group[i].index !== group[i - 1].index + 1) {
+        const blockId = group[i].blockId;
+        // Don't overwrite if already has an error
+        if (!blocksErrors[blockId]) {
+          blocksErrors[blockId] = {
+            _layout: {
+              title: 'Placeholder Position',
+              message: `This slot block is not adjacent to others in the "${slotId}" group. Move this block or the previous one to make them contiguous.`,
+            },
+          };
         }
       }
     }
   }
+}
 
+/**
+ * Validate template slot structure across EVERY region of the whole tree — the page's regions AND
+ * every nested container's regions (blocks_layout AND object_list) — not just the page `items`
+ * region. Walks region-aware via getChildFields + getChildBlockEntries, so a slot-grouping
+ * violation in a footer region or inside a slider's `slides` is reported, not silently ignored.
+ *
+ * Rules (per region):
+ * 1. Blocks with the same slotId must be adjacent (contiguous)
+ * 2. Different slot groups must be separated by a fixed block
+ *
+ * @param {Object} formData - Page data with blocks and blocks_layout
+ * @returns {{ valid: boolean, blocksErrors: Object }} Validation result with Volto-compatible blocksErrors
+ */
+export function validateTemplatePlaceholders(formData) {
+  const blocksErrors = {};
+  const visited = new Set();
+
+  const visit = (container) => {
+    if (!container || typeof container !== 'object' || visited.has(container)) {
+      return;
+    }
+    visited.add(container);
+    for (const field of getChildFields(container)) {
+      const entries = getChildBlockEntries(container, field);
+      validateRegionSlots(entries, blocksErrors);
+      for (const { block } of entries) visit(block);
+    }
+  };
+
+  visit(formData);
   return { valid: Object.keys(blocksErrors).length === 0, blocksErrors };
 }

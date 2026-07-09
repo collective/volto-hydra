@@ -12,11 +12,11 @@
  * down in BlockRenderer.
  */
 import BlockRenderer from './BlockRenderer.astro';
-const { formData } = Astro.props;
+const { formData, editMode } = Astro.props;
 const items = formData?.blocks_layout?.items || [];
 const blocks = formData?.blocks || {};
 ---
 {items.map((id: string) => {
   const block = { ...blocks[id], '@uid': id };
-  return <BlockRenderer block={block} content={formData} />;
+  return <BlockRenderer block={block} content={formData} editMode={editMode} />;
 })}

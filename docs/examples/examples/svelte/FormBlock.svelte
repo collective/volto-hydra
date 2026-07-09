@@ -1,5 +1,8 @@
 <script>
   export let block;
+  // Expand the subblocks object_list, passing its idField (field_id) so the merge stamps ids
+  // correctly. Edit-mode pass-through sets each field's @uid from field_id.
+  $: fields = expandTemplatesSync(block.subblocks || [], { idField: 'field_id' });
 </script>
 
 <form data-block-uid={block['@uid']} class="form-block" on:submit|preventDefault>
@@ -8,7 +11,7 @@
     <p data-edit-text="description">{block.description}</p>
   {/if}
 
-  {#each block.subblocks || [] as field (field.field_id || field.id)}
+  {#each fields as field (field.field_id)}
     <div class="form-field" data-block-uid={field.field_id}>
       {#if field.field_type === 'text'}
         <label><span data-edit-text="label">{field.label}</span> <input type="text" required={field.required} /></label>

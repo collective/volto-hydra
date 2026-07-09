@@ -373,8 +373,12 @@ function getTemplateInfoFromNeighbors(context) {
     // Empty container — check if parent container has childSlotIds for this field.
     // This handles the case where all blocks in a slot region inside a container
     // have been deleted, leaving the container field empty.
-    if (containerId && field && allBlocks) {
-      const parentBlock = allBlocks?.[containerId];
+    if (containerId && field) {
+      // The parent container (for childSlotIds). Prefer the explicitly-passed block:
+      // for a nested add, allBlocks is THIS level's siblings, so the parent lives one
+      // level up and isn't in it. The id lookup only resolves when a caller passes the
+      // parent-level allBlocks (e.g. a top-level container's empty slot).
+      const parentBlock = context.parentBlock || allBlocks?.[containerId];
       if (parentBlock?.templateId && parentBlock?.childSlotIds?.[field]) {
         return {
           templateId: parentBlock.templateId,

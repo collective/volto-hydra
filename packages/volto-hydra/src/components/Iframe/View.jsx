@@ -14,7 +14,7 @@ import {
   isSlateFieldType,
   formDataContentEqual,
   getUniqueTemplateIds,
-  getBlockAddability,
+  getBlockType,
   isBlockReadonly,
   isBlockPositionLocked,
 } from '@volto-hydra/helpers';
@@ -238,8 +238,8 @@ import slateTransforms from '../../utils/slateTransforms';
 // as applyFormat was replaced by SLATE_TRANSFORM_REQUEST handling
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
-import { buildBlockPathMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, _getContainerChildFieldName } from '../../utils/blockPath';
-import { canContainAll } from '@volto-hydra/helpers';
+import { buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
+import { canContainAll, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
   applySchemaDefaultsToFormData,
@@ -985,7 +985,10 @@ const Iframe = (props) => {
       document.removeEventListener('hydra-exit-selection-mode', handleExitSelectionMode);
       document.removeEventListener('hydra-enter-selection-mode', handleEnterSelectionMode);
     };
-  }, [blocksClipboard, properties, iframeSyncState?.blockPathMap, onChangeFormData, dispatch, intl]);
+    // NOTE: templateEditMode must be a dep — these handlers (handleDelete) gate
+    // on it via isBlockReadonly; without it the listener closure keeps a
+    // stale edit mode and refuses to mutate template blocks while editing.
+  }, [blocksClipboard, properties, iframeSyncState?.blockPathMap, iframeSyncState?.templateEditMode, onChangeFormData, dispatch, intl]);
 
   // Template cache: stores loaded template documents keyed by templateId
   // Used for comparison on save to detect template changes
@@ -993,6 +996,14 @@ const Iframe = (props) => {
 
   // Pending template edit exit - stores { requestId, prevInstanceId } when waiting for flush
   const pendingTemplateEditExitRef = useRef(null);
+
+  // Resolve each object_list field's idField ONCE from the schema (a form's subblocks are keyed
+  // by field_id, not @id) and pass it to every merge — so the merge stamps item ids into the
+  // right field instead of minting a bogus @id. A frontend passes this same shape as a hint.
+  const idFieldMap = useMemo(
+    () => buildIdFieldMap(config.blocks.blocksConfig, intl),
+    [intl],
+  );
 
 
   // Trigger for template sync effect - INIT increments this when templates need loading
@@ -1069,6 +1080,24 @@ const Iframe = (props) => {
             const lastSlash = templateId.lastIndexOf('/');
             const parentFolder = lastSlash > 0 ? templateId.slice(0, lastSlash) : '/';
             const id = templateId.slice(lastSlash + 1);
+            // Creating a template requires "Add portal content" on the CHOSEN save folder
+            // (never a hardcoded path — the author picks the location). Check it before
+            // POSTing so an unauthorized location blocks the save loudly instead of silently
+            // dropping the template; the backend 403 is the final word.
+            let targetFolder = null;
+            try {
+              targetFolder = await api.get(parentFolder);
+            } catch {
+              // Couldn't read the folder's permissions — don't block on that; proceed and
+              // let the backend be the authority (a real 403 will surface on POST).
+            }
+            if (targetFolder?.can_add === false) {
+              const err = new Error(
+                `You don't have permission to add templates in "${parentFolder}" (requires “Add portal content”).`,
+              );
+              err.isPermissionError = true;
+              throw err;
+            }
             await api.post(parentFolder, {
               data: {
                 '@type': 'Document',
@@ -1095,6 +1124,8 @@ const Iframe = (props) => {
           }
         } catch (error) {
           console.error(`[HYDRA] Failed to save template ${templateId}:`, error);
+          // A permission failure must block the save, not silently drop the template.
+          if (error?.isPermissionError) throw error;
         }
       }));
     };
@@ -1146,8 +1177,7 @@ const Iframe = (props) => {
         loadTemplate: async () => formData,
         filterInstanceId: prevInstanceId,
         uuidGenerator: uuid,
-        blocksConfig: config.blocks.blocksConfig,
-        intl,
+        idFieldMap,
       }).then(({ merged: updatedTemplate }) => {
         log('REVERSE MERGE: Updated template blocks:', Object.keys(updatedTemplate.blocks || {}));
         // Log first block's value to check if edit is captured
@@ -1340,6 +1370,7 @@ const Iframe = (props) => {
             },
             pageBlocksFields: { [fieldName || 'items']: { allowedLayouts: [templateConfig.templateUrl] } },
             uuidGenerator: uuid,
+            idFieldMap,
             blocksConfig: config.blocks.blocksConfig,
             intl,
           });
@@ -1425,7 +1456,7 @@ const Iframe = (props) => {
       let cellData = { '@type': virtualType };
       cellData = applyBlockDefaults({ data: cellData, formData: cellData, intl, metadata, properties }, mergedBlocksConfig);
       cellData = initializeContainerBlock(cellData, mergedBlocksConfig, uuid, { intl, metadata, properties, blockType: virtualType });
-      delete cellData['@type'];
+      cellData = clearBlockType(cellData);
 
       const result = insertTableColumn(
         formData,
@@ -1456,6 +1487,40 @@ const Iframe = (props) => {
 
     // Create block data (use custom data if provided)
     let blockData;
+
+    // Inherit template membership (templateId/slotId) for a block inserted into a
+    // container region — uniform across blocks_layout and object_list. Both are just an
+    // ordered region of child blocks; getChildBlockEntries (public helper) normalises the
+    // storage so this never branches on it. The neighbour is the LAST existing child for
+    // 'inside' (append at end), else the sibling blockId we insert relative to.
+    const inheritTemplateMembership = (bd) => {
+      const region = containerConfig?.region || 'items';
+      // The REAL container the new block lands in: containerConfig.parentId (the page,
+      // or the container for a nested/inside add). NOT blockPathMap[blockId].parentId —
+      // for a template-member block that is the VIRTUAL templateInstanceId, not a real
+      // block, so getChildBlockEntries finds no siblings and nothing is inherited.
+      const containerId = action === 'inside' ? blockId : (containerConfig?.parentId || PAGE_BLOCK_UID);
+      const container = (containerId === PAGE_BLOCK_UID || containerId === 'page')
+        ? formData
+        : getBlockById(formData, blockPathMap, containerId);
+      const entries = getChildBlockEntries(container, containerConfig);
+      const refIndex = entries.findIndex((entry) => entry.id === blockId);
+      const position = action === 'inside' ? entries.length
+        : action === 'after' ? refIndex + 1
+        : refIndex;
+      const insertAfter = action === 'after' || action === 'inside';
+      return applyBlockDefaultsWithContext(bd, {
+        items: entries.map((entry) => entry.block),
+        position,
+        insertAfter,
+        parentBlock: container,
+        containerId,
+        field: region,
+        blocksConfig: mergedBlocksConfig,
+        intl,
+      });
+    };
+
     if (customBlockData) {
       blockData = customBlockData;
     } else if (isObjectList) {
@@ -1510,31 +1575,12 @@ const Iframe = (props) => {
       // Initialize nested containers (e.g., cells in a row)
       blockData = initializeContainerBlock(blockData, mergedBlocksConfig, uuid, { intl, metadata, properties, siblingData, blockType: effectiveType });
 
-      // Inherit template fields from neighbors (same logic as blocks_layout)
-      if (action !== 'inside') {
-        const parentId = blockPathMap[blockId]?.parentId;
-        const parentBlock = parentId === PAGE_BLOCK_UID
-          ? formData
-          : getBlockById(formData, blockPathMap, parentId);
-        const existingItems = parentBlock ? getContainerItems(parentBlock, containerConfig) : [];
-        const idFld = containerConfig?.idField || fieldDef?.idField || '@id';
-        const refIndex = existingItems.findIndex(item => item[idFld] === blockId);
-        const position = action === 'after' ? refIndex + 1 : refIndex;
+      // Inherit template membership from the neighbour (uniform read; see helper above).
+      blockData = inheritTemplateMembership(blockData);
 
-          blockData = applyBlockDefaultsWithContext(blockData, {
-          position,
-          insertAfter: action === 'after',
-          items: existingItems,
-          blocksConfig: mergedBlocksConfig,
-          intl,
-        });
-      }
-
-      // Store type in typeField, clean up @type if typeField is different
-      blockData[typeFieldName] = effectiveType;
-      if (typeFieldName !== '@type') {
-        delete blockData['@type']; // @type was only used for schema resolution
-      }
+      // Store the type in the typeField (dropping the @type used only for schema
+      // resolution) — the shared setBlockType.
+      blockData = setBlockType(blockData, effectiveType, typeFieldName);
     } else {
       // Standard block with @type
       blockData = { '@type': blockType };
@@ -1542,27 +1588,8 @@ const Iframe = (props) => {
         blockData.value = [{ type: 'p', children: [{ text: '' }] }];
       }
 
-      // Calculate position for context
-      const containerId = containerConfig?.parentId || 'page';
-      const containerRegion = containerConfig?.region || 'items';
-      const container = containerId === 'page' ? formData : getBlockById(formData, blockPathMap, containerId);
-      const layoutItems = container?.blocks_layout?.[containerRegion] || [];
-      const refIndex = layoutItems.indexOf(blockId);
-      const position = action === 'after' ? refIndex + 1 : refIndex;
-
-      // Apply defaults with extended context for dynamic defaults
-      // insertAfter tells inheritance logic which neighbor to inherit template membership from
-      blockData = applyBlockDefaultsWithContext(blockData, {
-        containerId,
-        field: containerRegion,
-        position,
-        insertAfter: action === 'after',
-        layoutItems,
-        allBlocks: formData.blocks,
-        blockPathMap,
-        blocksConfig: mergedBlocksConfig,
-        intl,
-      });
+      // Inherit template membership from the neighbour (uniform read; see helper above).
+      blockData = inheritTemplateMembership(blockData);
 
       // Also apply regular applyBlockDefaults for non-context-aware schemas
       blockData = applyBlockDefaults({ data: blockData, formData: blockData, intl, metadata, properties });
@@ -1689,6 +1716,16 @@ const Iframe = (props) => {
       mergedBlocksConfig,
       intl,
     );
+
+    // A typed object_list item carries its type in the typeField, not @type — the same field
+    // getBlockAddability reads (dcd3114). Everything above ran with @type so applyBlockDefaults
+    // / initializeContainerBlock could find the schema; now write the type where it lives (and
+    // drop @type), or a form field's pick would land in @type (which FormBlock ignores) and
+    // field_type would stay 'empty'.
+    const targetTypeField = iframeSyncState.blockPathMap?.[id]?.typeField;
+    if (targetTypeField) {
+      blockData = setBlockType(blockData, blockData['@type'], targetTypeField);
+    }
 
     // Use container-aware mutation for nested blocks
     const newFormData = mutateBlockInContainer(
@@ -2857,18 +2894,11 @@ const Iframe = (props) => {
             break;
           }
 
-          // Check if we can add/replace at this block - if so, open block chooser for empty blocks
-          // This should happen on every click of an empty block, not just "new" selections
-          // BlockChooser will dynamically decide to mutate vs insert based on selected block type
-          // IMPORTANT: Rebuild blockPathMap from properties instead of using iframeSyncState.blockPathMap
-          // because React state updates are async and the state may be stale when BLOCK_SELECTED arrives
-          // shortly after a delete operation creates an empty block
-          const currentBlockPathMap = buildBlockPathMap(properties, config.blocks.blocksConfig, intl);
-          const selectedBlockData = getBlockById(properties, currentBlockPathMap, event.data.blockUid);
-          const addability = getBlockAddability(event.data.blockUid, currentBlockPathMap, selectedBlockData, iframeSyncState.templateEditMode);
-          if (addability.canReplace) {
-            setAddNewBlockOpened(true);
-          }
+          // NOTE: selecting an empty block must NOT open the block chooser. BLOCK_SELECTED fires
+          // for every selection — click, keyboard nav, escape-to-parent, sidebar, and the admin's
+          // own pendingSelectBlockUid after an insert or after a delete seeds a replacement empty.
+          // An empty block gets a '+' (getBlockAddability: canReplace), and clicking THAT opens
+          // the chooser via handleIframeAdd. That is the convert gesture.
 
           // Now update blockUI state
           log(' About to call setBlockUI for:', event.data.blockUid);
@@ -3490,8 +3520,7 @@ const Iframe = (props) => {
             preloadedTemplates: templateCacheRef.current,
             pageBlocksFields,
             uuidGenerator: uuid,
-            blocksConfig: config.blocks.blocksConfig,
-            intl,
+            idFieldMap,
           });
           let blockPathMap = buildBlockPathMap(mergedFormData, config.blocks.blocksConfig, intl);
 
@@ -3577,6 +3606,7 @@ const Iframe = (props) => {
           uuidGenerator: uuid,
           blocksConfig: config.blocks.blocksConfig,
           intl,
+          idFieldMap,
         });
         if (moreTemplateIds.length > 0) {
           log('[INITIAL_DATA] Discovered nested templates:', moreTemplateIds);
@@ -4055,9 +4085,12 @@ const Iframe = (props) => {
         const blockData = getBlockById(properties, bpm, chooser.blockId);
         if (blockData) {
           const blockType = blockData['@type'];
-          const childField = blockType
-            ? _getContainerChildFieldName(blockType, blocksConfig, intl) : null;
-          const hasChildren = childField && (blockData?.[childField]?.items?.length > 0);
+          // Children across ALL regions (blocks_layout + object_list), not just the default.
+          const hasChildren = blockType
+            ? getContainerRegionDescriptors(blockData['@type'], blocksConfig, intl, blockData).some(
+                (d) => getChildBlockEntries(blockData, d).length > 0,
+              )
+            : false;
           let updatedProperties;
           if (hasChildren) {
             updatedProperties = convertContainerBlock(
@@ -4084,58 +4117,21 @@ const Iframe = (props) => {
     setChooser(null);
   };
 
+  // Close the wrap/convert chooser on an outside click — it's a bare popup (no Cancel button),
+  // so "click away to dismiss" lives here. Clicks inside the .blocks-chooser are ignored; picking
+  // a type commits + closes via commitChooser.
+  useEffect(() => {
+    if (!chooser) return;
+    const onDown = (e) => {
+      if (e.target.closest('.blocks-chooser')) return;
+      setChooser(null);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [chooser]);
+
   return (
     <div id="iframeContainer">
-      {chooser && createPortal(
-        <div
-          className="container-block-chooser"
-          style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            zIndex: 10000,
-            background: 'white',
-            border: '1px solid #999',
-            borderRadius: '6px',
-            padding: '12px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-            minWidth: '320px',
-            maxHeight: '70vh',
-            overflowY: 'auto',
-          }}
-          // Stop the underlying iframe from receiving the click and clearing the chooser.
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
-            {chooser.kind === 'wrap' ? 'Wrap in…' : 'Convert to…'}
-          </div>
-          {chooser.allowedBlocks.length === 0 ? (
-            <div style={{ color: '#888', fontSize: '13px' }}>
-              No compatible target available.
-            </div>
-          ) : (
-            <BlockChooser
-              showRestricted
-              allowedBlocks={chooser.allowedBlocks}
-              blocksConfig={blocksConfig}
-              currentBlock={chooser.blockId || null}
-              onInsertBlock={(_id, value) => commitChooser(value['@type'])}
-              onMutateBlock={(_id, value) => commitChooser(value['@type'])}
-            />
-          )}
-          <button
-            onClick={() => setChooser(null)}
-            style={{
-              marginTop: '6px', padding: '6px 10px',
-              background: 'transparent', border: 'none', color: '#666', cursor: 'pointer',
-            }}
-          >
-            Cancel
-          </button>
-        </div>,
-        document.body,
-      )}
       <OpenObjectBrowser
         origin={iframeSrc && new URL(iframeSrc).origin}
         pendingFieldMedia={pendingFieldMedia}
@@ -4166,13 +4162,26 @@ const Iframe = (props) => {
         }}
         onFieldMediaCancelled={() => setPendingFieldMedia(null)}
       />
-      {addNewBlockOpened &&
+      {(addNewBlockOpened || chooser) &&
         createPortal(
           <div
             ref={setPopperElement}
             style={styles.popper}
             {...attributes.popper}
           >
+            {chooser ? (
+              // Wrap/convert reuses the SAME popper-anchored chooser as add — one popup, bare:
+              // pick a type to commit, click away to dismiss (no modal, no title/Cancel).
+              <BlockChooser
+                showRestricted
+                allowedBlocks={chooser.allowedBlocks}
+                blocksConfig={blocksConfig}
+                currentBlock={chooser.blockId || selectedBlock}
+                onInsertBlock={(_id, value) => commitChooser(value['@type'])}
+                onMutateBlock={(_id, value) => commitChooser(value['@type'])}
+                ref={blockChooserRef}
+              />
+            ) : (
             <BlockChooser
               onMutateBlock={
                 onMutateBlock
@@ -4215,6 +4224,7 @@ const Iframe = (props) => {
               navRoot={navRoot}
               contentType={contentType}
             />
+            )}
           </div>,
           document.body,
         )}
@@ -4708,12 +4718,16 @@ const Iframe = (props) => {
               // children, offer it as a target. The existing getConvertibleTypes
               // doesn't cover this because it relies on fieldMappings, which are
               // content-level.
-              const childField = blockType ? _getContainerChildFieldName(blockType, blocksConfig, intl) : null;
-              const childIds = childField ? (blockData?.[childField]?.items || []) : [];
-              if (childIds.length === 0) return contentTargets;
+              // Child types across ALL regions (blocks_layout + object_list), not just default.
+              const childEntries = blockType
+                ? getContainerRegionDescriptors(blockData['@type'], blocksConfig, intl, blockData).flatMap((d) =>
+                    getChildBlockEntries(blockData, d),
+                  )
+                : [];
+              if (childEntries.length === 0) return contentTargets;
 
-              const childTypes = childIds
-                .map((id) => blockData.blocks?.[id]?.['@type'])
+              const childTypes = childEntries
+                .map((e) => e.block?.['@type'])
                 .filter(Boolean);
               const containerTargets = [];
               const existingTypes = new Set(contentTargets.map(t => t.type));
@@ -4750,13 +4764,16 @@ const Iframe = (props) => {
               const allowedTypes = bpm?.[selectedBlock]?.allowedSiblingTypes;
               const contentTargets = getConvertibleTypes(blockType, blocksConfig, allowedTypes);
 
-              const childField = blockType
-                ? _getContainerChildFieldName(blockType, blocksConfig, intl) : null;
-              const childIds = childField ? (blockData?.[childField]?.items || []) : [];
+              // Child types across ALL regions (blocks_layout + object_list), not just default.
+              const childEntries = blockType
+                ? getContainerRegionDescriptors(blockData['@type'], blocksConfig, intl, blockData).flatMap((d) =>
+                    getChildBlockEntries(blockData, d),
+                  )
+                : [];
               const containerTargets = [];
-              if (childIds.length > 0) {
-                const childTypes = childIds
-                  .map((id) => blockData.blocks?.[id]?.['@type']).filter(Boolean);
+              if (childEntries.length > 0) {
+                const childTypes = childEntries
+                  .map((e) => e.block?.['@type']).filter(Boolean);
                 const existing = new Set(contentTargets.map(t => t.type));
                 for (const [type, cfg] of Object.entries(blocksConfig || {})) {
                   if (!cfg?.blockSchema || type === blockType || existing.has(type)) continue;
@@ -4809,15 +4826,11 @@ const Iframe = (props) => {
               const eligibleTypes = [];
               for (const [type, cfg] of Object.entries(blocksConfig || {})) {
                 if (!cfg?.blockSchema) continue;
-                let schema;
-                try {
-                  schema = typeof cfg.blockSchema === 'function'
-                    ? cfg.blockSchema({ blocksConfig, intl }) : cfg.blockSchema;
-                } catch { continue; }
-                let childField = null;
-                for (const [fn, fd] of Object.entries(schema?.properties || {})) {
-                  if (fd?.widget === 'blocks_layout') { childField = { region: fn, ...fd }; break; }
-                }
+                // A container's child field may be blocks_layout (section, columns) OR an
+                // object_list (a slider's `slides`). One descriptor covers both, so a slider is
+                // now offered as a wrap target too.
+                let childField;
+                try { childField = getContainerRegionDescriptors(type, blocksConfig, intl)[0] || null; } catch { continue; }
                 if (!childField) continue;
                 if (!canContainAll(childField, selectedTypes, 0)) continue;
                 if (!parentAllows(type)) continue;
@@ -4840,16 +4853,25 @@ const Iframe = (props) => {
               if (!selectedBlock || !bpm?.[selectedBlock]) return {};
               const block = getBlockById(properties, bpm, selectedBlock);
               if (!block) return {};
-              const childField = _getContainerChildFieldName(block['@type'], blocksConfig, intl);
-              const childIds = block?.[childField]?.items || [];
-              if (childIds.length === 0) return {}; // not a container with children
+              // Read children from ALL regions + funnel, so a slider (children in `slides`) and a
+              // multi-region/mixed container are unwrappable the same as a section.
+              const childEntries = getContainerRegionDescriptors(
+                block['@type'],
+                blocksConfig,
+                intl,
+                block,
+              ).flatMap((d) => getChildBlockEntries(block, d));
+              if (childEntries.length === 0) return {}; // not a container with children
 
-              const childTypes = childIds
-                .map((id) => block.blocks?.[id]?.['@type'])
+              const childTypes = childEntries
+                .map((e) => e.block?.['@type'])
                 .filter(Boolean);
               const parentCC = getContainerFieldConfig(selectedBlock, bpm, properties, blocksConfig, intl);
               let canUnwrap = false;
-              if (parentCC && !parentCC.isObjectList) {
+              // Symmetric with wrap: works for object_list parents too. getContainerItems +
+              // canContainAll + unwrapContainer are all storage-agnostic (funnel), so the
+              // old `!parentCC.isObjectList` gate was the last blocks_layout-only assumption.
+              if (parentCC) {
                 const parentPath = parentCC.parentId === PAGE_BLOCK_UID ? [] : bpm[parentCC.parentId]?.path;
                 const parentBlock = getBlockByPath(properties, parentPath);
                 const currentCount = parentBlock ? (getContainerItems(parentBlock, parentCC).length - 1) : 0;
@@ -4951,24 +4973,43 @@ const Iframe = (props) => {
 
             const buttonWidth = 30;
             const buttonHeight = 30;
-            let addLeft = isRightDirection
-              ? iframeRect.left + blockUI.rect.left + blockUI.rect.width + 8
-              : iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth;
 
-            let isConstrained = false;
-            const iframeRight = iframeRect.left + iframeRect.width;
-            if (addLeft + buttonWidth > iframeRight) {
-              addLeft = iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth - 8;
-              isConstrained = true;
-            }
+            // An empty block is REPLACED, not appended to: its '+' picks the empty's type in
+            // place. Draw it in the middle of the block, over the centered '+' glyph hydra
+            // renders ([data-hydra-empty]::after) — that glyph is what the editor aims at, and
+            // it's the only way to type the block. The 'add after' position (below/right) would
+            // leave the glyph dead.
+            const emptyPathInfo = iframeSyncState.blockPathMap?.[selectedBlock];
+            const isEmptyBlock =
+              getBlockType(
+                getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock),
+                emptyPathInfo?.typeField,
+              ) === 'empty';
 
+            let addLeft;
             let addTop;
-            if (isRightDirection) {
-              addTop = isConstrained
-                ? iframeRect.top + blockUI.rect.top + blockUI.rect.height - buttonHeight - 8
-                : iframeRect.top + blockUI.rect.top;
+            if (isEmptyBlock) {
+              addLeft = iframeRect.left + blockUI.rect.left + blockUI.rect.width / 2 - buttonWidth / 2;
+              addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height / 2 - buttonHeight / 2;
             } else {
-              addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;
+              addLeft = isRightDirection
+                ? iframeRect.left + blockUI.rect.left + blockUI.rect.width + 8
+                : iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth;
+
+              let isConstrained = false;
+              const iframeRight = iframeRect.left + iframeRect.width;
+              if (addLeft + buttonWidth > iframeRight) {
+                addLeft = iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth - 8;
+                isConstrained = true;
+              }
+
+              if (isRightDirection) {
+                addTop = isConstrained
+                  ? iframeRect.top + blockUI.rect.top + blockUI.rect.height - buttonHeight - 8
+                  : iframeRect.top + blockUI.rect.top;
+              } else {
+                addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;
+              }
             }
 
             const pathInfo = iframeSyncState.blockPathMap?.[selectedBlock];
@@ -5021,6 +5062,7 @@ const Iframe = (props) => {
         multiSelected={multiSelected}
         formData={properties}
         blockPathMap={iframeSyncState.blockPathMap}
+        templatePermissions={templateCacheRef.current}
         onSelectBlock={onSelectBlock}
         onDeleteBlock={onDeleteBlock}
         onBlockAction={(actionId, blockId) => {
@@ -5234,7 +5276,32 @@ const Iframe = (props) => {
             return;
           }
 
-          // Entering template edit mode
+          // Entering template edit mode — invalidate the cached template and
+          // re-fetch it fresh. templateCacheRef persists across page navigations
+          // (a useRef that's never reset), so without this we'd edit + save a
+          // stale copy left over from another page. It also guarantees the
+          // template is IN the cache: the reverse-merge (on exit) and the save
+          // are both gated on `templateCacheRef.current[id]` being present, so a
+          // forced/snippet template that wasn't cache-loaded here would otherwise
+          // be silently skipped and never persisted.
+          {
+            const enterFormData = iframeSyncState.formData;
+            let editTemplateId = null;
+            for (const block of Object.values(enterFormData?.blocks || {})) {
+              if (block.templateInstanceId === instanceId && block.templateId) {
+                editTemplateId = block.templateId;
+                break;
+              }
+            }
+            if (editTemplateId) {
+              try {
+                templateCacheRef.current[editTemplateId] = await new Api().get(editTemplateId);
+              } catch {
+                // Re-fetch failed (offline / 404) — keep whatever's cached rather
+                // than dropping it, so the save still has something to persist.
+              }
+            }
+          }
           setIframeSyncState(prev => ({
             ...prev,
             templateEditMode: instanceId,

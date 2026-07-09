@@ -12,6 +12,7 @@ import {
   reorderBlocksInContainer,
   moveBlockBetweenContainers,
   ensureEmptyBlockIfEmpty,
+  insertBlockInContainer,
   getAllContainerFields,
   listContainerChildren,
   convertContainerBlock,
@@ -174,6 +175,120 @@ describe('empty-region seeding', () => {
     expect(result.blocks_layout.items).toEqual(['a']); // untouched
     expect(result.blocks_layout.footer.length).toBe(1); // seeded
     expect(result.blocks[result.blocks_layout.footer[0]]).toBeTruthy();
+  });
+});
+
+describe('ensureEmptyBlockIfEmpty — auto-content joins the template instance', () => {
+  // A container that IS a template instance, with an empty items region. When the
+  // editor seeds its default child (e.g. a new column's auto-slate), that child
+  // must join the SAME instance so it stays editable in template edit mode — the
+  // flat readonly check is `isBlockReadonly = block.templateInstanceId === templateEditMode`.
+  // If it isn't stamped, the seeded slate is read-only → no add-after "+" → you
+  // can't add anything into a freshly-added column.
+  const cfgTpl = {
+    _page: { id: '_page', schema: () => ({ properties: { items: { widget: 'blocks_layout' } } }) },
+    column: { id: 'column', schema: () => ({ properties: { items: { widget: 'blocks_layout', allowedBlocks: ['slate'], defaultBlockType: 'slate' } } }) },
+    slate: { id: 'slate' },
+  };
+
+  test('a default block seeded into an empty template-instance container carries templateInstanceId', () => {
+    const form = {
+      '@type': 'Document',
+      blocks: {
+        col1: {
+          '@type': 'column',
+          templateId: 'resolveuid/x',
+          templateInstanceId: 'inst-1',
+          slotId: 'col1',
+          blocks: {},
+          blocks_layout: { items: [] },
+        },
+      },
+      blocks_layout: { items: ['col1'] },
+    };
+    const map = buildBlockPathMap(form, cfgTpl, intl);
+    let n = 0;
+    const uuid = () => `seed-${++n}`;
+    const result = ensureEmptyBlockIfEmpty(form, { parentId: 'col1' }, map, uuid, cfgTpl, { intl });
+
+    const col = result.blocks.col1;
+    const childId = col.blocks_layout.items[0];
+    const child = col.blocks[childId];
+    expect(child, 'empty template-instance column should be seeded with a default child').toBeTruthy();
+    // Reproduces the bug: the seeded child currently has NO templateInstanceId, so
+    // it renders read-only in template edit mode (no add-after "+").
+    expect(child.templateInstanceId).toBe('inst-1');
+  });
+});
+
+describe('insertBlockInContainer — add-after joins the template instance', () => {
+  // Adding a block after a template-instance sibling must stamp it into the same instance
+  // (centralized via inheritTemplateMembership) — else the added block renders read-only
+  // in template edit mode, the same failure as the seeded auto-content.
+  const cfg = {
+    _page: { id: '_page', schema: () => ({ properties: { items: { widget: 'blocks_layout' } } }) },
+    column: { id: 'column', schema: () => ({ properties: { items: { widget: 'blocks_layout', allowedBlocks: ['slate'] } } }) },
+    slate: { id: 'slate' },
+  };
+
+  test('a block added after a template-instance sibling carries templateInstanceId', () => {
+    const form = {
+      '@type': 'Document',
+      blocks: {
+        col1: {
+          '@type': 'column',
+          templateId: 'resolveuid/x',
+          templateInstanceId: 'inst-1',
+          slotId: 'col1',
+          blocks: { a: { '@type': 'slate', templateId: 'resolveuid/x', templateInstanceId: 'inst-1', slotId: 'a' } },
+          blocks_layout: { items: ['a'] },
+        },
+      },
+      blocks_layout: { items: ['col1'] },
+    };
+    const map = buildBlockPathMap(form, cfg, intl);
+    const cc = getContainerFieldConfig('a', map, form, cfg, intl);
+    const result = insertBlockInContainer(form, map, 'a', 'b', { '@type': 'slate' }, cc, 'after');
+
+    const col = result.blocks.col1;
+    expect(col.blocks_layout.items).toEqual(['a', 'b']);
+    expect(col.blocks.b.templateInstanceId).toBe('inst-1'); // added block joins the instance
+  });
+
+  test('a block added after a FIXED template sibling inherits fixed/readOnly (template content)', () => {
+    const form = {
+      '@type': 'Document',
+      blocks: {
+        col1: {
+          '@type': 'column',
+          templateId: 'resolveuid/x',
+          templateInstanceId: 'inst-1',
+          slotId: 'col1',
+          blocks: {
+            a: {
+              '@type': 'slate',
+              fixed: true,
+              readOnly: true,
+              templateId: 'resolveuid/x',
+              templateInstanceId: 'inst-1',
+              slotId: 'a',
+            },
+          },
+          blocks_layout: { items: ['a'] },
+        },
+      },
+      blocks_layout: { items: ['col1'] },
+    };
+    const map = buildBlockPathMap(form, cfg, intl);
+    const cc = getContainerFieldConfig('a', map, form, cfg, intl);
+    const result = insertBlockInContainer(form, map, 'a', 'b', { '@type': 'slate' }, cc, 'after');
+
+    // Template content inherits fixed/readOnly so the reverse merge captures it and it
+    // propagates to other pages (mirrors the templatePropagation "new column" test).
+    const b = result.blocks.col1.blocks.b;
+    expect(b.templateInstanceId).toBe('inst-1');
+    expect(b.fixed).toBe(true);
+    expect(b.readOnly).toBe(true);
   });
 });
 

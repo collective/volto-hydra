@@ -159,4 +159,51 @@ test.describe('Code Example Block', () => {
     const textContent = await codePre.evaluate((el: any) => el.textContent);
     expect(textContent).toMatch(/^ {2}/); // starts with 2 spaces
   });
+
+  // End-to-end guard for the object_list field-default seed: the codeExample `tabs` field
+  // declares a `default` of one JavaScript tab. Adding a new codeExample must keep that
+  // default — applyBlockDefaults populates it, and the container initializer must NOT replace
+  // it with a blank item. Regression: initializeContainerBlock used to overwrite it.
+  test('adding a codeExample seeds its schema-default tab (JavaScript), not a blank', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Capture the page save so we can inspect the new codeExample's persisted data.
+    let savedBlocks: Record<string, any> | null = null;
+    page.on('request', (req) => {
+      if (req.method() !== 'PATCH' || !/test-page/.test(req.url())) return;
+      try {
+        const body = req.postDataJSON();
+        if (body?.blocks) savedBlocks = body.blocks;
+      } catch {
+        /* not JSON */
+      }
+    });
+
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.clickAddBlockButton();
+    await helper.selectBlockType('codeExample');
+    // Wait for the new codeExample to render (its seeded tab's code area) before saving.
+    await expect(
+      helper.getIframe().locator('pre[data-edit-text="code"]').first(),
+    ).toBeAttached({ timeout: 10000 });
+    await helper.saveContent();
+
+    await expect
+      .poll(
+        () =>
+          !!savedBlocks &&
+          Object.values(savedBlocks).some((b: any) => b['@type'] === 'codeExample'),
+        { message: 'the saved page should contain the added codeExample block', timeout: 5000 },
+      )
+      .toBe(true);
+
+    const codeBlock = Object.values(savedBlocks!).find(
+      (b: any) => b['@type'] === 'codeExample',
+    ) as any;
+    // The field default (one JavaScript tab) survived — not replaced by a blank item.
+    expect(codeBlock.tabs).toHaveLength(1);
+    expect(codeBlock.tabs[0].label).toBe('JavaScript');
+  });
 });

@@ -92,11 +92,16 @@ const modify = (config, { target, dev }, webpackConfig) => {
         } else if (compilationError) {
           res.status(500).send(`Compilation error: ${compilationError}`);
         } else {
-          // Webpack compilation is done, check if SSR server on port 3001 is ready
+          // Webpack compilation is done, check if the SSR server is ready. Use the
+          // razzle SSR PORT (default 3001), NOT a hardcoded 3001, so a fresh admin on
+          // an alternate port (PORT=3021 to run alongside an existing Volto) health-
+          // checks its OWN SSR. Hardcoding 3001 made /health return 503 forever on any
+          // non-default-port run, timing out Playwright's webServer readiness gate.
           const http = require('http');
+          const ssrPort = process.env.PORT || 3001;
           let responded = false;
 
-          const checkReq = http.get('http://localhost:3001/', () => {
+          const checkReq = http.get(`http://localhost:${ssrPort}/`, () => {
             if (!responded) {
               responded = true;
               res.status(200).send('OK');

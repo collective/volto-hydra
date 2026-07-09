@@ -9,8 +9,13 @@
  * individually.
  */
 import { getImageUrl } from './utils.js';
-const { block } = Astro.props;
-const slides = block.slides || [];
+import { expandTemplatesSync } from '$helpers';
+// astro renders ONLY via the edit render API (SSR has no window.name), so default to edit mode —
+// also covers a slider nested in a container, whose BlockRenderer doesn't thread editMode down.
+const { block, editMode = true } = Astro.props;
+// Expand the slides object_list (idField @id). Edit mode makes this a pass-through that sets each
+// slide's @uid (a view render would need pre-loaded templates instead).
+const slides = expandTemplatesSync(block.slides || [], { idField: '@id', editMode });
 ---
 <div class="slider-block">
   {slides.map((slide: any, i: number) => (

@@ -294,7 +294,7 @@ onMounted(() => {
                             footer: {
                                 title: 'Footer',
                                 allowedBlocks: ['slate', 'image', 'socialLinks'],
-                                allowedLayouts: route.path === '/_test_data/another-page'
+                                allowedLayouts: route.path.startsWith('/_test_data/another-page')
                                     ? ['/_test_data/templates/footer-layout']
                                     : ['/templates/site-footer'],
                             },
@@ -337,7 +337,7 @@ onMounted(() => {
 const footerAllowedLayouts = computed(() => {
     const normalizedPath = route.path.replace(/\/$/, '');
     // Test page uses its own test footer layout
-    if (normalizedPath === '/_test_data/another-page') {
+    if (normalizedPath.startsWith('/_test_data/another-page')) {
         return ['/_test_data/templates/footer-layout'];
     }
     // All other pages get the site footer

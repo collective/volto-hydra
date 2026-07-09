@@ -140,7 +140,11 @@ export default defineNuxtConfig({
     },
   },
   css: ['/assets/css/main.css'],
-  devtools: { enabled: true },
+  // devtools off: when the frontend is embedded in the admin iframe (cross-origin),
+  // Nuxt DevTools throws `SecurityError: ... __NUXT_DEVTOOLS_DISABLE__ ... cross-origin
+  // frame` trying to read the parent window, which breaks iframe access in dev-mode
+  // tests (dev:test). Not needed for this example/test fixture.
+  devtools: { enabled: false },
   // postcss: {
   //   plugins: {
   //     tailwindcss: {},

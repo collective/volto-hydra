@@ -940,12 +940,14 @@ function enrichContent(content, urlPath, baseUrl, expandList = []) {
     'items': childItems,
     'items_total': childItems.length,
     '@components': expandComponents(stubComponents(fullUrl), expandList, urlPath, baseUrl),
-    // Permissions - always grant for mock API
+    // Permissions - granted by default, but a fixture may set `_mockPermissions` to model
+    // an unauthorized case (e.g. a templates folder the user can't add to, or a template
+    // document the user can't modify). This mirrors Plone's per-object permission flags.
     'can_manage_portlets': true,
-    'can_view': true,
-    'can_edit': true,
-    'can_delete': true,
-    'can_add': true,
+    'can_view': transformed._mockPermissions?.can_view ?? true,
+    'can_edit': transformed._mockPermissions?.can_edit ?? true,
+    'can_delete': transformed._mockPermissions?.can_delete ?? true,
+    'can_add': transformed._mockPermissions?.can_add ?? true,
     'can_list_contents': true
   };
 

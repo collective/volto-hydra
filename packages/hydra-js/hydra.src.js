@@ -15,13 +15,14 @@ import {
   deepEqual,
   findChangedUnit,
   isBlockReadonly,
+  isBlockInEditedTemplate,
   isBlockPositionLocked,
   getBlockAddability,
   isTextOnlyBlockChange,
   findBlockInForm,
   slateNodesText,
 } from '@volto-hydra/helpers';
-import { expelAllowedTypes } from './containerOps.js';
+import { expelAllowedTypes, findOnlyEmptyChildUid } from './containerOps.js';
 
 /**
  * This IS a large file and it needs to be written in one file so for better understanding and
@@ -393,16 +394,19 @@ export class Bridge {
   isBlockReadonly(blockUid) {
     const blockData = this.getBlockData(blockUid);
 
-    // Use shared utility for template edit mode and block.readOnly checks
-    const readonlyFromShared = isBlockReadonly(blockData, this.templateEditMode);
-
-    // In template edit mode, the shared function handles everything
+    // In template edit mode the flat shared check (templateInstanceId match) is
+    // sufficient at any depth: the merge stamps every block with its resolved
+    // instance id, so same-template nested content carries the instance's id and a
+    // foreign embedded template carries its own — editable iff the stamped id
+    // matches the edited instance.
     if (this.templateEditMode) {
-      log('isBlockReadonly:', readonlyFromShared ? 'TRUE' : 'FALSE', '(template edit mode) for:', blockUid);
-      return readonlyFromShared;
+      const readonly = !isBlockInEditedTemplate(blockData, this.templateEditMode);
+      log('isBlockReadonly:', readonly ? 'TRUE' : 'FALSE', '(template edit mode) for:', blockUid);
+      return readonly;
     }
 
-    // Normal mode: also check Bridge-specific registry
+    // Normal mode: shared block.readOnly check + Bridge-specific registry
+    const readonlyFromShared = isBlockReadonly(blockData, this.templateEditMode);
     if (this._readonlyBlocks.has(blockUid)) {
       log('isBlockReadonly: TRUE (registry) for:', blockUid);
       return true;
@@ -964,8 +968,12 @@ export class Bridge {
     const blockData = this.getBlockData(blockUid);
     const addability = getBlockAddability(blockUid, this.blockPathMap, blockData, this.templateEditMode);
 
-    // Hide add button if can't insert after (add button only adds after the selected block)
-    if (!addability.canInsertAfter) {
+    // Hide the add button only if the block can neither take a sibling after it NOR be
+    // replaced. An '@type: empty' placeholder can't take siblings (canInsertAfter is false)
+    // but CAN be replaced (canReplace) — the + then opens the chooser to pick its type in
+    // place. Without this, a seeded empty (no defaultBlockType + multiple allowedBlocks) is
+    // stranded with no + and no way to be typed.
+    if (!addability.canInsertAfter && !addability.canReplace) {
       return 'hidden';
     }
 
@@ -4091,6 +4099,15 @@ export class Bridge {
         const clickedLinkableField = isInsideReadonly ? null : event.target.closest('[data-edit-link]');
         const clickedMediaField = isInsideReadonly ? null : event.target.closest('[data-edit-media]');
 
+        // Clicking a data-edit-text element starts INLINE text editing, so prevent
+        // the element's OWN default action. A data-edit-text submit button would
+        // otherwise submit the form (showing the success state) instead of letting
+        // you edit its label. Links are handled above (data-edit-link); a plain
+        // <h3>/<p>/<label> has no default action so this is a no-op for them.
+        if (clickedEditableField) {
+          event.preventDefault();
+        }
+
         if (editableField) {
           const rect = editableField.getBoundingClientRect();
           this.lastClickPosition = {
@@ -4329,6 +4346,15 @@ export class Bridge {
           if (isInPopup) return;
 
           e.preventDefault();
+          // Also stop propagation so this editor key (escape-to-parent) does not
+          // reach the FRONTEND's own window/document keydown handlers. Otherwise an
+          // app-level ESC shortcut — e.g. a slide-out menu that closes on ESC —
+          // fires too, dismissing UI mid-edit. The blocker is capture-phase, so
+          // this halts the event before it bubbles to the page's listeners. Safe
+          // here: this branch only runs with a block selected (the no-block / popup
+          // / slash cases already returned). Matches the block-mode / blocked
+          // branches which already stopPropagation.
+          e.stopPropagation();
           if (activeEditField) {
             // Text mode → Block mode
             log('Escape key - entering block mode from text editing:', this.selectedBlockUid);
@@ -8817,14 +8843,12 @@ export class Bridge {
           if (validTargetInfo?.blockType === 'empty') {
             emptyTargetUid = closestBlockUid;
           } else {
-            const targetData = this.getBlockData(closestBlockUid);
-            const layoutItems = targetData?.blocks_layout?.items;
-            if (Array.isArray(layoutItems) && layoutItems.length === 1) {
-              const onlyChildUid = layoutItems[0];
-              if (this.blockPathMap?.[onlyChildUid]?.blockType === 'empty') {
-                emptyTargetUid = onlyChildUid;
-              }
-            }
+            // Region-aware: find the container's only child via blockPathMap (covers an
+            // object_list container's `slides`, which a blocks_layout.items read missed).
+            emptyTargetUid = findOnlyEmptyChildUid(
+              this.blockPathMap,
+              closestBlockUid,
+            );
           }
           if (emptyTargetUid) {
             const lineIndicator = document.querySelector('.volto-hydra-drop-indicator');

@@ -10,6 +10,10 @@
  * to use it via the same import path as before.
  */
 
+// @volto-hydra/helpers is pure (no @plone/volto), so importing from it keeps this module
+// free of Volto deps — unlike @volto-hydra/hydra-js, which is why PAGE_BLOCK_UID is inlined.
+import { getBlockType } from '@volto-hydra/helpers';
+
 // Same value as PAGE_BLOCK_UID in hydra.js — defined locally to avoid
 // importing from @volto-hydra/hydra-js (which would pull in Volto deps).
 const PAGE_BLOCK_UID = '_page';
@@ -83,6 +87,25 @@ export function getBlockTypeSchema(blockType, intl, blocksConfig) {
 
   _typeSchemaCache.set(blockType, result);
   return result;
+}
+
+/**
+ * Resolve the object_list idField for every block type ONCE, so the merge can stamp item ids
+ * without re-walking schemas per block. Returns { blockType: { field: idField } }. The admin
+ * builds this from blocksConfig; a frontend passes the same shape as a literal hint.
+ */
+export function buildIdFieldMap(blocksConfig, intl) {
+  const map = {};
+  for (const type of Object.keys(blocksConfig || {})) {
+    let schema = null;
+    try { schema = getBlockTypeSchema(type, intl, blocksConfig); } catch { schema = null; }
+    for (const [field, def] of Object.entries(schema?.properties || {})) {
+      if (def?.widget === 'object_list') {
+        (map[type] || (map[type] = {}))[field] = def.idField || '@id';
+      }
+    }
+  }
+  return map;
 }
 
 /**
@@ -550,11 +573,12 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         region, // The container field (region) this block lives in
         blockType, // Block type for uniform lookups (single source of truth)
         _schemaRef: storeSchema(blockSchema), // Deduplicated schema reference
-        allowedSiblingTypes: effectiveAllowedBlocks
-          ? (parentId === PAGE_BLOCK_UID
-            ? effectiveAllowedBlocks.filter(t => defaultPageAllowedBlocks.includes(t))
-            : effectiveAllowedBlocks)
-          : defaultPageAllowedBlocks,
+        // A field's own allowedBlocks is authoritative at every level (same as the object_list
+        // path). We deliberately do NOT intersect page-level fields against a page-wide allowed
+        // set: that set is the UNION of all page regions' allowedBlocks, so it can't express
+        // per-region restrictions (footer vs items may allow different blocks). effectiveAllowedBlocks
+        // already IS the region's field def; the old intersection was a no-op (region ⊆ union).
+        allowedSiblingTypes: effectiveAllowedBlocks || defaultPageAllowedBlocks,
         allowedTemplates: fieldDef.allowedTemplates || null,
         maxSiblings: effectiveMaxLength,
         siblingCount: layout.length, // Total siblings in this container
@@ -637,7 +661,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       // - If typed mode and type missing, fall back to defaultBlockType (e.g., old data without @type)
       // - Otherwise, use virtual type like 'slateTable:rows' (single-schema object_list)
       const itemBlockType = typeField
-        ? (item[typeField] || (hasAllowedBlocks && fieldDef.defaultBlockType) || virtualType)
+        ? (getBlockType(item, typeField) || (hasAllowedBlocks && fieldDef.defaultBlockType) || virtualType)
         : virtualType;
 
       // Determine schema for this item:

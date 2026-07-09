@@ -155,7 +155,12 @@
        inline (no recursive Block render for navItems). Wrapped in
        <Suspense> because expandListingBlocks fetches asynchronously. -->
   <Suspense v-else-if="block['@type'] == 'contextNavigation'">
+    <!-- Key on child ids+types so the async setup re-runs when children change structurally
+         (e.g. a seeded 'empty' is typed into a navItem in place). Without this the async
+         setup's one-time result goes stale and the nav keeps showing the old children.
+         ariaLabel/href edits stay reactive via props, so they don't force a re-mount. -->
     <ContextNavigationBlock :block-id="block_uid"
+                            :key="(block.blocks_layout?.items || []).map((id) => (block.blocks?.[id]?.['@type'] || '?') + id).join('|')"
                             :block="block"
                             :api-url="effectiveApiUrl"
                             :context-path="effectiveContextPath" />
@@ -615,7 +620,7 @@
   </div>
 
   <!-- Form block: renders subblocks as form fields, POSTs to /@submit-form -->
-  <div v-else-if="block['@type'] == 'form'" :data-block-uid="block_uid" class="my-6">
+  <div v-else-if="block['@type'] == 'form'" :data-block-uid="block_uid" class="form-block my-6">
     <h3 v-if="block.title" data-edit-text="title" class="text-xl font-semibold mb-4">{{ block.title }}</h3>
     <div v-if="formState[block_uid]?.success" class="form-success p-4 bg-green-50 text-green-800 rounded-lg mb-4">
       {{ block.send_message || 'Form submitted successfully.' }}
@@ -854,7 +859,7 @@
 
 </template>
 <script setup>
-import { ref, reactive, watch, nextTick, computed, toRefs, inject, onMounted } from 'vue';
+import { ref, reactive, watch, nextTick, computed, toRefs, inject, onMounted, unref } from 'vue';
 import { isEditMode } from '@hydra-js/hydra.js';
 import { staticBlocks, expandTemplatesSync } from '@hydra-js/helpers';
 import RichText from './richtext.vue';
@@ -863,7 +868,10 @@ import RichText from './richtext.vue';
 const injectedApiUrl = inject('apiUrl', '');
 const injectedContextPath = inject('contextPath', '/');
 const injectedTemplates = inject('templates', {});
-const templateState = inject('templateState', {});
+// No default: templateState MUST be provided once at the page root and shared by
+// every Block (top-level + nested). A default {} would give each component its own
+// state, breaking nested-container recognition (the merge throws if it's missing).
+const templateState = inject('templateState');
 const injectedPages = inject('pages', {});
 
 const props = defineProps({
@@ -991,8 +999,11 @@ function socialInfo(url) {
 // Expand child blocks: wraps expandTemplatesSync with injected context
 // For blocks dicts: expand(layout, blocks)
 // For object_list arrays: expand(items, null, '@id')
+// unref: `templates` is provided as a computed ref ([...slug].vue); the Vue-free
+// merge does Object.keys(templates), which on a raw ref yields ComputedRefImpl
+// internals → "template not found" 500. Unwrap to the plain object.
 const expand = (layout, blocks, idField) => expandTemplatesSync(layout, {
-  blocks, templateState, templates: injectedTemplates,
+  blocks, templateState, templates: unref(injectedTemplates),
   ...(idField && { idField }),
 });
 

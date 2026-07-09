@@ -9,7 +9,7 @@
  * No `regions` map, no synthesised 'items'.
  */
 
-import { getBlocksFieldNames, buildBlockPathMap } from './buildBlockPathMap.js';
+import { getBlocksFieldNames, buildBlockPathMap, getPageAllowedBlocksFromRestricted } from './buildBlockPathMap.js';
 import { mapLayoutItems } from './containerOps.js';
 
 describe('getBlocksFieldNames', () => {
@@ -115,6 +115,19 @@ describe('buildBlockPathMap — page blocks fields', () => {
   test('per-field allowedBlocks applies to its blocks', () => {
     const map = buildBlockPathMap(formData, blocksConfig);
     expect(map['footer-1'].allowedSiblingTypes).toEqual(['slate']);
+  });
+
+  test('the default (items) region with no per-region allowedBlocks falls back to the page-level list', () => {
+    // Compat: a page's single "top-level" allowed-blocks list (derived from `restricted`) must
+    // apply to the default `items` region when that region declares no allowedBlocks of its own.
+    // effectiveAllowedBlocks is null → allowedSiblingTypes is `defaultPageAllowedBlocks`, NOT
+    // undefined and NOT the footer's ['slate']. (Guards the removal of the page-level intersect:
+    // that filter was a no-op; this fallback is the actual page-level application.)
+    const map = buildBlockPathMap(formData, blocksConfig);
+    const pageLevel = getPageAllowedBlocksFromRestricted(blocksConfig, { properties: formData });
+    expect(map['hero-1'].allowedSiblingTypes).toEqual(pageLevel);
+    // and it is NOT the footer region's per-region list
+    expect(map['hero-1'].allowedSiblingTypes).not.toEqual(['slate']);
   });
 
   test('a page with data only in a non-default field is still processed', () => {

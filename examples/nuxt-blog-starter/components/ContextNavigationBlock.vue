@@ -33,6 +33,12 @@
           </a>
         </li>
       </ul>
+      <!-- Non-nav children (e.g. a seeded 'empty' placeholder when the nav has no
+           items yet) are delegated to the central block dispatch, which renders
+           'empty' as a selectable placeholder. contextNavigation doesn't reject or
+           special-case them — 'empty' is a universal placeholder, never a declared type. -->
+      <Block v-for="item in extras" :key="item.blockId"
+             :block_uid="item.blockId" :block="item.block" :data="block" />
     </details>
   </nav>
 </template>
@@ -96,6 +102,7 @@ const exposedUids = computed(() => {
 
 async function expandChildren() {
   const flat = [];
+  const extras = [];
   for (const childId of props.block.blocks_layout.items) {
     const child = props.block.blocks[childId];
     if (child['@type'] === 'navItem') {
@@ -141,12 +148,20 @@ async function expandChildren() {
         flat.push({ block: item, blockId: item['@uid'] });
       }
     } else {
-      throw new Error(`contextNavigation child of @type "${child['@type']}" is not allowed (expected navItem or listing)`);
+      // Not a nav child (navItem/listing). Don't reject it — delegate to the central
+      // block dispatch (<Block> in the template). A seeded 'empty' placeholder is the
+      // common case (empty nav); block.vue renders 'empty' as a selectable placeholder.
+      extras.push({ block: child, blockId: childId });
     }
   }
 
-  const pathOf = (entry) =>
-    new URL(entry.block.href[0]['@id'], 'http://placeholder').pathname;
+  // A freshly-typed navItem (just picked from the chooser to replace a seeded empty) has no
+  // href yet — tolerate it (treat as root-level, render as a plain anchor) instead of crashing
+  // the whole nav on href[0]['@id'].
+  const pathOf = (entry) => {
+    const h = entry.block.href?.[0]?.['@id'];
+    return h ? new URL(h, 'http://placeholder').pathname : '';
+  };
   const segsOf = (p) => p.split('/').filter(Boolean);
   const here = route.path.replace(/\/$/, '');
 
@@ -208,7 +223,7 @@ async function expandChildren() {
     return true; // ancestor of current (or current)
   };
 
-  return flat.flatMap((entry, i) => {
+  const entries = flat.flatMap((entry, i) => {
     if (!passes(segs[i]) || !hasAllAncestors(segs[i])) return [];
     const itemPath = paths[i];
     const stripped = itemPath.replace(/\/$/, '');
@@ -228,7 +243,9 @@ async function expandChildren() {
       ].filter(Boolean),
     }];
   });
+
+  return { entries, extras };
 }
 
-const entries = await expandChildren();
+const { entries, extras } = await expandChildren();
 </script>

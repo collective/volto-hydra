@@ -3,7 +3,7 @@
     <h3 data-edit-text="title">{{ block.title }}</h3>
     <p v-if="block.description" data-edit-text="description">{{ block.description }}</p>
 
-    <div v-for="field in block.subblocks || []" :key="field['@id']" class="form-field" :data-block-uid="field.field_id">
+    <div v-for="field in fields" :key="field.field_id" class="form-field" :data-block-uid="field.field_id">
       <template v-if="field.field_type === 'text'">
         <label><span data-edit-text="label">{{ field.label }}</span> <input type="text" :required="field.required" /></label>
       </template>
@@ -48,5 +48,9 @@
 </template>
 
 <script setup>
-defineProps({ block: Object });
+import { computed } from 'vue';
+const props = defineProps({ block: Object });
+// Expand the subblocks object_list, passing its idField (field_id) so the merge stamps ids
+// correctly. In edit mode this is a pass-through that sets each field's @uid from field_id.
+const fields = computed(() => expandTemplatesSync(props.block.subblocks || [], { idField: 'field_id' }));
 </script>

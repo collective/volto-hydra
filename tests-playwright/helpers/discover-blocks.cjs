@@ -57,6 +57,55 @@ function buildAllowedBlocksList(blocksConfig) {
 }
 
 /**
+ * A blocks_layout region seeds an `@type: "empty"` placeholder — rather than a
+ * concrete default/single type — exactly when it has no `defaultBlockType` and
+ * more than one `allowedBlocks`. Mirrors getEmptyBlockType() in
+ * packages/volto-hydra/src/utils/blockPath.js (a 3-line predicate kept in sync
+ * here because that module imports Volto's `config`, which this CJS discovery
+ * can't load). Only these regions need the "renders when empty" sanity check —
+ * default/single-type regions seed a normal block that block-sanity already
+ * exercises.
+ * @returns {Array<{parentType: string, field: string}>}
+ */
+function emptySeedingRegions(blocksConfig) {
+  const out = [];
+  for (const [blockType, blockDef] of Object.entries(blocksConfig || {})) {
+    const props = blockDef?.blockSchema?.properties;
+    if (!props) continue;
+    for (const [fieldName, fieldDef] of Object.entries(props)) {
+      if (fieldDef?.widget !== 'blocks_layout') continue;
+      if (fieldDef?.defaultBlockType) continue; // seeds the default type
+      const allowed = fieldDef?.allowedBlocks;
+      if (!Array.isArray(allowed) || allowed.length <= 1) continue; // seeds the single type
+      out.push({ parentType: blockType, field: fieldName });
+    }
+  }
+  return out;
+}
+
+/**
+ * Pair each empty-seeding region with a real discovered container example so
+ * the sanity test has a page + block to load and strip. Regions whose parent
+ * container has no content example anywhere are skipped (nothing to strip).
+ * @param {Object} blocksConfig
+ * @param {DiscoveredBlock[]} blocks - discoverBlocks() output
+ * @returns {Array<{parentType: string, field: string, pagePath: string, blockId: string}>}
+ */
+function buildEmptyRegionCases(blocksConfig, blocks) {
+  const exampleByType = new Map();
+  for (const b of blocks || []) {
+    if (!exampleByType.has(b.blockType)) exampleByType.set(b.blockType, b);
+  }
+  const cases = [];
+  for (const { parentType, field } of emptySeedingRegions(blocksConfig)) {
+    const example = exampleByType.get(parentType);
+    if (!example) continue;
+    cases.push({ parentType, field, pagePath: example.pagePath, blockId: example.blockId });
+  }
+  return cases;
+}
+
+/**
  * For a parent block's data, return the set of sub-block types present in
  * the given container field. Handles both object_list shape (array of items
  * with field_type/@type) and blocks_layout shape (ids in {items:[]} that
@@ -371,6 +420,26 @@ function collectWidgetShapeIssues(blockData, blockSchema, pagePath, blockId, out
       // object — tolerate that. Just check it's not a primitive.
       if (typeof value !== 'object' || value === null) {
         issues.push(describe('object_list array/object', value));
+      } else if (Array.isArray(value) && Array.isArray(def.default) && def.default.length) {
+        // The field declares a `default` (e.g. codeExample.tabs → one JavaScript
+        // tab). A content item carrying only its idField dropped every field the
+        // default supplies — the signature of a seed that clobbered the schema
+        // default with a blank item (initializeContainerBlock used to overwrite
+        // the already-applied default). Missing optional fields are otherwise
+        // skipped above, so this default-aware check is what catches it.
+        const idField = def.idField || '@id';
+        const defaultFields = Object.keys(def.default[0] || {}).filter((k) => k !== idField);
+        if (defaultFields.length) {
+          for (const item of value) {
+            if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+            if (Object.keys(item).filter((k) => k !== idField).length === 0) {
+              issues.push(
+                `field "${field}": item ${JSON.stringify(item[idField])} has only its id — the ` +
+                  `schema default supplies ${JSON.stringify(defaultFields)}, so a bare item means the default was lost`,
+              );
+            }
+          }
+        }
       }
     } else if (widget === 'blocks_layout') {
       // blocks_layout field holds `{items: [...]}` pointing at sibling
@@ -702,4 +771,4 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   return result;
 }
 
-module.exports = { discoverBlocks, extractBlocks, buildObjectListFieldsMap };
+module.exports = { discoverBlocks, extractBlocks, buildObjectListFieldsMap, buildEmptyRegionCases };
