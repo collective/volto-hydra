@@ -60,9 +60,19 @@ test.describe('forced footer — add column → add form → convert field', () 
     await helper.selectBlockType('form');
     await expect(footer.locator('.form-block')).toBeVisible({ timeout: 10000 });
 
-    // Convert the seeded empty field to E-mail.
+    // `.form-block` appearing in the DOM is NOT the end of the insert. The admin asked the iframe to
+    // select the block it just inserted (pendingSelectBlockUid -> FORM_DATA.selectedBlockUid), and
+    // hydra applies that in afterContentRender, AFTER the render settles. Clicking a child inside
+    // that window gets overwritten by the pending select-the-new-form. Wait for the insert to reach
+    // its intended steady state — the form selected — before drilling into it.
+    const formId = await footer.locator('[data-block-uid]:has(.form-block)').last().getAttribute('data-block-uid');
+    await helper.waitForBlockSelectedInAdmin(formId!);
+
+    // Convert the seeded empty field to E-mail: select it, then click its '+' (an empty block is
+    // replaceable, so the '+' opens the chooser to pick its type in place).
     const fieldId = await footer.locator('.form-block [data-block-uid]').first().getAttribute('data-block-uid');
     await helper.clickBlockInIframe(fieldId!);
+    await helper.waitForBlockSelectedInAdmin(fieldId!);
     await page.locator('.volto-hydra-add-button').click();
     await expect(page.locator('.blocks-chooser')).toBeVisible({ timeout: 5000 });
     await helper.selectBlockType('from');

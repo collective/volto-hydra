@@ -14,7 +14,6 @@ import {
   isSlateFieldType,
   formDataContentEqual,
   getUniqueTemplateIds,
-  getBlockAddability,
   isBlockReadonly,
   isBlockPositionLocked,
 } from '@volto-hydra/helpers';
@@ -2894,18 +2893,11 @@ const Iframe = (props) => {
             break;
           }
 
-          // Check if we can add/replace at this block - if so, open block chooser for empty blocks
-          // This should happen on every click of an empty block, not just "new" selections
-          // BlockChooser will dynamically decide to mutate vs insert based on selected block type
-          // IMPORTANT: Rebuild blockPathMap from properties instead of using iframeSyncState.blockPathMap
-          // because React state updates are async and the state may be stale when BLOCK_SELECTED arrives
-          // shortly after a delete operation creates an empty block
-          const currentBlockPathMap = buildBlockPathMap(properties, config.blocks.blocksConfig, intl);
-          const selectedBlockData = getBlockById(properties, currentBlockPathMap, event.data.blockUid);
-          const addability = getBlockAddability(event.data.blockUid, currentBlockPathMap, selectedBlockData, iframeSyncState.templateEditMode);
-          if (addability.canReplace) {
-            setAddNewBlockOpened(true);
-          }
+          // NOTE: selecting an empty block must NOT open the block chooser. BLOCK_SELECTED fires
+          // for every selection — click, keyboard nav, escape-to-parent, sidebar, and the admin's
+          // own pendingSelectBlockUid after an insert or after a delete seeds a replacement empty.
+          // An empty block gets a '+' (getBlockAddability: canReplace), and clicking THAT opens
+          // the chooser via handleIframeAdd. That is the convert gesture.
 
           // Now update blockUI state
           log(' About to call setBlockUI for:', event.data.blockUid);
@@ -4124,58 +4116,21 @@ const Iframe = (props) => {
     setChooser(null);
   };
 
+  // Close the wrap/convert chooser on an outside click — it's a bare popup (no Cancel button),
+  // so "click away to dismiss" lives here. Clicks inside the .blocks-chooser are ignored; picking
+  // a type commits + closes via commitChooser.
+  useEffect(() => {
+    if (!chooser) return;
+    const onDown = (e) => {
+      if (e.target.closest('.blocks-chooser')) return;
+      setChooser(null);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [chooser]);
+
   return (
     <div id="iframeContainer">
-      {chooser && createPortal(
-        <div
-          className="container-block-chooser"
-          style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            zIndex: 10000,
-            background: 'white',
-            border: '1px solid #999',
-            borderRadius: '6px',
-            padding: '12px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-            minWidth: '320px',
-            maxHeight: '70vh',
-            overflowY: 'auto',
-          }}
-          // Stop the underlying iframe from receiving the click and clearing the chooser.
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
-            {chooser.kind === 'wrap' ? 'Wrap in…' : 'Convert to…'}
-          </div>
-          {chooser.allowedBlocks.length === 0 ? (
-            <div style={{ color: '#888', fontSize: '13px' }}>
-              No compatible target available.
-            </div>
-          ) : (
-            <BlockChooser
-              showRestricted
-              allowedBlocks={chooser.allowedBlocks}
-              blocksConfig={blocksConfig}
-              currentBlock={chooser.blockId || null}
-              onInsertBlock={(_id, value) => commitChooser(value['@type'])}
-              onMutateBlock={(_id, value) => commitChooser(value['@type'])}
-            />
-          )}
-          <button
-            onClick={() => setChooser(null)}
-            style={{
-              marginTop: '6px', padding: '6px 10px',
-              background: 'transparent', border: 'none', color: '#666', cursor: 'pointer',
-            }}
-          >
-            Cancel
-          </button>
-        </div>,
-        document.body,
-      )}
       <OpenObjectBrowser
         origin={iframeSrc && new URL(iframeSrc).origin}
         pendingFieldMedia={pendingFieldMedia}
@@ -4206,13 +4161,26 @@ const Iframe = (props) => {
         }}
         onFieldMediaCancelled={() => setPendingFieldMedia(null)}
       />
-      {addNewBlockOpened &&
+      {(addNewBlockOpened || chooser) &&
         createPortal(
           <div
             ref={setPopperElement}
             style={styles.popper}
             {...attributes.popper}
           >
+            {chooser ? (
+              // Wrap/convert reuses the SAME popper-anchored chooser as add — one popup, bare:
+              // pick a type to commit, click away to dismiss (no modal, no title/Cancel).
+              <BlockChooser
+                showRestricted
+                allowedBlocks={chooser.allowedBlocks}
+                blocksConfig={blocksConfig}
+                currentBlock={chooser.blockId || selectedBlock}
+                onInsertBlock={(_id, value) => commitChooser(value['@type'])}
+                onMutateBlock={(_id, value) => commitChooser(value['@type'])}
+                ref={blockChooserRef}
+              />
+            ) : (
             <BlockChooser
               onMutateBlock={
                 onMutateBlock
@@ -4255,6 +4223,7 @@ const Iframe = (props) => {
               navRoot={navRoot}
               contentType={contentType}
             />
+            )}
           </div>,
           document.body,
         )}

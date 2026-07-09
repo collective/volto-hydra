@@ -1171,18 +1171,20 @@ test.describe('Empty Block Behavior', () => {
     // click since empty blocks don't show a toolbar (clickBlockInIframe expects one).
     await emptyBlock.click();
 
-    // Clicking the empty block opens the chooser to pick its type.
-    const blockChooser = page.locator('.block-add-button-menu, .blocks-chooser');
-    await expect(blockChooser).toBeVisible({ timeout: 5000 });
-
     // The '+' add button IS visible for the empty — the type-in-place affordance. (This test
     // previously asserted it hidden; 9abb4a3 intentionally changed that so a no-default,
     // multi-allowed empty isn't stranded with no way to be typed.)
     const addButton = page.locator('.volto-hydra-add-button');
     await expect(addButton).toBeVisible({ timeout: 5000 });
+
+    // Clicking that '+' — the one drawn in the middle of the empty — opens the chooser. Merely
+    // SELECTING the empty must not (a delete that seeds an empty selects it too).
+    await addButton.click();
+    const blockChooser = page.locator('.block-add-button-menu, .blocks-chooser');
+    await expect(blockChooser).toBeVisible({ timeout: 5000 });
   });
 
-  test('clicking empty block opens block chooser', async ({ page }) => {
+  test("clicking an empty block's + opens the block chooser", async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -1220,11 +1222,15 @@ test.describe('Empty Block Behavior', () => {
     const emptyBlockId = await emptyBlockLocator.getAttribute('data-block-uid');
     console.log('[TEST] Empty block ID after deletions:', emptyBlockId);
 
-    // Click the empty block
-    // Don't use clickBlockInIframe because empty blocks open the chooser, not the sidebar
+    // Select the empty block. Don't use clickBlockInIframe — empty blocks show no toolbar.
     await emptyBlockLocator.click();
 
-    // Block chooser should open automatically
+    // Selecting it is not the convert gesture; clicking the '+' drawn in the middle of the empty
+    // is. Only then does the chooser open.
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+    await addButton.click();
+
     const blockChooser = page.locator('.blocks-chooser');
     await expect(blockChooser).toBeVisible({ timeout: 5000 });
   });
@@ -1263,9 +1269,12 @@ test.describe('Empty Block Behavior', () => {
     // Get the empty block's ID
     const emptyBlockId = await emptyBlockLocator.getAttribute('data-block-uid');
 
-    // Click the empty block to open chooser
-    // Don't use clickBlockInIframe because empty blocks open the chooser, not the sidebar
+    // Select the empty block, then click the '+' drawn in its middle to open the chooser.
+    // Don't use clickBlockInIframe — empty blocks show no toolbar.
     await emptyBlockLocator.click();
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+    await addButton.click();
 
     // Wait for block chooser
     const blockChooser = page.locator('.blocks-chooser');
@@ -1314,9 +1323,12 @@ test.describe('Empty Block Behavior', () => {
     );
     await expect(inContainerEmpty).toBeVisible({ timeout: 5000 });
 
-    // Adding into that empty (click → chooser → Teaser) clears the empty and
+    // Adding into that empty (select → click its '+' → chooser → Teaser) clears the empty and
     // places the new block inside the container.
     await inContainerEmpty.click();
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+    await addButton.click();
     const chooser = page.locator('.blocks-chooser');
     await expect(chooser).toBeVisible({ timeout: 5000 });
     await chooser.getByRole('button', { name: 'Teaser' }).click();
