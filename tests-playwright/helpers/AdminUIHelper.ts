@@ -3041,10 +3041,10 @@ export class AdminUIHelper {
   /**
    * Select a block type from the BlockChooser by its @type id.
    *
-   * BlockChooser renders each block as `<button class={block.id}>`. The button
-   * exists in the DOM regardless of accordion state, but is hidden inside
-   * collapsed groups. We open every collapsed accordion title before clicking
-   * so the call works without a per-type display-name mapping.
+   * BlockChooser renders each block as `<button class={block.id}>`. The button exists in the DOM
+   * regardless of accordion state, but is hidden inside collapsed groups. We first confirm the
+   * type is on offer at all (else the WRONG chooser is open — fail loudly saying what IS offered),
+   * then expand the section holding it and click it like a user would.
    */
   async selectBlockType(blockType: string): Promise<void> {
     // Scope to the visible chooser. A previous chooser instance may still be
@@ -3054,14 +3054,44 @@ export class AdminUIHelper {
     // `15 x locator resolved to visible <div class="blocks-chooser ...">`.
     const chooser = this.page.locator('.blocks-chooser:visible').first();
     await chooser.waitFor({ state: 'visible', timeout: 5000 });
+
+    // Confirm THIS chooser actually offers the type (the button exists in some section, even a
+    // collapsed one). If not, an UNEXPECTED chooser is open (e.g. the wrong add-context) — fail
+    // loudly with what IS offered, instead of a mystery "button never attached" timeout.
+    if ((await chooser.locator(`button.${blockType}`).count()) === 0) {
+      const offered = await chooser
+        .locator('button')
+        .evaluateAll((bs) =>
+          bs
+            .map((b) => b.className.replace(/\b(ui|basic|icon|button)\b/g, '').trim())
+            .filter(Boolean),
+        );
+      throw new Error(
+        `selectBlockType('${blockType}'): not offered by the open chooser. Offered: [${offered.join(
+          ', ',
+        )}]`,
+      );
+    }
+
+    // Open the accordion SECTION the button lives in, the way a user would, then click the button
+    // once it is genuinely visible. (We can't drive the search box instead: it filters on the
+    // block's TITLE, and callers pass the @type id — `from` would never match "E-mail".)
     const button = chooser.locator(`button.${blockType}`).first();
-    // The button always exists in the DOM (even inside collapsed accordions).
-    // Wait for it to be attached, then dispatch click via JS so we don't
-    // depend on accordion expansion or animation state. Avoids touching
-    // accordion titles, which (in the Popup-hosted chooser) can shift the
-    // Popup geometry and accidentally close it.
-    await button.waitFor({ state: 'attached', timeout: 5000 });
-    await button.evaluate((el) => (el as HTMLButtonElement).click());
+    if (!(await button.isVisible())) {
+      // Direct children only: a block button carries `class={block.id}`, so `.accordion .title`
+      // also matches the Title block's own <button class="... title">, not just Accordion.Title.
+      const sectionIndex = await chooser.locator('.accordion > .content').evaluateAll(
+        (contents, type) => contents.findIndex((c) => !!c.querySelector(`button.${type}`)),
+        blockType,
+      );
+      if (sectionIndex < 0) {
+        throw new Error(`selectBlockType('${blockType}'): button is in no accordion section.`);
+      }
+      await chooser.locator('.accordion > .title').nth(sectionIndex).click();
+    }
+    await expect(button).toBeVisible({ timeout: 5000 });
+    await button.click();
+
     // After click, wait until no visible chooser remains. Using a fresh
     // locator (not `chooser`) so we observe the live DOM state, not the
     // captured stale-now reference.
@@ -4679,31 +4709,50 @@ export class AdminUIHelper {
     });
     const addButton = section.getByRole('button', { name: 'Add block' });
     await expect(addButton).toBeVisible({ timeout: 5000 });
-    await addButton.click();
 
-    // Check if block chooser appeared (multiple allowed types)
-    const blockChooser = this.page.locator('.blocks-chooser');
-    const chooserVisible = await blockChooser
-      .waitFor({ state: 'visible', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
+    // A blockType is requested only for a MULTI-type container, where the chooser MUST open. A
+    // single-allowed-type container auto-inserts on the Add click (no chooser). Either way, wait
+    // for a real CONDITION — never a racy short timeout to guess which of the two happened.
+    if (blockType) {
+      await addButton.click();
+      const blockChooser = this.page.locator('.blocks-chooser');
+      await expect(blockChooser).toBeVisible({ timeout: 5000 });
 
-    if (chooserVisible && blockType) {
-      // Select the specified block type (may be in a collapsed accordion section)
-      const blockButton = blockChooser.getByRole('button', {
-        name: new RegExp(blockType, 'i'),
-      });
-      // If not visible, try expanding accordion sections to find it
-      if (!(await blockButton.isVisible({ timeout: 500 }).catch(() => false))) {
-        const sections = blockChooser.locator('.accordion .title');
-        for (let i = 0; i < (await sections.count()); i++) {
-          await sections.nth(i).click();
-          if (await blockButton.isVisible({ timeout: 300 }).catch(() => false)) break;
+      // Open the accordion section holding the target, then click it. We can't wait on the
+      // getByRole locator directly: semantic-ui marks collapsed Accordion.Content aria-hidden, so
+      // a button inside one is absent from the a11y tree — even `state: 'attached'` never resolves.
+      // Hence the section is located via the DOM (textContent), not by role.
+      const blockButton = blockChooser
+        .getByRole('button', { name: new RegExp(blockType, 'i') })
+        .first();
+      if (!(await blockButton.isVisible().catch(() => false))) {
+        const sectionIndex = await blockChooser.locator('.accordion > .content').evaluateAll(
+          (contents, pattern) => {
+            const re = new RegExp(pattern, 'i');
+            return contents.findIndex((c) =>
+              Array.from(c.querySelectorAll('button')).some((b) => re.test(b.textContent || '')),
+            );
+          },
+          blockType,
+        );
+        if (sectionIndex < 0) {
+          throw new Error(`addBlockViaSidebar('${blockType}'): not offered by the open chooser.`);
         }
+        await blockChooser.locator('.accordion > .title').nth(sectionIndex).click();
       }
+      await expect(blockButton).toBeVisible({ timeout: 5000 });
       await blockButton.click();
-      // Wait for chooser to close
-      await blockChooser.waitFor({ state: 'hidden', timeout: 5000 });
+      await expect(blockChooser).toBeHidden({ timeout: 5000 });
+    } else {
+      // Single-allowed-type container auto-inserts on the Add click (no chooser). The insert can
+      // land in a region the page-level block count doesn't track (e.g. a forced footer), so
+      // there's no clean count/selector to await — confirm no chooser opened, which for a
+      // single-type container is immediate, and gives the re-render a brief settle.
+      await addButton.click();
+      await this.page
+        .locator('.blocks-chooser')
+        .waitFor({ state: 'visible', timeout: 1000 })
+        .catch(() => {});
     }
   }
 
