@@ -793,6 +793,58 @@ function resolveUidUrls(obj, parentKey = null) {
  * Walks the data and for any object with image_field but no image_scales,
  * looks up the referenced image content and generates scales.
  */
+/**
+ * Relation fields (currently `preview_image_link`, from volto.preview_image_link)
+ * are stored on disk as `resolveuid/UID`. Plone's RelationChoiceFieldSerializer
+ * serialises them as a SUMMARY of the linked object — not a url string:
+ *
+ *   plone.restapi serializer/relationfield.py:23
+ *     summary = getMultiAdapter((value.to_object, request), ISerializeToJsonSummary)()
+ *
+ * and plone.volto registers a JSONSummarySerializerMetadata utility adding
+ * `image_field` and `image_scales` to every summary (plone.volto/summary.py).
+ *
+ * We only build the summary stub here; enrichImageBrains() then attaches
+ * image_scales, because the stub carries `image_field` and `@id`.
+ */
+const RELATION_FIELDS = ['preview_image_link'];
+
+function summarizeRelations(content, baseUrl) {
+  const out = { ...content };
+  for (const field of RELATION_FIELDS) {
+    const value = out[field];
+    if (typeof value !== 'string') continue; // already a summary, or unset
+    const contentPath = value.startsWith('http') ? new URL(value).pathname : value;
+    const raw = loadRawContentFromDisk(contentPath);
+    if (!raw) continue;
+    out[field] = {
+      '@id': `${baseUrl}${contentPath}`,
+      '@type': raw['@type'],
+      title: raw.title,
+      description: raw.description || '',
+      review_state: raw.review_state || 'published',
+      // Only images carry an image field; a linked non-image simply lacks it.
+      ...(raw['@type'] === 'Image' ? { image_field: 'image' } : {}),
+    };
+  }
+  return out;
+}
+
+/**
+ * An image block's `url` is either a bare string or Volto's object-browser
+ * form `[{'@id': ...}]`. Both appear in real content. Returns a string or null.
+ */
+function imageBlockUrl(url) {
+  if (typeof url === 'string') return url;
+  if (Array.isArray(url)) {
+    const first = url[0];
+    if (typeof first === 'string') return first;
+    if (first && typeof first['@id'] === 'string') return first['@id'];
+  }
+  if (url && typeof url['@id'] === 'string') return url['@id'];
+  return null;
+}
+
 function enrichImageBrains(obj, baseUrl) {
   if (!obj || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map(item => enrichImageBrains(item, baseUrl));
@@ -808,6 +860,32 @@ function enrichImageBrains(obj, baseUrl) {
       const scales = getImageScales(enrichedImage, baseUrl);
       if (scales) {
         obj = { ...obj, image_scales: scales };
+      }
+    }
+  }
+
+  // An image block references an Image object through `url` and carries no
+  // `image_field`. Real Plone's serializer attaches image_scales to it at
+  // request time; the content export on disk holds only the (resolveuid) url.
+  // Without this, anything reading `block.image_scales` — og:image resolution,
+  // responsive srcset — silently sees nothing against the mock, and fixtures
+  // are forced to hand-embed a shape the real API would have produced.
+  if (obj['@type'] === 'image' && obj.url && !obj.image_scales) {
+    // `url` comes in two shapes: a bare string, or Volto's object-browser form
+    // `[{'@id': ...}]`. Assuming a string throws `url.startsWith is not a
+    // function` and 500s the whole content response.
+    const url = imageBlockUrl(obj.url);
+    // resolveUidUrls has already run, so an internal reference is a real path.
+    const isExternal = typeof url === 'string' && url.startsWith('http') && !url.startsWith(baseUrl);
+    if (url && !isExternal) {
+      const contentPath = url.startsWith('http') ? new URL(url).pathname : url;
+      const rawContent = loadRawContentFromDisk(contentPath);
+      if (rawContent) {
+        const enrichedImage = enrichContent(rawContent, contentPath, baseUrl);
+        const scales = getImageScales(enrichedImage, baseUrl);
+        if (scales) {
+          obj = { ...obj, image_scales: scales };
+        }
       }
     }
   }
@@ -951,9 +1029,13 @@ function enrichContent(content, urlPath, baseUrl, expandList = []) {
     'can_list_contents': true
   };
 
-  // Resolve resolveuid/UID references to actual URLs (like Plone's serializer)
-  // Then add image_scales to catalog brain references (like Plone's serializer)
-  return enrichImageBrains(resolveUidUrls(enriched), baseUrl);
+  // 1. Resolve resolveuid/UID references to actual URLs (like Plone's serializer)
+  // 2. Turn relation fields into summaries of their target (RelationChoiceFieldSerializer)
+  // 3. Add image_scales to anything summary-shaped (image_field + @id)
+  return enrichImageBrains(
+    summarizeRelations(resolveUidUrls(enriched), baseUrl),
+    baseUrl,
+  );
 }
 
 /**

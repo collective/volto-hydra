@@ -402,3 +402,83 @@ describe('@site', () => {
     assert.ok(Array.isArray(data['plone.available_languages']), '@site must include plone.available_languages as an array (read by ManageTranslations)');
   });
 });
+
+describe('preview_image_link (volto.preview_image_link behaviour)', () => {
+  // Plone's RelationChoiceFieldSerializer returns ISerializeToJsonSummary of the
+  // LINKED object (plone.restapi serializer/relationfield.py:23), and plone.volto
+  // registers a JSONSummarySerializerMetadata utility that adds image_field and
+  // image_scales to every summary (plone.volto/src/plone/volto/summary.py).
+  // So the field arrives as a summary of the Image, not a bare url string.
+  it('serialises preview_image_link as a summary of the linked Image', async () => {
+    const res = await fetch(`${baseUrl}/_test_data/preview-image-link`, {
+      headers: { Accept: 'application/json' },
+    });
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    const pil = data.preview_image_link;
+
+    assert.equal(typeof pil, 'object', 'preview_image_link must be a summary object, not a string');
+    assert.ok(pil['@id'].endsWith('/_test_data/images/test-image-1'), `got ${pil['@id']}`);
+    assert.equal(pil['@type'], 'Image');
+    assert.equal(pil.image_field, 'image');
+    assert.ok(pil.image_scales, 'summary must carry image_scales');
+    assert.equal(pil.image_scales.image[0].width, 400);
+    assert.equal(pil.image_scales.image[0].height, 300);
+    assert.equal(pil.image_scales.image[0].download, '@@images/image');
+  });
+});
+
+describe('image blocks', () => {
+  // Real Plone's serializer adds `image_scales` to an image block whose `url`
+  // points at an Image object. Our content export stores only the resolveuid
+  // reference, so the mock must synthesise the scales the same way — otherwise
+  // frontends that read `block.image_scales` (og:image resolution, srcset)
+  // silently see nothing and fixtures have to hand-embed the shape.
+  //
+  // Note: a real image block has NO `image_field` key; the scales are keyed
+  // under `image` and `download` is RELATIVE to the image object.
+  it('adds image_scales to an image block that references an Image by resolveuid', async () => {
+    const res = await fetch(`${baseUrl}/_test_data/image-block-resolveuid`, {
+      headers: { Accept: 'application/json' },
+    });
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    const block = data.blocks['image-1'];
+
+    assert.ok(
+      block.url.endsWith('/_test_data/images/test-image-1'),
+      `resolveuid should resolve to the image object, got ${block.url}`,
+    );
+    assert.ok(block.image_scales, 'image block must carry image_scales');
+
+    const meta = block.image_scales.image[0];
+    assert.equal(meta.width, 400, 'width comes from the referenced Image');
+    assert.equal(meta.height, 300, 'height comes from the referenced Image');
+    assert.equal(meta.download, '@@images/image', 'download is relative to the image object');
+    assert.ok(meta.scales && Object.keys(meta.scales).length > 0, 'expected nested scales');
+  });
+
+  it('does not crash when the block url is an array of refs (Volto object-browser form)', async () => {
+    // Real content stores `url` both ways: 70 blocks use a bare resolveuid
+    // string, 5 use [{'@id': ...}] from the object-browser widget. A serializer
+    // that assumes a string throws `url.startsWith is not a function` and takes
+    // the whole content response down with it.
+    const res = await fetch(`${baseUrl}/_test_data/image-block-arrayurl`, {
+      headers: { Accept: 'application/json' },
+    });
+    assert.equal(res.status, 200, 'array-form url must not 500 the response');
+    const data = await res.json();
+    const block = data.blocks['image-1'];
+    assert.ok(block.image_scales, 'array-form url should still resolve to image_scales');
+    assert.equal(block.image_scales.image[0].width, 400);
+  });
+
+  it('leaves an image block with an external url untouched', async () => {
+    const res = await fetch(`${baseUrl}/_test_data/image-block-resolveuid`, {
+      headers: { Accept: 'application/json' },
+    });
+    const data = await res.json();
+    // the title block must not sprout image_scales
+    assert.equal(data.blocks['title-1'].image_scales, undefined);
+  });
+});
