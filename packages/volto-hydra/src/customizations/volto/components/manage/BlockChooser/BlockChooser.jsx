@@ -77,7 +77,10 @@ const BlockChooser = ({
 
   let blocksAvailable = {};
   const mostUsedBlocks = filter(filteredBlocksConfig, (item) => item.mostUsed);
-  if (mostUsedBlocks) {
+  // Only register "Most used" when it actually has blocks. filter() returns [] (which is truthy),
+  // so this used to register an empty group that then rendered as an empty, first, default-open
+  // section. Every other group already gets a key only when non-empty (groupBy skips empties).
+  if (mostUsedBlocks.length > 0) {
     blocksAvailable.mostUsed = mostUsedBlocks;
   }
   const groupedBlocks = groupBy(filteredBlocksConfig, (item) => item.group);
@@ -86,13 +89,11 @@ const BlockChooser = ({
     ...groupedBlocks,
   };
 
-  // Keep only groups that actually have available blocks. Checking mere key presence let the
-  // "Most used" group through even when empty — blocksAvailable.mostUsed is ALWAYS set (to a
-  // possibly-empty array), so an empty section rendered and, being first, default-opened. Using
-  // the group's length also makes activeIndex=0 land on the first section that has a block.
-  const groupBlocksOrder = filter(
-    config.blocks.groupBlocksOrder,
-    (item) => blocksAvailable[item.id]?.length > 0,
+  // Groups with no available blocks aren't keys of blocksAvailable (groupBy skips them, and
+  // "Most used" is now registered above only when non-empty), so key presence both hides empty
+  // sections AND makes activeIndex=0 land on the first section that has a block.
+  const groupBlocksOrder = filter(config.blocks.groupBlocksOrder, (item) =>
+    Object.keys(blocksAvailable).includes(item.id),
   );
   const [activeIndex, setActiveIndex] = React.useState(0);
 
