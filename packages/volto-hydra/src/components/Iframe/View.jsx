@@ -14,6 +14,7 @@ import {
   isSlateFieldType,
   formDataContentEqual,
   getUniqueTemplateIds,
+  getBlockType,
   isBlockReadonly,
   isBlockPositionLocked,
 } from '@volto-hydra/helpers';
@@ -4972,24 +4973,43 @@ const Iframe = (props) => {
 
             const buttonWidth = 30;
             const buttonHeight = 30;
-            let addLeft = isRightDirection
-              ? iframeRect.left + blockUI.rect.left + blockUI.rect.width + 8
-              : iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth;
 
-            let isConstrained = false;
-            const iframeRight = iframeRect.left + iframeRect.width;
-            if (addLeft + buttonWidth > iframeRight) {
-              addLeft = iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth - 8;
-              isConstrained = true;
-            }
+            // An empty block is REPLACED, not appended to: its '+' picks the empty's type in
+            // place. Draw it in the middle of the block, over the centered '+' glyph hydra
+            // renders ([data-hydra-empty]::after) — that glyph is what the editor aims at, and
+            // it's the only way to type the block. The 'add after' position (below/right) would
+            // leave the glyph dead.
+            const emptyPathInfo = iframeSyncState.blockPathMap?.[selectedBlock];
+            const isEmptyBlock =
+              getBlockType(
+                getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock),
+                emptyPathInfo?.typeField,
+              ) === 'empty';
 
+            let addLeft;
             let addTop;
-            if (isRightDirection) {
-              addTop = isConstrained
-                ? iframeRect.top + blockUI.rect.top + blockUI.rect.height - buttonHeight - 8
-                : iframeRect.top + blockUI.rect.top;
+            if (isEmptyBlock) {
+              addLeft = iframeRect.left + blockUI.rect.left + blockUI.rect.width / 2 - buttonWidth / 2;
+              addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height / 2 - buttonHeight / 2;
             } else {
-              addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;
+              addLeft = isRightDirection
+                ? iframeRect.left + blockUI.rect.left + blockUI.rect.width + 8
+                : iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth;
+
+              let isConstrained = false;
+              const iframeRight = iframeRect.left + iframeRect.width;
+              if (addLeft + buttonWidth > iframeRight) {
+                addLeft = iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth - 8;
+                isConstrained = true;
+              }
+
+              if (isRightDirection) {
+                addTop = isConstrained
+                  ? iframeRect.top + blockUI.rect.top + blockUI.rect.height - buttonHeight - 8
+                  : iframeRect.top + blockUI.rect.top;
+              } else {
+                addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;
+              }
             }
 
             const pathInfo = iframeSyncState.blockPathMap?.[selectedBlock];

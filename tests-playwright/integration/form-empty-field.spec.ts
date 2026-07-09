@@ -29,6 +29,22 @@ test.describe('form empty field — pick a type (typed object_list)', () => {
     const addBtn = page.locator('.volto-hydra-add-button');
     await expect(addBtn).toBeVisible({ timeout: 5000 });
 
+    // The '+' must sit IN THE MIDDLE of the empty block, over the centered '+' glyph hydra draws
+    // ([data-hydra-empty]::after). Clicking the empty is the only way to type it, so an 'add
+    // after' position (below/right of the block, where a normal block's + goes) strands the
+    // editor: they click the glyph and nothing happens. Selector-based clicks can't catch that.
+    const btnBox = (await addBtn.boundingBox())!;
+    const emptyBox = (await emptyField.boundingBox())!;
+    const btnCx = btnBox.x + btnBox.width / 2;
+    const btnCy = btnBox.y + btnBox.height / 2;
+    expect(btnCx).toBeGreaterThanOrEqual(emptyBox.x);
+    expect(btnCx).toBeLessThanOrEqual(emptyBox.x + emptyBox.width);
+    expect(btnCy).toBeGreaterThanOrEqual(emptyBox.y);
+    expect(btnCy).toBeLessThanOrEqual(emptyBox.y + emptyBox.height);
+    // ...and actually centered, not merely overlapping a corner.
+    expect(Math.abs(btnCx - (emptyBox.x + emptyBox.width / 2))).toBeLessThan(2);
+    expect(Math.abs(btnCy - (emptyBox.y + emptyBox.height / 2))).toBeLessThan(2);
+
     // Pick 'from' (the E-mail field type). onMutateBlock must write it to field_type, not
     // @type (which FormBlock ignores) — otherwise field_type stays 'empty' and nothing renders.
     await addBtn.click();
