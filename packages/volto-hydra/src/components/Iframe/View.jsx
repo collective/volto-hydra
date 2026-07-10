@@ -5048,6 +5048,20 @@ const Iframe = (props) => {
               } else {
                 addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;
               }
+
+              // Vertical counterpart of the horizontal clamp above. Sitting the '+' 8px
+              // BELOW the block puts it outside the canvas whenever the block ends at the
+              // canvas edge — on a phone that is on top of the bottom toolbar, where it
+              // paints over Save/Cancel and swallows their clicks. Pull it back INSIDE the
+              // block (same move `isConstrained` makes horizontally) rather than let it
+              // escape. Clamp the top edge too, for a block taller than the canvas.
+              const iframeBottom = iframeRect.top + iframeRect.height;
+              if (addTop + buttonHeight > iframeBottom) {
+                addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height - buttonHeight - 8;
+              }
+              if (addTop < iframeRect.top) {
+                addTop = iframeRect.top + 8;
+              }
             }
 
             const pathInfo = iframeSyncState.blockPathMap?.[selectedBlock];

@@ -735,6 +735,33 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     ).toBeGreaterThanOrEqual(sb.width - 12);
   });
 
+  test("the add '+' never leaves the iframe canvas (would sit under the bottom toolbar)", async ({
+    page,
+  }) => {
+    // The '+' is drawn at the selected block's bottom edge (`blockBottom + 8`) with no
+    // vertical bound — the horizontal overflow IS clamped (isConstrained), the vertical
+    // one never was. When the block's bottom is at the viewport bottom the button lands
+    // outside the canvas, on top of the bottom toolbar, and swallows its clicks
+    // ("<span>+</span> ... intercepts pointer events" on Save). Not a mobile-only bug:
+    // any viewport where the block ends at the canvas edge reproduces it.
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const addBtn = page.locator('.volto-hydra-add-button');
+    await expect(addBtn).toBeVisible({ timeout: 10000 });
+
+    const add = (await addBtn.boundingBox())!;
+    const canvas = (await page.locator('#previewIframe').boundingBox())!;
+
+    expect(add.y, "'+' top must be inside the canvas").toBeGreaterThanOrEqual(canvas.y - 1);
+    expect(
+      add.y + add.height,
+      `'+' bottom ${add.y + add.height} must not spill past the canvas bottom ${canvas.y + canvas.height}`,
+    ).toBeLessThanOrEqual(canvas.y + canvas.height + 1);
+  });
+
   test('Settings icon in bottom toolbar opens the sidebar (no ⋯ detour)', async ({
     page,
   }) => {
