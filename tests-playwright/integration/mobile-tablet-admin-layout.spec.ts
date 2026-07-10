@@ -616,13 +616,21 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     ).toBeGreaterThan(370);
   };
 
+  // These two ran in EDIT mode, where mobile-tablet.css deliberately hides the
+  // frontend switcher:
+  //   body.view-editview #toolbar-body .frontend-switcher-btn { display: none }
+  // "editors need Undo + Cancel + Save more than meta actions during inline edits;
+  // both stay reachable via ⋯". So the button could never be clicked and the tests
+  // timed out waiting for it. The sheet geometry they actually assert is mode-agnostic
+  // (the rules key off the viewport, not body.view-*), so exercise them in VIEW mode,
+  // where the button is a first-class part of the designed bottom toolbar.
   test('frontend switcher panel renders as a bottom sheet', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await helper.navigateToEdit('/test-page');
+    await page.goto('http://localhost:3001/test-page');
 
     await page.locator('#toolbar-frontend-switcher').click();
     await isBottomSheet(page, '.frontend-switcher-panel');
@@ -634,7 +642,7 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     await page.setViewportSize({ width: 375, height: 812 });
     const helper = new AdminUIHelper(page);
     await helper.login();
-    await helper.navigateToEdit('/test-page');
+    await page.goto('http://localhost:3001/test-page');
 
     await page.locator('#toolbar-frontend-switcher').click();
     await page
@@ -1393,10 +1401,12 @@ test.describe('Admin layout — mobile (≤767px)', () => {
       // Volto Toolbar's submenu container; its visibility is signalled
       // by .toolbar-content gaining the .show class.
       expectPanel: '.toolbar-content.show',
-      // Re-clicking the More button itself dismisses the menu — same
-      // affordance the editor would use. A separate close affordance
-      // would be ideal but Volto doesn't render one.
-      expectClose: '#toolbar-body .more',
+      // NOT the ⋯ button: opening a submenu hides the whole bottom bar
+      // (`body[data-hydra-submenu-open] #toolbar-body { display: none }`) so the
+      // editor only ever sees one bottom-anchored surface. The sheet brings its own
+      // back-arrow (MobileSubmenuClose, portaled to body) — that IS the separate
+      // close affordance the old comment here wished for.
+      expectClose: 'body > .mobile-submenu-close',
     },
     {
       label: 'Contents',
@@ -1415,7 +1425,9 @@ test.describe('Admin layout — mobile (≤767px)', () => {
       // visually broken on mobile, that's a SEPARATE Volto-stock
       // submenu-rendering bug — see project memory entry.
       expectPanel: '.toolbar-content.show',
-      expectClose: '#toolbar-body .add',
+      // Same as More: the bottom bar (and with it `.add`) is hidden while the
+      // submenu sheet is open; the sheet's own back-arrow dismisses it.
+      expectClose: 'body > .mobile-submenu-close',
     },
     {
       label: 'Edit',
