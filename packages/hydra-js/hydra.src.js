@@ -4263,14 +4263,18 @@ export class Bridge {
           this.multiSelectedBlockUids = [];
         }
 
-        // Only clicking TEXT lands in text mode.
+        // Only a block that HAS text lands in text mode.
         //
-        // Clicking an image, a container's own chrome, a card, or any block with no
-        // editable text has no cursor to place, so text mode is a lie: the editor sees
-        // no caret, yet Escape / the ⬆ button spend their first press "leaving" an
-        // inline editor that was never entered. Require the click to land inside a
-        // `data-edit-text` field that belongs to THIS block (a nested block's field
-        // belongs to the nested block, not its container).
+        // Clicking an image, a card, a container with no title — any block with no
+        // editable text — has no cursor to place, so text mode is a lie: the editor
+        // sees no caret, yet Escape / the ⬆ button spend their first press "leaving"
+        // an inline editor that was never entered, and deselecting takes two presses.
+        //
+        // Keyed on the block OWNING an editable field, not on the click landing
+        // exactly on the glyphs: clicking a text block's padding must still place the
+        // cursor, and `target.closest()` only walks ANCESTORS, so a click on the
+        // block's own <div> would never find the `data-edit-text` child below it.
+        // getOwnEditableFields excludes nested blocks' fields (fieldBelongsToBlock).
         //
         // Touch-aware on top of that:
         //   - Mouse (fine pointer)     → text mode if the click was on this block's text.
@@ -4287,10 +4291,10 @@ export class Bridge {
           typeof matchMedia === 'function' &&
           matchMedia('(pointer: coarse)').matches;
         const alreadySelected = blockUid === this.selectedBlockUid;
-        const clickedField = target.closest?.('[data-edit-text]');
-        const clickedOwnText =
-          !!clickedField && this.fieldBelongsToBlock(clickedField, blockElement);
-        const enterTextMode = clickedOwnText && (!coarsePointer || alreadySelected);
+        const hasOwnText =
+          !this.isBlockReadonly(blockUid) &&
+          this.getOwnEditableFields(blockElement).length > 0;
+        const enterTextMode = hasOwnText && (!coarsePointer || alreadySelected);
         this.editMode = enterTextMode ? 'text' : 'block';
         this.selectBlock(blockElement);
       } else {
