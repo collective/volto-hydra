@@ -41,6 +41,47 @@ const SHOTS_OUT_DIR = path.join(
 const CAPTURE_SHOTS = process.env.CAPTURE_MOBILE_SCREENSHOTS === '1';
 
 test.describe('Admin layout — desktop control (≥1024px)', () => {
+  test("desktop: the add '+' moves up onto the block rather than off the canvas", async ({
+    page,
+  }) => {
+    // The '+' sits 8px BELOW the selected block. Nothing about that is mobile-specific:
+    // scroll any block so its bottom meets the canvas edge and the button is drawn past
+    // it. On mobile that lands on the bottom toolbar; on desktop it is simply off-canvas
+    // and unclickable. The horizontal overflow has always been clamped (isConstrained
+    // pulls the button back inside the block); this is the vertical counterpart.
+    await page.setViewportSize({ width: 1280, height: 400 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.clickBlockInIframe('block-1-uuid');
+
+    const iframe = helper.getIframe();
+    const block = iframe.locator('[data-block-uid="block-1-uuid"]');
+    const addBtn = page.locator('.volto-hydra-add-button');
+    await expect(addBtn).toBeVisible({ timeout: 10000 });
+
+    // Put the block's BOTTOM on the canvas edge — the exact condition that pushes the
+    // '+' out. hydra repositions the chrome on scroll, so poll until it settles there.
+    await block.evaluate((el) => el.scrollIntoView({ block: 'end' }));
+
+    await expect
+      .poll(
+        async () => {
+          const add = await addBtn.boundingBox();
+          const blk = await block.boundingBox();
+          const canvas = await page.locator('#previewIframe').boundingBox();
+          if (!add || !blk || !canvas) return 'missing';
+          const canvasBottom = canvas.y + canvas.height;
+          if (blk.y + blk.height < canvasBottom - 40) return 'block not at canvas edge yet';
+          if (add.y + add.height > canvasBottom + 1) return `'+' spills past canvas`;
+          if (add.y + add.height > blk.y + blk.height + 1) return `'+' below the block`;
+          return 'clamped onto block';
+        },
+        { timeout: 10000 },
+      )
+      .toBe('clamped onto block');
+  });
+
   test('main toolbar pinned left, sidebar pinned right, drag handle visible, chevrons hidden', async ({
     page,
   }) => {
