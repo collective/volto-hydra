@@ -1799,7 +1799,7 @@ test.describe("Quanta select-parent button (⬆) — mobile layout", () => {
     await helper.navigateToEdit("/test-page");
     await helper.clickBlockInIframe("manual-teaser");
 
-    const btn = page.locator(".quanta-toolbar .select-parent-btn");
+    const btn = page.locator(".quanta-toolbar .step-up-btn");
     await expect(btn).toBeVisible();
     await expect(
       btn.locator("svg"),
@@ -1831,7 +1831,7 @@ test.describe("Quanta select-parent button (⬆) — mobile layout", () => {
     await helper.navigateToEdit("/test-page");
     await helper.clickBlockInIframe("manual-teaser");
 
-    const btn = page.locator(".quanta-toolbar .select-parent-btn");
+    const btn = page.locator(".quanta-toolbar .step-up-btn");
     await expect(btn).toBeVisible();
     const box = await btn.boundingBox();
     expect(box!.x).toBeGreaterThanOrEqual(0);
@@ -1916,7 +1916,7 @@ test.describe('Editor Guide screenshots — mobile', () => {
 
     // manual-teaser lives inside block-8-grid → parent button appears.
     await helper.clickBlockInIframe('manual-teaser');
-    await expect(page.locator('.quanta-toolbar .select-parent-btn')).toBeVisible(
+    await expect(page.locator('.quanta-toolbar .step-up-btn')).toBeVisible(
       { timeout: 3000 },
     );
     await page.waitForTimeout(300);

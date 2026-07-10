@@ -1329,7 +1329,7 @@ const SyncedSlateToolbar = ({
   // The toolbar reserves fixed-width affordances at both ends:
   //   - Desktop: drag handle (30) + menu/⋯ button (30) + gaps (10) = 70
   //   - Mobile  (@media max-width:767px): mobile-tablet.css HIDES the drag
-  //     handle and SHOWS chevron-up/down (~64). And select-parent-btn
+  //     handle and SHOWS chevron-up/down (~64). And step-up-btn
   //     (~32) is rendered when any block is selected. Plus menu/⋯ (30) +
   //     gaps (10) = 136.
   // If we use the desktop number on mobile, the slot system thinks more
@@ -1626,7 +1626,7 @@ const SyncedSlateToolbar = ({
       {selectedBlock && (
         <button
           type="button"
-          className="select-parent-btn"
+          className="step-up-btn"
           aria-label="Step up (exit text / select parent / deselect)"
           title="Step up"
           onClick={() => {

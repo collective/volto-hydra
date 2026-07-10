@@ -611,7 +611,7 @@ test.describe('Block Mode (Escape state machine)', () => {
       step: async (page: import('@playwright/test').Page) => {
         // Quanta's select-parent button posts STEP_UP to the iframe,
         // which calls the same stepUpSelection() that Escape does.
-        await page.locator('.quanta-toolbar .select-parent-btn').click();
+        await page.locator('.quanta-toolbar .step-up-btn').click();
       },
     },
   ] as const;
