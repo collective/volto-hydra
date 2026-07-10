@@ -235,19 +235,39 @@ const SyncedSlateToolbar = ({
     const result = [];
     const visit = (blockId, blockData) => {
       if (blockId !== PAGE_BLOCK_UID) result.push(blockId);
-      // Group this block's direct children by their containerField, then
-      // iterate each field's items in the order stored on the form data.
-      const childrenByField = {};
+      // Group this block's direct children by their REGION, then walk each
+      // region in the order stored on the form data.
+      //
+      // `pathInfo.containerField` is gone (#236): blocks_layout regions and
+      // object_list arrays are one concept — a named region — and the region
+      // name lives in `pathInfo.region`. Reading the old key made every child
+      // skip, leaving preOrder empty, findMoveTarget null, and EVERY chevron
+      // disabled. Order comes from the data, not from blockPathMap's insertion
+      // order, which is incidental.
+      const childrenByRegion = {};
       for (const [childId, childInfo] of Object.entries(blockPathMap || {})) {
         if (childInfo?.parentId !== blockId) continue;
-        const field = childInfo.containerField;
-        if (!field) continue;
-        if (!childrenByField[field]) childrenByField[field] = new Set();
-        childrenByField[field].add(childId);
+        const region = childInfo.region;
+        if (!region) continue;
+        if (!childrenByRegion[region]) childrenByRegion[region] = new Set();
+        childrenByRegion[region].add(childId);
       }
-      for (const [field, childSet] of Object.entries(childrenByField)) {
-        const orderedItems = blockData?.[field]?.items || [];
-        for (const childId of orderedItems) {
+      for (const [region, childSet] of Object.entries(childrenByRegion)) {
+        // blocks_layout region → the region's ordered id list in the shared
+        // blocks_layout dict. object_list region → the inline array itself,
+        // whose items carry their id under the region's idField.
+        const layoutOrder = blockData?.blocks_layout?.[region];
+        let orderedIds;
+        if (Array.isArray(layoutOrder)) {
+          orderedIds = layoutOrder;
+        } else if (Array.isArray(blockData?.[region])) {
+          const idField =
+            blockPathMap[[...childSet][0]]?.idField || '@id';
+          orderedIds = blockData[region].map((item) => item?.[idField]);
+        } else {
+          orderedIds = [];
+        }
+        for (const childId of orderedIds) {
           if (!childSet.has(childId)) continue;
           const childData = getBlockById(form, blockPathMap, childId);
           visit(childId, childData);
