@@ -1805,8 +1805,10 @@ test.describe('Parent Block Navigation', () => {
     await expect(page.locator('.quanta-toolbar')).toBeVisible();
     await expect(stepUpBtn).toBeVisible();
 
-    // Tap 1: blockClickHandler lands every click in text mode — even on a container —
-    // so the first transition is always text → block. Quanta stays.
+    // NB clickContainerBlockInIframe lands on the columns block's own <h3
+    // data-edit-text> title, so this IS a click on text and tap 1 leaves the inline
+    // editor. See block-selection.spec.ts for the no-text case (image → block mode,
+    // one tap to deselect).
     await stepUpBtn.click();
     await expect(page.locator('.quanta-toolbar')).toBeVisible();
 

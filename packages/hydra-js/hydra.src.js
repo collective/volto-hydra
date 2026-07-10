@@ -4263,22 +4263,34 @@ export class Bridge {
           this.multiSelectedBlockUids = [];
         }
 
-        // Touch-aware mode transition:
-        //   - Mouse (fine pointer)     → text mode immediately (place cursor).
+        // Only clicking TEXT lands in text mode.
+        //
+        // Clicking an image, a container's own chrome, a card, or any block with no
+        // editable text has no cursor to place, so text mode is a lie: the editor sees
+        // no caret, yet Escape / the ⬆ button spend their first press "leaving" an
+        // inline editor that was never entered. Require the click to land inside a
+        // `data-edit-text` field that belongs to THIS block (a nested block's field
+        // belongs to the nested block, not its container).
+        //
+        // Touch-aware on top of that:
+        //   - Mouse (fine pointer)     → text mode if the click was on this block's text.
         //   - Touch (coarse pointer):
         //       1st tap on a DIFFERENT block → block mode (no contenteditable,
         //         no cursor). iOS native long-press = word-select can't fire
         //         because the field is contenteditable=false in this state.
         //         Block-multi-select long-press has a clean canvas to grab.
         //       2nd tap on the SAME block    → text mode (cursor in field).
-        // Without this gate, long-press on a freshly selected block races
+        // Without that gate, long-press on a freshly selected block races
         // the OS word-select handles on top of the bridge's multi-select
         // timer, putting editors into both modes simultaneously.
         const coarsePointer =
           typeof matchMedia === 'function' &&
           matchMedia('(pointer: coarse)').matches;
         const alreadySelected = blockUid === this.selectedBlockUid;
-        const enterTextMode = !coarsePointer || alreadySelected;
+        const clickedField = target.closest?.('[data-edit-text]');
+        const clickedOwnText =
+          !!clickedField && this.fieldBelongsToBlock(clickedField, blockElement);
+        const enterTextMode = clickedOwnText && (!coarsePointer || alreadySelected);
         this.editMode = enterTextMode ? 'text' : 'block';
         this.selectBlock(blockElement);
       } else {

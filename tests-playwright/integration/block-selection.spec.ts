@@ -649,6 +649,33 @@ test.describe('Block Mode (Escape state machine)', () => {
       });
     });
 
+    test(`step-up via ${t.label}: a block with NO text starts in block mode (one step to deselect)`, async ({
+      page,
+    }) => {
+      // Only clicking TEXT lands in text mode. An image block has no `data-edit-text`
+      // field, so there is no cursor to place and no inline editor to leave — clicking
+      // it must land straight in block mode. Previously every click landed in text
+      // mode, so Escape / ⬆ wasted their first press "leaving" an editor that was
+      // never entered, and an image took two presses to deselect.
+      const helper = new AdminUIHelper(page);
+      await helper.login();
+      await helper.navigateToEdit('/test-page');
+
+      await helper.clickBlockInIframe('block-2-uuid'); // image: no editable text
+      const outline = page.locator('.volto-hydra-block-outline');
+      await expect(outline).toBeVisible({ timeout: 5000 });
+
+      // Already in block mode: the outline is the solid 'border' style, not the
+      // 'subtle' one that marks an active inline editor.
+      await expect(outline).toHaveAttribute('data-outline-style', 'border', {
+        timeout: 3000,
+      });
+
+      // So a SINGLE step-up deselects — no wasted "exit text mode" press.
+      await t.step(page);
+      await expect(outline).not.toBeVisible({ timeout: 3000 });
+    });
+
     test(`step-up via ${t.label}: text → block → parent → grandparent → page (nested)`, async ({
       page,
     }) => {
