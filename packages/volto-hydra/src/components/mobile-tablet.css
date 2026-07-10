@@ -304,11 +304,10 @@
   #toolbar-body .toolbar-actions {
     order: 999 !important;
     margin-left: auto !important;
-    /* Stock pastanaga has 20px padding on the wrapper; when the wrapper
-     * is right-aligned to the viewport edge that padding pushes the
-     * rightmost button past viewport (Edit/Save extends ~25px past).
-     * Zero it on mobile so the bounding box hugs the icon's visual edge. */
-    padding-right: 0 !important;
+    /* 10px right inset mirrors the 10px inter-button rhythm set below, so the
+     * rightmost button (Edit) sits the same distance from the viewport edge as
+     * the leftmost (User) does from the left. */
+    padding-right: 10px !important;
     padding-left: 0 !important;
   }
   /* DON'T override Save's order: stock .toolbar-actions is
@@ -326,15 +325,41 @@
     height: 0 !important;
     min-height: 0 !important;
   }
-  /* Icons inside the bottom toolbar — scale to fit the 44px bar. */
+  /* Icons inside the bottom toolbar — scale to fit the 44px bar.
+   *
+   * display:flex + align-items:center is what actually CENTRES the icon.
+   * Stock pastanaga renders these as `display: block`, so a 22px icon just
+   * sat under the 6px top padding: centre y 888 in an 871..915 bar whose
+   * centre is 893. `.frontend-switcher-btn` is flex already and landed dead
+   * centre, so the row disagreed with itself by 5px and read as misaligned. */
   #toolbar-body button,
   #toolbar-body a {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     height: 44px !important;
     padding: 6px 10px !important;
+  }
+  /* The inner row must centre its two group wrappers too, or a taller group
+   * (the 34px circled Edit icon) drags its neighbours off the centreline. */
+  #toolbar-body .toolbar-body {
+    align-items: center !important;
   }
   #toolbar-body svg {
     width: 22px !important;
     height: 22px !important;
+  }
+
+  /* Stock pastanaga puts `margin-left: 20px` on every toolbar button. Six
+   * buttons at 20px, plus a 54px circled Edit, total 422px of content in a
+   * 412px bar: the primary action hangs off the right edge and the bar turns
+   * into a silent horizontal scroller. Tighten the rhythm to 10px so the row
+   * fits any phone ≥360px, and give .toolbar-actions the matching right inset
+   * (it was zeroed because 20px pushed Edit past the edge — the real cause was
+   * the margins, not the padding). */
+  #toolbar-body .toolbar-bottom > *,
+  #toolbar-body .toolbar-actions > * {
+    margin-left: 10px !important;
   }
 
   /* Iframe canvas: fills the area between top affordances and the
@@ -427,6 +452,21 @@
     overflow-y: auto !important;
     transform: translateY(0) !important;
     animation: hydra-sheet-slide-up 0.2s ease-out !important;
+  }
+
+  /* The sheet WRAPPER is full-width (above), but the BlockChooser inside it is
+   * pinned to `width: 310px` by Volto's blocks.less. On a 412px phone that left
+   * ~100px of dead sheet to the right of the picker. Let it fill its sheet, and
+   * drop the desktop card chrome (own shadow / opaque panel / nudge offsets) now
+   * that the sheet itself provides the surface. */
+  .add-new-block-popup .blocks-chooser,
+  .container-block-chooser .blocks-chooser {
+    width: 100% !important;
+    min-width: 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   /* Backdrop behind every bottom sheet — dims the page and traps clicks

@@ -649,6 +649,92 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     expect(Math.abs(tb!.height - qb!.height)).toBeLessThanOrEqual(10);
   });
 
+  test('view mode: every bottom-toolbar icon is vertically centred in the bar', async ({
+    page,
+  }) => {
+    // The bar is 44px tall, but its <a>/<button> children are `display: block`
+    // (align-items has no effect), so a 22px icon sits at padding-top:6px —
+    // centre y 888 against the bar's 893. `.frontend-switcher-btn` happens to be
+    // display:flex and lands dead centre, so the icons disagree by ~5px and the
+    // row reads as misaligned. `.edit` is worse: its svg is `icon circled`
+    // (padding 4 + border 2, content-box) = 34px, not 22px.
+    await page.setViewportSize({ width: 412, height: 915 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await page.goto('http://localhost:3001/test-page');
+    const bar = page.locator('#toolbar-body');
+    await expect(bar).toBeVisible();
+
+    const m = await bar.evaluate((el: HTMLElement) => {
+      const b = el.getBoundingClientRect();
+      const icons = Array.from(el.querySelectorAll('a svg, button svg'))
+        .map((s) => s.getBoundingClientRect())
+        .filter((r) => r.width > 0)
+        .map((r) => ({ cy: r.y + r.height / 2, h: r.height }));
+      return { barCy: b.y + b.height / 2, icons };
+    });
+
+    expect(m.icons.length).toBeGreaterThan(3);
+    for (const icon of m.icons) {
+      expect(
+        Math.abs(icon.cy - m.barCy),
+        `icon centre ${icon.cy} vs bar centre ${m.barCy}`,
+      ).toBeLessThanOrEqual(1);
+    }
+  });
+
+  test('view mode: the bottom toolbar does not overflow — Edit stays on screen', async ({
+    page,
+  }) => {
+    // scrollWidth 422 > clientWidth 412: the primary action (Edit) hangs 10px
+    // off the right edge and the bar silently becomes horizontally scrollable.
+    await page.setViewportSize({ width: 412, height: 915 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await page.goto('http://localhost:3001/test-page');
+    const bar = page.locator('#toolbar-body');
+    await expect(bar).toBeVisible();
+
+    const overflow = await bar.evaluate((el: HTMLElement) => ({
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+    }));
+    expect(
+      overflow.scrollWidth,
+      'bottom bar must not scroll horizontally',
+    ).toBeLessThanOrEqual(overflow.clientWidth);
+
+    const edit = await page.locator('#toolbar-body .edit').boundingBox();
+    expect(edit!.x + edit!.width, 'Edit must stay within the viewport').toBeLessThanOrEqual(412);
+  });
+
+  test('add-block chooser fills the width of the mobile bottom sheet', async ({
+    page,
+  }) => {
+    // mobile-tablet.css turns `.add-new-block-popup` into a full-width bottom
+    // sheet, but nothing touches the `.blocks-chooser` INSIDE it — Volto's
+    // blocks.less pins that to `width: 310px`, so on a 412px phone the picker
+    // occupies ~75% of the sheet with dead space to its right.
+    await page.setViewportSize({ width: 412, height: 915 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+    await helper.clickBlockInIframe('block-1-uuid');
+
+    await page.locator('.volto-hydra-add-button').click();
+    const sheet = page.locator('.add-new-block-popup');
+    const chooser = page.locator('.blocks-chooser');
+    await expect(chooser).toBeVisible();
+
+    const sb = (await sheet.boundingBox())!;
+    const cb = (await chooser.boundingBox())!;
+    expect(sb.width, 'sheet spans the viewport').toBeGreaterThanOrEqual(410);
+    expect(
+      cb.width,
+      `chooser ${cb.width}px should fill the ${sb.width}px sheet`,
+    ).toBeGreaterThanOrEqual(sb.width - 12);
+  });
+
   test('Settings icon in bottom toolbar opens the sidebar (no ⋯ detour)', async ({
     page,
   }) => {
