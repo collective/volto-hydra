@@ -420,8 +420,12 @@ describe('preview_image_link (volto.preview_image_link behaviour)', () => {
     assert.equal(typeof pil, 'object', 'preview_image_link must be a summary object, not a string');
     assert.ok(pil['@id'].endsWith('/_test_data/images/test-image-1'), `got ${pil['@id']}`);
     assert.equal(pil['@type'], 'Image');
-    assert.equal(pil.image_field, 'image');
+    // image_field is NULL on a relation summary — verified against real Plone
+    // 6.1.5 (restapi 9.15.6) and 6.2.1 (10.0.2). The catalog BRAIN has 'image',
+    // the relation summary does not. Consumers must key off image_scales.
+    assert.equal(pil.image_field, null, 'real Plone leaves image_field null here');
     assert.ok(pil.image_scales, 'summary must carry image_scales');
+    assert.deepEqual(Object.keys(pil.image_scales), ['image']);
     assert.equal(pil.image_scales.image[0].width, 400);
     assert.equal(pil.image_scales.image[0].height, 300);
     assert.equal(pil.image_scales.image[0].download, '@@images/image');

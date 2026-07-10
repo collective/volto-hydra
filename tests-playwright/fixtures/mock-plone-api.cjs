@@ -804,8 +804,13 @@ function resolveUidUrls(obj, parentKey = null) {
  * and plone.volto registers a JSONSummarySerializerMetadata utility adding
  * `image_field` and `image_scales` to every summary (plone.volto/summary.py).
  *
- * We only build the summary stub here; enrichImageBrains() then attaches
- * image_scales, because the stub carries `image_field` and `@id`.
+ * IMPORTANT — `image_field` is NULL on a relation summary. Verified against real
+ * Plone 6.1.5 (plone.restapi 9.15.6) and 6.2.1 (10.0.2): the catalog BRAIN has
+ * `image_field: 'image'`, but the summary produced for a relation does not. An
+ * earlier version of this mock invented `image_field: 'image'` so that
+ * enrichImageBrains() would attach the scales — which made consumers key off a
+ * field real Plone never sends, and hid a live bug in og:image resolution.
+ * So attach image_scales here, directly, and leave image_field null.
  */
 const RELATION_FIELDS = ['preview_image_link'];
 
@@ -817,15 +822,21 @@ function summarizeRelations(content, baseUrl) {
     const contentPath = value.startsWith('http') ? new URL(value).pathname : value;
     const raw = loadRawContentFromDisk(contentPath);
     if (!raw) continue;
-    out[field] = {
+    const summary = {
       '@id': `${baseUrl}${contentPath}`,
       '@type': raw['@type'],
       title: raw.title,
       description: raw.description || '',
       review_state: raw.review_state || 'published',
-      // Only images carry an image field; a linked non-image simply lacks it.
-      ...(raw['@type'] === 'Image' ? { image_field: 'image' } : {}),
+      image_field: null,
     };
+    if (raw['@type'] === 'Image') {
+      const scales = getImageScales(enrichContent(raw, contentPath, baseUrl), baseUrl);
+      // A relation to a non-image simply has no image_scales — that, not
+      // image_field, is how a consumer tells the two apart.
+      if (scales) summary.image_scales = scales;
+    }
+    out[field] = summary;
   }
   return out;
 }
