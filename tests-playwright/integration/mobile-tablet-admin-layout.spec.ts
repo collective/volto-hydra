@@ -53,16 +53,26 @@ test.describe('Admin layout — desktop control (≥1024px)', () => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/test-page');
-    await helper.clickBlockInIframe('block-1-uuid');
+
+    // Use a block partway DOWN the page. scrollIntoView({block:'end'}) can't push a
+    // top-of-page block's bottom to the viewport bottom — there's nothing above it to
+    // scroll — which is why anchoring this to block-1 passed on admin-mock's short page
+    // but timed out on nuxt. block-3 has content both sides, so we can put its bottom
+    // exactly on the canvas edge.
+    await helper.clickBlockInIframe('block-3-uuid');
 
     const iframe = helper.getIframe();
-    const block = iframe.locator('[data-block-uid="block-1-uuid"]');
+    const block = iframe.locator('[data-block-uid="block-3-uuid"]');
     const addBtn = page.locator('.volto-hydra-add-button');
     await expect(addBtn).toBeVisible({ timeout: 10000 });
 
-    // Put the block's BOTTOM on the canvas edge — the exact condition that pushes the
-    // '+' out. hydra repositions the chrome on scroll, so poll until it settles there.
-    await block.evaluate((el) => el.scrollIntoView({ block: 'end' }));
+    // Drive the scroll deterministically: put the block's bottom on the iframe's
+    // viewport bottom (the canvas edge) — the exact condition that would push the '+'
+    // past it. hydra repositions the chrome on scroll, so poll until it settles.
+    await block.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      window.scrollBy(0, r.bottom - window.innerHeight);
+    });
 
     await expect
       .poll(
