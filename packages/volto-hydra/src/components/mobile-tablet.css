@@ -415,7 +415,16 @@
    * their natural z-index ladder. Other elements that depend on the
    * toolbar z (like the iframe below it) get z-index from .iframe
    * stacking, not from the toolbar's. */
-  #toolbar-body { z-index: auto !important; }
+  /* ...but the bar still has to out-rank the IFRAME CHROME. The admin's
+   * `.volto-hydra-add-button` is `position: fixed; z-index: 10`, placed at the
+   * selected block's bottom edge — when that edge is near the viewport bottom the
+   * '+' lands ON the bottom toolbar and, with `z-index: auto` here, paints over it
+   * and swallows the click ("<span>+</span> intercepts pointer events" on Save).
+   * --hydra-z-toolbars (100) is the layer this bar belongs to; it stays below the
+   * sheet ladder (200/201), and the popups the rule above cares about live in
+   * `#toolbar > .toolbar-content`, not inside `#toolbar-body`, so they are
+   * unaffected by this stacking context. */
+  #toolbar-body { z-index: var(--hydra-z-toolbars) !important; }
 
   /* Bottom-sheet popups on mobile. The popup React state-machine is
    * unchanged — only the geometry changes here. Every popup the admin
