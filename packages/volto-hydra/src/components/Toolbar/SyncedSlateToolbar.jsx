@@ -1395,7 +1395,10 @@ const SyncedSlateToolbar = ({
           border: '1px solid #e0e0e0',
           borderRadius: '3px',
           padding: '2px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+          // Quanta floats ABOVE the frontend's own content, so it needs enough
+          // elevation to read as a separate layer. At 0.08/3px it blended into
+          // whatever was behind it and the bar looked pasted onto the page.
+          boxShadow: '0 2px 12px rgba(0, 0, 0, 0.15)',
           pointerEvents: 'none', // Allow events to pass through to iframe drag button
           overflow: 'hidden', // Ensure buttons don't extend past maxWidth
         }}

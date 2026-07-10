@@ -104,7 +104,11 @@
     width: 100% !important;
     z-index: var(--hydra-z-toolbars) !important;
     border-radius: 0 !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+    /* Pinned edge-to-edge at the top, Quanta is the only thing separating the
+     * editor chrome from the page content scrolling under it — it needs a real
+     * drop shadow to sit above that content, not the 0.08/3px hairline that
+     * made it look pasted on. Mirrors the desktop inline style. */
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15) !important;
     opacity: 1 !important;
   }
 
