@@ -56,9 +56,15 @@ test.describe('touch-mode word-select suppression', () => {
     // block-3-uuid is a separate slate block that isn't auto-selected
     // on a fresh navigation to /test-page.
     const block3 = iframe.locator('[data-block-uid="block-3-uuid"]').first();
-    const block3Field = iframe.locator(
-      '[data-block-uid="block-3-uuid"] [data-edit-text]',
-    ).first();
+    // The editable field may be a DESCENDANT (mock frontend) OR the block element
+    // itself (nuxt renders `data-block-uid` + `data-edit-text` on the same <div>, as
+    // getOwnEditableFields notes). Match both so this isn't mock-only — a descendant-
+    // only selector times out on nuxt, where block-3's field is on the block element.
+    const block3Field = iframe
+      .locator(
+        '[data-block-uid="block-3-uuid"] [data-edit-text], [data-block-uid="block-3-uuid"][data-edit-text]',
+      )
+      .first();
     await page.waitForTimeout(500); // let any auto-restoration settle
 
     // Single tap on a different block → block mode (touch-first behavior).
