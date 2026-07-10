@@ -177,3 +177,25 @@ defineProps({ block: Object });
   </table>
 </div>
 ```
+
+### Astro
+
+<!-- file: examples/astro/TableBlock.astro -->
+```astro
+---
+/**
+ * Slate-table block. Each row/cell carries its own data-block-uid so the
+ * bridge can target individual cells for selection sync. Cell text uses
+ * the same slate-value render path as SlateBlock.
+ */
+import SlateNode from './SlateNode.astro';
+const { block } = Astro.props;
+const rows = block?.table?.rows || [];
+---
+<div><table><tbody>{rows.map((row: any) => (
+  <tr data-block-uid={row.key}>{(row.cells || []).map((cell: any) => (
+    <td data-block-uid={cell.key} data-edit-text="value"
+    >{(cell.value || []).map((node: any) => <SlateNode node={node} />)}</td>
+  ))}</tr>
+))}</tbody></table></div>
+```

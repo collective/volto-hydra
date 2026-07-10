@@ -1164,21 +1164,27 @@ test.describe('Empty Block Behavior', () => {
     // CSS content property wraps the value in quotes, so we check for '"+"'
     expect(pseudoContent).toBe('"+"');
 
-    // Empty block should NOT have an add button next to it
-    // Empty blocks are meant to be replaced via block chooser, not have blocks added after them
-    // Use direct click since empty blocks don't show a toolbar (clickBlockInIframe expects toolbar)
+    // A seeded 'empty' placeholder can't take a sibling AFTER it, but it CAN be typed in place: it
+    // now shows the '+' add button, which opens the block chooser to pick the empty's type
+    // (hydra.src.js getAddDirection keeps the '+' when canReplace is true; branch commit 9abb4a3 —
+    // "a seeded empty in a no-default multi-allowed container can pick its type"). Use a direct
+    // click since empty blocks don't show a toolbar (clickBlockInIframe expects one).
     await emptyBlock.click();
 
-    // Wait for block chooser to open (empty blocks open chooser on click)
+    // The '+' add button IS visible for the empty — the type-in-place affordance. (This test
+    // previously asserted it hidden; 9abb4a3 intentionally changed that so a no-default,
+    // multi-allowed empty isn't stranded with no way to be typed.)
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+
+    // Clicking that '+' — the one drawn in the middle of the empty — opens the chooser. Merely
+    // SELECTING the empty must not (a delete that seeds an empty selects it too).
+    await addButton.click();
     const blockChooser = page.locator('.block-add-button-menu, .blocks-chooser');
     await expect(blockChooser).toBeVisible({ timeout: 5000 });
-
-    // Verify the add button is NOT visible in the admin UI
-    const addButton = page.locator('.volto-hydra-add-button');
-    await expect(addButton).not.toBeVisible();
   });
 
-  test('clicking empty block opens block chooser', async ({ page }) => {
+  test("clicking an empty block's + opens the block chooser", async ({ page }) => {
     const helper = new AdminUIHelper(page);
 
     await helper.login();
@@ -1216,11 +1222,15 @@ test.describe('Empty Block Behavior', () => {
     const emptyBlockId = await emptyBlockLocator.getAttribute('data-block-uid');
     console.log('[TEST] Empty block ID after deletions:', emptyBlockId);
 
-    // Click the empty block
-    // Don't use clickBlockInIframe because empty blocks open the chooser, not the sidebar
+    // Select the empty block. Don't use clickBlockInIframe — empty blocks show no toolbar.
     await emptyBlockLocator.click();
 
-    // Block chooser should open automatically
+    // Selecting it is not the convert gesture; clicking the '+' drawn in the middle of the empty
+    // is. Only then does the chooser open.
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+    await addButton.click();
+
     const blockChooser = page.locator('.blocks-chooser');
     await expect(blockChooser).toBeVisible({ timeout: 5000 });
   });
@@ -1259,9 +1269,12 @@ test.describe('Empty Block Behavior', () => {
     // Get the empty block's ID
     const emptyBlockId = await emptyBlockLocator.getAttribute('data-block-uid');
 
-    // Click the empty block to open chooser
-    // Don't use clickBlockInIframe because empty blocks open the chooser, not the sidebar
+    // Select the empty block, then click the '+' drawn in its middle to open the chooser.
+    // Don't use clickBlockInIframe — empty blocks show no toolbar.
     await emptyBlockLocator.click();
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+    await addButton.click();
 
     // Wait for block chooser
     const blockChooser = page.locator('.blocks-chooser');
@@ -1280,6 +1293,54 @@ test.describe('Empty Block Behavior', () => {
     // The block should not have the empty fallback
     const blockContent = await teaserBlock.textContent();
     expect(blockContent).not.toContain('Empty block');
+  });
+
+  // Baseline (NO template): emptying a container seeds an empty placeholder
+  // INSIDE the container, and adding into it clears that empty. This is the
+  // behaviour parity that the template primary-slot case violates (see
+  // template-advanced.spec.ts 'emptied template primary slot has no in-slot empty').
+  test('emptied container seeds an in-place empty and adding into it clears it (no template)', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+    await helper.getStableBlockCount();
+    const iframe = helper.getIframe();
+
+    // Empty grid-1 by removing both of its cells.
+    for (const cell of ['grid-cell-2', 'grid-cell-1']) {
+      await helper.clickBlockInIframe(cell);
+      await helper.openQuantaToolbarMenu(cell);
+      await helper.clickQuantaToolbarMenuOption(cell, 'Remove');
+      await helper.waitForBlockToDisappear(cell);
+      await helper.getStableBlockCount();
+    }
+
+    // The emptied container gets an empty placeholder INSIDE it (data-hydra-empty).
+    const inContainerEmpty = iframe.locator(
+      '[data-block-uid="grid-1"] > .grid-row > [data-hydra-empty]',
+    );
+    await expect(inContainerEmpty).toBeVisible({ timeout: 5000 });
+
+    // Adding into that empty (select → click its '+' → chooser → Teaser) clears the empty and
+    // places the new block inside the container.
+    await inContainerEmpty.click();
+    const addButton = page.locator('.volto-hydra-add-button');
+    await expect(addButton).toBeVisible({ timeout: 5000 });
+    await addButton.click();
+    const chooser = page.locator('.blocks-chooser');
+    await expect(chooser).toBeVisible({ timeout: 5000 });
+    await chooser.getByRole('button', { name: 'Teaser' }).click();
+
+    const newChild = iframe
+      .locator('[data-block-uid="grid-1"] > .grid-row > [data-block-uid]')
+      .first();
+    await expect(newChild.locator('a').first()).toBeVisible({ timeout: 5000 });
+    // The empty is gone — the add replaced it in place.
+    await expect(
+      iframe.locator('[data-block-uid="grid-1"] [data-hydra-empty]'),
+    ).toHaveCount(0);
   });
 
   test('empty blocks are stripped on save and restored on re-edit', async ({

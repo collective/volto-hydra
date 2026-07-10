@@ -24,29 +24,9 @@ export function canContain(config, blockType, currentCount) {
   return true;
 }
 
-/**
- * Can a container accept every block type in `blockTypes` given its current
- * count? Considers the combined count against maxLength.
- *
- * @param {object} config         Container field config
- * @param {string[]} blockTypes   Block types to add (in order)
- * @param {number} currentCount   Current number of children
- * @returns {boolean}
- */
-export function canContainAll(config, blockTypes, currentCount) {
-  if (blockTypes.length === 0) return true;
-  if (config?.readOnly || config?.fixed) return false;
-  const { allowedBlocks, maxLength } = config || {};
-  if (allowedBlocks != null) {
-    for (const type of blockTypes) {
-      if (!allowedBlocks.includes(type)) return false;
-    }
-  }
-  if (maxLength != null && currentCount + blockTypes.length > maxLength) {
-    return false;
-  }
-  return true;
-}
+// canContainAll moved to @volto-hydra/helpers so SSR template-merge code
+// can call it without dragging in the iframe-only container ops here.
+// containerOps.test.js imports it from @volto-hydra/helpers.
 
 /**
  * Find the shortest conversion path from srcType to any allowedTarget, using
@@ -81,15 +61,52 @@ export function canContainAll(config, blockTypes, currentCount) {
 export function mapLayoutItems(sourceConfig, targetConfig, sourceBlock) {
   const sourceField = sourceConfig.fieldName;
   const targetField = targetConfig.fieldName;
-  const items = sourceBlock[sourceField]?.items ?? [];
+  const sourceLayout = sourceBlock[sourceField];
   const blocks = sourceBlock.blocks ?? {};
+
+  // Carry every region (the default `items` plus any named regions) into the
+  // target field. Non-array sub-keys are not regions and are ignored.
+  const regions = {};
+  if (sourceLayout && typeof sourceLayout === 'object') {
+    for (const [region, ids] of Object.entries(sourceLayout)) {
+      if (Array.isArray(ids)) regions[region] = ids;
+    }
+  }
+  if (!regions.items) regions.items = [];
+
   return {
     blocks,
-    [targetField]: { items },
+    [targetField]: regions,
   };
 }
 
-export function findConversionPath(srcType, allowedTargets, blocksConfig, depth = 3) {
+/**
+ * Types allowed for blocks EXPELLED from a container (edge-drag expel).
+ *
+ * Expelled children become siblings of the container, so they must satisfy the
+ * container's OWN region constraints — which buildBlockPathMap already resolved
+ * per region into `allowedSiblingTypes`. The raw field-level `allowedBlocks` of
+ * the parent's container field is only a fallback for the rare case where no
+ * region-resolved types are available; using it directly would ignore a
+ * region's narrower allowedBlocks.
+ *
+ * @param {Object|null} containerInfo - The container's blockPathMap entry
+ * @param {Object|null} [parentFieldDef] - The parent's container field schema (fallback)
+ * @returns {string[]|null}
+ */
+export function expelAllowedTypes(containerInfo, parentFieldDef = null) {
+  if (containerInfo?.allowedSiblingTypes != null) {
+    return containerInfo.allowedSiblingTypes;
+  }
+  return parentFieldDef?.allowedBlocks ?? null;
+}
+
+export function findConversionPath(
+  srcType,
+  allowedTargets,
+  blocksConfig,
+  depth = 3,
+) {
   if (!srcType || !blocksConfig?.[srcType]) return null;
   const targetSet = new Set(allowedTargets);
   if (targetSet.has(srcType)) return [srcType];
@@ -121,4 +138,26 @@ export function findConversionPath(srcType, allowedTargets, blocksConfig, depth 
     frontier = next;
   }
   return null;
+}
+
+/**
+ * The only child of a container that is a synthetic 'empty' placeholder — or null. Region-aware
+ * via blockPathMap (which records parentId for EVERY child, blocks_layout AND object_list), so it
+ * also spots an empty object_list container (a slider seeded with one placeholder slide). The drag
+ * "drop into an empty container's whitespace" gesture uses this; the earlier `blocks_layout.items`
+ * read missed object_list containers entirely.
+ *
+ * @param {Object} blockPathMap - uid -> { parentId, blockType, ... }
+ * @param {string} containerUid - the drop-target container's uid
+ * @returns {string|null} the placeholder child's uid, or null
+ */
+export function findOnlyEmptyChildUid(blockPathMap, containerUid) {
+  if (!blockPathMap) return null;
+  const childUids = Object.keys(blockPathMap).filter(
+    (uid) => blockPathMap[uid]?.parentId === containerUid,
+  );
+  return childUids.length === 1 &&
+    blockPathMap[childUids[0]]?.blockType === 'empty'
+    ? childUids[0]
+    : null;
 }

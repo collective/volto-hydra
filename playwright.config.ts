@@ -10,6 +10,11 @@ const needsNuxt = !projectArg || projectArg.includes('nuxt');
 const needsReact = !projectArg || projectArg.includes('react');
 const needsSvelte = !projectArg || projectArg.includes('svelte');
 const needsVue = !projectArg || projectArg.includes('vue');
+// Astro example frontend — opt-in only because it carries an SSR runtime
+// (Node adapter) the other doc examples don't, and the unconditional
+// startup tax for every `pnpm test:e2e` run would be unnecessary for the
+// majority of test invocations that don't touch Astro.
+const needsAstro = projectArg?.includes('astro');
 // Example frontends — opt-in only (not started unless explicitly requested)
 const needsNextjs = projectArg?.includes('nextjs');
 const needsF7 = projectArg?.includes('f7');
@@ -93,8 +98,10 @@ export default defineConfig({
 
   /* Configure projects for different test categories and frontends.
    *
-   * Three test directories:
+   * Test directories:
    *   unit/        — Pure unit tests, run once (no frontend needed)
+   *   api/         — HTTP-contract tests against the mock API, run once
+   *                  (frontend-agnostic, no browser storageState)
    *   bridge/      — Mock-parent tests using hydra.js bridge protocol,
    *                  run on ALL frontends (mock, nuxt, react, svelte, vue)
    *   integration/ — Full Volto admin UI tests, run on mock + nuxt only
@@ -115,6 +122,20 @@ export default defineConfig({
       testDir: 'tests-playwright/unit',
       use: {
         ...devices['Desktop Firefox'],
+        viewport: { width: 1280, height: 720 },
+      },
+    },
+
+    // --- API-contract tests — frontend-agnostic, run once ---
+    // Pure HTTP-contract tests against the mock API (port 8888, always started).
+    // No browser frontend and deliberately NO storageState — these assert a
+    // backend/serializer contract (which blocks fields persist), so they must
+    // not be multiplied across frontend projects or inherit a frontend's cookies.
+    {
+      name: 'api-contract',
+      testDir: 'tests-playwright/api',
+      use: {
+        ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
       },
     },
@@ -181,6 +202,17 @@ export default defineConfig({
         viewport: { width: 1280, height: 720 },
         permissions: ['clipboard-read', 'clipboard-write'],
         storageState: 'tests-playwright/fixtures/storage-vue.json',
+      },
+    },
+    // Astro SSR frontend (port 3009)
+    {
+      name: 'astro',
+      testDir: 'tests-playwright/bridge',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+        storageState: 'tests-playwright/fixtures/storage-svelte.json',
       },
     },
 
@@ -376,7 +408,7 @@ export default defineConfig({
             // All frontends available for switching
             RAZZLE_DEFAULT_IFRAME_URL: [
               URLS.testFrontend, URLS.nuxt, URLS.reactDoc, URLS.svelteDoc,
-              URLS.vueDoc, URLS.nextjs, URLS.f7,
+              URLS.vueDoc, URLS.nextjs, URLS.f7, URLS.astroDoc,
             ].join(','),
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
           },
@@ -402,7 +434,7 @@ export default defineConfig({
             // All frontends available for switching
             RAZZLE_DEFAULT_IFRAME_URL: [
               URLS.testFrontend, URLS.nuxt, URLS.reactDoc, URLS.svelteDoc,
-              URLS.vueDoc, URLS.nextjs, URLS.f7,
+              URLS.vueDoc, URLS.nextjs, URLS.f7, URLS.astroDoc,
             ].join(','),
             VOLTOCONFIG: process.cwd() + '/volto.config.js',
             // Prevent parcel from trying to access TTY (fixes segfault in background process)
@@ -450,6 +482,20 @@ export default defineConfig({
       timeout: 30 * 1000,
       reuseExistingServer: true,
       cwd: path.join(process.cwd(), 'docs/blocks/test-vue'),
+      stdout: 'pipe' as const,
+      stderr: 'pipe' as const,
+    }] : []),
+    // Astro SSR frontend for doc example tests (opt-in via --project=astro)
+    // dev:test pins the port via --port/--host so playwright's reuse logic
+    // gets a stable URL; the Node adapter is configured in astro.config.mjs.
+    // 120s timeout because the first run installs astro + @astrojs/node.
+    ...(needsAstro ? [{
+      name: 'Astro Frontend (Test)',
+      command: 'pnpm run dev:test',
+      url: URLS.astroDoc,
+      timeout: 120 * 1000,
+      reuseExistingServer: true,
+      cwd: path.join(process.cwd(), 'docs/examples/test-astro'),
       stdout: 'pipe' as const,
       stderr: 'pipe' as const,
     }] : []),

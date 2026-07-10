@@ -2,10 +2,12 @@
   import { getImageUrl } from './utils.js';
   export let block;
   let current = 0;
+  // Expand the slides object_list (keyed by @id). Edit-mode pass-through sets each slide's @uid.
+  $: slides = expandTemplatesSync(block.slides || [], { idField: '@id' });
 </script>
 
 <div data-block-uid={block['@uid']} class="slider-block">
-  {#each block.slides || [] as slide, i (slide['@id'])}
+  {#each slides as slide, i (slide['@id'])}
     <div
       data-block-uid={slide['@id']}
       class="slide"
@@ -25,7 +27,7 @@
     </div>
   {/each}
   <div class="slider-dots">
-    {#each block.slides || [] as _, i}
+    {#each slides as _, i}
       <button on:click={() => current = i} class:active={i === current} />
     {/each}
   </div>

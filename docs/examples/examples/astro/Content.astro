@@ -1,0 +1,22 @@
+---
+/**
+ * Top-level renderer for the page's blocks.
+ *
+ * Iterates `formData.blocks_layout.items` and renders each via
+ * BlockRenderer. The /api/render endpoint calls this when `unit='page'`.
+ * Returned HTML is the entire content area's inner markup, which the
+ * client drops into `#content`'s innerHTML.
+ *
+ * No outer wrapper element here — the wrapper is `#content` (defined in
+ * index.astro). Per-block wrappers (with data-block-uid) live one level
+ * down in BlockRenderer.
+ */
+import BlockRenderer from './BlockRenderer.astro';
+const { formData, editMode } = Astro.props;
+const items = formData?.blocks_layout?.items || [];
+const blocks = formData?.blocks || {};
+---
+{items.map((id: string) => {
+  const block = { ...blocks[id], '@uid': id };
+  return <BlockRenderer block={block} content={formData} editMode={editMode} />;
+})}

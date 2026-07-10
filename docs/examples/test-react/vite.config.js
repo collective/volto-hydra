@@ -120,6 +120,7 @@ export default defineConfig({
     alias: {
       '$examples': path.resolve(__dirname, '../examples/react'),
       '$hydra': path.resolve(__dirname, '../../../packages/hydra-js/hydra.src.js'),
+      '$helpers': path.resolve(__dirname, '../../../packages/helpers/index.js'),
       '$schemas': path.resolve(__dirname, '../block-definitions.json'),
     },
   },

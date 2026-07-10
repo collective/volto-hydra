@@ -31,7 +31,7 @@ This is a **custom** block — register it via `initBridge`.
         "title": {
           "title": "Title"
         },
-        "blocks_layout": {
+        "items": {
           "title": "Content",
           "widget": "blocks_layout",
           "allowedBlocks": [
@@ -103,8 +103,8 @@ This is a **custom** block — register it via `initBridge`.
       }
     }
   },
-  "columns": {
-    "items": [
+  "blocks_layout": {
+    "columns": [
       "col-1",
       "col-2"
     ]
@@ -121,7 +121,7 @@ The columns slot uses the standard shared-blocks shape: child columns live in `b
 <!-- file: examples/react/ColumnsBlock.jsx -->
 ```jsx
 function ColumnsBlock({ block }) {
-  const items = block.columns?.items || [];
+  const items = block.blocks_layout?.columns || [];
   const blocks = block.blocks || {};
 
   return (
@@ -158,7 +158,7 @@ function ColumnBlock({ block }) {
   <div :data-block-uid="block['@uid']" class="columns-block">
     <div style="display: flex; gap: 1rem">
       <ColumnBlock
-        v-for="id in block.columns?.items || []"
+        v-for="id in block.blocks_layout?.columns || []"
         :key="id"
         :block="{ ...block.blocks?.[id], '@uid': id }"
       />
@@ -182,9 +182,33 @@ defineProps({ block: Object });
 
 <div data-block-uid={block['@uid']} class="columns-block">
   <div style="display: flex; gap: 1rem">
-    {#each block.columns?.items || [] as id (id)}
+    {#each block.blocks_layout?.columns || [] as id (id)}
       <ColumnBlock block={{ ...block.blocks?.[id], '@uid': id }} />
     {/each}
+  </div>
+</div>
+```
+
+### Astro
+
+<!-- file: examples/astro/ColumnsBlock.astro -->
+```astro
+---
+/**
+ * Columns container. Each column is a sub-block of @type "column" rendered
+ * by ColumnBlock. The columns themselves get their own data-block-uid
+ * wrapper from ColumnBlock — this outer container is just layout.
+ */
+import ColumnBlock from './ColumnBlock.astro';
+const { block } = Astro.props;
+const items = block.blocks_layout?.columns || [];
+const subBlocks = block.blocks || {};
+---
+<div class="columns-block">
+  <div style="display: flex; gap: 1rem">
+    {items.map((id: string) => (
+      <ColumnBlock block={{ ...subBlocks[id], '@uid': id }} />
+    ))}
   </div>
 </div>
 ```

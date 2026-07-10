@@ -15,6 +15,7 @@ packages:
   - 'docs/examples/test-react'
   - 'docs/examples/test-svelte'
   - 'docs/examples/test-vue'
+  - 'docs/examples/test-astro'
 
 # Mirror of core/catalog.json. Volto 19's monorepo packages (e.g.
 # core/packages/components) reference shared deps via `catalog:` and Volto

@@ -29,6 +29,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '/hydra.js': path.resolve(__dirname, '../../../packages/hydra-js/hydra.src.js'),
+      '/helpers.js': path.resolve(__dirname, '../../../packages/helpers/index.js'),
       '/build-block-path-map.js': path.resolve(__dirname, '../../../packages/hydra-js/buildBlockPathMap.js'),
       '/shared-block-schemas.js': path.resolve(__dirname, '../shared-block-schemas.js'),
     },

@@ -1,5 +1,5 @@
 function FormBlock({ block }) {
-  const fields = block.subblocks || [];
+  const fields = expandTemplatesSync(block.subblocks || [], { idField: 'field_id' });
 
   return (
     <form data-block-uid={block['@uid']} className="form-block" onSubmit={e => e.preventDefault()}>
@@ -7,7 +7,7 @@ function FormBlock({ block }) {
       {block.description && <p data-edit-text="description">{block.description}</p>}
 
       {fields.map(field => (
-        <div key={field['@id']} data-block-uid={field.field_id} className="form-field">
+        <div key={field.field_id} data-block-uid={field.field_id} className="form-field">
           <FormField field={field} />
         </div>
       ))}

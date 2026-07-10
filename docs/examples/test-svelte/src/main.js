@@ -1,4 +1,5 @@
-import { initBridge, expandListingBlocks, ploneFetchItems, contentPath } from '$hydra';
+import { initBridge } from '$hydra';
+import { expandListingBlocks, ploneFetchItems, contentPath, expandTemplatesSync } from '$helpers';
 import docPageDefinitions from '$schemas';
 const docBlocksConfig = Object.fromEntries(
   Object.values(docPageDefinitions).flatMap(page => Object.entries(page.blocks))
@@ -7,6 +8,7 @@ import App from './App.svelte';
 
 // Expose hydra.js helpers globally for doc example components
 window.expandListingBlocks = expandListingBlocks;
+window.expandTemplatesSync = expandTemplatesSync;
 window.ploneFetchItems = ploneFetchItems;
 window._API_URL = 'http://localhost:8888';
 window._contentPath = (url) => contentPath(url, window._API_URL);

@@ -5,7 +5,14 @@
  * Strict TDD: each `it` below must fail before its implementation exists.
  */
 
-import { canContain, canContainAll, findConversionPath, mapLayoutItems } from './containerOps.js';
+import {
+  canContain,
+  findConversionPath,
+  mapLayoutItems,
+  expelAllowedTypes,
+  findOnlyEmptyChildUid,
+} from './containerOps.js';
+import { canContainAll } from '@volto-hydra/helpers';
 
 describe('containerOps', () => {
   describe('canContain', () => {
@@ -81,12 +88,17 @@ describe('containerOps', () => {
         slate: {},
         text: { fieldMappings: { slate: {} } },
       };
-      expect(findConversionPath('slate', ['text'], cfg)).toEqual(['slate', 'text']);
+      expect(findConversionPath('slate', ['text'], cfg)).toEqual([
+        'slate',
+        'text',
+      ]);
     });
 
     test('returns the source itself if already in allowedTargets', () => {
       const cfg = { slate: {} };
-      expect(findConversionPath('slate', ['slate', 'text'], cfg)).toEqual(['slate']);
+      expect(findConversionPath('slate', ['slate', 'text'], cfg)).toEqual([
+        'slate',
+      ]);
     });
 
     test('returns multi-step path via intermediates', () => {
@@ -95,7 +107,11 @@ describe('containerOps', () => {
         text: { fieldMappings: { slate: {} } },
         heading: { fieldMappings: { text: {} } },
       };
-      expect(findConversionPath('slate', ['heading'], cfg)).toEqual(['slate', 'text', 'heading']);
+      expect(findConversionPath('slate', ['heading'], cfg)).toEqual([
+        'slate',
+        'text',
+        'heading',
+      ]);
     });
 
     test('returns null when no path exists', () => {
@@ -116,7 +132,12 @@ describe('containerOps', () => {
         e: { fieldMappings: { d: {} } },
       };
       // With default depth=3, a->b->c->d is reachable (3 edges) but a->b->c->d->e (4 edges) is not
-      expect(findConversionPath('a', ['d'], cfg, 3)).toEqual(['a', 'b', 'c', 'd']);
+      expect(findConversionPath('a', ['d'], cfg, 3)).toEqual([
+        'a',
+        'b',
+        'c',
+        'd',
+      ]);
       expect(findConversionPath('a', ['e'], cfg, 3)).toBeNull();
       expect(findConversionPath('a', ['c'], cfg, 2)).toEqual(['a', 'b', 'c']);
       expect(findConversionPath('a', ['d'], cfg, 2)).toBeNull();
@@ -125,11 +146,13 @@ describe('containerOps', () => {
     test('picks the shortest path when multiple targets match', () => {
       const cfg = {
         slate: {},
-        quote: { fieldMappings: { slate: {} } },        // 1 hop
-        heading: { fieldMappings: { quote: {} } },       // 2 hops from slate
+        quote: { fieldMappings: { slate: {} } }, // 1 hop
+        heading: { fieldMappings: { quote: {} } }, // 2 hops from slate
       };
-      expect(findConversionPath('slate', ['heading', 'quote'], cfg))
-        .toEqual(['slate', 'quote']);
+      expect(findConversionPath('slate', ['heading', 'quote'], cfg)).toEqual([
+        'slate',
+        'quote',
+      ]);
     });
   });
 
@@ -174,8 +197,84 @@ describe('containerOps', () => {
         blocks: { a: {} },
         blocks_layout: { items: ['a'] },
       };
-      expect(mapLayoutItems(cfg, cfg, block))
-        .toEqual({ blocks: { a: {} }, blocks_layout: { items: ['a'] } });
+      expect(mapLayoutItems(cfg, cfg, block)).toEqual({
+        blocks: { a: {} },
+        blocks_layout: { items: ['a'] },
+      });
     });
+  });
+});
+
+describe('expelAllowedTypes', () => {
+  // Blocks EXPELLED from a container become siblings of that container, so they
+  // must satisfy the container's REGION constraints (allowedSiblingTypes, already
+  // region-resolved by buildBlockPathMap) — not the raw field-level allowedBlocks.
+  test('prefers the container region types over field-level allowedBlocks', () => {
+    // Container lives in e.g. a footer region that only allows columns, while the
+    // parent field-level list also allows slate. Expel must use the region.
+    const containerInfo = { allowedSiblingTypes: ['columns'] };
+    const parentFieldDef = {
+      widget: 'blocks_layout',
+      allowedBlocks: ['columns', 'slate'],
+    };
+    expect(expelAllowedTypes(containerInfo, parentFieldDef)).toEqual([
+      'columns',
+    ]);
+  });
+
+  test('falls back to field-level allowedBlocks only when the container has no resolved region types', () => {
+    expect(
+      expelAllowedTypes({}, { allowedBlocks: ['columns', 'slate'] }),
+    ).toEqual(['columns', 'slate']);
+    expect(expelAllowedTypes(null, { allowedBlocks: ['x'] })).toEqual(['x']);
+  });
+
+  test('returns null when neither is available', () => {
+    expect(expelAllowedTypes(null, null)).toBeNull();
+    expect(expelAllowedTypes({}, null)).toBeNull();
+  });
+});
+
+describe('findOnlyEmptyChildUid — region-aware empty-container drop target', () => {
+  test('finds the placeholder in an OBJECT_LIST container (a slider) — the blocks_layout.items read could not', () => {
+    // A slider seeded empty: its one placeholder slide lives in the object_list `slides`, NOT in
+    // blocks_layout.items. blockPathMap still records it with parentId=slider (region-aware).
+    const slider = {
+      '@type': 'slider',
+      slides: [{ '@id': 'ph', '@type': 'empty' }],
+    };
+    const blockPathMap = {
+      'slider-1': { blockType: 'slider' },
+      ph: { parentId: 'slider-1', region: 'slides', blockType: 'empty' },
+    };
+    // The OLD approach (targetData.blocks_layout.items) would find nothing here:
+    expect(slider.blocks_layout?.items ?? null).toBeNull();
+    // The region-aware helper finds the placeholder via blockPathMap:
+    expect(findOnlyEmptyChildUid(blockPathMap, 'slider-1')).toBe('ph');
+  });
+
+  test('finds the placeholder in a blocks_layout container', () => {
+    const blockPathMap = {
+      'grid-1': { blockType: 'gridBlock' },
+      ph: { parentId: 'grid-1', region: 'items', blockType: 'empty' },
+    };
+    expect(findOnlyEmptyChildUid(blockPathMap, 'grid-1')).toBe('ph');
+  });
+
+  test('returns null when the container has more than one child', () => {
+    const blockPathMap = {
+      'grid-1': { blockType: 'gridBlock' },
+      a: { parentId: 'grid-1', blockType: 'empty' },
+      b: { parentId: 'grid-1', blockType: 'teaser' },
+    };
+    expect(findOnlyEmptyChildUid(blockPathMap, 'grid-1')).toBeNull();
+  });
+
+  test('returns null when the only child is not an empty placeholder', () => {
+    const blockPathMap = {
+      'grid-1': { blockType: 'gridBlock' },
+      a: { parentId: 'grid-1', blockType: 'teaser' },
+    };
+    expect(findOnlyEmptyChildUid(blockPathMap, 'grid-1')).toBeNull();
   });
 });

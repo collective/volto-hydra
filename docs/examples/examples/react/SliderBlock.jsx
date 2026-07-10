@@ -2,7 +2,7 @@ import { getImageUrl } from './utils.js';
 
 function SliderBlock({ block }) {
   const [current, setCurrent] = useState(0);
-  const slides = block.slides || [];
+  const slides = expandTemplatesSync(block.slides || [], { idField: '@id' });
 
   return (
     <div data-block-uid={block['@uid']} className="slider-block">

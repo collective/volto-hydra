@@ -332,17 +332,27 @@ export function flattenScales(path, image) {
   if (!image) return;
 
   const basePath = image.base_path || path;
+  // HYDRA: build a NEW scales object rather than mutating in place. The image
+  // data arrives FROZEN from the Redux store, so assigning to
+  // scales[key].download throws "Cannot assign to read only property
+  // 'download'" — surfaced via react-beautiful-dnd's error boundary when an
+  // image block / image-led teaser is selected for editing.
+  const sourceScales = image.scales || {};
+  const scales = {};
+  Object.keys(sourceScales).forEach((key) => {
+    scales[key] = {
+      ...sourceScales[key],
+      download: flattenToAppURL(
+        removeObjectIdFromURL(basePath, sourceScales[key].download),
+      ),
+    };
+  });
+
   const imageInfo = {
     ...image,
-    scales: image.scales || {},
+    scales,
     download: flattenToAppURL(removeObjectIdFromURL(basePath, image.download)),
   };
-
-  Object.keys(imageInfo.scales).forEach((key) => {
-    imageInfo.scales[key].download = flattenToAppURL(
-      removeObjectIdFromURL(basePath, image.scales[key].download),
-    );
-  });
 
   return imageInfo;
 }

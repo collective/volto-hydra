@@ -47,6 +47,9 @@ function vueExamplesPlugin() {
       if (code.includes('expandListingBlocks') && !code.includes('expandListingBlocks =')) {
         neededImports.push(`const expandListingBlocks = (...a) => window.expandListingBlocks(...a);`);
       }
+      if (code.includes('expandTemplatesSync') && !code.includes('expandTemplatesSync =')) {
+        neededImports.push(`const expandTemplatesSync = (...a) => window.expandTemplatesSync(...a);`);
+      }
       if (code.includes('ploneFetchItems') && !code.includes('ploneFetchItems =')) {
         neededImports.push(`const ploneFetchItems = (...a) => window.ploneFetchItems(...a);`);
       }
@@ -79,6 +82,7 @@ export default defineConfig({
     alias: {
       '$examples': path.resolve(__dirname, '../examples/vue'),
       '$hydra': path.resolve(__dirname, '../../../packages/hydra-js/hydra.src.js'),
+      '$helpers': path.resolve(__dirname, '../../../packages/helpers/index.js'),
       '$schemas': path.resolve(__dirname, '../block-definitions.json'),
     },
   },

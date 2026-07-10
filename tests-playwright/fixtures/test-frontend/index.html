@@ -136,7 +136,8 @@
 
     <script src="/renderer.js"></script>
     <script type="module">
-        import { initBridge, expandListingBlocks, ploneFetchItems, expandTemplates, expandTemplatesSync, getAccessToken, contentPath } from '/hydra.js';
+        import { initBridge, getAccessToken } from '/hydra.js';
+        import { expandListingBlocks, ploneFetchItems, expandTemplates, expandTemplatesSync, contentPath } from '/helpers.js';
         import { sharedBlocksConfig } from '/shared-block-schemas.js';
 
         // Parse page numbers from URL query params (format: ?pg_{blockId}={pageNumber})
@@ -195,6 +196,15 @@
         async function renderContentWithListings(content) {
             const myGeneration = ++window._renderGeneration;
 
+            // ONE shared template-merge state for the WHOLE page render — created by the
+            // page-load entry and NEVER reset mid-render. Every expand call (top-level,
+            // footer, and every object_list / blocks_layout re-entry) reuses this one
+            // object, so instances minted by the top-level apply survive to every
+            // re-entry and recognition hits (data-derived) instead of re-applying. Reuse
+            // it here; only create it if we are the entry point (wiping it mid-render
+            // would drop the minted instances and re-apply → infinite loop).
+            if (!window._templateState) window._templateState = {};
+
             // Extract path from @id
             let contextPath = content['@id'] || '/';
             if (contextPath.startsWith('http')) {
@@ -234,17 +244,17 @@
             // Render footer_blocks if present (or if forced layout will inject content)
             // Determine if we should force footer layout based on page path (same logic as bridge init)
             const pagePath = contextPath.replace(/\/edit$/, '');
-            const forceFooterLayout = pagePath === '/_test_data/another-page';
+            const forceFooterLayout = pagePath.startsWith('/_test_data/another-page');
             const footerAllowedLayouts = forceFooterLayout ? ['/_test_data/templates/footer-layout'] : null;
 
             if (myGeneration !== window._renderGeneration) return; // stale render
 
-            if (content.footer_blocks?.items?.length > 0 || footerAllowedLayouts) {
+            if (content.blocks_layout?.footer?.length > 0 || footerAllowedLayouts) {
                 const footerBlocks = content.blocks || {};
-                const footerLayout = content.footer_blocks?.items || [];
+                const footerLayout = content.blocks_layout?.footer || [];
 
                 // Expand templates (handles both existing content and forced layouts)
-                const templateState = {};
+                const templateState = window._templateState;
                 const loadTemplate = async (templateId) => {
                     const headers = { 'Accept': 'application/json' };
                     const token = getAccessToken();
@@ -368,8 +378,12 @@
                     return res.json();
                 };
 
-                // Expand templates in main blocks field
-                const templateState = {};
+                // Expand templates in main blocks field. Seed the ONE shared
+                // template-merge state for this render cycle (parity with
+                // renderContentWithListings:204) so nested re-entries reuse the
+                // same object instead of getting undefined — no per-call default.
+                window._templateState = {};
+                const templateState = window._templateState;
                 const expandedItems = await expandTemplates(
                     content.blocks_layout?.items || [],
                     {
@@ -379,14 +393,15 @@
                         ...(contextNavLayoutForced ? { allowedLayouts: contextNavLayoutForced } : {}),
                     }
                 );
-                // Merge expanded blocks back (preserve blocks from other fields like footer_blocks)
+                // Merge expanded blocks back. Spread the existing blocks_layout so
+                // sibling regions (e.g. footer) survive — only the items region is
+                // re-expanded here.
                 const expandedBlocksMap = Object.fromEntries(expandedItems.map(item => [item['@uid'], item]));
                 content.blocks = { ...content.blocks, ...expandedBlocksMap };
-                content.blocks_layout = { items: expandedItems.map(item => item['@uid']) };
+                content.blocks_layout = { ...content.blocks_layout, items: expandedItems.map(item => item['@uid']) };
 
                 // Expose template expansion for renderer.js (object_list arrays)
                 window._expandTemplatesSync = expandTemplatesSync;
-                window._templateState = templateState;
 
                 // Render navigation from @components.navigation.items
                 const navItems = content['@components']?.navigation?.items || [];
@@ -425,7 +440,7 @@
 
                     // Determine if we should force footer layout based on page path
                     const pagePath = window.location.pathname.replace(/\/edit$/, '');
-                    const forceFooterLayout = pagePath === '/_test_data/another-page';
+                    const forceFooterLayout = pagePath.startsWith('/_test_data/another-page');
 
                     // Listen for changes from the admin UI and update blocks
                     // Return promise from async render so hydra.js can wait for DOM updates
@@ -434,15 +449,18 @@
                     window.bridge = initBridge({
                         page: {
                             schema: {
+                                // Blocks fields: each is a key in the shared blocks_layout dict.
+                                // The default field is 'items'; 'footer' is a second blocks field —
+                                // both persist inside the registered blocks_layout field.
                                 properties: {
-                                    blocks_layout: {
+                                    items: {
                                         title: 'Blocks',
-                                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest', 'title', 'description', 'section', 'contextNavigation'],
+                                        allowedBlocks: ['slate', 'image', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest', 'title', 'description', 'section', 'contextNavigation', 'codeExample'],
                                         allowedTemplates: ['/_test_data/templates/test-layout'],
                                         allowedLayouts: contextNavLayoutForced
                                             || [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
                                     },
-                                    footer_blocks: {
+                                    footer: {
                                         title: 'Footer',
                                         allowedBlocks: ['slate', 'image'],
                                         ...(forceFooterLayout ? { allowedLayouts: ['/_test_data/templates/footer-layout'] } : {}),
@@ -481,8 +499,8 @@
                             // hydra.js uses waitForContentReady to know when DOM is ready)
                             if (formData.blocks && formData.blocks_layout) {
                                 // Debug: Log column contents
-                                const col1 = formData.blocks?.['columns-1']?.columns?.['col-1'];
-                                const col2 = formData.blocks?.['columns-1']?.columns?.['col-2'];
+                                const col1 = formData.blocks?.['columns-1']?.blocks?.['col-1'];
+                                const col2 = formData.blocks?.['columns-1']?.blocks?.['col-2'];
                                 if (col1 || col2) {
                                     tfLog('col-1 blocks_layout:', col1?.blocks_layout?.items);
                                     tfLog('col-2 blocks_layout:', col2?.blocks_layout?.items);

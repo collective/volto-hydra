@@ -151,7 +151,7 @@ export const sharedBlocksConfig = {
                 {
                     id: 'default',
                     title: 'Default',
-                    fields: ['title', 'blocks_layout'],
+                    fields: ['title', 'items'],
                 },
             ],
             properties: {
@@ -159,10 +159,10 @@ export const sharedBlocksConfig = {
                     title: 'Title',
                     type: 'string',
                 },
-                blocks_layout: {
+                items: {
                     title: 'Content',
                     widget: 'blocks_layout',
-                    allowedBlocks: ['slate', 'image'],
+                    allowedBlocks: ['slate', 'image', 'form'],
                     defaultBlockType: 'slate',
                 },
             },
@@ -187,7 +187,7 @@ export const sharedBlocksConfig = {
                 { id: 'default', title: 'Default', fields: [] },
             ],
             properties: {
-                blocks_layout: { widget: 'blocks_layout' },
+                items: { widget: 'blocks_layout' },
             },
             required: [],
         },
@@ -379,10 +379,10 @@ export const sharedBlocksConfig = {
                     title: 'Panels',
                     widget: 'object_list',
                     schema: {
-                        fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'blocks_layout'] }],
+                        fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'items'] }],
                         properties: {
                             title: { title: 'Title', type: 'string' },
-                            blocks_layout: {
+                            items: {
                                 title: 'Content',
                                 widget: 'blocks_layout',
                                 allowedBlocks: ['slate', 'image'],
@@ -546,9 +546,9 @@ export const sharedBlocksConfig = {
     gridBlock: {
         allowedBlocks: ['teaser', 'image'],
         blockSchema: {
-            fieldsets: [{ id: 'default', title: 'Default', fields: ['blocks_layout', 'variation'] }],
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['items', 'variation'] }],
             properties: {
-                blocks_layout: {
+                items: {
                     widget: 'blocks_layout',
                     itemTypeField: 'variation',  // sync trigger
                     allowedBlocks: ['teaser', 'image'],

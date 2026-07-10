@@ -542,6 +542,14 @@ test.describe('allowedLayouts', () => {
       const brandingBlock = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Branding - Forced Layout' });
       await expect(brandingBlock).toBeVisible({ timeout: 10000 });
 
+      // The forced layout also contains a nested `columns` container whose
+      // children live in a non-`items` region — the regions shape (#234) the
+      // template merge must walk. Its cell must render (dropped/threw before the
+      // helpers' expandTemplates iterated every region).
+      // innermost [data-block-uid] (the cell slate) — ancestors also contain the text
+      const columnCell = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Column Cell' }).last();
+      await expect(columnCell).toBeVisible({ timeout: 10000 });
+
       // User content should still be there (moved to default placeholder)
       const userContent = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer user content' });
       await expect(userContent).toBeVisible();
@@ -569,9 +577,153 @@ test.describe('allowedLayouts', () => {
       const brandingBlock = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Branding - Forced Layout' });
       await expect(brandingBlock).toBeVisible({ timeout: 10000 });
 
+      // Nested columns container (non-items region) must render too (#234).
+      // innermost [data-block-uid] (the cell slate) — ancestors also contain the text
+      const columnCell = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Column Cell' }).last();
+      await expect(columnCell).toBeVisible({ timeout: 10000 });
+
       // User content should still be there
       const userContent = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer user content' });
       await expect(userContent).toBeVisible();
+    });
+
+    test('editing a nested columns cell in a forced footer persists after save', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
+
+      await helper.login();
+      await helper.navigateToEdit('/another-page');
+      await helper.waitForIframeReady();
+
+      const footerContent = iframe.locator('#footer-content');
+      // The forced footer's branding block is a direct child of the footer
+      // instance (used to enter template edit mode); the columns cell is nested
+      // 3 levels deep (columns -> column -> slate) — the block we actually edit.
+      const branding = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Branding' }).last();
+      await expect(branding).toBeVisible({ timeout: 10000 });
+      const brandingId = await branding.getAttribute('data-block-uid');
+      const cell = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Column Cell' }).last();
+      await expect(cell).toBeVisible({ timeout: 10000 });
+      const cellId = await cell.getAttribute('data-block-uid');
+
+      // Enter template edit mode via the instance (branding -> parent instance).
+      await helper.clickBlockInIframe(brandingId);
+      await helper.waitForSidebarOpen();
+      await helper.escapeToParent();
+      const editToggle = page.locator('.edit-template-toggle');
+      await expect(editToggle).toBeVisible({ timeout: 5000 });
+      await editToggle.click();
+      const checkbox = page.locator('.edit-template-toggle');
+      await expect(checkbox).toHaveAttribute('aria-pressed', 'true', { timeout: 5000 });
+
+      // Select the deeply-nested columns cell — it must unlock in edit mode
+      // (approach B ancestry unlock; the bridge sets contenteditable on selection).
+      await helper.clickBlockInIframe(cellId);
+      await helper.waitForBlockSelectedInAdmin(cellId);
+      const cellEditor = helper.getSlateField(iframe.locator(`[data-block-uid="${cellId}"]`));
+      await expect(cellEditor).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
+
+      // Edit the nested cell with a unique marker.
+      await cellEditor.click();
+      await expect(cellEditor).toBeFocused({ timeout: 2000 });
+      await page.keyboard.press('End');
+      await page.keyboard.type(' FOOTEREDIT');
+      await expect(iframe.locator(`[data-block-uid="${cellId}"]`)).toContainText('FOOTEREDIT', { timeout: 5000 });
+
+      // Exit edit mode.
+      await helper.clickBlockInIframe(brandingId);
+      await helper.escapeToParent();
+      await editToggle.click();
+      await expect(checkbox).toHaveAttribute('aria-pressed', 'false', { timeout: 5000 });
+
+      // Save.
+      await page.keyboard.press('Control+s');
+      const pencilIcon = page.locator('.toolbar-actions .edit, [aria-label="Edit"]');
+      await expect(pencilIcon).toBeVisible({ timeout: 10000 });
+
+      // PROOF OF SAVE: navigate to a DIFFERENT page (/another-page-2) that
+      // independently forces the SAME footer-layout. The edit can only appear
+      // there if it was saved back into the footer-layout TEMPLATE and re-applied
+      // on load — reloading the same page we edited would not distinguish a real
+      // template save from this page's own local/footer state.
+      await helper.navigateToView('/another-page-2');
+      await helper.waitForIframeReady();
+      // Sanity: page-2's own content rules out a stale /another-page render.
+      await expect(iframe.locator('[data-block-uid]').filter({ hasText: 'second forced-footer page' }).first()).toBeVisible({ timeout: 15000 });
+      const persistedCell = iframe.locator('#footer-content [data-block-uid]').filter({ hasText: 'FOOTEREDIT' }).last();
+      await expect(persistedCell).toBeVisible({ timeout: 15000 });
+    });
+
+    test('editing a forced-footer template lets you add + remove columns in the footer container (footer region)', async ({ page }) => {
+      const helper = new AdminUIHelper(page);
+      const iframe = helper.getIframe();
+
+      await helper.login();
+      await helper.navigateToEdit('/another-page');
+      await helper.waitForIframeReady();
+
+      const footerContent = iframe.locator('#footer-content');
+      const branding = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Branding' }).last();
+      await expect(branding).toBeVisible({ timeout: 10000 });
+      const brandingId = await branding.getAttribute('data-block-uid');
+      const cell = footerContent.locator('[data-block-uid]').filter({ hasText: 'Footer Column Cell' }).last();
+      await expect(cell).toBeVisible({ timeout: 10000 });
+      const cellId = await cell.getAttribute('data-block-uid');
+
+      // Enter template edit mode via the instance (branding -> parent instance).
+      await helper.clickBlockInIframe(brandingId);
+      await helper.waitForSidebarOpen();
+      await helper.escapeToParent();
+      const editToggle = page.locator('.edit-template-toggle');
+      await expect(editToggle).toBeVisible({ timeout: 5000 });
+      await editToggle.click();
+      await expect(page.locator('.edit-template-toggle')).toHaveAttribute('aria-pressed', 'true', { timeout: 5000 });
+
+      // Navigate up to the columns container (cell -> column -> columns). This is a
+      // container in the FOOTER region — the forced-region canAdd case the recursive
+      // stamping fixes (the nested columns now carry the footer instance id).
+      await helper.clickBlockInIframe(cellId);
+      await helper.waitForBlockSelectedInAdmin(cellId);
+      await helper.escapeToParent(); // -> column
+      await helper.escapeToParent(); // -> columns
+
+      // Add + remove a COLUMN in the forced-footer columns container.
+      const columns = footerContent.locator('.columns-row > [data-block-uid]');
+      await expect(columns).toHaveCount(1);
+      const firstColId = await columns.first().getAttribute('data-block-uid');
+      await helper.addBlockViaSidebar('Columns'); // columns slot allowedBlocks: ['column'] → auto-insert
+      await expect(columns).toHaveCount(2);
+
+      // The added column must be a REAL member of the slot region. Each column is its
+      // OWN slot (like the fixed footer-col-1), so the new column gets its own distinct
+      // stored slotId — not undefined, and not a copy of the neighbour's. Reading it
+      // from #sidebar-template-settings only succeeds when the new column IS a template
+      // member: that panel renders only for a block carrying templateId + the edited
+      // instanceId, so a truthy read here proves membership (store-on-add inherited
+      // template membership from its neighbour). A count-only assertion would still pass
+      // if store-on-add produced a non-member.
+      // Clicking a column selects its inner cell, so select a cell and escape up to
+      // the column (the same nav the test uses above) to read the column's slotId.
+      await helper.clickBlockInIframe(cellId); // neighbour column's known cell
+      await helper.escapeToParent(); // -> neighbour column
+      await helper.waitForSidebarOpen();
+      const neighbourSlotId = await page.locator('#sidebar-template-settings #field-slotId').inputValue();
+
+      const newCellId = await columns.nth(1).locator('[data-block-uid]').first().getAttribute('data-block-uid');
+      await helper.clickBlockInIframe(newCellId); // new column's placeholder cell
+      await helper.escapeToParent(); // -> new column
+      await helper.waitForSidebarOpen();
+      const newSlotId = await page.locator('#sidebar-template-settings #field-slotId').inputValue();
+
+      expect(neighbourSlotId).toBeTruthy(); // the existing fixed column is a member
+      expect(newSlotId).toBeTruthy();       // the new column is ALSO a member (own stored slotId)
+      expect(newSlotId).not.toBe(neighbourSlotId); // each column is its OWN distinct slot
+
+      // Remove the column.
+      await page.evaluate((id) => {
+        document.dispatchEvent(new CustomEvent('hydra-delete-blocks', { detail: { blockIds: [id] } }));
+      }, firstColId);
+      await expect(columns).toHaveCount(1);
     });
 
     test('fixed block from forced layout is locked', async ({ page }) => {
@@ -712,7 +864,7 @@ test.describe('allowedLayouts', () => {
       await helper.waitForBlockSelectedInAdmin(headerBlockId!);
 
       // Enter template edit mode — blocks outside the template become readonly
-      const editTemplateLabel = page.getByText('Edit Template', { exact: true });
+      const editTemplateLabel = page.locator('.edit-template-toggle');
       await editTemplateLabel.click();
 
       // Footer block should be locked (outside the template)

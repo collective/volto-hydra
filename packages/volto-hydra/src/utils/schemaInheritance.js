@@ -33,8 +33,9 @@
  * branch can be removed — until then, both branches are load-bearing.
  */
 import config from '@plone/volto/registry';
-import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds } from './blockPath';
-import { PAGE_BLOCK_UID, convertFieldValue } from '@volto-hydra/hydra-js';
+import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField } from './blockPath';
+import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { convertFieldValue } from '@volto-hydra/helpers';
 import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context';
 // Pure validation/default-application logic lives in schemaValidation.js
 // (no dependencies — safe to import from CI scripts and test runners).
@@ -372,8 +373,12 @@ function getTemplateInfoFromNeighbors(context) {
     // Empty container — check if parent container has childSlotIds for this field.
     // This handles the case where all blocks in a slot region inside a container
     // have been deleted, leaving the container field empty.
-    if (containerId && field && allBlocks) {
-      const parentBlock = allBlocks?.[containerId];
+    if (containerId && field) {
+      // The parent container (for childSlotIds). Prefer the explicitly-passed block:
+      // for a nested add, allBlocks is THIS level's siblings, so the parent lives one
+      // level up and isn't in it. The id lookup only resolves when a caller passes the
+      // parent-level allBlocks (e.g. a top-level container's empty slot).
+      const parentBlock = context.parentBlock || allBlocks?.[containerId];
       if (parentBlock?.templateId && parentBlock?.childSlotIds?.[field]) {
         return {
           templateId: parentBlock.templateId,
@@ -1847,11 +1852,12 @@ function createSingleEnhancerLegacy(recipe) {
  */
 function getFirstBlocksField(blockId, blockPathMap) {
   if (!blockPathMap || !blockId) return undefined;
-  for (const pathInfo of Object.values(blockPathMap)) {
-    // Only consider blocks fields, not object_list items
-    if (pathInfo.parentId === blockId && pathInfo.containerField && !pathInfo.isObjectListItem) {
-      return pathInfo.containerField;
-    }
+  // The first container field of this block — its NAME, storage-agnostic
+  // (blocks-layout and object_list act the same here). getChildField hides the
+  // region-vs-containerField detail.
+  for (const childId of getChildBlockIds(blockId, blockPathMap)) {
+    const field = getChildField(childId, blockPathMap);
+    if (field) return field;
   }
   return undefined;
 }
@@ -2295,12 +2301,10 @@ export function syncChildBlockTypes(formData, blockPathMap, blockId, oldBlockDat
   const declaredBlocksField = findBlocksFieldForTypeField(blockConfig, typeField, intl);
   const effectiveBlocksField = declaredBlocksField ?? getFirstBlocksField(blockId, blockPathMap);
 
-  // Get child block IDs, filtered to the effective blocks field
-  const allChildIds = getChildBlockIds(blockId, blockPathMap);
+  // Child block IDs in the effective container field (storage-agnostic).
   const childIds = effectiveBlocksField
-    ? allChildIds.filter((id) => blockPathMap[id]?.containerField === effectiveBlocksField)
-    : allChildIds;
-  console.log('[syncChildBlockTypes] childIds:', childIds, 'in field:', effectiveBlocksField);
+    ? getChildBlockIdsInField(blockId, effectiveBlocksField, blockPathMap)
+    : getChildBlockIds(blockId, blockPathMap);
   if (childIds.length === 0) return result;
 
   // Transform each child

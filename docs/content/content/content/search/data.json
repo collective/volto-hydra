@@ -79,8 +79,8 @@
           }
         }
       },
-      "listing": {
-        "items": ["results-listing"]
+      "blocks_layout": {
+        "listing": ["results-listing"]
       }
     }
   },

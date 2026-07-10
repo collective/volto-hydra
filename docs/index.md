@@ -17,6 +17,7 @@ A Visual Headless CMS using Plone as a server, providing true visual editing wit
 
 architecture
 build-a-frontend
+server-rendered-frontends
 live-preview
 custom-blocks
 container-blocks
@@ -31,7 +32,7 @@ examples/README
 ## Why Hydra?
 
 - **Visual + True Headless + Open Source** — a unique combination in the CMS space
-- **Framework agnostic** — use Next.js, Nuxt.js, Astro, or any frontend stack
+- **Framework agnostic** — Next.js, Nuxt.js, Astro, plus server-only stacks (PHP, Django, Rails, Laravel) via the [server-render pattern](./server-rendered-frontends.md)
 - **Quick visual editing** — enable it with simple HTML data attributes, no React or Vue required in your frontend
 - **Omni-channel** — switch between multiple frontends mid-edit
 - **Enterprise features** — versioning, i18n, workflow, and automated content rules
@@ -47,7 +48,7 @@ Open <https://hydra.pretagov.com>, log in, then:
 - Pick one of the preset frontends, or paste in your own frontend URL.
 - Edit any page — every change updates the live preview.
 
-The default preset is a Nuxt.js frontend deployed as an [SSG](https://hydra-nuxt-flowbrite.netlify.app/) to demonstrate scale-to-zero editing on free hosting. See [Build a frontend › Deployment patterns](./build-a-frontend.md#deployment-patterns).
+The default preset is a Nuxt.js frontend deployed as an [SSG](https://hydra-nuxt-flowbrite.netlify.app/) to demonstrate scale-to-zero editing on free hosting. An [Astro example](https://github.com/collective/volto-hydra/tree/main/docs/examples/test-astro) demonstrates the [server-render pattern](./server-rendered-frontends.md) for static-first frameworks. See [Build a frontend › Deployment patterns](./build-a-frontend.md#deployment-patterns).
 
 To run Hydra locally against your own frontend, see the **Run Locally** section of the [project README](https://github.com/collective/volto-hydra#run-locally).
 

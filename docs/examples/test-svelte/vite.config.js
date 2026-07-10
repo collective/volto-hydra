@@ -13,6 +13,7 @@ import path from 'path';
  */
 const GLOBAL_INJECTIONS = {
   expandListingBlocks: { inject: '(...a) => window.expandListingBlocks(...a)' },
+  expandTemplatesSync: { inject: '(...a) => window.expandTemplatesSync(...a)' },
   ploneFetchItems: { inject: '(...a) => window.ploneFetchItems(...a)' },
   contentPath: { inject: '(...a) => window._contentPath(...a)' },
   API_URL: { inject: '() => window._API_URL', rewrite: true, getterName: '_getApiUrl' },
@@ -66,6 +67,7 @@ export default defineConfig({
     alias: {
       '$examples': path.resolve(__dirname, '../examples/svelte'),
       '$hydra': path.resolve(__dirname, '../../../packages/hydra-js/hydra.src.js'),
+      '$helpers': path.resolve(__dirname, '../../../packages/helpers/index.js'),
       '$schemas': path.resolve(__dirname, '../block-definitions.json'),
     },
   },

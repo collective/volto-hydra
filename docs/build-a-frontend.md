@@ -6,13 +6,25 @@ The actual code you write will depend on the framework you choose. You can look 
 - [Next.js](https://github.com/collective/volto-hydra/tree/main/examples/hydra-nextjs)
 - [F7-Vue](https://github.com/collective/volto-hydra/tree/main/examples/hydra-vue-f7)
 
+```{note}
+This guide describes the integration pattern for frameworks with client-side
+reactivity (React, Vue, Svelte, Solid, Next, Nuxt, etc.) — your component
+tree consumes `formData` and re-renders, the framework's virtual DOM
+diff handles the per-block update.
+
+For server-only frameworks without client-side reactivity (Astro, PHP,
+Django, Rails, Laravel, Symfony, Go templates), use the
+[server-render pattern](./server-rendered-frontends.md) instead — one config
+option on `initBridge` plus one small HTTP endpoint.
+```
+
 ## What an integrated frontend looks like
 
 Before you dive into the steps, here's what your frontend ends up doing.
 
 To make a site editable with Hydra you break a page into:
 
-- **Blocks layout** — areas of the page that contain a list of blocks that make up your page content.
+- **Blocks fields** — one or more named, ordered lists of blocks. Each is a schema property with `widget: 'blocks_layout'`; the field name is a key inside the page's `blocks_layout` dict (the default field is `items`, plus e.g. `header`, `footer`). Every field's blocks live in the page's single shared `blocks` dict; the field only records ordering.
 - **Blocks** — discrete visual elements with a schema and settings that can be moved and edited.
   - Type, title, icon etc. so the user can pick from a menu.
   - Fields: string, image, link etc. each with their own sidebar widget.
@@ -28,10 +40,13 @@ if (window.name.startsWith('hydra')) {
     bridge = initBridge({
       page: {
         schema: {
+          // Each blocks field (widget: 'blocks_layout') is a named list of
+          // blocks. The field name is the key inside the `blocks_layout` dict;
+          // the default field is `items`. Each has its own allowedBlocks.
           properties: {
-            blocks_layout: { allowedBlocks: ['slate', 'grid', 'myimage'] },
-            header_blocks: { allowedBlocks: ['slate', 'image'], maxLength: 3 },
-            footer_blocks: { allowedBlocks: ['slate', 'link'] },
+            items:  { widget: 'blocks_layout', allowedBlocks: ['slate', 'grid', 'myimage'] },
+            header: { widget: 'blocks_layout', allowedBlocks: ['slate', 'image'], maxLength: 3 },
+            footer: { widget: 'blocks_layout', allowedBlocks: ['slate', 'link'] },
           },
         },
       },
@@ -56,7 +71,7 @@ else {
 }
 ```
 
-Page data ends up shaped like this:
+Page data ends up shaped like this — one shared `blocks` dict, and a region per named list inside `blocks_layout`:
 
 ```js
 {
@@ -66,10 +81,16 @@ Page data ends up shaped like this:
     'header-1': { '@type': 'image', ... },
     'footer-1': { '@type': 'slate', ... }
   },
-  blocks_layout: { items: ['text-1'] },
-  header_blocks: { items: ['header-1'] },
-  footer_blocks: { items: ['footer-1'] }
+  blocks_layout: {
+    items: ['text-1'],     // main content region (the default)
+    header: ['header-1'],  // header region
+    footer: ['footer-1']   // footer region
+  }
 }
+```
+
+```{note}
+Regions are sub-keys of `blocks_layout` — **not** separate top-level fields — because that is what makes them persist. `blocks_layout` is a registered backend field (a Plone behavior field), so the whole dict, including every region, is saved verbatim. A separate top-level field such as `footer_blocks` would be **silently dropped** by the backend on save, because it isn't a registered field. See [Container blocks](container-blocks.md) for the data model in full.
 ```
 
 Then you augment the rendered HTML with `data-` attributes (or `<!-- hydra ... -->` comments) so Hydra can find your blocks and editable fields:
@@ -131,6 +152,8 @@ In your page template, fill title etc. from the content metadata.
 3. If the block is a container, call the `Block` component recursively
 4. In your page, iterate down the `blocks_layout` list and render a `Block` component for each
 5. Rendering Slate — split into a separate component as it's used in many blocks and is also recursive
+
+Give `Block` an `@type: "empty"` case: a container region with no `defaultBlockType` and more than one `allowedBlocks` seeds an `empty` placeholder for the user to type in place, and any custom container renderer must route its children through `Block` so `empty` is handled rather than rejected. See [Empty Blocks](container-blocks.md#empty-blocks).
 
 ## 7. Helper Functions
 

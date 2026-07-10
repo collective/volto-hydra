@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import SlateBlock, { SlateInline } from "@/components/SlateBlock";
 import CodeExampleBlock from "@/components/CodeExampleBlock/CodeExampleBlock";
-import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, staticBlocks, contentPath } from "#utils/hydra";
+import { expandTemplatesSync, expandListingBlocks, ploneFetchItems, staticBlocks, contentPath } from "#utils/helpers";
 import SwiperSlider from "@/components/SwiperSlider";
 
 // Template context for nested block expansion
@@ -716,7 +716,7 @@ function FormBlock({ id, block, data, apiUrl, contextPath }) {
 function SearchBlock({ id, block, data, apiUrl, contextPath }) {
   const expand = useExpand();
   const facets = expand(block.facets || [], null, "@id");
-  const searchResults = expand(block.listing?.items || [], block.blocks || {});
+  const searchResults = expand(block.blocks_layout?.listing || [], block.blocks || {});
 
   const [searchText, setSearchText] = useState("");
   const [facetValues, setFacetValues] = useState({});
@@ -782,7 +782,7 @@ function SearchBlock({ id, block, data, apiUrl, contextPath }) {
   };
 
   const getListingTotalResults = () => {
-    const listingUid = block.listing?.items?.[0];
+    const listingUid = block.blocks_layout?.listing?.[0];
     if (!listingUid) return null;
     const listingBlock = block.blocks?.[listingUid];
     return listingBlock?._paging?.totalItems || listingBlock?.items_total || null;
@@ -1135,7 +1135,7 @@ function Block({ block, id, data, apiUrl, contextPath }) {
       return (
         <div data-block-uid={id} data-block-container="{allowed:['Column'],add:'horizontal'}" className="columns-block" style={{ display: "flex", gap: "1rem" }}>
           {block.title && <h3 data-edit-text="title">{block.title}</h3>}
-          {(block.columns?.items || []).map((columnId) => {
+          {(block.blocks_layout?.columns || []).map((columnId) => {
             const col = block.blocks?.[columnId];
             if (!col) return null;
             const children = expand(col.blocks_layout?.items || [], col.blocks || {});

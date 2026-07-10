@@ -1,0 +1,17 @@
+---
+/**
+ * Slate block: a rich-text editor's value tree. Renders the value array
+ * recursively via SlateNode. The `data-edit-text="value"` attribute is
+ * the hook the bridge's selection sync uses to pair this DOM element
+ * with the block's `value` field for inline editing.
+ *
+ * Note: this component does NOT set `data-block-uid` — the wrapper in
+ * BlockRenderer.astro handles that. Mirrors test-svelte's SlateBlock
+ * minus the outer wrapper (which is BlockRenderer's job here).
+ */
+import SlateNode from './SlateNode.astro';
+const { block } = Astro.props;
+const value = block?.value || [];
+---
+<div data-edit-text="value"
+>{value.map((node: any) => <SlateNode node={node} />)}</div>

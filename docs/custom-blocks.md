@@ -21,15 +21,15 @@ const bridge = initBridge({
 
 ### `page` — page-level blocks fields
 
-Defines the **regions of a page** where blocks can live. `page.schema.properties` is keyed by field name; each entry is one region.
+Defines the **blocks fields of a page** where blocks can live. `page.schema.properties` is keyed by field name; each `widget: 'blocks_layout'` entry is one blocks field. The field name is the key inside the page's `blocks_layout` dict (the default field is `items`), so they all persist inside the registered `blocks_layout` field.
 
 ```js
 page: {
   schema: {
     properties: {
-      blocks_layout: { title: 'Content', allowedBlocks: ['slate', 'image', 'slider'] },
-      header_blocks: { title: 'Header',  allowedBlocks: ['slate'], maxLength: 3 },
-      footer_blocks: { title: 'Footer',  allowedBlocks: ['slate', 'link'] },
+      items:  { widget: 'blocks_layout', title: 'Content', allowedBlocks: ['slate', 'image', 'slider'] },
+      header: { widget: 'blocks_layout', title: 'Header',  allowedBlocks: ['slate'], maxLength: 3 },
+      footer: { widget: 'blocks_layout', title: 'Footer',  allowedBlocks: ['slate', 'link'] },
     },
   },
 }

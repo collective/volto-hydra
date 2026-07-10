@@ -1,4 +1,4 @@
-import { expandTemplates, expandTemplatesSync } from './hydra.src.js';
+import { expandTemplates, expandTemplatesSync } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from './mergeTemplates.js';
 
 // Wrapper to match old applyLayoutTemplate signature for existing tests
@@ -6,7 +6,7 @@ async function applyLayoutTemplate(pageData, templateData, uuidGenerator) {
   const templateUrl = templateData['@id'];
   const { merged } = await mergeTemplatesIntoPage(pageData, {
     loadTemplate: async () => templateData,
-    pageBlocksFields: { blocks_layout: { allowedLayouts: [templateUrl] } },
+    pageBlocksFields: { items: { allowedLayouts: [templateUrl] } },
     uuidGenerator,
   });
   return merged;
@@ -18,7 +18,7 @@ async function mergeTemplateContent(target, source, filterTemplateId = null) {
   // This simulates the old merge behavior
   const { merged } = await mergeTemplatesIntoPage(target, {
     loadTemplate: async () => source,
-    pageBlocksFields: { blocks_layout: {} },
+    pageBlocksFields: { items: {} },
   });
   return { merged };
 }
@@ -579,7 +579,7 @@ describe('reverse merge - page to template (for saving)', () => {
     // This simulates what happens on save
     const { merged } = await mergeTemplatesIntoPage(template, {
       loadTemplate: async () => pageWithEdits, // The "template" to load is actually the page
-      pageBlocksFields: { blocks_layout: { allowedLayouts: ['/templates/header-footer'] } },
+      pageBlocksFields: { items: { allowedLayouts: ['/templates/header-footer'] } },
       uuidGenerator,
     });
 
@@ -591,6 +591,56 @@ describe('reverse merge - page to template (for saving)', () => {
     const footerBlock = Object.values(merged.blocks).find(b => b.slotId === 'footer' && b.fixed);
     expect(footerBlock).toBeDefined();
     expect(footerBlock.value[0].text).toBe('User Edited Footer');
+  });
+
+  // The admin SAVE path (View.jsx "REVERSE MERGE") uses filterInstanceId — NOT
+  // allowedLayouts — to merge the edited instance back into the template, so a
+  // fixed+readOnly edit made in template edit mode propagates to OTHER pages using the
+  // template. This is integration :866 ("saved template changes … appear on other
+  // pages") at the unit level; the allowedLayouts reverse test above does not cover it.
+  test('a fixed+readOnly template edit propagates to another page (reverse capture + forward apply)', async () => {
+    let counter2 = 0;
+    const uuidGen = () => `rev-${++counter2}`;
+    const template = {
+      '@id': '/templates/hf',
+      blocks: {
+        header: { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/hf', templateInstanceId: 'inst-1', slotId: 'header', value: [{ text: 'Original Header' }] },
+        'default-slot': { '@type': 'slate', templateId: '/templates/hf', templateInstanceId: 'inst-1', slotId: 'default', value: [] },
+      },
+      blocks_layout: { items: ['header', 'default-slot'] },
+    };
+    // The page as edited in template edit mode: the fixed+readOnly header was changed.
+    const pageWithEdits = {
+      blocks: {
+        'page-header': { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/hf', templateInstanceId: 'inst-1', slotId: 'header', value: [{ text: 'Edited Header' }] },
+        'user-block-1': { '@type': 'slate', templateId: '/templates/hf', templateInstanceId: 'inst-1', slotId: 'default', value: [{ text: 'User content' }] },
+      },
+      blocks_layout: { items: ['page-header', 'user-block-1'] },
+    };
+    // 1. SAVE: reverse-merge (filterInstanceId) captures the edit into the template.
+    const { merged: updatedTemplate } = await mergeTemplatesIntoPage(template, {
+      loadTemplate: async () => pageWithEdits,
+      filterInstanceId: 'inst-1',
+      uuidGenerator: uuidGen,
+    });
+    const header = Object.values(updatedTemplate.blocks).find((b) => b.slotId === 'header' && b.fixed);
+    expect(header?.value?.[0]?.text).toBe('Edited Header'); // captured into the template
+
+    // 2. VIEW another page: a DIFFERENT page (its own instanceId) forward-merges the
+    // UPDATED template and must show the edit — this is integration :866's assertion.
+    const page2 = {
+      blocks: {
+        'p2-header': { '@type': 'slate', fixed: true, readOnly: true, templateId: '/templates/hf', templateInstanceId: 'inst-2', slotId: 'header', value: [{ text: 'Original Header' }] },
+        'p2-user': { '@type': 'slate', templateId: '/templates/hf', templateInstanceId: 'inst-2', slotId: 'default', value: [{ text: 'Page 2 content' }] },
+      },
+      blocks_layout: { items: ['p2-header', 'p2-user'] },
+    };
+    const { merged: page2Merged } = await mergeTemplatesIntoPage(page2, {
+      loadTemplate: async () => updatedTemplate,
+      uuidGenerator: uuidGen,
+    });
+    const p2Header = Object.values(page2Merged.blocks).find((b) => b.slotId === 'header' && b.fixed);
+    expect(p2Header?.value?.[0]?.text).toBe('Edited Header'); // propagated to page 2
   });
 
   test('fixed+readOnly transfers to template, fixed+editable stays on page', async () => {
@@ -641,7 +691,7 @@ describe('reverse merge - page to template (for saving)', () => {
 
     const { merged } = await mergeTemplatesIntoPage(template, {
       loadTemplate: async () => pageWithEdits,
-      pageBlocksFields: { blocks_layout: { allowedLayouts: ['/templates/mixed'] } },
+      pageBlocksFields: { items: { allowedLayouts: ['/templates/mixed'] } },
       uuidGenerator,
     });
 
@@ -664,7 +714,7 @@ describe('expandTemplates preserves untouched blocks', () => {
     };
     const layout = ['block-abc-123'];
 
-    const items = await expandTemplates(layout, { blocks });
+    const items = await expandTemplates(layout, { blocks, templateState: {} });
 
     expect(items.length).toBe(1);
     expect(items[0]['@uid']).toBe('block-abc-123');
@@ -703,6 +753,7 @@ describe('expandTemplates preserves untouched blocks', () => {
 
     const items = await expandTemplates(layout, {
       blocks,
+      templateState: {},
       loadTemplate: async () => templateData,
       allowedLayouts: ['/templates/test'], // Same template as already applied
     });
@@ -886,6 +937,63 @@ describe('multiple template instances with shared templateState', () => {
     // Footer should NOT have main header (wrong template)
     const wrongHeader = footerItems.find(item => item.value?.[0]?.text === 'Main Header');
     expect(wrongHeader).toBeUndefined();
+  });
+
+  test('two containers of the SAME template on one page keep separate instanceIds + content', async () => {
+    // The data-derived recognition (by minted templateInstanceId) must keep two
+    // instances of the same template independent — no cross-contamination of slot
+    // content, distinct instance ids, each container re-enters as ITS own instance.
+    const cardTemplate = {
+      '@id': '/templates/card',
+      blocks: {
+        'card': {
+          '@type': 'columns', fixed: true, readOnly: true,
+          templateId: '/templates/card', slotId: 'card',
+          blocks: {
+            'card-body': { '@type': 'slate', templateId: '/templates/card', slotId: 'body' },
+          },
+          blocks_layout: { items: ['card-body'] },
+        },
+      },
+      blocks_layout: { items: ['card'] },
+    };
+    // A loaded page with TWO card instances (e.g. the user inserted the card twice),
+    // each carrying its own instanceId and its own body content.
+    const page = {
+      blocks: {
+        'cardA': {
+          '@type': 'columns', fixed: true, readOnly: true,
+          templateId: '/templates/card', templateInstanceId: 'inst-A', slotId: 'card',
+          blocks: { 'bodyA': { '@type': 'slate', templateId: '/templates/card', templateInstanceId: 'inst-A', slotId: 'body', value: [{ text: 'Body A' }] } },
+          blocks_layout: { items: ['bodyA'] },
+        },
+        'cardB': {
+          '@type': 'columns', fixed: true, readOnly: true,
+          templateId: '/templates/card', templateInstanceId: 'inst-B', slotId: 'card',
+          blocks: { 'bodyB': { '@type': 'slate', templateId: '/templates/card', templateInstanceId: 'inst-B', slotId: 'body', value: [{ text: 'Body B' }] } },
+          blocks_layout: { items: ['bodyB'] },
+        },
+      },
+      blocks_layout: { items: ['cardA', 'cardB'] },
+    };
+    const { merged } = await mergeTemplatesIntoPage(page, {
+      loadTemplate: async () => cardTemplate,
+      pageBlocksFields: { items: {} },
+      uuidGenerator: (() => { let c = 0; return () => `u-${++c}`; })(),
+    });
+
+    const cards = Object.values(merged.blocks).filter((b) => b.slotId === 'card');
+    expect(cards.length).toBe(2); // both instances survive
+    expect(new Set(cards.map((c) => c.templateInstanceId)).size).toBe(2); // distinct
+
+    const bodyText = (card) =>
+      Object.values(card.blocks || {}).find((b) => b.slotId === 'body')?.value?.[0]?.text;
+    const cardWith = (text) => cards.find((c) => bodyText(c) === text);
+    const cA = cardWith('Body A');
+    const cB = cardWith('Body B');
+    expect(cA).toBeDefined(); // Body A stayed in its own card
+    expect(cB).toBeDefined(); // Body B stayed in its own card
+    expect(cA.templateInstanceId).not.toBe(cB.templateInstanceId);
   });
 
   test('expandTemplatesSync: blocks field without template passes through unchanged', () => {
@@ -1092,14 +1200,15 @@ describe('nextSlotId and childSlotIds on fixed blocks', () => {
         'container': {
           '@type': 'gridBlock',
           fixed: true,
+          templateId: '/templates/t1',
           slotId: 'container',
           blocks: {
-            'cell-1': { '@type': 'slate', fixed: true, slotId: 'cell-1', value: [{ text: 'Cell 1' }] },
-            'cell-2': { '@type': 'slate', slotId: 'sidebar', value: [{ text: 'Sidebar content' }] },
+            'cell-1': { '@type': 'slate', fixed: true, templateId: '/templates/t1', slotId: 'cell-1', value: [{ text: 'Cell 1' }] },
+            'cell-2': { '@type': 'slate', templateId: '/templates/t1', slotId: 'sidebar', value: [{ text: 'Sidebar content' }] },
           },
           blocks_layout: { items: ['cell-1', 'cell-2'] },
         },
-        'slot': { '@type': 'slate', slotId: 'default', value: [] },
+        'slot': { '@type': 'slate', templateId: '/templates/t1', slotId: 'default', value: [] },
       },
       blocks_layout: { items: ['container', 'slot'] },
     };
@@ -1114,6 +1223,38 @@ describe('nextSlotId and childSlotIds on fixed blocks', () => {
     expect(containerBlock.childSlotIds).toEqual({ blocks: 'sidebar' });
     // Container should also have nextSlotId for the top-level slot
     expect(containerBlock.nextSlotId).toBe('default');
+  });
+
+  // Same as above, but the container's slot lives in an OBJECT_LIST region (a slider's `slides`),
+  // not blocks_layout. The childSlotIds add-path anchor was computed via blocksLayoutRegions only,
+  // so an object_list slot container got no anchor. It must be keyed by the field name (`slides`),
+  // matching schemaInheritance's parentBlock.childSlotIds[field] lookup.
+  test('childSlotIds set on a fixed container whose slot lives in an object_list region (slider slides)', async () => {
+    const pageData = { blocks: {}, blocks_layout: { items: [] } };
+
+    const templateData = {
+      '@id': '/templates/t2',
+      blocks: {
+        'slider-c': {
+          '@type': 'slider',
+          fixed: true,
+          templateId: '/templates/t2',
+          slotId: 'slider-c',
+          slides: [
+            { '@id': 'slide-1', '@type': 'slate', fixed: true, templateId: '/templates/t2', slotId: 'slide-1', value: [{ text: 'Fixed slide' }] },
+            { '@id': 'slide-2', '@type': 'slate', templateId: '/templates/t2', slotId: 'caption', value: [{ text: 'Caption slot' }] },
+          ],
+        },
+        'slot': { '@type': 'slate', templateId: '/templates/t2', slotId: 'default', value: [] },
+      },
+      blocks_layout: { items: ['slider-c', 'slot'] },
+    };
+
+    const result = await applyLayoutTemplate(pageData, templateData, uuidGenerator);
+    const containerBlock = result.blocks[result.blocks_layout.items[0]];
+    expect(containerBlock.fixed).toBe(true);
+    // The first non-fixed slot inside the object_list `slides` is captured, keyed by field name.
+    expect(containerBlock.childSlotIds).toEqual({ slides: 'caption' });
   });
 });
 

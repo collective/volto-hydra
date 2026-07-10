@@ -33,6 +33,12 @@
           </a>
         </li>
       </ul>
+      <!-- Non-nav children (e.g. a seeded 'empty' placeholder when the nav has no
+           items yet) are delegated to the central block dispatch, which renders
+           'empty' as a selectable placeholder. contextNavigation doesn't reject or
+           special-case them — 'empty' is a universal placeholder, never a declared type. -->
+      <Block v-for="item in extras" :key="item.blockId"
+             :block_uid="item.blockId" :block="item.block" :data="block" />
     </details>
   </nav>
 </template>
@@ -40,7 +46,7 @@
 <script setup>
 // contextNavigation parent renderer.
 //
-// Walks block.items.items; for each navItem, keeps it as-is; for each
+// Walks block.blocks_layout.items; for each navItem, keeps it as-is; for each
 // listing, expands via expandListingBlocks (with the listing's
 // fieldMappings.@default mapping @id→href via type='link' and title→label).
 // Output: a single flat list. Level for each entry is derived from
@@ -52,7 +58,7 @@
 // `ref` from vue; `useRoute` is a Nuxt auto-import composable so no explicit
 // import is needed for it (same pattern as ListingBlock.vue).
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
-import { expandListingBlocks, ploneFetchItems } from '@hydra-js/hydra.js';
+import { expandListingBlocks, ploneFetchItems } from '@hydra-js/helpers';
 
 const props = defineProps({
   blockId: { type: String, required: true },
@@ -90,13 +96,14 @@ const NAV_LISTING_SIZE = 1000;
 // the bridge's data-block-selector `~=` word-list match to open the
 // disclosure when admin selects any of these blocks.
 const exposedUids = computed(() => {
-  const childIds = props.block.items?.items || [];
+  const childIds = props.block.blocks_layout?.items || [];
   return [props.blockId, ...childIds].join(' ');
 });
 
 async function expandChildren() {
   const flat = [];
-  for (const childId of props.block.items.items) {
+  const extras = [];
+  for (const childId of props.block.blocks_layout.items) {
     const child = props.block.blocks[childId];
     if (child['@type'] === 'navItem') {
       flat.push({ block: child, blockId: childId });
@@ -141,12 +148,20 @@ async function expandChildren() {
         flat.push({ block: item, blockId: item['@uid'] });
       }
     } else {
-      throw new Error(`contextNavigation child of @type "${child['@type']}" is not allowed (expected navItem or listing)`);
+      // Not a nav child (navItem/listing). Don't reject it — delegate to the central
+      // block dispatch (<Block> in the template). A seeded 'empty' placeholder is the
+      // common case (empty nav); block.vue renders 'empty' as a selectable placeholder.
+      extras.push({ block: child, blockId: childId });
     }
   }
 
-  const pathOf = (entry) =>
-    new URL(entry.block.href[0]['@id'], 'http://placeholder').pathname;
+  // A freshly-typed navItem (just picked from the chooser to replace a seeded empty) has no
+  // href yet — tolerate it (treat as root-level, render as a plain anchor) instead of crashing
+  // the whole nav on href[0]['@id'].
+  const pathOf = (entry) => {
+    const h = entry.block.href?.[0]?.['@id'];
+    return h ? new URL(h, 'http://placeholder').pathname : '';
+  };
   const segsOf = (p) => p.split('/').filter(Boolean);
   const here = route.path.replace(/\/$/, '');
 
@@ -208,7 +223,7 @@ async function expandChildren() {
     return true; // ancestor of current (or current)
   };
 
-  return flat.flatMap((entry, i) => {
+  const entries = flat.flatMap((entry, i) => {
     if (!passes(segs[i]) || !hasAllAncestors(segs[i])) return [];
     const itemPath = paths[i];
     const stripped = itemPath.replace(/\/$/, '');
@@ -228,7 +243,9 @@ async function expandChildren() {
       ].filter(Boolean),
     }];
   });
+
+  return { entries, extras };
 }
 
-const entries = await expandChildren();
+const { entries, extras } = await expandChildren();
 </script>

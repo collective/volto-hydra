@@ -47,6 +47,7 @@ import {
 import { v4 as uuid } from 'uuid';
 import { toast } from 'react-toastify';
 import { stripEmptyBlocks, ensureAllContainersHaveBlocks } from '../../../../../utils/blockPath';
+import { stripFixedInsideSlots } from '@volto-hydra/helpers';
 import { createLog } from '../../../../../utils/log';
 const log = createLog('FORM');
 import {
@@ -623,8 +624,10 @@ class Form extends Component {
     // Strip empty slot blocks before diffing — they exist only for UX
     // in edit mode and must never be persisted. Needs the full page formData
     // so buildBlockPathMap can traverse all page-level blocks fields.
-    const formData = stripEmptyBlocks(
-      this.state.formData, config.blocks.blocksConfig, this.props.intl,
+    // Also enforce fixed-XOR-inside-slot: scrub fixed/readOnly from any block inside a slot
+    // (a paste/programmatic path may have created that malformed state) before persisting.
+    const formData = stripFixedInsideSlots(
+      stripEmptyBlocks(this.state.formData, config.blocks.blocksConfig, this.props.intl),
     );
 
     const fieldsModified = Object.keys(

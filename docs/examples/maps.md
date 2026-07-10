@@ -107,3 +107,25 @@ defineProps({ block: Object });
   {/if}
 </div>
 ```
+
+### Astro
+
+<!-- file: examples/astro/MapsBlock.astro -->
+```astro
+---
+const { block } = Astro.props;
+---
+<div class="maps-block">
+  {block.url ? (
+    <iframe
+      src={block.url}
+      title={block.title || 'Map'}
+      allowfullscreen
+      loading="lazy"
+      style="width: 100%; height: 450px; border: none"
+    />
+  ) : (
+    <p>No map URL set</p>
+  )}
+</div>
+```

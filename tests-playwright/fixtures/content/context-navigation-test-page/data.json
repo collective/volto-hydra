@@ -32,7 +32,7 @@
           "href": [{ "@id": "/_test_data/test-page/sub" }]
         }
       },
-      "items": {
+      "blocks_layout": {
         "items": ["item-self", "item-test-page", "item-test-page-child"]
       }
     },
@@ -65,7 +65,7 @@
           }
         }
       },
-      "items": {
+      "blocks_layout": {
         "items": ["snav-listing"]
       }
     },
@@ -98,7 +98,7 @@
           }
         }
       },
-      "items": {
+      "blocks_layout": {
         "items": ["snav-4-listing"]
       }
     },
@@ -133,7 +133,7 @@
           }
         }
       },
-      "items": {
+      "blocks_layout": {
         "items": ["snav-5-listing"]
       }
     }

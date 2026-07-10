@@ -18,6 +18,13 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
+import {
+  getTemplateInstanceSchema,
+  getTemplateBlockSettingsSchema,
+  getTemplateEditButtonState,
+  blockKindFromFlags,
+  blockKindFlags,
+} from './templateSettingsSchema';
 import { useIntl } from 'react-intl';
 import { useLocation } from 'react-router-dom';
 import { set, cloneDeep, isEqual } from 'lodash';
@@ -30,7 +37,8 @@ import DropdownMenu from '../Toolbar/DropdownMenu';
 import { getBlockById, updateBlockById, getResolvedSchema, getCommonAncestor } from '../../utils/blockPath';
 import { HydraSchemaProvider } from '../../context';
 import { getConvertibleTypes, convertBlockType, findTypeField } from '../../utils/schemaInheritance';
-import { PAGE_BLOCK_UID, isBlockReadonly } from '@volto-hydra/hydra-js';
+import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
+import { isBlockReadonly } from '@volto-hydra/helpers';
 
 /**
  * Get the display title for a block type
@@ -48,9 +56,9 @@ const getBlockTypeTitle = (blockType, blockPathMap, blockId) => {
       if (itemConfig?.title) return itemConfig.title;
     }
 
-    // Fallback: derive from containerField (e.g., "subblocks" -> "Subblock")
-    if (pathInfo.containerField) {
-      const singular = pathInfo.containerField.replace(/s$/, '');
+    // Fallback: derive from the region/field name (e.g., "subblocks" -> "Subblock")
+    if (pathInfo.region) {
+      const singular = pathInfo.region.replace(/s$/, '');
       return singular.charAt(0).toUpperCase() + singular.slice(1);
     }
   }
@@ -145,43 +153,9 @@ const getFilteredBlockSchema = (blockType, intl, blockPathMap, blockId, blockDat
   return filterBlocksFields(schema);
 };
 
-/**
- * Schema for block settings in template edit mode
- * Adds slotId, fixed, and readOnly fields to control template behavior
- */
-const getTemplateBlockSettingsSchema = () => ({
-  title: 'Template Block Settings',
-  fieldsets: [
-    {
-      id: 'default',
-      title: 'Default',
-      fields: [],
-    },
-    {
-      id: 'template',
-      title: 'Template Settings',
-      fields: ['slotId', 'fixed', 'readOnly'],
-    },
-  ],
-  properties: {
-    slotId: {
-      title: 'Slot ID',
-      description: 'Identifies where user content goes in the template (e.g., "header", "primary")',
-      type: 'string',
-    },
-    fixed: {
-      title: 'Fixed Position',
-      description: 'Disable drag & drop on this block',
-      type: 'boolean',
-    },
-    readOnly: {
-      title: 'Read-only',
-      description: 'Disable editing on this block (content comes from template)',
-      type: 'boolean',
-    },
-  },
-  required: ['slotId'],
-});
+// getTemplateBlockSettingsSchema (a single `kind` dropdown replacing the fixed + readOnly
+// checkboxes, with the inside-slot restriction) lives in the pure ./templateSettingsSchema
+// module so it can be unit-tested without the React tree. Imported at the top of this file.
 
 /**
  * Single parent block section with header and settings
@@ -191,37 +165,9 @@ const getTemplateBlockSettingsSchema = () => ({
  * Schema for template instance settings
  * Used by BlockDataForm to render a consistent form
  */
-const getTemplateInstanceSchema = (intl) => ({
-  title: 'Template Settings',
-  fieldsets: [
-    {
-      id: 'default',
-      title: 'Default',
-      fields: ['title', 'folder', 'editTemplate'],
-    },
-  ],
-  properties: {
-    title: {
-      title: 'Template Name',
-      description: 'Display name for this template',
-      type: 'string',
-    },
-    folder: {
-      title: 'Save Location',
-      description: 'Folder where this template will be saved',
-      widget: 'object_browser',
-      mode: 'link',
-      selectableTypes: ['Folder'],
-      allowExternals: false,
-    },
-    editTemplate: {
-      title: 'Edit Template',
-      description: 'When enabled, you can edit the template structure. Fixed blocks become editable.',
-      type: 'boolean',
-    },
-  },
-  required: ['title'],
-});
+// getTemplateInstanceSchema (with editTemplate permission gating) lives in the pure,
+// dependency-free ./templateSettingsSchema module so it can be unit-tested without the
+// React/Volto component tree. Imported at the top of this file.
 
 const ParentBlockSection = ({
   blockId,
@@ -242,6 +188,7 @@ const ParentBlockSection = ({
   templateEditMode,
   onChangeTemplateSettings,
   onToggleTemplateEditMode,
+  templatePermissions,
 }) => {
   // Get intl from context if not passed (needed for getTemplateInstanceSchema)
   const contextIntl = useIntl();
@@ -484,24 +431,16 @@ const ParentBlockSection = ({
 
       {/* Template instance settings form — only for top-level, not nested */}
       {pathInfo?.isTemplateInstance && !pathInfo?.isNestedTemplateInstance && onChangeTemplateSettings && (() => {
-        // Build form data with editTemplate reflecting current state
-        const templateFormData = {
-          ...blockData,
-          editTemplate: templateEditMode === blockId,
-        };
+        // Template instance settings: name / save location. Entering edit mode is the
+        // prominent button at the top of the panel (see the main render), not a field here.
+        const templateFormData = { ...blockData };
         const templateSchema = getTemplateInstanceSchema(contextIntl);
         const formContent = (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
             <BlockDataForm
               schema={templateSchema}
               onChangeField={(fieldId, value) => {
-                if (fieldId === 'editTemplate') {
-                  // Toggle template edit mode
-                  onToggleTemplateEditMode(value ? blockId : null);
-                } else {
-                  // Update template settings
-                  onChangeTemplateSettings(blockId, { [fieldId]: value });
-                }
+                onChangeTemplateSettings(blockId, { [fieldId]: value });
               }}
               formData={templateFormData}
               block={blockId}
@@ -514,31 +453,53 @@ const ParentBlockSection = ({
 
       {/* Template block settings form - shown when editing a block inside a template during edit mode */}
       {(() => {
-        // Check if this block is inside the template being edited
+        // Check if this block is inside the template being edited. object_list items
+        // (slides, rows) are template members too — every block in a template can set
+        // fixed/readOnly, so they show this panel as well. Only the template-instance
+        // host block itself is excluded (it's the container, not a member).
         const isBlockInEditedTemplate = templateEditMode &&
           !pathInfo?.isTemplateInstance &&
-          !pathInfo?.isObjectListItem &&
           blockData &&
           blockData.templateId &&
           blockData.templateInstanceId === templateEditMode;
 
         if (!isBlockInEditedTemplate) return null;
 
-        // Build form data with current template block settings
+        // fixed-XOR-inside-slot: a block is "inside a slot" when any ancestor is a slot
+        // (a template block that is neither fixed nor readOnly). Inside a slot the only
+        // allowed kind is `slot`, so the dropdown drops the fixed-bearing options.
+        const isInsideSlot = (bid) => {
+          let pid = blockPathMap[bid]?.parentId;
+          while (pid) {
+            const anc = getBlockById(formData, blockPathMap, pid);
+            if (!anc) break;
+            if (anc.templateInstanceId && !anc.fixed && !anc.readOnly) return true;
+            pid = blockPathMap[pid]?.parentId;
+          }
+          return false;
+        };
+        const insideSlot = isInsideSlot(blockId);
+        // Build form data with current template block settings — `kind` is derived from the
+        // block's fixed/readOnly flags (the single dropdown replaces the two checkboxes).
         const templateBlockFormData = {
           slotId: blockData.slotId || '',
-          fixed: blockData.fixed || false,
-          readOnly: blockData.readOnly || false,
+          kind: blockKindFromFlags(blockData.fixed, blockData.readOnly),
         };
-        const templateBlockSchema = getTemplateBlockSettingsSchema();
+        const templateBlockSchema = getTemplateBlockSettingsSchema({ insideSlot });
         const formContent = (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
             <BlockDataForm
               schema={templateBlockSchema}
               onChangeField={(fieldId, value) => {
                 const newBlockData = cloneDeep(blockData);
-                // All fields are now top-level (placeholder, fixed, readOnly)
-                newBlockData[fieldId] = value;
+                if (fieldId === 'kind') {
+                  // Map the chosen kind back to its fixed/readOnly flags.
+                  const { fixed, readOnly } = blockKindFlags(value);
+                  newBlockData.fixed = fixed;
+                  newBlockData.readOnly = readOnly;
+                } else {
+                  newBlockData[fieldId] = value;
+                }
                 onChangeBlock(blockId, newBlockData);
               }}
               formData={templateBlockFormData}
@@ -547,8 +508,14 @@ const ParentBlockSection = ({
             />
           </HydraSchemaProvider>
         );
-        // Portal to sidebar-template-settings (appears after block's regular settings)
-        const targetElement = document.getElementById('sidebar-template-settings');
+        // Portal each block's template settings to ITS OWN target — the current
+        // block's dedicated #sidebar-template-settings area, a parent's into its own
+        // #parent-sidebar-{id} section — the same per-block routing the regular
+        // settings use above. A single shared target stacked EVERY hierarchy block's
+        // template settings into the current block's area (showing it twice).
+        const targetElement = document.getElementById(
+          isCurrentBlock ? 'sidebar-template-settings' : `parent-sidebar-${blockId}`,
+        );
         return targetElement ? createPortal(formContent, targetElement) : null;
       })()}
     </div>
@@ -571,6 +538,7 @@ const ParentBlocksWidget = ({
   templateEditMode,
   onChangeTemplateSettings,
   onToggleTemplateEditMode,
+  templatePermissions,
 }) => {
   const isMultiSelected = multiSelected.length > 1;
   const [isClient, setIsClient] = React.useState(false);
@@ -728,6 +696,20 @@ const ParentBlocksWidget = ({
   // Get parent chain
   const parentIds = getParentChain(selectedBlock, blockPathMap);
 
+  // The (non-nested) template instance the selection belongs to — drives the Edit-template
+  // button at the top of the panel. Walk up the selection's parent chain to find it.
+  const findTemplateInstance = (bid) => {
+    let cur = bid;
+    while (cur) {
+      const pi = blockPathMap[cur];
+      if (!pi) break;
+      if (pi.isTemplateInstance && !pi.isNestedTemplateInstance) return cur;
+      cur = pi.parentId;
+    }
+    return null;
+  };
+  const templateInstanceBlockId = findTemplateInstance(selectedBlock);
+
   // Get current block data and type from blockPathMap (single source of truth)
   // For virtual blocks (like template instances), use blockData from pathMap
   const pathInfo = blockPathMap[selectedBlock];
@@ -744,6 +726,41 @@ const ParentBlocksWidget = ({
     <>
       {createPortal(
         <>
+          {/* Edit-template button — first in the virtual-blocks panel; the obvious,
+              permission-gated way to enter/exit template edit mode (replaces the buried
+              editTemplate checkbox). */}
+          {templateInstanceBlockId && (() => {
+            const tplInfo = blockPathMap[templateInstanceBlockId];
+            const canEdit = templatePermissions?.[tplInfo?.templateId]?.can_edit ?? true;
+            const isEditing = templateEditMode === templateInstanceBlockId;
+            const btn = getTemplateEditButtonState({ canEdit, isEditing });
+            return (
+              <button
+                type="button"
+                className={`edit-template-toggle${isEditing ? ' edit-template-toggle--active' : ''}`}
+                aria-pressed={isEditing}
+                disabled={btn.disabled}
+                title={btn.title}
+                onClick={() =>
+                  onToggleTemplateEditMode(isEditing ? null : templateInstanceBlockId)
+                }
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  marginBottom: '8px',
+                  border: '1px solid',
+                  borderColor: isEditing ? '#0b78d0' : '#ccc',
+                  borderRadius: '4px',
+                  background: isEditing ? '#0b78d0' : '#fff',
+                  color: btn.disabled ? '#999' : isEditing ? '#fff' : '#0b78d0',
+                  fontWeight: 600,
+                  cursor: btn.disabled ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {btn.label}
+              </button>
+            );
+          })()}
           {/* Parent blocks with headers + settings */}
           {parentIds.map((parentId, index) => {
             // For virtual blocks (like template instances), use blockData from pathMap
@@ -759,6 +776,7 @@ const ParentBlocksWidget = ({
                 blockId={parentId}
                 blockType={parentType}
                 blockData={parentData}
+                templatePermissions={templatePermissions}
                 parentId={grandparentId}
                 index={index}
                 isCurrentBlock={false}
@@ -784,6 +802,7 @@ const ParentBlocksWidget = ({
             blockId={selectedBlock}
             blockType={currentBlockType}
             blockData={currentBlockData}
+            templatePermissions={templatePermissions}
             parentId={parentIds.length > 0 ? parentIds[parentIds.length - 1] : null}
             index={parentIds.length}
             isCurrentBlock={true}

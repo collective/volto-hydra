@@ -2,7 +2,7 @@
   import NavItem from './NavItem.svelte';
   export let block;
   export let blocks;
-  $: items = block.items?.items || [];
+  $: items = block.blocks_layout?.items || [];
 </script>
 
 <nav

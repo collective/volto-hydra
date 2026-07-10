@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "#utils/hydra": ["../../packages/hydra-js/hydra.src.js"],
+      "#utils/helpers": ["../../packages/helpers/index.js"]
     }
   }
 }

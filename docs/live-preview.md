@@ -84,16 +84,19 @@ bridge = initBridge({
     page: {
         schema: {
             properties: {
-                blocks_layout: {
+                items: {
+                    widget: 'blocks_layout',
                     title: 'Content',
                     allowedBlocks: ['slate', 'image', 'hero', 'columns'],
                 },
-                header_blocks: {
+                header: {
+                    widget: 'blocks_layout',
                     title: 'Header',
                     allowedBlocks: ['slate', 'image'],
                     maxLength: 3,
                 },
-                footer_blocks: {
+                footer: {
+                    widget: 'blocks_layout',
                     title: 'Footer',
                     allowedBlocks: ['slate', 'link'],
                 },

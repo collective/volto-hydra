@@ -24,6 +24,7 @@ const FRONTEND_URLS: Record<string, string> = {
   vue: URLS.vueDoc,
   nextjs: URLS.nextjs,
   f7: URLS.f7,
+  astro: URLS.astroDoc,
 };
 
 export function getFrontendUrl(projectName: string): string | undefined {

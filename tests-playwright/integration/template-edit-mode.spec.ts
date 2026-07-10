@@ -217,8 +217,8 @@ test.describe('Template Creation', () => {
 
     // Template edit mode should be active (indicated by toggle in sidebar)
     await helper.waitForSidebarOpen();
-    const editModeToggle = page.locator('.edit-template-toggle input, [data-field-id="editTemplate"] input');
-    await expect(editModeToggle).toBeChecked({ timeout: 5000 });
+    const editModeToggle = page.locator('.edit-template-toggle');
+    await expect(editModeToggle).toHaveAttribute('aria-pressed', 'true', { timeout: 5000 });
   });
 
   test('can toggle template edit mode from sidebar', async ({ page }) => {
@@ -241,7 +241,7 @@ test.describe('Template Creation', () => {
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
     // Sidebar should have "Edit Template" toggle
-    const editTemplateToggle = page.locator('.edit-template-toggle, [data-field-id="editTemplate"] input, label').filter({ hasText: /edit.*template/i });
+    const editTemplateToggle = page.locator('.edit-template-toggle');
     await expect(editTemplateToggle).toBeVisible();
 
     // Toggle edit mode on
@@ -249,6 +249,140 @@ test.describe('Template Creation', () => {
 
     // Edit mode should be active - blocks outside template should be locked (greyed out)
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+  });
+});
+
+test.describe('Template Edit Mode - Save', () => {
+  // TDD reproducer: entering template edit mode and saving the page WITHOUT
+  // making any edits should still persist the template (a PATCH/POST to the
+  // template document, not just the page).
+  test('saving in template edit mode without editing still saves the template', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Capture every content-shaped write (PATCH updates a template, POST creates
+    // one); body carries blocks_layout for a template/page write.
+    const writes: Array<{ method: string; url: string }> = [];
+    page.on('request', (req) => {
+      const m = req.method();
+      if (m !== 'PATCH' && m !== 'POST') return;
+      if (!req.url().startsWith(URLS.mockApi)) return;
+      let body: any = null;
+      try { body = req.postDataJSON(); } catch { /* not JSON */ }
+      if (!body || !body.blocks_layout) return;
+      writes.push({ method: m, url: req.url() });
+    });
+
+    // Select the template instance and enter template edit mode.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    const editTemplateToggle = page.locator('.edit-template-toggle');
+    await expect(editTemplateToggle).toBeVisible();
+    await editTemplateToggle.click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1); // edit mode active
+
+    // Save WITHOUT editing anything.
+    await helper.saveContent();
+
+    // A write whose URL is NOT the page itself = the template document being saved.
+    const pageEnds = (u: string) => u.replace(/\/$/, '').endsWith('/template-test-page');
+    const templateWrites = writes.filter((w) => !pageEnds(w.url));
+    expect(
+      templateWrites.length,
+      `expected the template document to be saved when saving in edit mode; observed: ${JSON.stringify(writes)}`,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  // TDD: templateCacheRef (View.jsx:995) is a useRef that's never reset — it
+  // leaks across page navigations, so a template cached while editing is reused
+  // verbatim instead of re-fetched. Entering template edit mode must invalidate
+  // that cache (re-fetch the template) so edits + the save operate on the current
+  // backend copy, and other pages sharing the template load the fresh copy.
+  test('entering template edit mode re-fetches the template (invalidates the cache)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Wait for the initial load (template fetched + cached) to settle.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+
+    // From here, count GETs that fetch the shared template document.
+    const templateGets: string[] = [];
+    page.on('request', (req) => {
+      if (req.method() !== 'GET') return;
+      const u = req.url();
+      if (u.startsWith(URLS.mockApi) && /test-layout/.test(u)) templateGets.push(u);
+    });
+
+    // Enter template edit mode.
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    const editTemplateToggle = page.locator('.edit-template-toggle');
+    await expect(editTemplateToggle).toBeVisible();
+    await editTemplateToggle.click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1); // edit mode active
+
+    // Entering edit mode must invalidate the cache and re-fetch the template.
+    await expect
+      .poll(() => templateGets.length, {
+        message: 'entering template edit mode should invalidate the cache and re-fetch the template',
+        timeout: 5000,
+      })
+      .toBeGreaterThanOrEqual(1);
+  });
+
+  // End-to-end guard for the real symptom: without invalidating the cache on
+  // entry, saving in edit mode writes the STALE page-load copy back to the
+  // backend — clobbering whatever the template had become since (another page's
+  // save, a concurrent edit). Here we simulate the backend template having
+  // changed after page-load; the fix must re-fetch it on entry so the save
+  // persists the fresh copy, not the stale one.
+  test('saving in edit mode persists the re-fetched template, not a stale cached copy', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+    // Initial load fetches + caches the template (the copy that would go stale).
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+
+    const MARKER = 'FRESH-BACKEND-COPY';
+    // From now, any GET of the template returns a marked copy — i.e. the backend
+    // moved on after page-load. (Set up AFTER the initial load so only the
+    // edit-mode re-fetch sees it.) PATCH/etc. pass through untouched.
+    await page.route(/test-layout/, async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      const resp = await route.fetch();
+      const json = await resp.json();
+      const firstId = json.blocks_layout?.items?.[0];
+      if (firstId && json.blocks?.[firstId]) {
+        json.blocks[firstId] = { ...json.blocks[firstId], value: [{ type: 'p', children: [{ text: MARKER }] }] };
+      }
+      await route.fulfill({ response: resp, json });
+    });
+
+    // Capture the template's save body (the template PATCH, not the page PATCH).
+    const templatePatchBodies: string[] = [];
+    page.on('request', (req) => {
+      if (req.method() !== 'PATCH' || !/test-layout/.test(req.url())) return;
+      try { templatePatchBodies.push(JSON.stringify(req.postDataJSON())); } catch { /* not JSON */ }
+    });
+
+    // Enter edit mode (must re-fetch the marked copy) + save without editing.
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    await expect(page.locator('.edit-template-toggle')).toBeVisible();
+    await page.locator('.edit-template-toggle').click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1); // edit mode active
+    await helper.saveContent();
+
+    expect(
+      templatePatchBodies.join('\n'),
+      'the save must persist the freshly re-fetched template (marker present), not the stale page-load cache',
+    ).toContain(MARKER);
   });
 });
 
@@ -280,7 +414,7 @@ test.describe('Template Edit Mode - Editability', () => {
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
     // Toggle edit mode on
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await editToggle.click();
     // Wait for edit mode to activate (blocks outside template get locked)
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
@@ -292,6 +426,114 @@ test.describe('Template Edit Mode - Editability', () => {
     // Now the fixed block should be editable
     isEditable = await editor.getAttribute('contenteditable');
     expect(isEditable).toBe('true');
+  });
+
+  test('fixed readonly blocks NESTED in a template container become editable in edit mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // A grid cell is a fixed template block nested two levels deep
+    // (grid -> cell), not a direct child of the instance — the flat unlock check
+    // (templateInstanceId match) only covers direct children, so the cell stays
+    // locked. Edit mode must walk the instance subtree and unlock it too.
+    const { blockId: cellId, locator: cellBlock } = await helper.waitForBlockByContent('Template Grid Cell 1');
+
+    // Initially the nested fixed block is NOT editable.
+    const editor = helper.getSlateField(cellBlock);
+    let isEditable = await editor.getAttribute('contenteditable');
+    expect(isEditable).not.toBe('true');
+
+    // Enter template edit mode via the instance.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    const editToggle = page.locator('.edit-template-toggle');
+    await editToggle.click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+
+    // The nested grid cell must now be editable — it belongs to the instance.
+    await helper.clickBlockInIframe(cellId);
+    await helper.waitForBlockSelectedInAdmin(cellId);
+    isEditable = await editor.getAttribute('contenteditable');
+    expect(isEditable).toBe('true');
+  });
+
+  test('a nested template block can be deleted in edit mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    const iframe = helper.getIframe();
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const cellLocator = iframe.locator('[data-block-uid]').filter({ hasText: 'Template Grid Cell 1' });
+    const { blockId: cellId } = await helper.waitForBlockByContent('Template Grid Cell 1');
+
+    // Enter template edit mode via the instance.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    const editToggle = page.locator('.edit-template-toggle');
+    await editToggle.click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+
+    // Delete the nested cell. handleDelete filters out blocks isBlockReadonlyDeep
+    // flags as readonly — this guards two fixes together: (1) the ancestry-aware
+    // unlock (the flat templateInstanceId check treated the nested cell as
+    // readonly), and (2) handleDelete depending on templateEditMode (a stale
+    // listener closure otherwise saw edit mode as null and refused to mutate any
+    // template block at all).
+    await helper.clickBlockInIframe(cellId);
+    await helper.waitForBlockSelectedInAdmin(cellId);
+    await page.evaluate((id) => {
+      document.dispatchEvent(new CustomEvent('hydra-delete-blocks', { detail: { blockIds: [id] } }));
+    }, cellId);
+
+    // The nested cell must be gone — it belongs to the edited instance.
+    await expect(cellLocator).toHaveCount(0, { timeout: 5000 });
+  });
+
+  test('editing a template lets you add + remove children in a container (items region)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Enter template edit mode via the instance.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    await page.locator('.edit-template-toggle').click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+
+    // Select a grid cell, then escape up to the grid container.
+    const { blockId: cellId } = await helper.waitForBlockByContent('Template Grid Cell 1');
+    await helper.clickBlockInIframe(cellId);
+    await helper.waitForBlockSelectedInAdmin(cellId);
+    await helper.escapeToParent();
+
+    // canAdd must resolve for the nested grid in edit mode — before recursive
+    // stamping the cells had no instance id and the Add control never showed.
+    // Assert against the iframe (render = source of truth, selection-independent).
+    // The merged grid has ONE real cell (fixture's tpl-grid-cell-2 is a markerless
+    // default the merge drops).
+    const gridCells = helper.getIframe().locator('.grid-row > [data-block-uid]');
+    await expect(gridCells).toHaveCount(1);
+
+    // ADD a child to the nested container while editing the template.
+    // (gridBlock allowedBlocks = ['teaser','image'].)
+    await helper.addBlockViaSidebar('Blocks', 'Teaser');
+    await expect(gridCells).toHaveCount(2);
+
+    // REMOVE a child from the nested container while editing the template.
+    await page.evaluate((id) => {
+      document.dispatchEvent(new CustomEvent('hydra-delete-blocks', { detail: { blockIds: [id] } }));
+    }, cellId);
+    await expect(gridCells).toHaveCount(1);
   });
 
   test('blocks outside template become locked in edit mode', async ({ page }) => {
@@ -321,7 +563,7 @@ test.describe('Template Edit Mode - Editability', () => {
     await helper.escapeToParent();
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await editToggle.click();
     // Wait for edit mode to activate (blocks outside template get locked)
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
@@ -353,10 +595,10 @@ test.describe('Template Edit Mode - Editability', () => {
     await helper.escapeToParent();
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
-    const editCheckbox = page.locator('#field-editTemplate');
+    const editToggle = page.locator('.edit-template-toggle');
+    const editCheckbox = page.locator('.edit-template-toggle');
     await editToggle.click();
-    await expect(editCheckbox).toBeChecked();
+    await expect(editCheckbox).toHaveAttribute('aria-pressed', 'true');
     // Wait for edit mode to activate
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
@@ -369,7 +611,7 @@ test.describe('Template Edit Mode - Editability', () => {
     await helper.escapeToParent();
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
     await editToggle.click();
-    await expect(editCheckbox).not.toBeChecked();
+    await expect(editCheckbox).toHaveAttribute('aria-pressed', 'false');
     // Wait for edit mode to deactivate
     await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
 
@@ -402,7 +644,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await helper.escapeToParent();
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await editToggle.click();
     // Wait for edit mode to activate
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
@@ -441,7 +683,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await helper.escapeToParent();
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await editToggle.click();
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
@@ -469,9 +711,9 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     // Exit template edit mode - click header to access the edit toggle
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForSidebarOpen();
-    const editCheckbox = page.locator('#field-editTemplate');
+    const editCheckbox = page.locator('.edit-template-toggle');
     await editToggle.click();
-    await expect(editCheckbox).not.toBeChecked();
+    await expect(editCheckbox).toHaveAttribute('aria-pressed', 'false');
     await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
 
     // Select the moved block - it should be editable now (template edit mode is off)
@@ -510,7 +752,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await helper.escapeToParent();
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await editToggle.click();
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
@@ -566,7 +808,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await helper.escapeToParent();
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await editToggle.click();
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
@@ -616,7 +858,7 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await helper.escapeToParent();
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await editToggle.click();
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
@@ -671,7 +913,7 @@ test.describe('Template Edit Mode - Validation', () => {
     await helper.escapeToParent();
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await editToggle.click();
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
@@ -693,8 +935,8 @@ test.describe('Template Edit Mode - Validation', () => {
     await expect(errorMessage).toBeVisible({ timeout: 5000 });
 
     // Verify we're still in edit mode (checkbox should still be checked)
-    const checkbox = page.locator('.field-wrapper-editTemplate input[type="checkbox"]');
-    await expect(checkbox).toBeChecked();
+    const checkbox = page.locator('.edit-template-toggle');
+    await expect(checkbox).toHaveAttribute('aria-pressed', 'true');
     // Verify standalone block is still readonly (template edit mode still active)
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
   });
@@ -725,7 +967,7 @@ test.describe('Template Edit Mode - Validation', () => {
     await helper.escapeToParent();
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await editToggle.click();
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
@@ -749,8 +991,8 @@ test.describe('Template Edit Mode - Validation', () => {
     await expect(errorMessage).toBeVisible({ timeout: 5000 });
 
     // Verify we're still in edit mode (checkbox should still be checked)
-    const checkbox = page.locator('.field-wrapper-editTemplate input[type="checkbox"]');
-    await expect(checkbox).toBeChecked();
+    const checkbox = page.locator('.edit-template-toggle');
+    await expect(checkbox).toHaveAttribute('aria-pressed', 'true');
     // Verify standalone block is still readonly (template edit mode still active)
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
   });
@@ -774,7 +1016,7 @@ test.describe('Template Edit Mode - Validation', () => {
     await helper.escapeToParent();
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await editToggle.click();
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
@@ -797,8 +1039,8 @@ test.describe('Template Edit Mode - Validation', () => {
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
     // Click to exit template edit mode - waits for async flush before toggling
     await editToggle.click();
-    const checkbox = page.locator('.field-wrapper-editTemplate input[type="checkbox"]');
-    await expect(checkbox).not.toBeChecked({ timeout: 5000 });
+    const checkbox = page.locator('.edit-template-toggle');
+    await expect(checkbox).toHaveAttribute('aria-pressed', 'false', { timeout: 5000 });
     await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
 
     // Save should succeed - wait for pencil icon (view mode) indicating save completed
@@ -824,6 +1066,61 @@ test.describe('Template Edit Mode - Validation', () => {
     const { locator: page2Header } = await helper.waitForBlockByContent('edited');
     await expect(page2Header).toContainText('edited', { timeout: 15000 });
   });
+
+  test('saved NESTED template changes (a block inside a container) persist to other pages', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+
+    // A grid cell is nested inside the grid container (and inside a nested
+    // "Template blocks" instance level) — not a direct child of the instance.
+    // The top-level save test above only edits the header; the reverse merge that
+    // captures edits back into the template must also walk into containers, or a
+    // nested edit is silently dropped on save.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: cellId, locator: cellLocator } = await helper.waitForBlockByContent('Template Grid Cell 1');
+
+    // Enter template edit mode
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    const editToggle = page.locator('.edit-template-toggle');
+    await editToggle.click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+
+    // Edit the NESTED grid cell with a unique marker
+    await helper.clickBlockInIframe(cellId);
+    const editor = helper.getSlateField(cellLocator);
+    await expect(editor).toHaveAttribute('contenteditable', 'true', { timeout: 5000 });
+    await editor.click();
+    await expect(editor).toBeFocused({ timeout: 2000 });
+    await page.keyboard.press('End');
+    await page.keyboard.type(' NESTEDSAVE');
+    const cellBlock = iframe.locator(`[data-block-uid="${cellId}"]`);
+    await expect(cellBlock).toContainText('NESTEDSAVE', { timeout: 5000 });
+
+    // Exit edit mode
+    await helper.escapeToParent();
+    const editToggle2 = page.locator('.edit-template-toggle');
+    await editToggle2.click();
+    const checkbox = page.locator('.edit-template-toggle');
+    await expect(checkbox).toHaveAttribute('aria-pressed', 'false', { timeout: 5000 });
+    await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
+
+    // Save
+    await page.keyboard.press('Control+s');
+    const pencilIcon = page.locator('.toolbar-actions .edit, [aria-label="Edit"]');
+    await expect(pencilIcon).toBeVisible({ timeout: 10000 });
+    await helper.getStableBlockCount();
+
+    // The nested edit must persist to another page using the same template.
+    await helper.navigateToView('/template-test-page-2');
+    const { locator: page2Cell } = await helper.waitForBlockByContent('NESTEDSAVE');
+    await expect(page2Cell).toContainText('NESTEDSAVE', { timeout: 15000 });
+  });
 });
 
 test.describe('Template Edit Mode - Block Settings', () => {
@@ -847,7 +1144,7 @@ test.describe('Template Edit Mode - Block Settings', () => {
     await helper.escapeToParent();
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await editToggle.click();
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
@@ -855,14 +1152,65 @@ test.describe('Template Edit Mode - Block Settings', () => {
     await helper.clickBlockInIframe(USER_CONTENT_1);
     await helper.waitForSidebarOpen();
 
-    // slotId input should be visible and have initial value from block data
+    // slotId input should be visible and have initial value from block data.
     const slotIdInput = page.locator('.field-wrapper-slotId input');
     await expect(slotIdInput).toHaveValue('primary', { timeout: 5000 });
     await helper.expectTemplateSettingsCount(1);
-    // Now clear and fill with new value
-    await slotIdInput.clear();
-    await slotIdInput.fill('new-slot-name');
-    await expect(slotIdInput).toHaveValue('new-slot-name');
+
+    // CRITICAL — wait for the sidebar form to STOP re-rendering before
+    // typing. Just-asserting toHaveValue('primary') above only catches
+    // the first poll where the value matches; Volto's TextWidget can
+    // still be receiving Redux dispatches from schema-inheritance
+    // recompute / template state churn for several hundred ms after.
+    // If we start typing during that window the input unmounts and our
+    // keystrokes go nowhere (or land on the next mount with leftover
+    // text). Gate on N consecutive same-value polls of 'primary' before
+    // touching it. (Cheap on the fast path: passes after ~300ms.)
+    {
+      let prev = '', stable = 0;
+      await expect.poll(async () => {
+        const v = await slotIdInput.inputValue();
+        if (v === prev && v === 'primary') stable++;
+        else { stable = 0; prev = v; }
+        return stable >= 3;
+      }, { timeout: 5000, intervals: [100, 150, 200] }).toBe(true);
+    }
+
+    // pressSequentially (NOT fill) on purpose. Volto's TextWidget is a
+    // React controlled input whose value flows from Redux. fill() sets
+    // the DOM `.value` directly and fires ONE 'input' event — React's
+    // onChange may not dispatch the Redux update in time, and the next
+    // render reads the stale value and reverts the DOM. Typing one char
+    // at a time fires real keydown/keyup/input per char, React handles
+    // each deterministically.
+    await slotIdInput.press('ControlOrMeta+a');
+    await slotIdInput.press('Backspace');
+    await slotIdInput.pressSequentially('new-slot-name', { delay: 20 });
+
+    // Stable-for-N-consecutive-polls gate: value must equal
+    // 'new-slot-name' for 3 polls in a row. If a late re-render of the
+    // sidebar form (from an iframe FORM_DATA echo or schema-inheritance
+    // recompute) reverts the value, the counter resets and we keep
+    // waiting; if Redux can't settle on the typed value at all the poll
+    // times out, surfacing the bug rather than masking it.
+    //
+    // Generous timeout (10s) because admin-nuxt is markedly slower than
+    // admin-mock — extra FORM_DATA echoes from the Nuxt iframe extend the
+    // re-render churn window before the form quiets down.
+    const seen: string[] = [];
+    let prev = '';
+    let stable = 0;
+    try {
+      await expect.poll(async () => {
+        const v = await slotIdInput.inputValue();
+        if (seen[seen.length - 1] !== v) seen.push(v);
+        if (v === prev && v === 'new-slot-name') stable++;
+        else { stable = 0; prev = v; }
+        return stable >= 3;
+      }, { timeout: 10000, intervals: [100, 150, 200] }).toBe(true);
+    } catch (e) {
+      throw new Error(`slotId never settled at "new-slot-name". Distinct values seen during poll: ${JSON.stringify(seen)} — last value: "${prev}"`);
+    }
   });
 
   test('can toggle block fixed mode in edit mode', async ({ page }) => {
@@ -885,7 +1233,7 @@ test.describe('Template Edit Mode - Block Settings', () => {
     await helper.escapeToParent();
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await editToggle.click();
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
@@ -897,21 +1245,21 @@ test.describe('Template Edit Mode - Block Settings', () => {
     const sidebar = page.locator('#sidebar-template-settings');
     await sidebar.scrollIntoViewIfNeeded();
 
-    // Fixed checkbox should be visible and toggleable
-    const fixedLabel = page.locator('.field-wrapper-fixed label[for="field-fixed"]');
-    const fixedCheckbox = page.locator('.field-wrapper-fixed input[type="checkbox"]');
-    await expect(fixedLabel).toBeVisible({ timeout: 5000 });
+    // The kind dropdown replaces the fixed/readOnly checkboxes. A user-content block that is
+    // neither fixed nor readOnly starts as "Slot"; changing it to a fixed kind must take.
+    const kindField = page.locator('#sidebar-template-settings .field-wrapper-kind');
+    await expect(kindField).toBeVisible({ timeout: 5000 });
     await helper.expectTemplateSettingsCount(1);
 
-    const wasChecked = await fixedCheckbox.isChecked();
-    await fixedLabel.click();
+    const kindValue = kindField.locator('.react-select__single-value');
+    await expect(kindValue).toContainText('Slot');
 
-    // Verify checkbox state changed
-    if (wasChecked) {
-      await expect(fixedCheckbox).not.toBeChecked({ timeout: 5000 });
-    } else {
-      await expect(fixedCheckbox).toBeChecked({ timeout: 5000 });
-    }
+    // Open the dropdown and pick a fixed kind; verify the selection took.
+    await kindField.locator('.react-select__control').click();
+    await page
+      .locator('.react-select__menu .react-select__option', { hasText: 'Fixed, read-only' })
+      .click();
+    await expect(kindValue).toContainText('Fixed, read-only', { timeout: 5000 });
   });
 });
 
@@ -922,8 +1270,10 @@ test.describe('Template Edit Mode - Object List Items', () => {
   // Carousel slides: only the first slide is visible by default.
   // Use carousel next button (data-block-selector="+1") to navigate to subsequent slides.
   const SLIDER_BLOCK_ID = 'template-slider';
-  const SLIDE_1_ID = 'tpl-slide-1';
-  const SLIDE_2_ID = 'tpl-slide-2';
+  // Forced-layout nested template blocks are instance-scoped (`${instanceId}::tpl-slide-1`)
+  // so two instances don't collide; resolve the actual rendered id from this suffix.
+  const SLIDE_1_SUFFIX = 'tpl-slide-1';
+  const SLIDE_2_SUFFIX = 'tpl-slide-2';
 
   test('object_list items inside readOnly template block are locked', async ({ page }) => {
     const helper = new AdminUIHelper(page);
@@ -936,6 +1286,8 @@ test.describe('Template Edit Mode - Object List Items', () => {
     // Wait for slider container to be visible
     await expect(iframe.locator(`[data-block-uid="${SLIDER_BLOCK_ID}"]`)).toBeVisible({ timeout: 10000 });
 
+    const SLIDE_1_ID = await helper.resolveBlockId(SLIDE_1_SUFFIX);
+    const SLIDE_2_ID = await helper.resolveBlockId(SLIDE_2_SUFFIX);
     // Verify slides have hydra-locked class (readOnly from template)
     await helper.waitForBlockReadonly(SLIDE_1_ID);
 
@@ -968,6 +1320,7 @@ test.describe('Template Edit Mode - Object List Items', () => {
     await expect(iframe.locator(`[data-block-uid="${SLIDER_BLOCK_ID}"]`)).toBeVisible({ timeout: 10000 });
 
     // Use carousel indicator to select slide 1
+    const SLIDE_1_ID = await helper.resolveBlockId(SLIDE_1_SUFFIX);
     const slide1Indicator = iframe.locator(`[data-block-selector="${SLIDE_1_ID}"]`);
     await slide1Indicator.click();
     await helper.waitForSidebarCurrentBlock('Slide');
@@ -994,6 +1347,8 @@ test.describe('Template Edit Mode - Object List Items', () => {
     const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
     const templateBlockIds = [headerBlockId, USER_CONTENT_1, USER_CONTENT_2, footerBlockId];
 
+    const SLIDE_1_ID = await helper.resolveBlockId(SLIDE_1_SUFFIX);
+    const SLIDE_2_ID = await helper.resolveBlockId(SLIDE_2_SUFFIX);
     // Initially locked
     await helper.waitForBlockReadonly(SLIDE_1_ID);
 
@@ -1003,7 +1358,7 @@ test.describe('Template Edit Mode - Object List Items', () => {
     await helper.escapeToParent();
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await expect(editToggle).toBeVisible({ timeout: 10000 });
     await editToggle.click();
 
@@ -1049,12 +1404,13 @@ test.describe('Template Edit Mode - Object List Items', () => {
     await helper.escapeToParent();
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await expect(editToggle).toBeVisible({ timeout: 10000 });
     await editToggle.click();
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
     // Select slide 1 via carousel indicator, then click the [+] to add a new slide
+    const SLIDE_1_ID = await helper.resolveBlockId(SLIDE_1_SUFFIX);
     await helper.waitForBlockEditable(SLIDE_1_ID);
     const slide1Indicator = iframe.locator(`[data-block-selector="${SLIDE_1_ID}"]`);
     await slide1Indicator.click();
@@ -1068,11 +1424,11 @@ test.describe('Template Edit Mode - Object List Items', () => {
     const sidebarInputs = page.locator('#sidebar-properties input:not([type="hidden"]), #sidebar-properties textarea, #sidebar-properties [contenteditable="true"]');
     await expect(sidebarInputs.first()).toBeVisible({ timeout: 5000 });
 
-    // The new slide should inherit template settings from its neighbor (fixed, readOnly)
-    // so it should have a template settings section with fixed=true
+    // The new slide should inherit template settings from its neighbor (fixed, readOnly),
+    // so the kind dropdown shows "Fixed, read-only".
     await helper.expectTemplateSettingsCount(1);
-    const fixedCheckbox = page.locator('#sidebar-template-settings .field-wrapper-fixed input[type="checkbox"]');
-    await expect(fixedCheckbox).toBeChecked({ timeout: 5000 });
+    const kindValue = page.locator('#sidebar-template-settings .field-wrapper-kind .react-select__single-value');
+    await expect(kindValue).toContainText('Fixed, read-only', { timeout: 5000 });
 
     // The iframe [+] add button should still be visible on the new slide
     const addButton = page.locator('.volto-hydra-add-button');
@@ -1161,7 +1517,7 @@ test.describe('Template Edit Mode - UI Restrictions', () => {
     await helper.escapeToParent();
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
-    const editToggle = page.locator('.field-wrapper-editTemplate label[for="field-editTemplate"]');
+    const editToggle = page.locator('.edit-template-toggle');
     await editToggle.click();
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
@@ -1264,7 +1620,7 @@ test.describe('Template Edit Mode - UI Restrictions', () => {
     await helper.waitForBlockSelectedInAdmin(templateBlockIds);
 
     // Click the label instead of the hidden checkbox input
-    const editToggleLabel = page.locator('label[for="field-editTemplate"]');
+    const editToggleLabel = page.locator('.edit-template-toggle');
     await editToggleLabel.click();
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
@@ -1275,5 +1631,105 @@ test.describe('Template Edit Mode - UI Restrictions', () => {
     // Add button should NOT be visible for blocks outside the template
     const addButton = page.locator('button[title*="Add block"]');
     await expect(addButton).toHaveCount(0);
+  });
+});
+
+test.describe('Template Edit Mode - Permissions', () => {
+  test('Edit-template button is disabled when the user lacks Modify permission on the template', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    // Deny "Modify portal content" on the template document: force can_edit=false on every
+    // test-layout template response. Isolated to this test — no fixture change, no effect
+    // on other tests. Verifies the edit gate end to end (threading + key match + rendering).
+    await page.route('**/*test-layout*', async (route) => {
+      const res = await route.fetch();
+      let body;
+      try {
+        body = await res.json();
+      } catch {
+        return route.fulfill({ response: res });
+      }
+      body.can_edit = false;
+      return route.fulfill({ response: res, json: body });
+    });
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+    await helper.getStableBlockCount();
+
+    // Enter the template instance (select a template block, then escape to its parent).
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+
+    // The Edit-template button is present but DISABLED (permission-gated), with a tooltip.
+    const editButton = page.locator('.edit-template-toggle');
+    await expect(editButton).toBeVisible({ timeout: 10000 });
+    await expect(editButton).toBeDisabled();
+    // Tooltip confirms can_edit=false reached the button (threading + key match).
+    await expect(editButton).toHaveAttribute('title', /permission|Modify portal content/i);
+    await expect(editButton).toContainText('Edit template');
+  });
+
+  test('creating a template in a folder without Add permission is blocked at save', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+
+    // Force the templates folder (the default save location) to report no Add permission,
+    // so the save-time can_add check blocks the create. Fulfilling here works regardless of
+    // whether the folder exists in the fixtures.
+    await page.route(
+      (u) => u.pathname.endsWith('/templates'),
+      async (route) => {
+        if (route.request().method() !== 'GET') return route.continue();
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ '@id': 'templates', '@type': 'Folder', can_add: false }),
+        });
+      },
+    );
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // A new template create is a POST with @type Document — must NOT happen when denied.
+    const templatePosts: Array<any> = [];
+    page.on('request', (req) => {
+      if (req.method() !== 'POST') return;
+      let body: any = null;
+      try {
+        body = req.postDataJSON();
+      } catch {
+        /* not JSON */
+      }
+      if (body?.['@type'] === 'Document') templatePosts.push(body);
+    });
+
+    // Make a template on a regular block, then attempt to save.
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelectedInAdmin('block-1-uuid');
+    await helper.openQuantaToolbarMenu('block-1-uuid');
+    await page
+      .locator('.volto-hydra-dropdown-menu .volto-hydra-dropdown-item')
+      .filter({ hasText: /make.*template/i })
+      .click();
+    await helper.waitForSidebarOpen();
+
+    // The save's can_add check GETs the folder; can_add=false blocks the create.
+    const folderCheck = page.waitForRequest(
+      (r) => r.method() === 'GET' && new URL(r.url()).pathname.endsWith('/templates'),
+      { timeout: 15000 },
+    );
+    await page.locator('#toolbar-save, button:has-text("Save")').first().click();
+    await folderCheck;
+
+    // Create is blocked: the page stays in edit mode (a successful save redirects away),
+    // and no template document was POSTed.
+    await expect(page).toHaveURL(/\/edit$/, { timeout: 5000 });
+    expect(
+      templatePosts.length,
+      'template POST must be blocked when the target folder denies Add',
+    ).toBe(0);
   });
 });

@@ -1,0 +1,19 @@
+---
+/**
+ * Single column inside a Columns block. Renders each of its child blocks
+ * through BlockRenderer (which wraps them with data-block-uid). The
+ * column's own data-block-uid wrapper is needed here because ColumnBlock
+ * is invoked DIRECTLY by ColumnsBlock (not via BlockRenderer), so the
+ * wrapper contract must be honored manually.
+ */
+import BlockRenderer from './BlockRenderer.astro';
+const { block } = Astro.props;
+const items = block.blocks_layout?.items || [];
+const subBlocks = block.blocks || {};
+---
+<div data-block-uid={block['@uid']} style="flex: 1">
+  {block.title && <h4 data-edit-text="title">{block.title}</h4>}
+  {items.map((id: string) => (
+    <BlockRenderer block={{ ...subBlocks[id], '@uid': id }} />
+  ))}
+</div>

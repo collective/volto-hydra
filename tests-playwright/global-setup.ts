@@ -10,7 +10,7 @@ import { chromium } from '@playwright/test';
 import { URLS } from './ports';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
-const { discoverBlocks } = require('./helpers/discover-blocks.cjs');
+const { discoverBlocks, buildEmptyRegionCases } = require('./helpers/discover-blocks.cjs');
 
 /**
  * Fetch the frontend's registered blocksConfig by loading mock-parent in a
@@ -82,6 +82,31 @@ async function globalSetup() {
     const outPath = path.resolve(__dirname, '../.discovered-blocks.json');
     fs.writeFileSync(outPath, JSON.stringify(blocks, null, 2));
     console.log(`[SETUP] Wrote ${blocks.length} discovered blocks to ${outPath}`);
+
+    // The empty-region sweep needs block schemas (allowedBlocks/defaultBlockType)
+    // to know which regions seed an `empty`. block-sanity deliberately runs
+    // schema-less in CI (MOCK_PARENT_URL unset) to skip its strict schema checks,
+    // so fetch schemas JUST for this sweep — from the always-present mock
+    // test-frontend — without turning block-sanity's checks on. Best-effort: on
+    // failure the sweep is simply empty (its tests skip) rather than failing setup.
+    let ecConfig = blocksConfig;
+    if (Object.keys(ecConfig).length === 0) {
+      try {
+        ({ blocksConfig: ecConfig } = await fetchBlocksConfig(
+          `${URLS.testFrontend}/mock-parent.html`,
+          URLS.testFrontend,
+          discoverApi,
+        ));
+        console.log(`[SETUP] Fetched ${Object.keys(ecConfig).length} schemas from the mock frontend for empty-region detection`);
+      } catch (err) {
+        console.warn(`[SETUP] empty-region schema fetch failed (sweep will be empty): ${err}`);
+        ecConfig = {};
+      }
+    }
+    const emptyRegions = buildEmptyRegionCases(ecConfig, blocks);
+    const emptyOutPath = path.resolve(__dirname, '../.discovered-empty-regions.json');
+    fs.writeFileSync(emptyOutPath, JSON.stringify(emptyRegions, null, 2));
+    console.log(`[SETUP] Wrote ${emptyRegions.length} empty-seeding container region(s) to ${emptyOutPath}`);
   }
 
   // Bridge-only CI jobs don't run Volto — skip the health check

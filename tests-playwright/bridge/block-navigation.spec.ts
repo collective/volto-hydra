@@ -114,8 +114,15 @@ async function selectNonEditableBlock(helper, page, blockId: string) {
   // Wait for the block element to exist in DOM
   const blockEl = iframe.locator(`[data-block-uid="${blockId}"]`);
   await expect(blockEl).toBeAttached({ timeout: 5000 });
-  // Give hydra.js time to process the selection
-  await page.waitForTimeout(200);
+  // Wait for the BLOCK_SELECTED round-trip to complete: iframe must have
+  // received the selection AND echoed BLOCK_SELECTED back to mock-parent,
+  // which updates lastSelectedBlockUid. Condition-based — replaces a
+  // historical fixed 200ms sleep that flaked on slow CI runners and on
+  // Astro (where the renderEndpoint POST adds a network round-trip
+  // before the bridge can fire BLOCK_SELECTED).
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.mockParent.lastSelectedBlockUid || null);
+  }, { timeout: 5000, intervals: [50, 100, 200] }).toBe(blockId);
 }
 
 /**

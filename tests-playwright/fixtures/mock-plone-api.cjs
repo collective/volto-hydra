@@ -292,6 +292,47 @@ function getImageScales(content, baseUrl) {
 }
 
 /**
+ * Generate image_scales for a non-Image content item that has a lead image
+ * field set via blob_path (Documents/CaseStudy with the ILeadImage behaviour).
+ * Real Plone exposes image_field + image_scales for these in listing brains;
+ * our distribution export only carries the raw blob_path field, so synthesise
+ * the brain shape here. Downloads are relative (`@@images/<field>[/scale]`) so
+ * the frontend prefixes the item @id — same as getImageScales. No actual
+ * resizing happens; the @@images endpoint serves the same bytes at any scale.
+ */
+function getLeadImageScales(content, fieldName) {
+  const f = content[fieldName];
+  if (!f) return null;
+  const width = f.width || 800;
+  const height = f.height || 600;
+  const scaleConfigs = {
+    icon: 32, tile: 64, thumb: 128, mini: 200, preview: 400,
+    teaser: 600, large: 800, larger: 1000, great: 1200, huge: 1600,
+  };
+  const scales = {};
+  for (const [name, maxDim] of Object.entries(scaleConfigs)) {
+    if (maxDim < width || maxDim < height) {
+      const ratio = Math.min(maxDim / width, maxDim / height);
+      scales[name] = {
+        download: `@@images/${fieldName}/${name}`,
+        width: Math.round(width * ratio),
+        height: Math.round(height * ratio),
+      };
+    }
+  }
+  return {
+    [fieldName]: [{
+      'content-type': f['content-type'] || 'image/jpeg',
+      download: `@@images/${fieldName}`,
+      filename: f.filename || `${content.id || fieldName}`,
+      width,
+      height,
+      scales,
+    }],
+  };
+}
+
+/**
  * Generate scales object for an image field
  * @param {string} fullUrl - Full URL of the content item
  * @param {string} fieldName - Image field name (e.g., 'image', 'preview_image')
@@ -448,6 +489,12 @@ function formatSearchItem(content, baseUrl) {
   if (content['@type'] === 'Image') {
     item.image_field = 'image';
     item.image_scales = getImageScales(content, baseUrl) || getPlaceholderImageScales(content.title);
+  } else if (content.image && (content.image.blob_path || content.image.width)) {
+    // Lead image field (CaseStudy/Document with ILeadImage). Real Plone
+    // exposes image_field='image' + image_scales for these in listings; the
+    // @@images endpoint resolves the blob_path (incl. cross-referenced blobs).
+    item.image_field = 'image';
+    item.image_scales = getLeadImageScales(content, 'image');
   } else if (hasPreviewImage) {
     item.image_field = 'preview_image';
     item.image_scales = getPlaceholderImageScales(content.title, 'preview_image');
@@ -893,12 +940,14 @@ function enrichContent(content, urlPath, baseUrl, expandList = []) {
     'items': childItems,
     'items_total': childItems.length,
     '@components': expandComponents(stubComponents(fullUrl), expandList, urlPath, baseUrl),
-    // Permissions - always grant for mock API
+    // Permissions - granted by default, but a fixture may set `_mockPermissions` to model
+    // an unauthorized case (e.g. a templates folder the user can't add to, or a template
+    // document the user can't modify). This mirrors Plone's per-object permission flags.
     'can_manage_portlets': true,
-    'can_view': true,
-    'can_edit': true,
-    'can_delete': true,
-    'can_add': true,
+    'can_view': transformed._mockPermissions?.can_view ?? true,
+    'can_edit': transformed._mockPermissions?.can_edit ?? true,
+    'can_delete': transformed._mockPermissions?.can_delete ?? true,
+    'can_add': transformed._mockPermissions?.can_add ?? true,
     'can_list_contents': true
   };
 
@@ -2443,6 +2492,26 @@ app.get('*/@@images/*', (req, res) => {
     res.sendFile(imageFile);
   };
 
+  // Distribution lead/preview image may reference ANOTHER content item's blob
+  // via blob_path (e.g. a case study whose lead image points at /images/msc.png).
+  // Resolve the blob_path through contentDirMap and serve the exact bytes, so
+  // <item>/@@images/<field> works even when the bytes live under another item.
+  if (dirInfo) {
+    try {
+      const data = JSON.parse(fs.readFileSync(path.join(dirInfo.dirPath, 'data.json'), 'utf-8'));
+      const bp = data[fieldName] && data[fieldName].blob_path;
+      const sep = `/${fieldName}/`;
+      const idx = bp ? bp.indexOf(sep) : -1;
+      if (idx > 0) {
+        const itemRel = bp.slice(0, idx);   // e.g. images/msc.png
+        const within = bp.slice(idx + 1);   // e.g. image/<file>.png
+        const tgt = contentDirMap['/' + itemRel];
+        const blobFile = tgt ? path.join(tgt.dirPath, within) : null;
+        if (blobFile && fs.existsSync(blobFile)) { serveFile(blobFile); return; }
+      }
+    } catch (e) { /* fall through to dir scan */ }
+  }
+
   if (imageDir && fs.existsSync(imageDir)) {
     const files = fs.readdirSync(imageDir);
     if (files.length > 0) {
@@ -2614,6 +2683,45 @@ app.get('*', (req, res, next) => {
 });
 
 /**
+ * Standard Plone fields that are "registered" in this mock world — common
+ * dexterity/behavior fields a content type may legitimately expose. Used to
+ * decide which top-level fields survive a PATCH (see dropUnregisteredFields).
+ * Deliberately does NOT include `footer_blocks` / `header_blocks`: layout
+ * regions now live as sub-keys of `blocks_layout`, not as separate fields.
+ */
+const STANDARD_REGISTERED_FIELDS = new Set([
+  'title', 'description', 'blocks', 'blocks_layout', 'id', 'UID',
+  'review_state', 'created', 'modified', 'effective', 'expires',
+  'subjects', 'language', 'rights', 'relatedItems', 'preview_image',
+  'exclude_from_nav', 'allow_discussion', 'layout', 'text',
+  'contact_email', 'contact_name', 'contact_phone', 'event_url',
+  'start', 'end', 'open_end', 'whole_day', 'location', 'image',
+]);
+
+/**
+ * Mirror Plone's deserializer: keep only top-level keys that are registered
+ * fields. A key survives if it is metadata (`@`-prefixed), already present on
+ * the stored object (so it's clearly a real field of this type), or in the
+ * standard registered set. Everything else is dropped, the same way a real
+ * Plone backend ignores values for fields that don't exist on the schema.
+ */
+function dropUnregisteredFields(body, baseline) {
+  const out = {};
+  for (const [key, value] of Object.entries(body || {})) {
+    if (
+      key.startsWith('@') ||
+      (baseline && Object.prototype.hasOwnProperty.call(baseline, key)) ||
+      STANDARD_REGISTERED_FIELDS.has(key)
+    ) {
+      out[key] = value;
+    } else {
+      console.log(`[PATCH] dropping unregistered field: ${key}`);
+    }
+  }
+  return out;
+}
+
+/**
  * PATCH /:path
  * Update content - persists to session storage for authenticated requests.
  * Default session ('_default') does NOT persist to ensure test isolation for
@@ -2633,7 +2741,14 @@ app.patch('*', (req, res) => {
   const content = getContent(cleanPath, sessionId);
 
   if (content) {
-    const mergedContent = { ...content, ...req.body };
+    // Emulate Plone's REST deserializer: only fields backed by a registered
+    // dexterity field / behavior survive a save. Unknown top-level fields (e.g.
+    // an ad-hoc `footer_blocks`) are silently dropped. This is WHY layout
+    // regions must live as sub-keys of the registered `blocks_layout` dict —
+    // they ride along inside a registered field and persist, whereas a separate
+    // top-level region field would be discarded here.
+    const registeredBody = dropUnregisteredFields(req.body, content);
+    const mergedContent = { ...content, ...registeredBody };
 
     // Persist to session storage for test verification when session is provided
     // Default session doesn't persist to maintain backward compatibility

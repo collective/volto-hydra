@@ -22,10 +22,6 @@
     "docs-images-listing-edit-001/image/listing-edit.png",
     "docs-images-maps-edit-001/image/maps-edit.png",
     "docs-images-media-empty-placeholder-001/image/media-empty-placeholder.png",
-    "docs-images-mobile-block-selected-001/image/mobile-block-selected.png",
-    "docs-images-mobile-dropdown-menu-001/image/mobile-dropdown-menu.png",
-    "docs-images-mobile-select-parent-001/image/mobile-select-parent.png",
-    "docs-images-mobile-sidebar-fullscreen-001/image/mobile-sidebar-fullscreen.png",
     "docs-images-multi-select-001/image/multi-select.png",
     "docs-images-parent-chain-001/image/parent-chain.png",
     "docs-images-search-edit-001/image/search-edit.png",
@@ -54,7 +50,11 @@
     "docs/examples/table/preview_image/black-starry-night.jpg",
     "docs/examples/teaser/preview_image/black-starry-night.jpg",
     "docs/examples/toc/preview_image/black-starry-night.jpg",
-    "quadrant-svg/image/quadrant.svg"
+    "quadrant-svg/image/quadrant.svg",
+    "docs-images-mobile-block-selected-001/image/mobile-block-selected.png",
+    "docs-images-mobile-dropdown-menu-001/image/mobile-dropdown-menu.png",
+    "docs-images-mobile-select-parent-001/image/mobile-select-parent.png",
+    "docs-images-mobile-sidebar-fullscreen-001/image/mobile-sidebar-fullscreen.png"
   ],
   "_data_files_": [
     "plone_site_root/data.json",
@@ -124,10 +124,6 @@
     "docs-images-listing-edit-001/data.json",
     "docs-images-maps-edit-001/data.json",
     "docs-images-media-empty-placeholder-001/data.json",
-    "docs-images-mobile-block-selected-001/data.json",
-    "docs-images-mobile-dropdown-menu-001/data.json",
-    "docs-images-mobile-select-parent-001/data.json",
-    "docs-images-mobile-sidebar-fullscreen-001/data.json",
     "docs-images-multi-select-001/data.json",
     "docs-images-parent-chain-001/data.json",
     "docs-images-search-edit-001/data.json",
@@ -163,7 +159,12 @@
     "docs/examples/grid/grid-image/data.json",
     "docs/examples/grid/listing/data.json",
     "docs/examples/grid/teaser/data.json",
-    "docs/examples/grid/text/data.json"
+    "docs/examples/grid/text/data.json",
+    "docs-images-mobile-block-selected-001/data.json",
+    "docs-images-mobile-dropdown-menu-001/data.json",
+    "docs-images-mobile-select-parent-001/data.json",
+    "docs-images-mobile-sidebar-fullscreen-001/data.json",
+    "docs/server-rendered-frontends/data.json"
   ],
   "default_page": {},
   "local_roles": {
@@ -910,6 +911,13 @@
       }
     },
     "docs-images-mobile-sidebar-fullscreen-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-server-rendered-frontends-001": {
       "local_roles": {
         "admin": [
           "Owner"
