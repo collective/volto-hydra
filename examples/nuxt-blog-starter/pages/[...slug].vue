@@ -398,7 +398,9 @@ const inEditModeAtSetup =
 
 // retrieve the data associated with an article
 // based on its slug (pre-loads templates for sync expansion)
-const result = await ploneApi({ path, pages, preloadTemplates });
+// reloadTemplates: while editing, always reload templates (the editor may be changing
+// one — never serve a cached copy). View/SSG reuses the shared template cache.
+const result = await ploneApi({ path, pages, preloadTemplates, reloadTemplates: inEditModeAtSetup });
 
 // Moved content: ploneApi detected the backend's 302 and resolved the
 // new frontend path. Issue a permanent redirect from the page setup
