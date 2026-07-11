@@ -717,31 +717,28 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
     });
   }
 
-  if (shapeIssues.length) {
-    const lines = shapeIssues.flatMap((e) => [
-      `  ${e.pagePath} [${e.blockId}] (${e.blockType}):`,
-      ...e.issues.map((msg) => `    - ${msg}`),
-    ]);
-    throw new Error(
-      `Discovery found ${shapeIssues.length} block(s) whose data shape doesn't match the ` +
-        `declared widget/type in the block schema. These will crash Volto's sidebar widgets ` +
-        `(e.g. UrlWidget expecting a string but getting an array). Either fix the content ` +
-        `or update the schema.\n` +
-        lines.join('\n'),
-    );
+  // Like unregistered types, shape and slate issues are real content/schema
+  // problems but should each be a failing test rather than blocking the whole
+  // suite in globalSetup. Emit a synthetic discovered-block entry per issue.
+  for (const e of shapeIssues) {
+    result.push({
+      blockType: e.blockType,
+      blockId: e.blockId,
+      pagePath: e.pagePath,
+      shapeIssue: true,
+      issues: e.issues,
+    });
   }
 
-  if (slateIssues.length) {
-    const lines = slateIssues.flatMap((e) => [
-      `  ${e.pagePath} [${e.blockId}] field "${e.field}":`,
-      ...e.issues.map((msg) => `    - ${msg}`),
-    ]);
-    throw new Error(
-      `Discovery found ${slateIssues.length} slate field(s) with structural issues. ` +
-        `Each slate field must be a single element root with a string \`type\`; ` +
-        `text leaves must live inside an element.\n` +
-        lines.join('\n'),
-    );
+  for (const e of slateIssues) {
+    result.push({
+      blockType: e.blockType || 'slate',
+      blockId: e.blockId,
+      pagePath: e.pagePath,
+      slateIssue: true,
+      field: e.field,
+      issues: e.issues,
+    });
   }
 
   // Every block type the FRONTEND registers needs at least one content

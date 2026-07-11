@@ -31,11 +31,14 @@ interface DiscoveredBlock {
   pagePath: string;
   blockData: Record<string, unknown>;
   isListing: boolean;
-  // Set by discovery for @types used in content but not registered in the
-  // frontend's blocksConfig. These become a failing test rather than blocking
-  // the whole suite in globalSetup.
+  // Set by discovery for content/schema problems that become a failing test
+  // rather than blocking the whole suite in globalSetup.
   unregistered?: boolean;
   occurrenceCount?: number;
+  shapeIssue?: boolean;
+  slateIssue?: boolean;
+  field?: string;
+  issues?: string[];
 }
 
 // Read discovered blocks (written by globalSetup)
@@ -81,6 +84,20 @@ test.describe('Block sanity (auto-discovered)', () => {
             `occurrence(s), e.g. ${block.pagePath}) but is not registered in the frontend's ` +
             `blocksConfig, so it renders as "Not implemented Block". Register its schema ` +
             `(customBlocks) or migrate the content to an existing type.`,
+        );
+      });
+      continue;
+    }
+    // Content/schema shape mismatch (e.g. a field declared slate but holding a
+    // string) — fails as its own test rather than blocking the suite.
+    if (block.shapeIssue || block.slateIssue) {
+      const kind = block.shapeIssue ? 'data shape' : 'slate structure';
+      test(`${block.blockType} block [${block.blockId}] has valid ${kind}`, () => {
+        throw new Error(
+          `Block "${block.blockType}" [${block.blockId}] on ${block.pagePath}` +
+            (block.field ? ` field "${block.field}"` : '') +
+            ` has ${kind} that does not match its schema:\n` +
+            (block.issues || []).map((m) => `  - ${m}`).join('\n'),
         );
       });
       continue;
