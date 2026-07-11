@@ -701,19 +701,20 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
     );
   }
 
-  if (unregisteredTypes.size) {
-    const lines = [];
-    for (const [blockType, occurrences] of unregisteredTypes) {
-      const sample = occurrences.slice(0, 5).map((o) => `${o.pagePath} [${o.blockId}]`);
-      const more = occurrences.length > 5 ? ` (+ ${occurrences.length - 5} more)` : '';
-      lines.push(`  - "${blockType}": ${occurrences.length} occurrence(s) — e.g. ${sample.join(', ')}${more}`);
-    }
-    throw new Error(
-      `Discovery found ${unregisteredTypes.size} block @type(s) used in content but not registered ` +
-        `in the frontend's blocksConfig. The renderer will fall through to "Not implemented Block". ` +
-        `Either register the schema (customBlocks) or migrate the content to an existing type.\n` +
-        lines.join('\n'),
-    );
+  // A block @type used in content but not registered in the frontend's
+  // blocksConfig is a real problem (it renders as "Not implemented Block"), but
+  // it should NOT block the whole suite in globalSetup — it is just another
+  // failing test. Emit a synthetic discovered-block entry per unregistered
+  // type so block-sanity generates one failing test each, while the registered
+  // blocks still run.
+  for (const [blockType, occurrences] of unregisteredTypes) {
+    result.push({
+      blockType,
+      blockId: occurrences[0].blockId,
+      pagePath: occurrences[0].pagePath,
+      unregistered: true,
+      occurrenceCount: occurrences.length,
+    });
   }
 
   if (shapeIssues.length) {

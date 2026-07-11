@@ -31,6 +31,11 @@ interface DiscoveredBlock {
   pagePath: string;
   blockData: Record<string, unknown>;
   isListing: boolean;
+  // Set by discovery for @types used in content but not registered in the
+  // frontend's blocksConfig. These become a failing test rather than blocking
+  // the whole suite in globalSetup.
+  unregistered?: boolean;
+  occurrenceCount?: number;
 }
 
 // Read discovered blocks (written by globalSetup)
@@ -66,6 +71,20 @@ const test = base.extend<{ helper: AdminUIHelper }>({
 
 test.describe('Block sanity (auto-discovered)', () => {
   for (const block of discoveredBlocks) {
+    // A block @type used in content but not registered in the frontend's
+    // blocksConfig fails as its own test (it renders as "Not implemented
+    // Block") rather than blocking the whole suite.
+    if (block.unregistered) {
+      test(`${block.blockType} block @type is registered in the frontend`, () => {
+        throw new Error(
+          `Block @type "${block.blockType}" is used in content (${block.occurrenceCount} ` +
+            `occurrence(s), e.g. ${block.pagePath}) but is not registered in the frontend's ` +
+            `blocksConfig, so it renders as "Not implemented Block". Register its schema ` +
+            `(customBlocks) or migrate the content to an existing type.`,
+        );
+      });
+      continue;
+    }
     const labelVariation = block.variation && block.variation !== 'default'
       ? ` (${block.variation})`
       : '';
