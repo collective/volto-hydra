@@ -961,6 +961,53 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     ).toBeGreaterThan(800);
   });
 
+  test('mobile: pick existing content in the object browser applies the link', async ({
+    page,
+  }) => {
+    // The placement test above stops at "the picker opened full-screen". This drives the
+    // whole flow on a phone — open the LinkEditor, browse, SELECT a page, and assert the
+    // link actually lands in the text. The desktop equivalent is
+    // inline-editing-links.spec.ts "can use browse button in link editor"; mobile has its
+    // own full-screen-overlay tap/scroll quirks that a desktop pass doesn't cover.
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const blockId = 'block-1-uuid';
+    await helper.editBlockTextInIframe(blockId, 'Click here');
+    const editor = await helper.getEditorLocator(blockId);
+    await helper.selectAllTextInEditor(editor);
+
+    await helper.clickFormatButton('link');
+    await helper.waitForLinkEditorPopup();
+
+    // The Browse button only shows when the URL input is empty.
+    const linkUrlInput = await helper.getLinkEditorUrlInput();
+    if ((await linkUrlInput.inputValue())?.length > 0) {
+      await linkUrlInput.clear();
+    }
+    const browseButton = await helper.getLinkEditorBrowseButton();
+    await browseButton.click();
+
+    const objectBrowser = await helper.waitForObjectBrowser();
+    // Selecting a page auto-submits the link.
+    await helper.objectBrowserSelectItem(objectBrowser, /Another Page/);
+
+    const submitButton = page.getByRole('button', { name: 'Submit' });
+    if (await submitButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await submitButton.click();
+    }
+
+    // The link must actually be applied to the selected text.
+    await expect(async () => {
+      const blockHtml = await editor.innerHTML();
+      expect(blockHtml).toContain('<a ');
+      expect(blockHtml).toContain('/another-page');
+      expect(blockHtml).toContain('Click here');
+    }).toPass({ timeout: 5000 });
+  });
+
   /**
    * User-reported regression: on mobile in VIEW mode (not /edit), the
    * editor saw a big empty gap at the top of the screen and the
