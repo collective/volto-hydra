@@ -175,8 +175,62 @@ export class AdminUIHelper {
     // Wait for iframe to load
     await this.waitForIframeReady();
 
+    // Edit mode is only usable once the bridge connects. Fail fast (with the
+    // real diagnostic) if it doesn't, instead of proceeding into a dead editor.
+    await this.waitForBridgeConnected();
+
     // Wait for all blocks to render (Nuxt async components may still be loading)
     await this.getStableBlockCount();
+  }
+
+  /**
+   * After entering edit mode, assert the Hydra bridge actually connected.
+   *
+   * hydra.js paints a "Hydra Bridge: Not Connected" overlay
+   * (#hydra-bridge-diagnostic) when it's loaded in an edit iframe but
+   * initBridge() was never called (or INITIAL_DATA never arrived) — see
+   * hydra.src.js _showBridgeDiagnostic. But that overlay only appears after a
+   * 5s idle timeout, long after a typical test has torn down, so nothing
+   * actually catches it. This is the immediate, positive form of that same
+   * check: it waits for the bridge to report `initialized` (INITIAL_DATA
+   * received), and on timeout throws the same facts the overlay would show, so
+   * a broken edit boot fails fast with a clear message instead of surfacing
+   * later as a confusing "block was clicked but nothing got selected" timeout.
+   */
+  async waitForBridgeConnected(timeout: number = 15000): Promise<void> {
+    const iframe = this.getIframe();
+    const body = iframe.locator('body');
+    try {
+      await expect(async () => {
+        const initialized = await body.evaluate(
+          () => (window as any).__hydraBridge?.initialized === true,
+        );
+        expect(initialized).toBe(true);
+      }).toPass({ timeout });
+    } catch {
+      // Bridge never connected — gather the same facts hydra's overlay reports.
+      const info = await body.evaluate(() => {
+        const b = (window as any).__hydraBridge;
+        return {
+          windowName: window.name || '(empty)',
+          bridgeCreated: !!b,
+          initialized: b?.initialized === true,
+          adminOrigin: b?.adminOrigin || null,
+        };
+      });
+      const overlayPresent =
+        (await iframe.locator('#hydra-bridge-diagnostic').count()) > 0;
+      const hint = !info.bridgeCreated
+        ? 'hydra.js was imported but initBridge() was never called — the frontend must call initBridge() in edit mode.'
+        : 'INIT was sent but the admin never responded with INITIAL_DATA — check adminOrigin matches the parent origin.';
+      throw new Error(
+        'Hydra bridge did not connect after entering edit mode ' +
+          '(the "Hydra Bridge: Not Connected" condition). ' +
+          `window.name="${info.windowName}", initBridge called=${info.bridgeCreated}, ` +
+          `INITIAL_DATA received=${info.initialized}, adminOrigin=${info.adminOrigin}, ` +
+          `diagnostic overlay present=${overlayPresent}. ${hint}`,
+      );
+    }
   }
 
   /**
