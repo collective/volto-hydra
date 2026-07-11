@@ -233,6 +233,7 @@ function checkIntegrity(contentDir) {
     imagesOk: 0, imagesBroken: 0,
     resolveuidOk: 0, resolveuidBroken: 0,
     linksOk: 0, linksBroken: 0,
+    layoutOk: 0, layoutBroken: 0,
   };
 
   // Pass 1: build UID → relpath and path → data
@@ -386,6 +387,37 @@ function checkIntegrity(contentDir) {
     }
   }
 
+  // Pass 2d: blocks_layout references must resolve to a block in the SAME
+  // container. A uid listed in a container's blocks_layout but absent from its
+  // `blocks` dict is a dangling reference — exactly what a partial block deletion
+  // leaves behind (block def removed, layout entry not). Checks the page itself
+  // and every nested container, across EVERY array in blocks_layout (standard
+  // `items` plus the vestigial nested `blocks_layout` key some exports carry).
+  function checkLayout(rel, bid, container) {
+    const sub = container.blocks;
+    const bl = container.blocks_layout;
+    if (!sub || typeof sub !== 'object' || !bl || typeof bl !== 'object') return;
+    for (const [lkey, arr] of Object.entries(bl)) {
+      if (!Array.isArray(arr)) continue;
+      for (const ref of arr) {
+        if (typeof ref !== 'string') continue;
+        if (Object.prototype.hasOwnProperty.call(sub, ref)) {
+          stats.layoutOk += 1;
+        } else {
+          stats.layoutBroken += 1;
+          const where = bid ? `block ${bid} ` : 'page ';
+          errors.push(`  ${rel}: ${where}blocks_layout.${lkey} references missing block ${ref}`);
+        }
+      }
+    }
+  }
+  for (const { rel, data } of items) {
+    checkLayout(rel, null, data);  // page-level blocks_layout
+    for (const [bid, block] of walkBlocks(data.blocks)) {
+      if (block.blocks && typeof block.blocks === 'object') checkLayout(rel, bid, block);
+    }
+  }
+
   // Parent containers (metadata cross-check for completeness)
   const metaPath = path.join(contentDir, '__metadata__.json');
   if (fs.existsSync(metaPath)) {
@@ -414,6 +446,7 @@ function formatReport(title, result) {
     lines.push(`Images:  ${result.stats.imagesOk} ok, ${result.stats.imagesBroken} broken`);
     lines.push(`UIDs:    ${result.stats.resolveuidOk} resolved, ${result.stats.resolveuidBroken} broken`);
     lines.push(`Links:   ${result.stats.linksOk} ok, ${result.stats.linksBroken} broken`);
+    lines.push(`Layout:  ${result.stats.layoutOk} ok, ${result.stats.layoutBroken} dangling`);
   }
   if (result.errors.length) {
     lines.push('');

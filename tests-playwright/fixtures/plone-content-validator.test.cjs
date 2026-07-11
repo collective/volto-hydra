@@ -381,6 +381,66 @@ describe('plone-content-validator checkIntegrity()', () => {
     assert.equal(r.stats.linksOk, 2);
   });
 
+  it('FAILS on a blocks_layout.items entry with no matching block', () => {
+    // A uid listed in a container's blocks_layout but absent from its `blocks`
+    // dict is a dangling reference — what a partial block deletion leaves (remove
+    // the block def but not its layout entry).
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a', '@type': 'Document', id: 'page-a', UID: 'pageauid1234567',
+        parent: { '@id': '/' },
+        blocks: { 'real-1': { '@type': 'slate' } },
+        blocks_layout: { items: ['real-1', 'ghost-block-999'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(
+      r.errors.some((e) => e.includes('ghost-block-999') && e.includes('blocks_layout')),
+      r.errors.join('\n'),
+    );
+  });
+
+  it('FAILS on a dangling ref in the nested blocks_layout.blocks_layout key', () => {
+    // The exact bug a teaser removal left: block def gone from `blocks`, uid still
+    // in the vestigial blocks_layout.blocks_layout array.
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a', '@type': 'Document', id: 'page-a', UID: 'pageauid1234567',
+        parent: { '@id': '/' },
+        blocks: {
+          'grid-1': {
+            '@type': 'gridBlock',
+            blocks: { 'child-1': { '@type': 'teaser' } },
+            blocks_layout: { blocks_layout: ['deleted-teaser-uid'], items: ['child-1'] },
+          },
+        },
+        blocks_layout: { items: ['grid-1'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(
+      r.errors.some((e) => e.includes('deleted-teaser-uid')),
+      r.errors.join('\n'),
+    );
+  });
+
+  it('accepts a container whose blocks_layout fully resolves', () => {
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a', '@type': 'Document', id: 'page-a', UID: 'pageauid1234567',
+        parent: { '@id': '/' },
+        blocks: { 'a': { '@type': 'slate' }, 'b': { '@type': 'slate' } },
+        blocks_layout: { blocks_layout: [], items: ['a', 'b'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.deepEqual(r.errors, []);
+    assert.equal(r.stats.layoutBroken, 0);
+  });
+
   it('resolves valid resolveuid refs', () => {
     // UID must be hex ≥ 10 chars to match the /resolveuid/[a-f0-9]{10,}/ regex
     const uid = 'abcdef1234567890';
