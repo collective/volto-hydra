@@ -417,13 +417,22 @@ const SyncedSlateToolbar = ({
       // Check if focus went to the iframe
       const iframe = document.getElementById('previewIframe');
       if (document.activeElement === iframe) {
-        // Dispatch synthetic mousedown on document to trigger handleClickOutside
+        // Dispatch a synthetic mousedown so Volto's Toolbar handleClickOutside runs
+        // and closes any open toolbar menu now that focus left for the iframe.
+        //
+        // Dispatch on document.body, NOT document. handleClickOutside does
+        // `e.target.closest('.ui.modal')`, and `document` has no `.closest` — dispatching
+        // on document made `e.target === document` and threw
+        // `TypeError: target.closest is not a function`, aborting handleClickOutside
+        // before closeMenu() ran, on EVERY focus-to-iframe transition (e.g. cancelling
+        // the LinkEditor). body is an Element with .closest and the event still bubbles
+        // to the document-level listener, so the menu actually closes.
         const mousedownEvent = new MouseEvent('mousedown', {
           bubbles: true,
           cancelable: true,
           view: window,
         });
-        document.dispatchEvent(mousedownEvent);
+        document.body.dispatchEvent(mousedownEvent);
       }
     };
 
