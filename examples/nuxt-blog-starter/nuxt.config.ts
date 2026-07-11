@@ -11,7 +11,11 @@ export default defineNuxtConfig({
   nitro: {
     preset: 'static',
     prerender: {
-      failOnError: false, // IPX image routes may 500 during local build
+      // Deploy sets NUXT_PRERENDER_STRICT=1 (see scripts/netlify-build.sh): fail the build
+      // on ANY prerender error — page OR IPX image route — and print the REAL error, rather
+      // than silently shipping broken images. Off by default so a local dev build without a
+      // fully-imported API/blobs can still complete despite IPX 500s.
+      failOnError: process.env.NUXT_PRERENDER_STRICT === '1',
       requestTimeout: 30000, // 30s timeout for SSG fetch requests (default 10s)
       // Cap at 2 parallel routes. Nitro defaults to 1 (serial). The
       // deployed Plone API is a single small (512MB) auto-suspending
