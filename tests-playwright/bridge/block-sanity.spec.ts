@@ -39,6 +39,7 @@ interface DiscoveredBlock {
   slateIssue?: boolean;
   field?: string;
   issues?: string[];
+  noExample?: boolean;
 }
 
 // Read discovered blocks (written by globalSetup)
@@ -84,6 +85,18 @@ test.describe('Block sanity (auto-discovered)', () => {
             `occurrence(s), e.g. ${block.pagePath}) but is not registered in the frontend's ` +
             `blocksConfig, so it renders as "Not implemented Block". Register its schema ` +
             `(customBlocks) or migrate the content to an existing type.`,
+        );
+      });
+      continue;
+    }
+    // A frontend-registered type with no content example — fails as its own
+    // test (nothing to render) rather than blocking the suite.
+    if (block.noExample) {
+      test(`${block.blockType} block has a content example to render`, () => {
+        throw new Error(
+          `Block @type "${block.blockType}" is registered in the frontend but no content ` +
+            `example exists to run its render test. Add a fixture (a page with a populated ` +
+            `instance), or mark the type restricted if it only belongs inside a parent container.`,
         );
       });
       continue;

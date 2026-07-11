@@ -756,13 +756,10 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
       if (cfg?.restricted) continue;
       if (!discoveredTypes.has(blockType)) missing.push(blockType);
     }
-    if (missing.length) {
-      throw new Error(
-        `Discovery found ${missing.length} frontend-registered block type(s) with no content ` +
-          `example to run the sanity render test against. Add a fixture (page with a populated ` +
-          `instance) or mark the type restricted if it only belongs inside a parent container.\n` +
-          missing.map((t) => `  - ${t}`).join('\n'),
-      );
+    // A registered type with no content example can't get a render test — but
+    // that is a failing test for that type, not a reason to block the suite.
+    for (const blockType of missing) {
+      result.push({ blockType, noExample: true });
     }
   }
 
