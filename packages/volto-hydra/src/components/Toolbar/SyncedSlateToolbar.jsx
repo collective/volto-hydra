@@ -1290,7 +1290,14 @@ const SyncedSlateToolbar = ({
   const blockTypeFields = blockFieldTypes?.[blockType] || {};
   const fieldType = blockTypeFields[fieldName];
   const blockIsReadonly = isBlockReadonly(block, templateEditMode);
-  const showFormatButtons = isSlateFieldType(fieldType) && !blockIsReadonly && !isMultiSelected;
+  // Text-format controls (bold/italic/link/… and the block-format dropdown) only
+  // apply while a text field is actually focused. focusedFieldName is null in block
+  // mode (block selected, no cursor) — the same signal the selection outline uses
+  // (View.jsx isTextMode). Gate on it so the format buttons don't appear on a block
+  // that isn't being text-edited (e.g. the first tap on a coarse-pointer device).
+  const isTextMode = !!blockUI?.focusedFieldName;
+  const showFormatButtons =
+    isTextMode && isSlateFieldType(fieldType) && !blockIsReadonly && !isMultiSelected;
 
   // CRITICAL: Only show Slate if we actually have a valid field value array
   const hasValidSlateValue = fieldValue && Array.isArray(fieldValue) && fieldValue.length > 0;
