@@ -304,13 +304,16 @@ function checkIntegrity(contentDir) {
     }
   }
 
-  // Pass 2c: Internal link refs in blocks. Covers any block's plain `url`
-  // string (image, hero, button, ...) and `href` link-object arrays
-  // (teaser/button/cta), walking nested blocks (sections, grids, columns)
-  // — not just the top level, so a broken CTA inside a section is caught too.
-  const isInternalPath = (u) =>
-    typeof u === 'string' && u.startsWith('/') &&
-    !u.includes('resolveuid') && !u.includes('@@') && !u.includes('/++');
+  // Pass 2c: link/media reference integrity across every block (nested included).
+  //
+  // Every reference-bearing field must point at something that EXISTS or is a
+  // recognized external/resource form. A reference the validator cannot verify
+  // is a FAILURE, not a skip. The old version only looked at `url` when it was a
+  // STRING and treated broken refs as warnings — so an image block storing
+  // `url: [{ "@id": "/images/test-image" }]` (object_browser ARRAY form) pointing
+  // at a nonexistent object was never checked, and 5 such dead blocks shipped
+  // while this gate reported "Links: N ok, 0 broken".
+  const LINK_FIELDS = ['url', 'href', 'image', 'preview_image', 'preview_image_link', 'backgroundImage'];
 
   function* walkBlocks(blocks) {
     for (const [bid, block] of Object.entries(blocks || {})) {
@@ -322,31 +325,64 @@ function checkIntegrity(contentDir) {
     }
   }
 
+  // Extract every reference string from a field value in any shape it takes:
+  //   "…"                  plain string
+  //   [{ "@id": "…" }, …]   object_browser / image array
+  //   { "@id": "…" }        single relation
+  function refStrings(val) {
+    const out = [];
+    const pushId = (o) => { if (o && typeof o === 'object' && typeof o['@id'] === 'string') out.push(o['@id']); };
+    if (typeof val === 'string') out.push(val);
+    else if (Array.isArray(val)) val.forEach(pushId);
+    else if (val && typeof val === 'object') pushId(val);
+    return out.filter((s) => s !== '');
+  }
+
+  // Classify a reference. Returns null when verified/recognized, or a reason
+  // string when it is a failure. NOTHING is silently accepted — an unrecognized
+  // form returns a reason so it fails loudly.
+  function refFailure(ref) {
+    const ru = ref.match(/resolveuid\/([a-f0-9]{10,})/);
+    if (ru) return uidMap.has(ru[1]) ? null : `broken resolveuid/${ru[1]}`;
+    if (/^https?:\/\//.test(ref)) return null;             // external — well-formed, unverifiable offline
+    if (/^(mailto:|tel:|data:)/.test(ref)) return null;    // known schemes
+    if (ref.startsWith('#')) return null;                  // in-page anchor
+    if (ref.startsWith('/') || ref.startsWith('../')) {
+      // strip ../ prefixes, scale suffixes (@@images/…) and resource views (/++…)
+      let base = ref.replace(/^(\.\.\/)+/, '');
+      if (!base.startsWith('/')) base = '/' + base;
+      base = base.split('/@@')[0].split('/++')[0].replace(/\/+$/, '') || '/';
+      return pathMap.has(base) ? null : `path not in content: ${base}`;
+    }
+    return `unrecognized reference form: ${ref.slice(0, 60)}`;
+  }
+
+  function checkBlockRefs(rel, bid, block) {
+    for (const field of LINK_FIELDS) {
+      if (!(field in block)) continue;
+      for (const ref of refStrings(block[field])) {
+        const reason = refFailure(ref);
+        if (reason) {
+          stats.linksBroken += 1;
+          errors.push(`  ${rel}: block ${bid} (${block['@type']}) ${field}: ${reason}`);
+        } else {
+          stats.linksOk += 1;
+        }
+      }
+    }
+    // object_list / column sub-items carry the same link/media fields
+    for (const key of ['items', 'columns', 'column_items']) {
+      const arr = block[key];
+      if (!Array.isArray(arr)) continue;
+      arr.forEach((it, i) => {
+        if (it && typeof it === 'object') checkBlockRefs(rel, `${bid}.${key}[${i}]`, it);
+      });
+    }
+  }
+
   for (const { rel, data } of items) {
     for (const [bid, block] of walkBlocks(data.blocks)) {
-      // Plain string url on any block (hero CTA, image, button-with-url, ...)
-      if (isInternalPath(block.url)) {
-        if (pathMap.has(block.url)) {
-          stats.linksOk += 1;
-        } else {
-          warnings.push(`  ${rel}: block ${bid} (${block['@type']}) url references missing: ${block.url}`);
-          stats.linksBroken += 1;
-        }
-      }
-      // href link-object arrays (teaser/button/cta)
-      if (Array.isArray(block.href)) {
-        for (const h of block.href) {
-          const linkId = (h && typeof h === 'object') ? (h['@id'] || '') : '';
-          if (isInternalPath(linkId)) {
-            if (pathMap.has(linkId)) {
-              stats.linksOk += 1;
-            } else {
-              warnings.push(`  ${rel}: block ${bid} href references missing: ${linkId}`);
-              stats.linksBroken += 1;
-            }
-          }
-        }
-      }
+      checkBlockRefs(rel, bid, block);
     }
   }
 
