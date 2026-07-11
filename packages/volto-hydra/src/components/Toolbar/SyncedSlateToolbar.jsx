@@ -564,21 +564,56 @@ const SyncedSlateToolbar = ({
     }
   }, [mouseActivityCounter, startFadeTimer]);
 
-  // Poll for LinkEditor (.add-link) visibility changes to detect when it closes
-  // The LinkEditor doesn't use Redux for visibility - it uses CSS opacity
-  // IMPORTANT: Use linkEditorWasVisibleRef instead of local variable because
-  // effect dependencies change frequently, causing restarts that reset local state
-  useEffect(() => {
-    let pollCount = 0;
+  // The LinkEditor (.add-link) closed: unblock the iframe with the formatRequestId and
+  // hand back the selection captured when the link button was clicked. Focus restoration
+  // then happens in the iframe (the FORM_DATA useEffect focuses the iframe element, and
+  // afterContentRender restores the field selection). Uses only refs, so it's stable and
+  // safe to call from either the event or the poll.
+  //
+  // Idempotent: guarded by activeFormatRequestIdRef (nulled after firing), so if the
+  // event AND the poll both notice the same close it's a no-op the second time.
+  const handleLinkEditorClosed = useCallback(() => {
+    if (activeFormatRequestIdRef.current) {
+      onChangeFormDataRef.current(
+        null,
+        currentSelectionRef.current,
+        activeFormatRequestIdRef.current,
+      );
+      activeFormatRequestIdRef.current = null;
+    }
+    // Don't clear pendingFlushRef here — it's cleared when the flush completes. A stale
+    // close can arrive while a new button click is pending; don't disturb it.
+  }, []);
 
+  // Event-driven close for the CANCEL path. The LinkEditor's real close signal is React
+  // state inside Volto's useLinkEditor (setShowLinkEditor(false)), which this component
+  // can't observe — the helper renders generically via persistentHelpers. Escape / cancel
+  // route through AddLinkForm.onClose (our shadow), which dispatches this event, so we
+  // react the instant it closes instead of up to 100ms later on the next poll tick — that
+  // detection gap is what raced the async selection-restore (the flaky "cancelling
+  // LinkEditor" test).
+  useEffect(() => {
+    const onClose = () => {
+      linkEditorWasVisibleRef.current = false;
+      handleLinkEditorClosed();
+    };
+    document.addEventListener('hydra:linkeditor-close', onClose);
+    return () => document.removeEventListener('hydra:linkeditor-close', onClose);
+  }, [handleLinkEditorClosed]);
+
+  // Poll fallback for close paths that do NOT route through AddLinkForm.onClose — most
+  // notably applying a link, which Volto's useLinkEditor closes directly via
+  // setShowLinkEditor(false). Converting those to events too would mean shadowing the
+  // Volto hook; the poll is a cheap safety net and the event above already makes the
+  // flaky cancel path deterministic.
+  useEffect(() => {
     const checkVisibility = () => {
       const popup = document.querySelector('.add-link');
-      pollCount++;
 
       if (!popup) {
         if (linkEditorWasVisibleRef.current) {
           linkEditorWasVisibleRef.current = false;
-          handlePopupClosed();
+          handleLinkEditorClosed();
         }
         return;
       }
@@ -587,31 +622,14 @@ const SyncedSlateToolbar = ({
       const isVisible = style.opacity !== '0' && style.display !== 'none' && style.visibility !== 'hidden';
 
       if (linkEditorWasVisibleRef.current && !isVisible) {
-        handlePopupClosed();
+        handleLinkEditorClosed();
       }
       linkEditorWasVisibleRef.current = isVisible;
     };
 
-    const handlePopupClosed = () => {
-      if (activeFormatRequestIdRef.current) {
-        // Send the formatRequestId to unblock the iframe. Focus restoration
-        // happens automatically: the FORM_DATA useEffect focuses the iframe
-        // element after React render, and afterContentRender restores the
-        // field selection inside the iframe.
-        // Use refs for stable access — this interval must not restart on every
-        // selection/form change or it can miss the popup's entire lifecycle.
-        onChangeFormDataRef.current(null, currentSelectionRef.current, activeFormatRequestIdRef.current);
-        activeFormatRequestIdRef.current = null;
-      }
-      // NOTE: Don't clear pendingFlushRef here - it will be cleared when the flush completes.
-      // The polling might detect a stale popup closing while a new button click is pending,
-      // and we don't want to interfere with that pending operation.
-    };
-
     const intervalId = setInterval(checkVisibility, 100);
     return () => clearInterval(intervalId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Stable interval — uses refs for currentSelection and onChangeFormData
+  }, [handleLinkEditorClosed]);
 
   // Helper function for applying inline format with prospective formatting support
   // Used by both hotkey transforms and toolbar button clicks

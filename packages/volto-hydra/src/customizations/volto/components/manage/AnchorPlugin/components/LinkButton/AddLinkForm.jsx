@@ -218,7 +218,17 @@ class AddLinkForm extends Component {
    * @method onClose
    * @returns {undefined}
    */
-  onClose = () => this.props.onOverrideContent(undefined);
+  onClose = () => {
+    // Tell SyncedSlateToolbar the LinkEditor closed, synchronously, so it can unblock the
+    // iframe and restore the editor selection the instant we cancel — instead of its 100ms
+    // poll noticing the DOM change up to a tick later, which raced the async selection
+    // restore (the flaky "cancelling LinkEditor does not block editor" test). The toolbar's
+    // handler is idempotent, so the poll fallback firing too is harmless. Guarded for SSR.
+    if (typeof document !== 'undefined') {
+      document.dispatchEvent(new CustomEvent('hydra:linkeditor-close'));
+    }
+    this.props.onOverrideContent(undefined);
+  };
 
   /**
    * Keydown handler
