@@ -701,46 +701,44 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
     );
   }
 
-  if (unregisteredTypes.size) {
-    const lines = [];
-    for (const [blockType, occurrences] of unregisteredTypes) {
-      const sample = occurrences.slice(0, 5).map((o) => `${o.pagePath} [${o.blockId}]`);
-      const more = occurrences.length > 5 ? ` (+ ${occurrences.length - 5} more)` : '';
-      lines.push(`  - "${blockType}": ${occurrences.length} occurrence(s) — e.g. ${sample.join(', ')}${more}`);
-    }
-    throw new Error(
-      `Discovery found ${unregisteredTypes.size} block @type(s) used in content but not registered ` +
-        `in the frontend's blocksConfig. The renderer will fall through to "Not implemented Block". ` +
-        `Either register the schema (customBlocks) or migrate the content to an existing type.\n` +
-        lines.join('\n'),
-    );
+  // A block @type used in content but not registered in the frontend's
+  // blocksConfig is a real problem (it renders as "Not implemented Block"), but
+  // it should NOT block the whole suite in globalSetup — it is just another
+  // failing test. Emit a synthetic discovered-block entry per unregistered
+  // type so block-sanity generates one failing test each, while the registered
+  // blocks still run.
+  for (const [blockType, occurrences] of unregisteredTypes) {
+    result.push({
+      blockType,
+      blockId: occurrences[0].blockId,
+      pagePath: occurrences[0].pagePath,
+      unregistered: true,
+      occurrenceCount: occurrences.length,
+    });
   }
 
-  if (shapeIssues.length) {
-    const lines = shapeIssues.flatMap((e) => [
-      `  ${e.pagePath} [${e.blockId}] (${e.blockType}):`,
-      ...e.issues.map((msg) => `    - ${msg}`),
-    ]);
-    throw new Error(
-      `Discovery found ${shapeIssues.length} block(s) whose data shape doesn't match the ` +
-        `declared widget/type in the block schema. These will crash Volto's sidebar widgets ` +
-        `(e.g. UrlWidget expecting a string but getting an array). Either fix the content ` +
-        `or update the schema.\n` +
-        lines.join('\n'),
-    );
+  // Like unregistered types, shape and slate issues are real content/schema
+  // problems but should each be a failing test rather than blocking the whole
+  // suite in globalSetup. Emit a synthetic discovered-block entry per issue.
+  for (const e of shapeIssues) {
+    result.push({
+      blockType: e.blockType,
+      blockId: e.blockId,
+      pagePath: e.pagePath,
+      shapeIssue: true,
+      issues: e.issues,
+    });
   }
 
-  if (slateIssues.length) {
-    const lines = slateIssues.flatMap((e) => [
-      `  ${e.pagePath} [${e.blockId}] field "${e.field}":`,
-      ...e.issues.map((msg) => `    - ${msg}`),
-    ]);
-    throw new Error(
-      `Discovery found ${slateIssues.length} slate field(s) with structural issues. ` +
-        `Each slate field must be a single element root with a string \`type\`; ` +
-        `text leaves must live inside an element.\n` +
-        lines.join('\n'),
-    );
+  for (const e of slateIssues) {
+    result.push({
+      blockType: e.blockType || 'slate',
+      blockId: e.blockId,
+      pagePath: e.pagePath,
+      slateIssue: true,
+      field: e.field,
+      issues: e.issues,
+    });
   }
 
   // Every block type the FRONTEND registers needs at least one content
@@ -758,13 +756,10 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
       if (cfg?.restricted) continue;
       if (!discoveredTypes.has(blockType)) missing.push(blockType);
     }
-    if (missing.length) {
-      throw new Error(
-        `Discovery found ${missing.length} frontend-registered block type(s) with no content ` +
-          `example to run the sanity render test against. Add a fixture (page with a populated ` +
-          `instance) or mark the type restricted if it only belongs inside a parent container.\n` +
-          missing.map((t) => `  - ${t}`).join('\n'),
-      );
+    // A registered type with no content example can't get a render test — but
+    // that is a failing test for that type, not a reason to block the suite.
+    for (const blockType of missing) {
+      result.push({ blockType, noExample: true });
     }
   }
 
