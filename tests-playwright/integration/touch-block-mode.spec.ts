@@ -101,4 +101,103 @@ test.describe('touch-mode word-select suppression', () => {
       'text mode must NOT suppress text selection — user wants word-select to work here',
     ).not.toBe('none');
   });
+
+  // Regression: on a touch device, moving a selected block with the mobile
+  // chevron (▲/▼) must NOT drop the block out of block mode. The user taps a
+  // block (→ block mode, chevrons appear), taps ▼ to reorder, and expects to
+  // stay on that block in block mode so they can keep nudging it. The bug:
+  // after the move the body flips out of data-hydra-edit-mode="block".
+  test('chevron move keeps the block in block mode (does not change mode)', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+
+    // Tap a block that isn't the auto-restored selection → first tap on a
+    // touch device lands in BLOCK mode (chevrons appear).
+    const block3 = iframe.locator('[data-block-uid="block-3-uuid"]').first();
+    await block3.click();
+
+    await expect
+      .poll(() => iframe.locator('body').getAttribute('data-hydra-edit-mode'))
+      .toBe('block');
+
+    const chevronDown = page.locator('.quanta-toolbar .chevron-down');
+    await expect(chevronDown).toBeVisible();
+
+    const before = await helper.getBlockOrder();
+    const idx = before.indexOf('block-3-uuid');
+    await chevronDown.click();
+
+    // Wait for the move to actually land (block-3 shifts one slot down).
+    await expect(async () => {
+      const after = await helper.getBlockOrder();
+      expect(after[idx + 1]).toBe('block-3-uuid');
+    }).toPass({ timeout: 5000 });
+
+    // The block must still be selected (chevron toolbar still up) AND still in
+    // block mode. It must not silently flip to text mode.
+    await expect(page.locator('.quanta-toolbar .chevron-down')).toBeVisible();
+    await expect
+      .poll(() => iframe.locator('body').getAttribute('data-hydra-edit-mode'))
+      .toBe('block');
+  });
+
+  // Root cause of "moving a block in a grid flips block→text": after the move a
+  // Volto-style frontend (volto-light-theme) re-renders and REFOCUSES its own
+  // contenteditable slate field. hydra's document 'focus' listener treats any
+  // field focus inside the selected block as "user is editing text" and sets
+  // focusedFieldName — which the admin reads as text mode (format buttons appear),
+  // even though editMode is still 'block'. A focus the FRONTEND initiated must not
+  // drag the editor into text mode while in block mode. (Simple client frontends
+  // like the mock/nuxt examples don't refocus on re-render, so the field focus is
+  // simulated here — that's the frontend's contribution, not a user gesture.)
+  test('a frontend refocusing a field while in BLOCK mode must not flip to text mode', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+    // Read hydra's own state (the source of truth) rather than the admin toolbar,
+    // which lags behind by a postMessage round-trip. focusedFieldName is the
+    // text-mode signal the admin reads to surface the format toolbar.
+    const bridgeState = () =>
+      iframe.locator('body').evaluate(() => {
+        const b = (window as { __hydraBridge?: { focusedFieldName?: string | null; editMode?: string } }).__hydraBridge;
+        return { field: b?.focusedFieldName ?? null, mode: b?.editMode ?? null };
+      });
+    const block = iframe.locator('[data-block-uid="block-3-uuid"]').first();
+
+    // Establish CLEAN block mode: tap to text, then Escape back to block. Escape
+    // (stepUp) clears focusedFieldName and makes the field non-editable — the
+    // exact state a user is in before reordering a block.
+    await block.click();
+    await block.click();
+    await expect.poll(bridgeState).toEqual({ field: 'value', mode: 'text' });
+    await page.keyboard.press('Escape');
+    await expect.poll(bridgeState).toEqual({ field: null, mode: 'block' });
+
+    // Simulate the frontend refocusing its contenteditable slate field on
+    // re-render (what Volto does after a move). The editable field may be a
+    // descendant (mock) OR the block element itself (nuxt).
+    const field = iframe
+      .locator(
+        '[data-block-uid="block-3-uuid"] [data-edit-text], [data-block-uid="block-3-uuid"][data-edit-text]',
+      )
+      .first();
+    await field.evaluate((el) => {
+      el.setAttribute('contenteditable', 'true');
+      (el as HTMLElement).focus();
+    });
+
+    // In BLOCK mode a FRONTEND-initiated focus is not the user asking to edit
+    // text, so hydra must NOT record a focusedFieldName (which would flip the
+    // admin into text mode / surface the format toolbar). editMode stays 'block'.
+    await expect.poll(bridgeState).toEqual({ field: null, mode: 'block' });
+  });
 });

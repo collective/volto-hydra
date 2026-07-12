@@ -3771,6 +3771,19 @@ export class Bridge {
             // Focus changed within the currently selected block
             const editableField = target.getAttribute('data-edit-text');
             if (editableField) {
+              // In block mode the user is manipulating the block, not editing
+              // text. A focus event the FRONTEND initiated — e.g. Volto (or any
+              // frontend that renders its own contenteditable slate) refocusing
+              // the field after re-rendering the block on a move/reorder — must
+              // NOT set focusedFieldName. focusedFieldName is the admin's text-
+              // mode signal (it surfaces the format toolbar), so setting it here
+              // silently flips block mode into text mode. Genuine text entry
+              // goes through the click handler, which sets editMode='text'
+              // BEFORE the field is focused, so this guard doesn't block it.
+              if (this.editMode === 'block') {
+                log('Field focus ignored — in block mode:', editableField);
+                return;
+              }
               log('Field focused:', editableField);
               const previousFieldName = this.focusedFieldName;
               this.focusedFieldName = editableField;

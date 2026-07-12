@@ -821,6 +821,51 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     ).toBeLessThanOrEqual(canvas.y + canvas.height + 1);
   });
 
+  test("a nested block's '+' pulled inside for lack of room stays at the block's TOP, not bottom", async ({
+    page,
+  }) => {
+    // A nested block adds its next sibling to the RIGHT ('right' add direction).
+    // On a narrow phone a full-width nested block has no room to the right, so the
+    // '+' is pulled INSIDE the block (isConstrained). Only the horizontal axis was
+    // constrained, so the button must keep its vertical position at the block's
+    // TOP-right — it was just "moved in a bit". Dropping it to the BOTTOM-right
+    // changes an axis that wasn't constrained and reads as the button teleporting
+    // to the wrong corner. (On admin-mock the grid renders as narrow columns so
+    // the '+' fits in the gutter unconstrained — still top — so this asserts the
+    // same invariant on both frontends; the constrained path is exercised on
+    // admin-nuxt, where the grid stacks full-width.)
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+    await helper.getStableBlockCount();
+
+    const iframe = helper.getIframe();
+    await helper.clickBlockInIframe('grid-cell-1');
+
+    const block = iframe.locator('[data-block-uid="grid-cell-1"]').first();
+    const addBtn = page.locator('.volto-hydra-add-button');
+    await expect(addBtn).toBeVisible({ timeout: 10000 });
+
+    await expect
+      .poll(
+        async () => {
+          const add = await addBtn.boundingBox();
+          const blk = await block.boundingBox();
+          if (!add || !blk) return 'missing';
+          const nearTop = Math.abs(add.y - blk.y) <= 40;
+          const nearBottom =
+            Math.abs(add.y + add.height - (blk.y + blk.height)) <= 40;
+          // Bottom-anchored (and NOT also near a short block's top) is the bug.
+          if (nearBottom && !nearTop) return 'bottom';
+          if (nearTop) return 'top';
+          return 'elsewhere';
+        },
+        { timeout: 10000 },
+      )
+      .toBe('top');
+  });
+
   test('Settings icon in bottom toolbar opens the sidebar (no ⋯ detour)', async ({
     page,
   }) => {

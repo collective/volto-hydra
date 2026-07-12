@@ -5034,17 +5034,20 @@ const Iframe = (props) => {
                 ? iframeRect.left + blockUI.rect.left + blockUI.rect.width + 8
                 : iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth;
 
-              let isConstrained = false;
               const iframeRight = iframeRect.left + iframeRect.width;
               if (addLeft + buttonWidth > iframeRight) {
+                // No room to the right — pull the '+' INSIDE the block horizontally.
                 addLeft = iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth - 8;
-                isConstrained = true;
               }
 
               if (isRightDirection) {
-                addTop = isConstrained
-                  ? iframeRect.top + blockUI.rect.top + blockUI.rect.height - buttonHeight - 8
-                  : iframeRect.top + blockUI.rect.top;
+                // A right-add pulled inside for lack of room was only constrained
+                // on the horizontal axis, so keep the button at the block's
+                // TOP-right — it was just nudged in. Dropping it to the block's
+                // bottom would move it on an axis that never overflowed. The
+                // vertical clamp below still pulls it up if a tall block would
+                // push it past the canvas bottom.
+                addTop = iframeRect.top + blockUI.rect.top;
               } else {
                 addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;
               }
@@ -5053,7 +5056,7 @@ const Iframe = (props) => {
               // BELOW the block puts it outside the canvas whenever the block ends at the
               // canvas edge — on a phone that is on top of the bottom toolbar, where it
               // paints over Save/Cancel and swallows their clicks. Pull it back INSIDE the
-              // block (same move `isConstrained` makes horizontally) rather than let it
+              // block (same move the horizontal clamp above makes) rather than let it
               // escape. Clamp the top edge too, for a block taller than the canvas.
               const iframeBottom = iframeRect.top + iframeRect.height;
               if (addTop + buttonHeight > iframeBottom) {
