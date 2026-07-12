@@ -40,13 +40,15 @@ echo "=== Building prod (SSG) ==="
 # must fail the deploy, not ship a site with missing images. set -o pipefail (top) makes
 # the non-zero `generate` exit propagate through the `tee`.
 NUXT_PRERENDER_STRICT=1 pnpm run generate 2>&1 | tee nuxt-generate.log
-# Backstop for the non-strict path: if anything still logged a [500] (page OR image)
-# without aborting, refuse to ship. (With strict on, `generate` already exited non-zero
-# above and set -e stopped us before here — this only bites if strict is somehow off.)
-if grep -qE '\[500\]' nuxt-generate.log; then
+# Backstop: refuse to ship if the prerender logged a Server Error ([500]) OR a filesystem
+# write error (ENOTDIR/EEXIST). failOnError only catches prerender FETCH errors; a write
+# collision — e.g. a Plone Image id ending in .jpg rendered both bare (a FILE) and via
+# image_scales `<id>/@@images/image-1800.jpeg` (a DIRECTORY) → `ENOTDIR mkdir <id>/@@images`
+# — is logged as ERROR but `nuxt generate` still exits 0, silently dropping that image.
+if grep -qE '\[500\]|ENOTDIR|EEXIST' nuxt-generate.log; then
   echo >&2
-  echo "ERROR: prerender produced a Server Error (page or image route) — refusing to ship a broken site:" >&2
-  grep -B2 -E -- '\[500\]' nuxt-generate.log >&2
+  echo "ERROR: prerender produced a Server Error or dropped an image (write collision) — refusing to ship a broken site:" >&2
+  grep -B2 -E -- '\[500\]|ENOTDIR|EEXIST' nuxt-generate.log >&2
   rm -f nuxt-generate.log
   exit 1
 fi

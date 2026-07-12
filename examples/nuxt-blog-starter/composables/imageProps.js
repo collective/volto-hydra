@@ -114,8 +114,12 @@ export default function imageProps(block, bgStyles=false, imageField='image') {
         // image block with image_field and url
         image_url = `${image_url}/@@images/${block?.image_field}`;
     }
-    else if (block['@type'] == "image" && !image_url.includes('@@images') && !image_url.includes('@@download') && !image_url.includes('@@display-file') && !image_url.startsWith('data:')) {
-        // image block without scale info - add default image scale
+    else if ((block['@type'] == "image" || block['@type'] == "Image") && !image_url.includes('@@images') && !image_url.includes('@@download') && !image_url.includes('@@display-file') && !image_url.startsWith('data:')) {
+        // image block ("image") or a Plone Image content reference ("Image", e.g. a
+        // slider slide preview_image whose id ends in .jpg) without scale info —
+        // resolve through the @@images/image traversal. This keeps the id a
+        // DIRECTORY on disk during SSG; rendering it bare (a file) collides with the
+        // image_scales form (`<id>/@@images/image-1800.jpeg`, a directory) → ENOTDIR.
         image_url = `${image_url}/@@images/image`;
     }
     else if (!image_url.startsWith('data:') && !image_url.includes('@@images') && !image_url.includes('@@download') && !image_url.includes('@@display-file') && !/\.[a-zA-Z]+$/.test(image_url)) {
