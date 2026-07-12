@@ -3532,6 +3532,12 @@ export class Bridge {
       const isHydraView = window.name.startsWith('hydra-view:') || (editParam === 'false');
       const hydraBridgeEnabled = isHydraEdit || isHydraView || editParam !== null;
       const isEditMode = isHydraEdit;
+      // Remember whether this bridge is in EDIT mode. View mode has no block
+      // selection / inline editing, so edit-only keyboard handling (the Escape
+      // step-up machine) must not run there — otherwise it hijacks the
+      // frontend's own Escape (e.g. closing a search box) and sends the admin a
+      // deselect it can't handle (no onSelectBlock in view mode).
+      this._isEditMode = isEditMode;
 
       // Extract admin origin from iframe name
       if ((isHydraEdit || isHydraView) && !this.adminOrigin) {
@@ -4496,8 +4502,13 @@ export class Bridge {
 
         const activeEditField = document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]');
 
-        // === Escape: three-state machine (works in all modes) ===
+        // === Escape: three-state machine (edit mode only) ===
         if (e.key === 'Escape') {
+          // View mode has nothing to step up (no selection/editing) and its
+          // admin has no onSelectBlock handler. Don't hijack the frontend's own
+          // Escape (e.g. closing a search box) or send a deselect it can't
+          // handle — let Escape pass through to the page.
+          if (!this._isEditMode) return;
           // Don't interfere with slash menu, modals, dropdowns
           if (this._slashMenuActive) return;
           const isInPopup = e.target?.closest?.('.volto-hydra-dropdown-menu, .blocks-chooser, [role="dialog"]');
