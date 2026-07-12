@@ -285,7 +285,7 @@ onMounted(() => {
                         properties: {
                             items: {
                                 title: 'Blocks',
-                                allowedBlocks: [...new Set(['slate', 'image', 'video', 'gridBlock', 'teaser', 'listing', 'summary', 'default', 'section', 'contextNavigation', ...pageLevelBlocks])],
+                                allowedBlocks: [...new Set(['slate', 'image', 'separator', 'video', 'gridBlock', 'teaser', 'listing', 'summary', 'default', 'section', 'contextNavigation', ...pageLevelBlocks])],
                                 allowedTemplates: ['/_test_data/templates/test-layout'],
                                 allowedLayouts: CONTENT_TYPE_LAYOUTS[pageType]
                                     || contextNavLayoutForced.value
