@@ -290,6 +290,17 @@ const SyncedSlateToolbar = ({
     return false;
   };
 
+  // Nesting depth: number of container ancestors (page-level = 0).
+  const depthOf = (id) => {
+    let d = 0;
+    let cur = blockPathMap?.[id]?.parentId;
+    while (cur && cur !== PAGE_BLOCK_UID) {
+      d++;
+      cur = blockPathMap?.[cur]?.parentId;
+    }
+    return d;
+  };
+
   // Returns the MOVE_BLOCKS payload for the next accepting slot in
   // direction, or null if there isn't one (chevron should be disabled).
   const findMoveTarget = (direction) => {
@@ -313,9 +324,21 @@ const SyncedSlateToolbar = ({
       // No allowedSiblingTypes recorded → assume permissive (top-level
       // page-children commonly have no explicit restriction).
       if (!sourceType || !allowed || allowed.includes(sourceType)) {
+        // When the target is DEEPER than the source, the block is entering a
+        // container rather than swapping with a same-level sibling. The nearest
+        // block in that direction is the container's edge child closest to the
+        // source (its LAST child when moving up, its FIRST when moving down), so
+        // the block should land at the FAR edge — the container's end when
+        // arriving from below (up), its start when arriving from above (down).
+        // Inserting on the near side instead drops it one slot short (the
+        // reported "lands in the middle"). Flip insertAfter for that case; a
+        // same-level or shallower target keeps the normal sibling behaviour.
+        const enteringContainer = depthOf(candidateId) > depthOf(selectedBlock);
         return {
           targetBlockId: candidateId,
-          insertAfter: direction === 'down',
+          insertAfter: enteringContainer
+            ? direction === 'up'
+            : direction === 'down',
           targetParentId: candidateInfo.parentId === PAGE_BLOCK_UID ? null : candidateInfo.parentId,
         };
       }

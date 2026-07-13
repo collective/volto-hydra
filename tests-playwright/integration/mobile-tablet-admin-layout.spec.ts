@@ -603,6 +603,36 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     }).toPass({ timeout: 5000 });
   });
 
+  test('chevron ▲ into a grid from below lands at the grid END, not the middle', async ({
+    page,
+  }) => {
+    // A block sitting just below a grid, moved up, enters the grid from below.
+    // It must land as the LAST child (the grid's end), not before the last child
+    // (the "lands in the middle" bug). Entering a container from below = far edge.
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/grid-slates-test-page');
+
+    const iframe = helper.getIframe();
+    const gridOrder = () =>
+      iframe
+        .locator('[data-block-uid="gs-grid"] [data-block-uid]')
+        .evaluateAll((els) => els.map((e) => e.getAttribute('data-block-uid')));
+
+    expect(await gridOrder()).toEqual(['gs-slate-1', 'gs-slate-2', 'gs-slate-3']);
+
+    // gs-after is the page-level slate directly below the grid.
+    await iframe.locator('[data-block-uid="gs-after"]').first().click();
+    const chevronUp = page.locator('.quanta-toolbar .chevron-up');
+    await expect(chevronUp).toBeVisible();
+    await chevronUp.click();
+
+    await expect
+      .poll(gridOrder)
+      .toEqual(['gs-slate-1', 'gs-slate-2', 'gs-slate-3', 'gs-after']);
+  });
+
   /**
    * Every popup the admin surfaces should render as a bottom sheet on
    * mobile — same geometry, same gesture. Assert each known popup's
