@@ -748,17 +748,25 @@ class Form extends Component {
               onSelectBlock={this.onSelectBlock}
             />
             <UndoToolbar
-              state={{
-                formData,
-                selected: this.props.uiState.selected,
-                multiSelected: this.props.uiState.multiSelected,
-              }}
+              // Track CONTENT (formData) only. useUndoManager/Undoo saves a new
+              // snapshot whenever the tracked state changes, and dedupes only
+              // against the immediately-current one. Including selection made
+              // every selection change a snapshot — and, worse, after an undo the
+              // iframe re-settles the selection, so the re-render saved a
+              // DUPLICATE-formData entry (same content, different selection). That
+              // wasted an undo step on an invisible selection change: undo the
+              // remove, then the next press reverts selection-only and the move
+              // before it becomes unreachable. selected/multiSelected were never
+              // actually restored on undo anyway (selection is uiState/props, not
+              // Form state — setState(state) wrote phantom fields), so dropping
+              // them loses nothing and makes each undo map to one edit.
+              state={{ formData }}
               enableHotKeys
               onUndoRedo={({ state }) => {
                 if (this.props.global) {
                   this.props.setFormData(state.formData);
                 }
-                return this.setState(state);
+                return this.setState({ formData: state.formData });
               }}
             />
           </Container>
