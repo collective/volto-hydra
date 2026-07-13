@@ -248,4 +248,60 @@ test.describe('touch-mode word-select suppression', () => {
     // block-1 must not hijack it.
     await expect.poll(bridgeState).toEqual({ sel: 'block-3-uuid', mode: 'block' });
   });
+
+  // End-to-end (real user actions, not a simulated event): a slate block inside a
+  // grid. The invariant under test is "focusedFieldName is non-null ONLY in text
+  // mode" — the admin surfaces the slate format toolbar off focusedFieldName, so
+  // if a select or a move leaves it set in block mode, the user sees block handles
+  // AND the text toolbar at once ("block mode to slate"). Assert both hydra's own
+  // focusedFieldName (deterministic) and the admin's Bold button (user-facing).
+  const gridSlateState = (iframe: import('@playwright/test').FrameLocator) =>
+    iframe.locator('body').evaluate(() => {
+      const b = (window as { __hydraBridge?: { focusedFieldName?: string | null; editMode?: string } }).__hydraBridge;
+      return { field: b?.focusedFieldName ?? null, mode: b?.editMode ?? null };
+    });
+
+  test('selecting a slate inside a grid lands in block mode with no text toolbar', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/grid-slates-test-page');
+
+    const iframe = helper.getIframe();
+    const slate = iframe.locator('[data-block-uid="gs-slate-1"]').first();
+    await slate.scrollIntoViewIfNeeded();
+    await slate.click();
+
+    // First tap on a touch device = block mode, and block mode has no focused
+    // text field, so no format toolbar.
+    await expect.poll(() => gridSlateState(iframe)).toEqual({ field: null, mode: 'block' });
+    await expect(helper.getQuantaToolbarFormatButton('Bold')).toHaveCount(0);
+  });
+
+  test('moving a slate inside a grid keeps block mode with no text toolbar', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/grid-slates-test-page');
+
+    const iframe = helper.getIframe();
+    const slate = iframe.locator('[data-block-uid="gs-slate-1"]').first();
+    await slate.scrollIntoViewIfNeeded();
+    await slate.click();
+    await expect.poll(() => gridSlateState(iframe)).toEqual({ field: null, mode: 'block' });
+
+    // Move it down within the grid.
+    const chevronDown = page.locator('.quanta-toolbar .chevron-down');
+    await expect(chevronDown).toBeVisible();
+    await chevronDown.click();
+
+    // The move re-renders the slate; the frontend may refocus its field, but the
+    // block must stay in block mode with no text toolbar throughout.
+    await expect(async () => {
+      expect(await gridSlateState(iframe)).toEqual({ field: null, mode: 'block' });
+      expect(await helper.getQuantaToolbarFormatButton('Bold').count()).toBe(0);
+    }).toPass({ timeout: 3000 });
+  });
 });

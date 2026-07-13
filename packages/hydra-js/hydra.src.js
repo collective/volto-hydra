@@ -189,17 +189,41 @@ export class Bridge {
     // @media (pointer: coarse). That CSS is what stops iOS long-press =
     // word-select from firing while we're in block mode.
     let _editMode = 'text';
+    let _focusedFieldName = null;
     Object.defineProperty(this, 'editMode', {
       get: () => _editMode,
       set: (v) => {
         _editMode = v;
+        // Invariant (see focusedFieldName below): block mode has no focused text
+        // field. Clearing on the transition drops any field a frontend focus set
+        // moments earlier — e.g. the tap that selects a block focuses its
+        // contenteditable (setting focusedFieldName) a beat BEFORE the click
+        // handler flips us to block mode. Without this, block mode would keep a
+        // stale focusedFieldName and the admin would show the text toolbar.
+        if (v === 'block') _focusedFieldName = null;
         this._syncEditModeAttribute();
       },
       enumerable: true,
       configurable: true,
     });
     this.multiSelectedBlockUids = []; // Array of block UIDs in multi-selection
-    this.focusedFieldName = null; // Track which editable field within the block has focus
+    // focusedFieldName = which editable text field within the block has focus. It
+    // is the admin's TEXT-mode signal: a non-null value surfaces the slate format
+    // toolbar. Guard it as an accessor so the invariant holds from ONE place
+    // instead of the ~10 sites that assign it: it may be non-null only in text
+    // mode. Frontends fire focus/selectionchange on their own contenteditable
+    // during re-renders (e.g. autofocusing a field after a move/reorder) — those
+    // must never flip block mode into text mode. In block mode the assignment is
+    // dropped; a real user re-enters text via a tap (which sets editMode='text'
+    // first, so genuine editing is unaffected).
+    Object.defineProperty(this, 'focusedFieldName', {
+      get: () => _focusedFieldName,
+      set: (v) => {
+        _focusedFieldName = v && _editMode === 'block' ? null : v;
+      },
+      enumerable: true,
+      configurable: true,
+    });
     this.focusedLinkableField = null; // Track which linkable field has focus (for link editing)
     this.focusedMediaField = null; // Track which media field has focus (for image selection)
     this.isInlineEditing = false;
@@ -3109,9 +3133,18 @@ export class Bridge {
     const linkableFields = elementForFields ? this.getLinkableFields(elementForFields) : {};
     const mediaFields = elementForFields ? this.getMediaFields(elementForFields) : {};
     const addDirection = elementForFields ? this.getAddDirection(elementForFields) : 'bottom';
-    const focusedFieldName = options.focusedFieldName !== undefined
-      ? options.focusedFieldName
-      : this.focusedFieldName;
+    // Text-mode invariant at the ONE boundary that reaches the admin:
+    // focusedFieldName is the admin's text-mode signal (it surfaces the slate
+    // format toolbar), so it may be non-null only in text mode. Force null in
+    // block mode regardless of what the caller passes — a stale field, or one a
+    // frontend focus/selectionchange set during a re-render, must never flip
+    // block mode into text mode. Media/linkable fields pass through (they're
+    // needed for image/link blocks in block mode too).
+    const focusedFieldName = this.editMode === 'block'
+      ? null
+      : options.focusedFieldName !== undefined
+        ? options.focusedFieldName
+        : this.focusedFieldName;
     const focusedLinkableField = options.focusedLinkableField !== undefined
       ? options.focusedLinkableField
       : this.focusedLinkableField;
