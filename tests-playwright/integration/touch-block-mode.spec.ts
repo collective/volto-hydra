@@ -200,4 +200,52 @@ test.describe('touch-mode word-select suppression', () => {
     // admin into text mode / surface the format toolbar). editMode stays 'block'.
     await expect.poll(bridgeState).toEqual({ field: null, mode: 'block' });
   });
+
+  // "Worse version": moving a CONTAINER (e.g. a grid) in block mode. After the
+  // move the Volto frontend re-renders and autofocuses the container's FIRST
+  // CHILD field — a DIFFERENT block than the selected grid. hydra's focus
+  // listener then runs selectBlock(child), hijacking the selection off the grid
+  // onto the child (and leaving the grid's expand handles behind → confused
+  // mode). A focus the frontend initiated must not change which block is
+  // selected while in block mode.
+  test('a frontend focusing a DIFFERENT block while in BLOCK mode must not move the selection', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const iframe = helper.getIframe();
+    const bridgeState = () =>
+      iframe.locator('body').evaluate(() => {
+        const b = (window as { __hydraBridge?: { selectedBlockUid?: string | null; editMode?: string } }).__hydraBridge;
+        return { sel: b?.selectedBlockUid ?? null, mode: b?.editMode ?? null };
+      });
+
+    // Clean block mode on block-3 (tap→text, Escape→block).
+    const block = iframe.locator('[data-block-uid="block-3-uuid"]').first();
+    await block.click();
+    await block.click();
+    await expect
+      .poll(() => iframe.locator('body').getAttribute('data-hydra-edit-mode'))
+      .toBe('text');
+    await page.keyboard.press('Escape');
+    await expect.poll(bridgeState).toEqual({ sel: 'block-3-uuid', mode: 'block' });
+
+    // Simulate the frontend autofocusing a DIFFERENT block's field on re-render
+    // (what Volto does to the grid's first child after moving the grid).
+    const otherField = iframe
+      .locator(
+        '[data-block-uid="block-1-uuid"] [data-edit-text], [data-block-uid="block-1-uuid"][data-edit-text]',
+      )
+      .first();
+    await otherField.evaluate((el) => {
+      el.setAttribute('contenteditable', 'true');
+      (el as HTMLElement).focus();
+    });
+
+    // Selection must STAY on block-3 in block mode — the frontend's focus on
+    // block-1 must not hijack it.
+    await expect.poll(bridgeState).toEqual({ sel: 'block-3-uuid', mode: 'block' });
+  });
 });

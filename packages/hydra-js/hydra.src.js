@@ -3744,6 +3744,21 @@ export class Bridge {
             const blockUid = blockElement?.getAttribute('data-block-uid');
             if (!blockUid || !this.selectedBlockUid) return;
 
+            // Focus tracking is a TEXT-mode concern. This listener exists to (a)
+            // follow the caret to a different block (Tab) and (b) record which
+            // field is focused so the admin shows the right format toolbar — both
+            // only meaningful while editing text. In BLOCK mode, selection is
+            // driven by taps and the chevrons, so a focus event here is
+            // FRONTEND-initiated (e.g. Volto autofocusing a container's first
+            // child after re-rendering it on a move) rather than a user gesture.
+            // Acting on it hijacks selection (jumping off a moved grid onto its
+            // first child, leaving the grid's handles behind) or sets
+            // focusedFieldName (silently flipping to the text toolbar). Ignore
+            // all focus in block mode; a real user re-enters text via a tap,
+            // which goes through the click handler (it sets editMode='text'
+            // BEFORE focusing, so genuine editing is unaffected).
+            if (this.editMode === 'block') return;
+
             if (blockUid !== this.selectedBlockUid) {
               // Skip if block-selector or arrow-key navigation is in progress —
               // those flows manage their own block selection
@@ -3771,19 +3786,6 @@ export class Bridge {
             // Focus changed within the currently selected block
             const editableField = target.getAttribute('data-edit-text');
             if (editableField) {
-              // In block mode the user is manipulating the block, not editing
-              // text. A focus event the FRONTEND initiated — e.g. Volto (or any
-              // frontend that renders its own contenteditable slate) refocusing
-              // the field after re-rendering the block on a move/reorder — must
-              // NOT set focusedFieldName. focusedFieldName is the admin's text-
-              // mode signal (it surfaces the format toolbar), so setting it here
-              // silently flips block mode into text mode. Genuine text entry
-              // goes through the click handler, which sets editMode='text'
-              // BEFORE the field is focused, so this guard doesn't block it.
-              if (this.editMode === 'block') {
-                log('Field focus ignored — in block mode:', editableField);
-                return;
-              }
               log('Field focused:', editableField);
               const previousFieldName = this.focusedFieldName;
               this.focusedFieldName = editableField;
