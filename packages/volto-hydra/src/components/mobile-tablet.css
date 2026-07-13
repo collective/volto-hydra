@@ -245,15 +245,14 @@
    *
    * After this: 4–5 buttons remain, all fit within 375px, primary CTA
    * is always rightmost. */
-  /* Hide secondary actions that don't fit on a 375px compact bar:
-   *   - .redo: paired with Undo, but the user prioritised Undo only
-   * .undo is intentionally NOT hidden — it belongs on the edit bar.
+  /* Hide secondary actions that don't fit on a 375px compact bar.
+   * .undo AND .redo both stay on the edit bar: Redo was previously hidden,
+   * but on a phone there's no keyboard for Ctrl+Y, so hiding the button left
+   * redo completely unreachable. Undo + Redo + Save/Cancel still fit within
+   * 375px.
    * .user (Personal tools) is hidden in EDIT mode only (see rule
    * below) — it stays visible in VIEW mode per the user's mobile
    * toolbar mockup (leftmost icon). */
-  #toolbar-body .redo {
-    display: none !important;
-  }
   /* In EDIT mode hide the Frontend & Viewport switcher AND Personal
    * tools from the bottom bar — editors need Undo + Cancel + Save more
    * than meta actions during inline edits. Both still reachable via ⋯.

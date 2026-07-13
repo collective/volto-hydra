@@ -1715,6 +1715,26 @@ test.describe('Admin layout — mobile (≤767px)', () => {
     await expect(undoBtn).toBeEnabled();
   });
 
+  test('edit mode: Redo button is visible on mobile (reachable without a keyboard)', async ({
+    page,
+  }) => {
+    // Redo used to be hidden on the compact mobile bar, leaving it unreachable
+    // on a phone (no Ctrl+Y). It must render on the edit bar within the viewport.
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    const redoBtn = page.locator('#toolbar-body .redo');
+    await expect(redoBtn).toBeVisible({ timeout: 3000 });
+    const box = await redoBtn.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(376);
+    // On a fresh page there's nothing to redo, so it's present but disabled —
+    // that's correct; the point is it's reachable once there's redo history.
+  });
+
   /**
    * Stronger-than-toBeVisible tests: assert a panel is actually opaquely
    * rendered on top of the page content, not just present in the DOM.
