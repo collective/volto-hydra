@@ -1694,6 +1694,105 @@ export class Bridge {
   }
 
   /**
+   * Chevron (mobile up/down) move target, computed from RENDER geometry and the
+   * SAME edge machinery the container edge-handles use — not a data-order tree
+   * walk. Moving `blockUid` one visual step in `direction` ('up'|'down') is one
+   * of three things, decided by what is rendered adjacent to it:
+   *   - the neighbour in that direction is a container it may enter → DESCEND to
+   *     that container's near edge (reusing _computeEdgePlan 'absorb', same as
+   *     dragging the container's edge over the block);
+   *   - there's a plain sibling in that direction → SWAP with it in this region;
+   *   - it's at its own container's edge with nothing beyond → EXIT to the parent
+   *     (reusing _computeEdgePlan 'expel').
+   * Returns the { targetBlockId, insertAfter, targetParentId } for the existing
+   * MOVE_BLOCKS → moveBlockBetweenContainers container API, or null (chevron
+   * disabled). Siblings come from _getSiblingsByDomOrder, i.e. render order.
+   */
+  _computeChevronMove(blockUid, direction) {
+    if (!blockUid || blockUid === PAGE_BLOCK_UID) return null;
+    const info = this.blockPathMap?.[blockUid];
+    if (!info) return null;
+    if (this._filterMutableBlockUids([blockUid], 'move').length === 0) return null;
+
+    const parentId = info.parentId;
+    const down = direction === 'down';
+    const FAR = 1e7;
+
+    // Render-order siblings sharing this block's region.
+    const siblings = this._getSiblingsByDomOrder(null, parentId).filter(
+      (id) => this.blockPathMap?.[id]?.region === info.region,
+    );
+    const idx = siblings.indexOf(blockUid);
+    if (idx < 0) return null;
+    const neighborId = siblings[down ? idx + 1 : idx - 1];
+
+    const edgeCursor = (uid, edge, mode) => {
+      const el = this.queryBlockElement(uid);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      // Mirror _positionEdgeHandles.planFor: cursor "as far as possible" in the
+      // outward (absorb) or inward (expel) direction for this edge.
+      if (mode === 'absorb') {
+        return edge === 'top' ? r.top - FAR : r.bottom + FAR;
+      }
+      return edge === 'bottom' ? r.top - FAR : r.bottom + FAR;
+    };
+
+    if (neighborId) {
+      // Try to DESCEND into the neighbour if it's a container that accepts us.
+      // Guard on the neighbour actually being a container (has children) —
+      // _computeEdgePlan treats a childless leaf as an empty container with a
+      // permissive childAllowed, which would let a block "enter" e.g. an image.
+      const neighborChildren = this._getSiblingsByDomOrder(null, neighborId);
+      const enterEdge = down ? 'top' : 'bottom';
+      const cursor = neighborChildren.length
+        ? edgeCursor(neighborId, enterEdge, 'absorb')
+        : null;
+      const plan =
+        cursor != null
+          ? this._computeEdgePlan(neighborId, enterEdge, 'absorb', cursor)
+          : { kind: 'none', blocks: [] };
+      if (plan.kind === 'absorb' && plan.blocks.includes(blockUid)) {
+        const ownChildren = this._getSiblingsByDomOrder(null, neighborId);
+        const insertAfter = enterEdge === 'bottom';
+        const target = ownChildren.length
+          ? insertAfter
+            ? ownChildren[ownChildren.length - 1]
+            : ownChildren[0]
+          : neighborId;
+        return { targetBlockId: target, insertAfter, targetParentId: neighborId };
+      }
+      // Otherwise SWAP with the neighbour inside this region.
+      return {
+        targetBlockId: neighborId,
+        insertAfter: down,
+        targetParentId: parentId === PAGE_BLOCK_UID ? null : parentId,
+      };
+    }
+
+    // No neighbour in this direction → at the container's edge → EXIT to parent.
+    if (parentId && parentId !== PAGE_BLOCK_UID) {
+      const exitEdge = down ? 'bottom' : 'top';
+      const cursor = edgeCursor(parentId, exitEdge, 'expel');
+      const plan =
+        cursor != null
+          ? this._computeEdgePlan(parentId, exitEdge, 'expel', cursor)
+          : { kind: 'none', blocks: [] };
+      if (plan.kind === 'expel' && plan.blocks.includes(blockUid)) {
+        const cInfo = this.blockPathMap?.[parentId];
+        const grandparent = cInfo?.parentId;
+        return {
+          targetBlockId: parentId,
+          insertAfter: down,
+          targetParentId:
+            grandparent && grandparent !== PAGE_BLOCK_UID ? grandparent : null,
+        };
+      }
+    }
+    return null;
+  }
+
+  /**
    * Filter a list of block UIDs to those that can be mutated by `op`.
    * Single source of truth for locked-block protection on the iframe side.
    * op: 'delete' | 'move' | 'edit'.
@@ -3203,6 +3302,12 @@ export class Bridge {
       // (per docs/architecture.md). Iframe keeps invisible event-capture
       // divs at the same coords for mousedown.
       canResize: this._lastCanResize || null,
+      // Chevron (mobile up/down) move targets, computed HERE from render geometry
+      // (reusing _computeEdgePlan) rather than by a data-order walk in the admin.
+      // The admin uses them for the chevrons' enabled state and, on press,
+      // dispatches the target straight through the existing MOVE_BLOCKS path.
+      moveUpTarget: blockUid && blockUid !== PAGE_BLOCK_UID ? this._computeChevronMove(blockUid, 'up') : null,
+      moveDownTarget: blockUid && blockUid !== PAGE_BLOCK_UID ? this._computeChevronMove(blockUid, 'down') : null,
       isMultiElement: blockUid && blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid).length > 1 : false,
     };
 

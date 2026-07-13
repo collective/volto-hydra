@@ -197,203 +197,14 @@ const SyncedSlateToolbar = ({
     return updateBlockById(form, blockPathMap, blockId, newBlockData);
   }, [form, blockPathMap]);
 
-  // ──────────────────────────────────────────────────────────────
-  // Chevron move buttons (mobile #145).
-  //
-  // ONE rule covers every case (within-parent swap, INTO a container,
-  // ESCAPE out, SKIP past a rejecting container):
-  //
-  //   Move the source to the immediately-previous (or immediately-next)
-  //   position in the document's PRE-ORDER traversal that accepts the
-  //   source block's @type. The dispatch is always "insert source
-  //   BEFORE/AFTER the candidate block in the candidate's container".
-  //
-  // Why this is general AND simple:
-  //   - within-parent swap: predecessor in pre-order IS the sibling above
-  //     → insert before sibling = swap.
-  //   - ESCAPE out: when source sits at the top of an inner container,
-  //     pre-order's predecessor is the inner container itself. Its slot
-  //     (in cols/columns object_list) usually rejects the source type,
-  //     so we walk further back to the OUTER container (e.g. columns-1)
-  //     whose slot (at page) DOES accept → land just before that outer
-  //     container at page level.
-  //   - INTO container: when there's a container above, pre-order's
-  //     predecessor walks DOWN into that container to its last leaf.
-  //     That leaf's container accepts our type → insert before leaf =
-  //     enter container at the top.
-  //   - SKIP past rejecting container: every leaf inside rejects, but
-  //     the container's own slot at the outer level accepts → land at
-  //     outer level just past the container.
-  //   - disabled when nowhere to go: no accepting slot exists in that
-  //     direction at all.
-  //
-  // The OLD implementation had three separate cases (CASE A boundary,
-  // CASE B INTO via BFS, CASE C swap) plus a hand-coded enable check.
-  // Each case had its own edge case it could fail on. This is one
-  // walk through one ordered list.
-  const computePreOrder = () => {
-    const result = [];
-    const visit = (blockId, blockData) => {
-      if (blockId !== PAGE_BLOCK_UID) result.push(blockId);
-      // Group this block's direct children by their REGION, then walk each
-      // region in the order stored on the form data.
-      //
-      // `pathInfo.containerField` is gone (#236): blocks_layout regions and
-      // object_list arrays are one concept — a named region — and the region
-      // name lives in `pathInfo.region`. Reading the old key made every child
-      // skip, leaving preOrder empty, findMoveTarget null, and EVERY chevron
-      // disabled. Order comes from the data, not from blockPathMap's insertion
-      // order, which is incidental.
-      const childrenByRegion = {};
-      for (const [childId, childInfo] of Object.entries(blockPathMap || {})) {
-        if (childInfo?.parentId !== blockId) continue;
-        const region = childInfo.region;
-        if (!region) continue;
-        if (!childrenByRegion[region]) childrenByRegion[region] = new Set();
-        childrenByRegion[region].add(childId);
-      }
-      for (const [region, childSet] of Object.entries(childrenByRegion)) {
-        // blocks_layout region → the region's ordered id list in the shared
-        // blocks_layout dict. object_list region → the inline array itself,
-        // whose items carry their id under the region's idField.
-        const layoutOrder = blockData?.blocks_layout?.[region];
-        let orderedIds;
-        if (Array.isArray(layoutOrder)) {
-          orderedIds = layoutOrder;
-        } else if (Array.isArray(blockData?.[region])) {
-          const idField =
-            blockPathMap[[...childSet][0]]?.idField || '@id';
-          orderedIds = blockData[region].map((item) => item?.[idField]);
-        } else {
-          orderedIds = [];
-        }
-        for (const childId of orderedIds) {
-          if (!childSet.has(childId)) continue;
-          const childData = getBlockById(form, blockPathMap, childId);
-          visit(childId, childData);
-        }
-      }
-    };
-    visit(PAGE_BLOCK_UID, form);
-    return result;
-  };
 
-  // True if descendantId sits anywhere under ancestorId in the block
-  // tree. Used to skip candidates that are inside source's own subtree
-  // (a container can't be moved into itself).
-  const isDescendantOf = (descendantId, ancestorId) => {
-    let cur = blockPathMap?.[descendantId]?.parentId;
-    while (cur && cur !== PAGE_BLOCK_UID) {
-      if (cur === ancestorId) return true;
-      cur = blockPathMap?.[cur]?.parentId;
-    }
-    return false;
-  };
-
-  // Every insertion slot { containerId, region, index, orderedIds, allowed } in
-  // VISUAL (pre-order) order. A container's own slots interleave with its
-  // parent's — exactly as rendered — so a slot list is the sound basis for a
-  // chevron move: "down"/"up" step to the adjacent slot, which makes them
-  // inverses by construction and lets a block ENTER a container from either side
-  // instead of skipping it (the flattened-neighbour model couldn't express that:
-  // a container sits before its children in pre-order, so walking down hit the
-  // container-as-sibling but walking up hit a child, and the two disagreed).
-  const computeSlots = () => {
-    const slots = [];
-    const visit = (blockId, blockData) => {
-      const childrenByRegion = {};
-      for (const [childId, childInfo] of Object.entries(blockPathMap || {})) {
-        if (childInfo?.parentId !== blockId) continue;
-        const region = childInfo.region;
-        if (!region) continue;
-        if (!childrenByRegion[region]) childrenByRegion[region] = new Set();
-        childrenByRegion[region].add(childId);
-      }
-      for (const [region, childSet] of Object.entries(childrenByRegion)) {
-        const layoutOrder = blockData?.blocks_layout?.[region];
-        let orderedIds;
-        if (Array.isArray(layoutOrder)) {
-          orderedIds = layoutOrder.filter((id) => childSet.has(id));
-        } else if (Array.isArray(blockData?.[region])) {
-          const idField = blockPathMap[[...childSet][0]]?.idField || '@id';
-          orderedIds = blockData[region]
-            .map((item) => item?.[idField])
-            .filter((id) => childSet.has(id));
-        } else {
-          orderedIds = [];
-        }
-        // Children of a region share allowedSiblingTypes; use it to gate the slot.
-        const allowed = orderedIds.length
-          ? blockPathMap[orderedIds[0]]?.allowedSiblingTypes
-          : undefined;
-        for (let i = 0; i <= orderedIds.length; i++) {
-          slots.push({ containerId: blockId, region, index: i, orderedIds, allowed });
-          if (i < orderedIds.length) {
-            visit(orderedIds[i], getBlockById(form, blockPathMap, orderedIds[i]));
-          }
-        }
-      }
-    };
-    visit(PAGE_BLOCK_UID, form);
-    return slots;
-  };
-
-  // Returns the MOVE_BLOCKS payload for the slot one visual step away in
-  // `direction`, or null if there isn't a valid one (chevron should be disabled).
-  const findMoveTarget = (direction) => {
-    if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) return null;
-    const sourceInfo = blockPathMap?.[selectedBlock];
-    if (!sourceInfo) return null;
-    const sourceType = getBlock(selectedBlock)?.['@type'];
-    const slots = computeSlots();
-
-    // The source occupies the block between its two adjacent NO-OP slots in its
-    // own region: (parent, region, k) just before it and (parent, region, k+1)
-    // just after it. Moving to either leaves it in place, so a real move starts
-    // one slot past them (this also skips the source's own subtree slots, which
-    // sit between the two when the source is itself a container).
-    const inSourceRegion = (s) =>
-      s.containerId === sourceInfo.parentId && s.region === sourceInfo.region;
-    const sourceRegionSlot = slots.find(inSourceRegion);
-    const k = sourceRegionSlot?.orderedIds.indexOf(selectedBlock);
-    if (k == null || k < 0) return null;
-    const beforeIdx = slots.findIndex((s) => inSourceRegion(s) && s.index === k);
-    const afterIdx = slots.findIndex((s) => inSourceRegion(s) && s.index === k + 1);
-    if (beforeIdx < 0 || afterIdx < 0) return null;
-
-    const isValid = (s) => {
-      if (s.orderedIds.length === 0) return false; // empty region: no anchor block
-      // Can't move a block into its own subtree.
-      if (s.containerId === selectedBlock || isDescendantOf(s.containerId, selectedBlock)) return false;
-      // No allowedSiblingTypes recorded → permissive (page children usually have none).
-      if (sourceType && s.allowed && !s.allowed.includes(sourceType)) return false;
-      return true;
-    };
-
-    let target = null;
-    if (direction === 'down') {
-      for (let i = afterIdx + 1; i < slots.length; i++) {
-        if (isValid(slots[i])) { target = slots[i]; break; }
-      }
-    } else {
-      for (let i = beforeIdx - 1; i >= 0; i--) {
-        if (isValid(slots[i])) { target = slots[i]; break; }
-      }
-    }
-    if (!target) return null;
-
-    const atEnd = target.index >= target.orderedIds.length;
-    return {
-      targetBlockId: atEnd
-        ? target.orderedIds[target.orderedIds.length - 1]
-        : target.orderedIds[target.index],
-      insertAfter: atEnd,
-      targetParentId: target.containerId === PAGE_BLOCK_UID ? null : target.containerId,
-    };
-  };
-
+  // The move target is computed by hydra.js from RENDER geometry (reusing the
+  // container edge-handle machinery) and delivered on BLOCK_SELECTED. The chevron
+  // just dispatches it through the existing MOVE_BLOCKS → moveBlockBetweenContainers
+  // path; the admin no longer re-derives the tree from data order.
   const moveSelectedBlock = (direction) => {
-    const target = findMoveTarget(direction);
+    const target =
+      direction === 'up' ? blockUI?.moveUpTarget : blockUI?.moveDownTarget;
     if (!target) return;
     document.dispatchEvent(
       new CustomEvent('hydra-move-block', {
@@ -402,8 +213,9 @@ const SyncedSlateToolbar = ({
     );
   };
 
-  const isAtTopOfParent = !findMoveTarget('up');
-  const isAtBottomOfParent = !findMoveTarget('down');
+  // null target => no move that way => chevron disabled.
+  const isAtTopOfParent = !blockUI?.moveUpTarget;
+  const isAtBottomOfParent = !blockUI?.moveDownTarget;
 
   // Create Slate editor once using Volto's makeEditor (includes all plugins)
   // Add withEmptyInlineRemoval to clean up empty formatting elements after delete

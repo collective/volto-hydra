@@ -2972,6 +2972,10 @@ const Iframe = (props) => {
               addDirection: event.data.addDirection, // Direction for add button positioning
               isMultiElement: event.data.isMultiElement, // True if block renders as multiple DOM elements
               canResize: event.data.canResize || null, // {top,bottom,left,right} booleans for edge-drag chrome
+              // Chevron move targets computed by hydra.js from render geometry.
+              // null => that chevron is disabled; otherwise the MOVE_BLOCKS target.
+              moveUpTarget: event.data.moveUpTarget || null,
+              moveDownTarget: event.data.moveDownTarget || null,
               selectionModeRects: event.data.selectionModeRects,
             };
           });
