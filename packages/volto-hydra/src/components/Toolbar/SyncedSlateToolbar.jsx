@@ -290,61 +290,106 @@ const SyncedSlateToolbar = ({
     return false;
   };
 
-  // Nesting depth: number of container ancestors (page-level = 0).
-  const depthOf = (id) => {
-    let d = 0;
-    let cur = blockPathMap?.[id]?.parentId;
-    while (cur && cur !== PAGE_BLOCK_UID) {
-      d++;
-      cur = blockPathMap?.[cur]?.parentId;
-    }
-    return d;
+  // Every insertion slot { containerId, region, index, orderedIds, allowed } in
+  // VISUAL (pre-order) order. A container's own slots interleave with its
+  // parent's — exactly as rendered — so a slot list is the sound basis for a
+  // chevron move: "down"/"up" step to the adjacent slot, which makes them
+  // inverses by construction and lets a block ENTER a container from either side
+  // instead of skipping it (the flattened-neighbour model couldn't express that:
+  // a container sits before its children in pre-order, so walking down hit the
+  // container-as-sibling but walking up hit a child, and the two disagreed).
+  const computeSlots = () => {
+    const slots = [];
+    const visit = (blockId, blockData) => {
+      const childrenByRegion = {};
+      for (const [childId, childInfo] of Object.entries(blockPathMap || {})) {
+        if (childInfo?.parentId !== blockId) continue;
+        const region = childInfo.region;
+        if (!region) continue;
+        if (!childrenByRegion[region]) childrenByRegion[region] = new Set();
+        childrenByRegion[region].add(childId);
+      }
+      for (const [region, childSet] of Object.entries(childrenByRegion)) {
+        const layoutOrder = blockData?.blocks_layout?.[region];
+        let orderedIds;
+        if (Array.isArray(layoutOrder)) {
+          orderedIds = layoutOrder.filter((id) => childSet.has(id));
+        } else if (Array.isArray(blockData?.[region])) {
+          const idField = blockPathMap[[...childSet][0]]?.idField || '@id';
+          orderedIds = blockData[region]
+            .map((item) => item?.[idField])
+            .filter((id) => childSet.has(id));
+        } else {
+          orderedIds = [];
+        }
+        // Children of a region share allowedSiblingTypes; use it to gate the slot.
+        const allowed = orderedIds.length
+          ? blockPathMap[orderedIds[0]]?.allowedSiblingTypes
+          : undefined;
+        for (let i = 0; i <= orderedIds.length; i++) {
+          slots.push({ containerId: blockId, region, index: i, orderedIds, allowed });
+          if (i < orderedIds.length) {
+            visit(orderedIds[i], getBlockById(form, blockPathMap, orderedIds[i]));
+          }
+        }
+      }
+    };
+    visit(PAGE_BLOCK_UID, form);
+    return slots;
   };
 
-  // Returns the MOVE_BLOCKS payload for the next accepting slot in
-  // direction, or null if there isn't one (chevron should be disabled).
+  // Returns the MOVE_BLOCKS payload for the slot one visual step away in
+  // `direction`, or null if there isn't a valid one (chevron should be disabled).
   const findMoveTarget = (direction) => {
     if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) return null;
-    const preOrder = computePreOrder();
-    const sourceIdx = preOrder.indexOf(selectedBlock);
-    if (sourceIdx < 0) return null;
+    const sourceInfo = blockPathMap?.[selectedBlock];
+    if (!sourceInfo) return null;
     const sourceType = getBlock(selectedBlock)?.['@type'];
-    const step = direction === 'up' ? -1 : 1;
-    let i = sourceIdx + step;
-    while (i >= 0 && i < preOrder.length) {
-      const candidateId = preOrder[i];
-      // Don't try to land in source's own subtree.
-      if (candidateId === selectedBlock || isDescendantOf(candidateId, selectedBlock)) {
-        i += step;
-        continue;
+    const slots = computeSlots();
+
+    // The source occupies the block between its two adjacent NO-OP slots in its
+    // own region: (parent, region, k) just before it and (parent, region, k+1)
+    // just after it. Moving to either leaves it in place, so a real move starts
+    // one slot past them (this also skips the source's own subtree slots, which
+    // sit between the two when the source is itself a container).
+    const inSourceRegion = (s) =>
+      s.containerId === sourceInfo.parentId && s.region === sourceInfo.region;
+    const sourceRegionSlot = slots.find(inSourceRegion);
+    const k = sourceRegionSlot?.orderedIds.indexOf(selectedBlock);
+    if (k == null || k < 0) return null;
+    const beforeIdx = slots.findIndex((s) => inSourceRegion(s) && s.index === k);
+    const afterIdx = slots.findIndex((s) => inSourceRegion(s) && s.index === k + 1);
+    if (beforeIdx < 0 || afterIdx < 0) return null;
+
+    const isValid = (s) => {
+      if (s.orderedIds.length === 0) return false; // empty region: no anchor block
+      // Can't move a block into its own subtree.
+      if (s.containerId === selectedBlock || isDescendantOf(s.containerId, selectedBlock)) return false;
+      // No allowedSiblingTypes recorded → permissive (page children usually have none).
+      if (sourceType && s.allowed && !s.allowed.includes(sourceType)) return false;
+      return true;
+    };
+
+    let target = null;
+    if (direction === 'down') {
+      for (let i = afterIdx + 1; i < slots.length; i++) {
+        if (isValid(slots[i])) { target = slots[i]; break; }
       }
-      const candidateInfo = blockPathMap?.[candidateId];
-      if (!candidateInfo) { i += step; continue; }
-      const allowed = candidateInfo.allowedSiblingTypes;
-      // No allowedSiblingTypes recorded → assume permissive (top-level
-      // page-children commonly have no explicit restriction).
-      if (!sourceType || !allowed || allowed.includes(sourceType)) {
-        // When the target is DEEPER than the source, the block is entering a
-        // container rather than swapping with a same-level sibling. The nearest
-        // block in that direction is the container's edge child closest to the
-        // source (its LAST child when moving up, its FIRST when moving down), so
-        // the block should land at the FAR edge — the container's end when
-        // arriving from below (up), its start when arriving from above (down).
-        // Inserting on the near side instead drops it one slot short (the
-        // reported "lands in the middle"). Flip insertAfter for that case; a
-        // same-level or shallower target keeps the normal sibling behaviour.
-        const enteringContainer = depthOf(candidateId) > depthOf(selectedBlock);
-        return {
-          targetBlockId: candidateId,
-          insertAfter: enteringContainer
-            ? direction === 'up'
-            : direction === 'down',
-          targetParentId: candidateInfo.parentId === PAGE_BLOCK_UID ? null : candidateInfo.parentId,
-        };
+    } else {
+      for (let i = beforeIdx - 1; i >= 0; i--) {
+        if (isValid(slots[i])) { target = slots[i]; break; }
       }
-      i += step;
     }
-    return null;
+    if (!target) return null;
+
+    const atEnd = target.index >= target.orderedIds.length;
+    return {
+      targetBlockId: atEnd
+        ? target.orderedIds[target.orderedIds.length - 1]
+        : target.orderedIds[target.index],
+      insertAfter: atEnd,
+      targetParentId: target.containerId === PAGE_BLOCK_UID ? null : target.containerId,
+    };
   };
 
   const moveSelectedBlock = (direction) => {

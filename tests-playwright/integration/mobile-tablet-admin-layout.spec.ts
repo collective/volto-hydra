@@ -633,6 +633,59 @@ test.describe('Admin layout — mobile (≤767px)', () => {
       .toEqual(['gs-slate-1', 'gs-slate-2', 'gs-slate-3', 'gs-after']);
   });
 
+  test('chevron ▼ into a grid from above enters at the START, not skips past it', async ({
+    page,
+  }) => {
+    // Mirror of the up case. A block just above a grid, moved down, enters the
+    // grid from above and must land as the FIRST child — one visual step. The bug:
+    // it jumps PAST the whole grid (lands after it) because the flattened walk hits
+    // the grid container before its children.
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/grid-slates-test-page');
+
+    const iframe = helper.getIframe();
+    const gridOrder = () =>
+      iframe
+        .locator('[data-block-uid="gs-grid"] [data-block-uid]')
+        .evaluateAll((els) => els.map((e) => e.getAttribute('data-block-uid')));
+
+    expect(await gridOrder()).toEqual(['gs-slate-1', 'gs-slate-2', 'gs-slate-3']);
+
+    // gs-title is the page-level slate directly above the grid.
+    await iframe.locator('[data-block-uid="gs-title"]').first().click();
+    const chevronDown = page.locator('.quanta-toolbar .chevron-down');
+    await expect(chevronDown).toBeVisible();
+    await chevronDown.click();
+
+    await expect
+      .poll(gridOrder)
+      .toEqual(['gs-title', 'gs-slate-1', 'gs-slate-2', 'gs-slate-3']);
+  });
+
+  test('chevron up and down are inverses across a grid boundary (round-trip)', async ({
+    page,
+  }) => {
+    // Move a block down into the grid, then up — it must return to exactly where
+    // it started. If down "skips" but up "enters", the block ends up trapped
+    // inside the grid and the two chevrons stop being inverses.
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/grid-slates-test-page');
+
+    const iframe = helper.getIframe();
+    const order = () => helper.getBlockOrder('body');
+
+    const before = await order();
+    await iframe.locator('[data-block-uid="gs-title"]').first().click();
+    await page.locator('.quanta-toolbar .chevron-down').click();
+    await expect.poll(order).not.toEqual(before); // it moved
+    await page.locator('.quanta-toolbar .chevron-up').click();
+    await expect.poll(order).toEqual(before); // …and came all the way back
+  });
+
   /**
    * Every popup the admin surfaces should render as a bottom sheet on
    * mobile — same geometry, same gesture. Assert each known popup's
