@@ -7663,12 +7663,13 @@ export class Bridge {
           : 'nonEditableBlock';
         log('Sending BLOCK_SELECTED immediately for:', pending.blockUid, `(${src})`,
             'mediaField:', pending.focusedMediaField, 'hasEditable:', hasEditableFields, 'isBlockMode:', isBlockMode);
-        // focusedFieldName: null for non-editable and block mode (no text field
-        // focused). Media/linkable fields always pass through — they're set from
-        // the click and the toolbar needs them regardless of block type.
+        // focusedFieldName: null for a non-editable block (no text field). Block
+        // mode is handled centrally by sendBlockSelected (the invariant), so it
+        // needn't be re-checked here. Media/linkable fields always pass through —
+        // they're set from the click and the toolbar needs them regardless.
         this.sendBlockSelected(src, blockElement, {
           blockUid: pending.blockUid,
-          focusedFieldName: (isBlockMode || !hasEditableFields) ? null : pending.focusedFieldName,
+          focusedFieldName: hasEditableFields ? pending.focusedFieldName : null,
           focusedLinkableField: pending.focusedLinkableField,
           focusedMediaField: pending.focusedMediaField,
         });
@@ -7748,9 +7749,10 @@ export class Bridge {
             this.needsFieldDetection = false;
           }
 
-          // In block mode, don't set up contenteditable or focus fields
+          // In block mode, don't set up contenteditable or focus fields.
+          // (sendBlockSelected forces focusedFieldName null in block mode.)
           if (this.editMode === 'block') {
-            this.sendBlockSelected('blockMode', currentBlockElement, { focusedFieldName: null });
+            this.sendBlockSelected('blockMode', currentBlockElement);
           } else if (this.editMode === 'text') {
 
           // Check if field was already editable before we do anything
