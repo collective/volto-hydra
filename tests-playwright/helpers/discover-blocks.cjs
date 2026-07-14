@@ -383,6 +383,25 @@ function collectWidgetShapeIssues(blockData, blockSchema, pagePath, blockId, out
     const describe = (exp, got) =>
       `field "${field}": expected ${exp}, got ${Array.isArray(got) ? `array(${got.length})` : typeof got}`;
 
+    // Plone rich text (`widget: 'richtext'`, value serialized as
+    // `{data: '<html>', encoding, content-type}`) is not permitted: this design
+    // system renders all rich text as slate so it round-trips through the
+    // editing bridge. Flag it from either side —
+    //   1. the schema still declares `widget: 'richtext'`, or
+    //   2. the stored value is still the `{data: '<html>'}` object
+    //      (catches content the slate migration hasn't converted yet, even once
+    //      the schema has been flipped to `widget: 'slate'`).
+    const looksLikeRichText =
+      value && typeof value === 'object' && !Array.isArray(value) && typeof value.data === 'string';
+    if (widget === 'richtext' || looksLikeRichText) {
+      issues.push(
+        `field "${field}": Plone rich text is not allowed — this design system renders rich text as slate. ` +
+          `Declare the field as \`widget: 'slate'\` (an array of slate nodes) and store its value as slate, ` +
+          `not \`{data: '<html>'}\`.`,
+      );
+      continue;
+    }
+
     if (widget === 'url') {
       if (typeof value !== 'string') {
         issues.push(describe('url string', value));
