@@ -562,14 +562,14 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         collectSlateIssues(blockData, pagePath, blockId, slateIssues);
         collectWidgetShapeIssues(blockData, schema, pagePath, blockId, shapeIssues);
 
-        // Unregistered block type: only real @type values placed at a
-        // blocks_layout-style position count. Object_list sub-items don't
-        // need top-level registration — their type is controlled by the
-        // parent's schema.
-        const isTopLevelBlock = entry.containerField === 'blocks' || entry.parentId === '_page';
+        // Unregistered block type: any real @type the frontend can't render is
+        // a problem no matter how deep it sits — a nested unknown falls through
+        // to the "Not implemented" placeholder just like a top-level one. Flag
+        // every unregistered @type at any depth (object_list sub-items whose
+        // type is parent-controlled have no @type of their own, so they're
+        // naturally excluded by the `blockType` guard).
         if (
           blockType &&
-          isTopLevelBlock &&
           REGISTERED.size &&
           !REGISTERED.has(blockType) &&
           !PAGE_TYPES.has(blockType)
@@ -742,18 +742,18 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   }
 
   // Every block type the FRONTEND registers needs at least one content
-  // example so the sanity spec emits a render test for it. We use
-  // `frontendKeys` (passed in) — the set of types the frontend sent via
-  // INIT.blocks — so mock-parent's own test baseline (hero, slate, mock-*)
-  // doesn't trigger false positives. `restricted: true` types (form fields,
-  // column sub-blocks) are only valid inside specific containers and are
-  // covered by their parent's render test.
+  // example so the sanity spec emits a render test for it — INCLUDING
+  // `restricted` types. `restricted` only means "not offered in the page block
+  // chooser"; the block still renders (inside a container), so it still needs
+  // an example to be render-tested. If a type is genuinely container-only, add
+  // a fixture whose parent instance uses it — the child is then discovered
+  // nested and covered — rather than relying on `restricted` to skip coverage.
+  // `frontendKeys` (types the frontend sent via INIT.blocks) keeps mock-parent's
+  // own baseline (hero, slate, mock-*) from causing false positives.
   if (frontendKeys && frontendKeys.length) {
     const discoveredTypes = new Set(result.map((r) => r.blockType));
     const missing = [];
     for (const blockType of frontendKeys) {
-      const cfg = blocksConfig[blockType];
-      if (cfg?.restricted) continue;
       if (!discoveredTypes.has(blockType)) missing.push(blockType);
     }
     // A registered type with no content example can't get a render test — but
