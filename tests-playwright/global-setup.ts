@@ -16,7 +16,7 @@ const { discoverBlocks, buildEmptyRegionCases } = require('./helpers/discover-bl
  * Fetch the frontend's registered blocksConfig by loading mock-parent in a
  * headless browser and asking its bridge helper. Optional — if MOCK_PARENT_URL
  * and FRONTEND_URL aren't set, discovery runs without schemas (type-only
- * discovery, skipping the widget-shape validation).
+ * discovery, skipping the schema-mismatch validation).
  */
 async function fetchBlocksConfig(
   mockParentUrl: string,
@@ -57,7 +57,7 @@ async function globalSetup() {
       : Infinity;
     const maxLabel = Number.isFinite(maxPages) ? `max ${maxPages} pages` : 'all pages';
 
-    // Fetch blocksConfig from the frontend so discovery can validate widget
+    // Fetch blocksConfig from the frontend so discovery can validate field
     // data shapes, and the frontend-only key set so discovery can flag
     // registered-but-unused types without false positives from mock-parent's
     // own test baseline. Optional — skipped when MOCK_PARENT_URL/FRONTEND_URL

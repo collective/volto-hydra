@@ -864,7 +864,112 @@
         }
       ]
     },
-    "h-31": {
+    "p-31": {
+      "@type": "slate",
+      "plaintext": "Give `Block` an `@type: \"empty\"` case: a container region with no `defaultBlockType` and more than one `allowedBlocks` seeds an `empty` placeholder for the user to type in place, and any custom container renderer must route its children through `Block` so `empty` is handled rather than rejected. See [Empty Blocks](container-blocks.md#empty-blocks).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Give "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "Block"
+                }
+              ]
+            },
+            {
+              "text": " an "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "@type: \"empty\""
+                }
+              ]
+            },
+            {
+              "text": " case: a container region with no "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "defaultBlockType"
+                }
+              ]
+            },
+            {
+              "text": " and more than one "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedBlocks"
+                }
+              ]
+            },
+            {
+              "text": " seeds an "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "empty"
+                }
+              ]
+            },
+            {
+              "text": " placeholder for the user to type in place, and any custom container renderer must route its children through "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "Block"
+                }
+              ]
+            },
+            {
+              "text": " so "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "empty"
+                }
+              ]
+            },
+            {
+              "text": " is handled rather than rejected. See "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "container-blocks.md#empty-blocks"
+              },
+              "children": [
+                {
+                  "text": "Empty Blocks"
+                }
+              ]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    "h-32": {
       "@type": "slate",
       "plaintext": "7. Helper Functions",
       "value": [
@@ -878,7 +983,7 @@
         }
       ]
     },
-    "p-32": {
+    "p-33": {
       "@type": "slate",
       "plaintext": "Several helper functions get reused in many blocks:",
       "value": [
@@ -892,7 +997,7 @@
         }
       ]
     },
-    "ol-33": {
+    "ol-34": {
       "@type": "slate",
       "plaintext": "Generating a URL for links — all REST API URLs are relative to the API URL, so you need to convert these to the right frontend URL Generating a URL for an image — blocks have image data in many formats so a helper function is useful",
       "value": [
@@ -935,7 +1040,7 @@
         }
       ]
     },
-    "p-34": {
+    "p-35": {
       "@type": "slate",
       "plaintext": "- You may also decide to use your framework or hosting solution for image resizing",
       "value": [
@@ -949,7 +1054,7 @@
         }
       ]
     },
-    "h-35": {
+    "h-36": {
       "@type": "slate",
       "plaintext": "8. Listing Blocks",
       "value": [
@@ -963,7 +1068,7 @@
         }
       ]
     },
-    "ul-36": {
+    "ul-37": {
       "@type": "slate",
       "plaintext": "Use the Listing Helpers or make your own REST API call to query items Create your own pagination scheme (e.g., embed page in URL for static generation) Render the items and pagination",
       "value": [
@@ -1023,7 +1128,7 @@
         }
       ]
     },
-    "h-37": {
+    "h-38": {
       "@type": "slate",
       "plaintext": "9. Redirects",
       "value": [
@@ -1037,7 +1142,7 @@
         }
       ]
     },
-    "ol-38": {
+    "ol-39": {
       "@type": "slate",
       "plaintext": "If your contents call results in a redirect, you will need to do an internal redirect in the framework so the path shown is correct If you are using SSG, you will need special code to query all the redirects at generate time and add redirect routes",
       "value": [
@@ -1078,7 +1183,7 @@
         }
       ]
     },
-    "h-39": {
+    "h-40": {
       "@type": "slate",
       "plaintext": "10. Error Pages",
       "value": [
@@ -1092,7 +1197,7 @@
         }
       ]
     },
-    "p-40": {
+    "p-41": {
       "@type": "slate",
       "plaintext": "If your [REST API call returns an error](https://6.docs.plone.org/plone.restapi/docs/source/http-status-codes.html), handle this within the framework to display the error and set the status code.",
       "value": [
@@ -1120,7 +1225,7 @@
         }
       ]
     },
-    "h-41": {
+    "h-42": {
       "@type": "slate",
       "plaintext": "11. Search Blocks",
       "value": [
@@ -1134,7 +1239,7 @@
         }
       ]
     },
-    "p-42": {
+    "p-43": {
       "@type": "slate",
       "plaintext": "If you choose to allow Volto's built-in Search Block for end-user customisable search:",
       "value": [
@@ -1148,7 +1253,7 @@
         }
       ]
     },
-    "ul-43": {
+    "ul-44": {
       "@type": "slate",
       "plaintext": "Render Facets/Filters (currently not as sub-blocks but this could change) Build your query and make a REST API call to query items",
       "value": [
@@ -1186,7 +1291,7 @@
         }
       ]
     },
-    "h-44": {
+    "h-45": {
       "@type": "slate",
       "plaintext": "12. Form Blocks",
       "value": [
@@ -1200,7 +1305,7 @@
         }
       ]
     },
-    "p-45": {
+    "p-46": {
       "@type": "slate",
       "plaintext": "Form-block is a plugin that allows a visual form builder:",
       "value": [
@@ -1214,7 +1319,7 @@
         }
       ]
     },
-    "ul-46": {
+    "ul-47": {
       "@type": "slate",
       "plaintext": "Currently not a container with sub-blocks but this could change Render each field type component (or limit which are available) Produce a compatible JSON submission to the form-block endpoint Handle field validation errors Handle the thank-you page",
       "value": [
@@ -1265,7 +1370,7 @@
         }
       ]
     },
-    "h-47": {
+    "h-48": {
       "@type": "slate",
       "plaintext": "Deployment patterns",
       "value": [
@@ -1279,7 +1384,7 @@
         }
       ]
     },
-    "p-48": {
+    "p-49": {
       "@type": "slate",
       "plaintext": "Hydra separates your production frontend from the editing experience, which gives you choice in how each is deployed.",
       "value": [
@@ -1293,7 +1398,7 @@
         }
       ]
     },
-    "h-49": {
+    "h-50": {
       "@type": "slate",
       "plaintext": "SPA / Hybrid — full visual editing",
       "value": [
@@ -1307,7 +1412,7 @@
         }
       ]
     },
-    "p-50": {
+    "p-51": {
       "@type": "slate",
       "plaintext": "The simplest setup — your frontend handles both production and editing:",
       "value": [
@@ -1321,7 +1426,7 @@
         }
       ]
     },
-    "ol-51": {
+    "ol-52": {
       "@type": "slate",
       "plaintext": "Deploy your frontend as SPA or Hybrid (SSR + client-side hydration). Deploy Hydra and the Plone API server. Log in to Hydra, go to user preferences, set your frontend URL.",
       "value": [
@@ -1356,7 +1461,7 @@
         }
       ]
     },
-    "p-52": {
+    "p-53": {
       "@type": "slate",
       "plaintext": "This gives you all visual editing features including inline text editing, drag and drop, and realtime preview.",
       "value": [
@@ -1370,7 +1475,7 @@
         }
       ]
     },
-    "h-53": {
+    "h-54": {
       "@type": "slate",
       "plaintext": "SSG / SSR — production speed + visual editing",
       "value": [
@@ -1384,7 +1489,7 @@
         }
       ]
     },
-    "p-54": {
+    "p-55": {
       "@type": "slate",
       "plaintext": "Get the speed of static generation while keeping visual editing. Deploy two versions of the same frontend:",
       "value": [
@@ -1398,7 +1503,7 @@
         }
       ]
     },
-    "ol-55": {
+    "ol-56": {
       "@type": "slate",
       "plaintext": "Production — deploy your frontend in SSG or SSR mode (fast, cacheable). Editing — deploy the same frontend in SPA mode to a separate URL (used only inside Hydra). Hydra + Plone — only needs to run during editing, so scale-to-zero / serverless works. SSG rebuild — for SSG, configure collective.webhook to trigger a rebuild on edit. SSR doesn't need this.",
       "value": [
@@ -1487,7 +1592,7 @@
         }
       ]
     },
-    "h-56": {
+    "h-57": {
       "@type": "slate",
       "plaintext": "Example: the Nuxt.js demo",
       "value": [
@@ -1501,7 +1606,7 @@
         }
       ]
     },
-    "p-57": {
+    "p-58": {
       "@type": "slate",
       "plaintext": "The default Hydra demo uses exactly the SSG / SSR pattern above:",
       "value": [
@@ -1515,7 +1620,7 @@
         }
       ]
     },
-    "ul-58": {
+    "ul-59": {
       "@type": "slate",
       "plaintext": "Production — SSG on Netlify. All pages statically generated, images optimized, fast globally. Editing — same Nuxt codebase deployed as SPA to a different Netlify URL. Only loaded inside Hydra's iframe. Hydra + Plone — deployed to fly.io with scale-to-zero. Cost is free or minimal since it only runs during editing.",
       "value": [
@@ -1602,7 +1707,7 @@
         }
       ]
     },
-    "p-59": {
+    "p-60": {
       "@type": "slate",
       "plaintext": "For most frameworks, switching between SSG / SSR and SPA is just a config toggle, so you get the best of both worlds with minimal effort.",
       "value": [
@@ -1650,35 +1755,36 @@
       "ol-28",
       "h-29",
       "ol-30",
-      "h-31",
-      "p-32",
-      "ol-33",
-      "p-34",
-      "h-35",
-      "ul-36",
-      "h-37",
-      "ol-38",
-      "h-39",
-      "p-40",
-      "h-41",
-      "p-42",
-      "ul-43",
-      "h-44",
-      "p-45",
-      "ul-46",
-      "h-47",
-      "p-48",
-      "h-49",
-      "p-50",
-      "ol-51",
-      "p-52",
-      "h-53",
-      "p-54",
-      "ol-55",
-      "h-56",
-      "p-57",
-      "ul-58",
-      "p-59"
+      "p-31",
+      "h-32",
+      "p-33",
+      "ol-34",
+      "p-35",
+      "h-36",
+      "ul-37",
+      "h-38",
+      "ol-39",
+      "h-40",
+      "p-41",
+      "h-42",
+      "p-43",
+      "ul-44",
+      "h-45",
+      "p-46",
+      "ul-47",
+      "h-48",
+      "p-49",
+      "h-50",
+      "p-51",
+      "ol-52",
+      "p-53",
+      "h-54",
+      "p-55",
+      "ol-56",
+      "h-57",
+      "p-58",
+      "ul-59",
+      "p-60"
     ]
   }
 }

@@ -77,3 +77,39 @@ Pressing `Escape` is always safe. It progressively backs out:
 3. If nothing is selected → no-op.
 
 So `Escape` repeatedly takes you up one level at a time. See [Selecting blocks](selecting-blocks.md) for what selection looks like at each level.
+
+## Editing on a phone
+
+On narrow screens (≤767 px) the editor reshapes into a two-bar layout: the **Quanta toolbar** pins to the top of the viewport — always visible, never fades — and the **main toolbar** (Save, Cancel, Frontend switcher, Settings shortcut) sits as a compact bar at the bottom. The iframe canvas fills the space in between. There is no side panel: the sidebar opens as a full-screen sheet, popups slide up from the bottom, and the link editor takes over the top bar.
+
+![Mobile editing — Quanta toolbar pinned at the top with chevrons and format buttons, a slate block selected mid-screen with its selection outline, and the compact main toolbar at the bottom.](_images/mobile-block-selected.png)
+
+### Bottom-sheet popups
+
+The `⋯` menu — and every other contextual chooser (block-type picker, frontend switcher, convert chooser) — slides up from the bottom of the screen with the canvas dimmed behind. Tap the back arrow at the bottom-left of the sheet to dismiss; the canvas underneath comes back unchanged.
+
+![Mobile ⋯ menu as a slide-up bottom sheet showing Settings, Make Template, Copy, Cut, Remove with a back arrow at the bottom-left and the canvas dimmed behind it.](_images/mobile-dropdown-menu.png)
+
+### Sidebar as a full-screen sheet
+
+A side panel is impossible on a 375 px screen. Instead, opening the sidebar (via the **Settings** shortcut in the main toolbar, or by choosing **Settings** in the `⋯` menu) covers the entire viewport. The `X` button in the top-right closes it and brings you back to the canvas. While the sidebar is open, the iframe is hidden behind it — same source of truth, just a different surface.
+
+![Mobile sidebar as a full-screen sheet showing the Page header with an X close button, the DEFAULT section open with Title and Summary fields, and the DATES section below.](_images/mobile-sidebar-fullscreen.png)
+
+### Escaping nested blocks with `⬆`
+
+Phones don't have an `Escape` key. To walk back up out of a nested block (a teaser inside a grid, a paragraph inside a column), the Quanta toolbar shows an extra **`⬆` button** to the left of `⋯` whenever the selected block has a parent. One tap selects the parent container; tap again to keep walking up.
+
+![Mobile Quanta toolbar with a nested teaser selected — the ⬆ select-parent button is visible to the left of ⋯, and the teaser's grid parent is highlighted with a dashed selection outline.](_images/mobile-select-parent.png)
+
+### Differences from desktop in one place
+
+| Desktop / tablet | Mobile (≤767 px) |
+| --- | --- |
+| Quanta floats near the block, can fade after idle | Quanta pinned to top, always visible |
+| Main toolbar on the left, full height | Main toolbar at the bottom, 44 px compact |
+| Sidebar on the right as a side panel | Sidebar covers the whole screen |
+| `⋯` menu drops down inline | `⋯` menu slides up as a bottom sheet |
+| `Escape` key walks selection up | Tap the `⬆` button in Quanta |
+
+Otherwise everything works the same: tapping a block selects it, tapping into text starts editing, the same fields and the same blocks. The mechanics are unchanged — only the placement and gestures differ.

@@ -17,6 +17,7 @@ import DropdownMenu from './DropdownMenu';
 import linkSVG from '@plone/volto/icons/link.svg';
 import imageSVG from '@plone/volto/icons/image.svg';
 import clearSVG from '@plone/volto/icons/clear.svg';
+import upSVG from '@plone/volto/icons/up.svg';
 import AddLinkForm from '@plone/volto/components/manage/AnchorPlugin/components/LinkButton/AddLinkForm';
 import { ImageInput } from '@plone/volto/components/manage/Widgets/ImageWidget';
 import { createLog } from '../../utils/log';
@@ -196,6 +197,26 @@ const SyncedSlateToolbar = ({
     return updateBlockById(form, blockPathMap, blockId, newBlockData);
   }, [form, blockPathMap]);
 
+
+  // The move target is computed by hydra.js from RENDER geometry (reusing the
+  // container edge-handle machinery) and delivered on BLOCK_SELECTED. The chevron
+  // just dispatches it through the existing MOVE_BLOCKS → moveBlockBetweenContainers
+  // path; the admin no longer re-derives the tree from data order.
+  const moveSelectedBlock = (direction) => {
+    const target =
+      direction === 'up' ? blockUI?.moveUpTarget : blockUI?.moveDownTarget;
+    if (!target) return;
+    document.dispatchEvent(
+      new CustomEvent('hydra-move-block', {
+        detail: { blockId: selectedBlock, ...target },
+      }),
+    );
+  };
+
+  // null target => no move that way => chevron disabled.
+  const isAtTopOfParent = !blockUI?.moveUpTarget;
+  const isAtBottomOfParent = !blockUI?.moveDownTarget;
+
   // Create Slate editor once using Volto's makeEditor (includes all plugins)
   // Add withEmptyInlineRemoval to clean up empty formatting elements after delete
   const [editor] = useState(() => {
@@ -276,13 +297,22 @@ const SyncedSlateToolbar = ({
       // Check if focus went to the iframe
       const iframe = document.getElementById('previewIframe');
       if (document.activeElement === iframe) {
-        // Dispatch synthetic mousedown on document to trigger handleClickOutside
+        // Dispatch a synthetic mousedown so Volto's Toolbar handleClickOutside runs
+        // and closes any open toolbar menu now that focus left for the iframe.
+        //
+        // Dispatch on document.body, NOT document. handleClickOutside does
+        // `e.target.closest('.ui.modal')`, and `document` has no `.closest` — dispatching
+        // on document made `e.target === document` and threw
+        // `TypeError: target.closest is not a function`, aborting handleClickOutside
+        // before closeMenu() ran, on EVERY focus-to-iframe transition (e.g. cancelling
+        // the LinkEditor). body is an Element with .closest and the event still bubbles
+        // to the document-level listener, so the menu actually closes.
         const mousedownEvent = new MouseEvent('mousedown', {
           bubbles: true,
           cancelable: true,
           view: window,
         });
-        document.dispatchEvent(mousedownEvent);
+        document.body.dispatchEvent(mousedownEvent);
       }
     };
 
@@ -414,21 +444,56 @@ const SyncedSlateToolbar = ({
     }
   }, [mouseActivityCounter, startFadeTimer]);
 
-  // Poll for LinkEditor (.add-link) visibility changes to detect when it closes
-  // The LinkEditor doesn't use Redux for visibility - it uses CSS opacity
-  // IMPORTANT: Use linkEditorWasVisibleRef instead of local variable because
-  // effect dependencies change frequently, causing restarts that reset local state
-  useEffect(() => {
-    let pollCount = 0;
+  // The LinkEditor (.add-link) closed: unblock the iframe with the formatRequestId and
+  // hand back the selection captured when the link button was clicked. Focus restoration
+  // then happens in the iframe (the FORM_DATA useEffect focuses the iframe element, and
+  // afterContentRender restores the field selection). Uses only refs, so it's stable and
+  // safe to call from either the event or the poll.
+  //
+  // Idempotent: guarded by activeFormatRequestIdRef (nulled after firing), so if the
+  // event AND the poll both notice the same close it's a no-op the second time.
+  const handleLinkEditorClosed = useCallback(() => {
+    if (activeFormatRequestIdRef.current) {
+      onChangeFormDataRef.current(
+        null,
+        currentSelectionRef.current,
+        activeFormatRequestIdRef.current,
+      );
+      activeFormatRequestIdRef.current = null;
+    }
+    // Don't clear pendingFlushRef here — it's cleared when the flush completes. A stale
+    // close can arrive while a new button click is pending; don't disturb it.
+  }, []);
 
+  // Event-driven close for the CANCEL path. The LinkEditor's real close signal is React
+  // state inside Volto's useLinkEditor (setShowLinkEditor(false)), which this component
+  // can't observe — the helper renders generically via persistentHelpers. Escape / cancel
+  // route through AddLinkForm.onClose (our shadow), which dispatches this event, so we
+  // react the instant it closes instead of up to 100ms later on the next poll tick — that
+  // detection gap is what raced the async selection-restore (the flaky "cancelling
+  // LinkEditor" test).
+  useEffect(() => {
+    const onClose = () => {
+      linkEditorWasVisibleRef.current = false;
+      handleLinkEditorClosed();
+    };
+    document.addEventListener('hydra:linkeditor-close', onClose);
+    return () => document.removeEventListener('hydra:linkeditor-close', onClose);
+  }, [handleLinkEditorClosed]);
+
+  // Poll fallback for close paths that do NOT route through AddLinkForm.onClose — most
+  // notably applying a link, which Volto's useLinkEditor closes directly via
+  // setShowLinkEditor(false). Converting those to events too would mean shadowing the
+  // Volto hook; the poll is a cheap safety net and the event above already makes the
+  // flaky cancel path deterministic.
+  useEffect(() => {
     const checkVisibility = () => {
       const popup = document.querySelector('.add-link');
-      pollCount++;
 
       if (!popup) {
         if (linkEditorWasVisibleRef.current) {
           linkEditorWasVisibleRef.current = false;
-          handlePopupClosed();
+          handleLinkEditorClosed();
         }
         return;
       }
@@ -437,31 +502,14 @@ const SyncedSlateToolbar = ({
       const isVisible = style.opacity !== '0' && style.display !== 'none' && style.visibility !== 'hidden';
 
       if (linkEditorWasVisibleRef.current && !isVisible) {
-        handlePopupClosed();
+        handleLinkEditorClosed();
       }
       linkEditorWasVisibleRef.current = isVisible;
     };
 
-    const handlePopupClosed = () => {
-      if (activeFormatRequestIdRef.current) {
-        // Send the formatRequestId to unblock the iframe. Focus restoration
-        // happens automatically: the FORM_DATA useEffect focuses the iframe
-        // element after React render, and afterContentRender restores the
-        // field selection inside the iframe.
-        // Use refs for stable access — this interval must not restart on every
-        // selection/form change or it can miss the popup's entire lifecycle.
-        onChangeFormDataRef.current(null, currentSelectionRef.current, activeFormatRequestIdRef.current);
-        activeFormatRequestIdRef.current = null;
-      }
-      // NOTE: Don't clear pendingFlushRef here - it will be cleared when the flush completes.
-      // The polling might detect a stale popup closing while a new button click is pending,
-      // and we don't want to interfere with that pending operation.
-    };
-
     const intervalId = setInterval(checkVisibility, 100);
     return () => clearInterval(intervalId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Stable interval — uses refs for currentSelection and onChangeFormData
+  }, [handleLinkEditorClosed]);
 
   // Helper function for applying inline format with prospective formatting support
   // Used by both hotkey transforms and toolbar button clicks
@@ -1122,7 +1170,14 @@ const SyncedSlateToolbar = ({
   const blockTypeFields = blockFieldTypes?.[blockType] || {};
   const fieldType = blockTypeFields[fieldName];
   const blockIsReadonly = isBlockReadonly(block, templateEditMode);
-  const showFormatButtons = isSlateFieldType(fieldType) && !blockIsReadonly && !isMultiSelected;
+  // Text-format controls (bold/italic/link/… and the block-format dropdown) only
+  // apply while a text field is actually focused. focusedFieldName is null in block
+  // mode (block selected, no cursor) — the same signal the selection outline uses
+  // (View.jsx isTextMode). Gate on it so the format buttons don't appear on a block
+  // that isn't being text-edited (e.g. the first tap on a coarse-pointer device).
+  const isTextMode = !!blockUI?.focusedFieldName;
+  const showFormatButtons =
+    isTextMode && isSlateFieldType(fieldType) && !blockIsReadonly && !isMultiSelected;
 
   // CRITICAL: Only show Slate if we actually have a valid field value array
   const hasValidSlateValue = fieldValue && Array.isArray(fieldValue) && fieldValue.length > 0;
@@ -1184,11 +1239,27 @@ const SyncedSlateToolbar = ({
   const availableWidth = Math.max(100, iframeRight - toolbarLeft); // Min 100px for basic controls
   const constrainedMaxWidth = Math.min(maxToolbarWidth || 400, availableWidth);
 
-  // Calculate how many buttons fit based on constrained width
-  // Measured widths: drag handle ~30px, menu button ~30px, gaps ~10px
+  // Calculate how many buttons fit based on constrained width.
+  // The toolbar reserves fixed-width affordances at both ends:
+  //   - Desktop: drag handle (30) + menu/⋯ button (30) + gaps (10) = 70
+  //   - Mobile  (@media max-width:767px): mobile-tablet.css HIDES the drag
+  //     handle and SHOWS chevron-up/down (~64). And step-up-btn
+  //     (~32) is rendered when any block is selected. Plus menu/⋯ (30) +
+  //     gaps (10) = 136.
+  // If we use the desktop number on mobile, the slot system thinks more
+  // buttons fit than actually do → inline format buttons spill past the
+  // toolbar's max-width → `overflow: hidden` clips the rightmost ones,
+  // which is the user-reported "icons clipping at the top of the bar"
+  // on phones. Detect coarse-pointer / phone-width and bump FIXED_WIDTH
+  // so the slot system shifts inline buttons into the overflow ⋯ menu
+  // before they fall off the visible canvas.
   const BUTTON_WIDTH = 32;
   const FORMAT_DROPDOWN_WIDTH = 50;
-  const FIXED_WIDTH = 70; // drag handle (30) + menu button (30) + gaps/padding (10)
+  const isPhoneViewport =
+    typeof window !== 'undefined' &&
+    window.matchMedia &&
+    window.matchMedia('(max-width: 767px)').matches;
+  const FIXED_WIDTH = isPhoneViewport ? 136 : 70;
   const availableForButtons = constrainedMaxWidth - FIXED_WIDTH;
 
   // Format dropdown counts as ~1.5 buttons worth of space
@@ -1238,11 +1309,41 @@ const SyncedSlateToolbar = ({
           border: '1px solid #e0e0e0',
           borderRadius: '3px',
           padding: '2px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+          // Quanta floats ABOVE the frontend's own content, so it needs enough
+          // elevation to read as a separate layer. At 0.08/3px it blended into
+          // whatever was behind it and the bar looked pasted onto the page.
+          boxShadow: '0 2px 12px rgba(0, 0, 0, 0.15)',
           pointerEvents: 'none', // Allow events to pass through to iframe drag button
           overflow: 'hidden', // Ensure buttons don't extend past maxWidth
         }}
       >
+      {/* Mobile-only chevron move buttons. Hidden on desktop/tablet via
+       * .quanta-toolbar .chevron-buttons { display: none } in
+       * mobile-tablet.css. Within-parent move only. */}
+      {(() => {
+        if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) return null;
+        const block = getBlock(selectedBlock);
+        if (isBlockPositionLocked(block, templateEditMode)) return null;
+        return (
+          <div className="chevron-buttons">
+            <button
+              type="button"
+              className="chevron-up"
+              aria-label="Move block up"
+              disabled={isAtTopOfParent}
+              onClick={() => moveSelectedBlock('up')}
+            >▲</button>
+            <button
+              type="button"
+              className="chevron-down"
+              aria-label="Move block down"
+              disabled={isAtBottomOfParent}
+              onClick={() => moveSelectedBlock('down')}
+            >▼</button>
+          </div>
+        );
+      })()}
+
       {/* Drag handle or lock icon - only show for blocks, not page-level fields */}
       {(() => {
         if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) {
@@ -1427,6 +1528,44 @@ const SyncedSlateToolbar = ({
         );
       })()}
 
+      {/* Step-up button — mobile equivalent of the Escape key.
+       * The state machine (text → block → parent → deselect) lives in
+       * hydra.js's stepUpSelection() method. The button simply posts a
+       * STEP_UP message to the iframe; the SAME code path runs whether
+       * the editor pressed Escape (desktop) or tapped this button
+       * (mobile). Zero duplicated logic.
+       *
+       * Visible whenever ANY block is selected (including top-level)
+       * so a touch editor always has a way back. */}
+      {selectedBlock && (
+        <button
+          type="button"
+          className="step-up-btn"
+          aria-label="Step up (exit text / select parent / deselect)"
+          title="Step up"
+          onClick={() => {
+            const iframe = document.getElementById('previewIframe');
+            if (iframe?.contentWindow) {
+              iframe.contentWindow.postMessage({ type: 'STEP_UP' }, '*');
+            }
+          }}
+          style={{
+            background: '#fff',
+            border: 'none',
+            padding: '4px 6px',
+            cursor: 'pointer',
+            color: '#222',
+            pointerEvents: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <Icon name={upSVG} size="20px" color="#222" />
+        </button>
+      )}
+
       {/* Three-dots menu button */}
       <button
         className="volto-hydra-menu-trigger"
@@ -1470,8 +1609,6 @@ const SyncedSlateToolbar = ({
             triggerButton?.click();
           }
         }}
-        parentId={parentId}
-        onSelectBlock={onSelectBlock}
         overflowButtons={overflowButtons}
         showFormatDropdown={!showFormatDropdown}
         blockButtons={blockButtons}

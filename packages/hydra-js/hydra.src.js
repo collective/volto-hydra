@@ -182,9 +182,48 @@ export class Bridge {
     this.blockTextMutationObserver = null;
     this.attributeMutationObserver = null;
     this.selectedBlockUid = null;
-    this.editMode = 'text'; // 'text' | 'block' — user switches via Escape/Enter/click
+    // 'text' | 'block' — user switches via Escape / Enter / click. Defined
+    // as an accessor so EVERY assignment also writes the body attribute
+    // the injected CSS reads (`body[data-hydra-edit-mode="block"]`) to set
+    // `user-select: none` on data-edit-text fields under
+    // @media (pointer: coarse). That CSS is what stops iOS long-press =
+    // word-select from firing while we're in block mode.
+    let _editMode = 'text';
+    let _focusedFieldName = null;
+    Object.defineProperty(this, 'editMode', {
+      get: () => _editMode,
+      set: (v) => {
+        _editMode = v;
+        // Invariant (see focusedFieldName below): block mode has no focused text
+        // field. Clearing on the transition drops any field a frontend focus set
+        // moments earlier — e.g. the tap that selects a block focuses its
+        // contenteditable (setting focusedFieldName) a beat BEFORE the click
+        // handler flips us to block mode. Without this, block mode would keep a
+        // stale focusedFieldName and the admin would show the text toolbar.
+        if (v === 'block') _focusedFieldName = null;
+        this._syncEditModeAttribute();
+      },
+      enumerable: true,
+      configurable: true,
+    });
     this.multiSelectedBlockUids = []; // Array of block UIDs in multi-selection
-    this.focusedFieldName = null; // Track which editable field within the block has focus
+    // focusedFieldName = which editable text field within the block has focus. It
+    // is the admin's TEXT-mode signal: a non-null value surfaces the slate format
+    // toolbar. Guard it as an accessor so the invariant holds from ONE place
+    // instead of the ~10 sites that assign it: it may be non-null only in text
+    // mode. Frontends fire focus/selectionchange on their own contenteditable
+    // during re-renders (e.g. autofocusing a field after a move/reorder) — those
+    // must never flip block mode into text mode. In block mode the assignment is
+    // dropped; a real user re-enters text via a tap (which sets editMode='text'
+    // first, so genuine editing is unaffected).
+    Object.defineProperty(this, 'focusedFieldName', {
+      get: () => _focusedFieldName,
+      set: (v) => {
+        _focusedFieldName = v && _editMode === 'block' ? null : v;
+      },
+      enumerable: true,
+      configurable: true,
+    });
     this.focusedLinkableField = null; // Track which linkable field has focus (for link editing)
     this.focusedMediaField = null; // Track which media field has focus (for image selection)
     this.isInlineEditing = false;
@@ -1655,6 +1694,123 @@ export class Bridge {
   }
 
   /**
+   * Deepest render-order insertion target when a block ENTERS `containerUid`
+   * from `enterEdge` ('top' → before the first child, 'bottom' → after the
+   * last child). Follows the near-edge child chain down and returns the
+   * DEEPEST sub-container whose region accepts `type` (so a slate entering
+   * `columns` lands in the nearest column, not beside the columns). Returns
+   * null when no reachable level accepts `type` — the caller then swaps/skips
+   * past the container. Acceptance is the schema's region rule
+   * (allowedSiblingTypes); which child to follow is DOM order (render).
+   */
+  _descendAbsorbTarget(containerUid, enterEdge, type) {
+    const children = this._getSiblingsByDomOrder(null, containerUid);
+    if (children.length === 0) return null; // leaf / empty container: not enterable here
+    const insertAfter = enterEdge === 'bottom';
+    const nearChild = insertAfter ? children[children.length - 1] : children[0];
+    // Deepest-acceptable wins: try to descend into the near child first.
+    if (this._getSiblingsByDomOrder(null, nearChild).length > 0) {
+      const deeper = this._descendAbsorbTarget(nearChild, enterEdge, type);
+      if (deeper) return deeper;
+    }
+    // Accept at THIS level if the container's region allows `type`.
+    const childAllowed = this.blockPathMap?.[children[0]]?.allowedSiblingTypes || null;
+    if (!childAllowed || (type && childAllowed.includes(type))) {
+      return { targetBlockId: nearChild, insertAfter, targetParentId: containerUid };
+    }
+    return null;
+  }
+
+  /**
+   * When a block is at its container's edge (no sibling in the move
+   * direction), walk UP through ancestor containers until one whose region
+   * accepts `type` is found, and place the block as a sibling of the highest
+   * rejecting container in that region. e.g. a slate at the top of a column
+   * escapes col → columns (rejects slate) → page (accepts). Null when nothing
+   * up to the page accepts `type` (chevron stays disabled).
+   */
+  _ascendExpelTarget(blockUid, down) {
+    const type = this.getBlockData(blockUid)?.['@type'];
+    let container = this.blockPathMap?.[blockUid]?.parentId;
+    while (container && container !== PAGE_BLOCK_UID) {
+      const cInfo = this.blockPathMap[container];
+      const grandparent = cInfo?.parentId;
+      // Types allowed as siblings of `container` = the region the block would
+      // land in if it escapes to this level.
+      const regionAllowed = cInfo?.allowedSiblingTypes || null;
+      if (!regionAllowed || (type && regionAllowed.includes(type))) {
+        return {
+          targetBlockId: container,
+          insertAfter: down,
+          targetParentId:
+            grandparent && grandparent !== PAGE_BLOCK_UID ? grandparent : null,
+        };
+      }
+      container = grandparent;
+    }
+    return null;
+  }
+
+  /**
+   * Chevron (mobile up/down) move target. ONE rule for every case, computed
+   * from render order (_getSiblingsByDomOrder) + the schema's region
+   * acceptance, routed through the MOVE_BLOCKS → moveBlockBetweenContainers
+   * container API. Moving `blockUid` one visual step in `direction`
+   * ('up'|'down'):
+   *   - neighbour in that direction is a container that accepts us at some
+   *     reachable level → ABSORB into it (deepest near-edge position);
+   *   - neighbour is a plain sibling (or a container that rejects us at every
+   *     level) → SWAP past it within this region;
+   *   - no neighbour (at the container edge) → EXPEL to the nearest ancestor
+   *     region that accepts us.
+   * Returns { targetBlockId, insertAfter, targetParentId } or null (disabled).
+   */
+  _computeChevronMove(blockUid, direction) {
+    if (!blockUid || blockUid === PAGE_BLOCK_UID) return null;
+    const info = this.blockPathMap?.[blockUid];
+    if (!info) return null;
+    if (this._filterMutableBlockUids([blockUid], 'move').length === 0) return null;
+
+    const parentId = info.parentId;
+    const down = direction === 'down';
+    const type = this.getBlockData(blockUid)?.['@type'];
+
+    // Render-order siblings sharing this block's region.
+    const siblings = this._getSiblingsByDomOrder(null, parentId).filter(
+      (id) => this.blockPathMap?.[id]?.region === info.region,
+    );
+    const idx = siblings.indexOf(blockUid);
+    if (idx < 0) return null;
+    const neighborId = siblings[down ? idx + 1 : idx - 1];
+
+    if (neighborId) {
+      // ABSORB into the neighbour if it's a container that accepts us at some
+      // reachable level; otherwise SWAP past it within this region.
+      const neighborIsContainer =
+        this._getSiblingsByDomOrder(null, neighborId).length > 0;
+      if (neighborIsContainer) {
+        const target = this._descendAbsorbTarget(
+          neighborId,
+          down ? 'top' : 'bottom',
+          type,
+        );
+        if (target) return target;
+      }
+      return {
+        targetBlockId: neighborId,
+        insertAfter: down,
+        targetParentId: parentId === PAGE_BLOCK_UID ? null : parentId,
+      };
+    }
+
+    // At the container edge → EXPEL to the nearest ancestor region that accepts us.
+    if (parentId && parentId !== PAGE_BLOCK_UID) {
+      return this._ascendExpelTarget(blockUid, down);
+    }
+    return null;
+  }
+
+  /**
    * Filter a list of block UIDs to those that can be mutated by `op`.
    * Single source of truth for locked-block protection on the iframe side.
    * op: 'delete' | 'move' | 'edit'.
@@ -2950,6 +3106,95 @@ export class Bridge {
    * @param {string} [options.focusedFieldName] - Override focused field name
    * @param {Object} [options.selection] - Serialized selection to include
    */
+  /**
+   * Progressive step-up state machine (the "Escape" gesture).
+   *
+   * Walks ONE step up from the current selection state:
+   *   1. Multi-select       → single anchor block
+   *   2. Nothing selected   → confirm-deselect (no-op signal to admin)
+   *   3. Text mode          → block mode of the same block
+   *   4. Block mode (nested) → parent block
+   *   5. Block mode (root)  → deselect (page mode)
+   *
+   * Triggered by:
+   *   - Escape key (admin-side handler when iframe doesn't have focus,
+   *     and iframe-side handler when it does)
+   *   - STEP_UP postMessage from the admin (e.g., the ⬆ button in Quanta
+   *     on mobile — touch devices have no Escape key)
+   *
+   * Returns true if the gesture was consumed (so the caller can
+   * preventDefault on the event); false otherwise.
+   */
+  stepUpSelection(opts = {}) {
+    // 1. Multi-select → single block (anchor)
+    if (this.multiSelectedBlockUids.length > 0) {
+      const anchorUid = this.multiSelectedBlockUids[0];
+      this.multiSelectedBlockUids = [];
+      this.selectedBlockUid = anchorUid;
+      const anchorEl = this.queryBlockElement(anchorUid);
+      if (anchorEl) {
+        this.sendBlockSelected(opts.source || 'stepUpMultiSelect', anchorEl, {
+          focusedFieldName: null,
+        });
+      }
+      return true;
+    }
+
+    // 2. No block selected: confirm deselect to admin
+    if (!this.selectedBlockUid) {
+      this.sendBlockSelected(opts.source || 'stepUp', null);
+      return true;
+    }
+
+    // 3. Text mode → Block mode (when an inline edit field is active)
+    const activeEditField = document.activeElement?.closest?.(
+      '[data-edit-text][contenteditable="true"]',
+    );
+    // Also accept this.editMode === 'text' so a STEP_UP message that
+    // arrives AFTER focus has shifted off the inline editor (which is
+    // what happens when the user taps the admin-side ⬆ button) still
+    // recognises text mode.
+    if (activeEditField || this.editMode === 'text') {
+      log('stepUp: text → block mode for', this.selectedBlockUid);
+      this.editMode = 'block';
+      const blockElement = this.queryBlockElement(this.selectedBlockUid);
+      if (blockElement) {
+        this.collectBlockFields(blockElement, 'data-edit-text', (el) => {
+          if (el.getAttribute('contenteditable') === 'true') {
+            el.setAttribute('contenteditable', 'false');
+          }
+        });
+      }
+      if (activeEditField) activeEditField.blur();
+      this.focusedFieldName = null;
+      if (blockElement) {
+        this.sendBlockSelected(opts.source || 'stepUpToBlockMode', blockElement, {
+          focusedFieldName: null,
+        });
+      }
+      return true;
+    }
+
+    // 4 & 5. Block mode → Parent (or deselect)
+    this.editMode = 'block';
+    const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
+    const parentId = pathInfo?.parentId || null;
+    log('stepUp: block → parent', parentId, 'from', this.selectedBlockUid);
+    if (parentId && parentId !== PAGE_BLOCK_UID) {
+      if (this.blockPathMap?.[parentId]?.isTemplateInstance) {
+        this.selectBlock(parentId);
+      } else {
+        const parentElement = this.queryBlockElement(parentId);
+        if (parentElement) this.selectBlock(parentElement);
+      }
+    } else {
+      this.selectedBlockUid = null;
+      this.editMode = 'text';
+      this.sendBlockSelected(opts.source || 'stepUp', null);
+    }
+    return true;
+  }
+
   sendBlockSelected(src, blockElement, options = {}) {
     // Suppress position-tracking updates during carousel/selector navigation
     // Allow initial selection sources (fieldFocusListener, selectionChangeListener, etc.) through
@@ -3005,9 +3250,18 @@ export class Bridge {
     const linkableFields = elementForFields ? this.getLinkableFields(elementForFields) : {};
     const mediaFields = elementForFields ? this.getMediaFields(elementForFields) : {};
     const addDirection = elementForFields ? this.getAddDirection(elementForFields) : 'bottom';
-    const focusedFieldName = options.focusedFieldName !== undefined
-      ? options.focusedFieldName
-      : this.focusedFieldName;
+    // Text-mode invariant at the ONE boundary that reaches the admin:
+    // focusedFieldName is the admin's text-mode signal (it surfaces the slate
+    // format toolbar), so it may be non-null only in text mode. Force null in
+    // block mode regardless of what the caller passes — a stale field, or one a
+    // frontend focus/selectionchange set during a re-render, must never flip
+    // block mode into text mode. Media/linkable fields pass through (they're
+    // needed for image/link blocks in block mode too).
+    const focusedFieldName = this.editMode === 'block'
+      ? null
+      : options.focusedFieldName !== undefined
+        ? options.focusedFieldName
+        : this.focusedFieldName;
     const focusedLinkableField = options.focusedLinkableField !== undefined
       ? options.focusedLinkableField
       : this.focusedLinkableField;
@@ -3066,6 +3320,12 @@ export class Bridge {
       // (per docs/architecture.md). Iframe keeps invisible event-capture
       // divs at the same coords for mousedown.
       canResize: this._lastCanResize || null,
+      // Chevron (mobile up/down) move targets, computed HERE from render geometry
+      // (reusing _computeEdgePlan) rather than by a data-order walk in the admin.
+      // The admin uses them for the chevrons' enabled state and, on press,
+      // dispatches the target straight through the existing MOVE_BLOCKS path.
+      moveUpTarget: blockUid && blockUid !== PAGE_BLOCK_UID ? this._computeChevronMove(blockUid, 'up') : null,
+      moveDownTarget: blockUid && blockUid !== PAGE_BLOCK_UID ? this._computeChevronMove(blockUid, 'down') : null,
       isMultiElement: blockUid && blockUid !== PAGE_BLOCK_UID ? this.getAllBlockElements(blockUid).length > 1 : false,
     };
 
@@ -3428,6 +3688,12 @@ export class Bridge {
       const isHydraView = window.name.startsWith('hydra-view:') || (editParam === 'false');
       const hydraBridgeEnabled = isHydraEdit || isHydraView || editParam !== null;
       const isEditMode = isHydraEdit;
+      // Remember whether this bridge is in EDIT mode. View mode has no block
+      // selection / inline editing, so edit-only keyboard handling (the Escape
+      // step-up machine) must not run there — otherwise it hijacks the
+      // frontend's own Escape (e.g. closing a search box) and sends the admin a
+      // deselect it can't handle (no onSelectBlock in view mode).
+      this._isEditMode = isEditMode;
 
       // Extract admin origin from iframe name
       if ((isHydraEdit || isHydraView) && !this.adminOrigin) {
@@ -3633,6 +3899,21 @@ export class Bridge {
             const blockElement = target?.closest('[data-block-uid]');
             const blockUid = blockElement?.getAttribute('data-block-uid');
             if (!blockUid || !this.selectedBlockUid) return;
+
+            // Focus tracking is a TEXT-mode concern. This listener exists to (a)
+            // follow the caret to a different block (Tab) and (b) record which
+            // field is focused so the admin shows the right format toolbar — both
+            // only meaningful while editing text. In BLOCK mode, selection is
+            // driven by taps and the chevrons, so a focus event here is
+            // FRONTEND-initiated (e.g. Volto autofocusing a container's first
+            // child after re-rendering it on a move) rather than a user gesture.
+            // Acting on it hijacks selection (jumping off a moved grid onto its
+            // first child, leaving the grid's handles behind) or sets
+            // focusedFieldName (silently flipping to the text toolbar). Ignore
+            // all focus in block mode; a real user re-enters text via a tap,
+            // which goes through the click handler (it sets editMode='text'
+            // BEFORE focusing, so genuine editing is unaffected).
+            if (this.editMode === 'block') return;
 
             if (blockUid !== this.selectedBlockUid) {
               // Skip if block-selector or arrow-key navigation is in progress —
@@ -3895,6 +4176,14 @@ export class Bridge {
           this.multiSelectedBlockUids = [];
           // Ack back to admin so it can clear selectionMode
           this.sendMessageToParent({ type: 'EXIT_SELECTION_MODE' });
+        } else if (event.data.type === 'STEP_UP') {
+          // Admin-side ⬆ button (mobile, where no Escape key exists)
+          // routes through the same state machine as the desktop
+          // Escape key. The button click is just a relay — all the
+          // text → block → parent → deselect logic lives in
+          // stepUpSelection() so there is one source of truth.
+          log('Received STEP_UP');
+          this.stepUpSelection({ source: 'stepUpMessage' });
         } else if (event.data.type === 'TEMPLATE_EDIT_MODE') {
           // Toggle template edit mode - affects which blocks are editable via isBlockReadonly
           // instanceId: the template instance being edited, or null to exit edit mode
@@ -4151,7 +4440,39 @@ export class Bridge {
           this.multiSelectedBlockUids = [];
         }
 
-        this.editMode = 'text';
+        // Only a block that HAS text lands in text mode.
+        //
+        // Clicking an image, a card, a container with no title — any block with no
+        // editable text — has no cursor to place, so text mode is a lie: the editor
+        // sees no caret, yet Escape / the ⬆ button spend their first press "leaving"
+        // an inline editor that was never entered, and deselecting takes two presses.
+        //
+        // Keyed on the block OWNING an editable field, not on the click landing
+        // exactly on the glyphs: clicking a text block's padding must still place the
+        // cursor, and `target.closest()` only walks ANCESTORS, so a click on the
+        // block's own <div> would never find the `data-edit-text` child below it.
+        // getOwnEditableFields excludes nested blocks' fields (fieldBelongsToBlock).
+        //
+        // Touch-aware on top of that:
+        //   - Mouse (fine pointer)     → text mode if the click was on this block's text.
+        //   - Touch (coarse pointer):
+        //       1st tap on a DIFFERENT block → block mode (no contenteditable,
+        //         no cursor). iOS native long-press = word-select can't fire
+        //         because the field is contenteditable=false in this state.
+        //         Block-multi-select long-press has a clean canvas to grab.
+        //       2nd tap on the SAME block    → text mode (cursor in field).
+        // Without that gate, long-press on a freshly selected block races
+        // the OS word-select handles on top of the bridge's multi-select
+        // timer, putting editors into both modes simultaneously.
+        const coarsePointer =
+          typeof matchMedia === 'function' &&
+          matchMedia('(pointer: coarse)').matches;
+        const alreadySelected = blockUid === this.selectedBlockUid;
+        const hasOwnText =
+          !this.isBlockReadonly(blockUid) &&
+          this.getOwnEditableFields(blockElement).length > 0;
+        const enterTextMode = hasOwnText && (!coarsePointer || alreadySelected);
+        this.editMode = enterTextMode ? 'text' : 'block';
         this.selectBlock(blockElement);
       } else {
         // No block - check for page-level fields
@@ -4230,6 +4551,24 @@ export class Bridge {
 
       document.addEventListener('touchstart', (e) => {
         if (this._longPressTimer) clearTimeout(this._longPressTimer);
+
+        // Don't fire the block multi-select long-press while the user is
+        // editing text. The OS-native long-press = word-select gesture
+        // must win cleanly on a focused contenteditable. Without this
+        // gate the timer fires AND the word-select handles appear at the
+        // same time, putting the editor into multi-block-select mode
+        // while they were trying to copy a word.
+        // Test: tap a slate field to focus it, long-press to word-select
+        //   → should ONLY show word-selection, not enter multi-select.
+        const ae = document.activeElement;
+        const inTextMode = !!(
+          ae &&
+          ae !== document.body &&
+          ae.closest &&
+          ae.closest('[contenteditable="true"]')
+        );
+        if (inTextMode) return;
+
         const touch = e.touches[0];
         startX = touch.clientX;
         startY = touch.clientY;
@@ -4281,6 +4620,18 @@ export class Bridge {
     // No separate document-level keydown handlers needed.
   }
 
+  // Sync `document.body.dataset.hydraEditMode` to the current editMode.
+  // The injected CSS uses this attribute (gated by @media (pointer: coarse))
+  // to set `user-select: none` on data-edit-text fields when in block mode
+  // — which is what actually suppresses the iOS / Android Chrome
+  // OS-level long-press = word-select gesture. contenteditable=false
+  // alone doesn't do it: the browsers happily word-select non-editable
+  // text via long-press.
+  _syncEditModeAttribute() {
+    if (typeof document === 'undefined' || !document.body) return;
+    document.body.dataset.hydraEditMode = this.editMode || 'text';
+  }
+
   ////////////////////////////////////////////////////////////////////////////////
   // Transform Blocking API - Prevent user input during Slate transforms
   ////////////////////////////////////////////////////////////////////////////////
@@ -4322,74 +4673,32 @@ export class Bridge {
 
         const activeEditField = document.activeElement?.closest?.('[data-edit-text][contenteditable="true"]');
 
-        // === Escape: three-state machine (works in all modes) ===
+        // === Escape: three-state machine (edit mode only) ===
         if (e.key === 'Escape') {
-          // Multi-select → single block (anchor)
-          if (this.multiSelectedBlockUids.length > 0) {
-            const anchorUid = this.multiSelectedBlockUids[0];
-            this.multiSelectedBlockUids = [];
-            this.selectedBlockUid = anchorUid;
-            const anchorEl = this.queryBlockElement(anchorUid);
-            if (anchorEl) {
-              this.sendBlockSelected('escapeMultiSelect', anchorEl, { focusedFieldName: null });
-            }
-            return;
-          }
-          // No block selected: send deselect to admin
-          if (!this.selectedBlockUid) {
-            this.sendBlockSelected('escapeKey', null);
-            return;
-          }
+          // View mode has nothing to step up (no selection/editing) and its
+          // admin has no onSelectBlock handler. Don't hijack the frontend's own
+          // Escape (e.g. closing a search box) or send a deselect it can't
+          // handle — let Escape pass through to the page.
+          if (!this._isEditMode) return;
           // Don't interfere with slash menu, modals, dropdowns
           if (this._slashMenuActive) return;
           const isInPopup = e.target?.closest?.('.volto-hydra-dropdown-menu, .blocks-chooser, [role="dialog"]');
           if (isInPopup) return;
 
-          e.preventDefault();
-          // Also stop propagation so this editor key (escape-to-parent) does not
-          // reach the FRONTEND's own window/document keydown handlers. Otherwise an
-          // app-level ESC shortcut — e.g. a slide-out menu that closes on ESC —
-          // fires too, dismissing UI mid-edit. The blocker is capture-phase, so
-          // this halts the event before it bubbles to the page's listeners. Safe
-          // here: this branch only runs with a block selected (the no-block / popup
-          // / slash cases already returned). Matches the block-mode / blocked
-          // branches which already stopPropagation.
-          e.stopPropagation();
-          if (activeEditField) {
-            // Text mode → Block mode
-            log('Escape key - entering block mode from text editing:', this.selectedBlockUid);
-            this.editMode = 'block';
-            const blockElement = this.queryBlockElement(this.selectedBlockUid);
-            if (blockElement) {
-              this.collectBlockFields(blockElement, 'data-edit-text', (el) => {
-                if (el.getAttribute('contenteditable') === 'true') {
-                  el.setAttribute('contenteditable', 'false');
-                }
-              });
-            }
-            activeEditField.blur();
-            this.focusedFieldName = null;
-            if (blockElement) {
-              this.sendBlockSelected('escapeToBlockMode', blockElement, { focusedFieldName: null });
-            }
-          } else {
-            // Block mode → Parent (or deselect)
-            this.editMode = 'block'; // stay in block mode for parent
-            const pathInfo = this.blockPathMap?.[this.selectedBlockUid];
-            const parentId = pathInfo?.parentId || null;
-            log('Escape key - selecting parent:', parentId, 'from:', this.selectedBlockUid);
-            if (parentId && parentId !== PAGE_BLOCK_UID) {
-              if (this.blockPathMap?.[parentId]?.isTemplateInstance) {
-                this.selectBlock(parentId);
-              } else {
-                const parentElement = this.queryBlockElement(parentId);
-                if (parentElement) this.selectBlock(parentElement);
-              }
-            } else {
-              this.selectedBlockUid = null;
-              this.editMode = 'text';
-              this.sendBlockSelected('escapeKey', null);
-            }
+          // The state machine itself lives in stepUpSelection() — that
+          // way the SAME progression is reachable from a STEP_UP
+          // postMessage (sent by the admin-side ⬆ button), with zero
+          // duplicated logic.
+          if (this.stepUpSelection({ source: 'escapeKey' })) {
+            e.preventDefault();
+            // Also stop propagation so this editor key (escape-to-parent) does not
+            // reach the FRONTEND's own window/document keydown handlers. Otherwise an
+            // app-level ESC shortcut — e.g. a slide-out menu that closes on ESC —
+            // fires too, dismissing UI mid-edit. The blocker is capture-phase, so
+            // this halts the event before it bubbles to the page's listeners. Safe
+            // here: only when stepUpSelection actually consumed the Escape (the
+            // no-block / popup / slash cases already returned or return false).
+            e.stopPropagation();
           }
           return;
         }
@@ -7477,12 +7786,13 @@ export class Bridge {
           : 'nonEditableBlock';
         log('Sending BLOCK_SELECTED immediately for:', pending.blockUid, `(${src})`,
             'mediaField:', pending.focusedMediaField, 'hasEditable:', hasEditableFields, 'isBlockMode:', isBlockMode);
-        // focusedFieldName: null for non-editable and block mode (no text field
-        // focused). Media/linkable fields always pass through — they're set from
-        // the click and the toolbar needs them regardless of block type.
+        // focusedFieldName: null for a non-editable block (no text field). Block
+        // mode is handled centrally by sendBlockSelected (the invariant), so it
+        // needn't be re-checked here. Media/linkable fields always pass through —
+        // they're set from the click and the toolbar needs them regardless.
         this.sendBlockSelected(src, blockElement, {
           blockUid: pending.blockUid,
-          focusedFieldName: (isBlockMode || !hasEditableFields) ? null : pending.focusedFieldName,
+          focusedFieldName: hasEditableFields ? pending.focusedFieldName : null,
           focusedLinkableField: pending.focusedLinkableField,
           focusedMediaField: pending.focusedMediaField,
         });
@@ -7562,9 +7872,10 @@ export class Bridge {
             this.needsFieldDetection = false;
           }
 
-          // In block mode, don't set up contenteditable or focus fields
+          // In block mode, don't set up contenteditable or focus fields.
+          // (sendBlockSelected forces focusedFieldName null in block mode.)
           if (this.editMode === 'block') {
-            this.sendBlockSelected('blockMode', currentBlockElement, { focusedFieldName: null });
+            this.sendBlockSelected('blockMode', currentBlockElement);
           } else if (this.editMode === 'text') {
 
           // Check if field was already editable before we do anything
@@ -9356,6 +9667,13 @@ export class Bridge {
     };
     document.addEventListener('mousemove', sendActivity);
     document.addEventListener('mousedown', sendActivity);
+    // Touch fires MOUSE_ACTIVITY too. Without this, a real touch tap on
+    // a phone might never trigger mousedown (the browser is free to
+    // delay or skip mouse synthesis), so the Quanta toolbar stays at
+    // opacity:0 after the user taps a block — they can see the toolbar
+    // is mounted but can't aim at the chevron-up / chevron-down buttons.
+    // Reported bug: "in block mode I can't move the block up and down".
+    document.addEventListener('touchstart', sendActivity, { passive: true });
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -11898,6 +12216,33 @@ export class Bridge {
     style.innerHTML = `
         [contenteditable] {
           outline: 0px solid transparent;
+        }
+        /* In block mode, suppress OS-level long-press = word-select on
+           the selected block AND all of its descendants. iOS Safari and
+           Chrome on Android treat ANY text as long-press-selectable —
+           even when contenteditable=false — so we have to disable text
+           selection at the CSS level. Without this, a long-press on the
+           selected block fires the bridge's multi-select gesture AND
+           the OS word-select handles in the same beat.
+           Scope is intentionally WIDE: every descendant of a
+           [data-block-uid] wrapper as well as of [data-edit-text]
+           in block mode. Anything narrower lets the OS resolve the
+           long-press to an ancestor of the editable field and start
+           selection from there (reported regression on Chrome devtools
+           mobile-emulation: only the inner field had the rule, the
+           wrapper didn't, the OS picked the wrapper, selection ran).
+           The rule is NOT gated by @media (pointer: coarse). Block
+           mode is by design a transient state where text-selection
+           isn't the user's intent. Gating to coarse pointers also
+           missed Chrome devtools mobile-emulation in practice, which
+           reintroduced the bug. */
+        [data-hydra-edit-mode="block"] [data-edit-text],
+        [data-hydra-edit-mode="block"] [data-edit-text] *,
+        [data-hydra-edit-mode="block"] [data-block-uid],
+        [data-hydra-edit-mode="block"] [data-block-uid] * {
+          -webkit-user-select: none !important;
+          user-select: none !important;
+          -webkit-touch-callout: none !important;
         }
         /* Placeholder text for empty editable fields. The ::before is in
            normal flow (no position: absolute) so the placeholder text

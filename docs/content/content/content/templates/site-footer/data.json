@@ -67,30 +67,12 @@
         }
       ],
       "plaintext": "Hydra \u2014 visual editing for headless Plone. \u00a9 2024-2026 Plone Foundation."
-    },
-    "default-slot": {
-      "@type": "slate",
-      "templateId": "/templates/site-footer",
-      "templateInstanceId": "site-footer-def-instance",
-      "slotId": "default",
-      "value": [
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": ""
-            }
-          ]
-        }
-      ],
-      "plaintext": ""
     }
   },
   "blocks_layout": {
     "items": [
       "footer-social",
-      "footer-copyright",
-      "default-slot"
+      "footer-copyright"
     ]
   },
   "@components": {

@@ -1,0 +1,72 @@
+{
+  "@id": "http://localhost:8888/_test_data/teaser-image-test-page",
+  "@type": "Document",
+  "UID": "teaser-image-test-page-uid",
+  "id": "teaser-image-test-page",
+  "title": "Teaser image test page",
+  "description": "Teasers whose targets do / do not have an image",
+  "effective": "2024-11-01T00:00:00+00:00",
+  "review_state": "published",
+  "parent": {
+    "@id": "http://localhost:8888",
+    "@type": "Plone Site",
+    "title": "Site"
+  },
+  "blocks": {
+    "teaser-noimg": {
+      "@type": "teaser",
+      "title": "Imageless target",
+      "href": [
+        {
+          "@id": "/_test_data/another-page",
+          "@type": "Document",
+          "title": "Imageless target",
+          "Title": "Imageless target",
+          "Description": "target has no image",
+          "hasPreviewImage": true,
+          "image_field": "preview_image"
+        }
+      ]
+    },
+    "teaser-withimg": {
+      "@type": "teaser",
+      "title": "Image target",
+      "href": [
+        {
+          "@id": "/_test_data/another-page",
+          "@type": "Document",
+          "title": "Image target",
+          "Title": "Image target",
+          "Description": "target has an image",
+          "hasPreviewImage": true,
+          "image_field": "image",
+          "image_scales": {
+            "image": [
+              {
+                "download": "@@images/image-800.jpeg",
+                "width": 800,
+                "height": 600,
+                "scales": {
+                  "preview": {
+                    "download": "@@images/image-400.jpeg",
+                    "width": 400,
+                    "height": 300
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": ["teaser-noimg", "teaser-withimg"]
+  },
+  "allow_discussion": false,
+  "is_folderish": false,
+  "exclude_from_nav": false,
+  "created": "2025-01-02T12:00:00+00:00",
+  "modified": "2025-01-02T12:00:00+00:00",
+  "lock": { "locked": false }
+}

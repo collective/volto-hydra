@@ -175,8 +175,62 @@ export class AdminUIHelper {
     // Wait for iframe to load
     await this.waitForIframeReady();
 
+    // Edit mode is only usable once the bridge connects. Fail fast (with the
+    // real diagnostic) if it doesn't, instead of proceeding into a dead editor.
+    await this.waitForBridgeConnected();
+
     // Wait for all blocks to render (Nuxt async components may still be loading)
     await this.getStableBlockCount();
+  }
+
+  /**
+   * After entering edit mode, assert the Hydra bridge actually connected.
+   *
+   * hydra.js paints a "Hydra Bridge: Not Connected" overlay
+   * (#hydra-bridge-diagnostic) when it's loaded in an edit iframe but
+   * initBridge() was never called (or INITIAL_DATA never arrived) — see
+   * hydra.src.js _showBridgeDiagnostic. But that overlay only appears after a
+   * 5s idle timeout, long after a typical test has torn down, so nothing
+   * actually catches it. This is the immediate, positive form of that same
+   * check: it waits for the bridge to report `initialized` (INITIAL_DATA
+   * received), and on timeout throws the same facts the overlay would show, so
+   * a broken edit boot fails fast with a clear message instead of surfacing
+   * later as a confusing "block was clicked but nothing got selected" timeout.
+   */
+  async waitForBridgeConnected(timeout: number = 15000): Promise<void> {
+    const iframe = this.getIframe();
+    const body = iframe.locator('body');
+    try {
+      await expect(async () => {
+        const initialized = await body.evaluate(
+          () => (window as any).__hydraBridge?.initialized === true,
+        );
+        expect(initialized).toBe(true);
+      }).toPass({ timeout });
+    } catch {
+      // Bridge never connected — gather the same facts hydra's overlay reports.
+      const info = await body.evaluate(() => {
+        const b = (window as any).__hydraBridge;
+        return {
+          windowName: window.name || '(empty)',
+          bridgeCreated: !!b,
+          initialized: b?.initialized === true,
+          adminOrigin: b?.adminOrigin || null,
+        };
+      });
+      const overlayPresent =
+        (await iframe.locator('#hydra-bridge-diagnostic').count()) > 0;
+      const hint = !info.bridgeCreated
+        ? 'hydra.js was imported but initBridge() was never called — the frontend must call initBridge() in edit mode.'
+        : 'INIT was sent but the admin never responded with INITIAL_DATA — check adminOrigin matches the parent origin.';
+      throw new Error(
+        'Hydra bridge did not connect after entering edit mode ' +
+          '(the "Hydra Bridge: Not Connected" condition). ' +
+          `window.name="${info.windowName}", initBridge called=${info.bridgeCreated}, ` +
+          `INITIAL_DATA received=${info.initialized}, adminOrigin=${info.adminOrigin}, ` +
+          `diagnostic overlay present=${overlayPresent}. ${hint}`,
+      );
+    }
   }
 
   /**
@@ -799,6 +853,19 @@ export class AdminUIHelper {
       return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     });
 
+    // Blur the active element first. The bridge gates long-press multi-
+    // select when a contenteditable is focused (so iOS native long-press =
+    // word-select can fire cleanly in text mode without us also entering
+    // multi-block-select). Tests that combine clickBlockInIframe → long-
+    // press leave the field focused, which would gate the multi-select
+    // even though the test author wants it to fire. Matches real mobile
+    // UX where a user presses Escape or taps elsewhere to exit text mode
+    // before initiating multi-select.
+    await iframe.locator('body').evaluate(() => {
+      const ae = document.activeElement;
+      if (ae && (ae as HTMLElement).blur) (ae as HTMLElement).blur();
+    });
+
     // Dispatch touchstart
     await iframe.locator('body').evaluate((body, pos) => {
       const el = document.elementFromPoint(pos.x, pos.y) || body;
@@ -1162,9 +1229,15 @@ export class AdminUIHelper {
     }, { timeout: 5000 }).toBeTruthy();
 
     // Wait for both drag handles (iframe and Volto toolbar) to be aligned
-    // Only check if the Volto toolbar drag handle exists (some blocks/tests may not have it)
+    // Only check if the Volto toolbar drag handle is actually visible.
+    // On mobile (@media max-width:600px) the drag handle is hidden via
+    // display:none — the chevron buttons replace it — so alignment is
+    // moot. Skip silently in that case.
     const voltoToolbarDragHandle = this.page.locator('.quanta-toolbar .drag-handle');
-    if (await voltoToolbarDragHandle.count() > 0) {
+    const dragHandleVisible =
+      (await voltoToolbarDragHandle.count()) > 0 &&
+      (await voltoToolbarDragHandle.isVisible().catch(() => false));
+    if (dragHandleVisible) {
       await this.waitForDragHandlesAligned(5000);
     }
   }
@@ -4288,24 +4361,37 @@ export class AdminUIHelper {
 
     await userMenu.click();
 
-    // Wait for dropdown to appear - the logout is a Link with id="toolbar-logout"
-    // It contains an SVG with class="logout"
-    const logoutButton = this.page
-      .locator('#toolbar-logout')
-      .or(this.page.locator('a .icon.logout').first())
-      .or(this.page.locator('[aria-label="Logout"]'))
-      .or(this.page.locator('text=Logout'));
+    // Wait for the actual Logout link to appear. The .or() fallback exists
+    // for Volto variants that don't emit #toolbar-logout, but on the live
+    // tree (Volto 19) it does — and we MUST wait specifically for it
+    // because an a11y announcement <span class="visually-hidden">
+    // containing "Menu opened, Focus on Logout" appears slightly before
+    // the real link, and an .or()/.first() race can resolve to that span.
+    const primaryLogout = this.page.locator('#toolbar-logout');
+    const primaryCount = await primaryLogout
+      .waitFor({ state: 'visible', timeout: 4000 })
+      .then(() => 1)
+      .catch(() => 0);
+    const logoutButton = primaryCount > 0
+      ? primaryLogout
+      : this.page
+          .locator('a .icon.logout')
+          .or(this.page.locator('[aria-label="Logout"]'))
+          .or(this.page.locator('text=Logout'))
+          .first();
 
-    try {
-      await logoutButton.first().waitFor({ state: 'visible', timeout: 2000 });
-    } catch (e) {
-      throw new Error(
-        'Logout button did not appear after clicking user menu. ' +
-        'Check that the menu dropdown is working correctly.'
-      );
+    if (primaryCount === 0) {
+      try {
+        await logoutButton.waitFor({ state: 'visible', timeout: 2000 });
+      } catch (e) {
+        throw new Error(
+          'Logout button did not appear after clicking user menu. ' +
+          'Check that the menu dropdown is working correctly.'
+        );
+      }
     }
 
-    await logoutButton.first().click();
+    await logoutButton.click();
 
     // Wait for redirect to login page
     try {

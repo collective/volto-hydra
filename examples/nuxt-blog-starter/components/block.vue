@@ -177,9 +177,9 @@
     :data-block-readonly="block.overwrite ? undefined : ''">
     <!-- Preview image: use block.preview_image if set, otherwise use target's image -->
     <!-- data-edit-link prevents navigation in edit mode, data-edit-media enables image picker overlay -->
-    <NuxtLink :to="getUrl(block.href)" v-if="block.preview_image || block.href?.[0]?.hasPreviewImage" data-edit-link="href">
+    <NuxtLink :to="getUrl(block.href)" v-if="block.preview_image || hrefHasImage(block)" data-edit-link="href">
       <NuxtImg class="rounded-t-lg" data-edit-media="preview_image" v-if="block.preview_image" v-for="props in [imageProps(block.preview_image)]" :src="props.url" alt="" />
-      <NuxtImg class="rounded-t-lg" data-edit-media="preview_image" v-else-if="block.href?.[0]?.hasPreviewImage" v-for="props in [imageProps(block.href[0])]" :src="props.url" alt="" />
+      <NuxtImg class="rounded-t-lg" data-edit-media="preview_image" v-else-if="hrefHasImage(block)" v-for="props in [imageProps(block.href[0])]" :src="props.url" alt="" />
     </NuxtLink>
     <div v-else data-edit-media="preview_image" class="rounded-t-lg bg-gray-200 flex items-center justify-center" style="height: 200px; cursor: pointer;">
       <span class="text-gray-400">Click to add image</span>
@@ -1282,6 +1282,17 @@ const getTeaserTitle = (block) => {
     return block.title || hrefObj?.title || '';
   }
   return hrefObj?.title || '';
+};
+
+// A teaser target has a usable image only when its summary carries image_scales
+// for its image_field. Plone can serialize hasPreviewImage:true for a target
+// that has no deliverable image (image_scales absent) — trusting that flag emits
+// an <img> for a nonexistent /@@images/preview_image, which 404s and fails the
+// strict SSG prerender. image_scales is the real signal.
+const hrefHasImage = (block) => {
+  const h = block?.href?.[0];
+  const field = h?.image_field;
+  return !!(h && field && h.image_scales?.[field]?.[0]);
 };
 
 const getTeaserDescription = (block) => {

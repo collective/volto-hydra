@@ -139,7 +139,7 @@ import { getImageUrl } from './utils.js';
 
 function SliderBlock({ block }) {
   const [current, setCurrent] = useState(0);
-  const slides = block.slides || [];
+  const slides = expandTemplatesSync(block.slides || [], { idField: '@id' });
 
   return (
     <div data-block-uid={block['@uid']} className="slider-block">
@@ -180,7 +180,7 @@ function SliderBlock({ block }) {
 <template>
   <div :data-block-uid="block['@uid']" class="slider-block">
     <div
-      v-for="(slide, i) in block.slides || []"
+      v-for="(slide, i) in slides"
       :key="slide['@id']"
       :data-block-uid="slide['@id']"
       class="slide"
@@ -199,7 +199,7 @@ function SliderBlock({ block }) {
     </div>
     <div class="slider-dots">
       <button
-        v-for="(_, i) in block.slides || []"
+        v-for="(_, i) in slides"
         :key="i"
         @click="current = i"
         :class="{ active: i === current }"
@@ -209,10 +209,12 @@ function SliderBlock({ block }) {
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { getImageUrl } from './utils.js';
-defineProps({ block: Object });
+const props = defineProps({ block: Object });
 const current = ref(0);
+// Expand the slides object_list (keyed by @id). Edit-mode pass-through sets each slide's @uid.
+const slides = computed(() => expandTemplatesSync(props.block.slides || [], { idField: '@id' }));
 </script>
 ```
 
@@ -224,10 +226,12 @@ const current = ref(0);
   import { getImageUrl } from './utils.js';
   export let block;
   let current = 0;
+  // Expand the slides object_list (keyed by @id). Edit-mode pass-through sets each slide's @uid.
+  $: slides = expandTemplatesSync(block.slides || [], { idField: '@id' });
 </script>
 
 <div data-block-uid={block['@uid']} class="slider-block">
-  {#each block.slides || [] as slide, i (slide['@id'])}
+  {#each slides as slide, i (slide['@id'])}
     <div
       data-block-uid={slide['@id']}
       class="slide"
@@ -247,7 +251,7 @@ const current = ref(0);
     </div>
   {/each}
   <div class="slider-dots">
-    {#each block.slides || [] as _, i}
+    {#each slides as _, i}
       <button on:click={() => current = i} class:active={i === current} />
     {/each}
   </div>
@@ -269,8 +273,13 @@ const current = ref(0);
  * individually.
  */
 import { getImageUrl } from './utils.js';
-const { block } = Astro.props;
-const slides = block.slides || [];
+import { expandTemplatesSync } from '$helpers';
+// astro renders ONLY via the edit render API (SSR has no window.name), so default to edit mode —
+// also covers a slider nested in a container, whose BlockRenderer doesn't thread editMode down.
+const { block, editMode = true } = Astro.props;
+// Expand the slides object_list (idField @id). Edit mode makes this a pass-through that sets each
+// slide's @uid (a view render would need pre-loaded templates instead).
+const slides = expandTemplatesSync(block.slides || [], { idField: '@id', editMode });
 ---
 <div class="slider-block">
   {slides.map((slide: any, i: number) => (

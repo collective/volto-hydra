@@ -385,7 +385,15 @@ export const sharedBlocksConfig = {
                             items: {
                                 title: 'Content',
                                 widget: 'blocks_layout',
-                                allowedBlocks: ['slate', 'image'],
+                                // Accordion panels accept the general page-level content blocks
+                                // (the demo panels hold separator/teaser/listing/slateTable, not
+                                // just slate/image) — EXCEPT accordion itself, to prevent nesting
+                                // accordions inside accordions.
+                                allowedBlocks: [
+                                    'slate', 'image', 'separator', 'teaser', 'listing', 'slateTable',
+                                    'hero', 'columns', 'slider', 'gridBlock', 'section',
+                                    'contextNavigation', 'codeExample', 'toc', 'highlight', 'introduction',
+                                ],
                                 defaultBlockType: 'slate',
                             },
                         },
@@ -394,6 +402,25 @@ export const sharedBlocksConfig = {
             },
         },
     },
+    // Separator (horizontal rule) — a simple leaf block with no editable fields.
+    // Registered so it's a valid page-level block (it's used across the docs
+    // content and inside accordions); without this it isn't in the page's
+    // allowedBlocks and the move/containment logic treats it as disallowed.
+    separator: {
+        id: 'separator',
+        title: 'Separator',
+        group: 'common',
+        blockSchema: { properties: {} },
+    },
+    // Simple/core blocks used across the docs content but previously unregistered,
+    // so they were excluded from the page-level allowed set (getPageAllowedBlocks
+    // only includes registered blocks with an id). Minimal registration makes them
+    // valid page blocks; the frontend still owns their rendering.
+    search: { id: 'search', title: 'Search', group: 'common', blockSchema: { properties: {} } },
+    heading: { id: 'heading', title: 'Heading', group: 'common', blockSchema: { properties: {} } },
+    slateTable: { id: 'slateTable', title: 'Table', group: 'common', blockSchema: { properties: {} } },
+    maps: { id: 'maps', title: 'Map', group: 'common', blockSchema: { properties: {} } },
+    video: { id: 'video', title: 'Video', group: 'common', blockSchema: { properties: {} } },
     // Code example block: tabbed code display with syntax highlighting
     codeExample: {
         id: 'codeExample',
@@ -430,14 +457,21 @@ export const sharedBlocksConfig = {
                                 widget: 'select',
                                 choices: [
                                     ['javascript', 'JavaScript'],
+                                    ['js', 'JavaScript'],
                                     ['jsx', 'JSX'],
                                     ['typescript', 'TypeScript'],
+                                    ['ts', 'TypeScript'],
+                                    ['vue', 'Vue'],
+                                    ['svelte', 'Svelte'],
+                                    ['astro', 'Astro'],
                                     ['python', 'Python'],
+                                    ['php', 'PHP'],
                                     ['json', 'JSON'],
                                     ['html', 'HTML'],
                                     ['css', 'CSS'],
                                     ['bash', 'Bash'],
                                     ['xml', 'XML'],
+                                    ['text', 'Text'],
                                 ],
                             },
                             code: {
@@ -465,6 +499,7 @@ export const sharedBlocksConfig = {
     // filterConvertibleFrom: '@default' means only show types whose fieldMappings
     // include @default as a source (i.e., can convert from catalog brain fields)
     listing: {
+        id: 'listing',
         blockSchema: {
             fieldsets: [{ id: 'default', title: 'Default', fields: ['variation', 'fieldMapping'] }],
             properties: {
@@ -544,14 +579,21 @@ export const sharedBlocksConfig = {
         },
     },
     gridBlock: {
-        allowedBlocks: ['teaser', 'image'],
+        id: 'gridBlock',
+        // Match Volto core's grid (allowedBlocks: ['image','listing','slate','teaser']).
+        // gridBlock is used with slate cards and listings throughout the content
+        // (e.g. docs/examples/grid/text, docs/examples/grid/listing, the homepage
+        // "Why Hydra" cards); the old ['teaser','image'] wrongly rejected those, which
+        // made the chevron move (and drop) walk children OUT of the grid to a parent
+        // that accepts the type. Keep gridBlock (no nesting) and hero out of it.
+        allowedBlocks: ['slate', 'image', 'listing', 'teaser'],
         blockSchema: {
             fieldsets: [{ id: 'default', title: 'Default', fields: ['items', 'variation'] }],
             properties: {
                 items: {
                     widget: 'blocks_layout',
                     itemTypeField: 'variation',  // sync trigger
-                    allowedBlocks: ['teaser', 'image'],
+                    allowedBlocks: ['slate', 'image', 'listing', 'teaser'],
                 },
                 variation: {
                     title: 'Item Type',

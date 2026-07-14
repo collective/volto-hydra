@@ -534,7 +534,79 @@
         }
       ]
     },
-    "h-15": {
+    "p-15": {
+      "@type": "slate",
+      "plaintext": "That dispatch must also handle `@type: \"empty\"` — the placeholder Hydra seeds into any container region with no `defaultBlockType` and more than one `allowedBlocks` — by rendering an empty, selectable slot (with its `data-block-uid`) rather than erroring. See [Empty Blocks](container-blocks.md#empty-blocks).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "That dispatch must also handle "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "@type: \"empty\""
+                }
+              ]
+            },
+            {
+              "text": " — the placeholder Hydra seeds into any container region with no "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "defaultBlockType"
+                }
+              ]
+            },
+            {
+              "text": " and more than one "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedBlocks"
+                }
+              ]
+            },
+            {
+              "text": " — by rendering an empty, selectable slot (with its "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-block-uid"
+                }
+              ]
+            },
+            {
+              "text": ") rather than erroring. See "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "container-blocks.md#empty-blocks"
+              },
+              "children": [
+                {
+                  "text": "Empty Blocks"
+                }
+              ]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    "h-16": {
       "@type": "slate",
       "plaintext": "Worked example: Astro",
       "value": [
@@ -548,25 +620,14 @@
         }
       ]
     },
-    "ce-16": {
-      "@type": "codeExample",
-      "tabs": [
-        {
-          "@id": "ce-16-js-2a381c",
-          "label": "Js",
-          "language": "js",
-          "code": "// src/main.js (bridge bootstrap, runs in the iframe child)\nimport { initBridge } from '@volto-hydra/hydra-js';\n\ninitBridge({\n  page: { schema: { properties: { blocks_layout: { allowedBlocks: [...] } } } },\n  blocks: { /* your block configs */ },\n  renderEndpoint: '/api/render',\n  renderContainer: '#content',   // optional, default '#content'\n});"
-        }
-      ]
-    },
     "ce-17": {
       "@type": "codeExample",
       "tabs": [
         {
           "@id": "ce-17-astro-6cfb06",
-          "label": "Astro",
-          "language": "astro",
-          "code": "---\n// src/components/BlockRenderer.astro — enforces the data-block-uid contract.\nimport SlateBlock from './SlateBlock.astro';\nimport ImageBlock from './ImageBlock.astro';\n// ...\n\nconst { block } = Astro.props;\nconst type = block?.['@type'];\nconst uid  = block?.['@uid'];\n---\n<div data-block-uid={uid}>\n  {type === 'slate' && <SlateBlock block={block} />}\n  {type === 'image' && <ImageBlock block={block} />}\n  {/* ...one branch per block type... */}\n</div>"
+          "label": "Js",
+          "language": "js",
+          "code": "// src/main.js (bridge bootstrap, runs in the iframe child)\nimport { initBridge } from '@volto-hydra/hydra-js';\n\ninitBridge({\n  page: { schema: { properties: { blocks_layout: { allowedBlocks: [...] } } } },\n  blocks: { /* your block configs */ },\n  renderEndpoint: '/api/render',\n  renderContainer: '#content',   // optional, default '#content'\n});"
         }
       ]
     },
@@ -575,13 +636,24 @@
       "tabs": [
         {
           "@id": "ce-18-ts-ad6a37",
+          "label": "Astro",
+          "language": "astro",
+          "code": "---\n// src/components/BlockRenderer.astro — enforces the data-block-uid contract.\nimport SlateBlock from './SlateBlock.astro';\nimport ImageBlock from './ImageBlock.astro';\n// ...\n\nconst { block } = Astro.props;\nconst type = block?.['@type'];\nconst uid  = block?.['@uid'];\n---\n<div data-block-uid={uid}>\n  {type === 'slate' && <SlateBlock block={block} />}\n  {type === 'image' && <ImageBlock block={block} />}\n  {/* ...one branch per block type... */}\n</div>"
+        }
+      ]
+    },
+    "ce-19": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-19-ts-892388",
           "label": "Ts",
           "language": "ts",
           "code": "// src/pages/api/render.ts — the render endpoint.\nimport type { APIRoute } from 'astro';\nimport { experimental_AstroContainer as AstroContainer } from 'astro/container';\nimport BlockRenderer from '../../components/BlockRenderer.astro';\nimport Content from '../../components/Content.astro';\n\nexport const POST: APIRoute = async ({ request }) => {\n  const { unit, formData } = await request.json();\n  const container = await AstroContainer.create();\n  if (unit.unit === 'page') {\n    const html = await container.renderToString(Content, { props: { formData } });\n    return new Response(html, { headers: { 'Content-Type': 'text/html' } });\n  }\n  // unit === 'block'\n  const block = findBlockById(formData, unit.blockId);\n  const html = await container.renderToString(BlockRenderer, { props: { block } });\n  return new Response(html, { headers: { 'Content-Type': 'text/html' } });\n};\n\nfunction findBlockById(formData, blockId) {\n  const blocks = formData?.blocks;\n  if (!blocks) return null;\n  if (blocks[blockId]) return { ...blocks[blockId], '@uid': blockId };\n  for (const child of Object.values(blocks)) {\n    const inside = findBlockById(child, blockId);\n    if (inside) return inside;\n  }\n  return null;\n}"
         }
       ]
     },
-    "p-19": {
+    "p-20": {
       "@type": "slate",
       "plaintext": "The full working example lives at [`docs/examples/test-astro/`](https://github.com/collective/volto-hydra/tree/main/docs/examples/test-astro) with block components in [`docs/examples/examples/astro/`](https://github.com/collective/volto-hydra/tree/main/docs/examples/examples/astro).",
       "value": [
@@ -623,7 +695,7 @@
         }
       ]
     },
-    "h-20": {
+    "h-21": {
       "@type": "slate",
       "plaintext": "Worked example: PHP",
       "value": [
@@ -637,17 +709,6 @@
         }
       ]
     },
-    "ce-21": {
-      "@type": "codeExample",
-      "tabs": [
-        {
-          "@id": "ce-21-php-5e1f05",
-          "label": "Php",
-          "language": "php",
-          "code": "<!-- blocks/_renderer.php — enforces the data-block-uid contract -->\n<div data-block-uid=\"<?= htmlspecialchars($block['@uid']) ?>\">\n  <?php\n    $tpl = __DIR__ . \"/{$block['@type']}.php\";\n    if (file_exists($tpl)) include $tpl;\n  ?>\n</div>"
-        }
-      ]
-    },
     "ce-22": {
       "@type": "codeExample",
       "tabs": [
@@ -655,7 +716,7 @@
           "@id": "ce-22-php-e87720",
           "label": "Php",
           "language": "php",
-          "code": "<!-- blocks/slate.php — one file per block type -->\n<div data-edit-text=\"value\">\n  <?php foreach ($block['value'] ?? [] as $node) include __DIR__ . '/_slate_node.php'; ?>\n</div>"
+          "code": "<!-- blocks/_renderer.php — enforces the data-block-uid contract -->\n<div data-block-uid=\"<?= htmlspecialchars($block['@uid']) ?>\">\n  <?php\n    $tpl = __DIR__ . \"/{$block['@type']}.php\";\n    if (file_exists($tpl)) include $tpl;\n  ?>\n</div>"
         }
       ]
     },
@@ -666,11 +727,22 @@
           "@id": "ce-23-php-9a04e4",
           "label": "Php",
           "language": "php",
+          "code": "<!-- blocks/slate.php — one file per block type -->\n<div data-edit-text=\"value\">\n  <?php foreach ($block['value'] ?? [] as $node) include __DIR__ . '/_slate_node.php'; ?>\n</div>"
+        }
+      ]
+    },
+    "ce-24": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-24-php-ebbd45",
+          "label": "Php",
+          "language": "php",
           "code": "<?php\n// api/render.php — the render endpoint\nheader('Content-Type: text/html');\n\n$payload  = json_decode(file_get_contents('php://input'), true);\n$unit     = $payload['unit'];\n$formData = $payload['formData'];\n\nif ($unit['unit'] === 'page') {\n    foreach ($formData['blocks_layout']['items'] as $id) {\n        $block = array_merge($formData['blocks'][$id], ['@uid' => $id]);\n        include __DIR__ . '/../blocks/_renderer.php';\n    }\n} else {\n    $block = find_block_by_id($formData, $unit['blockId']);\n    include __DIR__ . '/../blocks/_renderer.php';\n}\n\nfunction find_block_by_id($data, $blockId) {\n    $blocks = $data['blocks'] ?? [];\n    if (isset($blocks[$blockId])) {\n        return array_merge($blocks[$blockId], ['@uid' => $blockId]);\n    }\n    foreach ($blocks as $child) {\n        $found = find_block_by_id($child, $blockId);\n        if ($found) return $found;\n    }\n    return null;\n}"
         }
       ]
     },
-    "p-24": {
+    "p-25": {
       "@type": "slate",
       "plaintext": "The HTML page that loads in the editor iframe just needs to pull in the bridge and call `initBridge` with the endpoint:",
       "value": [
@@ -695,18 +767,18 @@
         }
       ]
     },
-    "ce-25": {
+    "ce-26": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-25-html-2d26cc",
+          "@id": "ce-26-html-476b8c",
           "label": "Html",
           "language": "html",
           "code": "<!-- index.php (or a static index.html) -->\n<!DOCTYPE html>\n<html>\n<head><title>My PHP frontend</title></head>\n<body>\n  <div id=\"content\"></div>\n  <script type=\"module\">\n    import { initBridge } from '/static/hydra.js';\n    initBridge({\n      page: { schema: { properties: { blocks_layout: { allowedBlocks: [...] } } } },\n      blocks: { /* ... */ },\n      renderEndpoint: '/api/render.php',\n    });\n  </script>\n</body>\n</html>"
         }
       ]
     },
-    "h-26": {
+    "h-27": {
       "@type": "slate",
       "plaintext": "Adapting for Django / Rails / Laravel / Symfony / Go",
       "value": [
@@ -720,7 +792,7 @@
         }
       ]
     },
-    "p-27": {
+    "p-28": {
       "@type": "slate",
       "plaintext": "The recipe is the same in every framework — only the rendering call changes:",
       "value": [
@@ -734,7 +806,7 @@
         }
       ]
     },
-    "tbl-28": {
+    "tbl-29": {
       "@type": "slateTable",
       "table": {
         "fixed": true,
@@ -745,10 +817,10 @@
         "striped": false,
         "rows": [
           {
-            "key": "tbl-28-r0",
+            "key": "tbl-29-r0",
             "cells": [
               {
-                "key": "tbl-28-r0c0",
+                "key": "tbl-29-r0c0",
                 "type": "header",
                 "value": [
                   {
@@ -762,7 +834,7 @@
                 ]
               },
               {
-                "key": "tbl-28-r0c1",
+                "key": "tbl-29-r0c1",
                 "type": "header",
                 "value": [
                   {
@@ -778,10 +850,10 @@
             ]
           },
           {
-            "key": "tbl-28-r1",
+            "key": "tbl-29-r1",
             "cells": [
               {
-                "key": "tbl-28-r1c0",
+                "key": "tbl-29-r1c0",
                 "type": "data",
                 "value": [
                   {
@@ -795,7 +867,7 @@
                 ]
               },
               {
-                "key": "tbl-28-r1c1",
+                "key": "tbl-29-r1c1",
                 "type": "data",
                 "value": [
                   {
@@ -816,10 +888,10 @@
             ]
           },
           {
-            "key": "tbl-28-r2",
+            "key": "tbl-29-r2",
             "cells": [
               {
-                "key": "tbl-28-r2c0",
+                "key": "tbl-29-r2c0",
                 "type": "data",
                 "value": [
                   {
@@ -833,7 +905,7 @@
                 ]
               },
               {
-                "key": "tbl-28-r2c1",
+                "key": "tbl-29-r2c1",
                 "type": "data",
                 "value": [
                   {
@@ -854,10 +926,10 @@
             ]
           },
           {
-            "key": "tbl-28-r3",
+            "key": "tbl-29-r3",
             "cells": [
               {
-                "key": "tbl-28-r3c0",
+                "key": "tbl-29-r3c0",
                 "type": "data",
                 "value": [
                   {
@@ -871,7 +943,7 @@
                 ]
               },
               {
-                "key": "tbl-28-r3c1",
+                "key": "tbl-29-r3c1",
                 "type": "data",
                 "value": [
                   {
@@ -892,10 +964,10 @@
             ]
           },
           {
-            "key": "tbl-28-r4",
+            "key": "tbl-29-r4",
             "cells": [
               {
-                "key": "tbl-28-r4c0",
+                "key": "tbl-29-r4c0",
                 "type": "data",
                 "value": [
                   {
@@ -909,7 +981,7 @@
                 ]
               },
               {
-                "key": "tbl-28-r4c1",
+                "key": "tbl-29-r4c1",
                 "type": "data",
                 "value": [
                   {
@@ -930,10 +1002,10 @@
             ]
           },
           {
-            "key": "tbl-28-r5",
+            "key": "tbl-29-r5",
             "cells": [
               {
-                "key": "tbl-28-r5c0",
+                "key": "tbl-29-r5c0",
                 "type": "data",
                 "value": [
                   {
@@ -947,7 +1019,7 @@
                 ]
               },
               {
-                "key": "tbl-28-r5c1",
+                "key": "tbl-29-r5c1",
                 "type": "data",
                 "value": [
                   {
@@ -968,10 +1040,10 @@
             ]
           },
           {
-            "key": "tbl-28-r6",
+            "key": "tbl-29-r6",
             "cells": [
               {
-                "key": "tbl-28-r6c0",
+                "key": "tbl-29-r6c0",
                 "type": "data",
                 "value": [
                   {
@@ -985,7 +1057,7 @@
                 ]
               },
               {
-                "key": "tbl-28-r6c1",
+                "key": "tbl-29-r6c1",
                 "type": "data",
                 "value": [
                   {
@@ -1006,10 +1078,10 @@
             ]
           },
           {
-            "key": "tbl-28-r7",
+            "key": "tbl-29-r7",
             "cells": [
               {
-                "key": "tbl-28-r7c0",
+                "key": "tbl-29-r7c0",
                 "type": "data",
                 "value": [
                   {
@@ -1023,7 +1095,7 @@
                 ]
               },
               {
-                "key": "tbl-28-r7c1",
+                "key": "tbl-29-r7c1",
                 "type": "data",
                 "value": [
                   {
@@ -1046,7 +1118,7 @@
         ]
       }
     },
-    "p-29": {
+    "p-30": {
       "@type": "slate",
       "plaintext": "Everything else — the diff, the POST, the swap, the `data-block-uid` contract — is identical because the bridge handles it.",
       "value": [
@@ -1071,7 +1143,7 @@
         }
       ]
     },
-    "h-30": {
+    "h-31": {
       "@type": "slate",
       "plaintext": "Caveats",
       "value": [
@@ -1085,7 +1157,7 @@
         }
       ]
     },
-    "ul-31": {
+    "ul-32": {
       "@type": "slate",
       "plaintext": "Network round trip per edit. Faster than full reload (Sanity's",
       "value": [
@@ -1112,7 +1184,7 @@
         }
       ]
     },
-    "p-32": {
+    "p-33": {
       "@type": "slate",
       "plaintext": "approach) but slower than client-side reconciliation. For a typical   edit (one block at a time) it's a few hundred bytes and a few   milliseconds on a same-origin endpoint. Don't put the endpoint behind   authentication that adds another round trip.",
       "value": [
@@ -1126,7 +1198,7 @@
         }
       ]
     },
-    "ul-33": {
+    "ul-34": {
       "@type": "slate",
       "plaintext": "data-block-uid MUST be the outer element. A wrapper around the",
       "value": [
@@ -1153,7 +1225,7 @@
         }
       ]
     },
-    "p-34": {
+    "p-35": {
       "@type": "slate",
       "plaintext": "block from outside the renderer (e.g. a CSS-grid `<li>` your layout   adds) will break `outerHTML` swaps — the swap would replace the wrapper   too. Always wrap inside the renderer.",
       "value": [
@@ -1189,7 +1261,7 @@
         }
       ]
     },
-    "ul-35": {
+    "ul-36": {
       "@type": "slate",
       "plaintext": "The endpoint must be on the same origin as the rendered page (or",
       "value": [
@@ -1216,7 +1288,7 @@
         }
       ]
     },
-    "p-36": {
+    "p-37": {
       "@type": "slate",
       "plaintext": "CORS-enabled). The bridge POSTs from the iframe child to whatever URL   you give it; cross-origin without CORS will fail.",
       "value": [
@@ -1230,7 +1302,7 @@
         }
       ]
     },
-    "ul-37": {
+    "ul-38": {
       "@type": "slate",
       "plaintext": "The endpoint receives the full formData on every edit. Don't log",
       "value": [
@@ -1257,7 +1329,7 @@
         }
       ]
     },
-    "p-38": {
+    "p-39": {
       "@type": "slate",
       "plaintext": "it to disk or replay it — it's editing state, potentially containing   unpublished content.",
       "value": [
@@ -1289,30 +1361,31 @@
       "h-12",
       "p-13",
       "p-14",
-      "h-15",
-      "ce-16",
+      "p-15",
+      "h-16",
       "ce-17",
       "ce-18",
-      "p-19",
-      "h-20",
-      "ce-21",
+      "ce-19",
+      "p-20",
+      "h-21",
       "ce-22",
       "ce-23",
-      "p-24",
-      "ce-25",
-      "h-26",
-      "p-27",
-      "tbl-28",
-      "p-29",
-      "h-30",
-      "ul-31",
-      "p-32",
-      "ul-33",
-      "p-34",
-      "ul-35",
-      "p-36",
-      "ul-37",
-      "p-38"
+      "ce-24",
+      "p-25",
+      "ce-26",
+      "h-27",
+      "p-28",
+      "tbl-29",
+      "p-30",
+      "h-31",
+      "ul-32",
+      "p-33",
+      "ul-34",
+      "p-35",
+      "ul-36",
+      "p-37",
+      "ul-38",
+      "p-39"
     ]
   }
 }

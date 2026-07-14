@@ -40,6 +40,9 @@ interface DiscoveredBlock {
   field?: string;
   issues?: string[];
   noExample?: boolean;
+  allowedBlocksViolation?: boolean;
+  parentType?: string;
+  allowed?: string[];
 }
 
 // Read discovered blocks (written by globalSetup)
@@ -97,6 +100,23 @@ test.describe('Block sanity (auto-discovered)', () => {
           `Block @type "${block.blockType}" is registered in the frontend but no content ` +
             `example exists to run its render test. Add a fixture (a page with a populated ` +
             `instance), or mark the type restricted if it only belongs inside a parent container.`,
+        );
+      });
+      continue;
+    }
+    // A block placed in a container that doesn't allow its @type — it can't be
+    // reordered within its container (the chevron / drag walks it OUT to the
+    // nearest ancestor that accepts the type). Fails as its own test rather
+    // than blocking the suite.
+    if (block.allowedBlocksViolation) {
+      test(`${block.blockType} block [${block.blockId}] is allowed in its container`, () => {
+        throw new Error(
+          `Block "${block.blockType}" [${block.blockId}] on ${block.pagePath} is placed in a ` +
+            `${block.parentType} container that doesn't allow its @type ` +
+            `(allowed: [${(block.allowed || []).join(', ')}]). Such a block can't be reordered ` +
+            `within its container — the mobile chevron / drag walks it OUT to the nearest ` +
+            `ancestor that accepts the type, so it "escapes". Widen the container's allowedBlocks ` +
+            `(if the placement is intended) or move/convert the block.`,
         );
       });
       continue;

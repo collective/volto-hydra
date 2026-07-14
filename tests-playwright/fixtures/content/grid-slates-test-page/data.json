@@ -1,0 +1,164 @@
+{
+ "@id": "/grid-slates-test-page",
+ "@type": "Document",
+ "UID": "grid-slates-test-uid",
+ "id": "grid-slates-test-page",
+ "title": "Grid Slates Test Page",
+ "description": "gridBlock with three slate children (mirrors prod add-ons grid).",
+ "review_state": "published",
+ "parent": {
+  "@id": "http://localhost:8888",
+  "@type": "Plone Site",
+  "title": "Site"
+ },
+ "allow_discussion": false,
+ "is_folderish": false,
+ "exclude_from_nav": false,
+ "created": "2025-01-01T12:00:00+00:00",
+ "modified": "2025-01-01T12:00:00+00:00",
+ "lock": {
+  "locked": false,
+  "stealable": true
+ },
+ "@components": {
+  "actions": {
+   "@id": "http://localhost:8888/container-test-page/@actions",
+   "document_actions": [],
+   "object": [
+    {
+     "id": "view",
+     "title": "View"
+    },
+    {
+     "id": "edit",
+     "title": "Edit"
+    },
+    {
+     "id": "folderContents",
+     "title": "Contents"
+    }
+   ],
+   "object_buttons": [],
+   "portal_tabs": [],
+   "site_actions": [],
+   "user": []
+  },
+  "breadcrumbs": {
+   "@id": "http://localhost:8888/container-test-page/@breadcrumbs",
+   "items": [
+    {
+     "@id": "http://localhost:8888",
+     "title": "Home"
+    },
+    {
+     "@id": "http://localhost:8888/container-test-page",
+     "title": "Container Test Page"
+    }
+   ],
+   "root": "http://localhost:8888"
+  },
+  "navigation": {
+   "@id": "http://localhost:8888/container-test-page/@navigation",
+   "items": []
+  },
+  "workflow": {
+   "@id": "http://localhost:8888/container-test-page/@workflow"
+  }
+ },
+ "can_manage_portlets": true,
+ "can_view": true,
+ "can_edit": true,
+ "can_delete": true,
+ "can_add": true,
+ "blocks": {
+  "gs-title": {
+   "@type": "slate",
+   "value": [
+    {
+     "type": "p",
+     "children": [
+      {
+       "text": "Grid Slates"
+      }
+     ]
+    }
+   ],
+   "plaintext": "Grid Slates"
+  },
+  "gs-grid": {
+   "@type": "gridBlock",
+   "blocks": {
+    "gs-slate-1": {
+     "@type": "slate",
+     "value": [
+      {
+       "type": "p",
+       "children": [
+        {
+         "text": "First grid slate"
+        }
+       ]
+      }
+     ],
+     "plaintext": "First grid slate"
+    },
+    "gs-slate-2": {
+     "@type": "slate",
+     "value": [
+      {
+       "type": "p",
+       "children": [
+        {
+         "text": "Second grid slate"
+        }
+       ]
+      }
+     ],
+     "plaintext": "Second grid slate"
+    },
+    "gs-slate-3": {
+     "@type": "slate",
+     "value": [
+      {
+       "type": "p",
+       "children": [
+        {
+         "text": "Third grid slate"
+        }
+       ]
+      }
+     ],
+     "plaintext": "Third grid slate"
+    }
+   },
+   "blocks_layout": {
+    "items": [
+     "gs-slate-1",
+     "gs-slate-2",
+     "gs-slate-3"
+    ]
+   }
+  },
+  "gs-after": {
+   "@type": "slate",
+   "value": [
+    {
+     "type": "p",
+     "children": [
+      {
+       "text": "Text after the grid"
+      }
+     ]
+    }
+   ],
+   "plaintext": "Text after the grid"
+  }
+ },
+ "blocks_layout": {
+  "items": [
+   "gs-title",
+   "gs-grid",
+   "gs-after"
+  ]
+ }
+}

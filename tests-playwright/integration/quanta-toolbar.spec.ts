@@ -307,6 +307,34 @@ test.describe('Quanta Toolbar - Format Dropdown', () => {
     await expect(formatDropdown).toBeVisible();
   });
 
+  test('text-format buttons show in text mode but hide in block mode (no cursor)', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // A desktop click on a Slate block lands in TEXT mode (cursor placed in the
+    // editable field): the block-format dropdown and the inline text-format
+    // buttons (bold/italic/link/…) are relevant, so they're shown.
+    await helper.clickBlockInIframe('block-1-uuid');
+    const toolbar = page.locator('.quanta-toolbar');
+    const formatDropdown = toolbar.locator('.format-dropdown-trigger');
+    await expect(formatDropdown).toBeVisible();
+    expect(await toolbar.locator('[data-toolbar-button]').count()).toBeGreaterThan(0);
+
+    // Escape steps up TEXT → BLOCK mode: the same block stays selected, but the
+    // text cursor is gone (focusedFieldName is cleared). Text-formatting controls
+    // don't apply to a block that isn't being text-edited, so they must leave the
+    // toolbar — only the block-level actions (drag, step-up, move) remain.
+    await page.keyboard.press('Escape');
+    await helper.waitForIframeBlockHandle('block-1-uuid');
+    await expect(toolbar).toBeVisible();
+    await expect(formatDropdown).toBeHidden();
+    await expect(toolbar.locator('[data-toolbar-button]')).toHaveCount(0);
+  });
+
   test('format dropdown shows paragraph format options when clicked', async ({
     page,
   }) => {
