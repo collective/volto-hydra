@@ -408,7 +408,14 @@ function collectWidgetShapeIssues(blockData, blockSchema, pagePath, blockId, out
       }
     } else if (widget === 'object_browser') {
       // Plone link format: [{"@id": "/path"}] (array of objects with @id).
-      if (!Array.isArray(value)) {
+      // `mode: 'link'` fields additionally accept a plain string href — a link
+      // may be an external URL or come from a listing fieldMapping (@id -> a
+      // string), and the frontend's link resolver handles both. Only reject a
+      // string for non-link object browsers (content/image selection), where an
+      // @id array is required.
+      if (def?.mode === 'link' && typeof value === 'string') {
+        // valid href
+      } else if (!Array.isArray(value)) {
         issues.push(describe('object_browser array', value));
       } else if (value.length && (typeof value[0] !== 'object' || !value[0]['@id'])) {
         issues.push(`field "${field}": object_browser items must be objects with "@id"`);
