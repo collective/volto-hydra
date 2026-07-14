@@ -1694,19 +1694,76 @@ export class Bridge {
   }
 
   /**
-   * Chevron (mobile up/down) move target, computed from RENDER geometry and the
-   * SAME edge machinery the container edge-handles use — not a data-order tree
-   * walk. Moving `blockUid` one visual step in `direction` ('up'|'down') is one
-   * of three things, decided by what is rendered adjacent to it:
-   *   - the neighbour in that direction is a container it may enter → DESCEND to
-   *     that container's near edge (reusing _computeEdgePlan 'absorb', same as
-   *     dragging the container's edge over the block);
-   *   - there's a plain sibling in that direction → SWAP with it in this region;
-   *   - it's at its own container's edge with nothing beyond → EXIT to the parent
-   *     (reusing _computeEdgePlan 'expel').
-   * Returns the { targetBlockId, insertAfter, targetParentId } for the existing
-   * MOVE_BLOCKS → moveBlockBetweenContainers container API, or null (chevron
-   * disabled). Siblings come from _getSiblingsByDomOrder, i.e. render order.
+   * Deepest render-order insertion target when a block ENTERS `containerUid`
+   * from `enterEdge` ('top' → before the first child, 'bottom' → after the
+   * last child). Follows the near-edge child chain down and returns the
+   * DEEPEST sub-container whose region accepts `type` (so a slate entering
+   * `columns` lands in the nearest column, not beside the columns). Returns
+   * null when no reachable level accepts `type` — the caller then swaps/skips
+   * past the container. Acceptance is the schema's region rule
+   * (allowedSiblingTypes); which child to follow is DOM order (render).
+   */
+  _descendAbsorbTarget(containerUid, enterEdge, type) {
+    const children = this._getSiblingsByDomOrder(null, containerUid);
+    if (children.length === 0) return null; // leaf / empty container: not enterable here
+    const insertAfter = enterEdge === 'bottom';
+    const nearChild = insertAfter ? children[children.length - 1] : children[0];
+    // Deepest-acceptable wins: try to descend into the near child first.
+    if (this._getSiblingsByDomOrder(null, nearChild).length > 0) {
+      const deeper = this._descendAbsorbTarget(nearChild, enterEdge, type);
+      if (deeper) return deeper;
+    }
+    // Accept at THIS level if the container's region allows `type`.
+    const childAllowed = this.blockPathMap?.[children[0]]?.allowedSiblingTypes || null;
+    if (!childAllowed || (type && childAllowed.includes(type))) {
+      return { targetBlockId: nearChild, insertAfter, targetParentId: containerUid };
+    }
+    return null;
+  }
+
+  /**
+   * When a block is at its container's edge (no sibling in the move
+   * direction), walk UP through ancestor containers until one whose region
+   * accepts `type` is found, and place the block as a sibling of the highest
+   * rejecting container in that region. e.g. a slate at the top of a column
+   * escapes col → columns (rejects slate) → page (accepts). Null when nothing
+   * up to the page accepts `type` (chevron stays disabled).
+   */
+  _ascendExpelTarget(blockUid, down) {
+    const type = this.getBlockData(blockUid)?.['@type'];
+    let container = this.blockPathMap?.[blockUid]?.parentId;
+    while (container && container !== PAGE_BLOCK_UID) {
+      const cInfo = this.blockPathMap[container];
+      const grandparent = cInfo?.parentId;
+      // Types allowed as siblings of `container` = the region the block would
+      // land in if it escapes to this level.
+      const regionAllowed = cInfo?.allowedSiblingTypes || null;
+      if (!regionAllowed || (type && regionAllowed.includes(type))) {
+        return {
+          targetBlockId: container,
+          insertAfter: down,
+          targetParentId:
+            grandparent && grandparent !== PAGE_BLOCK_UID ? grandparent : null,
+        };
+      }
+      container = grandparent;
+    }
+    return null;
+  }
+
+  /**
+   * Chevron (mobile up/down) move target. ONE rule for every case, computed
+   * from render order (_getSiblingsByDomOrder) + the schema's region
+   * acceptance, routed through the MOVE_BLOCKS → moveBlockBetweenContainers
+   * container API. Moving `blockUid` one visual step in `direction`
+   * ('up'|'down'):
+   *   - neighbour in that direction is a container that accepts us at some
+   *     reachable level → ABSORB into it (deepest near-edge position);
+   *   - neighbour is a plain sibling (or a container that rejects us at every
+   *     level) → SWAP past it within this region;
+   *   - no neighbour (at the container edge) → EXPEL to the nearest ancestor
+   *     region that accepts us.
+   * Returns { targetBlockId, insertAfter, targetParentId } or null (disabled).
    */
   _computeChevronMove(blockUid, direction) {
     if (!blockUid || blockUid === PAGE_BLOCK_UID) return null;
@@ -1716,7 +1773,7 @@ export class Bridge {
 
     const parentId = info.parentId;
     const down = direction === 'down';
-    const FAR = 1e7;
+    const type = this.getBlockData(blockUid)?.['@type'];
 
     // Render-order siblings sharing this block's region.
     const siblings = this._getSiblingsByDomOrder(null, parentId).filter(
@@ -1726,43 +1783,19 @@ export class Bridge {
     if (idx < 0) return null;
     const neighborId = siblings[down ? idx + 1 : idx - 1];
 
-    const edgeCursor = (uid, edge, mode) => {
-      const el = this.queryBlockElement(uid);
-      if (!el) return null;
-      const r = el.getBoundingClientRect();
-      // Mirror _positionEdgeHandles.planFor: cursor "as far as possible" in the
-      // outward (absorb) or inward (expel) direction for this edge.
-      if (mode === 'absorb') {
-        return edge === 'top' ? r.top - FAR : r.bottom + FAR;
-      }
-      return edge === 'bottom' ? r.top - FAR : r.bottom + FAR;
-    };
-
     if (neighborId) {
-      // Try to DESCEND into the neighbour if it's a container that accepts us.
-      // Guard on the neighbour actually being a container (has children) —
-      // _computeEdgePlan treats a childless leaf as an empty container with a
-      // permissive childAllowed, which would let a block "enter" e.g. an image.
-      const neighborChildren = this._getSiblingsByDomOrder(null, neighborId);
-      const enterEdge = down ? 'top' : 'bottom';
-      const cursor = neighborChildren.length
-        ? edgeCursor(neighborId, enterEdge, 'absorb')
-        : null;
-      const plan =
-        cursor != null
-          ? this._computeEdgePlan(neighborId, enterEdge, 'absorb', cursor)
-          : { kind: 'none', blocks: [] };
-      if (plan.kind === 'absorb' && plan.blocks.includes(blockUid)) {
-        const ownChildren = this._getSiblingsByDomOrder(null, neighborId);
-        const insertAfter = enterEdge === 'bottom';
-        const target = ownChildren.length
-          ? insertAfter
-            ? ownChildren[ownChildren.length - 1]
-            : ownChildren[0]
-          : neighborId;
-        return { targetBlockId: target, insertAfter, targetParentId: neighborId };
+      // ABSORB into the neighbour if it's a container that accepts us at some
+      // reachable level; otherwise SWAP past it within this region.
+      const neighborIsContainer =
+        this._getSiblingsByDomOrder(null, neighborId).length > 0;
+      if (neighborIsContainer) {
+        const target = this._descendAbsorbTarget(
+          neighborId,
+          down ? 'top' : 'bottom',
+          type,
+        );
+        if (target) return target;
       }
-      // Otherwise SWAP with the neighbour inside this region.
       return {
         targetBlockId: neighborId,
         insertAfter: down,
@@ -1770,24 +1803,9 @@ export class Bridge {
       };
     }
 
-    // No neighbour in this direction → at the container's edge → EXIT to parent.
+    // At the container edge → EXPEL to the nearest ancestor region that accepts us.
     if (parentId && parentId !== PAGE_BLOCK_UID) {
-      const exitEdge = down ? 'bottom' : 'top';
-      const cursor = edgeCursor(parentId, exitEdge, 'expel');
-      const plan =
-        cursor != null
-          ? this._computeEdgePlan(parentId, exitEdge, 'expel', cursor)
-          : { kind: 'none', blocks: [] };
-      if (plan.kind === 'expel' && plan.blocks.includes(blockUid)) {
-        const cInfo = this.blockPathMap?.[parentId];
-        const grandparent = cInfo?.parentId;
-        return {
-          targetBlockId: parentId,
-          insertAfter: down,
-          targetParentId:
-            grandparent && grandparent !== PAGE_BLOCK_UID ? grandparent : null,
-        };
-      }
+      return this._ascendExpelTarget(blockUid, down);
     }
     return null;
   }

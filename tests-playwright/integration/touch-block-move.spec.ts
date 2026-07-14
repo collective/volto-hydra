@@ -75,11 +75,11 @@ test.describe('touch-mode block move via chevron', () => {
         }));
       },
     );
-    await page.waitForTimeout(800);
-
     // Confirm we ARE in block mode — that's the precondition the bug needs.
-    const editMode = await iframe.locator('body').getAttribute('data-hydra-edit-mode');
-    expect(editMode, '1st tap on a touch device should leave us in block mode').toBe('block');
+    await expect(
+      iframe.locator('body'),
+      '1st tap on a touch device should leave us in block mode',
+    ).toHaveAttribute('data-hydra-edit-mode', 'block', { timeout: 5000 });
 
     // The chevron-up button must be visible AND clickable. The Quanta
     // toolbar starts faded; touch should fire MOUSE_ACTIVITY which unfades
@@ -177,8 +177,7 @@ test.describe('touch-mode block move via chevron', () => {
 
     // === 1st block: tap block-3 (slate), move it up. ===
     await tap('block-3-uuid');
-    await page.waitForTimeout(800);
-    expect(await iframe.locator('body').getAttribute('data-hydra-edit-mode')).toBe('block');
+    await expect(iframe.locator('body')).toHaveAttribute('data-hydra-edit-mode', 'block', { timeout: 5000 });
     await expect(page.locator('.quanta-toolbar .chevron-up')).toBeVisible({ timeout: 5000 });
     await tapChevronUp();
     await expect.poll(async () => {
@@ -198,11 +197,10 @@ test.describe('touch-mode block move via chevron', () => {
     expect(secondTarget).toBeTruthy();
 
     await tap(secondTarget);
-    await page.waitForTimeout(800);
-    expect(
-      await iframe.locator('body').getAttribute('data-hydra-edit-mode'),
+    await expect(
+      iframe.locator('body'),
       'second tap on a different block must still be block mode',
-    ).toBe('block');
+    ).toHaveAttribute('data-hydra-edit-mode', 'block', { timeout: 5000 });
 
     const chevronUp2 = page.locator('.quanta-toolbar .chevron-up');
     await expect(chevronUp2).toBeVisible({ timeout: 5000 });
@@ -255,12 +253,10 @@ test.describe('touch-mode block move via chevron', () => {
       el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
       el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
     });
-    await page.waitForTimeout(800);
-
-    expect(
-      await iframe.locator('body').getAttribute('data-hydra-edit-mode'),
+    await expect(
+      iframe.locator('body'),
       'tap on block inside container should still enter block mode',
-    ).toBe('block');
+    ).toHaveAttribute('data-hydra-edit-mode', 'block', { timeout: 5000 });
 
     const chevronUp = page.locator('.quanta-toolbar .chevron-up');
     await expect(chevronUp, 'chevron ▲ must show for a block inside a column').toBeVisible({ timeout: 5000 });
@@ -345,11 +341,10 @@ test.describe('touch-mode block move via chevron', () => {
       expect(beforeIdx, `${uid} must be in DOM order before tap`).toBeGreaterThan(-1);
 
       await tap(uid);
-      await page.waitForTimeout(800);
-      expect(
-        await iframe.locator('body').getAttribute('data-hydra-edit-mode'),
+      await expect(
+        iframe.locator('body'),
         `tap on ${uid} must enter block mode`,
-      ).toBe('block');
+      ).toHaveAttribute('data-hydra-edit-mode', 'block', { timeout: 5000 });
 
       const chev = page.locator(
         `.quanta-toolbar .${dir === 'up' ? 'chevron-up' : 'chevron-down'}`,
@@ -409,23 +404,31 @@ test.describe('touch-mode block move via chevron', () => {
       });
     };
 
-    // === 1st move: top-level swap of text-after with columns-1 ===
+    // === 1st move: chevron-up text-after (columns-1 above accepts slate → absorbs into col-2) ===
     await tap('text-after');
-    await page.waitForTimeout(800);
-    expect(await iframe.locator('body').getAttribute('data-hydra-edit-mode')).toBe('block');
+    await expect(iframe.locator('body')).toHaveAttribute('data-hydra-edit-mode', 'block', { timeout: 5000 });
     await expect(page.locator('.quanta-toolbar .chevron-up')).toBeVisible({ timeout: 5000 });
     await tapChevronUp();
-    await page.waitForTimeout(800);
+    // Wait for the move to apply: text-after is absorbed into col-2, so its
+    // DOM parent changes from the page to col-2. (Flattened block order is
+    // unchanged — absorbed-as-last-child vs top-level-after-columns look the
+    // same in a flat traversal — so we assert the parent, not the order.)
+    await expect
+      .poll(async () =>
+        iframe.locator('[data-block-uid="text-after"]').first().evaluate(
+          (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid') || 'top-level',
+        ),
+        { timeout: 5000 },
+      )
+      .toBe('col-2');
 
     // === 2nd block: tap text-1b INSIDE col-1 and chevron-up it ===
     // (text-1b was originally at idx 1 inside col-1, sibling of text-1a/col1-img-1)
     await tap('text-1b');
-    await page.waitForTimeout(800);
-
-    expect(
-      await iframe.locator('body').getAttribute('data-hydra-edit-mode'),
+    await expect(
+      iframe.locator('body'),
       '2nd tap (different block, in container) should also be block mode',
-    ).toBe('block');
+    ).toHaveAttribute('data-hydra-edit-mode', 'block', { timeout: 5000 });
 
     const chevronUp2 = page.locator('.quanta-toolbar .chevron-up');
     await expect(chevronUp2).toBeVisible({ timeout: 5000 });
@@ -476,11 +479,9 @@ test.describe('touch-mode block move via chevron', () => {
       el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
       el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
     });
-    await page.waitForTimeout(800);
-
-    expect(
-      await iframe.locator('body').getAttribute('data-hydra-edit-mode'),
-    ).toBe('block');
+    await expect(
+      iframe.locator('body'),
+    ).toHaveAttribute('data-hydra-edit-mode', 'block', { timeout: 5000 });
 
     const chevronUp = page.locator('.quanta-toolbar .chevron-up');
     await expect(chevronUp).toBeVisible({ timeout: 5000 });
@@ -508,33 +509,19 @@ test.describe('touch-mode block move via chevron', () => {
   });
 
   /**
-   * Skip-past behavior: when the target container REJECTS the block's
-   * @type at every accessible leaf AND every slot AND every nesting
-   * level, chevron should fall through to a simple swap so the block
-   * skips past the container — not silently no-op.
-   *
-   * Fixture: text-after (slate) is at idx 2 in container-test-page top
-   * level. grid-1 (gridBlock) at idx 3 only accepts @type=teaser at
-   * every leaf. chevron-▼ on text-after should hop past grid-1, ending
-   * up at idx 3 with grid-1 sliding up to idx 2.
-   *
-   * Also exercises "check other slots in the same container and each
-   * container level too": grid-1 has two grid-cells (grid-cell-1,
-   * grid-cell-2), both rejecting slate. The new logic must check BOTH
-   * cells (and any nested levels) before deciding to skip.
+   * Symmetric absorb (mirror of the chevron-▲-INTO-columns test above): when
+   * the block BELOW is a container that ACCEPTS this block's @type, chevron-▼
+   * puts the block INTO the container. gridBlock's allowedBlocks includes
+   * slate (grids hold slate cards across the real content), so text-after
+   * (slate) chevron-▼ enters grid-1 rather than skipping past it. Up-into and
+   * down-into are the same rule, only mirrored.
    */
-  test('chevron ▼ skips past a container whose every slot rejects the type', async ({ page }) => {
+  test('container-aware chevron-down: text-after (slate) + grid-1 below (accepts slate) → INTO grid-1', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
     const iframe = helper.getIframe();
-
-    const orderBefore = await helper.getBlockOrder();
-    const idxTextBefore = orderBefore.indexOf('text-after');
-    const idxGridBefore = orderBefore.indexOf('grid-1');
-    expect(idxTextBefore, 'text-after must be in fixture').toBeGreaterThan(-1);
-    expect(idxGridBefore, 'grid-1 must be after text-after initially').toBeGreaterThan(idxTextBefore);
 
     await iframe.locator('[data-block-uid="text-after"]').first().evaluate((el) => {
       const r = el.getBoundingClientRect();
@@ -545,8 +532,7 @@ test.describe('touch-mode block move via chevron', () => {
       el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
       el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
     });
-    await page.waitForTimeout(800);
-    expect(await iframe.locator('body').getAttribute('data-hydra-edit-mode')).toBe('block');
+    await expect(iframe.locator('body')).toHaveAttribute('data-hydra-edit-mode', 'block', { timeout: 5000 });
 
     const chevronDown = page.locator('.quanta-toolbar .chevron-down');
     await expect(chevronDown).toBeVisible({ timeout: 5000 });
@@ -561,21 +547,78 @@ test.describe('touch-mode block move via chevron', () => {
       el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
     });
 
-    // text-after must remain at top level (NOT swallowed into grid-1) and
-    // must now sit BELOW grid-1 in DOM order.
+    // text-after must now be INSIDE grid-1 (absorbed), not a top-level sibling.
     await expect.poll(async () => {
-      return await iframe.locator('[data-block-uid="text-after"]').first().evaluate((el) => {
-        const ancestor = el.parentElement && el.parentElement.closest
-          ? el.parentElement.closest('[data-block-uid]')
-          : null;
-        return ancestor ? ancestor.getAttribute('data-block-uid') : 'top-level';
-      });
+      return await iframe.locator('[data-block-uid="text-after"]').first().evaluate(
+        (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid') || 'top-level',
+      );
+    }, { timeout: 5000 }).toBe('grid-1');
+  });
+
+  /**
+   * Skip-past behavior: when the neighbouring container REJECTS the block's
+   * @type at EVERY reachable level, the move falls through to a swap so the
+   * block skips past the container — never gets silently absorbed.
+   *
+   * Fixture: grid-1 and grid-2 are adjacent top-level gridBlocks. gridBlock's
+   * allowedBlocks is [slate,image,listing,teaser] — a grid does NOT accept a
+   * gridBlock, and grid-2's teaser cells reject it too, so no reachable level
+   * of grid-2 accepts grid-1. chevron-▼ on grid-1 must hop past grid-2 (grid-1
+   * lands below grid-2 at top level), exercising the multi-level rejection scan.
+   */
+  test('chevron ▼ skips past a container that rejects the type at every level: grid-1 past grid-2', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/container-test-page');
+
+    const iframe = helper.getIframe();
+
+    const orderBefore = await helper.getBlockOrder();
+    expect(
+      orderBefore.indexOf('grid-2'),
+      'grid-2 must be after grid-1 initially',
+    ).toBeGreaterThan(orderBefore.indexOf('grid-1'));
+
+    // Select grid-1 (a container). Events dispatch directly on the grid-1
+    // element, so no child cell steals the selection (hydra resolves the
+    // block via event.target.closest, not elementFromPoint).
+    await iframe.locator('[data-block-uid="grid-1"]').first().evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const x = r.x + r.width / 2;
+      const y = r.y + r.height / 2;
+      const t = new Touch({ identifier: 1, target: el, clientX: x, clientY: y });
+      el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+      el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+    });
+    await expect(iframe.locator('body')).toHaveAttribute('data-hydra-edit-mode', 'block', { timeout: 5000 });
+
+    const chevronDown = page.locator('.quanta-toolbar .chevron-down');
+    await expect(chevronDown).toBeVisible({ timeout: 5000 });
+    await expect(chevronDown).not.toBeDisabled();
+    await chevronDown.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const x = r.x + r.width / 2;
+      const y = r.y + r.height / 2;
+      const t = new Touch({ identifier: 2, target: el, clientX: x, clientY: y });
+      el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [t], targetTouches: [t], changedTouches: [t] }));
+      el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
+    });
+
+    // grid-1 must remain a top-level block (NOT absorbed into grid-2) and now
+    // sit AFTER grid-2.
+    await expect.poll(async () => {
+      return await iframe.locator('[data-block-uid="grid-1"]').first().evaluate(
+        (el) => el.parentElement?.closest('[data-block-uid]')?.getAttribute('data-block-uid') || 'top-level',
+      );
     }, { timeout: 5000 }).toBe('top-level');
 
     const orderAfter = await helper.getBlockOrder();
-    const idxTextAfter = orderAfter.indexOf('text-after');
-    const idxGridAfter = orderAfter.indexOf('grid-1');
-    expect(idxTextAfter, 'text-after should be after grid-1 after the skip').toBeGreaterThan(idxGridAfter);
+    expect(
+      orderAfter.indexOf('grid-1'),
+      'grid-1 should be after grid-2 after the skip',
+    ).toBeGreaterThan(orderAfter.indexOf('grid-2'));
   });
 
   /**
@@ -606,11 +649,9 @@ test.describe('touch-mode block move via chevron', () => {
       el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [t] }));
       el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }));
     });
-    await page.waitForTimeout(800);
-
-    expect(
-      await iframe.locator('body').getAttribute('data-hydra-edit-mode'),
-    ).toBe('block');
+    await expect(
+      iframe.locator('body'),
+    ).toHaveAttribute('data-hydra-edit-mode', 'block', { timeout: 5000 });
 
     const chevronUp = page.locator('.quanta-toolbar .chevron-up');
     await expect(chevronUp).toBeVisible({ timeout: 5000 });
