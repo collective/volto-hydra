@@ -414,7 +414,30 @@ export async function verifyBlockRendering(
   if (isFieldlessBlock && (await block.count()) === 0) {
     return; // metadata-projection block legitimately rendered nothing
   }
-  await expect(block).toBeVisible({ timeout: 15000 });
+  await expect(block.first()).toBeVisible({ timeout: 15000 });
+
+  // A data-block-uid may match several elements. That is legitimate for a
+  // listing/container block whose expanded items carry the parent uid
+  // (expandListingBlocks — see listing-links.tsx), but ONLY when the matches are
+  // contiguous: the container element contains all the rest. The same block
+  // rendered twice in separate DOM subtrees is a real bug. Discovery flags the
+  // literal `listing` type (handled above); this covers the container blocks
+  // that hold one (footer/tags/linkList, search results).
+  if ((await block.count()) > 1) {
+    const contiguous = await block.first().evaluate(
+      (first, uid) =>
+        Array.from(document.querySelectorAll(`[data-block-uid="${uid}"]`)).every(
+          (el) => el === first || first.contains(el),
+        ),
+      blockId,
+    );
+    expect(
+      contiguous,
+      `data-block-uid="${blockId}" appears on unrelated elements (a block rendered twice); a shared uid is only valid for a listing/container whose items nest inside it`,
+    ).toBe(true);
+    await checkEditAnnotations(block.first(), blockData);
+    return;
+  }
 
   // Verify expected text content renders
   if (expectedText) {
