@@ -1,0 +1,18 @@
+{
+  "@id": "/image-block-arrayurl",
+  "@type": "Document",
+  "UID": "image-block-arrayurl-uid",
+  "id": "image-block-arrayurl",
+  "title": "Image block whose url is an array of refs",
+  "description": "Volto's object-browser widget stores the image reference as [{'@id': ...}] rather than a bare string. The serializer must cope with both.",
+  "review_state": "published",
+  "blocks": {
+    "title-1": { "@type": "title" },
+    "image-1": {
+      "@type": "image",
+      "url": [{ "@id": "resolveuid/test-image-1-uid" }],
+      "alt": "array-form image reference"
+    }
+  },
+  "blocks_layout": { "items": ["title-1", "image-1"] }
+}

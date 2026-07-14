@@ -350,10 +350,9 @@ function collectSlateIssues(blockData, pagePath, blockId, out) {
 }
 
 /**
- * Check each field in blockData against the type/widget its schema declares —
- * i.e. does the stored value match what the field says it should be. Catches
- * schema mismatches (e.g. `widget: 'url'` with an array value, or a `select`
- * value not in its `choices`) that would crash Volto's sidebar widget rendering.
+ * Check each field in blockData against the declared widget/type in the
+ * block schema. Catches shape mismatches (e.g. `widget: 'url'` with an
+ * array value) that would crash Volto's sidebar widget rendering.
  *
  * Checks performed:
  *  - `widget: 'url'` / `type: 'string'` — value is a string
@@ -366,7 +365,7 @@ function collectSlateIssues(blockData, pagePath, blockId, out) {
  *  - `widget: 'slate'` — value is a non-empty array of slate nodes (deep
  *    structural checks stay in collectSlateIssues)
  */
-function collectSchemaMismatches(blockData, blockSchema, pagePath, blockId, out) {
+function collectWidgetShapeIssues(blockData, blockSchema, pagePath, blockId, out) {
   const props = blockSchema?.properties;
   if (!props || !blockData || typeof blockData !== 'object') return;
 
@@ -471,21 +470,18 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
 
   const seen = new Map();
   const slateIssues = [];
-  const schemaMismatches = [];
+  const shapeIssues = [];
+  // Containment: a non-fixed block whose @type isn't in its container's resolved
+  // allowedSiblingTypes can't be reordered within its container (the mobile
+  // chevron / drag walks it OUT to the nearest ancestor that accepts the type,
+  // so it "escapes"). Surface each as a failing test, like the issues below.
+  const allowedBlocksViolations = []; // {blockType, allowed, parentType, pagePath, blockId}
+  const CONTAINMENT_EXEMPT = new Set(['empty', 'column', 'title', 'description']);
   // Track block @types seen in content that aren't in blocksConfig — the
   // frontend's Block.vue falls through to a "Not implemented" placeholder
   // for these. Collect all occurrences so the report shows every page
   // affected, not just the first.
   const unregisteredTypes = new Map(); // blockType → [{pagePath, blockId}]
-  // Blocks placed in a container whose allowedBlocks doesn't include their @type.
-  // Such a block can't be reordered within its container — the mobile chevron /
-  // drag walks it OUT to the nearest ancestor that DOES accept the type, so it
-  // "escapes". Collect all occurrences and fail loudly.
-  const allowedBlocksViolations = []; // {blockType, allowed, parentType, pagePath, blockId}
-  // Content-type / structural / placeholder blocks NOT governed by allowedBlocks:
-  // placed by content-type layouts (title/description), structural wrappers
-  // (column), or seeded placeholders (empty).
-  const CONTAINMENT_EXEMPT = new Set(['empty', 'column', 'title', 'description']);
   const REGISTERED = new Set(Object.keys(blocksConfig || {}));
   // Plone content types appear as @type on the page root (Document, etc.)
   // — skip these, they're not blocks.
@@ -554,9 +550,24 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         if (blockId === '_schemas' || blockId === '_page') continue;
         if (!entry || typeof entry !== 'object' || !Array.isArray(entry.path)) continue;
 
-        // Containment: every block's @type must be in its container's resolved
-        // allowedSiblingTypes. Skip template-placed / content-type-fixed blocks
-        // (governed by the layout, not allowedBlocks) and exempt structural types.
+        // Resolve block data from the entry's path
+        let blockData = content;
+        for (const segment of entry.path) {
+          blockData = blockData?.[segment];
+          if (blockData === undefined) break;
+        }
+        if (!blockData || typeof blockData !== 'object') continue;
+
+        const blockType = blockData['@type']; // may be undefined for object_list items
+        // Resolved schema for this entry — may be inline (object_list schema)
+        // or come from blocksConfig[blockType].
+        const schemaRef = entry._schemaRef;
+        const resolvedSchema = schemaRef ? pathMap._schemas?.[schemaRef] : null;
+        const schema = resolvedSchema || (blockType ? blocksConfig[blockType]?.blockSchema : null);
+
+        // Containment check (see allowedBlocksViolations above): flag a block
+        // placed in a container that doesn't allow its @type. Skip template-
+        // placed / content-type-fixed blocks and exempt structural types.
         if (
           entry.blockType &&
           !entry.isTemplateInstance &&
@@ -575,23 +586,8 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
           });
         }
 
-        // Resolve block data from the entry's path
-        let blockData = content;
-        for (const segment of entry.path) {
-          blockData = blockData?.[segment];
-          if (blockData === undefined) break;
-        }
-        if (!blockData || typeof blockData !== 'object') continue;
-
-        const blockType = blockData['@type']; // may be undefined for object_list items
-        // Resolved schema for this entry — may be inline (object_list schema)
-        // or come from blocksConfig[blockType].
-        const schemaRef = entry._schemaRef;
-        const resolvedSchema = schemaRef ? pathMap._schemas?.[schemaRef] : null;
-        const schema = resolvedSchema || (blockType ? blocksConfig[blockType]?.blockSchema : null);
-
         collectSlateIssues(blockData, pagePath, blockId, slateIssues);
-        collectSchemaMismatches(blockData, schema, pagePath, blockId, schemaMismatches);
+        collectWidgetShapeIssues(blockData, schema, pagePath, blockId, shapeIssues);
 
         // Unregistered block type: only real @type values placed at a
         // blocks_layout-style position count. Object_list sub-items don't
@@ -610,7 +606,7 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         }
 
         // Only add real @type blocks to the dedup set used for sanity tests.
-        // Object_list sub-items get their schema-mismatch check above but don't
+        // Object_list sub-items get their widget-shape check above but don't
         // need separate sanity test cases — they're covered by their parent
         // block's render test.
         if (!blockType) continue;
@@ -732,70 +728,56 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
     );
   }
 
-  if (unregisteredTypes.size) {
-    const lines = [];
-    for (const [blockType, occurrences] of unregisteredTypes) {
-      const sample = occurrences.slice(0, 5).map((o) => `${o.pagePath} [${o.blockId}]`);
-      const more = occurrences.length > 5 ? ` (+ ${occurrences.length - 5} more)` : '';
-      lines.push(`  - "${blockType}": ${occurrences.length} occurrence(s) — e.g. ${sample.join(', ')}${more}`);
-    }
-    throw new Error(
-      `Discovery found ${unregisteredTypes.size} block @type(s) used in content but not registered ` +
-        `in the frontend's blocksConfig. The renderer will fall through to "Not implemented Block". ` +
-        `Either register the schema (customBlocks) or migrate the content to an existing type.\n` +
-        lines.join('\n'),
-    );
+  // A block @type used in content but not registered in the frontend's
+  // blocksConfig is a real problem (it renders as "Not implemented Block"), but
+  // it should NOT block the whole suite in globalSetup — it is just another
+  // failing test. Emit a synthetic discovered-block entry per unregistered
+  // type so block-sanity generates one failing test each, while the registered
+  // blocks still run.
+  for (const [blockType, occurrences] of unregisteredTypes) {
+    result.push({
+      blockType,
+      blockId: occurrences[0].blockId,
+      pagePath: occurrences[0].pagePath,
+      unregistered: true,
+      occurrenceCount: occurrences.length,
+    });
   }
 
-  if (allowedBlocksViolations.length) {
-    // Dedupe by (blockType, parentType) so the message is about the config gap,
-    // not every instance; keep an example location per pair.
-    const byPair = new Map();
-    for (const v of allowedBlocksViolations) {
-      const key = `${v.blockType} ${v.parentType}`;
-      if (!byPair.has(key)) byPair.set(key, { ...v, count: 0 });
-      byPair.get(key).count++;
-    }
-    const lines = [...byPair.values()].map(
-      (v) =>
-        `  - "${v.blockType}" in ${v.parentType} — allowed: [${v.allowed.join(', ')}] ` +
-        `(${v.count}×, e.g. ${v.pagePath} [${v.blockId}])`,
-    );
-    throw new Error(
-      `Discovery found ${allowedBlocksViolations.length} block(s) placed in a container ` +
-        `that doesn't allow their @type. Such a block can't be reordered within its ` +
-        `container — the mobile chevron / drag walks it OUT to the nearest ancestor that ` +
-        `accepts the type, so it "escapes". Either widen the container's allowedBlocks ` +
-        `(if the placement is intended) or move/convert the block:\n` +
-        lines.join('\n'),
-    );
+  // Like unregistered types, containment / shape / slate issues are real
+  // content/schema problems but should each be a failing test rather than
+  // blocking the whole suite in globalSetup. Emit a synthetic discovered-block
+  // entry per issue.
+  for (const v of allowedBlocksViolations) {
+    result.push({
+      blockType: v.blockType,
+      blockId: v.blockId,
+      pagePath: v.pagePath,
+      allowedBlocksViolation: true,
+      parentType: v.parentType,
+      allowed: v.allowed,
+    });
   }
 
-  if (schemaMismatches.length) {
-    const lines = schemaMismatches.flatMap((e) => [
-      `  ${e.pagePath} [${e.blockId}] (${e.blockType}):`,
-      ...e.issues.map((msg) => `    - ${msg}`),
-    ]);
-    throw new Error(
-      `Discovery found ${schemaMismatches.length} block(s) whose field data doesn't match the ` +
-        `type/widget its schema declares. These will crash Volto's sidebar widgets ` +
-        `(e.g. UrlWidget expecting a string but getting an array, or a select value not in ` +
-        `its choices). Either fix the content or update the schema.\n` +
-        lines.join('\n'),
-    );
+  for (const e of shapeIssues) {
+    result.push({
+      blockType: e.blockType,
+      blockId: e.blockId,
+      pagePath: e.pagePath,
+      shapeIssue: true,
+      issues: e.issues,
+    });
   }
 
-  if (slateIssues.length) {
-    const lines = slateIssues.flatMap((e) => [
-      `  ${e.pagePath} [${e.blockId}] field "${e.field}":`,
-      ...e.issues.map((msg) => `    - ${msg}`),
-    ]);
-    throw new Error(
-      `Discovery found ${slateIssues.length} slate field(s) with structural issues. ` +
-        `Each slate field must be a single element root with a string \`type\`; ` +
-        `text leaves must live inside an element.\n` +
-        lines.join('\n'),
-    );
+  for (const e of slateIssues) {
+    result.push({
+      blockType: e.blockType || 'slate',
+      blockId: e.blockId,
+      pagePath: e.pagePath,
+      slateIssue: true,
+      field: e.field,
+      issues: e.issues,
+    });
   }
 
   // Every block type the FRONTEND registers needs at least one content
@@ -813,13 +795,10 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
       if (cfg?.restricted) continue;
       if (!discoveredTypes.has(blockType)) missing.push(blockType);
     }
-    if (missing.length) {
-      throw new Error(
-        `Discovery found ${missing.length} frontend-registered block type(s) with no content ` +
-          `example to run the sanity render test against. Add a fixture (page with a populated ` +
-          `instance) or mark the type restricted if it only belongs inside a parent container.\n` +
-          missing.map((t) => `  - ${t}`).join('\n'),
-      );
+    // A registered type with no content example can't get a render test — but
+    // that is a failing test for that type, not a reason to block the suite.
+    for (const blockType of missing) {
+      result.push({ blockType, noExample: true });
     }
   }
 

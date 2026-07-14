@@ -191,16 +191,21 @@ describe('plone-content-validator validate()', () => {
     );
   });
 
-  it('reports UID missing from local_roles', () => {
+  it('accepts content with NO local_roles (optional for plone.distribution)', () => {
+    // local_roles is generated/defaulted on import, not required: plone.distribution
+    // imports items fine when it is absent and defaults them to admin ownership.
+    // The REAL pretagov __metadata__.json ships no local_roles key at all and is
+    // deployed live (197 items). An earlier version of this test asserted the
+    // OPPOSITE — that missing local_roles is an error — which would have rejected
+    // that valid distribution. Assert the true behavior instead.
     const { root, contentDir } = buildFixture({
-      // Empty local_roles → page-a's UID should be flagged.
       localRoles: {},
     });
     const r = validate(contentDir);
     cleanup(root);
     assert.ok(
-      r.errors.some((e) => e.includes('local_roles') && e.includes('pageauid1234567')),
-      r.errors.join('\n'),
+      !r.errors.some((e) => e.includes('local_roles')),
+      `local_roles must not be required, got: ${r.errors.join('\n')}`,
     );
   });
 
@@ -259,7 +264,9 @@ describe('plone-content-validator checkIntegrity()', () => {
     assert.equal(r.stats.resolveuidBroken, 1);
   });
 
-  it('flags broken internal hrefs in block teasers', () => {
+  it('FAILS on a broken internal href in a block teaser', () => {
+    // A broken link is a malformed-content ERROR, not a warning. A warning does
+    // not fail the deploy gate, so a broken href would ship.
     const { root, contentDir } = buildFixture({
       pageA: {
         '@id': '/page-a',
@@ -277,7 +284,161 @@ describe('plone-content-validator checkIntegrity()', () => {
     });
     const r = checkIntegrity(contentDir);
     cleanup(root);
-    assert.ok(r.warnings.some((w) => w.includes('/does-not-exist')), r.warnings.join('\n'));
+    assert.ok(r.errors.some((e) => e.includes('/does-not-exist')), r.errors.join('\n'));
+    assert.equal(r.stats.linksBroken, 1);
+  });
+
+  it('FAILS on an image block url in [{"@id": path}] array form pointing nowhere', () => {
+    // The exact shape that shipped 5 dead image blocks on pretagov-site: url as
+    // an object_browser ARRAY, not a string, pointing at /images/test-image
+    // which does not exist. Pass 2c only checked url as a STRING, so this was
+    // never looked at and the gate reported "0 broken".
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a',
+        '@type': 'Document',
+        id: 'page-a',
+        UID: 'pageauid1234567',
+        parent: { '@id': '/' },
+        blocks: {
+          'image-1': {
+            '@type': 'image',
+            url: [{ '@id': '/images/test-image' }],
+          },
+        },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(
+      r.errors.some((e) => e.includes('/images/test-image')),
+      r.errors.join('\n'),
+    );
+    assert.equal(r.stats.linksBroken, 1);
+  });
+
+  it('accepts a valid array-form url that resolves', () => {
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a',
+        '@type': 'Document',
+        id: 'page-a',
+        UID: 'pageauid1234567',
+        parent: { '@id': '/' },
+        blocks: {
+          'image-1': { '@type': 'image', url: [{ '@id': '/' }] },  // homepage
+        },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.deepEqual(r.errors, []);
+    assert.equal(r.stats.linksBroken, 0);
+    assert.equal(r.stats.linksOk, 1);
+  });
+
+  it('FAILS on a reference form it does not understand', () => {
+    // "if a sanity test is finding links it can't understand, it fails." An
+    // href that is neither resolveuid, internal path, external URL, nor a known
+    // scheme must not be silently skipped.
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a',
+        '@type': 'Document',
+        id: 'page-a',
+        UID: 'pageauid1234567',
+        parent: { '@id': '/' },
+        blocks: {
+          'btn-1': { '@type': 'button', href: [{ '@id': 'garbage-not-a-ref' }] },
+        },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(
+      r.errors.some((e) => e.includes('garbage-not-a-ref')),
+      r.errors.join('\n'),
+    );
+  });
+
+  it('accepts external URLs and known schemes without flagging them', () => {
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a',
+        '@type': 'Document',
+        id: 'page-a',
+        UID: 'pageauid1234567',
+        parent: { '@id': '/' },
+        blocks: {
+          'img-1': { '@type': 'image', href: [{ '@id': 'https://digital.nsw.gov.au/x' }] },
+          'img-2': { '@type': 'image', href: [{ '@id': 'mailto:hi@example.com' }] },
+        },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.deepEqual(r.errors, []);
+    assert.equal(r.stats.linksOk, 2);
+  });
+
+  it('FAILS on a blocks_layout.items entry with no matching block', () => {
+    // A uid listed in a container's blocks_layout but absent from its `blocks`
+    // dict is a dangling reference — what a partial block deletion leaves (remove
+    // the block def but not its layout entry).
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a', '@type': 'Document', id: 'page-a', UID: 'pageauid1234567',
+        parent: { '@id': '/' },
+        blocks: { 'real-1': { '@type': 'slate' } },
+        blocks_layout: { items: ['real-1', 'ghost-block-999'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(
+      r.errors.some((e) => e.includes('ghost-block-999') && e.includes('blocks_layout')),
+      r.errors.join('\n'),
+    );
+  });
+
+  it('FAILS on a dangling ref in the nested blocks_layout.blocks_layout key', () => {
+    // The exact bug a teaser removal left: block def gone from `blocks`, uid still
+    // in the vestigial blocks_layout.blocks_layout array.
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a', '@type': 'Document', id: 'page-a', UID: 'pageauid1234567',
+        parent: { '@id': '/' },
+        blocks: {
+          'grid-1': {
+            '@type': 'gridBlock',
+            blocks: { 'child-1': { '@type': 'teaser' } },
+            blocks_layout: { blocks_layout: ['deleted-teaser-uid'], items: ['child-1'] },
+          },
+        },
+        blocks_layout: { items: ['grid-1'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.ok(
+      r.errors.some((e) => e.includes('deleted-teaser-uid')),
+      r.errors.join('\n'),
+    );
+  });
+
+  it('accepts a container whose blocks_layout fully resolves', () => {
+    const { root, contentDir } = buildFixture({
+      pageA: {
+        '@id': '/page-a', '@type': 'Document', id: 'page-a', UID: 'pageauid1234567',
+        parent: { '@id': '/' },
+        blocks: { 'a': { '@type': 'slate' }, 'b': { '@type': 'slate' } },
+        blocks_layout: { blocks_layout: [], items: ['a', 'b'] },
+      },
+    });
+    const r = checkIntegrity(contentDir);
+    cleanup(root);
+    assert.deepEqual(r.errors, []);
+    assert.equal(r.stats.layoutBroken, 0);
   });
 
   it('resolves valid resolveuid refs', () => {

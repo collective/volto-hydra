@@ -1,0 +1,14 @@
+{
+  "@id": "/preview-image-link",
+  "@type": "Document",
+  "UID": "preview-image-link-uid",
+  "id": "preview-image-link",
+  "title": "Document with preview_image_link set",
+  "description": "Source-shaped: the volto.preview_image_link behaviour stores a relation. Plone's RelationChoiceFieldSerializer serialises it as a SUMMARY of the linked Image (plone.restapi serializer/relationfield.py), and plone.volto's JSONSummarySerializerMetadata adds image_field + image_scales to every summary.",
+  "review_state": "published",
+  "preview_image_link": "resolveuid/test-image-1-uid",
+  "blocks": {
+    "title-1": { "@type": "title" }
+  },
+  "blocks_layout": { "items": ["title-1"] }
+}

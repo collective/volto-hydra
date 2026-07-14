@@ -31,6 +31,18 @@ interface DiscoveredBlock {
   pagePath: string;
   blockData: Record<string, unknown>;
   isListing: boolean;
+  // Set by discovery for content/schema problems that become a failing test
+  // rather than blocking the whole suite in globalSetup.
+  unregistered?: boolean;
+  occurrenceCount?: number;
+  shapeIssue?: boolean;
+  slateIssue?: boolean;
+  field?: string;
+  issues?: string[];
+  noExample?: boolean;
+  allowedBlocksViolation?: boolean;
+  parentType?: string;
+  allowed?: string[];
 }
 
 // Read discovered blocks (written by globalSetup)
@@ -66,6 +78,63 @@ const test = base.extend<{ helper: AdminUIHelper }>({
 
 test.describe('Block sanity (auto-discovered)', () => {
   for (const block of discoveredBlocks) {
+    // A block @type used in content but not registered in the frontend's
+    // blocksConfig fails as its own test (it renders as "Not implemented
+    // Block") rather than blocking the whole suite.
+    if (block.unregistered) {
+      test(`${block.blockType} block @type is registered in the frontend`, () => {
+        throw new Error(
+          `Block @type "${block.blockType}" is used in content (${block.occurrenceCount} ` +
+            `occurrence(s), e.g. ${block.pagePath}) but is not registered in the frontend's ` +
+            `blocksConfig, so it renders as "Not implemented Block". Register its schema ` +
+            `(customBlocks) or migrate the content to an existing type.`,
+        );
+      });
+      continue;
+    }
+    // A frontend-registered type with no content example — fails as its own
+    // test (nothing to render) rather than blocking the suite.
+    if (block.noExample) {
+      test(`${block.blockType} block has a content example to render`, () => {
+        throw new Error(
+          `Block @type "${block.blockType}" is registered in the frontend but no content ` +
+            `example exists to run its render test. Add a fixture (a page with a populated ` +
+            `instance), or mark the type restricted if it only belongs inside a parent container.`,
+        );
+      });
+      continue;
+    }
+    // A block placed in a container that doesn't allow its @type — it can't be
+    // reordered within its container (the chevron / drag walks it OUT to the
+    // nearest ancestor that accepts the type). Fails as its own test rather
+    // than blocking the suite.
+    if (block.allowedBlocksViolation) {
+      test(`${block.blockType} block [${block.blockId}] is allowed in its container`, () => {
+        throw new Error(
+          `Block "${block.blockType}" [${block.blockId}] on ${block.pagePath} is placed in a ` +
+            `${block.parentType} container that doesn't allow its @type ` +
+            `(allowed: [${(block.allowed || []).join(', ')}]). Such a block can't be reordered ` +
+            `within its container — the mobile chevron / drag walks it OUT to the nearest ` +
+            `ancestor that accepts the type, so it "escapes". Widen the container's allowedBlocks ` +
+            `(if the placement is intended) or move/convert the block.`,
+        );
+      });
+      continue;
+    }
+    // Content/schema shape mismatch (e.g. a field declared slate but holding a
+    // string) — fails as its own test rather than blocking the suite.
+    if (block.shapeIssue || block.slateIssue) {
+      const kind = block.shapeIssue ? 'data shape' : 'slate structure';
+      test(`${block.blockType} block [${block.blockId}] has valid ${kind}`, () => {
+        throw new Error(
+          `Block "${block.blockType}" [${block.blockId}] on ${block.pagePath}` +
+            (block.field ? ` field "${block.field}"` : '') +
+            ` has ${kind} that does not match its schema:\n` +
+            (block.issues || []).map((m) => `  - ${m}`).join('\n'),
+        );
+      });
+      continue;
+    }
     const labelVariation = block.variation && block.variation !== 'default'
       ? ` (${block.variation})`
       : '';
