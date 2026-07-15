@@ -222,16 +222,14 @@ test.describe('Template Creation', () => {
       'no dangling untitled-template placeholder should remain in the saved page blocks',
     ).not.toMatch(/untitled-template-\d+/);
 
-    // (3) The document created at the new id carries the source block — so a page
-    // referencing /…/my-new-layout (as the page now does, per (2)) resolves to real
-    // content and renders correctly. (We assert the created document's content rather
-    // than navigating to it: the STATIC test frontend can't render a session-created
-    // document in the iframe, a test-infra limitation — real Plone serves it directly.)
+    // (3) The created template LOADS and RENDERS at its new id — open its own page
+    // and the block renders in the iframe. (Proves the doc was created at the right id
+    // AND is servable/renderable — the page referencing it, per (2), resolves to real
+    // content.)
     expect(tpl!.body.blocks, 'the created template must carry the source block').toBeTruthy();
-    expect(
-      JSON.stringify(tpl!.body.blocks),
-      'the created template must contain the source block content',
-    ).toContain('This is a test paragraph');
+    await helper.navigateToEdit('/templates/my-new-layout');
+    const { locator } = await helper.waitForBlockByContent('This is a test paragraph');
+    await expect(locator).toBeVisible({ timeout: 10000 });
   });
 
   // Failing on purpose (TDD): a template document is just a Document at
@@ -1877,13 +1875,19 @@ test.describe('Template Edit Mode - Lock affordance + metadata gating', () => {
     const props = page.locator('#sidebar-properties');
 
     // LOCKED (template not being edited): each read-only sub-block's settings render
-    // through ReadOnlyForm — static values, no editable controls.
-    for (const id of [headerBlockId, footerBlockId]) {
+    // through ReadOnlyForm — static values, no editable controls — and crucially show
+    // the block's VALUES (not an empty panel, the original bug for view-less blocks).
+    for (const [id, content] of [
+      [headerBlockId, TEMPLATE_HEADER_CONTENT],
+      [footerBlockId, TEMPLATE_FOOTER_CONTENT],
+    ] as const) {
       await helper.clickBlockInIframe(id);
       await helper.waitForBlockSelectedInAdmin(id);
       await helper.waitForSidebarOpen();
       await expect(props.locator('.readonly-form')).toBeVisible({ timeout: 5000 });
       await expect(props.locator('input, textarea, [contenteditable="true"]')).toHaveCount(0);
+      // The block's own content is shown as a read-only value.
+      await expect(props.locator('.readonly-field-value').filter({ hasText: content })).toBeVisible();
     }
 
     // UNLOCK the template (enter edit mode): the same sub-block is now editable in the
