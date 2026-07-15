@@ -57,6 +57,25 @@ function buildAllowedBlocksList(blocksConfig) {
 }
 
 /**
+ * The field whose value names the @type of the items a listing/grid renders.
+ * A listing declares it on `schemaEnhancer.inheritSchemaFrom.typeField` (it has
+ * no blocks field); a grid declares `itemTypeField` on its blocks_layout /
+ * object_list field. The value that field holds MUST be a registered block type
+ * — expandListingBlocks stamps it onto every expanded item's `@type`, so a value
+ * that isn't a real block type makes every result render as "Unimplemented".
+ * Returns the field name, or null when the block renders no dynamic items.
+ */
+function itemTypeFieldOf(blockDef) {
+  const tf = blockDef?.schemaEnhancer?.inheritSchemaFrom?.typeField;
+  if (tf) return tf;
+  const props = blockDef?.blockSchema?.properties || {};
+  for (const def of Object.values(props)) {
+    if (def && typeof def === 'object' && def.itemTypeField) return def.itemTypeField;
+  }
+  return null;
+}
+
+/**
  * A blocks_layout region seeds an `@type: "empty"` placeholder — rather than a
  * concrete default/single type — exactly when it has no `defaultBlockType` and
  * more than one `allowedBlocks`. Mirrors getEmptyBlockType() in
@@ -512,6 +531,12 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   // for these. Collect all occurrences so the report shows every page
   // affected, not just the first.
   const unregisteredTypes = new Map(); // blockType → [{pagePath, blockId}]
+  // Item block types a stored listing/grid renders via its item-type field, and
+  // WHERE. Such a type has no stored authored instance of its own, but it IS
+  // rendered on the page holding that listing/grid — so we emit its render test
+  // anchored there (the items share the container's data-block-uid).
+  // itemType → { pagePath, containerUid }
+  const itemTypeExamples = new Map();
   const REGISTERED = new Set(Object.keys(blocksConfig || {}));
   // Plone content types appear as @type on the page root (Document, etc.)
   // — skip these, they're not blocks.
@@ -612,6 +637,36 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         ) {
           if (!unregisteredTypes.has(blockType)) unregisteredTypes.set(blockType, []);
           unregisteredTypes.get(blockType).push({ pagePath, blockId });
+        }
+
+        // A listing/grid stamps its item-type field's VALUE onto every expanded
+        // result's @type, so that value must be a registered block type. When it
+        // is, record the type as covered (it's rendered — and render-tested — on
+        // this block's page even without a stored instance of its own). When it
+        // isn't, flag it: every result would fall through to "Unimplemented".
+        if (blockType) {
+          const itemTypeField = itemTypeFieldOf(blocksConfig[blockType]);
+          if (itemTypeField) {
+            const itemType = blockData[itemTypeField];
+            if (typeof itemType === 'string' && itemType && itemType !== 'default') {
+              if (REGISTERED.has(itemType)) {
+                if (!itemTypeExamples.has(itemType)) {
+                  itemTypeExamples.set(itemType, { pagePath, containerUid: blockId });
+                }
+              } else if (!PAGE_TYPES.has(itemType)) {
+                shapeIssues.push({
+                  pagePath,
+                  blockId,
+                  blockType,
+                  issues: [
+                    `field "${itemTypeField}": item type ${JSON.stringify(itemType)} is not a registered block ` +
+                      `type — ${blockType} expands each result as \`@type: ${JSON.stringify(itemType)}\`, which the ` +
+                      `frontend renders as "Unimplemented". Set it to a registered item block type (e.g. "card", "listItem").`,
+                  ],
+                });
+              }
+            }
+          }
         }
 
         // Only add real @type blocks to the dedup set used for sanity tests.
@@ -801,18 +856,27 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
       for (const subType of allowedBlocks) required.add(subType);
     }
     const discoveredTypes = new Set(result.map((r) => r.blockType));
-    // A required type with no content example can't get a render test — but that
-    // is a failing test for that type, not a reason to block the suite.
     for (const blockType of required) {
       if (discoveredTypes.has(blockType)) continue;
-      // A convertible listing/search ITEM TYPE (declares `fieldMappings['@default']`)
-      // is populated at runtime from query results — it's rendered read-only by
-      // listing/search expansion and never stored as authored content, so it can't
-      // have a standalone example and shouldn't be required to (e.g. `listItem` is
-      // only ever a search result). It's still render-tested wherever it does
-      // appear in stored content (e.g. `card` inside a grid); this only relaxes the
-      // must-have-an-example rule for the never-stored case.
-      if (blocksConfig[blockType]?.fieldMappings?.['@default']) continue;
+      // A dynamic listing/grid item type has no stored authored instance, but a
+      // stored listing/grid that VALIDLY names it renders it on a real page.
+      // Emit its render test anchored on that page against the container's uid:
+      // the expanded items share their container's data-block-uid, so verifying
+      // the container walks the rendered items (their images must load, etc.).
+      // Added after the by-uid dedup above, so it coexists with the container's
+      // own test but is labelled as this item type. A type nothing validly
+      // renders (or only named via an already-flagged invalid value) still fails.
+      const ex = itemTypeExamples.get(blockType);
+      if (ex) {
+        result.push({
+          blockType,
+          blockId: ex.containerUid,
+          pagePath: ex.pagePath,
+          blockData: {},
+          isListing: true,
+        });
+        continue;
+      }
       result.push({ blockType, noExample: true });
     }
   }
