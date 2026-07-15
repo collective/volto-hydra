@@ -4368,8 +4368,11 @@ const Iframe = (props) => {
 
   return (
     <div id="iframeContainer">
-      {/* v2 template-edit decision modals: unlock warning, lock choice, save gate. */}
-      {templateModal && (() => {
+      {/* v2 template-edit decision modals: unlock warning, lock choice, save gate.
+          Portaled to document.body so it escapes #iframeContainer's stacking
+          context — otherwise on mobile it renders BEHIND the settings sidebar
+          (which sits at a higher z in the mobile ladder). */}
+      {templateModal && createPortal((() => {
         const close = () => setTemplateModal(null);
         const { kind, instanceId } = templateModal;
         return (
@@ -4454,7 +4457,7 @@ const Iframe = (props) => {
             )}
           </div>
         );
-      })()}
+      })(), document.body)}
       <OpenObjectBrowser
         origin={iframeSrc && new URL(iframeSrc).origin}
         pendingFieldMedia={pendingFieldMedia}

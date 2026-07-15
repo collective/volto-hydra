@@ -1755,6 +1755,57 @@ test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commi
   const I1_CONTENT = 'i1-content'; // editable member of instance 1 (keeps its id)
   const I2_CONTENT = 'i2-content'; // editable member of instance 2 (keeps its id)
 
+  // Reproduces the deployed-mobile bugs: (1) the lock toggle must be present on
+  // the template bar, and (2) the unlock/lock modals must render ABOVE the mobile
+  // settings popup (sidebar), not behind it — so their buttons are clickable.
+  test('on mobile the lock modal replaces the settings sidebar (one popup at a time)', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    // Select the template instance, then make sure the settings sidebar is OPEN
+    // (on mobile it may be a collapsed off-screen popup — the lock toggle lives
+    // inside it). Open it via the cog only when actually collapsed.
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    const sidebar = page.locator('.sidebar-container:not(.collapsed)');
+    if ((await sidebar.count()) === 0) {
+      await page.locator('[aria-label="Open settings"]').click();
+    }
+    await expect(sidebar).toBeVisible({ timeout: 5000 });
+
+    // (1) The lock toggle is present + clickable on the template bar.
+    const toggle = page.locator('.sidebar-section-header[data-is-current="true"] .edit-template-toggle');
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await toggle.click();
+
+    // (2) The unlock modal opens as the single popup: its confirm button is
+    // clickable (hit-tested) AND the settings sidebar has stepped aside.
+    const modal = page.locator('.template-unlock-modal');
+    await expect(modal).toBeVisible({ timeout: 5000 });
+    await expect(sidebar).toBeHidden();
+    await modal.locator('.template-confirm').click({ timeout: 5000 });
+    await expect(modal).toHaveCount(0);
+    await helper.waitForBlockEditable(headerBlockId);
+
+    // (3) The lock decision modal (the "save the template" path) is likewise
+    // reachable and replaces the sidebar. The sidebar returns once the unlock
+    // modal closed; re-open it only if it collapsed.
+    if ((await sidebar.count()) === 0) {
+      await page.locator('[aria-label="Open settings"]').click();
+    }
+    await expect(sidebar).toBeVisible({ timeout: 5000 });
+    await toggle.click();
+    const lockModal = page.locator('.template-lock-modal');
+    await expect(lockModal).toBeVisible({ timeout: 5000 });
+    await expect(sidebar).toBeHidden();
+    await lockModal.locator('.template-commit').click({ timeout: 5000 });
+    await expect(lockModal).toHaveCount(0);
+  });
+
   test('unlocking a template warns before entering edit mode; cancel is a no-op', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
