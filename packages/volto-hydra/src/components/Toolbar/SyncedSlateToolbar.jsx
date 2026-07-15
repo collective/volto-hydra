@@ -1354,8 +1354,8 @@ const SyncedSlateToolbar = ({
         const block = getBlock(selectedBlock);
 
         // Resolve the top-level template instance this block belongs to (walk up the
-        // parent chain to the outermost, non-nested instance). Drives both the lock
-        // (enter edit mode) and the unlock (exit) affordances below.
+        // parent chain to the outermost, non-nested instance). Drives the clickable
+        // lock (enter edit mode) below.
         let instanceId = null;
         {
           let cur = selectedBlock;
@@ -1390,50 +1390,9 @@ const SyncedSlateToolbar = ({
           </div>
         );
 
-        // Editing THIS block's template AND this is one of the template's own (fixed)
-        // blocks — the chrome that shows 🔒 when locked — so show the unlock toggle
-        // (🔓) next to the drag handle: click it to lock (exit edit mode). Only these
-        // "visual template blocks" get the unlock; a user-content/slot block that
-        // merely sits inside the template region does not.
-        const isFixedTemplateBlock = !!block?.fixed;
-        const editingThisTemplate =
-          !!templateEditMode && !!instanceId && instanceId === templateEditMode;
-        if (editingThisTemplate && isFixedTemplateBlock && onToggleTemplateEditMode) {
-          // Drag handle FIRST — its position is load-bearing (it overlays the iframe's
-          // invisible drag element, the chrome pattern). The unlock sits after it.
-          return (
-            <>
-              {dragHandle}
-              <button
-                type="button"
-                className="unlock-icon"
-                title="Editing this template — click to finish"
-                aria-label="Finish editing template"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleTemplateEditMode(null);
-                }}
-                style={{
-                  padding: '4px 6px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  pointerEvents: 'auto',
-                  cursor: 'pointer',
-                  color: '#0b78d0',
-                  fontSize: '14px',
-                  background: '#eaf4fd',
-                  border: 'none',
-                  borderRadius: '2px',
-                }}
-              >
-                🔓
-              </button>
-            </>
-          );
-        }
-
-        // Use shared utility to check position lock (handles template edit mode)
+        // The Quanta toolbar just shows the lock in place of the drag handle for a
+        // locked template block (below); the lock/unlock TOGGLE lives on the sidebar
+        // bar. In edit mode the block is movable, so the slot shows the drag handle.
         const isLocked = isBlockPositionLocked(block, templateEditMode);
         if (isLocked) {
           // The lock only shows for template chrome (fixed blocks), so it's the

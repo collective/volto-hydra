@@ -279,32 +279,6 @@ test.describe('Editor Guide screenshots', () => {
     console.log(`[screenshot] template-toolbar-lock -> ${path.relative(process.cwd(), file)}`);
   });
 
-  test('template-toolbar-unlock — the same toolbar shows the unlock while editing', async ({ page }) => {
-    const helper = new AdminUIHelper(page);
-    await helper.login();
-    await helper.navigateToEdit('/template-test-page');
-
-    const { blockId: headerBlockId } = await helper.waitForBlockByContent('Template Header - From Template');
-    await helper.clickBlockInIframe(headerBlockId);
-    await helper.waitForBlockSelectedInAdmin(headerBlockId);
-
-    // Click the lock to enter edit mode, then re-select the (now editable) fixed block —
-    // its toolbar shows the 🔓 unlock (click to finish) next to the drag handle.
-    await page.locator('.quanta-toolbar .lock-icon').click();
-    await helper.waitForBlockReadonly('standalone-block-1');
-    await helper.clickBlockInIframe(headerBlockId);
-    await helper.waitForBlockSelectedInAdmin(headerBlockId);
-    await expect(page.locator('.quanta-toolbar .unlock-icon')).toBeVisible({ timeout: 5000 });
-
-    const box = (await page.locator('.quanta-toolbar').boundingBox())!;
-    const file = path.join(OUT_DIR, 'template-toolbar-unlock.png');
-    await page.screenshot({
-      path: file,
-      clip: { x: box.x, y: box.y, width: Math.min(box.width, 200), height: box.height },
-    });
-    console.log(`[screenshot] template-toolbar-unlock -> ${path.relative(process.cwd(), file)}`);
-  });
-
   test('frontend-switcher — toolbar panel with viewport + frontends', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();

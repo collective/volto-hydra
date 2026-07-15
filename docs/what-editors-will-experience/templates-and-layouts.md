@@ -71,11 +71,11 @@ Select one of the template's own blocks and click the **lock icon** 🔒 — it 
 - on the block's **Quanta toolbar** in the canvas, and
 - on the template's bar in the **sidebar** ("Template: *name*"), next to its `⋯` menu.
 
-That same `⋯` menu also has an **Edit template** item. Any of these enters template edit mode: the lock turns into an **unlock** icon 🔓, and the sidebar's Template Name / Save Location become editable (they're disabled while locked — you can't rename or relocate a template without editing it).
+On the block's toolbar the lock takes the place of the drag handle (a locked block can't be moved):
 
-On the block's toolbar the lock 🔒 (left) becomes an unlock 🔓 next to the drag handle once you're editing (right):
+![Quanta toolbar of a locked template block, showing a closed lock icon in place of the drag handle.](_images/template-toolbar-lock.png)
 
-![Quanta toolbar of a locked template block, showing a closed lock icon.](_images/template-toolbar-lock.png) ![Quanta toolbar of the same block while editing, showing the drag handle and an open lock (unlock) icon.](_images/template-toolbar-unlock.png)
+That same `⋯` menu (on the sidebar bar) also has an **Edit template** item. Any of these enters template edit mode. The **sidebar** bar is the lock/unlock **toggle**: its icon turns into an **unlock** 🔓 while editing (click it — or "Done editing template" — to lock again), and the Template Name / Save Location become editable (they're disabled while locked, so you can't rename or relocate a template without editing it). In the canvas the now-unlocked block simply shows its drag handle again.
 
 ![A template instance selected but locked: the template is outlined and its sidebar bar "Template: test-layout" shows a closed lock icon 🔒; the Template Name / Save Location fields are disabled.](_images/template-edit-locked.png)
 

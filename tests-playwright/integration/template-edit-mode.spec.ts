@@ -1760,35 +1760,6 @@ test.describe('Template Edit Mode - Lock affordance + metadata gating', () => {
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
   });
 
-  // While editing, the toolbar shows an UNLOCK icon (🔓) — the in-canvas "you are
-  // editing this template" signal — and clicking it exits edit mode.
-  test('editing a template shows an unlock icon on the toolbar that exits edit mode', async ({ page }) => {
-    const helper = new AdminUIHelper(page);
-    await helper.login();
-    await helper.navigateToEdit('/template-test-page');
-
-    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
-
-    // Enter edit mode via the toolbar lock.
-    await helper.clickBlockInIframe(headerBlockId);
-    await helper.waitForBlockSelectedInAdmin(headerBlockId);
-    const lockIcon = page.locator('.quanta-toolbar .lock-icon');
-    await expect(lockIcon).toBeVisible({ timeout: 5000 });
-    await lockIcon.click();
-    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
-
-    // The now-editable template block's toolbar shows the 🔓 unlock (not the 🔒 lock).
-    await helper.clickBlockInIframe(headerBlockId);
-    await helper.waitForBlockSelectedInAdmin(headerBlockId);
-    const unlock = page.locator('.quanta-toolbar .unlock-icon');
-    await expect(unlock).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('.quanta-toolbar .lock-icon')).toHaveCount(0);
-
-    // Clicking the unlock exits template edit mode (outside blocks editable again).
-    await unlock.click();
-    await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
-  });
-
   // Sub-issue #2: you must be editing the template to change its name / save
   // location. When NOT in edit mode the metadata fields are disabled; entering
   // edit mode enables them.
