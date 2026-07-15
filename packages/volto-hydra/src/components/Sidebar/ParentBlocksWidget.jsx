@@ -521,13 +521,20 @@ const ParentBlockSection = ({
             : undefined;
         const templateFormData = {
           title: tplDoc?.title,
+          // Short name = the template's URL id (its filename). Empty for a brand-new
+          // template until the author sets it (or it's derived from the name at save).
+          id: tplDoc?.id,
           // A pending Save-Location edit lives on the doc's `folder`; otherwise show
           // where the template currently lives (its @id's parent folder).
           folder:
             tplDoc?.folder ||
             (tplLocation ? [{ '@id': tplLocation, title: tplLocation }] : undefined),
         };
-        const templateSchema = getTemplateInstanceSchema(contextIntl);
+        // The Short name is only editable for a not-yet-saved template; renaming a
+        // saved template's id is a move (out of scope here).
+        const templateSchema = getTemplateInstanceSchema(contextIntl, {
+          idEditable: !!tplDoc?._isNew,
+        });
         const formContent = isEditingThisTemplate ? (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
             <BlockDataForm
