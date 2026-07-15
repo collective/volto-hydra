@@ -1192,15 +1192,26 @@ setupContentWatchers();
  * @param {string} sessionId - Session ID for session-specific uploads
  */
 function getContent(urlPath, sessionId, expandList = []) {
-  // Check session-specific storage first (for uploads created in this session)
-  if (sessionId && sessionContent[sessionId]?.[urlPath]) {
-    const stored = sessionContent[sessionId][urlPath];
-    // Session content may be stored raw (POST handlers) or already-enriched
-    // (legacy callers that built full responses inline). Re-enrich
-    // unconditionally so the read-time @components reflect the current
-    // request's ?expand= choices, like Plone does.
-    const baseUrl = `http://localhost:${PORT}`;
-    return enrichContent(stored, urlPath, baseUrl, expandList);
+  // Check session-specific storage first (for content created in this session).
+  if (sessionId && sessionContent[sessionId]) {
+    const store = sessionContent[sessionId];
+    let stored = store[urlPath];
+    // A reader may address session-created content under the /_test_data test-content
+    // mount even though it was created under a bare path (e.g. the admin's templatesPath
+    // "/templates/x" while the frontend fetches "/_test_data/templates/x"). Un-prefix a
+    // missed /_test_data path so created content is served in-session either way. Strip
+    // ONLY (never add a prefix) so this can't shadow bare disk content.
+    if (!stored && urlPath.startsWith('/_test_data')) {
+      stored = store[urlPath.slice('/_test_data'.length) || '/'];
+    }
+    if (stored) {
+      // Session content may be stored raw (POST handlers) or already-enriched
+      // (legacy callers that built full responses inline). Re-enrich
+      // unconditionally so the read-time @components reflect the current
+      // request's ?expand= choices, like Plone does.
+      const baseUrl = `http://localhost:${PORT}`;
+      return enrichContent(stored, urlPath, baseUrl, expandList);
+    }
   }
 
   // Try disk first (distribution content may have a site root)

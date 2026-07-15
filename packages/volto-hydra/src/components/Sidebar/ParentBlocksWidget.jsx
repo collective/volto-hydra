@@ -21,7 +21,6 @@ import { createPortal } from 'react-dom';
 import {
   getTemplateInstanceSchema,
   getTemplateBlockSettingsSchema,
-  getTemplateEditButtonState,
   blockKindFromFlags,
   blockKindFlags,
 } from './templateSettingsSchema';
@@ -32,13 +31,17 @@ import config from '@plone/volto/registry';
 import { BlockDataForm } from '@plone/volto/components/manage/Form';
 import { Icon } from '@plone/volto/components';
 import leftArrowSVG from '@plone/volto/icons/left-key.svg';
+import lockSVG from '@plone/volto/icons/lock.svg';
+import unlockSVG from '@plone/volto/icons/unlock.svg';
 import { SidebarPortalTargetContext } from './SidebarPortalTargetContext';
 import DropdownMenu from '../Toolbar/DropdownMenu';
+import ReadOnlyForm from './ReadOnlyForm';
 import { getBlockById, updateBlockById, getResolvedSchema, getCommonAncestor } from '../../utils/blockPath';
 import { HydraSchemaProvider } from '../../context';
 import { getConvertibleTypes, convertBlockType, findTypeField } from '../../utils/schemaInheritance';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import { isBlockReadonly } from '@volto-hydra/helpers';
+import { flattenToAppURL } from '@plone/volto/helpers';
 
 /**
  * Get the display title for a block type
@@ -201,6 +204,20 @@ const ParentBlockSection = ({
   // Get pathInfo for template instance detection
   const pathInfo = blockPathMap?.[blockId];
 
+  // This section IS a top-level template instance → it carries the lock/unlock
+  // toggle (on this "blind" header bar) + the "Edit template" dropdown item, which
+  // replace the old standalone Edit-template button. Locked (🔒) = not editing;
+  // unlocked (🔓) = editing this template. Permission-gated on the template doc.
+  const isThisTemplateInstance =
+    !!pathInfo?.isTemplateInstance && !pathInfo?.isNestedTemplateInstance;
+  const isEditingThisTemplate = templateEditMode === blockId;
+  const canEditTemplate =
+    templatePermissions?.[pathInfo?.templateId]?.can_edit ?? true;
+  const canToggleTemplateEdit =
+    isThisTemplateInstance && !!onToggleTemplateEditMode && canEditTemplate;
+  const toggleTemplateEdit = () =>
+    onToggleTemplateEditMode(isEditingThisTemplate ? null : blockId);
+
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [menuButtonRect, setMenuButtonRect] = React.useState(null);
   const menuButtonRef = React.useRef(null);
@@ -216,7 +233,11 @@ const ParentBlockSection = ({
   const blockConfig = config.blocks?.blocksConfig?.[blockType];
   const useSchemaOnly = blockConfig?.disableCustomSidebarEditForm;
   const isReadonly = isBlockReadonly(blockData, templateEditMode);
-  const BlockEdit = useSchemaOnly ? null : (isReadonly ? blockConfig?.view : blockConfig?.edit);
+  // Read-only blocks render through ReadOnlyForm (below), never an editable Edit
+  // component (nor a hidden View, which produced no sidebar form and left view-less
+  // read-only blocks with an empty panel). So a read-only block always shows its
+  // values as static text, and never an editable input.
+  const BlockEdit = useSchemaOnly || isReadonly ? null : blockConfig?.edit;
 
   // Get schema for fallback rendering (when no Edit component or disableCustomSidebarEditForm)
   const schema = !BlockEdit ? getFilteredBlockSchema(blockType, intl, blockPathMap, blockId, blockData) : null;
@@ -306,6 +327,46 @@ const ParentBlockSection = ({
               </div>
             );
           })()}
+          {/* Lock/unlock toggle for a top-level template instance — the obvious,
+              consistent replacement for the old standalone Edit-template button.
+              lock = locked (not editing) → click to unlock & edit; unlock = editing →
+              click to lock (exit). Keeps the .edit-template-toggle contract. */}
+          {isThisTemplateInstance && onToggleTemplateEditMode && (
+            <button
+              type="button"
+              className={`edit-template-toggle${isEditingThisTemplate ? ' edit-template-toggle--active' : ''}`}
+              aria-pressed={isEditingThisTemplate}
+              aria-label={isEditingThisTemplate ? 'Lock template (stop editing)' : 'Unlock template to edit'}
+              disabled={!canEditTemplate}
+              title={
+                canEditTemplate
+                  ? isEditingThisTemplate
+                    ? 'Locking exits template edit mode'
+                    : 'Unlock to edit this template’s structure'
+                  : 'You don’t have permission to edit this template (requires “Modify portal content”).'
+              }
+              onClick={toggleTemplateEdit}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '4px',
+                cursor: canEditTemplate ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '2px',
+                opacity: canEditTemplate ? 1 : 0.5,
+              }}
+              onMouseEnter={(e) => canEditTemplate && (e.currentTarget.style.background = '#e8e8e8')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+            >
+              <Icon
+                name={isEditingThisTemplate ? unlockSVG : lockSVG}
+                size="20px"
+                color={isEditingThisTemplate ? '#0b78d0' : '#684cc9'}
+              />
+            </button>
+          )}
           <button
             ref={menuButtonRef}
             className="menu-trigger"
@@ -344,6 +405,9 @@ const ParentBlockSection = ({
                 isReadonly={!!blockData?.readOnly}
                 isInTemplate={!!blockData?.templateId}
                 onMakeTemplate={onBlockAction ? () => onBlockAction('makeTemplate', blockId) : null}
+                isTemplateInstance={isThisTemplateInstance}
+                isEditingTemplate={isEditingThisTemplate}
+                onToggleTemplateEdit={canToggleTemplateEdit ? toggleTemplateEdit : null}
               />
             );
           })()}
@@ -429,13 +493,49 @@ const ParentBlockSection = ({
         return targetElement ? createPortal(formContent, targetElement) : null;
       })()}
 
+      {/* Read-only block (fixed/readonly template chrome, or a readonly block in
+          normal mode): render its schema fields as static text, never editable. */}
+      {schema && isReadonly && !pathInfo?.isTemplateInstance && (() => {
+        const targetElement = document.getElementById(targetId);
+        return targetElement
+          ? createPortal(
+              <ReadOnlyForm schema={schema} formData={blockData} />,
+              targetElement,
+            )
+          : null;
+      })()}
+
       {/* Template instance settings form — only for top-level, not nested */}
       {pathInfo?.isTemplateInstance && !pathInfo?.isNestedTemplateInstance && onChangeTemplateSettings && (() => {
-        // Template instance settings: name / save location. Entering edit mode is the
-        // prominent button at the top of the panel (see the main render), not a field here.
-        const templateFormData = { ...blockData };
-        const templateSchema = getTemplateInstanceSchema(contextIntl);
-        const formContent = (
+        // Template instance settings: name / save location. These are the TEMPLATE'S
+        // OWN metadata (its document title + where it lives), so read them from the
+        // cached template document — NOT the instance block, which only carries them
+        // right after "Make Template". The doc is fetched + cached during the merge and
+        // passed here as templatePermissions; onChangeTemplateSettings writes edits back
+        // into it, so it stays the live source of truth. Editable only while editing.
+        const tplDoc = templatePermissions?.[pathInfo?.templateId];
+        const tplDocId = tplDoc?.['@id'];
+        const tplLocation =
+          tplDocId && tplDocId.lastIndexOf('/') > 0
+            ? flattenToAppURL(tplDocId.slice(0, tplDocId.lastIndexOf('/')))
+            : undefined;
+        const templateFormData = {
+          title: tplDoc?.title,
+          // Short name = the template's URL id (its filename). Empty for a brand-new
+          // template until the author sets it (or it's derived from the name at save).
+          id: tplDoc?.id,
+          // A pending Save-Location edit lives on the doc's `folder`; otherwise show
+          // where the template currently lives (its @id's parent folder).
+          folder:
+            tplDoc?.folder ||
+            (tplLocation ? [{ '@id': tplLocation, title: tplLocation }] : undefined),
+        };
+        // The Short name is only editable for a not-yet-saved template; renaming a
+        // saved template's id is a move (out of scope here).
+        const templateSchema = getTemplateInstanceSchema(contextIntl, {
+          idEditable: !!tplDoc?._isNew,
+        });
+        const formContent = isEditingThisTemplate ? (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
             <BlockDataForm
               schema={templateSchema}
@@ -446,6 +546,8 @@ const ParentBlockSection = ({
               block={blockId}
             />
           </HydraSchemaProvider>
+        ) : (
+          <ReadOnlyForm schema={templateSchema} formData={templateFormData} />
         );
         const targetElement = document.getElementById(targetId);
         return targetElement ? createPortal(formContent, targetElement) : null;
@@ -696,20 +798,6 @@ const ParentBlocksWidget = ({
   // Get parent chain
   const parentIds = getParentChain(selectedBlock, blockPathMap);
 
-  // The (non-nested) template instance the selection belongs to — drives the Edit-template
-  // button at the top of the panel. Walk up the selection's parent chain to find it.
-  const findTemplateInstance = (bid) => {
-    let cur = bid;
-    while (cur) {
-      const pi = blockPathMap[cur];
-      if (!pi) break;
-      if (pi.isTemplateInstance && !pi.isNestedTemplateInstance) return cur;
-      cur = pi.parentId;
-    }
-    return null;
-  };
-  const templateInstanceBlockId = findTemplateInstance(selectedBlock);
-
   // Get current block data and type from blockPathMap (single source of truth)
   // For virtual blocks (like template instances), use blockData from pathMap
   const pathInfo = blockPathMap[selectedBlock];
@@ -726,41 +814,9 @@ const ParentBlocksWidget = ({
     <>
       {createPortal(
         <>
-          {/* Edit-template button — first in the virtual-blocks panel; the obvious,
-              permission-gated way to enter/exit template edit mode (replaces the buried
-              editTemplate checkbox). */}
-          {templateInstanceBlockId && (() => {
-            const tplInfo = blockPathMap[templateInstanceBlockId];
-            const canEdit = templatePermissions?.[tplInfo?.templateId]?.can_edit ?? true;
-            const isEditing = templateEditMode === templateInstanceBlockId;
-            const btn = getTemplateEditButtonState({ canEdit, isEditing });
-            return (
-              <button
-                type="button"
-                className={`edit-template-toggle${isEditing ? ' edit-template-toggle--active' : ''}`}
-                aria-pressed={isEditing}
-                disabled={btn.disabled}
-                title={btn.title}
-                onClick={() =>
-                  onToggleTemplateEditMode(isEditing ? null : templateInstanceBlockId)
-                }
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  marginBottom: '8px',
-                  border: '1px solid',
-                  borderColor: isEditing ? '#0b78d0' : '#ccc',
-                  borderRadius: '4px',
-                  background: isEditing ? '#0b78d0' : '#fff',
-                  color: btn.disabled ? '#999' : isEditing ? '#fff' : '#0b78d0',
-                  fontWeight: 600,
-                  cursor: btn.disabled ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {btn.label}
-              </button>
-            );
-          })()}
+          {/* The template edit toggle is no longer a standalone button here — it now
+              lives as a lock/unlock icon on the template instance's header bar (and in
+              that bar's ⋯ dropdown), plus the Quanta toolbar lock in-canvas. */}
           {/* Parent blocks with headers + settings */}
           {parentIds.map((parentId, index) => {
             // For virtual blocks (like template instances), use blockData from pathMap

@@ -18,6 +18,7 @@ import linkSVG from '@plone/volto/icons/link.svg';
 import imageSVG from '@plone/volto/icons/image.svg';
 import clearSVG from '@plone/volto/icons/clear.svg';
 import upSVG from '@plone/volto/icons/up.svg';
+import lockSVG from '@plone/volto/icons/lock.svg';
 import AddLinkForm from '@plone/volto/components/manage/AnchorPlugin/components/LinkButton/AddLinkForm';
 import { ImageInput } from '@plone/volto/components/manage/Widgets/ImageWidget';
 import { createLog } from '../../utils/log';
@@ -181,6 +182,8 @@ const SyncedSlateToolbar = ({
   onUnwrap, // Handler for unwrap: () => void
   onMakeTemplate, // Handler for "Make Template" action
   templateEditMode, // instanceId of template being edited, or null
+  onToggleTemplateEditMode, // Enter/exit template edit mode: (instanceId|null) => void
+  templatePermissions, // Map templateId -> { can_edit } (defaults to editable)
 }) => {
 
   // Helper to get block data using path lookup (supports nested blocks)
@@ -1349,31 +1352,26 @@ const SyncedSlateToolbar = ({
         if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) {
           return <div style={{ width: '8px' }} />; // Spacer for page-level fields
         }
-        // Use shared utility to check position lock (handles template edit mode)
         const block = getBlock(selectedBlock);
-        const isLocked = isBlockPositionLocked(block, templateEditMode);
-        if (isLocked) {
-          return (
-            <div
-              className="lock-icon"
-              title="This block is part of a template and cannot be moved"
-              style={{
-                padding: '4px 6px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                pointerEvents: 'none',
-                color: '#999',
-                fontSize: '14px',
-                background: '#f5f5f5',
-                borderRadius: '2px',
-              }}
-            >
-              🔒
-            </div>
-          );
+
+        // Resolve the top-level template instance this block belongs to (walk up the
+        // parent chain to the outermost, non-nested instance). Drives the clickable
+        // lock (enter edit mode) below.
+        let instanceId = null;
+        {
+          let cur = selectedBlock;
+          while (cur) {
+            const pi = blockPathMap?.[cur];
+            if (!pi) break;
+            if (pi.isTemplateInstance && !pi.isNestedTemplateInstance) instanceId = cur;
+            cur = pi.parentId;
+          }
         }
-        return (
+        const tplInfo = instanceId ? blockPathMap?.[instanceId] : null;
+        const canEditTemplate =
+          templatePermissions?.[tplInfo?.templateId]?.can_edit ?? true;
+
+        const dragHandle = (
           <div
             className="drag-handle"
             style={{
@@ -1392,6 +1390,71 @@ const SyncedSlateToolbar = ({
             ⠿
           </div>
         );
+
+        // The Quanta toolbar just shows the lock in place of the drag handle for a
+        // locked template block (below); the lock/unlock TOGGLE lives on the sidebar
+        // bar. In edit mode the block is movable, so the slot shows the drag handle.
+        const isLocked = isBlockPositionLocked(block, templateEditMode);
+        if (isLocked) {
+          // The lock only shows for template chrome (fixed blocks), so it's the
+          // discoverable entry point into template edit mode: clicking it edits that
+          // template (its fixed blocks become editable/movable).
+          const canEnterEdit =
+            !!instanceId && !!onToggleTemplateEditMode && canEditTemplate;
+
+          if (canEnterEdit) {
+            return (
+              <button
+                type="button"
+                className="lock-icon"
+                title="Click to edit this template"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleTemplateEditMode(instanceId);
+                }}
+                style={{
+                  padding: '4px 6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'auto',
+                  cursor: 'pointer',
+                  color: '#999',
+                  fontSize: '14px',
+                  background: '#f5f5f5',
+                  border: 'none',
+                  borderRadius: '2px',
+                }}
+              >
+                <Icon name={lockSVG} size="16px" color="#684cc9" />
+              </button>
+            );
+          }
+          return (
+            <div
+              className="lock-icon"
+              title={
+                instanceId && !canEditTemplate
+                  ? 'You don’t have permission to edit this template'
+                  : 'This block is part of a template and cannot be moved'
+              }
+              style={{
+                padding: '4px 6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'none',
+                color: '#999',
+                fontSize: '14px',
+                background: '#f5f5f5',
+                borderRadius: '2px',
+              }}
+            >
+              <Icon name={lockSVG} size="16px" color="#999" />
+            </div>
+          );
+        }
+        return dragHandle;
       })()}
 
       {/* Real Slate buttons - only show if we have a valid slate field value */}

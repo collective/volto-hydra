@@ -48,6 +48,9 @@ const DropdownMenu = ({
   isReadonly = false, // Template blocks that can't be edited
   isInTemplate = false, // Whether block is already part of a template
   onMakeTemplate, // Handler for "Make Template" action
+  isTemplateInstance = false, // This block is a top-level template instance (host)
+  isEditingTemplate = false, // Currently editing this template
+  onToggleTemplateEdit = null, // Toggle template edit mode for this instance: () => void
   multiSelectedUids, // Array of multi-selected block UIDs (for copy/cut/delete)
   hasClipboard = false, // Whether blocksClipboard has content to paste
   pasteAllowed = true, // Whether clipboard types are allowed in target container
@@ -265,7 +268,46 @@ const DropdownMenu = ({
           />
         </>
       )}
-      {/* Make Template option - only shown for blocks not already in a template and not fixed */}
+      {/* Edit template / Done editing — labelled entry into template edit mode for a
+          top-level template instance. Complements the lock/unlock icon on the header
+          bar and the in-canvas Quanta toolbar lock. */}
+      {onToggleTemplateEdit && isTemplateInstance && (
+        <>
+          <div
+            className="volto-hydra-dropdown-item edit-template-item"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '10px',
+              cursor: 'pointer',
+              fontSize: '15px',
+              fontWeight: '500',
+            }}
+            onMouseEnter={(e) => (e.target.style.background = '#f0f0f0')}
+            onMouseLeave={(e) => (e.target.style.background = 'transparent')}
+            onClick={() => {
+              onClose();
+              onToggleTemplateEdit();
+            }}
+          >
+            {isEditingTemplate ? 'Done editing template' : 'Edit template'}
+          </div>
+          <div
+            style={{
+              height: '1px',
+              background: 'rgba(0, 0, 0, 0.1)',
+              margin: '0 10px',
+            }}
+          />
+        </>
+      )}
+      {/* Make Template — only for blocks not already in a template (and not fixed).
+          A template can't be re-templated: making a template out of content that
+          already carries a templateId would nest a FOREIGN template inside the new
+          one, which the merge flattens on re-instancing (a known limitation). So
+          the option is intentionally hidden for template content rather than
+          producing a template with dangling foreign references. To fork a template,
+          edit it in place instead. */}
       {onMakeTemplate && !isInTemplate && !isFixed && (
         <>
           <div

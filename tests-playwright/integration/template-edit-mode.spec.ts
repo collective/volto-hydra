@@ -165,6 +165,73 @@ test.describe('Template Creation', () => {
       .not.toMatch(/\/templates\/$/);
   });
 
+  // TDD (task #21): the template's URL id/filename is editable via a "Short name"
+  // field while editing. Setting it must (1) create the document at that id, (2)
+  // rewrite the page's block references to the new id (so they don't dangle at the
+  // placeholder), and (3) make the template load correctly when opened elsewhere.
+  test('changing a new template’s short name sets its id, rewrites references, and loads on its own page', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/test-page');
+
+    // Capture the template create POST + the page PATCH.
+    const docPosts: Array<{ url: string; body: any }> = [];
+    const pagePatches: any[] = [];
+    page.on('request', (req) => {
+      if (!req.url().startsWith(URLS.mockApi)) return;
+      let body: any = null;
+      try { body = req.postDataJSON(); } catch { /* not JSON */ }
+      if (req.method() === 'POST' && body?.['@type'] === 'Document') docPosts.push({ url: req.url(), body });
+      if (req.method() === 'PATCH' && /\/test-page$/.test(req.url().replace(/\/$/, '')) && body) pagePatches.push(body);
+    });
+
+    // Make a template from a regular block.
+    await helper.clickBlockInIframe('block-1-uuid');
+    await helper.waitForBlockSelectedInAdmin('block-1-uuid');
+    await helper.openQuantaToolbarMenu('block-1-uuid');
+    await page.locator('.volto-hydra-dropdown-menu .volto-hydra-dropdown-item')
+      .filter({ hasText: /make.*template/i }).click();
+    await helper.waitForSidebarOpen();
+
+    // Make Template auto-selects the instance and enters edit mode, so the Short
+    // name field is editable. Set a custom short name.
+    await expect(page.locator('.edit-template-toggle')).toHaveAttribute('aria-pressed', 'true', { timeout: 5000 });
+    const shortName = page.locator('.field').filter({ hasText: 'Short name' }).locator('input');
+    await expect(shortName).toBeEnabled({ timeout: 5000 });
+    await shortName.fill('my-new-layout');
+
+    // Save (creates the template + writes the page).
+    await helper.saveContent();
+
+    // (1) The template document is POSTed at the chosen id — not untitled-template-N.
+    const tpl = docPosts.find((p) => p.body.id === 'my-new-layout');
+    expect(
+      tpl,
+      `expected a template POST with id "my-new-layout"; saw ${JSON.stringify(docPosts.map((p) => p.body.id))}`,
+    ).toBeTruthy();
+
+    // (2) The page save rewrote the block's templateId to the new id (no dangling
+    // placeholder reference).
+    const patchWithRef = pagePatches.find((p) => JSON.stringify(p.blocks || {}).includes('my-new-layout'));
+    expect(
+      patchWithRef,
+      'page save must rewrite the block templateId to /…/my-new-layout, not leave the untitled placeholder',
+    ).toBeTruthy();
+    expect(
+      JSON.stringify(patchWithRef.blocks),
+      'no dangling untitled-template placeholder should remain in the saved page blocks',
+    ).not.toMatch(/untitled-template-\d+/);
+
+    // (3) The created template LOADS and RENDERS at its new id — open its own page
+    // and the block renders in the iframe. (Proves the doc was created at the right id
+    // AND is servable/renderable — the page referencing it, per (2), resolves to real
+    // content.)
+    expect(tpl!.body.blocks, 'the created template must carry the source block').toBeTruthy();
+    await helper.navigateToEdit('/templates/my-new-layout');
+    const { locator } = await helper.waitForBlockByContent('This is a test paragraph');
+    await expect(locator).toBeVisible({ timeout: 10000 });
+  });
+
   // Failing on purpose (TDD): a template document is just a Document at
   // /templates/<name> whose blocks happen to have templateId/slotId set.
   // It should be openable + editable in the admin like any other page.
@@ -1663,13 +1730,15 @@ test.describe('Template Edit Mode - Permissions', () => {
     await helper.waitForSidebarOpen();
     await helper.escapeToParent();
 
-    // The Edit-template button is present but DISABLED (permission-gated), with a tooltip.
+    // The lock toggle on the template bar is present but DISABLED (permission-gated),
+    // with a tooltip. (It shows a lock icon; the "Edit template" label lives in the ⋯
+    // dropdown, which is omitted entirely when the user lacks permission.)
     const editButton = page.locator('.edit-template-toggle');
     await expect(editButton).toBeVisible({ timeout: 10000 });
     await expect(editButton).toBeDisabled();
-    // Tooltip confirms can_edit=false reached the button (threading + key match).
+    // Tooltip + aria confirm can_edit=false reached the button (threading + key match).
     await expect(editButton).toHaveAttribute('title', /permission|Modify portal content/i);
-    await expect(editButton).toContainText('Edit template');
+    await expect(editButton).toHaveAttribute('aria-label', /unlock/i);
   });
 
   test('creating a template in a folder without Add permission is blocked at save', async ({ page }) => {
@@ -1731,5 +1800,142 @@ test.describe('Template Edit Mode - Permissions', () => {
       templatePosts.length,
       'template POST must be blocked when the target folder denies Add',
     ).toBe(0);
+  });
+});
+
+test.describe('Template Edit Mode - Lock affordance + metadata gating', () => {
+  // Sub-issue #1: the lock icon on a template block's Quanta toolbar is the
+  // discoverable way into template edit mode — clicking it enters edit mode for
+  // that block's template (no need to hunt for the sidebar toggle).
+  test('clicking the lock icon on a template block enters template edit mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // A fixed template block is position-locked in normal mode, so its toolbar
+    // shows the lock icon.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForBlockSelectedInAdmin(headerBlockId);
+
+    const lockIcon = page.locator('.quanta-toolbar .lock-icon');
+    await expect(lockIcon).toBeVisible({ timeout: 5000 });
+
+    // Clicking the lock enters template edit mode → blocks outside the template
+    // become readonly (greyed out).
+    await lockIcon.click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+  });
+
+  // Sub-issue #2: you must be editing the template to change its name / save
+  // location. When NOT in edit mode the metadata fields render READ-ONLY (static
+  // text, no inputs); entering edit mode swaps them for editable widgets.
+  test('template name and save location are read-only unless editing the template', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Select the template instance (escape up from a fixed block).
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+
+    // Template Settings form is shown (name + save location). Scope by label —
+    // there is also a page-level "Title" field with the same #field-title id.
+    const nameField = page.locator('.field').filter({ hasText: 'Template Name' });
+    const folderField = page.locator('.field').filter({ hasText: 'Save Location' });
+    await expect(nameField).toBeVisible({ timeout: 5000 });
+
+    // Locked → read-only: no editable input / browse control, value shown as text.
+    await expect(nameField.locator('input')).toHaveCount(0);
+    await expect(nameField.locator('.readonly-field-value')).toBeVisible();
+    await expect(folderField.locator('button.action')).toHaveCount(0);
+
+    // Enter template edit mode via the sidebar toggle.
+    await page.locator('.edit-template-toggle').click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+
+    // Editing → editable widgets appear and are enabled.
+    await expect(nameField.locator('input')).toBeVisible({ timeout: 5000 });
+    await expect(nameField.locator('input')).toBeEnabled();
+    await expect(folderField.locator('button.action')).toBeVisible();
+  });
+
+  // A template's read-only (fixed/readonly) sub-blocks show their fields as read-only
+  // text in the sidebar while the template is LOCKED — never editable inputs — and
+  // become editable once the template is unlocked (edit mode).
+  test('template sub-blocks show read-only sidebar fields when locked, editable while editing', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    const props = page.locator('#sidebar-properties');
+
+    // LOCKED (template not being edited): each read-only sub-block's settings render
+    // through ReadOnlyForm — static values, no editable controls — and crucially show
+    // the block's VALUES (not an empty panel, the original bug for view-less blocks).
+    for (const [id, content] of [
+      [headerBlockId, TEMPLATE_HEADER_CONTENT],
+      [footerBlockId, TEMPLATE_FOOTER_CONTENT],
+    ] as const) {
+      await helper.clickBlockInIframe(id);
+      await helper.waitForBlockSelectedInAdmin(id);
+      await helper.waitForSidebarOpen();
+      await expect(props.locator('.readonly-form')).toBeVisible({ timeout: 5000 });
+      await expect(props.locator('input, textarea, [contenteditable="true"]')).toHaveCount(0);
+      // The block's own content is shown as a read-only value.
+      await expect(props.locator('.readonly-field-value').filter({ hasText: content })).toBeVisible();
+    }
+
+    // UNLOCK the template (enter edit mode): the same sub-block is now editable in the
+    // sidebar — an Edit form, not ReadOnlyForm.
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    await page.locator('.edit-template-toggle').click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1); // edit mode active
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForBlockSelectedInAdmin(headerBlockId);
+    await expect(props.locator('.readonly-form')).toHaveCount(0);
+  });
+
+  // The template instance's sidebar bar carries a 🔒/🔓 lock toggle (the
+  // .edit-template-toggle) AND an "Edit template" item in its ⋯ dropdown — both
+  // replace the old standalone Edit/Done button.
+  test('the template bar dropdown has an Edit template item that toggles edit mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Select the template instance.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+
+    // The lock toggle on the bar is locked (not editing).
+    const lockToggle = page.locator('.edit-template-toggle');
+    await expect(lockToggle).toBeVisible({ timeout: 5000 });
+    await expect(lockToggle).toHaveAttribute('aria-pressed', 'false');
+    await expect(lockToggle).toHaveAttribute('aria-label', /unlock/i);
+
+    // Open the ⋯ dropdown on the current (instance) section header and click "Edit template".
+    await page.locator('.sidebar-section-header[data-is-current="true"] .menu-trigger').click();
+    const editItem = page.locator('.volto-hydra-dropdown-item.edit-template-item');
+    await expect(editItem).toBeVisible({ timeout: 5000 });
+    await expect(editItem).toContainText('Edit template');
+    await editItem.click();
+
+    // Edit mode is now active: outside blocks lock; the bar toggle flips to unlocked.
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+    await expect(lockToggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(lockToggle).toHaveAttribute('aria-label', /lock template/i);
+
+    // The dropdown item now reads "Done editing template".
+    await page.locator('.sidebar-section-header[data-is-current="true"] .menu-trigger').click();
+    await expect(editItem).toContainText('Done editing template');
   });
 });

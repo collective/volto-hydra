@@ -19,10 +19,12 @@ When a template is applied to a page, blocks fall into three categories:
 
 ### 🔒 Locked (fixed + read-only)
 
-Shown with a **lock icon** in the sidebar block list. You can't:
+Shown with a **lock icon** — a 🔒 in the Quanta toolbar (in place of the drag handle) and on the template's sidebar bar. You can't:
 - Edit the text/media inside it.
-- Move it (no drag handle in the Quanta toolbar).
+- Move it.
 - Delete it.
+
+Selecting a locked block still shows its content in the sidebar — as **read-only values**, not editable fields — so you can see what's there without being able to change it.
 
 Typical use: branded headers, footers, legal disclaimers — content the template author wants identical across every page.
 
@@ -42,7 +44,7 @@ Typical use: a "callout" block in the middle of a layout — every page has one,
 
 Regular blocks where you can do anything — add, edit, move, delete. The template marks regions as slots (with a `slotId`) and your existing content is placed into the matching slots when the template merges.
 
-![A page with a snippet template applied. The "Snippet Header" block is selected, rendered in muted style as a locked block. The sidebar shows the template's settings (Template Name, Save Location).](_images/template-locked.png)
+![A snippet template applied to a page. The "Snippet Header" block is selected, rendered muted as a locked block. Its sidebar shows its content read-only — a "Text" field with the value "Snippet Header - From Template" — above the template's own read-only settings (Template Name, Save Location).](_images/template-locked.png)
 
 ## Inserting between fixed blocks
 
@@ -64,12 +66,26 @@ The point of `slotId` is that two layouts can share the same set of region names
 
 ## Editing content inside a template
 
-Editing inside a template block (one that came from the merged template) goes through a special **template edit mode**. While in template edit mode:
+A template is **locked** by default: you're editing *this page's* content, while the template's fixed parts stay read-only. To change the template itself you **unlock** it — entering **template edit mode**.
 
-- Blocks inside the template instance become editable, including those marked readonly.
-- Blocks outside the template instance become locked.
+**To unlock**, select one of the template's blocks, then either click the 🔒 on the template's **sidebar bar** ("Template: *name*") or pick **Edit template** from that bar's `⋯` menu. While locked, the bar shows a 🔒 and the Template Settings (Template Name, Save Location) are read-only text:
 
-This lets you edit the template's *definition* without leaving the page — the changes propagate back to the saved template, so any other page using it picks up the change. Switch out of template edit mode (typically a toolbar action labelled "Edit template" / "Done") to go back to editing this page's content.
+![The template's sidebar bar showing a closed lock 🔒, with the Template Settings (Template Name, Save Location) rendered as read-only text.](_images/template-edit-locked.png)
+
+Once unlocked, the bar's icon becomes 🔓 and those fields become editable — so a template can't be renamed or relocated without editing it:
+
+![The same bar showing an open lock 🔓, with Template Name and Save Location now editable inputs.](_images/template-edit-editing.png)
+
+In edit mode:
+
+- Blocks **inside** the template become editable, including ones marked read-only.
+- Blocks **outside** the template lock.
+
+You can also enter edit mode straight from the canvas: a locked template block shows a 🔒 in its Quanta toolbar (in place of the drag handle) — click it to unlock the template.
+
+![The Quanta toolbar of a locked template block, showing a 🔒 where the drag handle would be.](_images/template-toolbar-lock.png)
+
+Editing here changes the template's *definition*, and the change propagates back to the saved template — so every other page using it picks it up. **Lock it again** (click the 🔓, or "Done editing template" in the `⋯` menu) to go back to editing this page.
 
 ```{warning}
 Edits made in template edit mode update the **template** itself, which may affect other pages. If you only want to override a value for this one page, look for a non-readonly version of the field on this page rather than entering template edit mode.
