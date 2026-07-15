@@ -12,7 +12,7 @@ import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
  * Renders a dropdown menu with:
  * - Overflow buttons (formatting buttons that don't fit in toolbar)
  * - Table actions (add row/column before, delete row/column) when in table mode
- * - Settings, Select Container, and Remove options
+ * - Settings and Remove options
  * Uses React portal to avoid container clipping issues.
  *
  * Overflow buttons are wrapped in a Slate context using the passed editor
@@ -24,8 +24,6 @@ const DropdownMenu = ({
   menuButtonRect,
   onClose,
   onOpenSettings,
-  parentId,
-  onSelectBlock,
   overflowButtons = [], // Array of { name, element } for buttons that overflow
   showFormatDropdown = false, // Whether to show FormatDropdown in overflow
   blockButtons = [], // Block buttons for FormatDropdown
@@ -50,6 +48,9 @@ const DropdownMenu = ({
   isReadonly = false, // Template blocks that can't be edited
   isInTemplate = false, // Whether block is already part of a template
   onMakeTemplate, // Handler for "Make Template" action
+  isTemplateInstance = false, // This block is a top-level template instance (host)
+  isEditingTemplate = false, // Currently editing this template
+  onToggleTemplateEdit = null, // Toggle template edit mode for this instance: () => void
   multiSelectedUids, // Array of multi-selected block UIDs (for copy/cut/delete)
   hasClipboard = false, // Whether blocksClipboard has content to paste
   pasteAllowed = true, // Whether clipboard types are allowed in target container
@@ -90,12 +91,6 @@ const DropdownMenu = ({
     }
   };
 
-  const handleSelectContainer = () => {
-    onClose();
-    if (parentId && onSelectBlock) {
-      onSelectBlock(parentId);
-    }
-  };
 
   const handleRemove = () => {
     onClose();
@@ -273,7 +268,46 @@ const DropdownMenu = ({
           />
         </>
       )}
-      {/* Make Template option - only shown for blocks not already in a template and not fixed */}
+      {/* Edit template / Done editing — labelled entry into template edit mode for a
+          top-level template instance. Complements the lock/unlock icon on the header
+          bar and the in-canvas Quanta toolbar lock. */}
+      {onToggleTemplateEdit && isTemplateInstance && (
+        <>
+          <div
+            className="volto-hydra-dropdown-item edit-template-item"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '10px',
+              cursor: 'pointer',
+              fontSize: '15px',
+              fontWeight: '500',
+            }}
+            onMouseEnter={(e) => (e.target.style.background = '#f0f0f0')}
+            onMouseLeave={(e) => (e.target.style.background = 'transparent')}
+            onClick={() => {
+              onClose();
+              onToggleTemplateEdit();
+            }}
+          >
+            {isEditingTemplate ? 'Done editing template' : 'Edit template'}
+          </div>
+          <div
+            style={{
+              height: '1px',
+              background: 'rgba(0, 0, 0, 0.1)',
+              margin: '0 10px',
+            }}
+          />
+        </>
+      )}
+      {/* Make Template — only for blocks not already in a template (and not fixed).
+          A template can't be re-templated: making a template out of content that
+          already carries a templateId would nest a FOREIGN template inside the new
+          one, which the merge flattens on re-instancing (a known limitation). So
+          the option is intentionally hidden for template content rather than
+          producing a template with dangling foreign references. To fork a template,
+          edit it in place instead. */}
       {onMakeTemplate && !isInTemplate && !isFixed && (
         <>
           <div
@@ -453,35 +487,6 @@ const DropdownMenu = ({
           <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.1)', margin: '0 10px' }} />
         </>
       )}
-      {/* Select Container option - only shown for nested blocks with a real parent (not page) */}
-      {parentId && parentId !== PAGE_BLOCK_UID && onSelectBlock && (
-        <>
-          <div
-            className="volto-hydra-dropdown-item"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: '10px',
-              cursor: 'pointer',
-              fontSize: '15px',
-              fontWeight: '500',
-            }}
-            onMouseEnter={(e) => (e.target.style.background = '#f0f0f0')}
-            onMouseLeave={(e) => (e.target.style.background = 'transparent')}
-            data-action="select-container"
-            onClick={handleSelectContainer}
-          >
-            ⬆️ Select Container
-          </div>
-          <div
-            style={{
-              height: '1px',
-              background: 'rgba(0, 0, 0, 0.1)',
-              margin: '0 10px',
-            }}
-          />
-        </>
-      )}
       {/* Remove action - label changes based on table mode and add direction */}
       {/* Hide remove for page-level fields and fixed template blocks */}
       {selectedBlock && selectedBlock !== PAGE_BLOCK_UID && !isFixed && (() => {
@@ -532,6 +537,17 @@ const DropdownMenu = ({
           </div>
         );
       })()}
+      {/* Mobile-only back-arrow at bottom-left corner. Hidden on
+       * desktop/tablet via .mobile-sheet-close { display: none } in
+       * mobile-tablet.css. */}
+      <button
+        type="button"
+        className="mobile-sheet-close"
+        aria-label="Close menu"
+        onClick={onClose}
+      >
+        ←
+      </button>
     </div>,
     document.body,
   );

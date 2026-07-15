@@ -973,17 +973,39 @@ const Iframe = (props) => {
       }
     };
 
+    // Mobile #145 — chevron buttons in the Quanta toolbar dispatch this
+    // CustomEvent to reorder the selected block within its parent. The
+    // existing MOVE_BLOCKS postMessage path is iframe-origin-gated, so
+    // admin-React → admin-React reuse goes through the CustomEvent bus
+    // (same pattern as hydra-paste-blocks, hydra-copy-blocks, etc.).
+    const handleMoveBlock = (e) => {
+      const { blockId, targetBlockId, insertAfter, targetParentId } = e.detail || {};
+      if (!blockId || !targetBlockId) return;
+      // Drop a synthetic MOVE_BLOCKS message in — the same handler in the
+      // window 'message' listener does the path-map rebuild, allowed-types
+      // check, and onChangeFormData call. Origin filter is bypassed by
+      // dispatching directly through MessageEvent on window.
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: { type: 'MOVE_BLOCKS', blockIds: [blockId], targetBlockId, insertAfter, targetParentId },
+          origin: iframeOriginRef.current || (iframeSrc ? new URL(iframeSrc).origin : ''),
+        }),
+      );
+    };
+
     document.addEventListener('hydra-copy-blocks', handleCopy);
     document.addEventListener('hydra-delete-blocks', handleDelete);
     document.addEventListener('hydra-paste-blocks', handlePaste);
     document.addEventListener('hydra-exit-selection-mode', handleExitSelectionMode);
     document.addEventListener('hydra-enter-selection-mode', handleEnterSelectionMode);
+    document.addEventListener('hydra-move-block', handleMoveBlock);
     return () => {
       document.removeEventListener('hydra-copy-blocks', handleCopy);
       document.removeEventListener('hydra-delete-blocks', handleDelete);
       document.removeEventListener('hydra-paste-blocks', handlePaste);
       document.removeEventListener('hydra-exit-selection-mode', handleExitSelectionMode);
       document.removeEventListener('hydra-enter-selection-mode', handleEnterSelectionMode);
+      document.removeEventListener('hydra-move-block', handleMoveBlock);
     };
     // NOTE: templateEditMode must be a dep — these handlers (handleDelete) gate
     // on it via isBlockReadonly; without it the listener closure keeps a
@@ -1042,12 +1064,73 @@ const Iframe = (props) => {
       }
 
       const templateCache = templateCacheRef.current;
-      const templateIds = getUniqueTemplateIds(formData).filter(
+
+      // Finalize the id/filename for any not-yet-saved template BEFORE we compute the
+      // ids to save: choose its id from the Short name (or a slug of the Template
+      // Name), then rewrite EVERY reference to the placeholder id — the template's own
+      // blocks + its cache key, AND the page's blocks. The page's blocks are frozen
+      // (Redux), so this rewrites immutably and returns the new page data for the page
+      // save (see Form.jsx); otherwise the page would reference a template id that was
+      // never created (404 on reload).
+      const slugifyId = (s) =>
+        String(s || '')
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+      const rewriteTemplateRefs = (node, oldId, newId) => {
+        if (Array.isArray(node)) {
+          let changed = false;
+          const arr = node.map((n) => {
+            const nn = rewriteTemplateRefs(n, oldId, newId);
+            if (nn !== n) changed = true;
+            return nn;
+          });
+          return changed ? arr : node;
+        }
+        if (!node || typeof node !== 'object') return node;
+        let changed = false;
+        const out = {};
+        for (const [k, v] of Object.entries(node)) {
+          const nv = rewriteTemplateRefs(v, oldId, newId);
+          out[k] = nv;
+          if (nv !== v) changed = true;
+        }
+        if (out.templateId === oldId) { out.templateId = newId; changed = true; }
+        if (out.templateInstanceId === oldId) { out.templateInstanceId = newId; changed = true; }
+        return changed ? out : node;
+      };
+
+      let pageFormData = formData;
+      for (const oldId of Object.keys(templateCache)) {
+        const tpl = templateCache[oldId];
+        if (!tpl?._isNew) continue;
+        const lastSlash = oldId.lastIndexOf('/');
+        const parent = lastSlash > 0 ? oldId.slice(0, lastSlash) : '';
+        const currentSlug = oldId.slice(lastSlash + 1);
+        // Short name → else derive from the Template Name → else keep the placeholder.
+        const desiredSlug = slugifyId(tpl.id) || slugifyId(tpl.title) || currentSlug;
+        const newId = `${parent}/${desiredSlug}`;
+        if (!desiredSlug || newId === oldId) continue;
+        templateCache[newId] = {
+          ...tpl,
+          '@id': newId,
+          id: desiredSlug,
+          blocks: rewriteTemplateRefs(tpl.blocks, oldId, newId),
+        };
+        delete templateCache[oldId];
+        pageFormData = rewriteTemplateRefs(pageFormData, oldId, newId);
+      }
+
+      const templateIds = getUniqueTemplateIds(pageFormData).filter(
         id => id !== currentPath && templateCache[id]
       );
 
       if (templateIds.length === 0) {
-        return;
+        // Only hand back page data when an id was actually rewritten; otherwise
+        // return nothing so Form.jsx uses its own (post-flush) state — which holds
+        // the just-flushed inline edits this pre-flush `formData` param lacks.
+        return pageFormData !== formData ? pageFormData : undefined;
       }
 
       // Use Volto's Api helper which handles auth and URL formatting
@@ -1128,6 +1211,12 @@ const Iframe = (props) => {
           if (error?.isPermissionError) throw error;
         }
       }));
+
+      // Hand the page data back to Form.jsx ONLY when an id was rewritten, so the page
+      // save writes the finalized references. Otherwise return nothing so Form uses its
+      // own post-flush state (which holds just-flushed inline edits this pre-flush
+      // `formData` param lacks).
+      return pageFormData !== formData ? pageFormData : undefined;
     };
   }, [saveTemplatesRef, referenceElement]);
 
@@ -2950,6 +3039,10 @@ const Iframe = (props) => {
               addDirection: event.data.addDirection, // Direction for add button positioning
               isMultiElement: event.data.isMultiElement, // True if block renders as multiple DOM elements
               canResize: event.data.canResize || null, // {top,bottom,left,right} booleans for edge-drag chrome
+              // Chevron move targets computed by hydra.js from render geometry.
+              // null => that chevron is disabled; otherwise the MOVE_BLOCKS target.
+              moveUpTarget: event.data.moveUpTarget || null,
+              moveDownTarget: event.data.moveDownTarget || null,
               selectionModeRects: event.data.selectionModeRects,
             };
           });
@@ -4130,6 +4223,87 @@ const Iframe = (props) => {
     return () => document.removeEventListener('mousedown', onDown);
   }, [chooser]);
 
+  // Enter/exit template edit mode for a given instance (null = exit). Shared by the
+  // sidebar "Edit template" toggle AND the Quanta toolbar lock icon, so both routes run
+  // the identical enter/exit machinery (validate + flush on exit, cache-refetch on enter).
+  const handleToggleTemplateEditMode = async (instanceId) => {
+    const prevInstanceId = iframeSyncState.templateEditMode;
+
+    // Exiting template edit mode - need to flush pending text updates first
+    if (prevInstanceId && !instanceId) {
+      const formData = iframeSyncState.formData;
+
+      // Validate template slot structure before allowing exit
+      const validation = validateTemplatePlaceholders(formData);
+      if (!validation.valid) {
+        // Show validation error - user must fix structure before exiting
+        const firstError = Object.values(validation.blocksErrors)[0]?._layout;
+        toast.error(
+          <Toast
+            error
+            title={firstError?.title || 'Invalid Template Structure'}
+            content={firstError?.message || 'Please fix the template structure before exiting edit mode.'}
+          />
+        );
+        return; // Don't exit edit mode
+      }
+
+      // Send FLUSH_BUFFER to get latest text changes before reverse merge
+      const requestId = `tpl-exit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      pendingTemplateEditExitRef.current = { requestId, prevInstanceId };
+
+      if (referenceElement?.contentWindow) {
+        referenceElement.contentWindow.postMessage(
+          { type: 'FLUSH_BUFFER', requestId },
+          '*'
+        );
+      }
+      // Effect will handle the rest when flush completes
+      return;
+    }
+
+    // Entering template edit mode — invalidate the cached template and
+    // re-fetch it fresh. templateCacheRef persists across page navigations
+    // (a useRef that's never reset), so without this we'd edit + save a
+    // stale copy left over from another page. It also guarantees the
+    // template is IN the cache: the reverse-merge (on exit) and the save
+    // are both gated on `templateCacheRef.current[id]` being present, so a
+    // forced/snippet template that wasn't cache-loaded here would otherwise
+    // be silently skipped and never persisted.
+    {
+      const enterFormData = iframeSyncState.formData;
+      let editTemplateId = null;
+      for (const block of Object.values(enterFormData?.blocks || {})) {
+        if (block.templateInstanceId === instanceId && block.templateId) {
+          editTemplateId = block.templateId;
+          break;
+        }
+      }
+      // Skip the re-fetch for a not-yet-saved template (_isNew): it doesn't exist on
+      // the backend, so a GET either 404s or (on a permissive mock) returns a stub —
+      // either way it would clobber the local definition and its _isNew flag.
+      if (editTemplateId && !templateCacheRef.current[editTemplateId]?._isNew) {
+        try {
+          templateCacheRef.current[editTemplateId] = await new Api().get(editTemplateId);
+        } catch {
+          // Re-fetch failed (offline / 404) — keep whatever's cached rather
+          // than dropping it, so the save still has something to persist.
+        }
+      }
+    }
+    setIframeSyncState(prev => ({
+      ...prev,
+      templateEditMode: instanceId,
+    }));
+    // Send template edit mode to iframe so it knows which blocks to make editable
+    if (referenceElement?.contentWindow) {
+      referenceElement.contentWindow.postMessage(
+        { type: 'TEMPLATE_EDIT_MODE', instanceId },
+        '*'
+      );
+    }
+  };
+
   return (
     <div id="iframeContainer">
       <OpenObjectBrowser
@@ -4166,6 +4340,7 @@ const Iframe = (props) => {
         createPortal(
           <div
             ref={setPopperElement}
+            className="add-new-block-popup"
             style={styles.popper}
             {...attributes.popper}
           >
@@ -4225,6 +4400,21 @@ const Iframe = (props) => {
               contentType={contentType}
             />
             )}
+            {/* Mobile-only back-arrow at bottom-left corner. Hidden on
+             * desktop/tablet via .mobile-sheet-close { display: none } in
+             * mobile-tablet.css. Serves BOTH popups now that wrap/convert
+             * reuses this one chooser (it used to live on the old modal). */}
+            <button
+              type="button"
+              className="mobile-sheet-close"
+              aria-label="Close menu"
+              onClick={() => {
+                setAddNewBlockOpened(false);
+                setChooser(null);
+              }}
+            >
+              ←
+            </button>
           </div>,
           document.body,
         )}
@@ -4896,6 +5086,8 @@ const Iframe = (props) => {
               };
             })()}
             templateEditMode={iframeSyncState.templateEditMode}
+            templatePermissions={templateCacheRef.current}
+            onToggleTemplateEditMode={handleToggleTemplateEditMode}
             onMakeTemplate={() => {
               // Create a new template from the selected block
               const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
@@ -4996,19 +5188,36 @@ const Iframe = (props) => {
                 ? iframeRect.left + blockUI.rect.left + blockUI.rect.width + 8
                 : iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth;
 
-              let isConstrained = false;
               const iframeRight = iframeRect.left + iframeRect.width;
               if (addLeft + buttonWidth > iframeRight) {
+                // No room to the right — pull the '+' INSIDE the block horizontally.
                 addLeft = iframeRect.left + blockUI.rect.left + blockUI.rect.width - buttonWidth - 8;
-                isConstrained = true;
               }
 
               if (isRightDirection) {
-                addTop = isConstrained
-                  ? iframeRect.top + blockUI.rect.top + blockUI.rect.height - buttonHeight - 8
-                  : iframeRect.top + blockUI.rect.top;
+                // A right-add pulled inside for lack of room was only constrained
+                // on the horizontal axis, so keep the button at the block's
+                // TOP-right — it was just nudged in. Dropping it to the block's
+                // bottom would move it on an axis that never overflowed. The
+                // vertical clamp below still pulls it up if a tall block would
+                // push it past the canvas bottom.
+                addTop = iframeRect.top + blockUI.rect.top;
               } else {
                 addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height + 8;
+              }
+
+              // Vertical counterpart of the horizontal clamp above. Sitting the '+' 8px
+              // BELOW the block puts it outside the canvas whenever the block ends at the
+              // canvas edge — on a phone that is on top of the bottom toolbar, where it
+              // paints over Save/Cancel and swallows their clicks. Pull it back INSIDE the
+              // block (same move the horizontal clamp above makes) rather than let it
+              // escape. Clamp the top edge too, for a block taller than the canvas.
+              const iframeBottom = iframeRect.top + iframeRect.height;
+              if (addTop + buttonHeight > iframeBottom) {
+                addTop = iframeRect.top + blockUI.rect.top + blockUI.rect.height - buttonHeight - 8;
+              }
+              if (addTop < iframeRect.top) {
+                addTop = iframeRect.top + 8;
               }
             }
 
@@ -5240,80 +5449,7 @@ const Iframe = (props) => {
             }));
           }
         }}
-        onToggleTemplateEditMode={async (instanceId) => {
-          const prevInstanceId = iframeSyncState.templateEditMode;
-
-          // Exiting template edit mode - need to flush pending text updates first
-          if (prevInstanceId && !instanceId) {
-            const formData = iframeSyncState.formData;
-
-            // Validate template slot structure before allowing exit
-            const validation = validateTemplatePlaceholders(formData);
-            if (!validation.valid) {
-              // Show validation error - user must fix structure before exiting
-              const firstError = Object.values(validation.blocksErrors)[0]?._layout;
-              toast.error(
-                <Toast
-                  error
-                  title={firstError?.title || 'Invalid Template Structure'}
-                  content={firstError?.message || 'Please fix the template structure before exiting edit mode.'}
-                />
-              );
-              return; // Don't exit edit mode
-            }
-
-            // Send FLUSH_BUFFER to get latest text changes before reverse merge
-            const requestId = `tpl-exit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            pendingTemplateEditExitRef.current = { requestId, prevInstanceId };
-
-            if (referenceElement?.contentWindow) {
-              referenceElement.contentWindow.postMessage(
-                { type: 'FLUSH_BUFFER', requestId },
-                '*'
-              );
-            }
-            // Effect will handle the rest when flush completes
-            return;
-          }
-
-          // Entering template edit mode — invalidate the cached template and
-          // re-fetch it fresh. templateCacheRef persists across page navigations
-          // (a useRef that's never reset), so without this we'd edit + save a
-          // stale copy left over from another page. It also guarantees the
-          // template is IN the cache: the reverse-merge (on exit) and the save
-          // are both gated on `templateCacheRef.current[id]` being present, so a
-          // forced/snippet template that wasn't cache-loaded here would otherwise
-          // be silently skipped and never persisted.
-          {
-            const enterFormData = iframeSyncState.formData;
-            let editTemplateId = null;
-            for (const block of Object.values(enterFormData?.blocks || {})) {
-              if (block.templateInstanceId === instanceId && block.templateId) {
-                editTemplateId = block.templateId;
-                break;
-              }
-            }
-            if (editTemplateId) {
-              try {
-                templateCacheRef.current[editTemplateId] = await new Api().get(editTemplateId);
-              } catch {
-                // Re-fetch failed (offline / 404) — keep whatever's cached rather
-                // than dropping it, so the save still has something to persist.
-              }
-            }
-          }
-          setIframeSyncState(prev => ({
-            ...prev,
-            templateEditMode: instanceId,
-          }));
-          // Send template edit mode to iframe so it knows which blocks to make editable
-          if (referenceElement?.contentWindow) {
-            referenceElement.contentWindow.postMessage(
-              { type: 'TEMPLATE_EDIT_MODE', instanceId },
-              '*'
-            );
-          }
-        }}
+        onToggleTemplateEditMode={handleToggleTemplateEditMode}
       />
       <ChildBlocksWidget
         selectedBlock={selectedBlock}

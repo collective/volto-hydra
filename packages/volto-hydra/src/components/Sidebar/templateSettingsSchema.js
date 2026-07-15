@@ -2,14 +2,27 @@
  * Schema for the "Template Settings" form (template name / save location) shown for a
  * top-level template instance in the sidebar. Entering edit mode is no longer a field here —
  * it's a prominent button at the top of the parent-blocks panel (see getTemplateEditButtonState).
+ *
+ * A template's name/location IS the template's own metadata, so changing it is editing the
+ * template — only allowed while that template is being edited. When locked, the sidebar renders
+ * this schema through ReadOnlyForm (static text) instead of the editable form.
+ *
+ * `id` is the template's URL id / filename (the last path segment). An object_browser can only
+ * SELECT existing content, so the id needs a plain text field. It's only editable for a not-yet-
+ * saved template (`idEditable`); renaming a saved one is a move (out of scope). Blank → derived
+ * from the Template Name at save.
+ *
+ * @param {Object} intl
+ * @param {Object} [opts]
+ * @param {boolean} [opts.idEditable=true] - allow editing the Short name (new templates only)
  */
-export const getTemplateInstanceSchema = (intl) => ({
+export const getTemplateInstanceSchema = (intl, { idEditable = true } = {}) => ({
   title: 'Template Settings',
   fieldsets: [
     {
       id: 'default',
       title: 'Default',
-      fields: ['title', 'folder'],
+      fields: ['title', 'id', 'folder'],
     },
   ],
   properties: {
@@ -17,6 +30,12 @@ export const getTemplateInstanceSchema = (intl) => ({
       title: 'Template Name',
       description: 'Display name for this template',
       type: 'string',
+    },
+    id: {
+      title: 'Short name',
+      description: 'The last part of the template’s URL. Leave blank to derive it from the name.',
+      type: 'string',
+      isDisabled: !idEditable,
     },
     folder: {
       title: 'Save Location',

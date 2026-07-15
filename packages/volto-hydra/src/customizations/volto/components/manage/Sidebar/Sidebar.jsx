@@ -64,9 +64,22 @@ const messages = defineMessages({
 const Sidebar = (props) => {
   const intl = useIntl();
   const { cookies, content } = props;
-  const [expanded, setExpanded] = useState(
-    cookies.get('sidebar_expanded') !== 'false',
-  );
+  const [expanded, setExpanded] = useState(() => {
+    // Mobile (≤767px) ALWAYS starts collapsed, regardless of the
+    // sidebar_expanded cookie. The cookie is per-domain not
+    // per-viewport, so a previous desktop session leaving the sidebar
+    // open would force-open the full-screen sheet on a mobile visit,
+    // hiding the canvas before the editor's first interaction.
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(max-width: 767px)').matches
+    ) {
+      return false;
+    }
+    // Desktop / tablet: honor the cookie (default open if unset).
+    return cookies.get('sidebar_expanded') !== 'false';
+  });
   const [size] = useState(0);
   const [showFull, setshowFull] = useState(true);
   const sidebarContentRef = useRef(null);

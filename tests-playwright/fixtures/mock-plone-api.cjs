@@ -1192,15 +1192,26 @@ setupContentWatchers();
  * @param {string} sessionId - Session ID for session-specific uploads
  */
 function getContent(urlPath, sessionId, expandList = []) {
-  // Check session-specific storage first (for uploads created in this session)
-  if (sessionId && sessionContent[sessionId]?.[urlPath]) {
-    const stored = sessionContent[sessionId][urlPath];
-    // Session content may be stored raw (POST handlers) or already-enriched
-    // (legacy callers that built full responses inline). Re-enrich
-    // unconditionally so the read-time @components reflect the current
-    // request's ?expand= choices, like Plone does.
-    const baseUrl = `http://localhost:${PORT}`;
-    return enrichContent(stored, urlPath, baseUrl, expandList);
+  // Check session-specific storage first (for content created in this session).
+  if (sessionId && sessionContent[sessionId]) {
+    const store = sessionContent[sessionId];
+    let stored = store[urlPath];
+    // A reader may address session-created content under the /_test_data test-content
+    // mount even though it was created under a bare path (e.g. the admin's templatesPath
+    // "/templates/x" while the frontend fetches "/_test_data/templates/x"). Un-prefix a
+    // missed /_test_data path so created content is served in-session either way. Strip
+    // ONLY (never add a prefix) so this can't shadow bare disk content.
+    if (!stored && urlPath.startsWith('/_test_data')) {
+      stored = store[urlPath.slice('/_test_data'.length) || '/'];
+    }
+    if (stored) {
+      // Session content may be stored raw (POST handlers) or already-enriched
+      // (legacy callers that built full responses inline). Re-enrich
+      // unconditionally so the read-time @components reflect the current
+      // request's ?expand= choices, like Plone does.
+      const baseUrl = `http://localhost:${PORT}`;
+      return enrichContent(stored, urlPath, baseUrl, expandList);
+    }
   }
 
   // Try disk first (distribution content may have a site root)
@@ -1430,6 +1441,37 @@ app.post('/*', (req, res, next) => {
     }
 
     return res.status(201).json(enrichContent(rawDoc, docPath, baseUrl, parseExpand(req)));
+  }
+
+  if (contentType === 'Folder') {
+    // Folder is a container without blocks — used to exercise the Hydra
+    // Add-shadow's type-aware post-create redirect: types without the
+    // volto.blocks behavior should land on the canonical view, not
+    // /edit. Same response shape as Document so Volto can transition
+    // off the POST response.
+    const id = body.id || `untitled-folder-${Date.now()}`;
+    const folderPath = `${parentPath === '/' ? '' : parentPath}/${id}`.replace(/\/+/g, '/');
+    const now = new Date().toISOString();
+    const baseUrl = `http://localhost:${PORT}`;
+    const rawFolder = {
+      '@type': 'Folder',
+      id,
+      title: body.title || id,
+      description: body.description || '',
+      created: now,
+      modified: now,
+      effective: now,
+      review_state: 'published',
+    };
+
+    const sessionId = getSessionId(req);
+    setSessionContent(sessionId, folderPath, rawFolder);
+
+    if (process.env.DEBUG) {
+      console.log(`Created Folder: ${folderPath}${sessionId ? ` (session: ${sessionId})` : ''}`);
+    }
+
+    return res.status(201).json(enrichContent(rawFolder, folderPath, baseUrl, parseExpand(req)));
   }
 
   // Unsupported content type - return 501 instead of passing to next
@@ -1880,6 +1922,11 @@ function listAddableTypes() {
       '@id': `http://localhost:${PORT}/@types/Document`,
       addable: true,
       title: 'Page',
+    },
+    {
+      '@id': `http://localhost:${PORT}/@types/Folder`,
+      addable: true,
+      title: 'Folder',
     },
   ];
 }

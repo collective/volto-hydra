@@ -647,28 +647,180 @@ test.describe('Navigation and URL Handling', () => {
 });
 
 test.describe('Page Creation', () => {
-  // Failing on purpose (TDD): adding a brand-new Document via Volto's
-  // toolbar Add button uses the same createContent → POST flow that the
-  // bridge's Make Template feature relies on. There was no existing
-  // test exercising it end-to-end through the admin UI — and on the mock
-  // API path, POST of @type:Document was returning 501 until the recent
-  // Make-Template-POST commit added a Document handler. Locks in:
+  // Parametrized over content type so the same journey covers both
+  // sides of the Hydra Add shadow's post-create redirect logic:
   //
-  //   - clicking #toolbar-add → types menu opens
-  //   - picking Document goes to /<folder>/add?type=Document
-  //   - filling Title + Save POSTs to the parent folder with @type:Document
-  //   - admin navigates to the new doc's view, which we can edit
+  //   - Document has the volto.blocks behavior → shadow sends user to
+  //     /<newpath>/edit so they land in the bridge's block editor.
+  //   - Folder has NO blocks behavior → shadow sends user to the
+  //     canonical view (bridge has nothing to drive on a flat metadata
+  //     edit page; /edit would be a worse default for these types).
   //
-  // /_test_data is folderish in the fixture, so the toolbar-add button is
-  // shown. Avoiding navigateToEdit's prefix here — we're navigating
+  // The shadow distinguishes by inspecting `nextProps.content.blocks_layout`
+  // on the POST 201 response — Plone populates that field iff the type
+  // has the volto.blocks behavior. Document gets it, Folder doesn't.
+  //
+  // /_test_data is folderish in the fixture, so the toolbar Add button
+  // is shown. Avoiding navigateToEdit's prefix here — we're navigating
   // *into* the test mount root, not editing a specific child.
-  test('adding a new Document via the toolbar Add button creates and edits it', async ({ page }) => {
+  const ADD_CASES = [
+    {
+      typeId: 'Document',
+      submenuItem: '#toolbar-add-document',
+      titleFieldFill: 'TDD Created Document',
+      expectedRedirectKind: 'edit' as const, // → /<newpath>/edit
+      expectsIframe: true,                   // iframe loads with a block
+    },
+    {
+      typeId: 'Folder',
+      submenuItem: '#toolbar-add-folder',
+      titleFieldFill: 'TDD Created Folder',
+      expectedRedirectKind: 'view' as const, // → /<newpath> (canonical)
+      expectsIframe: false,
+    },
+  ] as const;
+  for (const tc of ADD_CASES) {
+  test(`adding a new ${tc.typeId} via the toolbar Add button redirects to ${tc.expectedRedirectKind}`, async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await page.goto(`${helper.adminUrl}/_test_data`);
 
     // Capture the POST 201 response from createContent so we can navigate
-    // to the new doc by its server-assigned @id.
+    // to the new item by its server-assigned @id.
+    let createdAtId: string | null = null;
+    page.on('response', async (resp) => {
+      if (resp.request().method() !== 'POST' || resp.status() !== 201) return;
+      try {
+        const body = await resp.json();
+        if (body && body['@type'] === tc.typeId && body['@id']) {
+          createdAtId = body['@id'];
+        }
+      } catch {
+        /* not JSON */
+      }
+    });
+
+    // Open toolbar Add menu and pick the type.
+    await page.locator('#toolbar-add').click();
+    await page.locator(tc.submenuItem).click();
+    await page.waitForURL(new RegExp(`\\/add\\?type=${tc.typeId}`), { timeout: 10000 });
+
+    // Fill Title and save. Add shadow forces `visual = false` so the form
+    // renders the flat schema input (a real <input> for title), not
+    // Volto's in-page visual block editor.
+    const titleField = page.locator('#field-title input, input[name="title"]').first();
+    await expect(titleField).toBeVisible({ timeout: 5000 });
+    await titleField.fill(tc.titleFieldFill);
+    await page.locator('#toolbar-save, button:has-text("Save")').click();
+
+    await expect.poll(() => createdAtId, { timeout: 10000 }).toBeTruthy();
+
+    // Type-aware redirect from the Hydra Add shadow:
+    //   - Document (has volto.blocks behavior) → /<newpath>/edit
+    //   - Folder (no blocks behavior) → /<newpath> (canonical view)
+    const newPath = new URL(createdAtId!).pathname;
+    const expectedPattern =
+      tc.expectedRedirectKind === 'edit'
+        ? new RegExp(`${newPath.replace(/\//g, '\\/')}\\/edit$`)
+        : new RegExp(`${newPath.replace(/\//g, '\\/')}$`);
+    await page.waitForURL(expectedPattern, { timeout: 10000 });
+
+    if (tc.expectsIframe) {
+      await helper.waitForIframeReady();
+
+      // Iframe must have navigated to the new content's URL — not still
+      // showing the previous folder's content.
+      await expect.poll(
+        async () => {
+          const src = await page.locator('#previewIframe').getAttribute('src');
+          return src || '';
+        },
+        { timeout: 10000 },
+      ).toContain(newPath);
+
+      // Iframe must NOT be showing a 404. The user-reported bug: Volto
+      // creates content + redirects, the iframe loads the new URL, but
+      // the frontend returns 404 because the new content isn't fetchable
+      // (e.g. session token not threaded through).
+      const iframeBody = page.frameLocator('#previewIframe').locator('body');
+      await expect(iframeBody, 'iframe must not show 404 for the new content').not.toContainText('404', { timeout: 5000 });
+
+      // New document renders at least one block (Volto auto-creates an
+      // empty slate on new pages). Visible proves the round trip
+      // actually rendered the new content.
+      const iframe = helper.getIframe();
+      const anyBlock = iframe.locator('[data-block-uid]').first();
+      await expect(anyBlock).toBeVisible({ timeout: 10000 });
+    }
+  });
+  }
+
+  /**
+   * Regression: when the Add button is shown in the toolbar, clicking
+   * it MUST surface at least one addable content type. The earlier
+   * test above only exercises the happy path on /_test_data where
+   * Document IS addable. It can't catch the silent-empty-state bug
+   * the user reported (Add visible, click opens an empty chooser
+   * with no .toolbar-add-* items).
+   *
+   * The fix the user agreed on: hide the Add button entirely when
+   * there are no addable types. So this test couples two invariants:
+   *   1. If the Add button is in the DOM, it must be backed by at
+   *      least one type (clicking surfaces ≥1 .toolbar-add-*).
+   *   2. If types is empty, the button must NOT be rendered.
+   *
+   * Stock Volto already gates Add behind
+   * `is_folderish && (types.length > 0 || translations)` — but the
+   * translations branch can surface the button with zero addable
+   * types in a multilingual setup, which is what produces the empty
+   * chooser. The fix tightens the gate to require types > 0.
+   */
+  test('Add button is hidden when no addable types exist; visible click always surfaces ≥1 type', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    // /_test_data IS folderish and has Document as an addable type —
+    // happy path. Asserts the button is visible AND clicking it
+    // surfaces at least one #toolbar-add-* item.
+    await page.goto(`${helper.adminUrl}/_test_data`);
+
+    const addBtn = page.locator('#toolbar-add');
+    await expect(addBtn).toBeVisible({ timeout: 5000 });
+    await addBtn.click();
+
+    // Any link with id `toolbar-add-<type>` proves the submenu is
+    // populated. If the chooser ever silently renders empty, this
+    // count check fires.
+    const typeItems = page.locator('[id^="toolbar-add-"]');
+    await expect(typeItems.first()).toBeVisible({ timeout: 3000 });
+    const count = await typeItems.count();
+    expect(
+      count,
+      'Add chooser must contain at least one type item when visible',
+    ).toBeGreaterThan(0);
+  });
+
+  /**
+   * Mobile mirror of the toolbar-Add-creates-and-edits happy path above.
+   * Sets a portrait phone viewport, walks the SAME journey:
+   *   - tap #toolbar-add → submenu opens with type items
+   *   - tap #toolbar-add-document → navigate to /add?type=Document
+   *   - fill title, tap Save → POST 201 → redirect to /edit on new item
+   *
+   * Catches: the submenu doesn't get hidden off-screen by mobile-tablet
+   * CSS; the Add form is reachable; Save isn't behind a horizontal scroll
+   * or covered by the bottom toolbar.
+   */
+  test('mobile: adding a new Document via the toolbar Add button creates and edits it', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 }); // iPhone-12 portrait
+
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await page.goto(`${helper.adminUrl}/_test_data`);
+
     let createdAtId: string | null = null;
     page.on('response', async (resp) => {
       if (resp.request().method() !== 'POST' || resp.status() !== 201) return;
@@ -682,33 +834,32 @@ test.describe('Page Creation', () => {
       }
     });
 
-    // Open toolbar Add menu and pick Document.
-    await page.locator('#toolbar-add').click();
-    await page.locator('#toolbar-add-document').click();
+    // The Add button must be visible (Volto already filters it on
+    // small viewports via Semantic UI's responsive classes — if a
+    // mobile-tablet CSS rule hides it, this fires first).
+    const addBtn = page.locator('#toolbar-add');
+    await expect(addBtn).toBeVisible({ timeout: 5000 });
+    await addBtn.click();
+
+    // Submenu must surface ≥1 type link AND the Document item must be
+    // reachable by a real tap (not just present in the DOM behind the
+    // bottom toolbar).
+    const docLink = page.locator('#toolbar-add-document');
+    await expect(docLink).toBeVisible({ timeout: 5000 });
+    await docLink.click();
     await page.waitForURL(/\/add\?type=Document/, { timeout: 10000 });
 
-    // Fill Title and save.
-    // NOTE: the Add shadow at packages/volto-hydra/.../Add/Add.jsx forces
-    // `visual = false` so this page renders the flat schema form (a real
-    // <input> for title), not Volto's in-page visual block editor.
-    // Probing that boolean from outside is hard — BlocksToolbar renders
-    // nothing until a block is selected, the schema form is structurally
-    // similar in both modes, and the only visible difference is mounting
-    // order of UI Hydra never shows. So we leave it as a documented
-    // assumption rather than a brittle assertion.
+    // Title field, Save, same as the desktop counterpart — but the
+    // mobile-tablet rules must not have hidden either.
     const titleField = page.locator('#field-title input, input[name="title"]').first();
     await expect(titleField).toBeVisible({ timeout: 5000 });
-    await titleField.fill('TDD Created Document');
-    await page.locator('#toolbar-save, button:has-text("Save")').click();
+    await titleField.fill('TDD Mobile Document');
+    const saveBtn = page.locator('#toolbar-save, button:has-text("Save")').first();
+    await expect(saveBtn).toBeVisible({ timeout: 5000 });
+    await saveBtn.click();
 
-    // POST should have happened with @type:Document.
     await expect.poll(() => createdAtId, { timeout: 10000 }).toBeTruthy();
 
-    // Add-shadow check #2 (auto-edit redirect): after a successful
-    // create the Add shadow's history.push points at
-    // `${flattenToAppURL(content['@id'])}/edit`, not the canonical view
-    // URL — so editors land in edit mode on the new item. Wait for the
-    // natural redirect rather than manually pushing /edit ourselves.
     const newDocPath = new URL(createdAtId!).pathname;
     await page.waitForURL(
       new RegExp(`${newDocPath.replace(/\//g, '\\/')}\\/edit$`),
@@ -716,9 +867,21 @@ test.describe('Page Creation', () => {
     );
     await helper.waitForIframeReady();
 
-    // The new document loads with at least one block (Volto auto-creates
-    // an empty slate on new pages). Visible + selectable proves the round
-    // trip works.
+    // Iframe must have navigated to the new content URL (not stale).
+    await expect.poll(
+      async () => {
+        const src = await page.locator('#previewIframe').getAttribute('src');
+        return src || '';
+      },
+      { timeout: 10000 },
+    ).toContain(newDocPath);
+
+    // The user-reported bug surface: iframe loads but the frontend
+    // shows 404 because the bridge handshake didn't complete (e.g.
+    // INITIAL_DATA never received, session-token mismatch).
+    const iframeBody = page.frameLocator('#previewIframe').locator('body');
+    await expect(iframeBody, 'iframe must not show 404 for the new content').not.toContainText('404', { timeout: 5000 });
+
     const iframe = helper.getIframe();
     const anyBlock = iframe.locator('[data-block-uid]').first();
     await expect(anyBlock).toBeVisible({ timeout: 10000 });

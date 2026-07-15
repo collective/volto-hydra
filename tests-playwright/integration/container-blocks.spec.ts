@@ -1741,36 +1741,43 @@ test.describe('Parent Block Navigation', () => {
     expect(headerCount).toBe(1); // Only Page header
   });
 
-  test('toolbar menu has Select Container option for nested blocks', async ({
+  test('Quanta ⬆ steps up out of text mode, then to the parent', async ({
     page,
   }) => {
+    // The ⬆ button is a STEP-UP control, not "select parent" — it posts STEP_UP and
+    // runs hydra's stepUpSelection(), the exact state machine the Escape key drives:
+    //   text mode → block mode → parent → deselect.
+    // It was promoted out of the ⋯ dropdown by
+    // docs/superpowers/specs/2026-06-09-select-parent-quanta-button-design.md as a
+    // one-tap "select parent", but folding it into the Escape machine gave phones
+    // (which have no Escape key) a way out of text editing. That is the contract now,
+    // and block-selection.spec.ts's STEP_UP_TRIGGERS asserts ⬆ and Escape stay
+    // identical. So a nested slate block needs TWO taps to reach its container: the
+    // first leaves the inline editor, the second selects the parent.
     const helper = new AdminUIHelper(page);
 
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
-    // Select a nested block (text-1a inside col-1)
+    // Select a nested block (text-1a inside col-1). Clicking a slate block lands in
+    // text mode, so 4 headers: Page, Columns, Column, Text.
     await helper.clickBlockInIframe('text-1a');
-    await page.waitForTimeout(300);
+    await helper.waitForBlockSelectedInAdmin('text-1a');
 
-    // Open the toolbar menu
-    await helper.openQuantaToolbarMenu('text-1a');
+    const stepUpBtn = page.locator('.quanta-toolbar .step-up-btn');
+    await expect(stepUpBtn).toBeVisible();
 
-    // Should see "Select Container" option
-    const selectContainerOption = page.locator(
-      '.volto-hydra-dropdown-item:has-text("Select Container")',
-    );
-    await expect(selectContainerOption).toBeVisible();
+    // Tap 1: text mode → block mode. Same block, so the hierarchy is unchanged.
+    await stepUpBtn.click();
+    await expect(
+      page.locator('.sidebar-section-header.sticky-header'),
+    ).toHaveCount(4);
 
-    // Click it to select the parent
-    await selectContainerOption.click();
-    await page.waitForTimeout(300);
-
-    // Should now have col-1 selected (3 headers: Page, Columns, Column)
-    const headerCount = await page
-      .locator('.sidebar-section-header.sticky-header')
-      .count();
-    expect(headerCount).toBe(3);
+    // Tap 2: block mode → parent (col-1). Now 3 headers: Page, Columns, Column.
+    await stepUpBtn.click();
+    await expect(
+      page.locator('.sidebar-section-header.sticky-header'),
+    ).toHaveCount(3);
 
     const currentHeader = page.locator(
       '.sidebar-section-header[data-is-current="true"]',
@@ -1778,26 +1785,36 @@ test.describe('Parent Block Navigation', () => {
     await expect(currentHeader).toContainText(/column/i);
   });
 
-  test('toolbar menu hides Select Container for top-level blocks', async ({
+  test('Quanta ⬆ stays available on a top-level block and deselects it', async ({
     page,
   }) => {
+    // This test used to assert the button was HIDDEN at top level, back when ⬆ meant
+    // "select parent" and a top-level block has no parent to select. As a STEP-UP
+    // control it is still meaningful there — the machine's last state is `deselect` —
+    // and on a phone it is the only way out of a selection, so it must stay visible.
     const helper = new AdminUIHelper(page);
 
     await helper.login();
     await helper.navigateToEdit('/container-test-page');
 
-    // Select a top-level block (columns-1 has no parent)
+    // Select a top-level block (columns-1 has no parent).
     await helper.clickContainerBlockInIframe('columns-1');
-    await page.waitForTimeout(300);
+    await helper.waitForBlockSelectedInAdmin('columns-1');
 
-    // Open the toolbar menu
-    await helper.openQuantaToolbarMenu('columns-1');
+    const stepUpBtn = page.locator('.quanta-toolbar .step-up-btn');
+    await expect(page.locator('.quanta-toolbar')).toBeVisible();
+    await expect(stepUpBtn).toBeVisible();
 
-    // Should NOT see "Select Container" option (no parent to select)
-    const selectContainerOption = page.locator(
-      '.volto-hydra-dropdown-item:has-text("Select Container")',
-    );
-    await expect(selectContainerOption).not.toBeVisible();
+    // NB clickContainerBlockInIframe lands on the columns block's own <h3
+    // data-edit-text> title, so this IS a click on text and tap 1 leaves the inline
+    // editor. See block-selection.spec.ts for the no-text case (image → block mode,
+    // one tap to deselect).
+    await stepUpBtn.click();
+    await expect(page.locator('.quanta-toolbar')).toBeVisible();
+
+    // Tap 2: block mode with no parent → deselect. Quanta goes with the selection.
+    await stepUpBtn.click();
+    await expect(page.locator('.quanta-toolbar')).toBeHidden({ timeout: 5000 });
   });
 });
 

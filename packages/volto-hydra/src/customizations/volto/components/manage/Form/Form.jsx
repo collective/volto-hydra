@@ -588,17 +588,26 @@ class Form extends Component {
       });
       this.props.setSidebarTab(1);
     } else {
-      // Save templates first if the Iframe has set up the save function
+      // Save templates first if the Iframe has set up the save function. It returns the
+      // page data with finalized template ids ONLY when a new template's placeholder id
+      // was rewritten across the page's block references — save the page with THAT so it
+      // doesn't reference a template id that was never created. When it returns nothing,
+      // save from our own (post-flush) state so just-flushed inline edits aren't lost.
+      let finalizedFormData = null;
       if (this.props.isEditForm && this.saveTemplatesRef.current) {
         const currentPath = this.props.pathname;
-        await this.saveTemplatesRef.current(formData, currentPath);
+        finalizedFormData = await this.saveTemplatesRef.current(formData, currentPath);
       }
 
       // Then save the page
       if (this.props.isEditForm) {
-        this.props.onSubmit(this.getOnlyFormModifiedValues());
+        this.props.onSubmit(
+          finalizedFormData
+            ? this.getOnlyFormModifiedValues(finalizedFormData)
+            : this.getOnlyFormModifiedValues(),
+        );
       } else {
-        this.props.onSubmit(formData);
+        this.props.onSubmit(finalizedFormData || formData);
       }
       if (this.props.resetAfterSubmit) {
         this.setState({
@@ -620,14 +629,16 @@ class Form extends Component {
    * @param {Object} event Event object.
    * @returns {undefined}
    */
-  getOnlyFormModifiedValues = () => {
+  getOnlyFormModifiedValues = (sourceFormData = this.state.formData) => {
     // Strip empty slot blocks before diffing — they exist only for UX
     // in edit mode and must never be persisted. Needs the full page formData
     // so buildBlockPathMap can traverse all page-level blocks fields.
     // Also enforce fixed-XOR-inside-slot: scrub fixed/readOnly from any block inside a slot
     // (a paste/programmatic path may have created that malformed state) before persisting.
+    // `sourceFormData` defaults to state, but the save flow passes the template-id-
+    // finalized page data so those rewritten references reach the PATCH.
     const formData = stripFixedInsideSlots(
-      stripEmptyBlocks(this.state.formData, config.blocks.blocksConfig, this.props.intl),
+      stripEmptyBlocks(sourceFormData, config.blocks.blocksConfig, this.props.intl),
     );
 
     const fieldsModified = Object.keys(
@@ -748,17 +759,25 @@ class Form extends Component {
               onSelectBlock={this.onSelectBlock}
             />
             <UndoToolbar
-              state={{
-                formData,
-                selected: this.props.uiState.selected,
-                multiSelected: this.props.uiState.multiSelected,
-              }}
+              // Track CONTENT (formData) only. useUndoManager/Undoo saves a new
+              // snapshot whenever the tracked state changes, and dedupes only
+              // against the immediately-current one. Including selection made
+              // every selection change a snapshot — and, worse, after an undo the
+              // iframe re-settles the selection, so the re-render saved a
+              // DUPLICATE-formData entry (same content, different selection). That
+              // wasted an undo step on an invisible selection change: undo the
+              // remove, then the next press reverts selection-only and the move
+              // before it becomes unreachable. selected/multiSelected were never
+              // actually restored on undo anyway (selection is uiState/props, not
+              // Form state — setState(state) wrote phantom fields), so dropping
+              // them loses nothing and makes each undo map to one edit.
+              state={{ formData }}
               enableHotKeys
               onUndoRedo={({ state }) => {
                 if (this.props.global) {
                   this.props.setFormData(state.formData);
                 }
-                return this.setState(state);
+                return this.setState({ formData: state.formData });
               }}
             />
           </Container>

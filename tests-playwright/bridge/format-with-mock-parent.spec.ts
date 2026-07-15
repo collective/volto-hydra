@@ -284,8 +284,20 @@ test.describe('Inline Editing with Mock Parent', () => {
     // Wait long enough for the Redux echo (50ms) to arrive and re-render
     await page.waitForTimeout(200);
 
-    // Now try Ctrl+A — this should select all text even after the echo re-render
-    await editable.focus();
+    // Now try Ctrl+A — this should select all text even after the echo re-render.
+    //
+    // Click first, don't just focus(). The field's text is STILL fully selected from
+    // the Ctrl+A above (that is the point — the echo didn't destroy it), and Ctrl+A on
+    // an already-fully-selected field ESCALATES to block mode by design: hydra's
+    // `text → block → siblings` ladder, the same one Gutenberg documents ("select all
+    // text in current block... press again to select parent block or all blocks").
+    // Block mode deliberately has NO text selected — hydra sets
+    // `body[data-hydra-edit-mode="block"]`, which turns off user-select so an iOS
+    // long-press can't start a word-selection mid-gesture. So a bare focus()+Ctrl+A
+    // here asserts the opposite of the design and only ever passed by accident.
+    // Clicking collapses the selection to a caret, so Ctrl+A does what this test means
+    // it to: select the field's text again, proving focus/selection survived the echo.
+    await editable.click();
     await page.keyboard.press('ControlOrMeta+a');
 
     const selection = await expect.poll(async () => {

@@ -182,6 +182,13 @@ test.describe('Inline Editing - Basic', () => {
     await helper.selectAllTextInEditor(editor);
     await editor.pressSequentially('Hello World', { delay: 10 });
 
+    // On the slower CI static build, pressSequentially's DOM/slate sync can lag.
+    // moveCursorToPosition steps selection.modify() character-by-character from
+    // the element start, so it must count against the FULLY-settled text —
+    // otherwise it lands one short (cursor at index 5), yielding
+    // "HelloBeautiful  World". Wait for the exact text before positioning.
+    await helper.waitForEditorText(editor, /^Hello World$/);
+
     // Move cursor to the middle of the text (between 'Hello' and 'World')
     await helper.moveCursorToPosition(editor, 6); // Position after "Hello "
 

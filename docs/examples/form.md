@@ -545,7 +545,7 @@ This is a **custom** block — register it via `initBridge`.
 <!-- file: examples/react/FormBlock.jsx -->
 ```jsx
 function FormBlock({ block }) {
-  const fields = block.subblocks || [];
+  const fields = expandTemplatesSync(block.subblocks || [], { idField: 'field_id' });
 
   return (
     <form data-block-uid={block['@uid']} className="form-block" onSubmit={e => e.preventDefault()}>
@@ -553,7 +553,7 @@ function FormBlock({ block }) {
       {block.description && <p data-edit-text="description">{block.description}</p>}
 
       {fields.map(field => (
-        <div key={field['@id']} data-block-uid={field.field_id} className="form-field">
+        <div key={field.field_id} data-block-uid={field.field_id} className="form-field">
           <FormField field={field} />
         </div>
       ))}
@@ -628,7 +628,7 @@ function FormField({ field }) {
     <h3 data-edit-text="title">{{ block.title }}</h3>
     <p v-if="block.description" data-edit-text="description">{{ block.description }}</p>
 
-    <div v-for="field in block.subblocks || []" :key="field['@id']" class="form-field" :data-block-uid="field.field_id">
+    <div v-for="field in fields" :key="field.field_id" class="form-field" :data-block-uid="field.field_id">
       <template v-if="field.field_type === 'text'">
         <label><span data-edit-text="label">{{ field.label }}</span> <input type="text" :required="field.required" /></label>
       </template>
@@ -673,7 +673,11 @@ function FormField({ field }) {
 </template>
 
 <script setup>
-defineProps({ block: Object });
+import { computed } from 'vue';
+const props = defineProps({ block: Object });
+// Expand the subblocks object_list, passing its idField (field_id) so the merge stamps ids
+// correctly. In edit mode this is a pass-through that sets each field's @uid from field_id.
+const fields = computed(() => expandTemplatesSync(props.block.subblocks || [], { idField: 'field_id' }));
 </script>
 ```
 
@@ -683,6 +687,9 @@ defineProps({ block: Object });
 ```svelte
 <script>
   export let block;
+  // Expand the subblocks object_list, passing its idField (field_id) so the merge stamps ids
+  // correctly. Edit-mode pass-through sets each field's @uid from field_id.
+  $: fields = expandTemplatesSync(block.subblocks || [], { idField: 'field_id' });
 </script>
 
 <form data-block-uid={block['@uid']} class="form-block" on:submit|preventDefault>
@@ -691,7 +698,7 @@ defineProps({ block: Object });
     <p data-edit-text="description">{block.description}</p>
   {/if}
 
-  {#each block.subblocks || [] as field (field.field_id || field.id)}
+  {#each fields as field (field.field_id)}
     <div class="form-field" data-block-uid={field.field_id}>
       {#if field.field_type === 'text'}
         <label><span data-edit-text="label">{field.label}</span> <input type="text" required={field.required} /></label>
@@ -757,8 +764,13 @@ defineProps({ block: Object });
  * Each field row carries `data-block-uid={field.field_id}` so the bridge
  * can target individual fields for selection.
  */
-const { block } = Astro.props;
-const subblocks = block.subblocks || [];
+import { expandTemplatesSync } from '$helpers';
+// astro renders ONLY via the edit render API (SSR has no window.name), so default to edit mode.
+// The default also covers a form nested in a container, whose BlockRenderer doesn't thread editMode.
+const { block, editMode = true } = Astro.props;
+// Expand the subblocks object_list (idField field_id). Edit mode makes this a pass-through that
+// sets each field's @uid from field_id (a view render would need pre-loaded templates instead).
+const subblocks = expandTemplatesSync(block.subblocks || [], { idField: 'field_id', editMode });
 ---
 <form class="form-block">
   <h3 data-edit-text="title">{block.title}</h3>

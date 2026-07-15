@@ -33,6 +33,31 @@ async function snap(page: import('@playwright/test').Page, name: string) {
   console.log(`[screenshot] ${name} -> ${path.relative(process.cwd(), file)}`);
 }
 
+/**
+ * Tight shot of the sidebar template section — the "Template: …" bar plus its
+ * settings — so the doc image frames exactly the lock/unlock + Template Settings,
+ * not the whole viewport (page fields sit above it in a long sidebar).
+ */
+async function snapTemplateSection(
+  page: import('@playwright/test').Page,
+  name: string,
+  height = 260,
+) {
+  const bar = page
+    .locator('.sidebar-section-header')
+    .filter({ has: page.locator('.edit-template-toggle') });
+  // Align the bar to the TOP of the sidebar so the Template Settings below it are in
+  // frame (scrollIntoViewIfNeeded can park it at the bottom edge with nothing below).
+  await bar.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  const box = (await bar.boundingBox())!;
+  const file = path.join(OUT_DIR, `${name}.png`);
+  await page.screenshot({
+    path: file,
+    clip: { x: box.x, y: Math.max(0, box.y - 4), width: box.width, height },
+  });
+  console.log(`[screenshot] ${name} -> ${path.relative(process.cwd(), file)}`);
+}
+
 test.describe('Editor Guide screenshots', () => {
   test('block-selected — slate block in text mode with Quanta toolbar', async ({ page }) => {
     const helper = new AdminUIHelper(page);
@@ -215,6 +240,70 @@ test.describe('Editor Guide screenshots', () => {
     await snap(page, 'template-locked');
   });
 
+  test('template-edit-locked — template instance selected, lock on the bar (not editing)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Select a fixed template block, then step up to the template instance — its
+    // sidebar bar shows the 🔒 lock (not editing) and the Template Settings form
+    // with Name/Location disabled.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent('Template Header - From Template');
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    await expect(page.locator('.edit-template-toggle')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.edit-template-toggle')).toHaveAttribute('aria-pressed', 'false');
+
+    await snapTemplateSection(page, 'template-edit-locked');
+  });
+
+  test('template-edit-editing — unlocked, editing the template (unlock icon, fields enabled)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent('Template Header - From Template');
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+
+    // Unlock → template edit mode. Outside blocks lock; the bar toggle flips to 🔓.
+    await page.locator('.edit-template-toggle').click();
+    await helper.waitForBlockReadonly('standalone-block-1');
+    await expect(page.locator('.edit-template-toggle')).toHaveAttribute('aria-pressed', 'true', { timeout: 5000 });
+
+    // Re-select the instance so its (now enabled) Template Settings are shown.
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+
+    await snapTemplateSection(page, 'template-edit-editing', 330);
+  });
+
+  test('template-toolbar-lock — a template block toolbar shows the lock (not editing)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Select a fixed template block; its in-canvas Quanta toolbar shows the 🔒 lock —
+    // the in-canvas entry point into template edit mode.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent('Template Header - From Template');
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForBlockSelectedInAdmin(headerBlockId);
+    await expect(page.locator('.quanta-toolbar .lock-icon')).toBeVisible({ timeout: 5000 });
+
+    // The toolbar box is as wide as the block (transparent passthrough) with the
+    // buttons packed on the left — clip a tight strip around the button row.
+    const box = (await page.locator('.quanta-toolbar').boundingBox())!;
+    const file = path.join(OUT_DIR, 'template-toolbar-lock.png');
+    await page.screenshot({
+      path: file,
+      clip: { x: box.x, y: box.y, width: Math.min(box.width, 200), height: box.height },
+    });
+    console.log(`[screenshot] template-toolbar-lock -> ${path.relative(process.cwd(), file)}`);
+  });
+
   test('frontend-switcher — toolbar panel with viewport + frontends', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -322,3 +411,4 @@ test.describe('Editor Guide screenshots', () => {
     await snap(page, 'container-convert');
   });
 });
+

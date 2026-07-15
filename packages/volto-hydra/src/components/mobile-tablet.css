@@ -1,0 +1,850 @@
+/* packages/volto-hydra/src/components/mobile-tablet.css
+ *
+ * All `@media (max-width: ...)` rules for the mobile + tablet admin
+ * layout. Desktop (>=1024px) inherits NO rules from this file — verify
+ * via the desktop control test in mobile-tablet-admin-layout.spec.ts.
+ *
+ * Breakpoints aligned with Volto's own Semantic-UI defaults:
+ *   - mobile  ≤ 767px   (Volto's `largestMobileScreen`)
+ *   - tablet  768–1023px
+ *   - desktop ≥ 1024px
+ *
+ * NB the spec originally said 600/1023 — we aligned with 767 instead
+ * because Volto's stock CSS at 601–767 collapses the toolbar to top
+ * horizontally, and fighting that cascade is more work than just
+ * adopting Volto's boundary. The 601–767 range therefore gets the
+ * mobile layout, not the tablet one.
+ *
+ * Z-index ladder:
+ *   --hydra-z-toolbars:        100
+ *   --hydra-z-sheet-backdrop:  200
+ *   --hydra-z-sheet:           201
+ *   --hydra-z-sidebar-mobile:  300
+ *
+ * Inline-style note: .quanta-toolbar is inline-styled in
+ * SyncedSlateToolbar.jsx (top/left/maxWidth/opacity driven by JS).
+ * Mobile rules that override its position/visibility MUST use
+ * !important — scoped strictly to @media (max-width: 767px).
+ */
+
+:root {
+  --hydra-z-toolbars: 100;
+  --hydra-z-sheet-backdrop: 200;
+  --hydra-z-sheet: 201;
+  --hydra-z-sidebar-mobile: 300;
+}
+
+/* ─── Tablet (768–1023px) ─────────────────────────────────────────── */
+/* The visible main toolbar is #toolbar-body (class "toolbar expanded"),
+ * position:fixed. The outer #toolbar is just a static wrapper that holds
+ * it. Target the inner element by id. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* Same semantic-ui-mobile-icon-vanishing fix as landscape: stock
+   * Volto's More button has two Icon children gated by `mobile only`
+   * vs `mobile hidden`. Semantic-UI's `.mobile.hidden` rule hides
+   * its icon at our 768-1023 px breakpoint AND `.mobile.only` already
+   * hides at >767. Result: BOTH icons display:none, the More button
+   * renders as an empty 44×44 slot. Force the desktop variant
+   * visible so the editor actually sees the ⋯ dots. */
+  #toolbar-body .more svg.icon.mobile.hidden {
+    display: inline-block !important;
+  }
+  /* The desktop "Shrink toolbar" handle has a workflow-state colored
+   * stripe that bleeds through the right-edge strip as a thin
+   * vertical bar. Hide it on tablet portrait — same as portrait
+   * mobile and landscape. */
+  #toolbar-body .toolbar-handler {
+    display: none !important;
+  }
+  /* Move the main Volto toolbar from its desktop left-edge position to
+   * the far right of the viewport. */
+  #toolbar-body {
+    left: auto !important;
+    right: 0 !important;
+  }
+  /* Sidebar shifts left by the toolbar width. .sidebar-container is the
+   * visible fixed-positioned element; the bare #sidebar is just an
+   * empty static wrapper from Html.jsx. */
+  .sidebar-container {
+    right: 80px !important;
+  }
+  /* Iframe canvas: fill the viewport minus the right-edge toolbar (80px).
+   *
+   * An earlier version subtracted ANOTHER 375px for the sidebar unconditionally
+   * (`calc(100vw - 455px)`), which squashed the canvas to 313px at 768px even when
+   * the sidebar was COLLAPSED — a huge empty middle column. That was backed out, but
+   * backing it out entirely left the opposite bug: an EXPANDED sidebar is
+   * `position: fixed` and simply covers the canvas, so blocks under it can't be
+   * clicked at all (Playwright: "<p class='help'> from <div id='sidebar'> subtree
+   * intercepts pointer events" on a block in the right-hand column).
+   *
+   * Subtract the sidebar only while it is actually open. Collapsed → the canvas gets
+   * the full width; expanded → it ends exactly where the sidebar begins, which is the
+   * invariant the tablet layout test asserts. */
+  #iframeContainer {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    right: 80px !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+  body:has(.sidebar-container:not(.collapsed)) #iframeContainer {
+    /* 80px toolbar + 375px sidebar */
+    right: 455px !important;
+  }
+}
+
+/* ─── Mobile (≤767px) ─────────────────────────────────────────────── */
+@media (max-width: 767px) {
+
+  /* Quanta toolbar: pinned to top, full-width, ALWAYS visible.
+   * Overrides both the JS-driven inline position AND the inline
+   * `opacity: isFaded ? 0 : 1` — the desktop fade-on-idle UX doesn't
+   * make sense when Quanta is the persistent top toolbar. */
+  .quanta-toolbar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+    z-index: var(--hydra-z-toolbars) !important;
+    border-radius: 0 !important;
+    /* Pinned edge-to-edge at the top, Quanta is the only thing separating the
+     * editor chrome from the page content scrolling under it — it needs a real
+     * drop shadow to sit above that content, not the 0.08/3px hairline that
+     * made it look pasted on. Mirrors the desktop inline style. */
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15) !important;
+    opacity: 1 !important;
+  }
+
+  /* Main Volto toolbar: pinned to bottom, full-width, safe-area-aware.
+   * Compact to match Quanta's height (44px) so the two bars feel
+   * balanced and the iframe canvas gets the maximum vertical space.
+   * Allow horizontal scroll if there are more icons than fit at 375px;
+   * the bar's role is quick-access shortcuts, not a primary menu.
+   *
+   * Heights: min-height: 44px reserves space for the icons; padding-bottom
+   * with env(safe-area-inset-bottom) extends the bar BELOW the icons by
+   * the iOS home-indicator height (~34px). DO NOT add max-height — that
+   * would clamp the total box and the safe-area padding would eat into
+   * the icon content area, squeezing the icons to ~10px (the user-visible
+   * regression that triggered this rewrite). */
+  #toolbar-body {
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 44px !important;
+    max-height: none !important;
+    padding-bottom: env(safe-area-inset-bottom) !important;
+    z-index: auto !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+  /* Stock Volto nests a `.toolbar-body` (CLASS) container inside the
+   * `#toolbar-body` (ID) wrapper — on desktop it's a vertical column
+   * holding Save/Cancel/etc. stacked top-to-bottom. On mobile we lay
+   * the icons out horizontally so they fit in the 44px bottom bar.
+   * Without this rule the inner column stays vertical (~100px tall),
+   * which pushes #toolbar-body's auto-height up too and breaks the
+   * "44px tall" invariant the existing test (line ~489) checks. */
+  #toolbar-body .toolbar-body {
+    flex-direction: row !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    /* Push .toolbar-bottom (left group: User/Monitor/Undo/Settings)
+     * and .toolbar-actions (right group: Save/Cancel or Edit/Add/etc)
+     * to opposite ends of the row, with the empty space between them
+     * as a gap — same desktop "spacer" pattern users expect when they
+     * see two button groups in a single bar.
+     *
+     * The full-width is required for space-between to have free space
+     * to distribute: stock pastanaga sizes the inner .toolbar-body to
+     * its content (~284px on a 4-icon bar), leaving the gap empty. */
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
+  /* The desktop "Shrink toolbar" handle (.toolbar-handler) is rendered
+   * as a sibling of .toolbar-body inside #toolbar-body. On the
+   * compact mobile bar there is nothing to shrink, and the handle's
+   * default positioning overlaps the rightmost toolbar buttons
+   * (frontend switcher, settings shortcut) and steals clicks. Hide it. */
+  #toolbar-body .toolbar-handler {
+    display: none !important;
+  }
+
+  /* Stock Volto's toolbar submenus (More → History/State/Links,
+   * Add → Add Content) render inside #toolbar > .toolbar-content,
+   * which has `position: static; z-index: 3; no background` — on
+   * desktop it sits inside the expanded vertical toolbar panel, but
+   * on mobile with the toolbar pinned to the bottom there's no panel,
+   * so the menu renders transparent and overlaps the iframe content
+   * (visible to editors as "menus that bleed through the page"). Make
+   * the .show state behave like the other mobile bottom sheets: full-
+   * viewport, opaque, on top of everything, scrollable. */
+  #toolbar .toolbar-content.show {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    /* Sheet fills to the viewport bottom — the bottom toolbar is
+     * hidden by the `body[data-hydra-submenu-open] #toolbar-body`
+     * rule below while this submenu is open, so editors see the
+     * sheet's own back-arrow (.mobile-submenu-close) sitting where
+     * the bar used to be. */
+    bottom: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    background: #fff !important;
+    z-index: var(--hydra-z-sidebar-mobile) !important;
+    overflow-y: auto !important;
+    /* Room at the bottom for the .mobile-submenu-close back arrow
+     * (44px button + 12+12 px breathing room + iOS safe area). */
+    padding: 0 0 calc(56px + env(safe-area-inset-bottom)) 0 !important;
+  }
+  /* While a submenu sheet is open, replace the bottom toolbar with
+   * the sheet — hide #toolbar-body entirely so editors only ever
+   * see one bottom-anchored surface at a time. The sheet has its
+   * own bottom-left back-arrow (.mobile-submenu-close) to dismiss. */
+  body[data-hydra-submenu-open] #toolbar-body {
+    display: none !important;
+  }
+  /* The default `.pastanaga-menu` inside .toolbar-content has its own
+   * sizing rules that fight the full-viewport layout; let the parent
+   * own the geometry. */
+  #toolbar .toolbar-content.show .pastanaga-menu {
+    max-width: none !important;
+    width: 100% !important;
+    height: 100% !important;
+    box-shadow: none !important;
+  }
+
+  /* Mobile bottom toolbar layout
+   *
+   * Default Volto stuffs 6–7 buttons into the bar (Save/Cancel + Undo/
+   * Redo + Frontend switcher + Settings + Personal tools, plus More/Add/
+   * Contents/Edit in view mode). At 375px the rightmost 2–3 spill off
+   * the viewport — visible "icons clipped" + "horizontal scroll on the
+   * bar" issues the user reported.
+   *
+   * Strategy:
+   *  1. Hide buttons that are rarely needed on mobile and are reachable
+   *     elsewhere (Undo/Redo: long-press / system gestures; Contents
+   *     and Personal tools: not primary editor flows).
+   *  2. Push the primary action (Save in edit mode, Edit in view mode)
+   *     to the RIGHT edge with margin-left: auto — standard mobile
+   *     primary-CTA placement, and the position stays consistent so
+   *     editors don't have to hunt for it across modes.
+   *
+   * After this: 4–5 buttons remain, all fit within 375px, primary CTA
+   * is always rightmost. */
+  /* Hide secondary actions that don't fit on a 375px compact bar.
+   * .undo AND .redo both stay on the edit bar: Redo was previously hidden,
+   * but on a phone there's no keyboard for Ctrl+Y, so hiding the button left
+   * redo completely unreachable. Undo + Redo + Save/Cancel still fit within
+   * 375px.
+   * .user (Personal tools) is hidden in EDIT mode only (see rule
+   * below) — it stays visible in VIEW mode per the user's mobile
+   * toolbar mockup (leftmost icon). */
+  /* In EDIT mode hide the Frontend & Viewport switcher AND Personal
+   * tools from the bottom bar — editors need Undo + Cancel + Save more
+   * than meta actions during inline edits. Both still reachable via ⋯.
+   * In VIEW mode the Frontend switcher and Personal tools stay
+   * visible — they're part of the designed view-mode toolbar. */
+  body.view-editview #toolbar-body .frontend-switcher-btn,
+  body.view-editview #toolbar-body .user {
+    display: none !important;
+  }
+
+  /* View-mode bottom-toolbar order (per the user's portrait mockup):
+   *   User → Monitor → More → Add → Contents → Edit
+   * Volto stock DOM groups buttons in two wrappers inside the inner
+   * .toolbar-body flex row:
+   *   .toolbar-actions  → [Edit, Contents, Add, More]  (row-reverse)
+   *   .toolbar-bottom   → [Frontend & Viewport, Personal tools]
+   * The outer ordering rules above already put .toolbar-bottom on the
+   * LEFT and .toolbar-actions on the RIGHT. So we just need to fix
+   * the order WITHIN each wrapper so the right icons end up in the
+   * right slots. .toolbar-actions stays row-reverse (so Edit, the
+   * DOM-first child, lands rightmost). .toolbar-bottom needs the
+   * User icon ON THE LEFT of Frontend, but stock DOM order is
+   * [Frontend, User] — flip via flex order.
+   *
+   * Stock pastanaga (toolbar.less:271-281) hides .toolbar-bottom via
+   * `opacity: 0` and hides the .user button inside it with
+   * `display: none`. Both have to be undone on mobile so the icons
+   * actually render. Stock uses `flex-direction: row-reverse` for
+   * `.toolbar-bottom`; force `row` so the flex `order` properties
+   * line up with the L→R visual order. */
+  body.view-viewview #toolbar-body .toolbar-bottom {
+    opacity: 1 !important;
+    flex-direction: row !important;
+  }
+  body.view-viewview #toolbar-body .toolbar-bottom .user {
+    display: flex !important;
+    order: 0 !important;
+  }
+  body.view-viewview #toolbar-body .toolbar-bottom .frontend-switcher-btn {
+    order: 1 !important;
+  }
+  /* Primary action goes to the right edge.
+   *
+   * Volto's stock structure inside #toolbar-body .toolbar-body is two
+   * wrapper divs as the actual flex items:
+   *   - .toolbar-actions  (Save + Cancel in edit; Edit in view)
+   *   - .toolbar-bottom   (Frontend switcher, Settings, Undo, Redo, …)
+   * So `order` / `margin-left: auto` belongs on .toolbar-actions, not
+   * on .save / .edit directly (they aren't direct flex items of
+   * .toolbar-body — they're nested inside the wrapper).
+   *
+   * .toolbar-bottom gets order: 1 (sits to the LEFT) and
+   * .toolbar-actions gets order: 999 + margin-left: auto (sits to the
+   * RIGHT, pinned to the viewport's right edge). Within
+   * .toolbar-actions, Save itself is pushed to the rightmost slot via
+   * an inner order rule so Cancel stays to its left. */
+  #toolbar-body .toolbar-bottom {
+    order: 1 !important;
+  }
+  #toolbar-body .toolbar-actions {
+    order: 999 !important;
+    margin-left: auto !important;
+    /* 10px right inset mirrors the 10px inter-button rhythm set below, so the
+     * rightmost button (Edit) sits the same distance from the viewport edge as
+     * the leftmost (User) does from the left. */
+    padding-right: 10px !important;
+    padding-left: 0 !important;
+  }
+  /* DON'T override Save's order: stock .toolbar-actions is
+   * `flex-direction: row-reverse`, so DOM-first (Save) is already
+   * visually rightmost. Setting an explicit order on Save would push
+   * it left instead. */
+  /* Volto stock layout reserves ~100px of vertical space at the top via
+   * `#toolbar > .pusher` so static content sits BELOW where the
+   * (desktop, left-anchored) toolbar would be. On mobile we pull
+   * #toolbar-body out to position:fixed at the BOTTOM — so .pusher's
+   * reservation becomes a phantom gap with no toolbar inside it. This
+   * is what the user saw as "the toolbar is pushed down screen, gap
+   * at the top". Collapse the pusher on mobile so #main sits at y=0. */
+  #toolbar .pusher {
+    height: 0 !important;
+    min-height: 0 !important;
+  }
+  /* Icons inside the bottom toolbar — scale to fit the 44px bar.
+   *
+   * display:flex + align-items:center is what actually CENTRES the icon.
+   * Stock pastanaga renders these as `display: block`, so a 22px icon just
+   * sat under the 6px top padding: centre y 888 in an 871..915 bar whose
+   * centre is 893. `.frontend-switcher-btn` is flex already and landed dead
+   * centre, so the row disagreed with itself by 5px and read as misaligned. */
+  #toolbar-body button,
+  #toolbar-body a {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 44px !important;
+    padding: 6px 10px !important;
+  }
+  /* The inner row must centre its two group wrappers too, or a taller group
+   * (the 34px circled Edit icon) drags its neighbours off the centreline. */
+  #toolbar-body .toolbar-body {
+    align-items: center !important;
+  }
+  #toolbar-body svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  /* Stock pastanaga puts `margin-left: 20px` on every toolbar button. Six
+   * buttons at 20px, plus a 54px circled Edit, total 422px of content in a
+   * 412px bar: the primary action hangs off the right edge and the bar turns
+   * into a silent horizontal scroller. Tighten the rhythm to 10px so the row
+   * fits any phone ≥360px, and give .toolbar-actions the matching right inset
+   * (it was zeroed because 20px pushed Edit past the edge — the real cause was
+   * the margins, not the padding). */
+  #toolbar-body .toolbar-bottom > *,
+  #toolbar-body .toolbar-actions > * {
+    margin-left: 10px !important;
+  }
+
+  /* Iframe canvas: fills the area between top affordances and the
+   * main toolbar at the bottom (44px). The TOP reservation depends on
+   * mode:
+   *   - EDIT mode reserves 44px for the Quanta block toolbar that pins
+   *     to the selected block's top.
+   *   - VIEW mode has no Quanta — there's no block selection state to
+   *     paint a toolbar for. Reserving 44px just leaves an empty gap
+   *     above the page content, which is the user-reported "gap at
+   *     top in view mode" bug.
+   *
+   * Literal 44px is the measured toolbar height (boundingBox()).
+   * Deliberately NOT using CSS custom-property fallbacks
+   * (`var(--x, 44px)`); fallback-only vars hide the literal and violate
+   * the project's no-fallback rule. */
+  #iframeContainer {
+    position: fixed !important;
+    bottom: 44px !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+  }
+  body.view-editview #iframeContainer {
+    top: 44px !important;
+  }
+  body.view-viewview #iframeContainer {
+    top: 0 !important;
+  }
+  #previewIframe {
+    height: 100% !important;
+  }
+
+  /* The toolbar's .pusher-puller has BOTH an inline
+   * `transform: translateX(0px)` (for the desktop slide animation) AND
+   * `will-change: transform` in stock CSS. Both make it a containing
+   * block for position:fixed descendants, anchoring my bottom-sheet
+   * popups to .pusher-puller (which sits above the mobile viewport)
+   * instead of the viewport. Reset both on mobile so the popups
+   * resolve correctly. */
+  #toolbar .pusher-puller,
+  #toolbar .toolbar-content {
+    transform: none !important;
+    will-change: auto !important;
+  }
+  /* The toolbar's outer #toolbar-body has its own z-index: 100 (set by
+   * my own mobile rule) which becomes a stacking context — any popup
+   * rendered inside it is trapped below other toolbar descendants like
+   * .toolbar-handler-button. Drop the toolbar's stacking context on
+   * mobile so the bottom-sheet popups can rise above siblings via
+   * their natural z-index ladder. Other elements that depend on the
+   * toolbar z (like the iframe below it) get z-index from .iframe
+   * stacking, not from the toolbar's. */
+  /* ...but the bar still has to out-rank the IFRAME CHROME. The admin's
+   * `.volto-hydra-add-button` is `position: fixed; z-index: 10`, placed at the
+   * selected block's bottom edge — when that edge is near the viewport bottom the
+   * '+' lands ON the bottom toolbar and, with `z-index: auto` here, paints over it
+   * and swallows the click ("<span>+</span> intercepts pointer events" on Save).
+   * --hydra-z-toolbars (100) is the layer this bar belongs to; it stays below the
+   * sheet ladder (200/201), and the popups the rule above cares about live in
+   * `#toolbar > .toolbar-content`, not inside `#toolbar-body`, so they are
+   * unaffected by this stacking context. */
+  #toolbar-body { z-index: var(--hydra-z-toolbars) !important; }
+
+  /* Bottom-sheet popups on mobile. The popup React state-machine is
+   * unchanged — only the geometry changes here. Every popup the admin
+   * surfaces (⋯ menu, +, convert chooser, frontend switcher, settings
+   * modal) gets the same slide-up sheet treatment so the editor sees
+   * one consistent gesture model. NOTE: .add-link (the slate
+   * LinkEditor) is NOT in this list — it gets a top-pinned treatment
+   * further down because it's a contextual editor for selected text,
+   * not a menu/picker, and should sit where the format toolbar is. */
+  .volto-hydra-dropdown-menu,
+  .container-block-chooser,
+  .add-new-block-popup,
+  .frontend-switcher-panel,
+  .frontend-settings-modal {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    max-width: none !important;
+    /* 90vh, not 70vh: at 70 the last menu item (Remove, etc.) gets
+     * clipped on common ~6-item menus. Sheet still scrolls if taller. */
+    max-height: 90vh !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    background: #fff !important;
+    border-radius: 12px 12px 0 0 !important;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12) !important;
+    z-index: var(--hydra-z-sheet) !important;
+    /* Reserve room at the BOTTOM for the .mobile-sheet-close back-
+     * arrow (44px button + 12+12 px breathing room + iOS safe area).
+     * Items inside the sheet scroll naturally above the back button. */
+    padding-bottom: calc(56px + env(safe-area-inset-bottom)) !important;
+    overflow-y: auto !important;
+    transform: translateY(0) !important;
+    animation: hydra-sheet-slide-up 0.2s ease-out !important;
+  }
+
+  /* The sheet WRAPPER is full-width (above), but the BlockChooser inside it is
+   * pinned to `width: 310px` by Volto's blocks.less. On a 412px phone that left
+   * ~100px of dead sheet to the right of the picker. Let it fill its sheet, and
+   * drop the desktop card chrome (own shadow / opaque panel / nudge offsets) now
+   * that the sheet itself provides the surface. */
+  .add-new-block-popup .blocks-chooser,
+  .container-block-chooser .blocks-chooser {
+    width: 100% !important;
+    min-width: 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* Backdrop behind every bottom sheet — dims the page and traps clicks
+   * outside the sheet so accidental taps on the canvas don't fire. We
+   * attach it via ::before on document.body when a known popup is in
+   * the DOM. body:has() is supported on iOS Safari 15.4+ and modern
+   * Android Chrome — falls back to no-backdrop on older browsers
+   * (sheet still works). */
+  body:has(.volto-hydra-dropdown-menu),
+  body:has(.container-block-chooser),
+  body:has(.add-new-block-popup),
+  body:has(.frontend-switcher-panel),
+  body:has(.frontend-settings-modal) {
+    overflow: hidden;
+  }
+  body:has(.volto-hydra-dropdown-menu)::before,
+  body:has(.container-block-chooser)::before,
+  body:has(.add-new-block-popup)::before,
+  body:has(.frontend-switcher-panel)::before,
+  body:has(.frontend-settings-modal)::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: var(--hydra-z-sheet-backdrop);
+    pointer-events: none;
+  }
+
+  /* Slate LinkEditor — pinned to the TOP, covering Quanta. The
+   * desktop behavior is "the LinkEditor sits on top of the format
+   * toolbar in the same spot" (asserted by
+   * inline-editing-links.spec.ts). Mobile should keep that mental
+   * model: when you tap the link button, the format buttons swap out
+   * for a URL field in the same position. Bottom-sheet doesn't fit
+   * here — link editing is contextual to the selected text, not a
+   * menu/picker. Override the PositionedToolbar's inline top/left
+   * (set via JS in PositionedToolbar.jsx:25-27) with !important. */
+  .add-link {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: auto !important;
+    max-width: none !important;
+    width: 100% !important;
+    background: #fff !important;
+    border-radius: 0 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+    /* Above Quanta — same stack as Quanta is at var(--hydra-z-toolbars);
+     * bump by 1 so this sits visually atop Quanta without changing the
+     * scrim ladder. */
+    z-index: calc(var(--hydra-z-toolbars) + 1) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  /* The inner .link-form-container has desktop styling (rounded border,
+   * boxshadow) — drop those on mobile so it fills the top bar cleanly
+   * and matches Quanta's 44px height. */
+  .add-link .link-form-container {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    height: 44px !important;
+    width: 100% !important;
+    padding: 0 8px !important;
+  }
+  /* The URL input grows to fill the bar. */
+  .add-link .link-form-container input[type='text'],
+  .add-link .link-form-container input[type='url'] {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    height: 32px !important;
+  }
+
+  /* FrontendSettingsModal: the .frontend-settings-overlay is the backdrop
+   * that wraps the modal. On desktop it's a centered modal; on mobile
+   * the inner .frontend-settings-modal is the sheet — make the backdrop
+   * full-viewport and the modal slide up. */
+  .frontend-settings-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(0, 0, 0, 0.3) !important;
+    z-index: var(--hydra-z-sheet-backdrop) !important;
+    display: flex !important;
+    align-items: flex-end !important;
+    justify-content: stretch !important;
+  }
+
+  @keyframes hydra-sheet-slide-up {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+
+  /* Back-arrow (←) inside bottom sheets. Pinned to the BOTTOM-LEFT
+   * corner of every popup — matches the user's portrait mockup where
+   * the Add-blocks popup and the ⋯ menu both show a circular ← button
+   * anchored at the bottom-left. Same style across every popup
+   * (⋯ menu, Frontend & Viewport, Add/More submenus) so editors learn
+   * one dismiss gesture for all panels. The sheet rule above does NOT
+   * reserve padding-top because the dismiss is at the bottom; items
+   * scroll naturally above the back button. */
+  .mobile-sheet-close {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    top: auto;
+    right: auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    background: #f0f0f0;
+    color: #222;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    z-index: calc(var(--hydra-z-sheet) + 1);
+  }
+  /* The MobileSubmenuClose component portals its back button into
+   * document.body (so it sits above .toolbar-content.show's stacking
+   * context). When rendered, position it at the bottom-left of the
+   * submenu sheet — same bottom-left geometry as the other sheets.
+   * The submenu sheet uses var(--hydra-z-sidebar-mobile); make sure
+   * the portaled button sits above it. Leave room for the bottom bar
+   * (44px) so the back arrow doesn't sit on top of the editor's
+   * toolbar icons. */
+  /* With the bottom toolbar hidden under
+   * `body[data-hydra-submenu-open] #toolbar-body { display:none }`,
+   * the submenu back-arrow sits at the bottom-left of the viewport
+   * — same horizontal position the toolbar's leftmost icon held
+   * before the sheet opened, so the user's finger doesn't have to
+   * travel. */
+  .mobile-submenu-close {
+    position: fixed !important;
+    bottom: calc(12px + env(safe-area-inset-bottom)) !important;
+    left: 12px !important;
+    top: auto !important;
+    right: auto !important;
+    z-index: calc(var(--hydra-z-sidebar-mobile) + 1) !important;
+  }
+
+  /* Sidebar full-screen on mobile ONLY WHEN EXPANDED. When collapsed,
+   * the existing rule (`right: -355px`) slides it off-screen — leave
+   * that alone so the editor sees the canvas by default.
+   *
+   * Same rule also handles the ObjectBrowser picker, which Volto renders
+   * via SidebarPopup as a portaled <aside class="sidebar-container">.
+   * SidebarPopup uses CSSTransition with classNames="sidebar-container"
+   * — so during its 500ms enter animation the element carries
+   * .sidebar-container-enter / -enter-active and stock pastanaga
+   * (sidebar.less:392-423) re-mixes the desktop .sidebar-container
+   * rules (width:375px, right:0) PLUS a transform:translate(100%, 0%)
+   * for the slide-in. None of those rules use !important, but the
+   * transform must be overridden too or the picker renders mid-slide
+   * (i.e. partially offscreen on the right) when bbox is measured.
+   * Target both the bare class and the CSSTransition state classes,
+   * and zero out the transform. */
+  .sidebar-container:not(.collapsed),
+  .sidebar-container-enter,
+  .sidebar-container-enter-active,
+  .sidebar-container-enter-done {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: 100dvh !important;
+    transform: none !important;
+    z-index: var(--hydra-z-sidebar-mobile) !important;
+  }
+
+  /* Stock Volto leaves a 20px sliver of the collapsed sidebar peeking
+   * out on the right (sidebar.less:114-121: `right: calc(-100vw + 20px)`
+   * for the .trigger button to expand it). On mobile we have a Settings
+   * shortcut in the bottom toolbar that serves the same purpose without
+   * the visual cruft on the right edge, so push the collapsed sidebar
+   * fully offscreen and hide the trigger button it exposes. */
+  .sidebar-container.collapsed {
+    right: -100vw !important;
+  }
+  /* Hide the .trigger button in BOTH collapsed and expanded states on
+   * mobile. Collapsed: was the right-edge sliver (replaced by the
+   * Settings shortcut). Expanded full-screen: stock CSS still renders
+   * its .trigger:before — a 4px blue highlight bar at left:0 — which
+   * leaks through as a stray vertical mark on the full-screen sheet
+   * (visible in screenshots). The mobile sheet has a dedicated close
+   * button in the page-header; the .trigger affordance is redundant. */
+  .sidebar-container .trigger {
+    display: none !important;
+  }
+
+  /* The sidebar already has a .sidebar-close-button (Sidebar.jsx:182,
+   * onClick={onToggleExpanded}). On mobile the full-screen sheet just
+   * needs it to be a bigger touch target. Stays in its natural flex
+   * position in the page-header (right-aligned), no absolute hack —
+   * absolute positioning would overlap the title text and the title
+   * (which is itself clickable) would steal the click. */
+  .hydra-sidebar .sidebar-close-button {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  /* Chevron move buttons replace the drag handle. */
+  .quanta-toolbar .drag-handle { display: none !important; }
+  .quanta-toolbar .chevron-buttons {
+    display: flex !important;
+    pointer-events: auto;
+  }
+  .quanta-toolbar .chevron-buttons button {
+    width: 32px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .quanta-toolbar .chevron-buttons button:disabled {
+    color: #ccc;
+    cursor: default;
+  }
+}
+
+/* Desktop + tablet (≥768px): hide the mobile-only affordances. */
+@media (min-width: 768px) {
+  .mobile-sheet-close,
+  .mobile-submenu-close { display: none !important; }
+  .quanta-toolbar .chevron-buttons { display: none !important; }
+}
+
+/* MOBILE LANDSCAPE — phones rotated and small tablets in landscape
+ * (max-width: 1023 so large tablets / desktop stay on their own
+ * layout). Rotates the bottom toolbar to the RIGHT edge as a vertical
+ * strip: same icons, same primary-toward-meta sequence as desktop's
+ * vertical bar (Edit at TOP, Personal tools at BOTTOM).
+ *
+ * Why orientation rather than width-only: a phone in portrait at
+ * 375×812 should keep the bottom bar; rotated to 812×375 it should
+ * become the right-edge strip. `@media (orientation: landscape)` is
+ * the exact device-feature signal for that flip.
+ */
+@media (orientation: landscape) and (max-width: 1023px) {
+  /* Hide the desktop "Shrink toolbar" handle (and its workflow-state
+   * colored stripe) — same rule as portrait. It sits as a sibling of
+   * .toolbar-body inside #toolbar-body; in column mode it lands
+   * between Add and Frontend, appearing as a thin vertical colored
+   * bar that editors mistake for a divider. */
+  #toolbar-body .toolbar-handler {
+    display: none !important;
+  }
+  /* Stock Volto renders the More button with TWO Icon children, one
+   * with semantic-ui's `mobile hidden` (visible at >767px) and one
+   * with `mobile only` (visible at ≤767px). In our 812×375 landscape
+   * viewport semantic-ui hides BOTH (the .mobile.hidden rule kicks in
+   * for our wide-but-short viewport). Force the desktop variant
+   * visible so editors actually see the ⋯ dots. */
+  #toolbar-body .more svg.icon.mobile.hidden {
+    display: inline-block !important;
+  }
+  /* Pin toolbar to the right edge, full height, narrow column. */
+  #toolbar-body {
+    top: 0 !important;
+    bottom: 0 !important;
+    left: auto !important;
+    right: 0 !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding-bottom: 0 !important;
+    padding-right: env(safe-area-inset-right) !important;
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+  /* Inner column: stack vertically, full 44px wide rows. */
+  #toolbar-body .toolbar-body {
+    flex-direction: column !important;
+    width: 44px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+  /* Buttons stay 44×44 squares regardless of orientation. Use
+   * min-height (not height) because stock pastanaga sets
+   * `flex: 0 1 0%` on some toolbar buttons (e.g. .more), which
+   * collapses fixed `height` declarations to content size. min-height
+   * survives the flex-basis: 0% collapse. */
+  #toolbar-body button,
+  #toolbar-body a {
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 6px !important;
+    flex: 0 0 44px !important;
+  }
+
+  /* View-mode landscape order (top → bottom):
+   *   Edit → Contents → Add → More → Frontend → Personal tools
+   * Same primary-toward-meta sequence as desktop's vertical bar. The
+   * portrait CSS uses `flex-direction: row` on .toolbar-actions plus
+   * .toolbar-actions { order: 999; margin-left: auto } to push it
+   * right. In landscape we need .toolbar-actions at the TOP (primary
+   * Edit there) and .toolbar-bottom at the BOTTOM (meta).
+   *
+   * For the inner wrappers:
+   *   - .toolbar-actions: row-reverse (stock) → column flips Edit
+   *     visually first; force column with DOM-first child at top.
+   *   - .toolbar-bottom: column with .frontend-switcher-btn (Monitor)
+   *     above .user (Personal tools).
+   */
+  #toolbar-body .toolbar-actions {
+    order: 0 !important;
+    margin-left: 0 !important;
+    margin-top: 0 !important;
+    margin-bottom: auto !important; /* push the meta column to the bottom */
+    flex-direction: column !important;
+    width: 44px !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+  }
+  #toolbar-body .toolbar-bottom {
+    order: 999 !important;
+    flex-direction: column !important;
+    width: 44px !important;
+    height: auto !important;
+  }
+  /* View-mode .toolbar-bottom inner order: Frontend → User
+   * (top → bottom). */
+  body.view-viewview #toolbar-body .toolbar-bottom .frontend-switcher-btn {
+    order: 0 !important;
+  }
+  body.view-viewview #toolbar-body .toolbar-bottom .user {
+    order: 1 !important;
+  }
+
+  /* The portaled MobileSubmenuClose sits above the bottom bar in
+   * portrait (calc(44px + 12px) from the bottom). In landscape there
+   * is no bottom bar — the strip is on the right. Pin the back arrow
+   * to the bottom-left of the viewport with normal 12px margin. */
+  .mobile-submenu-close {
+    bottom: 12px !important;
+    left: 12px !important;
+  }
+
+  /* The iframe canvas needs to fill the width up to the right-edge
+   * toolbar (44px). Quanta still pins to top in landscape. */
+  #iframeContainer {
+    top: 44px !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 44px !important;
+    width: auto !important;
+  }
+}

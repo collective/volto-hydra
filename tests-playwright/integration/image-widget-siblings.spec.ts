@@ -78,6 +78,11 @@ test.describe('ImageWidget sibling preservation', () => {
     const heading = iframe.locator(`[data-block-uid="${BLOCK_UID}"] [data-edit-text="heading"]`);
     const originalHeading = (await heading.textContent()) ?? '';
     await heading.click();
+    // On the slower CI build the click hasn't focused the contenteditable yet
+    // when the keys fire, so the bridge's keyboard blocker swallows them and the
+    // edit never lands (heading stays == original → the assertion below times
+    // out). Wait for focus so the keystrokes are actually received.
+    await expect(heading).toBeFocused();
     await page.keyboard.press('End');
     await page.keyboard.type(' x');
     // Wait for the typed edit to round-trip to the admin (block registered dirty) BEFORE the

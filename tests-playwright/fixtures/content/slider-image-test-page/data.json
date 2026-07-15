@@ -1,0 +1,44 @@
+{
+  "@id": "http://localhost:8888/_test_data/slider-image-test-page",
+  "@type": "Document",
+  "UID": "slider-image-test-page-uid",
+  "id": "slider-image-test-page",
+  "title": "Slider image test page",
+  "description": "A slider slide whose preview_image is a bare Plone Image reference",
+  "review_state": "published",
+  "parent": {
+    "@id": "http://localhost:8888",
+    "@type": "Plone Site",
+    "title": "Site"
+  },
+  "blocks": {
+    "slider-img-1": {
+      "@type": "slider",
+      "slides": [
+        {
+          "@id": "slide-penguin",
+          "@uid": "slide-penguin",
+          "title": "Penguin slide",
+          "head_title": "Welcome",
+          "description": "Slide backed by a Plone Image whose id ends in .jpg",
+          "preview_image": [
+            {
+              "@id": "/images/penguin1.jpg",
+              "@type": "Image",
+              "title": "penguin1.jpg"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": ["slider-img-1"]
+  },
+  "allow_discussion": false,
+  "is_folderish": false,
+  "exclude_from_nav": false,
+  "created": "2025-01-02T12:00:00+00:00",
+  "modified": "2025-01-02T12:00:00+00:00",
+  "lock": { "locked": false }
+}

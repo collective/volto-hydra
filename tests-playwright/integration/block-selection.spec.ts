@@ -587,6 +587,132 @@ test.describe('Block Mode (Escape state machine)', () => {
     await expect(page.locator('.volto-hydra-block-outline')).not.toBeVisible({ timeout: 5000 });
   });
 
+  /**
+   * The progressive step-up state machine — text → block → parent →
+   * deselect — must be reachable BOTH from the Escape key (desktop)
+   * AND from the ⬆ button in the Quanta toolbar (mobile, where no
+   * Escape key exists). Both gestures route through the SAME
+   * `stepUpSelection()` method in hydra.js, so any drift between the
+   * two would be a code regression in that method or its trigger
+   * wiring. These tests parametrize the trigger and assert the exact
+   * same post-state after each step — if a future change accidentally
+   * gives one path a different behavior, the failing parametrized
+   * test names it.
+   */
+  const STEP_UP_TRIGGERS = [
+    {
+      label: 'Escape key',
+      step: async (page: import('@playwright/test').Page) => {
+        await page.keyboard.press('Escape');
+      },
+    },
+    {
+      label: '⬆ button',
+      step: async (page: import('@playwright/test').Page) => {
+        // Quanta's select-parent button posts STEP_UP to the iframe,
+        // which calls the same stepUpSelection() that Escape does.
+        await page.locator('.quanta-toolbar .step-up-btn').click();
+      },
+    },
+  ] as const;
+
+  for (const t of STEP_UP_TRIGGERS) {
+    test(`step-up via ${t.label}: text → block → page (top-level slate block)`, async ({
+      page,
+    }) => {
+      const helper = new AdminUIHelper(page);
+      await helper.login();
+      await helper.navigateToEdit('/test-page');
+
+      // Enter inline text editing on a top-level slate block.
+      await helper.clickBlockInIframe('block-1-uuid');
+      await helper.waitForIframeBlockHandle('block-1-uuid');
+      const outline = page.locator('.volto-hydra-block-outline');
+      await expect(outline).toHaveAttribute('data-outline-style', 'subtle', {
+        timeout: 3000,
+      });
+
+      // Step 1: text mode → block mode (same block, no inline cursor).
+      await t.step(page);
+      await expect(outline).toHaveAttribute('data-outline-style', 'border', {
+        timeout: 3000,
+      });
+      const editField = await helper.getEditorLocator('block-1-uuid', 'value');
+      await expect(editField).not.toHaveAttribute('contenteditable', 'true', {
+        timeout: 3000,
+      });
+
+      // Step 2: block mode → deselect (top-level block has no parent).
+      await t.step(page);
+      await expect(page.locator('.volto-hydra-block-outline')).not.toBeVisible({
+        timeout: 3000,
+      });
+    });
+
+    test(`step-up via ${t.label}: a block with NO text starts in block mode (one step to deselect)`, async ({
+      page,
+    }) => {
+      // Only clicking TEXT lands in text mode. An image block has no `data-edit-text`
+      // field, so there is no cursor to place and no inline editor to leave — clicking
+      // it must land straight in block mode. Previously every click landed in text
+      // mode, so Escape / ⬆ wasted their first press "leaving" an editor that was
+      // never entered, and an image took two presses to deselect.
+      const helper = new AdminUIHelper(page);
+      await helper.login();
+      await helper.navigateToEdit('/test-page');
+
+      await helper.clickBlockInIframe('block-2-uuid'); // image: no editable text
+      const outline = page.locator('.volto-hydra-block-outline');
+      await expect(outline).toBeVisible({ timeout: 5000 });
+
+      // Already in block mode: the outline is the solid 'border' style, not the
+      // 'subtle' one that marks an active inline editor.
+      await expect(outline).toHaveAttribute('data-outline-style', 'border', {
+        timeout: 3000,
+      });
+
+      // So a SINGLE step-up deselects — no wasted "exit text mode" press.
+      await t.step(page);
+      await expect(outline).not.toBeVisible({ timeout: 3000 });
+    });
+
+    test(`step-up via ${t.label}: text → block → parent → grandparent → page (nested)`, async ({
+      page,
+    }) => {
+      const helper = new AdminUIHelper(page);
+      await helper.login();
+      await helper.navigateToEdit('/container-test-page');
+
+      // text-1a sits inside col-1 inside columns-1 (three levels nested).
+      await helper.clickBlockInIframe('text-1a');
+      await helper.waitForIframeBlockHandle('text-1a');
+      const outline = page.locator('.volto-hydra-block-outline');
+      await expect(outline).toHaveAttribute('data-outline-style', 'subtle', {
+        timeout: 3000,
+      });
+
+      // text mode → block mode (still text-1a)
+      await t.step(page);
+      await expect(outline).toHaveAttribute('data-outline-style', 'border', {
+        timeout: 3000,
+      });
+
+      // block mode → parent col-1
+      await t.step(page);
+      await helper.waitForIframeBlockHandle('col-1');
+
+      // parent col-1 → grandparent columns-1
+      await t.step(page);
+      await helper.waitForIframeBlockHandle('columns-1');
+
+      // top-level columns-1 → page (deselect)
+      await t.step(page);
+      await expect(page.locator('.volto-hydra-block-outline')).not.toBeVisible({
+        timeout: 3000,
+      });
+    });
+  }
+
   test('Enter or click in block mode re-enters text editing', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();

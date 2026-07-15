@@ -982,3 +982,66 @@ test.describe('Allowed Blocks from Frontend', () => {
     expect(newCount).toBe(initialCount + 1);
   });
 });
+
+test.describe('Undo history', () => {
+  // Mobile viewport so the Quanta chevrons (move) and the bottom-bar Undo button
+  // are available — the exact controls the reproduction used.
+  test.use({ viewport: { width: 375, height: 812 } });
+
+  const gridOrder = (iframe: ReturnType<AdminUIHelper['getIframe']>) =>
+    iframe
+      .locator('[data-block-uid="gs-grid"] [data-block-uid]')
+      .evaluateAll((els) => els.map((e) => e.getAttribute('data-block-uid')));
+
+  // Repro: move a slate within a grid, then remove it. Undo brings the slate
+  // back (undoes the remove); a SECOND undo must undo the MOVE before it. The
+  // bug: undo stalled after one step — the move was unreachable. Cause: the undo
+  // snapshot included selection, and after each undo the iframe re-settles the
+  // selection, saving a duplicate-formData entry that wastes an undo step.
+  test('undo reverts a remove AND the move before it (one step each)', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/grid-slates-test-page');
+
+    const iframe = helper.getIframe();
+    expect(await gridOrder(iframe)).toEqual([
+      'gs-slate-1',
+      'gs-slate-2',
+      'gs-slate-3',
+    ]);
+
+    // Move the first slate down within the grid.
+    await iframe.locator('[data-block-uid="gs-slate-1"]').first().click();
+    const chevronDown = page.locator('.quanta-toolbar .chevron-down');
+    await expect(chevronDown).toBeVisible();
+    await chevronDown.click();
+    await expect
+      .poll(() => gridOrder(iframe))
+      .toEqual(['gs-slate-2', 'gs-slate-1', 'gs-slate-3']);
+
+    // Remove that slate.
+    await iframe.locator('[data-block-uid="gs-slate-1"]').first().click();
+    await helper.openQuantaToolbarMenu('gs-slate-1');
+    await helper.clickQuantaToolbarMenuOption('gs-slate-1', 'Remove');
+    await expect
+      .poll(() => gridOrder(iframe))
+      .toEqual(['gs-slate-2', 'gs-slate-3']);
+
+    const undoBtn = page.locator('#toolbar-body .undo');
+
+    // Undo #1 → the remove is undone (slate back, still at its moved position).
+    await undoBtn.click();
+    await expect
+      .poll(() => gridOrder(iframe))
+      .toEqual(['gs-slate-2', 'gs-slate-1', 'gs-slate-3']);
+
+    // Undo #2 → the MOVE is undone (original order restored). This is the step
+    // that used to stall.
+    await undoBtn.click();
+    await expect
+      .poll(() => gridOrder(iframe))
+      .toEqual(['gs-slate-1', 'gs-slate-2', 'gs-slate-3']);
+  });
+});

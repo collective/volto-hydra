@@ -11,6 +11,26 @@ export default async function ploneApi({
   _default = {},
   pages = {},
   preloadTemplates = [],  // Specific templates to eagerly pre-load (forced layouts)
+  // Whether a template FETCH failure is ignored. Default false: a failed template load
+  // propagates the real error (failing the render, and the SSG build), instead of being
+  // silently dropped — which otherwise resurfaces far away as a misleading
+  // "template not found in pre-loaded templates" 500 that hides the actual cause (the API
+  // didn't answer). Opt in with `ignoreTemplateErrors: true` only when a page can
+  // legitimately render without the template.
+  ignoreTemplateErrors = false,
+  // Milliseconds before a single template fetch is ABORTED (0 = no timeout). The SSG
+  // prerender hits the API ~179x; a cold instance accepted the connection but never
+  // answered, and with no timeout `fetch` hung ~300s on one route — stalling the whole
+  // build. This aborts (actually cancels) the request; loadTemplates also stops WAITING
+  // at its own 5s, but that leaves the socket open — the abort closes it. Kept at 5s to
+  // match loadTemplates so neither pre-empts the other with a surprising cap.
+  templateFetchTimeout = 5000,
+  // While EDITING, always reload templates — the editor may be changing a template, so a
+  // cached copy from an earlier render would be stale. In view / SSG, templates are
+  // immutable for the render, so reuse the shared cross-render cache: it dedupes the
+  // forced-layout fetches (site-footer is on every page — that was ~179 identical
+  // refetches across the prerender, extra load on the very API that then cold-hung).
+  reloadTemplates = false,
 }) {
   const runtimeConfig = useRuntimeConfig();
   const route = useRoute();
@@ -45,30 +65,34 @@ export default async function ploneApi({
       ? new URL(templateId).pathname
       : `/${templateId.replace(/^\//, '')}`;
     const url = `${runtimeConfig.public.backendBaseUrl}/++api++${tplPath}`;
-    const response = await fetch(url, { headers });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch template: ${templateId}`);
+    // Bound the fetch: a hung request (cold API that never answers) aborts instead of
+    // stalling the whole prerender indefinitely.
+    const controller = templateFetchTimeout > 0 ? new AbortController() : null;
+    const timer = controller
+      ? setTimeout(() => controller.abort(), templateFetchTimeout)
+      : null;
+    try {
+      const response = await fetch(url, { headers, signal: controller?.signal });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch template ${templateId}: HTTP ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        throw new Error(
+          `Timed out fetching template ${templateId} after ${templateFetchTimeout}ms`,
+        );
+      }
+      throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
-    return response.json();
   };
 
-  // Preload the forced-layout templates. These come from route-based
-  // rules (site-footer, context-navigation-layout, content-type
-  // layouts), not the page content — so kick the fetches off NOW, in
-  // parallel with the page fetch below, instead of waiting until the
-  // page resolves and loading them sequentially inside the transform.
-  // The resolved objects are merged into the template cache so
-  // loadTemplates only has to fetch what the page content references.
-  const preloadPromise = Promise.all(
-    [...new Set(preloadTemplates.filter(Boolean))].map(async (id) => {
-      try {
-        return [id, await loadTemplate(id)];
-      } catch (error) {
-        console.warn(`[ploneApi] Failed to preload template ${id}:`, error);
-        return null;
-      }
-    }),
-  ).then((entries) => Object.fromEntries(entries.filter(Boolean)));
+  // Working template set for this render: the shared cross-render cache in view/SSG (so a
+  // forced template is fetched once and reused across pages), or a fresh empty set while
+  // editing (so every template is reloaded from the API — never a stale cached copy).
+  const tplCache = reloadTemplates ? {} : templateCache;
 
   // plone.app.redirector 302s moved content (/++api++/old -> /++api++/new).
   // ofetch auto-follows to valid JSON, so without this the page would render
@@ -121,13 +145,27 @@ export default async function ploneApi({
         const comp = data['@components'];
         delete data['@components'];
 
-        // Merge the preloaded forced-layout templates (fetched in
-        // parallel with this page) into the cache, then loadTemplates
-        // only needs to fetch the templates the page content references.
-        Object.assign(templateCache, await preloadPromise);
-        const { templates, errors } = await loadTemplates(data, loadTemplate, templateCache, []);
+        // ONE template-loading path: loadTemplates handles the forced-layout templates
+        // (passed as extraTemplateIds — they aren't referenced in page content) AND the
+        // templates the content references, with a single dedup + cache + recursion.
+        // `tplCache` is the shared cross-render cache in view/SSG (so a forced template is
+        // fetched once and reused) or empty while editing (always reload). The per-fetch
+        // timeout lives in `loadTemplate` (below) — no change to the shared helper.
+        const { templates, errors } = await loadTemplates(
+          data,
+          loadTemplate,
+          tplCache,
+          preloadTemplates,
+        );
         if (errors.length) {
-          console.warn('[ploneApi] Failed to load templates:', errors.map(e => `${e.templateId}: ${e.error?.message || e.error}`).join('; '));
+          const summary = errors.map(e => `${e.templateId}: ${e.error?.message || e.error}`).join('; ');
+          // Default: don't swallow. A failed template load fails the render with the real
+          // error, instead of dropping the template and 500-ing far away with a misleading
+          // "not found". Opt into leniency only when a page can render without it.
+          if (!ignoreTemplateErrors) {
+            throw new Error(`Failed to load templates: ${summary}`);
+          }
+          console.warn('[ploneApi] Ignoring failed templates:', summary);
         }
 
         return {

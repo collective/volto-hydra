@@ -526,6 +526,12 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   const seen = new Map();
   const slateIssues = [];
   const shapeIssues = [];
+  // Containment: a non-fixed block whose @type isn't in its container's resolved
+  // allowedSiblingTypes can't be reordered within its container (the mobile
+  // chevron / drag walks it OUT to the nearest ancestor that accepts the type,
+  // so it "escapes"). Surface each as a failing test, like the issues below.
+  const allowedBlocksViolations = []; // {blockType, allowed, parentType, pagePath, blockId}
+  const CONTAINMENT_EXEMPT = new Set(['empty', 'column', 'title', 'description']);
   // Track block @types seen in content that aren't in blocksConfig — the
   // frontend's Block.vue falls through to a "Not implemented" placeholder
   // for these. Collect all occurrences so the report shows every page
@@ -619,6 +625,27 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         const schemaRef = entry._schemaRef;
         const resolvedSchema = schemaRef ? pathMap._schemas?.[schemaRef] : null;
         const schema = resolvedSchema || (blockType ? blocksConfig[blockType]?.blockSchema : null);
+
+        // Containment check (see allowedBlocksViolations above): flag a block
+        // placed in a container that doesn't allow its @type. Skip template-
+        // placed / content-type-fixed blocks and exempt structural types.
+        if (
+          entry.blockType &&
+          !entry.isTemplateInstance &&
+          !entry.isFixed &&
+          !CONTAINMENT_EXEMPT.has(entry.blockType) &&
+          Array.isArray(entry.allowedSiblingTypes) &&
+          entry.allowedSiblingTypes.length > 0 &&
+          !entry.allowedSiblingTypes.includes(entry.blockType)
+        ) {
+          allowedBlocksViolations.push({
+            blockType: entry.blockType,
+            allowed: entry.allowedSiblingTypes,
+            parentType: pathMap[entry.parentId]?.blockType || 'page',
+            pagePath,
+            blockId,
+          });
+        }
 
         collectSlateIssues(blockData, pagePath, blockId, slateIssues, blockType);
         collectWidgetShapeIssues(blockData, schema, pagePath, blockId, shapeIssues);
@@ -808,9 +835,21 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
     });
   }
 
-  // Like unregistered types, shape and slate issues are real content/schema
-  // problems but should each be a failing test rather than blocking the whole
-  // suite in globalSetup. Emit a synthetic discovered-block entry per issue.
+  // Like unregistered types, containment / shape / slate issues are real
+  // content/schema problems but should each be a failing test rather than
+  // blocking the whole suite in globalSetup. Emit a synthetic discovered-block
+  // entry per issue.
+  for (const v of allowedBlocksViolations) {
+    result.push({
+      blockType: v.blockType,
+      blockId: v.blockId,
+      pagePath: v.pagePath,
+      allowedBlocksViolation: true,
+      parentType: v.parentType,
+      allowed: v.allowed,
+    });
+  }
+
   for (const e of shapeIssues) {
     result.push({
       blockType: e.blockType,
