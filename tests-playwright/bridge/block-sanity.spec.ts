@@ -153,6 +153,11 @@ test.describe('Block sanity (auto-discovered)', () => {
         `${mockParentUrl}?api_path=${encodeURIComponent(apiPath)}${frontend}`,
       );
       await helper.waitForIframeReady();
+      // waitForIframeReady only confirms the DOM mounted; verifyBlockRendering
+      // reads __hydraBridge.blockPathMap, which is only populated once the
+      // bridge has received INITIAL_DATA. Without this wait the render check
+      // races bridge init and flakily throws "blockPathMap not available".
+      await helper.waitForBridgeConnected();
 
       const iframe = helper.getIframe();
 
