@@ -431,6 +431,22 @@ function collectWidgetShapeIssues(blockData, blockSchema, pagePath, blockId, out
       continue;
     }
 
+    // Images must be declared with the image widget so the editor offers an
+    // upload control and the frontend resolves scales. Detect an image
+    // reference by its Plone markers (image_scales / image_field) or a
+    // data:image URI, and require the declaring field to be `widget: 'image'`.
+    const looksLikeImageRef =
+      (value && typeof value === 'object' && !Array.isArray(value) &&
+        ('image_scales' in value || 'image_field' in value)) ||
+      (typeof value === 'string' && value.startsWith('data:image/'));
+    if (looksLikeImageRef && widget !== 'image') {
+      issues.push(
+        `field "${field}": image reference must be declared \`widget: 'image'\`, ` +
+          `got ${widget ? `\`widget: '${widget}'\`` : 'no widget'}.`,
+      );
+      continue;
+    }
+
     if (widget === 'url') {
       if (typeof value !== 'string') {
         issues.push(describe('url string', value));
@@ -461,6 +477,13 @@ function collectWidgetShapeIssues(blockData, blockSchema, pagePath, blockId, out
       if (!ok) {
         issues.push(`field "${field}": image expected string (URL/data URI), object, or array of objects with "@id" — got ${Array.isArray(value) ? 'malformed array' : typeof value}`);
       }
+    } else if (widget === 'file') {
+      // This DS renders images through the shared image pipeline; an image
+      // field must use `widget: 'image'` (not the generic file upload) so it is
+      // shape-checked and edited as an image.
+      issues.push(
+        `field "${field}": image content must use \`widget: 'image'\`, not \`widget: 'file'\`.`,
+      );
     } else if (widget === 'select' || widget === 'choice' || def?.factory === 'Choice') {
       const choices = def.choices || [];
       const allowed = choices.map(c => (Array.isArray(c) ? c[0] : c));
