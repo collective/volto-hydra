@@ -777,15 +777,26 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   // `frontendKeys` (types the frontend sent via INIT.blocks) keeps mock-parent's
   // own baseline (hero, slate, mock-*) from causing false positives.
   if (frontendKeys && frontendKeys.length) {
-    const discoveredTypes = new Set(result.map((r) => r.blockType));
-    const missing = [];
-    for (const blockType of frontendKeys) {
-      if (!discoveredTypes.has(blockType)) missing.push(blockType);
+    // Coverage requirement = the frontend's own registered types PLUS every type
+    // they declare addable in a region (`allowedBlocks`). A block that can be
+    // added anywhere must render, so it needs a content example even when it is
+    // not itself a top-level registered type — this is how the always-addable
+    // default blocks (slate, image) enter the hard coverage set. Restricted to
+    // FRONTEND schemas (`parentType` in frontendKeys) so the mock-parent test
+    // baseline's own allowedBlocks (e.g. 'column') don't create false positives.
+    const frontendKeySet = new Set(frontendKeys);
+    const required = new Set(frontendKeys);
+    for (const { parentType, allowedBlocks } of allowedBlocksList) {
+      if (!frontendKeySet.has(parentType)) continue;
+      for (const subType of allowedBlocks) required.add(subType);
     }
-    // A registered type with no content example can't get a render test — but
-    // that is a failing test for that type, not a reason to block the suite.
-    for (const blockType of missing) {
-      result.push({ blockType, noExample: true });
+    const discoveredTypes = new Set(result.map((r) => r.blockType));
+    // A required type with no content example can't get a render test — but that
+    // is a failing test for that type, not a reason to block the suite.
+    for (const blockType of required) {
+      if (!discoveredTypes.has(blockType)) {
+        result.push({ blockType, noExample: true });
+      }
     }
   }
 
