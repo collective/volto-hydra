@@ -66,12 +66,16 @@ The point of `slotId` is that two layouts can share the same set of region names
 
 A template is **locked** by default: you're editing *this page's* content, and the template's fixed parts are read-only. To change the template itself you **unlock** it, which enters a special **template edit mode**.
 
-Select any block from the template and click the **lock icon** 🔒 — it appears in two places:
+Select one of the template's own blocks and click the **lock icon** 🔒 — it appears in two places:
 
-- on the block's **Quanta toolbar** in the canvas (where the drag handle would be), and
+- on the block's **Quanta toolbar** in the canvas, and
 - on the template's bar in the **sidebar** ("Template: *name*"), next to its `⋯` menu.
 
 That same `⋯` menu also has an **Edit template** item. Any of these enters template edit mode: the lock turns into an **unlock** icon 🔓, and the sidebar's Template Name / Save Location become editable (they're disabled while locked — you can't rename or relocate a template without editing it).
+
+On the block's toolbar the lock 🔒 (left) becomes an unlock 🔓 next to the drag handle once you're editing (right):
+
+![Quanta toolbar of a locked template block, showing a closed lock icon.](_images/template-toolbar-lock.png) ![Quanta toolbar of the same block while editing, showing the drag handle and an open lock (unlock) icon.](_images/template-toolbar-unlock.png)
 
 ![A template instance selected but locked: the template is outlined and its sidebar bar "Template: test-layout" shows a closed lock icon 🔒; the Template Name / Save Location fields are disabled.](_images/template-edit-locked.png)
 
