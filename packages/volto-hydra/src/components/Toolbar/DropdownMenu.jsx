@@ -290,7 +290,7 @@ const DropdownMenu = ({
               onToggleTemplateEdit();
             }}
           >
-            {isEditingTemplate ? '🔓 Done editing template' : '🔒 Edit template'}
+            {isEditingTemplate ? 'Done editing template' : 'Edit template'}
           </div>
           <div
             style={{

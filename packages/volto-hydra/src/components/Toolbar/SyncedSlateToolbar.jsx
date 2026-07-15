@@ -18,6 +18,7 @@ import linkSVG from '@plone/volto/icons/link.svg';
 import imageSVG from '@plone/volto/icons/image.svg';
 import clearSVG from '@plone/volto/icons/clear.svg';
 import upSVG from '@plone/volto/icons/up.svg';
+import lockSVG from '@plone/volto/icons/lock.svg';
 import AddLinkForm from '@plone/volto/components/manage/AnchorPlugin/components/LinkButton/AddLinkForm';
 import { ImageInput } from '@plone/volto/components/manage/Widgets/ImageWidget';
 import { createLog } from '../../utils/log';
@@ -1425,7 +1426,7 @@ const SyncedSlateToolbar = ({
                   borderRadius: '2px',
                 }}
               >
-                🔒
+                <Icon name={lockSVG} size="16px" color="#684cc9" />
               </button>
             );
           }
@@ -1449,7 +1450,7 @@ const SyncedSlateToolbar = ({
                 borderRadius: '2px',
               }}
             >
-              🔒
+              <Icon name={lockSVG} size="16px" color="#999" />
             </div>
           );
         }

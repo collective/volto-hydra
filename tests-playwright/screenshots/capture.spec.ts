@@ -33,6 +33,31 @@ async function snap(page: import('@playwright/test').Page, name: string) {
   console.log(`[screenshot] ${name} -> ${path.relative(process.cwd(), file)}`);
 }
 
+/**
+ * Tight shot of the sidebar template section — the "Template: …" bar plus its
+ * settings — so the doc image frames exactly the lock/unlock + Template Settings,
+ * not the whole viewport (page fields sit above it in a long sidebar).
+ */
+async function snapTemplateSection(
+  page: import('@playwright/test').Page,
+  name: string,
+  height = 260,
+) {
+  const bar = page
+    .locator('.sidebar-section-header')
+    .filter({ has: page.locator('.edit-template-toggle') });
+  // Align the bar to the TOP of the sidebar so the Template Settings below it are in
+  // frame (scrollIntoViewIfNeeded can park it at the bottom edge with nothing below).
+  await bar.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  const box = (await bar.boundingBox())!;
+  const file = path.join(OUT_DIR, `${name}.png`);
+  await page.screenshot({
+    path: file,
+    clip: { x: box.x, y: Math.max(0, box.y - 4), width: box.width, height },
+  });
+  console.log(`[screenshot] ${name} -> ${path.relative(process.cwd(), file)}`);
+}
+
 test.describe('Editor Guide screenshots', () => {
   test('block-selected — slate block in text mode with Quanta toolbar', async ({ page }) => {
     const helper = new AdminUIHelper(page);
@@ -230,7 +255,7 @@ test.describe('Editor Guide screenshots', () => {
     await expect(page.locator('.edit-template-toggle')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('.edit-template-toggle')).toHaveAttribute('aria-pressed', 'false');
 
-    await snap(page, 'template-edit-locked');
+    await snapTemplateSection(page, 'template-edit-locked');
   });
 
   test('template-edit-editing — unlocked, editing the template (unlock icon, fields enabled)', async ({ page }) => {
@@ -253,7 +278,7 @@ test.describe('Editor Guide screenshots', () => {
     await helper.waitForSidebarOpen();
     await helper.escapeToParent();
 
-    await snap(page, 'template-edit-editing');
+    await snapTemplateSection(page, 'template-edit-editing', 330);
   });
 
   test('template-toolbar-lock — a template block toolbar shows the lock (not editing)', async ({ page }) => {

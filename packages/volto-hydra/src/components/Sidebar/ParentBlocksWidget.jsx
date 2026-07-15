@@ -31,13 +31,17 @@ import config from '@plone/volto/registry';
 import { BlockDataForm } from '@plone/volto/components/manage/Form';
 import { Icon } from '@plone/volto/components';
 import leftArrowSVG from '@plone/volto/icons/left-key.svg';
+import lockSVG from '@plone/volto/icons/lock.svg';
+import unlockSVG from '@plone/volto/icons/unlock.svg';
 import { SidebarPortalTargetContext } from './SidebarPortalTargetContext';
 import DropdownMenu from '../Toolbar/DropdownMenu';
+import ReadOnlyForm from './ReadOnlyForm';
 import { getBlockById, updateBlockById, getResolvedSchema, getCommonAncestor } from '../../utils/blockPath';
 import { HydraSchemaProvider } from '../../context';
 import { getConvertibleTypes, convertBlockType, findTypeField } from '../../utils/schemaInheritance';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import { isBlockReadonly } from '@volto-hydra/helpers';
+import { flattenToAppURL } from '@plone/volto/helpers';
 
 /**
  * Get the display title for a block type
@@ -229,7 +233,11 @@ const ParentBlockSection = ({
   const blockConfig = config.blocks?.blocksConfig?.[blockType];
   const useSchemaOnly = blockConfig?.disableCustomSidebarEditForm;
   const isReadonly = isBlockReadonly(blockData, templateEditMode);
-  const BlockEdit = useSchemaOnly ? null : (isReadonly ? blockConfig?.view : blockConfig?.edit);
+  // Read-only blocks render through ReadOnlyForm (below), never an editable Edit
+  // component (nor a hidden View, which produced no sidebar form and left view-less
+  // read-only blocks with an empty panel). So a read-only block always shows its
+  // values as static text, and never an editable input.
+  const BlockEdit = useSchemaOnly || isReadonly ? null : blockConfig?.edit;
 
   // Get schema for fallback rendering (when no Edit component or disableCustomSidebarEditForm)
   const schema = !BlockEdit ? getFilteredBlockSchema(blockType, intl, blockPathMap, blockId, blockData) : null;
@@ -321,7 +329,7 @@ const ParentBlockSection = ({
           })()}
           {/* Lock/unlock toggle for a top-level template instance — the obvious,
               consistent replacement for the old standalone Edit-template button.
-              🔒 = locked (not editing) → click to unlock & edit; 🔓 = editing →
+              lock = locked (not editing) → click to unlock & edit; unlock = editing →
               click to lock (exit). Keeps the .edit-template-toggle contract. */}
           {isThisTemplateInstance && onToggleTemplateEditMode && (
             <button
@@ -343,7 +351,6 @@ const ParentBlockSection = ({
                 border: 'none',
                 padding: '4px',
                 cursor: canEditTemplate ? 'pointer' : 'not-allowed',
-                fontSize: '15px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -353,7 +360,11 @@ const ParentBlockSection = ({
               onMouseEnter={(e) => canEditTemplate && (e.currentTarget.style.background = '#e8e8e8')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
             >
-              {isEditingThisTemplate ? '🔓' : '🔒'}
+              <Icon
+                name={isEditingThisTemplate ? unlockSVG : lockSVG}
+                size="20px"
+                color={isEditingThisTemplate ? '#0b78d0' : '#684cc9'}
+              />
             </button>
           )}
           <button
@@ -482,18 +493,42 @@ const ParentBlockSection = ({
         return targetElement ? createPortal(formContent, targetElement) : null;
       })()}
 
+      {/* Read-only block (fixed/readonly template chrome, or a readonly block in
+          normal mode): render its schema fields as static text, never editable. */}
+      {schema && isReadonly && !pathInfo?.isTemplateInstance && (() => {
+        const targetElement = document.getElementById(targetId);
+        return targetElement
+          ? createPortal(
+              <ReadOnlyForm schema={schema} formData={blockData} />,
+              targetElement,
+            )
+          : null;
+      })()}
+
       {/* Template instance settings form — only for top-level, not nested */}
       {pathInfo?.isTemplateInstance && !pathInfo?.isNestedTemplateInstance && onChangeTemplateSettings && (() => {
-        // Template instance settings: name / save location. Entering edit mode is the
-        // prominent button at the top of the panel (see the main render), not a field here.
-        // The name/location IS the template's metadata, so it's only editable while THIS
-        // template is being edited — otherwise the fields render disabled.
-        const templateFormData = { ...blockData };
-        const isEditingThisTemplate = templateEditMode === blockId;
-        const templateSchema = getTemplateInstanceSchema(contextIntl, {
-          disabled: !isEditingThisTemplate,
-        });
-        const formContent = (
+        // Template instance settings: name / save location. These are the TEMPLATE'S
+        // OWN metadata (its document title + where it lives), so read them from the
+        // cached template document — NOT the instance block, which only carries them
+        // right after "Make Template". The doc is fetched + cached during the merge and
+        // passed here as templatePermissions; onChangeTemplateSettings writes edits back
+        // into it, so it stays the live source of truth. Editable only while editing.
+        const tplDoc = templatePermissions?.[pathInfo?.templateId];
+        const tplDocId = tplDoc?.['@id'];
+        const tplLocation =
+          tplDocId && tplDocId.lastIndexOf('/') > 0
+            ? flattenToAppURL(tplDocId.slice(0, tplDocId.lastIndexOf('/')))
+            : undefined;
+        const templateFormData = {
+          title: tplDoc?.title,
+          // A pending Save-Location edit lives on the doc's `folder`; otherwise show
+          // where the template currently lives (its @id's parent folder).
+          folder:
+            tplDoc?.folder ||
+            (tplLocation ? [{ '@id': tplLocation, title: tplLocation }] : undefined),
+        };
+        const templateSchema = getTemplateInstanceSchema(contextIntl);
+        const formContent = isEditingThisTemplate ? (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
             <BlockDataForm
               schema={templateSchema}
@@ -504,6 +539,8 @@ const ParentBlockSection = ({
               block={blockId}
             />
           </HydraSchemaProvider>
+        ) : (
+          <ReadOnlyForm schema={templateSchema} formData={templateFormData} />
         );
         const targetElement = document.getElementById(targetId);
         return targetElement ? createPortal(formContent, targetElement) : null;

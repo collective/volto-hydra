@@ -1664,14 +1664,14 @@ test.describe('Template Edit Mode - Permissions', () => {
     await helper.escapeToParent();
 
     // The lock toggle on the template bar is present but DISABLED (permission-gated),
-    // with a tooltip. (It shows 🔒; the "Edit template" label lives in the ⋯ dropdown,
-    // which is omitted entirely when the user lacks permission.)
+    // with a tooltip. (It shows a lock icon; the "Edit template" label lives in the ⋯
+    // dropdown, which is omitted entirely when the user lacks permission.)
     const editButton = page.locator('.edit-template-toggle');
     await expect(editButton).toBeVisible({ timeout: 10000 });
     await expect(editButton).toBeDisabled();
-    // Tooltip confirms can_edit=false reached the button (threading + key match).
+    // Tooltip + aria confirm can_edit=false reached the button (threading + key match).
     await expect(editButton).toHaveAttribute('title', /permission|Modify portal content/i);
-    await expect(editButton).toContainText('🔒');
+    await expect(editButton).toHaveAttribute('aria-label', /unlock/i);
   });
 
   test('creating a template in a folder without Add permission is blocked at save', async ({ page }) => {
@@ -1761,9 +1761,9 @@ test.describe('Template Edit Mode - Lock affordance + metadata gating', () => {
   });
 
   // Sub-issue #2: you must be editing the template to change its name / save
-  // location. When NOT in edit mode the metadata fields are disabled; entering
-  // edit mode enables them.
-  test('template name and save location are disabled unless editing the template', async ({ page }) => {
+  // location. When NOT in edit mode the metadata fields render READ-ONLY (static
+  // text, no inputs); entering edit mode swaps them for editable widgets.
+  test('template name and save location are read-only unless editing the template', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/template-test-page');
@@ -1776,22 +1776,42 @@ test.describe('Template Edit Mode - Lock affordance + metadata gating', () => {
 
     // Template Settings form is shown (name + save location). Scope by label —
     // there is also a page-level "Title" field with the same #field-title id.
-    const nameInput = page.locator('.field').filter({ hasText: 'Template Name' }).locator('input');
-    await expect(nameInput).toBeVisible({ timeout: 5000 });
-    const folderBrowse = page.locator('.field').filter({ hasText: 'Save Location' }).locator('button.action');
-    await expect(folderBrowse).toBeVisible();
+    const nameField = page.locator('.field').filter({ hasText: 'Template Name' });
+    const folderField = page.locator('.field').filter({ hasText: 'Save Location' });
+    await expect(nameField).toBeVisible({ timeout: 5000 });
 
-    // Locked (not editing this template) → both disabled.
-    await expect(nameInput).toBeDisabled();
-    await expect(folderBrowse).toBeDisabled();
+    // Locked → read-only: no editable input / browse control, value shown as text.
+    await expect(nameField.locator('input')).toHaveCount(0);
+    await expect(nameField.locator('.readonly-field-value')).toBeVisible();
+    await expect(folderField.locator('button.action')).toHaveCount(0);
 
     // Enter template edit mode via the sidebar toggle.
     await page.locator('.edit-template-toggle').click();
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
 
-    // Editing → both enabled.
-    await expect(nameInput).toBeEnabled();
-    await expect(folderBrowse).toBeEnabled();
+    // Editing → editable widgets appear and are enabled.
+    await expect(nameField.locator('input')).toBeVisible({ timeout: 5000 });
+    await expect(nameField.locator('input')).toBeEnabled();
+    await expect(folderField.locator('button.action')).toBeVisible();
+  });
+
+  // A read-only (fixed/readonly) template block shows its fields as read-only text
+  // in the sidebar — never editable inputs.
+  test('a read-only template block shows read-only fields in the sidebar (no inputs)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // The header is a fixed + readOnly template block; in normal mode it's read-only.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForBlockSelectedInAdmin(headerBlockId);
+    await helper.waitForSidebarOpen();
+
+    // Its settings render through ReadOnlyForm — static values, no editable controls.
+    const props = page.locator('#sidebar-properties');
+    await expect(props.locator('.readonly-form')).toBeVisible({ timeout: 5000 });
+    await expect(props.locator('input, textarea, [contenteditable="true"]')).toHaveCount(0);
   });
 
   // The template instance's sidebar bar carries a 🔒/🔓 lock toggle (the
@@ -1808,11 +1828,11 @@ test.describe('Template Edit Mode - Lock affordance + metadata gating', () => {
     await helper.waitForSidebarOpen();
     await helper.escapeToParent();
 
-    // The lock toggle on the bar reads 🔒 (locked, not editing).
+    // The lock toggle on the bar is locked (not editing).
     const lockToggle = page.locator('.edit-template-toggle');
     await expect(lockToggle).toBeVisible({ timeout: 5000 });
     await expect(lockToggle).toHaveAttribute('aria-pressed', 'false');
-    await expect(lockToggle).toContainText('🔒');
+    await expect(lockToggle).toHaveAttribute('aria-label', /unlock/i);
 
     // Open the ⋯ dropdown on the current (instance) section header and click "Edit template".
     await page.locator('.sidebar-section-header[data-is-current="true"] .menu-trigger').click();
@@ -1821,10 +1841,10 @@ test.describe('Template Edit Mode - Lock affordance + metadata gating', () => {
     await expect(editItem).toContainText('Edit template');
     await editItem.click();
 
-    // Edit mode is now active: outside blocks lock; the bar toggle flips to 🔓.
+    // Edit mode is now active: outside blocks lock; the bar toggle flips to unlocked.
     await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
     await expect(lockToggle).toHaveAttribute('aria-pressed', 'true');
-    await expect(lockToggle).toContainText('🔓');
+    await expect(lockToggle).toHaveAttribute('aria-label', /lock template/i);
 
     // The dropdown item now reads "Done editing template".
     await page.locator('.sidebar-section-header[data-is-current="true"] .menu-trigger').click();

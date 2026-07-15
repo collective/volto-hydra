@@ -4,15 +4,10 @@
  * it's a prominent button at the top of the parent-blocks panel (see getTemplateEditButtonState).
  *
  * A template's name/location IS the template's own metadata, so changing it is editing the
- * template — only allowed while that template is being edited. When `disabled` (not in edit
- * mode for this instance) both fields render read-only (`isDisabled`), matching the block chrome
- * that only becomes editable in template edit mode.
- *
- * @param {Object} intl
- * @param {Object} [opts]
- * @param {boolean} [opts.disabled=false] - disable the name + location fields
+ * template — only allowed while that template is being edited. When locked, the sidebar renders
+ * this schema through ReadOnlyForm (static text) instead of the editable form.
  */
-export const getTemplateInstanceSchema = (intl, { disabled = false } = {}) => ({
+export const getTemplateInstanceSchema = (intl) => ({
   title: 'Template Settings',
   fieldsets: [
     {
@@ -26,7 +21,6 @@ export const getTemplateInstanceSchema = (intl, { disabled = false } = {}) => ({
       title: 'Template Name',
       description: 'Display name for this template',
       type: 'string',
-      isDisabled: disabled,
     },
     folder: {
       title: 'Save Location',
@@ -35,7 +29,6 @@ export const getTemplateInstanceSchema = (intl, { disabled = false } = {}) => ({
       mode: 'link',
       selectableTypes: ['Folder'],
       allowExternals: false,
-      isDisabled: disabled,
     },
   },
   required: ['title'],
