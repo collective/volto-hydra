@@ -1892,42 +1892,49 @@ export function stripFixedInsideSlots(node, insideSlot = false) {
 }
 
 /**
- * Check if a block is inside the template currently being edited.
- * A block is inside if its templateInstanceId matches the templateEditMode.
+ * Template edit mode (v2) is a SET of currently-unlocked template instance ids:
+ * multiple templates can be unlocked and edited on one page at once, and
+ * unlocking a template does NOT lock the rest of the page. The state is threaded
+ * as a string[] (postMessage-friendly); this normalizes null/undefined to [].
  *
- * @param {Object} blockData - The block data object
- * @param {string|null} templateEditMode - The templateInstanceId of the template being edited, or null
- * @returns {boolean} True if the block is inside the edited template, false otherwise
+ * @param {string[]|null} templateEditMode
+ * @returns {string[]}
  */
-export function isBlockInEditedTemplate(blockData, templateEditMode) {
-  if (!templateEditMode) return false;
-  return blockData?.templateInstanceId === templateEditMode;
+export function unlockedTemplateIds(templateEditMode) {
+  return Array.isArray(templateEditMode) ? templateEditMode : [];
 }
 
 /**
- * Check if a block should be readonly based on template edit mode.
- * This is the shared utility for both admin (sidebar/toolbar) and hydra.js Bridge.
- *
- * In template edit mode:
- * - Blocks inside the template being edited are editable (return false)
- * - Blocks outside the template are locked (return true)
- *
- * In normal mode:
- * - Check the block's readOnly property (Volto standard)
+ * Check if a block belongs to a template instance that is currently unlocked
+ * for editing.
  *
  * @param {Object} blockData - The block data object
- * @param {string|null} templateEditMode - The templateInstanceId of the template being edited, or null
+ * @param {string[]|null} templateEditMode - The unlocked template instance ids
+ * @returns {boolean} True if the block is inside an unlocked template, false otherwise
+ */
+export function isBlockInEditedTemplate(blockData, templateEditMode) {
+  const iid = blockData?.templateInstanceId;
+  if (!iid) return false;
+  return unlockedTemplateIds(templateEditMode).includes(iid);
+}
+
+/**
+ * Check if a block should be readonly. Shared by the admin (sidebar/toolbar) and
+ * the hydra.js Bridge.
+ *
+ * v2: a block is readonly by its OWN `readOnly` flag — UNLESS it belongs to a
+ * template instance that is currently unlocked (then it's editable). Unlocking a
+ * template no longer makes the rest of the page readonly, so page blocks (no
+ * `readOnly`) are always editable regardless of which templates are unlocked.
+ *
+ * @param {Object} blockData - The block data object
+ * @param {string[]|null} templateEditMode - The unlocked template instance ids
  * @returns {boolean} True if the block should be readonly
  */
 export function isBlockReadonly(blockData, templateEditMode) {
-  if (templateEditMode) {
-    // In template edit mode:
-    // - Blocks inside the template being edited are editable
-    // - Blocks outside the template are readonly
-    return !isBlockInEditedTemplate(blockData, templateEditMode);
-  }
-
-  // Normal mode: check block's readOnly property (Volto standard)
+  // A block in an unlocked template is editable, even if flagged readOnly.
+  if (isBlockInEditedTemplate(blockData, templateEditMode)) return false;
+  // Otherwise the block's own readOnly property (Volto standard).
   return !!blockData?.readOnly;
 }
 
@@ -1975,27 +1982,20 @@ export function clearBlockType(blockData) {
  * Check if a block's position is locked (cannot be moved/dragged).
  * This is the shared utility for both admin (toolbar) and hydra.js Bridge.
  *
- * In template edit mode:
- * - Blocks inside the template being edited are movable (return false) - even if fixed
- * - Blocks outside the template are locked (return true)
- *
- * In normal mode:
- * - Check the block's fixed property (Volto standard)
+ * v2: a block's position is locked by its OWN `fixed` flag — UNLESS it belongs to
+ * a template instance that is currently unlocked (then it's freely movable, even
+ * if fixed). Page blocks (no `fixed`) always move, regardless of which templates
+ * are unlocked. Drop-zone restrictions (where a block may LAND) are handled
+ * separately in the drag handler via getBlockAddability.
  *
  * @param {Object} blockData - The block data object
- * @param {string|null} templateEditMode - The templateInstanceId of the template being edited, or null
+ * @param {string[]|null} templateEditMode - The unlocked template instance ids
  * @returns {boolean} True if the block's position is locked
  */
 export function isBlockPositionLocked(blockData, templateEditMode) {
-  if (templateEditMode) {
-    // In template edit mode, ALL blocks are draggable (not position-locked)
-    // This allows dragging outside blocks into the template
-    // Drop zone restriction (where blocks can be dropped) is handled
-    // separately in the drag handler via isDropAllowedInTemplateEditMode
-    return false;
-  }
-
-  // Normal mode: check block's fixed property (Volto standard)
+  // A block in an unlocked template can be moved, even if flagged fixed.
+  if (isBlockInEditedTemplate(blockData, templateEditMode)) return false;
+  // Otherwise the block's own fixed property (Volto standard).
   return !!blockData?.fixed;
 }
 
@@ -2037,6 +2037,10 @@ export function getBlockAddability(
     return result;
   }
 
+  // v2: templateEditMode is a set of unlocked instance ids; "any template unlocked"
+  // is a non-empty set.
+  const anyTemplateUnlocked = unlockedTemplateIds(templateEditMode).length > 0;
+
   // Detect 'empty' storage-agnostically (blocks_layout @type OR object_list typeField),
   // otherwise the form's typed field (e.g. the E-mail field) is missed and never gets a '+'.
   const isEmptyBlock = getBlockType(blockData, pathInfo.typeField) === 'empty';
@@ -2048,7 +2052,7 @@ export function getBlockAddability(
   // would return early with canReplace=false, stranding it. Short-circuit that here (before
   // the maxReached + template-mode gates: replacing an empty mutates in place, it never adds
   // a sibling).
-  if (templateEditMode && isEmptyBlock) {
+  if (anyTemplateUnlocked && isEmptyBlock) {
     return { ...result, canReplace: true };
   }
 
@@ -2072,7 +2076,7 @@ export function getBlockAddability(
   // - For DnD (sourceBlockData provided): Allow if source OR target is in the template
   //   This enables dragging blocks from outside INTO the template
   let targetInTemplate = false;
-  if (templateEditMode) {
+  if (anyTemplateUnlocked) {
     targetInTemplate = isBlockInEditedTemplate(blockData, templateEditMode);
     const sourceInTemplate = sourceBlockData
       ? isBlockInEditedTemplate(sourceBlockData, templateEditMode)
@@ -2093,7 +2097,7 @@ export function getBlockAddability(
   // Apply static restrictions
   // In template edit mode, ignore restrictions for blocks in the template being edited
   // (the restrictions are for normal mode to prevent adding outside slots)
-  if (templateEditMode && targetInTemplate) {
+  if (anyTemplateUnlocked && targetInTemplate) {
     result.canInsertBefore = true;
     result.canInsertAfter = true;
   } else {
@@ -2898,11 +2902,22 @@ export function expandTemplatesSync(inputItems, options = {}) {
 
   // Recognise a DIFFERENT templateInstanceId as a different instance. The apply below
   // uses ONE instance per call (the first block's), so a layout spanning several
-  // instances — e.g. two of the same template inserted separately — would process only
-  // the first and drop the rest. Expand each instance's contiguous run on its own
-  // (sharing this templateState) and concatenate in order. Skipped for a forced layout /
-  // reverse merge, which intentionally re-home everything into one instance.
-  if (!allowedLayouts?.length && !filterInstanceId) {
+  // instances — e.g. two of the same template inserted separately, or two DIFFERENT
+  // templates (v2: multiple templates editable on one page) — would process only the
+  // first and drop the rest. Expand each instance's contiguous run on its own (sharing
+  // this templateState) and concatenate in order.
+  //
+  // This fires EVEN when allowedLayouts is present. A page-level field always carries
+  // allowedLayouts (its layout menu, e.g. [null, layoutA, layoutB]) so the earlier code
+  // skipped the split on every re-render and collapsed a multi-instance page into one
+  // forced layout — dropping every instance but the first. The split is only wrong for a
+  // genuine forced single-layout SWITCH (the user picks one layout to re-home the whole
+  // page), which passes exactly one allowedLayout; a menu list (length ≠ 1) is a
+  // re-render and must re-recognize the existing instances. Reverse merge (filterInstanceId)
+  // still re-homes into one instance, so it's excluded. allowedLayouts is dropped in the
+  // per-run recursion so each already-applied run re-applies its own template.
+  const forcedSingleLayout = allowedLayouts?.length === 1;
+  if (!filterInstanceId && !forcedSingleLayout) {
     const seenInstances = new Set();
     for (const id of layout) {
       const b = blocks[id];
@@ -2913,7 +2928,11 @@ export function expandTemplatesSync(inputItems, options = {}) {
       let run = null;
       const flushRun = () => {
         if (!run) return;
-        for (const it of expandTemplatesSync(run.ids, { ...options, blocks }))
+        for (const it of expandTemplatesSync(run.ids, {
+          ...options,
+          blocks,
+          allowedLayouts: undefined,
+        }))
           items.push(it);
         run = null;
       };

@@ -28,13 +28,8 @@ test.describe('forced footer — add column → add form → convert field', () 
     const brandingId = await branding.getAttribute('data-block-uid');
     const cellId = await footer.locator('[data-block-uid]').filter({ hasText: 'Footer Column Cell' }).last().getAttribute('data-block-uid');
 
-    // Enter template edit mode.
-    await helper.clickBlockInIframe(brandingId!);
-    await helper.waitForSidebarOpen();
-    await helper.escapeToParent();
-    const editToggle = page.locator('.edit-template-toggle');
-    await editToggle.click();
-    await expect(editToggle).toHaveAttribute('aria-pressed', 'true', { timeout: 5000 });
+    // Unlock the template for editing.
+    await helper.unlockTemplate(brandingId!);
 
     // Navigate to the columns container + add a NEW column.
     await helper.clickBlockInIframe(cellId!);

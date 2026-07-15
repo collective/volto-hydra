@@ -834,8 +834,14 @@ const Iframe = (props) => {
     toolbarRequestDone: null, // requestId - toolbar completed format, need to respond to iframe
     pendingSelectBlockUid: null, // Block to select after next FORM_DATA (for new block add)
     pendingFormatRequestId: null, // requestId to include in next FORM_DATA (for Enter key, etc.)
-    templateEditMode: null, // templateInstanceId of template being edited, or null if not in edit mode
+    templateEditMode: [], // v2: array of unlocked template instance ids (multiple at once)
   }));
+
+  // v2 template edit: the decision modal shown on unlock/lock/save-gate, and a
+  // per-instance snapshot of formData taken at unlock time (so "Reset changes"
+  // can revert only that template's blocks, keeping page edits).
+  const [templateModal, setTemplateModal] = useState(null); // { kind, instanceId } | null
+  const templateSnapshotsRef = useRef({});
 
   // Notify toolbar whether paste is allowed for the current selection + clipboard.
   useEffect(() => {
@@ -1016,8 +1022,76 @@ const Iframe = (props) => {
   // Used for comparison on save to detect template changes
   const templateCacheRef = useRef({});
 
-  // Pending template edit exit - stores { requestId, prevInstanceId } when waiting for flush
+  // Pending template edit exit - stores { requestId, prevInstanceId, mode } when
+  // waiting for flush before a lock-commit reverse-merge.
   const pendingTemplateEditExitRef = useRef(null);
+
+  // v2: broadcast the current set of unlocked template instance ids to the iframe
+  // (multiple templates may be unlocked at once). Bridge gates editability/movement
+  // on this set.
+  const postTemplateEditMode = useCallback((instanceIds) => {
+    if (referenceElement?.contentWindow) {
+      referenceElement.contentWindow.postMessage(
+        { type: 'TEMPLATE_EDIT_MODE', instanceIds },
+        '*',
+      );
+    }
+  }, [referenceElement]);
+
+  // Persist ONE template document from the cache: POST a brand-new template
+  // (_isNew) into its parent folder, else PATCH the existing one. Shared by the
+  // page-save path (saveTemplatesRef) and the v2 lock-commit ("Change on all
+  // pages"), which saves the template the moment you lock it.
+  const persistTemplateDoc = useCallback(async (api, templateId) => {
+    const template = templateCacheRef.current[templateId];
+    if (!template) return;
+    try {
+      if (template._isNew) {
+        // New template: POST to parent folder so Plone creates the Document and
+        // populates server-side fields (UID, created, …). The id goes in the body
+        // so Plone keeps our slug instead of deriving one from the title.
+        const lastSlash = templateId.lastIndexOf('/');
+        const parentFolder = lastSlash > 0 ? templateId.slice(0, lastSlash) : '/';
+        const id = templateId.slice(lastSlash + 1);
+        // Creating a template needs "Add portal content" on the chosen folder.
+        let targetFolder = null;
+        try {
+          targetFolder = await api.get(parentFolder);
+        } catch {
+          // Couldn't read permissions — let the backend 403 be the authority.
+        }
+        if (targetFolder?.can_add === false) {
+          const err = new Error(
+            `You don't have permission to add templates in "${parentFolder}" (requires “Add portal content”).`,
+          );
+          err.isPermissionError = true;
+          throw err;
+        }
+        await api.post(parentFolder, {
+          data: {
+            '@type': 'Document',
+            id,
+            title: template.title || id,
+            blocks: template.blocks,
+            blocks_layout: template.blocks_layout,
+          },
+        });
+        // Mutate in place so the cached reference stays valid; next save PATCHes.
+        delete template._isNew;
+      } else {
+        await api.patch(templateId, {
+          data: {
+            blocks: template.blocks,
+            blocks_layout: template.blocks_layout,
+          },
+        });
+      }
+    } catch (error) {
+      console.error(`[HYDRA] Failed to save template ${templateId}:`, error);
+      // A permission failure must block, not silently drop the template.
+      if (error?.isPermissionError) throw error;
+    }
+  }, []);
 
   // Resolve each object_list field's idField ONCE from the schema (a form's subblocks are keyed
   // by field_id, not @id) and pass it to every merge — so the merge stamps item ids into the
@@ -1039,6 +1113,31 @@ const Iframe = (props) => {
     if (!saveTemplatesRef) return;
 
     saveTemplatesRef.current = async (formData, currentPath) => {
+      // v2: the page save is GATED while an EXISTING template is unlocked —
+      // committing it affects every page that uses it, so that must be a deliberate
+      // lock action, not a page save. A brand-new (_isNew) template has no other
+      // pages yet, so it still persists on page save (preserving the make-template
+      // flow). Raise the "lock your templates first" modal and abort otherwise.
+      const findTemplateId = (instanceId) => {
+        for (const block of Object.values(formData?.blocks || {})) {
+          if (block.templateInstanceId === instanceId && block.templateId) {
+            return block.templateId;
+          }
+        }
+        return null;
+      };
+      const blockingUnlocked = (iframeSyncState.templateEditMode || []).filter(
+        (iid) => {
+          const tid = findTemplateId(iid);
+          const tpl = tid && templateCacheRef.current[tid];
+          return tpl && !tpl._isNew;
+        },
+      );
+      if (blockingUnlocked.length > 0) {
+        setTemplateModal({ kind: 'saveGate' });
+        return { blocked: true };
+      }
+
       // Flush any pending inline edit text from the iframe before saving.
       // Text typed in the iframe is debounced, so it may not have been sent
       // via INLINE_EDIT_DATA yet. The flush ensures formData is up to date.
@@ -1136,81 +1235,9 @@ const Iframe = (props) => {
       // Use Volto's Api helper which handles auth and URL formatting
       const api = new Api();
 
-      await Promise.all(templateIds.map(async (templateId) => {
-        const template = templateCache[templateId];
-        if (!template) return;
-
-        log('SAVE TEMPLATE: Saving template:', templateId, 'isNew:', !!template._isNew);
-        log('SAVE TEMPLATE: Template blocks:', Object.keys(template.blocks || {}));
-        // Log first block's value to check if edit is present
-        const firstBlockId = template.blocks_layout?.items?.[0];
-        if (firstBlockId && template.blocks[firstBlockId]) {
-          const block = template.blocks[firstBlockId];
-          log('SAVE TEMPLATE: First block value:', JSON.stringify(block.value)?.substring(0, 200));
-        }
-
-        try {
-          if (template._isNew) {
-            // New template: POST to parent folder so Plone creates the
-            // Document and populates server-side fields (UID, created,
-            // modified, effective). Without this, a downstream PATCH would
-            // 404 because the document doesn't exist yet.
-            //
-            // Parent folder = templateId minus the trailing /<id> segment.
-            // The id portion goes in the body so Plone uses it instead of
-            // generating a slug from title — keeps cached templateId stable
-            // across the save round-trip.
-            const lastSlash = templateId.lastIndexOf('/');
-            const parentFolder = lastSlash > 0 ? templateId.slice(0, lastSlash) : '/';
-            const id = templateId.slice(lastSlash + 1);
-            // Creating a template requires "Add portal content" on the CHOSEN save folder
-            // (never a hardcoded path — the author picks the location). Check it before
-            // POSTing so an unauthorized location blocks the save loudly instead of silently
-            // dropping the template; the backend 403 is the final word.
-            let targetFolder = null;
-            try {
-              targetFolder = await api.get(parentFolder);
-            } catch {
-              // Couldn't read the folder's permissions — don't block on that; proceed and
-              // let the backend be the authority (a real 403 will surface on POST).
-            }
-            if (targetFolder?.can_add === false) {
-              const err = new Error(
-                `You don't have permission to add templates in "${parentFolder}" (requires “Add portal content”).`,
-              );
-              err.isPermissionError = true;
-              throw err;
-            }
-            await api.post(parentFolder, {
-              data: {
-                '@type': 'Document',
-                id,
-                title: template.title || id,
-                blocks: template.blocks,
-                blocks_layout: template.blocks_layout,
-              },
-            });
-            // Mark as no-longer-new — subsequent saves should PATCH, not
-            // re-POST. We mutate in place so the existing reference in
-            // formData stays valid; another save flush won't trigger a
-            // duplicate create.
-            delete template._isNew;
-          } else {
-            // PATCH existing template - cache already has merged content
-            // from edit mode exit
-            await api.patch(templateId, {
-              data: {
-                blocks: template.blocks,
-                blocks_layout: template.blocks_layout,
-              },
-            });
-          }
-        } catch (error) {
-          console.error(`[HYDRA] Failed to save template ${templateId}:`, error);
-          // A permission failure must block the save, not silently drop the template.
-          if (error?.isPermissionError) throw error;
-        }
-      }));
+      await Promise.all(
+        templateIds.map((templateId) => persistTemplateDoc(api, templateId)),
+      );
 
       // Hand the page data back to Form.jsx ONLY when an id was rewritten, so the page
       // save writes the finalized references. Otherwise return nothing so Form uses its
@@ -1218,26 +1245,33 @@ const Iframe = (props) => {
       // `formData` param lacks).
       return pageFormData !== formData ? pageFormData : undefined;
     };
-  }, [saveTemplatesRef, referenceElement]);
+  }, [saveTemplatesRef, referenceElement, persistTemplateDoc, iframeSyncState.templateEditMode]);
 
-  // Handle pending template edit exit after flush completes
-  // When exiting template edit mode, we first flush pending text updates,
-  // then do the reverse merge once the flush completes
+  // v2 lock-commit ("Change on all pages"): after the iframe flushes pending
+  // inline edits, reverse-merge the instance's blocks back into the template
+  // cache AND save that template document now (at lock time). Then drop just this
+  // instance from the unlocked set — other unlocked templates stay unlocked.
   useEffect(() => {
     const pending = pendingTemplateEditExitRef.current;
     if (!pending) return;
-
-    // Check if flush completed
     if (iframeSyncState.completedFlushRequestId !== pending.requestId) return;
-
-    // Clear pending state
     pendingTemplateEditExitRef.current = null;
 
-    // Now do the reverse merge with fresh formData
     const { prevInstanceId } = pending;
     const formData = iframeSyncState.formData;
 
-    // Find the templateId for this instance
+    // Drop this instance from the unlocked set + tell the iframe.
+    const finish = () => {
+      const next = (iframeSyncState.templateEditMode || []).filter((id) => id !== prevInstanceId);
+      setIframeSyncState((prev) => ({
+        ...prev,
+        templateEditMode: (prev.templateEditMode || []).filter((id) => id !== prevInstanceId),
+      }));
+      postTemplateEditMode(next);
+      delete templateSnapshotsRef.current[prevInstanceId];
+    };
+
+    // Find the templateId for this instance.
     let templateId = null;
     for (const block of Object.values(formData.blocks || {})) {
       if (block.templateInstanceId === prevInstanceId && block.templateId) {
@@ -1248,54 +1282,32 @@ const Iframe = (props) => {
 
     if (templateId && templateCacheRef.current[templateId]) {
       const template = templateCacheRef.current[templateId];
-
-      log('REVERSE MERGE: Starting reverse merge for template:', templateId);
-      log('REVERSE MERGE: prevInstanceId:', prevInstanceId);
-      log('REVERSE MERGE: Template blocks:', Object.keys(template.blocks || {}));
-      log('REVERSE MERGE: FormData blocks:', Object.keys(formData.blocks || {}));
-      // Log fixed blocks' content in formData
-      for (const [blockId, block] of Object.entries(formData.blocks || {})) {
-        if (block.fixed && block.templateInstanceId === prevInstanceId) {
-          log(`REVERSE MERGE: Fixed block ${blockId}:`, JSON.stringify(block.value)?.substring(0, 200));
-        }
-      }
-
-      // Merge edited instance back into template (reverse merge)
-      // This captures edits to fixed+readOnly blocks into the template cache
+      // Capture edits to the instance's fixed+readOnly blocks into the template.
       mergeTemplatesIntoPage(template, {
         loadTemplate: async () => formData,
         filterInstanceId: prevInstanceId,
         uuidGenerator: uuid,
         idFieldMap,
-      }).then(({ merged: updatedTemplate }) => {
-        log('REVERSE MERGE: Updated template blocks:', Object.keys(updatedTemplate.blocks || {}));
-        // Log first block's value to check if edit is captured
-        const firstBlockId = updatedTemplate.blocks_layout?.items?.[0];
-        if (firstBlockId && updatedTemplate.blocks[firstBlockId]) {
-          const block = updatedTemplate.blocks[firstBlockId];
-          log('REVERSE MERGE: First block value:', JSON.stringify(block.value)?.substring(0, 200));
-        }
-
-        // Update cache with merged template
-        templateCacheRef.current[templateId] = updatedTemplate;
-      });
+      })
+        .then(async ({ merged: updatedTemplate }) => {
+          templateCacheRef.current[templateId] = updatedTemplate;
+          // "Change on all pages": persist the template document immediately.
+          await persistTemplateDoc(new Api(), templateId);
+        })
+        .catch((e) => {
+          toast.error(
+            <Toast
+              error
+              title="Couldn't save template"
+              content={e?.message || 'The template could not be saved.'}
+            />,
+          );
+        })
+        .finally(finish);
+    } else {
+      finish();
     }
-
-    // Update state to exit template edit mode
-    setIframeSyncState(prev => ({
-      ...prev,
-      templateEditMode: null,
-    }));
-
-    // Send template edit mode to iframe
-    const iframe = document.getElementById('previewIframe');
-    if (iframe?.contentWindow) {
-      iframe.contentWindow.postMessage(
-        { type: 'TEMPLATE_EDIT_MODE', instanceId: null },
-        '*'
-      );
-    }
-  }, [iframeSyncState.completedFlushRequestId, iframeSyncState.formData]);
+  }, [iframeSyncState.completedFlushRequestId, iframeSyncState.formData, postTemplateEditMode, persistTemplateDoc, idFieldMap]);
 
   // Pending INITIAL_DATA: when templates are loading during INIT, store data here
   // Sync effect will send INITIAL_DATA after templates are merged
@@ -4223,89 +4235,226 @@ const Iframe = (props) => {
     return () => document.removeEventListener('mousedown', onDown);
   }, [chooser]);
 
-  // Enter/exit template edit mode for a given instance (null = exit). Shared by the
-  // sidebar "Edit template" toggle AND the Quanta toolbar lock icon, so both routes run
-  // the identical enter/exit machinery (validate + flush on exit, cache-refetch on enter).
-  const handleToggleTemplateEditMode = async (instanceId) => {
-    const prevInstanceId = iframeSyncState.templateEditMode;
+  // v2: UNLOCK a template — snapshot the page (for Reset), re-fetch the template
+  // fresh, add the instance to the unlocked set, and tell the iframe. Does NOT
+  // lock the rest of the page.
+  const enterTemplateEdit = async (instanceId) => {
+    // Snapshot the current page so "Reset changes" can revert only this template's
+    // blocks later, leaving page edits intact.
+    templateSnapshotsRef.current[instanceId] = properties;
 
-    // Exiting template edit mode - need to flush pending text updates first
-    if (prevInstanceId && !instanceId) {
-      const formData = iframeSyncState.formData;
-
-      // Validate template slot structure before allowing exit
-      const validation = validateTemplatePlaceholders(formData);
-      if (!validation.valid) {
-        // Show validation error - user must fix structure before exiting
-        const firstError = Object.values(validation.blocksErrors)[0]?._layout;
-        toast.error(
-          <Toast
-            error
-            title={firstError?.title || 'Invalid Template Structure'}
-            content={firstError?.message || 'Please fix the template structure before exiting edit mode.'}
-          />
-        );
-        return; // Don't exit edit mode
-      }
-
-      // Send FLUSH_BUFFER to get latest text changes before reverse merge
-      const requestId = `tpl-exit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      pendingTemplateEditExitRef.current = { requestId, prevInstanceId };
-
-      if (referenceElement?.contentWindow) {
-        referenceElement.contentWindow.postMessage(
-          { type: 'FLUSH_BUFFER', requestId },
-          '*'
-        );
-      }
-      // Effect will handle the rest when flush completes
-      return;
-    }
-
-    // Entering template edit mode — invalidate the cached template and
-    // re-fetch it fresh. templateCacheRef persists across page navigations
-    // (a useRef that's never reset), so without this we'd edit + save a
-    // stale copy left over from another page. It also guarantees the
-    // template is IN the cache: the reverse-merge (on exit) and the save
-    // are both gated on `templateCacheRef.current[id]` being present, so a
-    // forced/snippet template that wasn't cache-loaded here would otherwise
-    // be silently skipped and never persisted.
-    {
-      const enterFormData = iframeSyncState.formData;
-      let editTemplateId = null;
-      for (const block of Object.values(enterFormData?.blocks || {})) {
-        if (block.templateInstanceId === instanceId && block.templateId) {
-          editTemplateId = block.templateId;
-          break;
-        }
-      }
-      // Skip the re-fetch for a not-yet-saved template (_isNew): it doesn't exist on
-      // the backend, so a GET either 404s or (on a permissive mock) returns a stub —
-      // either way it would clobber the local definition and its _isNew flag.
-      if (editTemplateId && !templateCacheRef.current[editTemplateId]?._isNew) {
-        try {
-          templateCacheRef.current[editTemplateId] = await new Api().get(editTemplateId);
-        } catch {
-          // Re-fetch failed (offline / 404) — keep whatever's cached rather
-          // than dropping it, so the save still has something to persist.
-        }
+    // Re-fetch the template fresh into the cache — templateCacheRef persists across
+    // page navigations, so without this we'd commit a stale copy. Skip for a
+    // not-yet-saved template (_isNew): a GET would 404 / return a stub and clobber it.
+    let editTemplateId = null;
+    for (const block of Object.values(iframeSyncState.formData?.blocks || {})) {
+      if (block.templateInstanceId === instanceId && block.templateId) {
+        editTemplateId = block.templateId;
+        break;
       }
     }
-    setIframeSyncState(prev => ({
+    if (editTemplateId && !templateCacheRef.current[editTemplateId]?._isNew) {
+      try {
+        templateCacheRef.current[editTemplateId] = await new Api().get(editTemplateId);
+      } catch {
+        // Offline / 404 — keep whatever's cached rather than dropping it.
+      }
+    }
+
+    const next = [...new Set([...(iframeSyncState.templateEditMode || []), instanceId])];
+    setIframeSyncState((prev) => ({
       ...prev,
-      templateEditMode: instanceId,
+      templateEditMode: [...new Set([...(prev.templateEditMode || []), instanceId])],
     }));
-    // Send template edit mode to iframe so it knows which blocks to make editable
-    if (referenceElement?.contentWindow) {
-      referenceElement.contentWindow.postMessage(
-        { type: 'TEMPLATE_EDIT_MODE', instanceId },
-        '*'
+    postTemplateEditMode(next);
+  };
+
+  // v2: LOCK with "Change on all pages" — validate structure, then flush pending
+  // inline edits; the flush-complete effect reverse-merges into the template and
+  // saves the template document, then drops this instance from the unlocked set.
+  const commitTemplateEdit = (instanceId) => {
+    const validation = validateTemplatePlaceholders(iframeSyncState.formData);
+    if (!validation.valid) {
+      const firstError = Object.values(validation.blocksErrors)[0]?._layout;
+      toast.error(
+        <Toast
+          error
+          title={firstError?.title || 'Invalid Template Structure'}
+          content={firstError?.message || 'Please fix the template structure before locking.'}
+        />,
       );
+      return false; // keep it unlocked so the user can fix it
     }
+    const requestId = `tpl-commit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    pendingTemplateEditExitRef.current = { requestId, prevInstanceId: instanceId };
+    if (referenceElement?.contentWindow) {
+      referenceElement.contentWindow.postMessage({ type: 'FLUSH_BUFFER', requestId }, '*');
+    }
+    return true;
+  };
+
+  // v2: LOCK with "Reset changes" — discard this template's edits by restoring its
+  // blocks from the unlock-time snapshot, while KEEPING page-content edits made in
+  // the meantime. The template cache is untouched (nothing is saved).
+  const resetTemplateEdit = (instanceId) => {
+    const snap = templateSnapshotsRef.current[instanceId];
+    if (snap) {
+      const isInst = (id, blocks) => blocks?.[id]?.templateInstanceId === instanceId;
+      // Blocks: drop the instance's current blocks, restore the snapshot's.
+      const blocks = {};
+      for (const [id, b] of Object.entries(properties.blocks || {})) {
+        if (b?.templateInstanceId !== instanceId) blocks[id] = b;
+      }
+      for (const [id, b] of Object.entries(snap.blocks || {})) {
+        if (b?.templateInstanceId === instanceId) blocks[id] = b;
+      }
+      // Layout: keep the current (page-edited) order of non-instance blocks; splice
+      // the snapshot's instance block ids back in at the instance's first position.
+      const snapInstanceItems = (snap.blocks_layout?.items || []).filter((id) =>
+        isInst(id, snap.blocks),
+      );
+      const items = [];
+      let spliced = false;
+      for (const id of properties.blocks_layout?.items || []) {
+        if (isInst(id, properties.blocks)) {
+          if (!spliced) {
+            items.push(...snapInstanceItems);
+            spliced = true;
+          }
+        } else {
+          items.push(id);
+        }
+      }
+      if (!spliced) {
+        // No surviving instance anchor (all instance blocks were deleted): place the
+        // group after the nearest preceding non-instance neighbour from the snapshot.
+        const snapItems = snap.blocks_layout?.items || [];
+        const firstIdx = snapItems.findIndex((id) => isInst(id, snap.blocks));
+        let anchorAt = items.length;
+        for (let i = firstIdx - 1; i >= 0; i--) {
+          const pos = items.indexOf(snapItems[i]);
+          if (pos !== -1) {
+            anchorAt = pos + 1;
+            break;
+          }
+        }
+        items.splice(anchorAt, 0, ...snapInstanceItems);
+      }
+      onChangeFormData({
+        ...properties,
+        blocks,
+        blocks_layout: { ...properties.blocks_layout, items },
+      });
+    }
+    const next = (iframeSyncState.templateEditMode || []).filter((id) => id !== instanceId);
+    setIframeSyncState((prev) => ({
+      ...prev,
+      templateEditMode: (prev.templateEditMode || []).filter((id) => id !== instanceId),
+    }));
+    postTemplateEditMode(next);
+    delete templateSnapshotsRef.current[instanceId];
+  };
+
+  // Entry point for the sidebar "Edit template" toggle AND the Quanta toolbar lock
+  // icon. Unlocking warns first; locking asks what to do with the edits. The actual
+  // enter/commit/reset run from the modal's buttons.
+  const handleToggleTemplateEditMode = (instanceId) => {
+    const unlocked = iframeSyncState.templateEditMode || [];
+    setTemplateModal({
+      kind: unlocked.includes(instanceId) ? 'lock' : 'unlock',
+      instanceId,
+    });
   };
 
   return (
     <div id="iframeContainer">
+      {/* v2 template-edit decision modals: unlock warning, lock choice, save gate. */}
+      {templateModal && (() => {
+        const close = () => setTemplateModal(null);
+        const { kind, instanceId } = templateModal;
+        return (
+          <div
+            className="template-edit-modal-overlay"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) close();
+            }}
+          >
+            {kind === 'unlock' && (
+              <div className="template-edit-modal template-unlock-modal">
+                <h3>Unlock this template to edit it?</h3>
+                <p>
+                  Changes you make to this template will appear on <strong>every
+                  page that uses it</strong> — as soon as you lock it again. The rest
+                  of this page stays editable.
+                </p>
+                <div className="template-edit-modal-actions">
+                  <button type="button" className="ui button template-cancel" onClick={close}>
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="ui primary button template-confirm"
+                    onClick={() => {
+                      close();
+                      enterTemplateEdit(instanceId);
+                    }}
+                  >
+                    Unlock to edit
+                  </button>
+                </div>
+              </div>
+            )}
+            {kind === 'lock' && (
+              <div className="template-edit-modal template-lock-modal">
+                <h3>Lock this template</h3>
+                <p>What should happen to your edits to this template?</p>
+                <div className="template-edit-modal-actions">
+                  <button
+                    type="button"
+                    className="ui primary button template-commit"
+                    onClick={() => {
+                      close();
+                      commitTemplateEdit(instanceId);
+                    }}
+                  >
+                    Change on all pages
+                  </button>
+                  <button
+                    type="button"
+                    className="ui button template-reset"
+                    onClick={() => {
+                      close();
+                      resetTemplateEdit(instanceId);
+                    }}
+                  >
+                    Reset changes
+                  </button>
+                  <button type="button" className="ui button template-cancel" onClick={close}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            {kind === 'saveGate' && (
+              <div className="template-edit-modal template-save-gate-modal">
+                <h3>Lock your templates first</h3>
+                <p>
+                  You have a template unlocked for editing. Lock it (choosing whether
+                  to change it on all pages or reset your changes) before saving the
+                  page.
+                </p>
+                <div className="template-edit-modal-actions">
+                  <button type="button" className="ui primary button template-confirm" onClick={close}>
+                    OK
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
       <OpenObjectBrowser
         origin={iframeSrc && new URL(iframeSrc).origin}
         pendingFieldMedia={pendingFieldMedia}
@@ -5143,6 +5292,13 @@ const Iframe = (props) => {
               // Rebuild blockPathMap
               const newBlockPathMap = buildBlockPathMap(updatedProperties, blocksConfig, intl);
 
+              // Snapshot for Reset, and enter edit mode for the just-created
+              // template instance (no unlock warning — the user explicitly made it).
+              templateSnapshotsRef.current[newInstanceId] = updatedProperties;
+              const nextEdit = [
+                ...new Set([...(iframeSyncState.templateEditMode || []), newInstanceId]),
+              ];
+
               // Find the template instance ID in the new pathMap
               // (it will be created as a virtual container)
               setIframeSyncState(prev => ({
@@ -5151,8 +5307,11 @@ const Iframe = (props) => {
                 blockPathMap: newBlockPathMap,
                 toolbarRequestDone: `make-template-${Date.now()}`,
                 pendingSelectBlockUid: newInstanceId, // Select the template instance
-                templateEditMode: newInstanceId, // Activate template edit mode
+                templateEditMode: [
+                  ...new Set([...(prev.templateEditMode || []), newInstanceId]),
+                ], // v2: add to the unlocked set
               }));
+              postTemplateEditMode(nextEdit);
             }}
           />
 

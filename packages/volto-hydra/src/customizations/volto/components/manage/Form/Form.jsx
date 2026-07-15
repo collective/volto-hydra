@@ -596,7 +596,12 @@ class Form extends Component {
       let finalizedFormData = null;
       if (this.props.isEditForm && this.saveTemplatesRef.current) {
         const currentPath = this.props.pathname;
-        finalizedFormData = await this.saveTemplatesRef.current(formData, currentPath);
+        const result = await this.saveTemplatesRef.current(formData, currentPath);
+        // v2: the page save is gated while a template is unlocked — the Iframe
+        // raised the "lock your templates first" modal and returns this sentinel.
+        // Abort the page save.
+        if (result?.blocked) return;
+        finalizedFormData = result;
       }
 
       // Then save the page

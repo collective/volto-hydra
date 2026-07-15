@@ -531,7 +531,7 @@ ChildBlocksWidget.propTypes = {
   onAddBlock: PropTypes.func,
   onMoveBlock: PropTypes.func,
   onChangeFormData: PropTypes.func,
-  templateEditMode: PropTypes.string,
+  templateEditMode: PropTypes.arrayOf(PropTypes.string),
 };
 
 export default ChildBlocksWidget;

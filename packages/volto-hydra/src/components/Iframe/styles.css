@@ -77,3 +77,37 @@
   margin: 0 !important;
   font-size: 14px !important;
 }
+
+/* v2 template-edit decision modals (unlock warning / lock choice / save gate). */
+.template-edit-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+.template-edit-modal {
+  background: #fff;
+  border-radius: 6px;
+  padding: 24px 28px;
+  max-width: 460px;
+  width: calc(100% - 48px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+.template-edit-modal h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.template-edit-modal p {
+  margin: 0 0 20px;
+  line-height: 1.5;
+  color: #4a4a4a;
+}
+.template-edit-modal-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}

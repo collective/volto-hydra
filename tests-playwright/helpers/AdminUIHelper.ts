@@ -1008,11 +1008,15 @@ export class AdminUIHelper {
 
   /**
    * v2 template edit: LOCK a template, choosing what to do with the edits.
-   * Clicks the (unlocked) toggle to raise the decision modal and picks an option.
-   * The template instance must currently be the selected section (its bar visible).
+   * Re-selects the instance (edits may have moved the selection), clicks the
+   * unlocked toggle to raise the decision modal, and picks an option.
+   * @param memberBlockId - any surviving block belonging to the template instance
    * @param choice - 'commit' (Change on all pages), 'reset' (Reset changes), or 'cancel'
    */
-  async lockTemplate(choice: 'commit' | 'reset' | 'cancel'): Promise<void> {
+  async lockTemplate(memberBlockId: string, choice: 'commit' | 'reset' | 'cancel'): Promise<void> {
+    await this.clickBlockInIframe(memberBlockId);
+    await this.waitForSidebarOpen();
+    await this.escapeToParent();
     const toggle = this.page.locator('.sidebar-section-header[data-is-current="true"] .edit-template-toggle');
     await expect(toggle).toBeVisible({ timeout: 5000 });
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
@@ -1022,6 +1026,13 @@ export class AdminUIHelper {
     const btn = { commit: '.template-commit', reset: '.template-reset', cancel: '.template-cancel' }[choice];
     await modal.locator(btn).click();
     await expect(modal).toHaveCount(0, { timeout: 5000 });
+    // commit/reset actually LOCK the template (remove it from the unlocked set).
+    // That is async for commit (flush → reverse-merge → save → unlock), so wait for
+    // the toggle to flip to locked before returning — otherwise a following page
+    // save races the save-gate. (cancel keeps it unlocked.)
+    if (choice !== 'cancel') {
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false', { timeout: 10000 });
+    }
   }
 
   /**

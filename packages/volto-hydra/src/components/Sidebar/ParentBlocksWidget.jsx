@@ -210,13 +210,16 @@ const ParentBlockSection = ({
   // unlocked (🔓) = editing this template. Permission-gated on the template doc.
   const isThisTemplateInstance =
     !!pathInfo?.isTemplateInstance && !pathInfo?.isNestedTemplateInstance;
-  const isEditingThisTemplate = templateEditMode === blockId;
+  // v2: templateEditMode is the set of unlocked instance ids. The instance's
+  // block id IS its templateInstanceId (see the toggle handler in View.jsx).
+  const isEditingThisTemplate = (templateEditMode || []).includes(blockId);
   const canEditTemplate =
     templatePermissions?.[pathInfo?.templateId]?.can_edit ?? true;
   const canToggleTemplateEdit =
     isThisTemplateInstance && !!onToggleTemplateEditMode && canEditTemplate;
-  const toggleTemplateEdit = () =>
-    onToggleTemplateEditMode(isEditingThisTemplate ? null : blockId);
+  // The handler decides unlock (warning modal) vs lock (decision modal) from the
+  // instance's current membership, so we always pass the instance id.
+  const toggleTemplateEdit = () => onToggleTemplateEditMode(blockId);
 
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [menuButtonRect, setMenuButtonRect] = React.useState(null);
@@ -559,11 +562,11 @@ const ParentBlockSection = ({
         // (slides, rows) are template members too — every block in a template can set
         // fixed/readOnly, so they show this panel as well. Only the template-instance
         // host block itself is excluded (it's the container, not a member).
-        const isBlockInEditedTemplate = templateEditMode &&
+        const isBlockInEditedTemplate =
           !pathInfo?.isTemplateInstance &&
           blockData &&
           blockData.templateId &&
-          blockData.templateInstanceId === templateEditMode;
+          (templateEditMode || []).includes(blockData.templateInstanceId);
 
         if (!isBlockInEditedTemplate) return null;
 

@@ -563,7 +563,7 @@ export function getSelectAfterDelete(
  * @param {Object} formData - The form data
  * @param {Object} blocksConfig - Block configuration from registry
  * @param {Object} intl - The intl object from react-intl
- * @param {string|null} templateEditMode - The templateInstanceId being edited, or null
+ * @param {string[]} templateEditMode - The unlocked template instance ids
  * @returns {Array} Array of container field configs [{ fieldName, title, allowedBlocks, allowedTemplates, defaultBlockType, maxLength, currentCount, canAdd }]
  */
 export function getAllContainerFields(
@@ -572,7 +572,7 @@ export function getAllContainerFields(
   formData,
   blocksConfig,
   intl,
-  templateEditMode = null,
+  templateEditMode = [],
 ) {
   const pathInfo = blockPathMap?.[blockId];
 
