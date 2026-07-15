@@ -394,7 +394,17 @@ function collectSlateIssues(blockData, pagePath, blockId, out, blockType) {
  *  - `widget: 'slate'` — value is a non-empty array of slate nodes (deep
  *    structural checks stay in collectSlateIssues)
  */
-function collectWidgetShapeIssues(blockData, blockSchema, pagePath, blockId, out) {
+// Fields present in block data that are not schema properties but are never
+// authored/editable content: structural, serialisation, and Volto slot runtime.
+const UNDECLARED_EXEMPT = new Set([
+  'id', 'blocks', 'blocks_layout', 'image_scales', 'plaintext', 'value',
+  'styles', 'override', 'block',
+  'fixed', 'slotId', 'templateId', 'readOnly',
+]);
+
+function collectWidgetShapeIssues(
+  blockData, blockSchema, pagePath, blockId, out, blockType, undeclaredFields,
+) {
   const props = blockSchema?.properties;
   if (!props || !blockData || typeof blockData !== 'object') return;
 
@@ -552,6 +562,22 @@ function collectWidgetShapeIssues(blockData, blockSchema, pagePath, blockId, out
     }
   }
 
+  // Reverse check: a stored field with no schema property. Only declared fields
+  // (plus blocks/blocks_layout) belong in a block's data — an undeclared field
+  // means the schema is missing it (it can't be edited in the sidebar) or the
+  // data is stray. Collected per (blockType, field) so it reports ONCE per field
+  // name, not once per instance. Structural / serialisation keys and Volto
+  // slot-runtime fields (added by the slot editor, not authored data) are exempt.
+  if (blockType) {
+    for (const key of Object.keys(blockData)) {
+      if (key.startsWith('@') || UNDECLARED_EXEMPT.has(key) || props[key]) continue;
+      const dedupeKey = `${blockType} ${key}`;
+      if (!undeclaredFields.has(dedupeKey)) {
+        undeclaredFields.set(dedupeKey, { blockType, field: key, pagePath, blockId });
+      }
+    }
+  }
+
   if (issues.length) {
     out.push({ pagePath, blockId, blockType: blockData['@type'], issues });
   }
@@ -567,6 +593,9 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   const seen = new Map();
   const slateIssues = [];
   const shapeIssues = [];
+  // (blockType, field) → one example location, for fields present in data but
+  // absent from the schema. Deduped so each missing field is reported once.
+  const undeclaredFields = new Map();
   // Containment: a non-fixed block whose @type isn't in its container's resolved
   // allowedSiblingTypes can't be reordered within its container (the mobile
   // chevron / drag walks it OUT to the nearest ancestor that accepts the type,
@@ -689,7 +718,9 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         }
 
         collectSlateIssues(blockData, pagePath, blockId, slateIssues, blockType);
-        collectWidgetShapeIssues(blockData, schema, pagePath, blockId, shapeIssues);
+        collectWidgetShapeIssues(
+          blockData, schema, pagePath, blockId, shapeIssues, blockType, undeclaredFields,
+        );
 
         // Unregistered block type: any real @type the frontend can't render is
         // a problem no matter how deep it sits — a nested unknown falls through
@@ -910,6 +941,13 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
       field: e.field,
       issues: e.issues,
     });
+  }
+
+  // One failing test per (blockType, field) present in data but missing from
+  // the schema — reported once, not per instance. A schema-completeness backlog
+  // (these fields can't be edited in the sidebar until declared).
+  for (const { blockType, field, blockId, pagePath } of undeclaredFields.values()) {
+    result.push({ blockType, blockId, pagePath, field, undeclaredField: true });
   }
 
   // Every block type the FRONTEND registers needs at least one content
