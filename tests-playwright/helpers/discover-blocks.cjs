@@ -447,6 +447,24 @@ function collectWidgetShapeIssues(blockData, blockSchema, pagePath, blockId, out
       continue;
     }
 
+    // A URL/link value must live in a url/link widget so the editor gives a link
+    // control and the frontend resolves it. Flag an absolute (http(s)://) or
+    // site-relative (/path) string sitting in a plain text field. url,
+    // object_browser (incl. mode:'link'), image and file legitimately hold
+    // URLs/paths and are handled by their own branches.
+    const urlWidgets = ['url', 'object_browser', 'image', 'file'];
+    const looksLikeUrl =
+      typeof value === 'string' &&
+      (/^https?:\/\//.test(value) || /^\/[^/]/.test(value));
+    if (looksLikeUrl && !urlWidgets.includes(widget)) {
+      issues.push(
+        `field "${field}": value looks like a URL/link (${JSON.stringify(value.slice(0, 48))}` +
+          `) — declare it as \`widget: 'url'\` (or \`widget: 'object_browser'\`, ` +
+          `mode: 'link' for a content link), not a plain text field.`,
+      );
+      continue;
+    }
+
     if (widget === 'url') {
       if (typeof value !== 'string') {
         issues.push(describe('url string', value));
