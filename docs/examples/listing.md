@@ -120,6 +120,8 @@ After the query is resolved, each item looks like:
 
 The listing block fetches items and renders each one based on the `variation`. Hydra's `expandListingBlocks` helper handles the fetch and field mapping.
 
+**Expanded items are read-only.** `expandListingBlocks` marks every item it produces read-only (via `setBlockReadonly`), so the bridge ignores any `data-edit-text` / `data-edit-link` / `data-edit-media` annotations inside them — they're query results, not authored content. Render each item with your **normal** item renderer, annotations and all; do not special-case expanded items and do **not** reach for `data-linkable-allow` to stop their links being flagged (that attribute is for navigation controls like pagers/facets, not read-only content — see [Visual Editing](../visual-editing.md#allowed-navigation-data-linkable-allow)). The same renderer serves the authored item (editable) and the expanded item (read-only) with no branching.
+
 ### React
 
 <!-- file: examples/react/ListingBlock.jsx -->

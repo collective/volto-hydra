@@ -312,13 +312,18 @@ function validateSlateNode(node, pathStr, issues) {
 /**
  * Walk a block's data for slate-shaped fields (arrays whose first item looks
  * like a slate node) and record all structural issues:
- *  - Multi-root values force renderers to add a nodeId-less wrapper.
+ *  - A slate field always resolves to exactly ONE top-level node (see
+ *    visual-editing.md "One top-level node per slate field"). Hydra normalizes
+ *    extras during editing — the `value` of a `slate` BLOCK splits each extra
+ *    node into its own block; a slate FIELD on any other block flattens them
+ *    back into the first node — so stored data with >1 top-level node is
+ *    un-normalized and breaks the one-node guarantee renderers rely on.
  *  - Missing `type` on root element.
  *  - Invalid node shapes anywhere in the tree.
  *
  * Schema-independent; runs against raw API data.
  */
-function collectSlateIssues(blockData, pagePath, blockId, out) {
+function collectSlateIssues(blockData, pagePath, blockId, out, blockType) {
   if (!blockData || typeof blockData !== 'object') return;
   for (const [key, value] of Object.entries(blockData)) {
     if (key.startsWith('@') || key === 'blocks' || key === 'blocks_layout') continue;
@@ -331,7 +336,12 @@ function collectSlateIssues(blockData, pagePath, blockId, out) {
 
     const issues = [];
     if (value.length > 1) {
-      issues.push(`multiple top-level nodes (${value.length}); split into separate blocks`);
+      // Advice differs by where the field lives, but both are invalid stored data.
+      const advice =
+        blockType === 'slate'
+          ? 'split into separate blocks'
+          : 'flatten into a single top-level node (a slate field holds exactly one)';
+      issues.push(`multiple top-level nodes (${value.length}); ${advice}`);
     }
     for (let i = 0; i < value.length; i++) {
       validateSlateNode(value[i], `value[${i}]`, issues);
@@ -585,7 +595,7 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         const resolvedSchema = schemaRef ? pathMap._schemas?.[schemaRef] : null;
         const schema = resolvedSchema || (blockType ? blocksConfig[blockType]?.blockSchema : null);
 
-        collectSlateIssues(blockData, pagePath, blockId, slateIssues);
+        collectSlateIssues(blockData, pagePath, blockId, slateIssues, blockType);
         collectWidgetShapeIssues(blockData, schema, pagePath, blockId, shapeIssues);
 
         // Unregistered block type: any real @type the frontend can't render is
