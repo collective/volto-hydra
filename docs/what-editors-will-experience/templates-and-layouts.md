@@ -24,6 +24,8 @@ Shown with a **lock icon** — a 🔒 in the Quanta toolbar (in place of the dra
 - Move it.
 - Delete it.
 
+Selecting a locked block still shows its content in the sidebar — as **read-only values**, not editable fields — so you can see what's there without being able to change it.
+
 Typical use: branded headers, footers, legal disclaimers — content the template author wants identical across every page.
 
 ### Fixed (editable, not movable)
@@ -42,7 +44,7 @@ Typical use: a "callout" block in the middle of a layout — every page has one,
 
 Regular blocks where you can do anything — add, edit, move, delete. The template marks regions as slots (with a `slotId`) and your existing content is placed into the matching slots when the template merges.
 
-![A page with a snippet template applied. The "Snippet Header" block is selected, rendered in muted style as a locked block. The sidebar shows the template's settings (Template Name, Save Location).](_images/template-locked.png)
+![A snippet template applied to a page. The "Snippet Header" block is selected, rendered muted as a locked block. Its sidebar shows its content read-only — a "Text" field with the value "Snippet Header - From Template" — above the template's own read-only settings (Template Name, Save Location).](_images/template-locked.png)
 
 ## Inserting between fixed blocks
 
