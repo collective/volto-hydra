@@ -142,14 +142,34 @@ export async function checkEditAnnotations(
   );
   expect(brokenImages, 'All images should have valid src and load successfully').toEqual([]);
 
-  // Any string field in block data whose value the renderer displays must
-  // sit inside [data-edit-text] so the editor can target it. Data-driven
-  // (no hardcoded field names): iterate every string-valued field, skip
-  // @-prefixed metadata, skip values not present in the rendered DOM.
+  // Any inline-text field the renderer displays must sit inside [data-edit-text]
+  // so the editor can target it. Drive this off the block schema: only plain
+  // text widgets qualify. Choice/select/object_browser/icon/file/slate fields are
+  // NOT inline text and would false-positive on coincidental text — e.g. a
+  // Choice `colour: "white"`, or `type: "info"` matching the material-icon
+  // ligature "info" rendered for the alert. Without a schema we cannot tell
+  // which fields are editable text, so skip rather than guess.
   if (blockData) {
+    const blockUid = await block.getAttribute('data-block-uid');
+    const schema = blockUid
+      ? await block.evaluate(
+          (_el, uid) => (window as any).__hydraBridge?.getBlockSchema?.(uid) || null,
+          blockUid,
+        )
+      : null;
+    const props = schema?.properties as Record<string, any> | undefined;
+    const isInlineTextField = (field: string): boolean => {
+      const p = props?.[field];
+      if (!p) return false; // not a schema field → not editable inline text
+      if (p.factory === 'Choice' || p.choices) return false; // dropdown, not text
+      const w = p.widget;
+      if (w && w !== 'text' && w !== 'textarea') return false; // select/icon/object_browser/file/slate/…
+      return p.type === undefined || p.type === 'string';
+    };
     for (const [field, value] of Object.entries(blockData)) {
       if (field.startsWith('@')) continue;
       if (typeof value !== 'string' || !value) continue;
+      if (!isInlineTextField(field)) continue;
       const hasEditText = await block.evaluate(
         (el, v) => {
           const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
