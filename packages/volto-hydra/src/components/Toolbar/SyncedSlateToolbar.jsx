@@ -1170,7 +1170,7 @@ const SyncedSlateToolbar = ({
 
   // Template instance the selected block belongs to (walk up to the TOP-level
   // instance, skipping nested ones) so the ⋯ dropdown can offer "Edit template" /
-  // "Done editing template" straight from the Quanta toolbar — i.e. unlock AND
+  // "Save template" straight from the Quanta toolbar — i.e. unlock AND
   // lock/save a template WITHOUT opening the settings sidebar.
   let toolbarTemplateInstanceId = null;
   {
@@ -1716,7 +1716,7 @@ const SyncedSlateToolbar = ({
         isInTemplate={!!block?.templateId}
         onMakeTemplate={onMakeTemplate}
         // Template edit/lock straight from the toolbar ⋯ menu (no sidebar needed):
-        // "Edit template" when locked, "Done editing template" (→ lock/save decision)
+        // "Edit template" when locked, "Save template" (→ lock/save decision)
         // while editing. Gated on Modify permission.
         isTemplateInstance={!!toolbarTemplateInstanceId && canEditToolbarTemplate && !!onToggleTemplateEditMode}
         isEditingTemplate={isEditingToolbarTemplate}

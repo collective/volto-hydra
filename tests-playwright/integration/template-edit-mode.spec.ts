@@ -1729,9 +1729,9 @@ test.describe('Template Edit Mode - Lock affordance + metadata gating', () => {
     await expect(lockToggle).toHaveAttribute('aria-pressed', 'true');
     await expect(lockToggle).toHaveAttribute('aria-label', /lock template/i);
 
-    // The dropdown item now reads "Done editing template".
+    // The dropdown item now reads "Save template".
     await page.locator('.sidebar-section-header[data-is-current="true"] .menu-trigger').click();
-    await expect(editItem).toContainText('Done editing template');
+    await expect(editItem).toContainText('Save template');
   });
 });
 
