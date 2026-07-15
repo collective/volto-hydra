@@ -209,13 +209,14 @@ test.describe('Templates', () => {
     expect(buttonTitles).not.toContain('underline');
     expect(buttonTitles).not.toContain('strikethrough');
 
-    // 3. Check sidebar does NOT have editable value field
+    // 3. The sidebar shows the block's content READ-ONLY — visible as static text,
+    // but with no editable control (ReadOnlyForm). It used to show nothing at all.
     await helper.waitForSidebarOpen();
-
-    // The sidebar should NOT have a 'value' field (the slate content field)
-    // Readonly blocks don't expose their content for editing in sidebar
-    const hasValueField = await helper.hasSidebarField('value');
-    expect(hasValueField).toBe(false);
+    const props = page.locator('#sidebar-properties');
+    await expect(props.locator('.readonly-form')).toBeVisible({ timeout: 5000 });
+    // The value is shown (read-only), and there's no editable input for it.
+    await expect(props.locator('.field-wrapper-value .readonly-field-value')).toBeVisible();
+    await expect(props.locator('input, textarea, [contenteditable="true"]')).toHaveCount(0);
 
     // 4. Try typing in iframe - nothing should happen
     await h1Element.click();
