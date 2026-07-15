@@ -120,12 +120,14 @@ export async function checkEditAnnotations(
   expect(offSiteLinks, 'Links should not point to a different localhost service (e.g. the API)').toEqual([]);
 
   // All images must have data-edit-media
+  // Decorative images (aria-hidden) are chrome, not editable content — e.g. a
+  // card's "→" arrow icon — so they don't carry data-edit-media.
   const imagesWithout = await block.locator('img').evaluateAll(
     (els: Element[]) => (els as HTMLImageElement[])
-      .filter(el => !el.hasAttribute('data-edit-media'))
+      .filter(el => !el.hasAttribute('data-edit-media') && el.getAttribute('aria-hidden') !== 'true')
       .map(el => el.getAttribute('src')),
   );
-  expect(imagesWithout, 'All images should have data-edit-media').toEqual([]);
+  expect(imagesWithout, 'All non-decorative images should have data-edit-media').toEqual([]);
 
   // All images must have a non-empty src and not be broken (naturalWidth > 0)
   const brokenImages = await block.locator('img').evaluateAll(
