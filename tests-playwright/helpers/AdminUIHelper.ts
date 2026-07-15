@@ -981,6 +981,50 @@ export class AdminUIHelper {
   }
 
   /**
+   * v2 template edit: UNLOCK a template for editing.
+   * Selects one of its member blocks, opens the template instance's sidebar bar,
+   * clicks the lock toggle, and confirms the "changes affect every page" warning
+   * modal. After this, the template's fixed blocks are editable (verify with
+   * waitForBlockEditable on a fixed member) while the rest of the page stays
+   * editable (v2: no page lock).
+   * @param memberBlockId - any block belonging to the template instance
+   */
+  async unlockTemplate(memberBlockId: string): Promise<void> {
+    await this.clickBlockInIframe(memberBlockId);
+    await this.waitForSidebarOpen();
+    await this.escapeToParent();
+    const toggle = this.page.locator('.sidebar-section-header[data-is-current="true"] .edit-template-toggle');
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await toggle.click();
+    // v2: unlocking warns first — the template's edits will appear on every page
+    // that uses it once locked.
+    const confirm = this.page.locator('.template-unlock-modal .template-confirm');
+    await expect(confirm).toBeVisible({ timeout: 5000 });
+    await confirm.click();
+    await expect(this.page.locator('.template-unlock-modal')).toHaveCount(0, { timeout: 5000 });
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  }
+
+  /**
+   * v2 template edit: LOCK a template, choosing what to do with the edits.
+   * Clicks the (unlocked) toggle to raise the decision modal and picks an option.
+   * The template instance must currently be the selected section (its bar visible).
+   * @param choice - 'commit' (Change on all pages), 'reset' (Reset changes), or 'cancel'
+   */
+  async lockTemplate(choice: 'commit' | 'reset' | 'cancel'): Promise<void> {
+    const toggle = this.page.locator('.sidebar-section-header[data-is-current="true"] .edit-template-toggle');
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await toggle.click();
+    const modal = this.page.locator('.template-lock-modal');
+    await expect(modal).toBeVisible({ timeout: 5000 });
+    const btn = { commit: '.template-commit', reset: '.template-reset', cancel: '.template-cancel' }[choice];
+    await modal.locator(btn).click();
+    await expect(modal).toHaveCount(0, { timeout: 5000 });
+  }
+
+  /**
    * Resolve a full (instance-scoped) block id from its template-child suffix. Forced-layout
    * nested template blocks are emitted as `${instanceId}::${templateChildId}` so two
    * instances of the same template don't collide in the blockPathMap; a test knows the

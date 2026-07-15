@@ -1939,3 +1939,224 @@ test.describe('Template Edit Mode - Lock affordance + metadata gating', () => {
     await expect(editItem).toContainText('Done editing template');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Template Edit Mode v2 — see docs/what-editors-will-experience/
+//   templates-and-layouts.md "Editing content inside a template".
+// Contract change:
+//  - Unlocking a template does NOT lock the rest of the page. The page stays
+//    editable and MULTIPLE templates can be unlocked at once.
+//  - Unlocking warns first (edits appear on every page using the template — on lock).
+//  - Locking commits: "Change on all pages" (save template doc) / "Reset changes"
+//    (revert only the template's own blocks, keep page edits) / "Cancel".
+//  - Templates save on LOCK, not on page save; saving the page while a template is
+//    unlocked is blocked with a "lock your templates first" prompt.
+// ---------------------------------------------------------------------------
+test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commit', () => {
+  // Two-instance fixture: instance 1 = test-layout, instance 2 = header-footer-layout.
+  const I1_HEADER = 'Template Header - From Template'; // fixed block, instance 1 (test-layout)
+  const I2_HEADER = 'Layout Header';                   // fixed block, instance 2 (header-footer-layout)
+  const I1_FOOTER = 'Template Footer - From Template';
+  const PAGE_TOP = 'page-block-top';
+  const PAGE_MID = 'page-block-mid';
+  const PAGE_BOTTOM = 'page-block-bottom';
+  const I1_CONTENT = 'i1-content'; // editable member of instance 1 (keeps its id)
+  const I2_CONTENT = 'i2-content'; // editable member of instance 2 (keeps its id)
+
+  test('unlocking a template warns before entering edit mode; cancel is a no-op', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Select the instance and click the lock toggle.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    const toggle = page.locator('.sidebar-section-header[data-is-current="true"] .edit-template-toggle');
+    await toggle.click();
+
+    // A warning modal appears — it must mention that the change hits every page.
+    const modal = page.locator('.template-unlock-modal');
+    await expect(modal).toBeVisible({ timeout: 5000 });
+    await expect(modal).toContainText(/every page|other pages|all pages/i);
+
+    // Cancel: no edit mode — the fixed block stays read-only, toggle stays locked.
+    await modal.locator('.template-cancel').click();
+    await expect(modal).toHaveCount(0);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await helper.waitForBlockReadonly(headerBlockId);
+
+    // Confirm: now edit mode — the fixed block becomes editable.
+    await toggle.click();
+    await modal.locator('.template-confirm').click();
+    await expect(modal).toHaveCount(0);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await helper.waitForBlockEditable(headerBlockId);
+  });
+
+  test('unlocking a template leaves the rest of the page editable (no page lock)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+
+    await helper.unlockTemplate(headerBlockId);
+    // The template's fixed block is now editable...
+    await helper.waitForBlockEditable(headerBlockId);
+
+    // ...and blocks OUTSIDE the template stay editable (this is the v2 change —
+    // they used to lock/grey out).
+    await helper.waitForBlockEditable(STANDALONE_BLOCK_1);
+    await helper.clickBlockInIframe(STANDALONE_BLOCK_1);
+    const standaloneEditor = helper.getSlateField(iframe.locator(`[data-block-uid="${STANDALONE_BLOCK_1}"]`));
+    expect(await standaloneEditor.getAttribute('contenteditable')).toBe('true');
+  });
+
+  test('two templates on one page can be unlocked and edited at the same time', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/two-template-page');
+
+    const { blockId: i1Header } = await helper.waitForBlockByContent(I1_HEADER);
+    const { blockId: i2Header } = await helper.waitForBlockByContent(I2_HEADER);
+
+    // Both templates start locked (fixed blocks read-only), page blocks editable.
+    await helper.waitForBlockReadonly(i1Header);
+    await helper.waitForBlockReadonly(i2Header);
+    await helper.waitForBlockEditable(PAGE_TOP);
+
+    // Unlock instance 1 → only its fixed block becomes editable; instance 2 stays locked.
+    await helper.unlockTemplate(I1_CONTENT);
+    await helper.waitForBlockEditable(i1Header);
+    await helper.waitForBlockReadonly(i2Header);
+    await helper.waitForBlockEditable(PAGE_MID); // page still editable
+
+    // Unlock instance 2 as well → BOTH are now editable simultaneously.
+    await helper.unlockTemplate(I2_CONTENT);
+    await helper.waitForBlockEditable(i2Header);
+    await helper.waitForBlockEditable(i1Header); // instance 1 stayed unlocked
+  });
+
+  test('locking a template opens a decision modal (Change on all pages / Reset / Cancel)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.unlockTemplate(headerBlockId);
+
+    // Click the (now unlocked) toggle → decision modal with the three choices.
+    const toggle = page.locator('.sidebar-section-header[data-is-current="true"] .edit-template-toggle');
+    await toggle.click();
+    const modal = page.locator('.template-lock-modal');
+    await expect(modal).toBeVisible({ timeout: 5000 });
+    await expect(modal.locator('.template-commit')).toContainText(/all pages/i);
+    await expect(modal.locator('.template-reset')).toContainText(/reset/i);
+    await expect(modal.locator('.template-cancel')).toBeVisible();
+
+    // Cancel keeps it unlocked (still editable).
+    await modal.locator('.template-cancel').click();
+    await expect(modal).toHaveCount(0);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await helper.waitForBlockEditable(headerBlockId);
+  });
+
+  test('Reset changes reverts the template blocks but keeps page-content edits', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/two-template-page');
+
+    const iframe = helper.getIframe();
+    const { blockId: i1Footer } = await helper.waitForBlockByContent(I1_FOOTER);
+    const footerLoc = iframe.locator(`[data-block-uid]`).filter({ hasText: I1_FOOTER });
+
+    await helper.unlockTemplate(I1_CONTENT);
+
+    // Structural template edit: delete a fixed template block of instance 1.
+    await helper.clickBlockInIframe(i1Footer);
+    await helper.waitForBlockSelectedInAdmin(i1Footer);
+    await page.evaluate((id) => {
+      document.dispatchEvent(new CustomEvent('hydra-delete-blocks', { detail: { blockIds: [id] } }));
+    }, i1Footer);
+    await expect(footerLoc).toHaveCount(0, { timeout: 5000 });
+
+    // Page-content edit (outside the template): delete a page block.
+    await helper.clickBlockInIframe(PAGE_BOTTOM);
+    await helper.waitForBlockSelectedInAdmin(PAGE_BOTTOM);
+    await page.evaluate((id) => {
+      document.dispatchEvent(new CustomEvent('hydra-delete-blocks', { detail: { blockIds: [id] } }));
+    }, PAGE_BOTTOM);
+    await expect(iframe.locator(`[data-block-uid="${PAGE_BOTTOM}"]`)).toHaveCount(0, { timeout: 5000 });
+
+    // Lock → Reset changes.
+    await helper.lockTemplate('reset');
+
+    // The template block comes back (template reverted to saved version)...
+    await expect(iframe.locator(`[data-block-uid]`).filter({ hasText: I1_FOOTER })).toBeVisible({ timeout: 5000 });
+    // ...but the page edit stays (page block is still gone).
+    await expect(iframe.locator(`[data-block-uid="${PAGE_BOTTOM}"]`)).toHaveCount(0);
+  });
+
+  test('Change on all pages saves the template document at LOCK time', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/two-template-page');
+
+    // Capture every template-document write (a PATCH/POST whose URL is NOT the page).
+    const templateWrites: string[] = [];
+    page.on('request', (req) => {
+      const m = req.method();
+      if (m !== 'PATCH' && m !== 'POST') return;
+      if (!req.url().startsWith(URLS.mockApi)) return;
+      let body: any = null;
+      try { body = req.postDataJSON(); } catch { /* not JSON */ }
+      if (!body || !body.blocks_layout) return;
+      if (req.url().replace(/\/$/, '').endsWith('/two-template-page')) return; // page write
+      templateWrites.push(`${m} ${req.url()}`);
+    });
+
+    const { blockId: i1Footer } = await helper.waitForBlockByContent(I1_FOOTER);
+    await helper.unlockTemplate(I1_CONTENT);
+
+    // Make a template edit.
+    await helper.clickBlockInIframe(i1Footer);
+    await helper.waitForBlockSelectedInAdmin(i1Footer);
+    await page.evaluate((id) => {
+      document.dispatchEvent(new CustomEvent('hydra-delete-blocks', { detail: { blockIds: [id] } }));
+    }, i1Footer);
+
+    // Locking with "Change on all pages" writes the template document now —
+    // before (and independently of) any page save.
+    await helper.lockTemplate('commit');
+    await expect.poll(() => templateWrites.length, { timeout: 5000 }).toBeGreaterThanOrEqual(1);
+  });
+
+  test('saving the page while a template is unlocked is blocked with a lock-first prompt', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Watch for a page PATCH — it must NOT happen while a template is unlocked.
+    let pagePatched = false;
+    page.on('request', (req) => {
+      if (req.method() !== 'PATCH') return;
+      if (req.url().replace(/\/$/, '').endsWith('/template-test-page')) pagePatched = true;
+    });
+
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.unlockTemplate(headerBlockId);
+
+    // Try to save the page.
+    await helper.saveContent().catch(() => { /* save is expected to be gated */ });
+
+    // A gate modal tells the user to lock their template(s) first, and the page
+    // is NOT saved.
+    const gate = page.locator('.template-save-gate-modal');
+    await expect(gate).toBeVisible({ timeout: 5000 });
+    await expect(gate).toContainText(/lock/i);
+    expect(pagePatched).toBe(false);
+  });
+});
