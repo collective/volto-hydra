@@ -208,15 +208,37 @@ function findSlateFields(
 }
 
 /**
+ * An empty text node (`{ text: '' }`, ignoring node-id metadata). Slate inserts
+ * these at inline boundaries — before a leading `<strong>`, between adjacent
+ * links, after a trailing inline — as normalization.
+ */
+function isEmptyTextNode(n: unknown): boolean {
+  if (!n || typeof n !== 'object' || Array.isArray(n)) return false;
+  const o = n as Record<string, unknown>;
+  if (o.text !== '') return false;
+  return Object.keys(o).every((k) => k === 'text' || k === 'nodeId' || k === 'data-node-id');
+}
+
+/**
  * Compare two slate trees for structural equality (types + text), ignoring
  * nodeId metadata and inline mark ordering. Used to verify that the DOM
  * round-trips back to the same Slate value via readSlateValueFromDOM.
+ *
+ * Empty text nodes are ignored on both sides: they are slate's inline-boundary
+ * normalization, which `readSlateValueFromDOM` produces (and hydra re-adds on
+ * load) but the renderer emits none of. So a stored value that hasn't been
+ * normalized — e.g. a `<p>` whose first child is a `<strong>`, stored as
+ * `[{strong}, …]` — round-trips to the same tree once these artifacts drop out.
+ * Any real (non-empty) text or structural difference is still caught, since only
+ * `{ text: '' }` nodes are removed.
  */
 function slateEqualIgnoringIds(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (Array.isArray(a) && Array.isArray(b)) {
-    if (a.length !== b.length) return false;
-    return a.every((item, i) => slateEqualIgnoringIds(item, b[i]));
+    const fa = a.filter((n) => !isEmptyTextNode(n));
+    const fb = b.filter((n) => !isEmptyTextNode(n));
+    if (fa.length !== fb.length) return false;
+    return fa.every((item, i) => slateEqualIgnoringIds(item, fb[i]));
   }
   if (a && b && typeof a === 'object' && typeof b === 'object') {
     const ao = a as Record<string, unknown>;
