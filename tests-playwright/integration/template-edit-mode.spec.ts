@@ -1663,13 +1663,15 @@ test.describe('Template Edit Mode - Permissions', () => {
     await helper.waitForSidebarOpen();
     await helper.escapeToParent();
 
-    // The Edit-template button is present but DISABLED (permission-gated), with a tooltip.
+    // The lock toggle on the template bar is present but DISABLED (permission-gated),
+    // with a tooltip. (It shows 🔒; the "Edit template" label lives in the ⋯ dropdown,
+    // which is omitted entirely when the user lacks permission.)
     const editButton = page.locator('.edit-template-toggle');
     await expect(editButton).toBeVisible({ timeout: 10000 });
     await expect(editButton).toBeDisabled();
     // Tooltip confirms can_edit=false reached the button (threading + key match).
     await expect(editButton).toHaveAttribute('title', /permission|Modify portal content/i);
-    await expect(editButton).toContainText('Edit template');
+    await expect(editButton).toContainText('🔒');
   });
 
   test('creating a template in a folder without Add permission is blocked at save', async ({ page }) => {
@@ -1790,5 +1792,42 @@ test.describe('Template Edit Mode - Lock affordance + metadata gating', () => {
     // Editing → both enabled.
     await expect(nameInput).toBeEnabled();
     await expect(folderBrowse).toBeEnabled();
+  });
+
+  // The template instance's sidebar bar carries a 🔒/🔓 lock toggle (the
+  // .edit-template-toggle) AND an "Edit template" item in its ⋯ dropdown — both
+  // replace the old standalone Edit/Done button.
+  test('the template bar dropdown has an Edit template item that toggles edit mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Select the template instance.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+
+    // The lock toggle on the bar reads 🔒 (locked, not editing).
+    const lockToggle = page.locator('.edit-template-toggle');
+    await expect(lockToggle).toBeVisible({ timeout: 5000 });
+    await expect(lockToggle).toHaveAttribute('aria-pressed', 'false');
+    await expect(lockToggle).toContainText('🔒');
+
+    // Open the ⋯ dropdown on the current (instance) section header and click "Edit template".
+    await page.locator('.sidebar-section-header[data-is-current="true"] .menu-trigger').click();
+    const editItem = page.locator('.volto-hydra-dropdown-item.edit-template-item');
+    await expect(editItem).toBeVisible({ timeout: 5000 });
+    await expect(editItem).toContainText('Edit template');
+    await editItem.click();
+
+    // Edit mode is now active: outside blocks lock; the bar toggle flips to 🔓.
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+    await expect(lockToggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(lockToggle).toContainText('🔓');
+
+    // The dropdown item now reads "Done editing template".
+    await page.locator('.sidebar-section-header[data-is-current="true"] .menu-trigger').click();
+    await expect(editItem).toContainText('Done editing template');
   });
 });

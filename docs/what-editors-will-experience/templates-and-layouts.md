@@ -64,12 +64,25 @@ The point of `slotId` is that two layouts can share the same set of region names
 
 ## Editing content inside a template
 
-Editing inside a template block (one that came from the merged template) goes through a special **template edit mode**. While in template edit mode:
+A template is **locked** by default: you're editing *this page's* content, and the template's fixed parts are read-only. To change the template itself you **unlock** it, which enters a special **template edit mode**.
+
+Select any block from the template and click the **lock icon** 🔒 — it appears in two places:
+
+- on the block's **Quanta toolbar** in the canvas (where the drag handle would be), and
+- on the template's bar in the **sidebar** ("Template: *name*"), next to its `⋯` menu.
+
+That same `⋯` menu also has an **Edit template** item. Any of these enters template edit mode: the lock turns into an **unlock** icon 🔓, and the sidebar's Template Name / Save Location become editable (they're disabled while locked — you can't rename or relocate a template without editing it).
+
+![A template instance selected but locked: the template is outlined and its sidebar bar "Template: test-layout" shows a closed lock icon 🔒; the Template Name / Save Location fields are disabled.](_images/template-edit-locked.png)
+
+While in template edit mode:
 
 - Blocks inside the template instance become editable, including those marked readonly.
 - Blocks outside the template instance become locked.
 
-This lets you edit the template's *definition* without leaving the page — the changes propagate back to the saved template, so any other page using it picks up the change. Switch out of template edit mode (typically a toolbar action labelled "Edit template" / "Done") to go back to editing this page's content.
+![The same template unlocked for editing: the sidebar bar shows an open lock 🔓, the Template Name / Save Location fields are enabled, and the template's structure (Header, Grid, slots) is listed below.](_images/template-edit-editing.png)
+
+This lets you edit the template's *definition* without leaving the page — the changes propagate back to the saved template, so any other page using it picks up the change. **Lock it again** — click the 🔓, or pick "Done editing template" from the `⋯` menu — to go back to editing this page's content.
 
 ```{warning}
 Edits made in template edit mode update the **template** itself, which may affect other pages. If you only want to override a value for this one page, look for a non-readonly version of the field on this page rather than entering template edit mode.

@@ -21,7 +21,6 @@ import { createPortal } from 'react-dom';
 import {
   getTemplateInstanceSchema,
   getTemplateBlockSettingsSchema,
-  getTemplateEditButtonState,
   blockKindFromFlags,
   blockKindFlags,
 } from './templateSettingsSchema';
@@ -201,6 +200,20 @@ const ParentBlockSection = ({
   // Get pathInfo for template instance detection
   const pathInfo = blockPathMap?.[blockId];
 
+  // This section IS a top-level template instance → it carries the lock/unlock
+  // toggle (on this "blind" header bar) + the "Edit template" dropdown item, which
+  // replace the old standalone Edit-template button. Locked (🔒) = not editing;
+  // unlocked (🔓) = editing this template. Permission-gated on the template doc.
+  const isThisTemplateInstance =
+    !!pathInfo?.isTemplateInstance && !pathInfo?.isNestedTemplateInstance;
+  const isEditingThisTemplate = templateEditMode === blockId;
+  const canEditTemplate =
+    templatePermissions?.[pathInfo?.templateId]?.can_edit ?? true;
+  const canToggleTemplateEdit =
+    isThisTemplateInstance && !!onToggleTemplateEditMode && canEditTemplate;
+  const toggleTemplateEdit = () =>
+    onToggleTemplateEditMode(isEditingThisTemplate ? null : blockId);
+
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [menuButtonRect, setMenuButtonRect] = React.useState(null);
   const menuButtonRef = React.useRef(null);
@@ -306,6 +319,43 @@ const ParentBlockSection = ({
               </div>
             );
           })()}
+          {/* Lock/unlock toggle for a top-level template instance — the obvious,
+              consistent replacement for the old standalone Edit-template button.
+              🔒 = locked (not editing) → click to unlock & edit; 🔓 = editing →
+              click to lock (exit). Keeps the .edit-template-toggle contract. */}
+          {isThisTemplateInstance && onToggleTemplateEditMode && (
+            <button
+              type="button"
+              className={`edit-template-toggle${isEditingThisTemplate ? ' edit-template-toggle--active' : ''}`}
+              aria-pressed={isEditingThisTemplate}
+              aria-label={isEditingThisTemplate ? 'Lock template (stop editing)' : 'Unlock template to edit'}
+              disabled={!canEditTemplate}
+              title={
+                canEditTemplate
+                  ? isEditingThisTemplate
+                    ? 'Locking exits template edit mode'
+                    : 'Unlock to edit this template’s structure'
+                  : 'You don’t have permission to edit this template (requires “Modify portal content”).'
+              }
+              onClick={toggleTemplateEdit}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '4px',
+                cursor: canEditTemplate ? 'pointer' : 'not-allowed',
+                fontSize: '15px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '2px',
+                opacity: canEditTemplate ? 1 : 0.5,
+              }}
+              onMouseEnter={(e) => canEditTemplate && (e.currentTarget.style.background = '#e8e8e8')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+            >
+              {isEditingThisTemplate ? '🔓' : '🔒'}
+            </button>
+          )}
           <button
             ref={menuButtonRef}
             className="menu-trigger"
@@ -344,6 +394,9 @@ const ParentBlockSection = ({
                 isReadonly={!!blockData?.readOnly}
                 isInTemplate={!!blockData?.templateId}
                 onMakeTemplate={onBlockAction ? () => onBlockAction('makeTemplate', blockId) : null}
+                isTemplateInstance={isThisTemplateInstance}
+                isEditingTemplate={isEditingThisTemplate}
+                onToggleTemplateEdit={canToggleTemplateEdit ? toggleTemplateEdit : null}
               />
             );
           })()}
@@ -701,20 +754,6 @@ const ParentBlocksWidget = ({
   // Get parent chain
   const parentIds = getParentChain(selectedBlock, blockPathMap);
 
-  // The (non-nested) template instance the selection belongs to — drives the Edit-template
-  // button at the top of the panel. Walk up the selection's parent chain to find it.
-  const findTemplateInstance = (bid) => {
-    let cur = bid;
-    while (cur) {
-      const pi = blockPathMap[cur];
-      if (!pi) break;
-      if (pi.isTemplateInstance && !pi.isNestedTemplateInstance) return cur;
-      cur = pi.parentId;
-    }
-    return null;
-  };
-  const templateInstanceBlockId = findTemplateInstance(selectedBlock);
-
   // Get current block data and type from blockPathMap (single source of truth)
   // For virtual blocks (like template instances), use blockData from pathMap
   const pathInfo = blockPathMap[selectedBlock];
@@ -731,41 +770,9 @@ const ParentBlocksWidget = ({
     <>
       {createPortal(
         <>
-          {/* Edit-template button — first in the virtual-blocks panel; the obvious,
-              permission-gated way to enter/exit template edit mode (replaces the buried
-              editTemplate checkbox). */}
-          {templateInstanceBlockId && (() => {
-            const tplInfo = blockPathMap[templateInstanceBlockId];
-            const canEdit = templatePermissions?.[tplInfo?.templateId]?.can_edit ?? true;
-            const isEditing = templateEditMode === templateInstanceBlockId;
-            const btn = getTemplateEditButtonState({ canEdit, isEditing });
-            return (
-              <button
-                type="button"
-                className={`edit-template-toggle${isEditing ? ' edit-template-toggle--active' : ''}`}
-                aria-pressed={isEditing}
-                disabled={btn.disabled}
-                title={btn.title}
-                onClick={() =>
-                  onToggleTemplateEditMode(isEditing ? null : templateInstanceBlockId)
-                }
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  marginBottom: '8px',
-                  border: '1px solid',
-                  borderColor: isEditing ? '#0b78d0' : '#ccc',
-                  borderRadius: '4px',
-                  background: isEditing ? '#0b78d0' : '#fff',
-                  color: btn.disabled ? '#999' : isEditing ? '#fff' : '#0b78d0',
-                  fontWeight: 600,
-                  cursor: btn.disabled ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {btn.label}
-              </button>
-            );
-          })()}
+          {/* The template edit toggle is no longer a standalone button here — it now
+              lives as a lock/unlock icon on the template instance's header bar (and in
+              that bar's ⋯ dropdown), plus the Quanta toolbar lock in-canvas. */}
           {/* Parent blocks with headers + settings */}
           {parentIds.map((parentId, index) => {
             // For virtual blocks (like template instances), use blockData from pathMap

@@ -215,6 +215,47 @@ test.describe('Editor Guide screenshots', () => {
     await snap(page, 'template-locked');
   });
 
+  test('template-edit-locked — template instance selected, lock on the bar (not editing)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Select a fixed template block, then step up to the template instance — its
+    // sidebar bar shows the 🔒 lock (not editing) and the Template Settings form
+    // with Name/Location disabled.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent('Template Header - From Template');
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    await expect(page.locator('.edit-template-toggle')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.edit-template-toggle')).toHaveAttribute('aria-pressed', 'false');
+
+    await snap(page, 'template-edit-locked');
+  });
+
+  test('template-edit-editing — unlocked, editing the template (unlock icon, fields enabled)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent('Template Header - From Template');
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+
+    // Unlock → template edit mode. Outside blocks lock; the bar toggle flips to 🔓.
+    await page.locator('.edit-template-toggle').click();
+    await helper.waitForBlockReadonly('standalone-block-1');
+    await expect(page.locator('.edit-template-toggle')).toHaveAttribute('aria-pressed', 'true', { timeout: 5000 });
+
+    // Re-select the instance so its (now enabled) Template Settings are shown.
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+
+    await snap(page, 'template-edit-editing');
+  });
+
   test('frontend-switcher — toolbar panel with viewport + frontends', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
