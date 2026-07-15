@@ -125,12 +125,29 @@ test.describe('Block sanity (auto-discovered)', () => {
     // string) — fails as its own test rather than blocking the suite.
     if (block.shapeIssue || block.slateIssue) {
       const kind = block.shapeIssue ? 'data shape' : 'slate structure';
-      test(`${block.blockType} block [${block.blockId}] has valid ${kind}`, () => {
+      // Include pagePath + field: a blockId can repeat across pages, and a block
+      // can have per-field shape/slate issues — without them, two entries would
+      // collide into a "duplicate test title" error and abort the whole run.
+      const where = `${block.pagePath || '?'}${block.field ? `.${block.field}` : ''}`;
+      test(`${block.blockType} block [${block.blockId}] on ${where} has valid ${kind}`, () => {
         throw new Error(
           `Block "${block.blockType}" [${block.blockId}] on ${block.pagePath}` +
             (block.field ? ` field "${block.field}"` : '') +
             ` has ${kind} that does not match its schema:\n` +
             (block.issues || []).map((m) => `  - ${m}`).join('\n'),
+        );
+      });
+      continue;
+    }
+    // A field present in stored data but not declared in the block schema — one
+    // test per (blockType, field) so each missing field is reported once. It
+    // can't be edited in the sidebar until the schema declares it.
+    if (block.undeclaredField) {
+      test(`${block.blockType} block declares field "${block.field}" in its schema`, () => {
+        throw new Error(
+          `Block "${block.blockType}" stores field "${block.field}" (e.g. on ` +
+            `${block.pagePath}) but its schema does not declare it — the field can't be ` +
+            `edited in the sidebar. Add it to the block schema, or remove the stray data.`,
         );
       });
       continue;
@@ -153,6 +170,11 @@ test.describe('Block sanity (auto-discovered)', () => {
         `${mockParentUrl}?api_path=${encodeURIComponent(apiPath)}${frontend}`,
       );
       await helper.waitForIframeReady();
+      // waitForIframeReady only confirms the DOM mounted; verifyBlockRendering
+      // reads __hydraBridge.blockPathMap, which is only populated once the
+      // bridge has received INITIAL_DATA. Without this wait the render check
+      // races bridge init and flakily throws "blockPathMap not available".
+      await helper.waitForBridgeConnected();
 
       const iframe = helper.getIframe();
 

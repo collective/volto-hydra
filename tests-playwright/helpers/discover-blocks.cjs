@@ -57,6 +57,25 @@ function buildAllowedBlocksList(blocksConfig) {
 }
 
 /**
+ * The field whose value names the @type of the items a listing/grid renders.
+ * A listing declares it on `schemaEnhancer.inheritSchemaFrom.typeField` (it has
+ * no blocks field); a grid declares `itemTypeField` on its blocks_layout /
+ * object_list field. The value that field holds MUST be a registered block type
+ * — expandListingBlocks stamps it onto every expanded item's `@type`, so a value
+ * that isn't a real block type makes every result render as "Unimplemented".
+ * Returns the field name, or null when the block renders no dynamic items.
+ */
+function itemTypeFieldOf(blockDef) {
+  const tf = blockDef?.schemaEnhancer?.inheritSchemaFrom?.typeField;
+  if (tf) return tf;
+  const props = blockDef?.blockSchema?.properties || {};
+  for (const def of Object.values(props)) {
+    if (def && typeof def === 'object' && def.itemTypeField) return def.itemTypeField;
+  }
+  return null;
+}
+
+/**
  * A blocks_layout region seeds an `@type: "empty"` placeholder — rather than a
  * concrete default/single type — exactly when it has no `defaultBlockType` and
  * more than one `allowedBlocks`. Mirrors getEmptyBlockType() in
@@ -312,13 +331,18 @@ function validateSlateNode(node, pathStr, issues) {
 /**
  * Walk a block's data for slate-shaped fields (arrays whose first item looks
  * like a slate node) and record all structural issues:
- *  - Multi-root values force renderers to add a nodeId-less wrapper.
+ *  - A slate field always resolves to exactly ONE top-level node (see
+ *    visual-editing.md "One top-level node per slate field"). Hydra normalizes
+ *    extras during editing — the `value` of a `slate` BLOCK splits each extra
+ *    node into its own block; a slate FIELD on any other block flattens them
+ *    back into the first node — so stored data with >1 top-level node is
+ *    un-normalized and breaks the one-node guarantee renderers rely on.
  *  - Missing `type` on root element.
  *  - Invalid node shapes anywhere in the tree.
  *
  * Schema-independent; runs against raw API data.
  */
-function collectSlateIssues(blockData, pagePath, blockId, out) {
+function collectSlateIssues(blockData, pagePath, blockId, out, blockType) {
   if (!blockData || typeof blockData !== 'object') return;
   for (const [key, value] of Object.entries(blockData)) {
     if (key.startsWith('@') || key === 'blocks' || key === 'blocks_layout') continue;
@@ -331,7 +355,12 @@ function collectSlateIssues(blockData, pagePath, blockId, out) {
 
     const issues = [];
     if (value.length > 1) {
-      issues.push(`multiple top-level nodes (${value.length}); split into separate blocks`);
+      // Advice differs by where the field lives, but both are invalid stored data.
+      const advice =
+        blockType === 'slate'
+          ? 'split into separate blocks'
+          : 'flatten into a single top-level node (a slate field holds exactly one)';
+      issues.push(`multiple top-level nodes (${value.length}); ${advice}`);
     }
     for (let i = 0; i < value.length; i++) {
       validateSlateNode(value[i], `value[${i}]`, issues);
@@ -365,7 +394,17 @@ function collectSlateIssues(blockData, pagePath, blockId, out) {
  *  - `widget: 'slate'` — value is a non-empty array of slate nodes (deep
  *    structural checks stay in collectSlateIssues)
  */
-function collectWidgetShapeIssues(blockData, blockSchema, pagePath, blockId, out) {
+// Fields present in block data that are not schema properties but are never
+// authored/editable content: structural, serialisation, and Volto slot runtime.
+const UNDECLARED_EXEMPT = new Set([
+  'id', 'blocks', 'blocks_layout', 'image_scales', 'plaintext', 'value',
+  'styles', 'override', 'block',
+  'fixed', 'slotId', 'templateId', 'readOnly',
+]);
+
+function collectWidgetShapeIssues(
+  blockData, blockSchema, pagePath, blockId, out, blockType, undeclaredFields,
+) {
   const props = blockSchema?.properties;
   if (!props || !blockData || typeof blockData !== 'object') return;
 
@@ -383,13 +422,73 @@ function collectWidgetShapeIssues(blockData, blockSchema, pagePath, blockId, out
     const describe = (exp, got) =>
       `field "${field}": expected ${exp}, got ${Array.isArray(got) ? `array(${got.length})` : typeof got}`;
 
+    // Plone rich text (`widget: 'richtext'`, value serialized as
+    // `{data: '<html>', encoding, content-type}`) is not permitted: this design
+    // system renders all rich text as slate so it round-trips through the
+    // editing bridge. Flag it from either side —
+    //   1. the schema still declares `widget: 'richtext'`, or
+    //   2. the stored value is still the `{data: '<html>'}` object
+    //      (catches content the slate migration hasn't converted yet, even once
+    //      the schema has been flipped to `widget: 'slate'`).
+    const looksLikeRichText =
+      value && typeof value === 'object' && !Array.isArray(value) && typeof value.data === 'string';
+    if (widget === 'richtext' || looksLikeRichText) {
+      issues.push(
+        `field "${field}": Plone rich text is not allowed — this design system renders rich text as slate. ` +
+          `Declare the field as \`widget: 'slate'\` (an array of slate nodes) and store its value as slate, ` +
+          `not \`{data: '<html>'}\`.`,
+      );
+      continue;
+    }
+
+    // Images must be declared with the image widget so the editor offers an
+    // upload control and the frontend resolves scales. Detect an image
+    // reference by its Plone markers (image_scales / image_field) or a
+    // data:image URI, and require the declaring field to be `widget: 'image'`.
+    const looksLikeImageRef =
+      (value && typeof value === 'object' && !Array.isArray(value) &&
+        ('image_scales' in value || 'image_field' in value)) ||
+      (typeof value === 'string' && value.startsWith('data:image/'));
+    if (looksLikeImageRef && widget !== 'image') {
+      issues.push(
+        `field "${field}": image reference must be declared \`widget: 'image'\`, ` +
+          `got ${widget ? `\`widget: '${widget}'\`` : 'no widget'}.`,
+      );
+      continue;
+    }
+
+    // A URL/link value must live in a url/link widget so the editor gives a link
+    // control and the frontend resolves it. Flag an absolute (http(s)://) or
+    // site-relative (/path) string sitting in a plain text field. url,
+    // object_browser (incl. mode:'link'), image and file legitimately hold
+    // URLs/paths and are handled by their own branches.
+    const urlWidgets = ['url', 'object_browser', 'image', 'file'];
+    const looksLikeUrl =
+      typeof value === 'string' &&
+      (/^https?:\/\//.test(value) || /^\/[^/]/.test(value));
+    if (looksLikeUrl && !urlWidgets.includes(widget)) {
+      issues.push(
+        `field "${field}": value looks like a URL/link (${JSON.stringify(value.slice(0, 48))}` +
+          `) — declare it as \`widget: 'url'\` (or \`widget: 'object_browser'\`, ` +
+          `mode: 'link' for a content link), not a plain text field.`,
+      );
+      continue;
+    }
+
     if (widget === 'url') {
       if (typeof value !== 'string') {
         issues.push(describe('url string', value));
       }
     } else if (widget === 'object_browser') {
       // Plone link format: [{"@id": "/path"}] (array of objects with @id).
-      if (!Array.isArray(value)) {
+      // `mode: 'link'` fields additionally accept a plain string href — a link
+      // may be an external URL or come from a listing fieldMapping (@id -> a
+      // string), and the frontend's link resolver handles both. Only reject a
+      // string for non-link object browsers (content/image selection), where an
+      // @id array is required.
+      if (def?.mode === 'link' && typeof value === 'string') {
+        // valid href
+      } else if (!Array.isArray(value)) {
         issues.push(describe('object_browser array', value));
       } else if (value.length && (typeof value[0] !== 'object' || !value[0]['@id'])) {
         issues.push(`field "${field}": object_browser items must be objects with "@id"`);
@@ -406,6 +505,13 @@ function collectWidgetShapeIssues(blockData, blockSchema, pagePath, blockId, out
       if (!ok) {
         issues.push(`field "${field}": image expected string (URL/data URI), object, or array of objects with "@id" — got ${Array.isArray(value) ? 'malformed array' : typeof value}`);
       }
+    } else if (widget === 'file') {
+      // This DS renders images through the shared image pipeline; an image
+      // field must use `widget: 'image'` (not the generic file upload) so it is
+      // shape-checked and edited as an image.
+      issues.push(
+        `field "${field}": image content must use \`widget: 'image'\`, not \`widget: 'file'\`.`,
+      );
     } else if (widget === 'select' || widget === 'choice' || def?.factory === 'Choice') {
       const choices = def.choices || [];
       const allowed = choices.map(c => (Array.isArray(c) ? c[0] : c));
@@ -456,6 +562,22 @@ function collectWidgetShapeIssues(blockData, blockSchema, pagePath, blockId, out
     }
   }
 
+  // Reverse check: a stored field with no schema property. Only declared fields
+  // (plus blocks/blocks_layout) belong in a block's data — an undeclared field
+  // means the schema is missing it (it can't be edited in the sidebar) or the
+  // data is stray. Collected per (blockType, field) so it reports ONCE per field
+  // name, not once per instance. Structural / serialisation keys and Volto
+  // slot-runtime fields (added by the slot editor, not authored data) are exempt.
+  if (blockType) {
+    for (const key of Object.keys(blockData)) {
+      if (key.startsWith('@') || UNDECLARED_EXEMPT.has(key) || props[key]) continue;
+      const dedupeKey = `${blockType} ${key}`;
+      if (!undeclaredFields.has(dedupeKey)) {
+        undeclaredFields.set(dedupeKey, { blockType, field: key, pagePath, blockId });
+      }
+    }
+  }
+
   if (issues.length) {
     out.push({ pagePath, blockId, blockType: blockData['@type'], issues });
   }
@@ -471,6 +593,9 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   const seen = new Map();
   const slateIssues = [];
   const shapeIssues = [];
+  // (blockType, field) → one example location, for fields present in data but
+  // absent from the schema. Deduped so each missing field is reported once.
+  const undeclaredFields = new Map();
   // Containment: a non-fixed block whose @type isn't in its container's resolved
   // allowedSiblingTypes can't be reordered within its container (the mobile
   // chevron / drag walks it OUT to the nearest ancestor that accepts the type,
@@ -482,6 +607,12 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   // for these. Collect all occurrences so the report shows every page
   // affected, not just the first.
   const unregisteredTypes = new Map(); // blockType → [{pagePath, blockId}]
+  // Item block types a stored listing/grid renders via its item-type field, and
+  // WHERE. Such a type has no stored authored instance of its own, but it IS
+  // rendered on the page holding that listing/grid — so we emit its render test
+  // anchored there (the items share the container's data-block-uid).
+  // itemType → { pagePath, containerUid }
+  const itemTypeExamples = new Map();
   const REGISTERED = new Set(Object.keys(blocksConfig || {}));
   // Plone content types appear as @type on the page root (Document, etc.)
   // — skip these, they're not blocks.
@@ -586,23 +717,55 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
           });
         }
 
-        collectSlateIssues(blockData, pagePath, blockId, slateIssues);
-        collectWidgetShapeIssues(blockData, schema, pagePath, blockId, shapeIssues);
+        collectSlateIssues(blockData, pagePath, blockId, slateIssues, blockType);
+        collectWidgetShapeIssues(
+          blockData, schema, pagePath, blockId, shapeIssues, blockType, undeclaredFields,
+        );
 
-        // Unregistered block type: only real @type values placed at a
-        // blocks_layout-style position count. Object_list sub-items don't
-        // need top-level registration — their type is controlled by the
-        // parent's schema.
-        const isTopLevelBlock = entry.containerField === 'blocks' || entry.parentId === '_page';
+        // Unregistered block type: any real @type the frontend can't render is
+        // a problem no matter how deep it sits — a nested unknown falls through
+        // to the "Not implemented" placeholder just like a top-level one. Flag
+        // every unregistered @type at any depth (object_list sub-items whose
+        // type is parent-controlled have no @type of their own, so they're
+        // naturally excluded by the `blockType` guard).
         if (
           blockType &&
-          isTopLevelBlock &&
           REGISTERED.size &&
           !REGISTERED.has(blockType) &&
           !PAGE_TYPES.has(blockType)
         ) {
           if (!unregisteredTypes.has(blockType)) unregisteredTypes.set(blockType, []);
           unregisteredTypes.get(blockType).push({ pagePath, blockId });
+        }
+
+        // A listing/grid stamps its item-type field's VALUE onto every expanded
+        // result's @type, so that value must be a registered block type. When it
+        // is, record the type as covered (it's rendered — and render-tested — on
+        // this block's page even without a stored instance of its own). When it
+        // isn't, flag it: every result would fall through to "Unimplemented".
+        if (blockType) {
+          const itemTypeField = itemTypeFieldOf(blocksConfig[blockType]);
+          if (itemTypeField) {
+            const itemType = blockData[itemTypeField];
+            if (typeof itemType === 'string' && itemType && itemType !== 'default') {
+              if (REGISTERED.has(itemType)) {
+                if (!itemTypeExamples.has(itemType)) {
+                  itemTypeExamples.set(itemType, { pagePath, containerUid: blockId });
+                }
+              } else if (!PAGE_TYPES.has(itemType)) {
+                shapeIssues.push({
+                  pagePath,
+                  blockId,
+                  blockType,
+                  issues: [
+                    `field "${itemTypeField}": item type ${JSON.stringify(itemType)} is not a registered block ` +
+                      `type — ${blockType} expands each result as \`@type: ${JSON.stringify(itemType)}\`, which the ` +
+                      `frontend renders as "Unimplemented". Set it to a registered item block type (e.g. "card", "listItem").`,
+                  ],
+                });
+              }
+            }
+          }
         }
 
         // Only add real @type blocks to the dedup set used for sanity tests.
@@ -780,24 +943,58 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
     });
   }
 
+  // One failing test per (blockType, field) present in data but missing from
+  // the schema — reported once, not per instance. A schema-completeness backlog
+  // (these fields can't be edited in the sidebar until declared).
+  for (const { blockType, field, blockId, pagePath } of undeclaredFields.values()) {
+    result.push({ blockType, blockId, pagePath, field, undeclaredField: true });
+  }
+
   // Every block type the FRONTEND registers needs at least one content
-  // example so the sanity spec emits a render test for it. We use
-  // `frontendKeys` (passed in) — the set of types the frontend sent via
-  // INIT.blocks — so mock-parent's own test baseline (hero, slate, mock-*)
-  // doesn't trigger false positives. `restricted: true` types (form fields,
-  // column sub-blocks) are only valid inside specific containers and are
-  // covered by their parent's render test.
+  // example so the sanity spec emits a render test for it — INCLUDING
+  // `restricted` types. `restricted` only means "not offered in the page block
+  // chooser"; the block still renders (inside a container), so it still needs
+  // an example to be render-tested. If a type is genuinely container-only, add
+  // a fixture whose parent instance uses it — the child is then discovered
+  // nested and covered — rather than relying on `restricted` to skip coverage.
+  // `frontendKeys` (types the frontend sent via INIT.blocks) keeps mock-parent's
+  // own baseline (hero, slate, mock-*) from causing false positives.
   if (frontendKeys && frontendKeys.length) {
-    const discoveredTypes = new Set(result.map((r) => r.blockType));
-    const missing = [];
-    for (const blockType of frontendKeys) {
-      const cfg = blocksConfig[blockType];
-      if (cfg?.restricted) continue;
-      if (!discoveredTypes.has(blockType)) missing.push(blockType);
+    // Coverage requirement = the frontend's own registered types PLUS every type
+    // they declare addable in a region (`allowedBlocks`). A block that can be
+    // added anywhere must render, so it needs a content example even when it is
+    // not itself a top-level registered type — this is how the always-addable
+    // default blocks (slate, image) enter the hard coverage set. Restricted to
+    // FRONTEND schemas (`parentType` in frontendKeys) so the mock-parent test
+    // baseline's own allowedBlocks (e.g. 'column') don't create false positives.
+    const frontendKeySet = new Set(frontendKeys);
+    const required = new Set(frontendKeys);
+    for (const { parentType, allowedBlocks } of allowedBlocksList) {
+      if (!frontendKeySet.has(parentType)) continue;
+      for (const subType of allowedBlocks) required.add(subType);
     }
-    // A registered type with no content example can't get a render test — but
-    // that is a failing test for that type, not a reason to block the suite.
-    for (const blockType of missing) {
+    const discoveredTypes = new Set(result.map((r) => r.blockType));
+    for (const blockType of required) {
+      if (discoveredTypes.has(blockType)) continue;
+      // A dynamic listing/grid item type has no stored authored instance, but a
+      // stored listing/grid that VALIDLY names it renders it on a real page.
+      // Emit its render test anchored on that page against the container's uid:
+      // the expanded items share their container's data-block-uid, so verifying
+      // the container walks the rendered items (their images must load, etc.).
+      // Added after the by-uid dedup above, so it coexists with the container's
+      // own test but is labelled as this item type. A type nothing validly
+      // renders (or only named via an already-flagged invalid value) still fails.
+      const ex = itemTypeExamples.get(blockType);
+      if (ex) {
+        result.push({
+          blockType,
+          blockId: ex.containerUid,
+          pagePath: ex.pagePath,
+          blockData: {},
+          isListing: true,
+        });
+        continue;
+      }
       result.push({ blockType, noExample: true });
     }
   }

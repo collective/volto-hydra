@@ -120,12 +120,14 @@ export async function checkEditAnnotations(
   expect(offSiteLinks, 'Links should not point to a different localhost service (e.g. the API)').toEqual([]);
 
   // All images must have data-edit-media
+  // Decorative images (aria-hidden) are chrome, not editable content — e.g. a
+  // card's "→" arrow icon — so they don't carry data-edit-media.
   const imagesWithout = await block.locator('img').evaluateAll(
     (els: Element[]) => (els as HTMLImageElement[])
-      .filter(el => !el.hasAttribute('data-edit-media'))
+      .filter(el => !el.hasAttribute('data-edit-media') && el.getAttribute('aria-hidden') !== 'true')
       .map(el => el.getAttribute('src')),
   );
-  expect(imagesWithout, 'All images should have data-edit-media').toEqual([]);
+  expect(imagesWithout, 'All non-decorative images should have data-edit-media').toEqual([]);
 
   // All images must have a non-empty src and not be broken (naturalWidth > 0)
   const brokenImages = await block.locator('img').evaluateAll(
@@ -140,14 +142,34 @@ export async function checkEditAnnotations(
   );
   expect(brokenImages, 'All images should have valid src and load successfully').toEqual([]);
 
-  // Any string field in block data whose value the renderer displays must
-  // sit inside [data-edit-text] so the editor can target it. Data-driven
-  // (no hardcoded field names): iterate every string-valued field, skip
-  // @-prefixed metadata, skip values not present in the rendered DOM.
+  // Any inline-text field the renderer displays must sit inside [data-edit-text]
+  // so the editor can target it. Drive this off the block schema: only plain
+  // text widgets qualify. Choice/select/object_browser/icon/file/slate fields are
+  // NOT inline text and would false-positive on coincidental text — e.g. a
+  // Choice `colour: "white"`, or `type: "info"` matching the material-icon
+  // ligature "info" rendered for the alert. Without a schema we cannot tell
+  // which fields are editable text, so skip rather than guess.
   if (blockData) {
+    const blockUid = await block.getAttribute('data-block-uid');
+    const schema = blockUid
+      ? await block.evaluate(
+          (_el, uid) => (window as any).__hydraBridge?.getBlockSchema?.(uid) || null,
+          blockUid,
+        )
+      : null;
+    const props = schema?.properties as Record<string, any> | undefined;
+    const isInlineTextField = (field: string): boolean => {
+      const p = props?.[field];
+      if (!p) return false; // not a schema field → not editable inline text
+      if (p.factory === 'Choice' || p.choices) return false; // dropdown, not text
+      const w = p.widget;
+      if (w && w !== 'text' && w !== 'textarea') return false; // select/icon/object_browser/file/slate/…
+      return p.type === undefined || p.type === 'string';
+    };
     for (const [field, value] of Object.entries(blockData)) {
       if (field.startsWith('@')) continue;
       if (typeof value !== 'string' || !value) continue;
+      if (!isInlineTextField(field)) continue;
       const hasEditText = await block.evaluate(
         (el, v) => {
           const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -186,15 +208,37 @@ function findSlateFields(
 }
 
 /**
+ * An empty text node (`{ text: '' }`, ignoring node-id metadata). Slate inserts
+ * these at inline boundaries — before a leading `<strong>`, between adjacent
+ * links, after a trailing inline — as normalization.
+ */
+function isEmptyTextNode(n: unknown): boolean {
+  if (!n || typeof n !== 'object' || Array.isArray(n)) return false;
+  const o = n as Record<string, unknown>;
+  if (o.text !== '') return false;
+  return Object.keys(o).every((k) => k === 'text' || k === 'nodeId' || k === 'data-node-id');
+}
+
+/**
  * Compare two slate trees for structural equality (types + text), ignoring
  * nodeId metadata and inline mark ordering. Used to verify that the DOM
  * round-trips back to the same Slate value via readSlateValueFromDOM.
+ *
+ * Empty text nodes are ignored on both sides: they are slate's inline-boundary
+ * normalization, which `readSlateValueFromDOM` produces (and hydra re-adds on
+ * load) but the renderer emits none of. So a stored value that hasn't been
+ * normalized — e.g. a `<p>` whose first child is a `<strong>`, stored as
+ * `[{strong}, …]` — round-trips to the same tree once these artifacts drop out.
+ * Any real (non-empty) text or structural difference is still caught, since only
+ * `{ text: '' }` nodes are removed.
  */
 function slateEqualIgnoringIds(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (Array.isArray(a) && Array.isArray(b)) {
-    if (a.length !== b.length) return false;
-    return a.every((item, i) => slateEqualIgnoringIds(item, b[i]));
+    const fa = a.filter((n) => !isEmptyTextNode(n));
+    const fb = b.filter((n) => !isEmptyTextNode(n));
+    if (fa.length !== fb.length) return false;
+    return fa.every((item, i) => slateEqualIgnoringIds(item, fb[i]));
   }
   if (a && b && typeof a === 'object' && typeof b === 'object') {
     const ao = a as Record<string, unknown>;
@@ -414,7 +458,30 @@ export async function verifyBlockRendering(
   if (isFieldlessBlock && (await block.count()) === 0) {
     return; // metadata-projection block legitimately rendered nothing
   }
-  await expect(block).toBeVisible({ timeout: 15000 });
+  await expect(block.first()).toBeVisible({ timeout: 15000 });
+
+  // A data-block-uid may match several elements. That is legitimate for a
+  // listing/container block whose expanded items carry the parent uid
+  // (expandListingBlocks — see listing-links.tsx), but ONLY when the matches are
+  // contiguous: the container element contains all the rest. The same block
+  // rendered twice in separate DOM subtrees is a real bug. Discovery flags the
+  // literal `listing` type (handled above); this covers the container blocks
+  // that hold one (footer/tags/linkList, search results).
+  if ((await block.count()) > 1) {
+    const contiguous = await block.first().evaluate(
+      (first, uid) =>
+        Array.from(document.querySelectorAll(`[data-block-uid="${uid}"]`)).every(
+          (el) => el === first || first.contains(el),
+        ),
+      blockId,
+    );
+    expect(
+      contiguous,
+      `data-block-uid="${blockId}" appears on unrelated elements (a block rendered twice); a shared uid is only valid for a listing/container whose items nest inside it`,
+    ).toBe(true);
+    await checkEditAnnotations(block.first(), blockData);
+    return;
+  }
 
   // Verify expected text content renders
   if (expectedText) {

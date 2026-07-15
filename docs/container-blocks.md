@@ -39,6 +39,27 @@ slides: {
 
 A block can declare several `blocks_layout` regions; they all share the one `blocks` dict, and each region gets its own list under `blocks_layout`.
 
+> **The region name is a key inside `blocks_layout` — not a top-level field.** The
+> ordering list lives at `blocks_layout.<region>` (a plain array of ids). A tempting
+> mistake is to store it as a top-level field named after the region:
+>
+> <!-- codeExample: json -->
+> ```json
+> // ✅ CORRECT — ordering keyed inside the shared blocks_layout dict
+> { "@type": "slider", "blocks": { … }, "blocks_layout": { "slides": ["slide-1", "slide-2"] } }
+>
+> // ❌ WRONG — an ad-hoc top-level `slides` field holding { items: [...] }
+> { "@type": "slider", "blocks": { … }, "slides": { "items": ["slide-1", "slide-2"] } }
+> ```
+>
+> The wrong form may *look* fine in a frontend that reads it back the same way, but
+> `slides` is **not a registered field**, so the backend **silently drops it on save**
+> (see [Why these persist](#why-these-persist-and-separate-top-level-fields-dont)) —
+> and tools that walk the shared dict (the block path map, the sanity checks, the
+> editor's reorder/drag) never see the region, because they look under
+> `blocks_layout`, never at a field named for the region. Renderers must read the
+> ordering from `blocks_layout[<region>]`, not from `<region>.items`.
+
 ## Multiple regions
 
 A container (or the page) can declare more than one **region** — each a schema property with its own `allowedBlocks`. The default region is `items`.

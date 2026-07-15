@@ -248,6 +248,23 @@ function checkIntegrity(contentDir) {
   const items = [];
   for (const { rel, data, dir } of walkData(contentDir)) {
     items.push({ rel, data, dir });
+    // `id` is required by the Plone importer: a missing id aborts the ENTIRE
+    // create-site with `KeyError: 'id'` (plone.exportimport process_id), and an
+    // underscore-prefixed id is rejected by Plone OFS. Both silently leave an
+    // empty site that still answers api-wait. Catch them here — like the
+    // duplicate-UID check below — so they're deploy-blocking, not runtime
+    // surprises. (The site root legitimately has no on-disk `id`.)
+    const isRoot =
+      data['@type'] === 'Plone Site' ||
+      rel === 'plone_site_root' ||
+      data['@id'] === '/Plone';
+    if (!isRoot) {
+      if (!data.id) {
+        errors.push(`  ${rel}: missing id (Plone import aborts with KeyError: 'id')`);
+      } else if (/^_/.test(data.id)) {
+        errors.push(`  ${rel}: id "${data.id}" starts with underscore (Plone OFS rejects it at import)`);
+      }
+    }
     if (data.UID) {
       if (uidMap.has(data.UID)) {
         errors.push(`  ${rel}: duplicate UID ${data.UID} (also in ${uidMap.get(data.UID)})`);
