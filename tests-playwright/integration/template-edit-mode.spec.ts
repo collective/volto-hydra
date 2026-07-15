@@ -627,14 +627,17 @@ test.describe('Template Edit Mode - Drag and Drop', () => {
     await helper.clickBlockInIframe(headerBlockId);
     await helper.waitForBlockSelectedInAdmin(headerBlockId);
 
-    // In edit mode, fixed blocks should show drag handle (not lock icon)
+    // In edit mode a fixed template block is movable — the drag handle shows — AND
+    // the lock/unlock toggle sits right next to it (v2: consistent lock location).
     const toolbar = page.locator('.quanta-toolbar');
     const dragHandle = toolbar.locator('.drag-handle, [title*="drag"], [aria-label*="drag"]');
     await expect(dragHandle).toBeVisible();
 
-    // Lock icon should NOT be visible
-    const lockIcon = toolbar.locator('.lock-icon, [title*="lock"], [aria-label*="locked"]');
-    await expect(lockIcon).not.toBeVisible();
+    // The toggle is in the "unlocked/editing" state — clicking it LOCKS (saves).
+    const toggle = toolbar.locator('.template-lock-toggle');
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(toggle).toHaveAttribute('aria-label', /lock template/i);
   });
 
   test('dragging block out of template removes template fields', async ({ page }) => {
@@ -1804,6 +1807,50 @@ test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commi
     await expect(sidebar).toBeHidden();
     await lockModal.locator('.template-commit').click({ timeout: 5000 });
     await expect(lockModal).toHaveCount(0);
+  });
+
+  test('a template unlocks AND saves from the toolbar lock toggle — consistent spot, no sidebar', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Capture the template document write (proves the save happened).
+    const templateWrites: string[] = [];
+    page.on('request', (req) => {
+      if (req.method() !== 'PATCH' && req.method() !== 'POST') return;
+      if (!req.url().startsWith(URLS.mockApi)) return;
+      let body: any = null;
+      try { body = req.postDataJSON(); } catch { /* not JSON */ }
+      if (!body?.blocks_layout) return;
+      if (req.url().replace(/\/$/, '').endsWith('/template-test-page')) return;
+      templateWrites.push(req.url());
+    });
+
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForBlockSelectedInAdmin(headerBlockId);
+
+    const toolbar = page.locator('.quanta-toolbar');
+    const toggle = toolbar.locator('.template-lock-toggle');
+
+    // Locked → the toggle shows the lock; clicking it UNLOCKS (via the warning modal).
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await toggle.click();
+    await page.locator('.template-unlock-modal .template-confirm').click();
+    await helper.waitForBlockEditable(headerBlockId);
+
+    // Editing → the toggle is in the SAME spot but now LOCKS; clicking → decision
+    // modal → "Change on all pages" saves the template. The sidebar is never opened.
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForBlockSelectedInAdmin(headerBlockId);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await toggle.click();
+    await page.locator('.template-lock-modal .template-commit').click();
+
+    await expect
+      .poll(() => templateWrites.length, { timeout: 5000 })
+      .toBeGreaterThanOrEqual(1);
   });
 
   test('unlocking a template warns before entering edit mode; cancel is a no-op', async ({ page }) => {
