@@ -1807,6 +1807,22 @@ test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commi
     expect(await standaloneEditor.getAttribute('contenteditable')).toBe('true');
   });
 
+  test('a locked template block is marked read-only but NOT visually dimmed', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const iframe = helper.getIframe();
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const block = iframe.locator(`[data-block-uid="${headerBlockId}"]`);
+
+    // The fixed template block is read-only (the live marker is present)...
+    await helper.waitForBlockReadonly(headerBlockId);
+    // ...but it is NOT greyed/dimmed — the lock icon in the toolbar is the cue.
+    await expect(block).not.toHaveCSS('filter', /grayscale/);
+    await expect(block).not.toHaveCSS('opacity', /0\.[0-9]/);
+  });
+
   test('two templates on one page can be unlocked and edited at the same time', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();

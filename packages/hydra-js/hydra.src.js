@@ -7325,16 +7325,20 @@ export class Bridge {
   }
 
   /**
-   * Applies visual styling to readonly blocks.
-   * Blocks where isBlockReadonly() returns true get the hydra-locked class.
-   * This visually greys out:
-   * - In normal mode: readonly template blocks
-   * - In template edit mode: blocks outside the template being edited
+   * Marks readonly blocks so the admin/tests can detect the LIVE readonly state
+   * (it recomputes on every TEMPLATE_EDIT_MODE change), WITHOUT visually dimming
+   * them. Locked template blocks are no longer greyed out — the Quanta toolbar's
+   * lock icon (shown on selection) is the read-only affordance instead.
+   *
+   * A block is readonly when isBlockReadonly() returns true: in normal mode, a
+   * readonly template block; in template edit mode, a template block whose
+   * instance is not unlocked (the rest of the page is never locked in v2).
+   *
+   * Uses a dynamic CSS rule keyed by data-block-uid (resilient to framework
+   * re-renders) that sets the custom property `--hydra-block-locked: 1`. It has
+   * no visual effect; it's the marker the admin queries.
    */
   applyReadonlyVisuals() {
-    // Build a dynamic CSS rule targeting readonly blocks by data-block-uid.
-    // This is resilient to framework re-renders — CSS selectors keep matching
-    // even when Vue/React/Svelte replaces or patches DOM elements.
     const readonlyUids = [];
     const allBlocks = document.querySelectorAll('[data-block-uid]');
     allBlocks.forEach((blockElement) => {
@@ -7354,7 +7358,7 @@ export class Bridge {
     let newCSS = '';
     if (readonlyUids.length > 0) {
       const selector = readonlyUids.map(uid => `[data-block-uid="${uid}"]`).join(', ');
-      newCSS = `${selector} { filter: grayscale(0.5) opacity(0.6); }`;
+      newCSS = `${selector} { --hydra-block-locked: 1; }`;
     }
     // Only update DOM when CSS actually changes to avoid unnecessary style recalculations
     if (this._readonlyStyleEl.textContent !== newCSS) {

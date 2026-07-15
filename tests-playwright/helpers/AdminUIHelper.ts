@@ -963,9 +963,10 @@ export class AdminUIHelper {
   async waitForBlockReadonly(blockId: string, timeout: number = 5000): Promise<void> {
     const iframe = this.getIframe();
     const block = iframe.locator(`[data-block-uid="${blockId}"]`);
-    // Readonly visuals are applied via dynamic CSS rules (not classList),
-    // so check computed filter instead of a class name.
-    await expect(block).toHaveCSS('filter', /grayscale/, { timeout });
+    // v2: readonly/locked blocks are no longer dimmed — they're marked by a
+    // dynamic CSS rule setting the `--hydra-block-locked` custom property (live,
+    // re-render-resilient, and invisible). See applyReadonlyVisuals in hydra.
+    await expect(block).toHaveCSS('--hydra-block-locked', '1', { timeout });
   }
 
   /**
@@ -977,7 +978,8 @@ export class AdminUIHelper {
   async waitForBlockEditable(blockId: string, timeout: number = 5000): Promise<void> {
     const iframe = this.getIframe();
     const block = iframe.locator(`[data-block-uid="${blockId}"]`);
-    await expect(block).not.toHaveCSS('filter', /grayscale/, { timeout });
+    // Editable = NOT marked locked (the `--hydra-block-locked` marker is absent).
+    await expect(block).not.toHaveCSS('--hydra-block-locked', '1', { timeout });
   }
 
   /**
