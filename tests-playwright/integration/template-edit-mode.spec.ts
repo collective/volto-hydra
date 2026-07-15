@@ -1733,3 +1733,62 @@ test.describe('Template Edit Mode - Permissions', () => {
     ).toBe(0);
   });
 });
+
+test.describe('Template Edit Mode - Lock affordance + metadata gating', () => {
+  // Sub-issue #1: the lock icon on a template block's Quanta toolbar is the
+  // discoverable way into template edit mode — clicking it enters edit mode for
+  // that block's template (no need to hunt for the sidebar toggle).
+  test('clicking the lock icon on a template block enters template edit mode', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // A fixed template block is position-locked in normal mode, so its toolbar
+    // shows the lock icon.
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForBlockSelectedInAdmin(headerBlockId);
+
+    const lockIcon = page.locator('.quanta-toolbar .lock-icon');
+    await expect(lockIcon).toBeVisible({ timeout: 5000 });
+
+    // Clicking the lock enters template edit mode → blocks outside the template
+    // become readonly (greyed out).
+    await lockIcon.click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+  });
+
+  // Sub-issue #2: you must be editing the template to change its name / save
+  // location. When NOT in edit mode the metadata fields are disabled; entering
+  // edit mode enables them.
+  test('template name and save location are disabled unless editing the template', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // Select the template instance (escape up from a fixed block).
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+
+    // Template Settings form is shown (name + save location). Scope by label —
+    // there is also a page-level "Title" field with the same #field-title id.
+    const nameInput = page.locator('.field').filter({ hasText: 'Template Name' }).locator('input');
+    await expect(nameInput).toBeVisible({ timeout: 5000 });
+    const folderBrowse = page.locator('.field').filter({ hasText: 'Save Location' }).locator('button.action');
+    await expect(folderBrowse).toBeVisible();
+
+    // Locked (not editing this template) → both disabled.
+    await expect(nameInput).toBeDisabled();
+    await expect(folderBrowse).toBeDisabled();
+
+    // Enter template edit mode via the sidebar toggle.
+    await page.locator('.edit-template-toggle').click();
+    await helper.waitForBlockReadonly(STANDALONE_BLOCK_1);
+
+    // Editing → both enabled.
+    await expect(nameInput).toBeEnabled();
+    await expect(folderBrowse).toBeEnabled();
+  });
+});

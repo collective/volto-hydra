@@ -181,6 +181,8 @@ const SyncedSlateToolbar = ({
   onUnwrap, // Handler for unwrap: () => void
   onMakeTemplate, // Handler for "Make Template" action
   templateEditMode, // instanceId of template being edited, or null
+  onToggleTemplateEditMode, // Enter/exit template edit mode: (instanceId|null) => void
+  templatePermissions, // Map templateId -> { can_edit } (defaults to editable)
 }) => {
 
   // Helper to get block data using path lookup (supports nested blocks)
@@ -1353,10 +1355,63 @@ const SyncedSlateToolbar = ({
         const block = getBlock(selectedBlock);
         const isLocked = isBlockPositionLocked(block, templateEditMode);
         if (isLocked) {
+          // Resolve the top-level template instance this locked block belongs to.
+          // The lock only shows for template chrome (fixed blocks), so this is the
+          // discoverable entry point into template edit mode: clicking it edits that
+          // template (its fixed blocks become editable/movable). Walk up the parent
+          // chain to the outermost instance (skip nested instances).
+          let instanceId = null;
+          {
+            let cur = selectedBlock;
+            while (cur) {
+              const pi = blockPathMap?.[cur];
+              if (!pi) break;
+              if (pi.isTemplateInstance && !pi.isNestedTemplateInstance) instanceId = cur;
+              cur = pi.parentId;
+            }
+          }
+          const tplInfo = instanceId ? blockPathMap?.[instanceId] : null;
+          const canEditTemplate =
+            templatePermissions?.[tplInfo?.templateId]?.can_edit ?? true;
+          const canEnterEdit =
+            !!instanceId && !!onToggleTemplateEditMode && canEditTemplate;
+
+          if (canEnterEdit) {
+            return (
+              <button
+                type="button"
+                className="lock-icon"
+                title="Click to edit this template"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleTemplateEditMode(instanceId);
+                }}
+                style={{
+                  padding: '4px 6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'auto',
+                  cursor: 'pointer',
+                  color: '#999',
+                  fontSize: '14px',
+                  background: '#f5f5f5',
+                  border: 'none',
+                  borderRadius: '2px',
+                }}
+              >
+                🔒
+              </button>
+            );
+          }
           return (
             <div
               className="lock-icon"
-              title="This block is part of a template and cannot be moved"
+              title={
+                instanceId && !canEditTemplate
+                  ? 'You don’t have permission to edit this template'
+                  : 'This block is part of a template and cannot be moved'
+              }
               style={{
                 padding: '4px 6px',
                 display: 'flex',

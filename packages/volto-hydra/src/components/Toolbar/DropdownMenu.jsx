@@ -265,7 +265,13 @@ const DropdownMenu = ({
           />
         </>
       )}
-      {/* Make Template option - only shown for blocks not already in a template and not fixed */}
+      {/* Make Template — only for blocks not already in a template (and not fixed).
+          A template can't be re-templated: making a template out of content that
+          already carries a templateId would nest a FOREIGN template inside the new
+          one, which the merge flattens on re-instancing (a known limitation). So
+          the option is intentionally hidden for template content rather than
+          producing a template with dangling foreign references. To fork a template,
+          edit it in place instead. */}
       {onMakeTemplate && !isInTemplate && !isFixed && (
         <>
           <div

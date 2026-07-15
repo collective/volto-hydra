@@ -2,8 +2,17 @@
  * Schema for the "Template Settings" form (template name / save location) shown for a
  * top-level template instance in the sidebar. Entering edit mode is no longer a field here —
  * it's a prominent button at the top of the parent-blocks panel (see getTemplateEditButtonState).
+ *
+ * A template's name/location IS the template's own metadata, so changing it is editing the
+ * template — only allowed while that template is being edited. When `disabled` (not in edit
+ * mode for this instance) both fields render read-only (`isDisabled`), matching the block chrome
+ * that only becomes editable in template edit mode.
+ *
+ * @param {Object} intl
+ * @param {Object} [opts]
+ * @param {boolean} [opts.disabled=false] - disable the name + location fields
  */
-export const getTemplateInstanceSchema = (intl) => ({
+export const getTemplateInstanceSchema = (intl, { disabled = false } = {}) => ({
   title: 'Template Settings',
   fieldsets: [
     {
@@ -17,6 +26,7 @@ export const getTemplateInstanceSchema = (intl) => ({
       title: 'Template Name',
       description: 'Display name for this template',
       type: 'string',
+      isDisabled: disabled,
     },
     folder: {
       title: 'Save Location',
@@ -25,6 +35,7 @@ export const getTemplateInstanceSchema = (intl) => ({
       mode: 'link',
       selectableTypes: ['Folder'],
       allowExternals: false,
+      isDisabled: disabled,
     },
   },
   required: ['title'],

@@ -433,8 +433,13 @@ const ParentBlockSection = ({
       {pathInfo?.isTemplateInstance && !pathInfo?.isNestedTemplateInstance && onChangeTemplateSettings && (() => {
         // Template instance settings: name / save location. Entering edit mode is the
         // prominent button at the top of the panel (see the main render), not a field here.
+        // The name/location IS the template's metadata, so it's only editable while THIS
+        // template is being edited — otherwise the fields render disabled.
         const templateFormData = { ...blockData };
-        const templateSchema = getTemplateInstanceSchema(contextIntl);
+        const isEditingThisTemplate = templateEditMode === blockId;
+        const templateSchema = getTemplateInstanceSchema(contextIntl, {
+          disabled: !isEditingThisTemplate,
+        });
         const formContent = (
           <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
             <BlockDataForm

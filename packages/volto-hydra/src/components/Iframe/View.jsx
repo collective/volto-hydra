@@ -4156,6 +4156,84 @@ const Iframe = (props) => {
     return () => document.removeEventListener('mousedown', onDown);
   }, [chooser]);
 
+  // Enter/exit template edit mode for a given instance (null = exit). Shared by the
+  // sidebar "Edit template" toggle AND the Quanta toolbar lock icon, so both routes run
+  // the identical enter/exit machinery (validate + flush on exit, cache-refetch on enter).
+  const handleToggleTemplateEditMode = async (instanceId) => {
+    const prevInstanceId = iframeSyncState.templateEditMode;
+
+    // Exiting template edit mode - need to flush pending text updates first
+    if (prevInstanceId && !instanceId) {
+      const formData = iframeSyncState.formData;
+
+      // Validate template slot structure before allowing exit
+      const validation = validateTemplatePlaceholders(formData);
+      if (!validation.valid) {
+        // Show validation error - user must fix structure before exiting
+        const firstError = Object.values(validation.blocksErrors)[0]?._layout;
+        toast.error(
+          <Toast
+            error
+            title={firstError?.title || 'Invalid Template Structure'}
+            content={firstError?.message || 'Please fix the template structure before exiting edit mode.'}
+          />
+        );
+        return; // Don't exit edit mode
+      }
+
+      // Send FLUSH_BUFFER to get latest text changes before reverse merge
+      const requestId = `tpl-exit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      pendingTemplateEditExitRef.current = { requestId, prevInstanceId };
+
+      if (referenceElement?.contentWindow) {
+        referenceElement.contentWindow.postMessage(
+          { type: 'FLUSH_BUFFER', requestId },
+          '*'
+        );
+      }
+      // Effect will handle the rest when flush completes
+      return;
+    }
+
+    // Entering template edit mode — invalidate the cached template and
+    // re-fetch it fresh. templateCacheRef persists across page navigations
+    // (a useRef that's never reset), so without this we'd edit + save a
+    // stale copy left over from another page. It also guarantees the
+    // template is IN the cache: the reverse-merge (on exit) and the save
+    // are both gated on `templateCacheRef.current[id]` being present, so a
+    // forced/snippet template that wasn't cache-loaded here would otherwise
+    // be silently skipped and never persisted.
+    {
+      const enterFormData = iframeSyncState.formData;
+      let editTemplateId = null;
+      for (const block of Object.values(enterFormData?.blocks || {})) {
+        if (block.templateInstanceId === instanceId && block.templateId) {
+          editTemplateId = block.templateId;
+          break;
+        }
+      }
+      if (editTemplateId) {
+        try {
+          templateCacheRef.current[editTemplateId] = await new Api().get(editTemplateId);
+        } catch {
+          // Re-fetch failed (offline / 404) — keep whatever's cached rather
+          // than dropping it, so the save still has something to persist.
+        }
+      }
+    }
+    setIframeSyncState(prev => ({
+      ...prev,
+      templateEditMode: instanceId,
+    }));
+    // Send template edit mode to iframe so it knows which blocks to make editable
+    if (referenceElement?.contentWindow) {
+      referenceElement.contentWindow.postMessage(
+        { type: 'TEMPLATE_EDIT_MODE', instanceId },
+        '*'
+      );
+    }
+  };
+
   return (
     <div id="iframeContainer">
       <OpenObjectBrowser
@@ -4938,6 +5016,8 @@ const Iframe = (props) => {
               };
             })()}
             templateEditMode={iframeSyncState.templateEditMode}
+            templatePermissions={templateCacheRef.current}
+            onToggleTemplateEditMode={handleToggleTemplateEditMode}
             onMakeTemplate={() => {
               // Create a new template from the selected block
               const blockData = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
@@ -5299,80 +5379,7 @@ const Iframe = (props) => {
             }));
           }
         }}
-        onToggleTemplateEditMode={async (instanceId) => {
-          const prevInstanceId = iframeSyncState.templateEditMode;
-
-          // Exiting template edit mode - need to flush pending text updates first
-          if (prevInstanceId && !instanceId) {
-            const formData = iframeSyncState.formData;
-
-            // Validate template slot structure before allowing exit
-            const validation = validateTemplatePlaceholders(formData);
-            if (!validation.valid) {
-              // Show validation error - user must fix structure before exiting
-              const firstError = Object.values(validation.blocksErrors)[0]?._layout;
-              toast.error(
-                <Toast
-                  error
-                  title={firstError?.title || 'Invalid Template Structure'}
-                  content={firstError?.message || 'Please fix the template structure before exiting edit mode.'}
-                />
-              );
-              return; // Don't exit edit mode
-            }
-
-            // Send FLUSH_BUFFER to get latest text changes before reverse merge
-            const requestId = `tpl-exit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            pendingTemplateEditExitRef.current = { requestId, prevInstanceId };
-
-            if (referenceElement?.contentWindow) {
-              referenceElement.contentWindow.postMessage(
-                { type: 'FLUSH_BUFFER', requestId },
-                '*'
-              );
-            }
-            // Effect will handle the rest when flush completes
-            return;
-          }
-
-          // Entering template edit mode — invalidate the cached template and
-          // re-fetch it fresh. templateCacheRef persists across page navigations
-          // (a useRef that's never reset), so without this we'd edit + save a
-          // stale copy left over from another page. It also guarantees the
-          // template is IN the cache: the reverse-merge (on exit) and the save
-          // are both gated on `templateCacheRef.current[id]` being present, so a
-          // forced/snippet template that wasn't cache-loaded here would otherwise
-          // be silently skipped and never persisted.
-          {
-            const enterFormData = iframeSyncState.formData;
-            let editTemplateId = null;
-            for (const block of Object.values(enterFormData?.blocks || {})) {
-              if (block.templateInstanceId === instanceId && block.templateId) {
-                editTemplateId = block.templateId;
-                break;
-              }
-            }
-            if (editTemplateId) {
-              try {
-                templateCacheRef.current[editTemplateId] = await new Api().get(editTemplateId);
-              } catch {
-                // Re-fetch failed (offline / 404) — keep whatever's cached rather
-                // than dropping it, so the save still has something to persist.
-              }
-            }
-          }
-          setIframeSyncState(prev => ({
-            ...prev,
-            templateEditMode: instanceId,
-          }));
-          // Send template edit mode to iframe so it knows which blocks to make editable
-          if (referenceElement?.contentWindow) {
-            referenceElement.contentWindow.postMessage(
-              { type: 'TEMPLATE_EDIT_MODE', instanceId },
-              '*'
-            );
-          }
-        }}
+        onToggleTemplateEditMode={handleToggleTemplateEditMode}
       />
       <ChildBlocksWidget
         selectedBlock={selectedBlock}
