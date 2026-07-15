@@ -804,9 +804,16 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
     // A required type with no content example can't get a render test — but that
     // is a failing test for that type, not a reason to block the suite.
     for (const blockType of required) {
-      if (!discoveredTypes.has(blockType)) {
-        result.push({ blockType, noExample: true });
-      }
+      if (discoveredTypes.has(blockType)) continue;
+      // A convertible listing/search ITEM TYPE (declares `fieldMappings['@default']`)
+      // is populated at runtime from query results — it's rendered read-only by
+      // listing/search expansion and never stored as authored content, so it can't
+      // have a standalone example and shouldn't be required to (e.g. `listItem` is
+      // only ever a search result). It's still render-tested wherever it does
+      // appear in stored content (e.g. `card` inside a grid); this only relaxes the
+      // must-have-an-example rule for the never-stored case.
+      if (blocksConfig[blockType]?.fieldMappings?.['@default']) continue;
+      result.push({ blockType, noExample: true });
     }
   }
 
