@@ -554,9 +554,17 @@
               frontendBlockKeys.add(blockType);
             }
             for (const [blockType, blockDef] of Object.entries(message.blocks)) {
-              if (!mockBlocksConfig[blockType]) {
-                mockBlocksConfig[blockType] = blockDef;
-              }
+              // The connected frontend's schema is authoritative for the blocks it
+              // registers, so it OVERRIDES the admin's own baseline fixtures.
+              // Otherwise a baseline block sharing a type name shadows the real
+              // frontend schema — e.g. the baseline `hero` fixture carries an extra
+              // slate `description` (for inline-editing tests) that a real frontend
+              // hero doesn't have, so block-sanity would validate against a field
+              // the frontend never renders. Each frontend sends its own hero (the
+              // mock test-frontend's `sharedBlocksConfig` hero keeps `description`),
+              // and baseline-only types (mock-*) are left untouched since the
+              // frontend simply doesn't send them.
+              mockBlocksConfig[blockType] = blockDef;
             }
           }
 
