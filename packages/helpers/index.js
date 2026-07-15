@@ -1312,7 +1312,13 @@ export function getImageUrl(value, apiUrl = '') {
     const field = value.image_field;
     const scales = value.image_scales[field];
     if (scales?.[0]?.download) {
-      const baseUrl = value['@id'] || '';
+      // A `preview_image_link` relation (e.g. a case-study teaser pointing at a
+      // shared /logos/<client> image) serializes its scales on the LINKED image,
+      // not this item. plone.volto stamps each scale entry with `base_path` = the
+      // linked image's path; use it as the base (Volto's Image.jsx does the same:
+      // `image.base_path || item['@id']`). Otherwise the URL resolves against the
+      // referencing item and 404s / serves the wrong image.
+      const baseUrl = scales[0].base_path || value['@id'] || '';
       const prefix = baseUrl.startsWith('http') ? '' : apiUrl;
       return `${prefix}${baseUrl}/${scales[0].download}`;
     }
