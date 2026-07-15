@@ -35,6 +35,16 @@ help: ## Show this help
 install: ## Installs the add-on in a development environment
 	pnpm dlx mrs-developer missdev --no-config --fetch-https
 	pnpm i
+	# lightningcss-cli ships a placeholder text file as its `lightningcss`
+	# binary; its postinstall.js is meant to replace that with the real native
+	# binary. With pnpm's non-hoisted layout the postinstall's
+	# `require.resolve('lightningcss-cli-<platform>')` can't resolve at the time
+	# pnpm runs it, so it silently leaves the placeholder and @plone/components'
+	# `build:css` (via `pnpm build:deps`) then dies with "This: command not
+	# found". `pnpm rebuild` doesn't retry it. Run the postinstall directly from
+	# the package dir (where the platform pkg IS resolvable) to land the binary.
+	PI="$$(node -e "console.log(require.resolve('lightningcss-cli/postinstall.js'))")"; \
+	  (cd "$$(dirname "$$PI")" && node postinstall.js)
 
 .PHONY: start
 start: ## Starts Volto, allowing reloading of the add-on during development
