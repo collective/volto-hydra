@@ -66,30 +66,23 @@ The point of `slotId` is that two layouts can share the same set of region names
 
 ## Editing content inside a template
 
-A template is **locked** by default: you're editing *this page's* content, while the template's fixed parts stay read-only. To change the template itself you **unlock** it — entering **template edit mode**.
+A template's own (fixed) blocks are **locked** by default — you can edit *this page's* content, but not the template. To change the template itself, **unlock** it: select one of its blocks and click the 🔒 on its **sidebar bar** ("Template: *name*"), on the block's **Quanta toolbar**, or **Edit template** in the bar's `⋯` menu. The 🔒 becomes 🔓, and the template's blocks — plus its Name / Save Location — become editable.
 
-**To unlock**, select one of the template's blocks, then either click the 🔒 on the template's **sidebar bar** ("Template: *name*") or pick **Edit template** from that bar's `⋯` menu. While locked, the bar shows a 🔒 and the Template Settings (Template Name, Save Location) are read-only text:
-
-![The template's sidebar bar showing a closed lock 🔒, with the Template Settings (Template Name, Save Location) rendered as read-only text.](_images/template-edit-locked.png)
-
-Once unlocked, the bar's icon becomes 🔓 and those fields become editable — so a template can't be renamed or relocated without editing it:
-
-![The same bar showing an open lock 🔓, with Template Name and Save Location now editable inputs.](_images/template-edit-editing.png)
-
-In edit mode:
-
-- Blocks **inside** the template become editable, including ones marked read-only.
-- Blocks **outside** the template lock.
-
-You can also enter edit mode straight from the canvas: a locked template block shows a 🔒 in its Quanta toolbar (in place of the drag handle) — click it to unlock the template.
-
-![The Quanta toolbar of a locked template block, showing a 🔒 where the drag handle would be.](_images/template-toolbar-lock.png)
-
-Editing here changes the template's *definition*, and the change propagates back to the saved template — so every other page using it picks it up. **Lock it again** (click the 🔓, or "Done editing template" in the `⋯` menu) to go back to editing this page.
+Unlocking one template unlocks only *that* template. The rest of the page stays editable as normal, and you can **unlock several templates at once** and edit them together.
 
 ```{warning}
-Edits made in template edit mode update the **template** itself, which may affect other pages. If you only want to override a value for this one page, look for a non-readonly version of the field on this page rather than entering template edit mode.
+Editing a template changes its **definition** — the change will appear on **every page that uses it**. Unlocking asks you to confirm first.
 ```
+
+**Locking is where your template edits commit.** When you lock a template you choose:
+
+- **Change on all pages** — save your edits to the template; every page using it picks them up.
+- **Reset changes** — discard the edits and revert the template to its saved version. Only the template reverts; any page content you edited while it was unlocked stays.
+- **Cancel** — keep editing (stay unlocked).
+
+Templates are saved when you **lock** them, not when you save the page. If you save the page while a template is still unlocked, you're prompted to lock it first.
+
+![A template's sidebar bar, locked (🔒) — the Template Settings show as read-only text. Clicking the lock unlocks it (🔓) and makes the template editable.](_images/template-edit-locked.png)
 
 ## Template instances in the sidebar
 
