@@ -832,7 +832,7 @@ test.describe('allowedLayouts', () => {
       await helper.waitForSidebarOpen();
     });
 
-    test('footer block stays editable while a header template is unlocked (v2: no page lock)', async ({ page }) => {
+    test('unlocking a header template does not change the footer block’s editability (v2: no page lock)', async ({ page }) => {
       const helper = new AdminUIHelper(page);
       const iframe = helper.getIframe();
 
@@ -840,18 +840,29 @@ test.describe('allowedLayouts', () => {
       await helper.navigateToEdit('/template-test-page');
       await helper.waitForIframeReady();
 
-      // Select a header template block, then unlock that template.
+      // The footer block's read-only marker is set by its OWN status: a plain page
+      // footer block (admin-mock) is editable; a readOnly footer-template block
+      // (admin-nuxt's forced footer) is not. Capture it BEFORE unlocking anything.
+      const footerBlock = iframe.locator('#footer-content [data-block-uid]').first();
+      await expect(footerBlock).toBeVisible({ timeout: 10000 });
+      const lockedBefore = (await footerBlock.evaluate((el) =>
+        getComputedStyle(el).getPropertyValue('--hydra-block-locked').trim(),
+      ));
+
+      // Select a header template block and unlock that template.
       const headerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Header' }).first();
       await expect(headerBlock).toBeVisible();
       const headerBlockId = await headerBlock.getAttribute('data-block-uid');
       await helper.unlockTemplate(headerBlockId!);
 
-      // v2: a footer (page) block OUTSIDE the edited template stays editable —
-      // unlocking a template no longer locks the rest of the page.
-      const footerBlock = iframe.locator('#footer-content [data-block-uid]').first();
-      await expect(footerBlock).toBeVisible({ timeout: 5000 });
-      const footerBlockId = await footerBlock.getAttribute('data-block-uid');
-      await helper.waitForBlockEditable(footerBlockId!);
+      // v2: unlocking the header template does NOT lock the rest of the page, so the
+      // footer's editability is UNCHANGED (whatever it was on its own).
+      await expect(async () => {
+        const lockedAfter = await footerBlock.evaluate((el) =>
+          getComputedStyle(el).getPropertyValue('--hydra-block-locked').trim(),
+        );
+        expect(lockedAfter).toBe(lockedBefore);
+      }).toPass({ timeout: 5000 });
     });
   });
 });
