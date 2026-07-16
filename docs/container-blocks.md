@@ -100,7 +100,7 @@ The backend deserializer only saves values for **registered fields**. `blocks` a
 
 ## object_list: a region stored inline
 
-The other storage choice for a region. Instead of ordering in the shared `blocks_layout` dict, all items share one inline schema and are stored as an array with an ID field on the field itself. Use `dataPath` when the data is nested within the block:
+The other storage choice for a region. Instead of ordering in the shared `blocks_layout` dict, all items share one inline schema and are stored as an array with an ID field, at the field itself. (To place the array deeper — e.g. `block.table.rows` — nest the field inside a `widget: 'object'`; see below.)
 
 <!-- codeExample: javascript -->
 ```javascript
@@ -109,7 +109,6 @@ slides: {
     title: 'Slides',
     widget: 'object_list',
     idField: '@id',
-    dataPath: ['data', 'rows'],  // optional path when data is nested
     schema: {
         properties: {
             title: { title: 'Title' },
@@ -119,15 +118,13 @@ slides: {
     }
 }
 
-// Resulting data (note: nested under dataPath)
+// Resulting data — the array is stored at the field
 {
   "@type": "slider",
-  "data": {
-    "slides": [
-      { "@id": "slide-1", "title": "First", "image": "..." },
-      { "@id": "slide-2", "title": "Second", "image": "..." }
-    ]
-  }
+  "slides": [
+    { "@id": "slide-1", "title": "First", "image": "..." },
+    { "@id": "slide-2", "title": "Second", "image": "..." }
+  ]
 }
 ```
 
@@ -159,6 +156,42 @@ facets: {
 
 Both `blocks_layout` and `object_list` look the same in the editing UI and blocks can be dragged between them — data is automatically adapted when moving between formats (ID fields added/stripped, type fields set appropriately).
 
+## widget: 'object': nesting fields (and containers) inside a block field
+
+A `widget: 'object'` field groups sub-fields under one key. Its `schema.properties` are first-class — plain fields OR nested containers — and everything nests **inside** the object, exactly where the schema puts it. No `dataPath` indirection.
+
+An **`object_list`** inside an object stores its array at `object.<field>`:
+
+<!-- codeExample: javascript -->
+```javascript
+// A table block whose rows live at block.table.rows
+table: {
+    widget: 'object',
+    schema: { properties: {
+        rows: { widget: 'object_list', idField: 'key',
+                schema: { properties: { cells: { widget: 'object_list', idField: 'key' /* … */ } } } },
+    } },
+}
+// data
+{ "@type": "slateTable", "table": { "rows": [ { "key": "r1", "cells": [ /* … */ ] } ] } }
+```
+
+A **`blocks_layout`** inside an object makes the object its own mini-container: it holds its own `blocks` dict + `blocks_layout`, just like a columns/grid container block, one level deeper:
+
+<!-- codeExample: javascript -->
+```javascript
+table: { widget: 'object', schema: { properties: {
+    body: { widget: 'blocks_layout' },
+} } }
+// data
+{ "@type": "slateTable",
+  "table": { "blocks": { "b1": { /* … */ } }, "blocks_layout": { "body": ["b1"] } } }
+```
+
+A nested field keeps its normal row in the parent's child widget; the sidebar prefixes the row **title** with the path (e.g. **Table / Rows**) so the nesting is visible. Blocks inside a nested container are edited in the canvas like any other container.
+
+This replaces `dataPath`: declare the container inside the object rather than hoisting it to the block's top level with a `dataPath` back-reference.
+
 ## Rendering Containers in Your Frontend
 
 Add `data-block-uid` to each child element. You don't need to mark the container element itself:
@@ -186,29 +219,28 @@ Add `data-block-uid` to each child element. You don't need to mark the container
 
 ## Table Mode
 
-Set `addMode: 'table'` for table-like structures (rows containing cells). This lets users add and remove columns as easily as rows:
+Set `addMode: 'table'` for table-like structures (rows containing cells). This lets users add and remove columns as easily as rows. The rows live inside a `table` object field (`block.table.rows`) — no `dataPath`:
 
 <!-- codeExample: javascript -->
 ```javascript
-rows: {
-    widget: 'object_list',
-    idField: 'key',
-    addMode: 'table',
-    dataPath: ['table', 'rows'],
-    schema: {
-        properties: {
-            cells: {
-                widget: 'object_list',
-                idField: 'key',
-                schema: {
-                    properties: {
-                        value: { title: 'Content',
-                                 widget: 'slate' }
-                    }
-                }
-            }
-        }
-    }
+table: {
+    widget: 'object',
+    schema: { properties: {
+        rows: {
+            widget: 'object_list',
+            idField: 'key',
+            addMode: 'table',
+            schema: { properties: {
+                cells: {
+                    widget: 'object_list',
+                    idField: 'key',
+                    schema: { properties: {
+                        value: { title: 'Content', widget: 'slate' },
+                    } },
+                },
+            } },
+        },
+    } },
 }
 ```
 
