@@ -1049,19 +1049,6 @@ const Iframe = (props) => {
     return isEqual(pick(snap), pick(formData));
   }, []);
 
-  // Lock a template WITHOUT saving (used when it wasn't changed): drop it from the
-  // unlocked set, tell the iframe, and discard its snapshot. No reverse-merge, no
-  // template write.
-  const exitTemplateEditNoSave = useCallback((instanceId) => {
-    const next = (iframeSyncState.templateEditMode || []).filter((id) => id !== instanceId);
-    setIframeSyncState((prev) => ({
-      ...prev,
-      templateEditMode: (prev.templateEditMode || []).filter((id) => id !== instanceId),
-    }));
-    postTemplateEditMode(next);
-    delete templateSnapshotsRef.current[instanceId];
-  }, [iframeSyncState.templateEditMode, postTemplateEditMode]);
-
   // v2: broadcast the current set of unlocked template instance ids to the iframe
   // (multiple templates may be unlocked at once). Bridge gates editability/movement
   // on this set.
@@ -1073,6 +1060,19 @@ const Iframe = (props) => {
       );
     }
   }, [referenceElement]);
+
+  // Lock a template WITHOUT saving (used when it wasn't changed): drop it from the
+  // unlocked set, tell the iframe, and discard its snapshot. No reverse-merge, no
+  // template write. (Declared AFTER postTemplateEditMode — it's a dependency.)
+  const exitTemplateEditNoSave = useCallback((instanceId) => {
+    const next = (iframeSyncState.templateEditMode || []).filter((id) => id !== instanceId);
+    setIframeSyncState((prev) => ({
+      ...prev,
+      templateEditMode: (prev.templateEditMode || []).filter((id) => id !== instanceId),
+    }));
+    postTemplateEditMode(next);
+    delete templateSnapshotsRef.current[instanceId];
+  }, [iframeSyncState.templateEditMode, postTemplateEditMode]);
 
   // Persist ONE template document from the cache: POST a brand-new template
   // (_isNew) into its parent folder, else PATCH the existing one. Shared by the
