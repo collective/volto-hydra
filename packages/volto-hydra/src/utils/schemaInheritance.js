@@ -1349,7 +1349,8 @@ export function applySchemaDefaultsToFormData(formData, blockPathMap, blocksConf
  *   { type: 'inheritSchemaFrom', config: { ... } }
  *
  * The returned function has a `config` property attached with the original config,
- * so parent blocks can read child's editableFields/parentControlledFields.
+ * so parent blocks can read the recipe's inheritSchemaFrom options (e.g.
+ * parentControlled) when computing which fields they claim from children.
  *
  * @param {Object|Array} recipe - Recipe object or array of recipes
  * @returns {Function|null} - schemaEnhancer function or null if invalid
@@ -1386,7 +1387,14 @@ export function createSchemaEnhancerFromRecipe(recipe, existingEnhancer) {
     return createSingleEnhancerLegacy(recipe);
   }
 
-  // New format: { inheritSchemaFrom: {...}, fieldRules: {...}, childBlockConfig: {...}, ... }
+  // Recognised recipe keys. Only these are converted to enhancer functions;
+  // any other key on the recipe object is ignored (and, if it's the ONLY key,
+  // the block is left with a raw object as its schemaEnhancer, which Volto then
+  // crashes on with "schemaEnhancer is not a function"). NOTE: `childBlockConfig`
+  // is NOT a recipe key — it was removed in the #213 schema-inheritance redesign.
+  // Container children no longer declare per-child field ownership; instead
+  // `installChildBlockEnhancers` auto-applies `hideParentOwnedFields` to every
+  // block, and the parent claims fields via `inheritSchemaFrom.parentControlled`.
   const enhancerTypes = ['inheritSchemaFrom', 'fieldRules'];
 
   // If the existing enhancer has _parts, check each part for type overlap.
