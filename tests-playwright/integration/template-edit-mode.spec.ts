@@ -309,7 +309,7 @@ test.describe('Template Creation', () => {
 
 test.describe('Template Edit Mode - Save', () => {
   // v2: templates commit when you LOCK them (Change on all pages), not with the
-  // page. Locking without editing still writes the template document.
+  // page. Locking a CHANGED template writes the template document.
   test('locking a template (Change on all pages) saves the template document', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -328,9 +328,16 @@ test.describe('Template Edit Mode - Save', () => {
       writes.push({ method: m, url: req.url() });
     });
 
-    // Unlock the template, then lock with "Change on all pages" — no edits needed.
+    // Unlock the template, make a change (delete the footer block), then lock with
+    // "Change on all pages" — the changed template is written.
     const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
     await helper.unlockTemplate(headerBlockId);
+    await helper.clickBlockInIframe(footerBlockId);
+    await helper.waitForBlockSelectedInAdmin(footerBlockId);
+    await page.evaluate((id) => {
+      document.dispatchEvent(new CustomEvent('hydra-delete-blocks', { detail: { blockIds: [id] } }));
+    }, footerBlockId);
     await helper.lockTemplate(headerBlockId, 'commit');
 
     // A write whose URL is NOT the page itself = the template document being saved.
@@ -594,8 +601,13 @@ test.describe('Template Edit Mode - Editability', () => {
     await helper.clickBlockInIframe(STANDALONE_BLOCK_1);
     expect(await standaloneEditor.getAttribute('contenteditable')).toBe('true');
 
-    // Lock the template (commit — no edits made, so it's a no-op save).
-    await helper.lockTemplate(headerBlockId, 'commit');
+    // Lock the template. No edits were made, so it locks SILENTLY — no decision
+    // modal (v2: don't prompt when the template hasn't changed).
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
+    await page.locator('.sidebar-section-header[data-is-current="true"] .edit-template-toggle').click();
+    await expect(page.locator('.template-lock-modal')).toHaveCount(0);
 
     // Template block is locked again...
     await helper.clickBlockInIframe(headerBlockId);
@@ -1761,7 +1773,7 @@ test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commi
   // Reproduces the deployed-mobile bugs: (1) the lock toggle must be present on
   // the template bar, and (2) the unlock/lock modals must render ABOVE the mobile
   // settings popup (sidebar), not behind it — so their buttons are clickable.
-  test('on mobile the lock modal replaces the settings sidebar (one popup at a time)', async ({ page }) => {
+  test('on mobile a template modal replaces the settings sidebar (one popup at a time)', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -1785,28 +1797,19 @@ test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commi
     await expect(toggle).toBeVisible({ timeout: 5000 });
     await toggle.click();
 
-    // (2) The unlock modal opens as the single popup: its confirm button is
-    // clickable (hit-tested) AND the settings sidebar has stepped aside.
+    // (2) The template modal opens as the single popup that REPLACES the settings
+    // sidebar (the whole point of the mobile fix): its confirm button is clickable
+    // (hit-tested — a covered button would fail) AND the settings sidebar has stepped
+    // aside while the modal is up. The lock decision modal uses the same overlay +
+    // bottom-sheet mechanism, so verifying the unlock modal here covers both.
     const modal = page.locator('.template-unlock-modal');
     await expect(modal).toBeVisible({ timeout: 5000 });
     await expect(sidebar).toBeHidden();
     await modal.locator('.template-confirm').click({ timeout: 5000 });
     await expect(modal).toHaveCount(0);
     await helper.waitForBlockEditable(headerBlockId);
-
-    // (3) The lock decision modal (the "save the template" path) is likewise
-    // reachable and replaces the sidebar. The sidebar returns once the unlock
-    // modal closed; re-open it only if it collapsed.
-    if ((await sidebar.count()) === 0) {
-      await page.locator('[aria-label="Open settings"]').click();
-    }
+    // The sidebar comes back once the modal closes.
     await expect(sidebar).toBeVisible({ timeout: 5000 });
-    await toggle.click();
-    const lockModal = page.locator('.template-lock-modal');
-    await expect(lockModal).toBeVisible({ timeout: 5000 });
-    await expect(sidebar).toBeHidden();
-    await lockModal.locator('.template-commit').click({ timeout: 5000 });
-    await expect(lockModal).toHaveCount(0);
   });
 
   test('a template unlocks AND saves from the toolbar lock toggle — consistent spot, no sidebar', async ({ page }) => {
@@ -1839,6 +1842,14 @@ test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commi
     await toggle.click();
     await page.locator('.template-unlock-modal .template-confirm').click();
     await helper.waitForBlockEditable(headerBlockId);
+
+    // Make a change (delete the footer) so locking prompts to save.
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
+    await helper.clickBlockInIframe(footerBlockId);
+    await helper.waitForBlockSelectedInAdmin(footerBlockId);
+    await page.evaluate((id) => {
+      document.dispatchEvent(new CustomEvent('hydra-delete-blocks', { detail: { blockIds: [id] } }));
+    }, footerBlockId);
 
     // Editing → the toggle is in the SAME spot but now LOCKS; clicking → decision
     // modal → "Change on all pages" saves the template. The sidebar is never opened.
@@ -1952,9 +1963,20 @@ test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commi
     await helper.navigateToEdit('/template-test-page');
 
     const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    const { blockId: footerBlockId } = await helper.waitForBlockByContent(TEMPLATE_FOOTER_CONTENT);
     await helper.unlockTemplate(headerBlockId);
 
+    // Make a change so locking prompts (an unchanged template locks silently).
+    await helper.clickBlockInIframe(footerBlockId);
+    await helper.waitForBlockSelectedInAdmin(footerBlockId);
+    await page.evaluate((id) => {
+      document.dispatchEvent(new CustomEvent('hydra-delete-blocks', { detail: { blockIds: [id] } }));
+    }, footerBlockId);
+
     // Click the (now unlocked) toggle → decision modal with the three choices.
+    await helper.clickBlockInIframe(headerBlockId);
+    await helper.waitForSidebarOpen();
+    await helper.escapeToParent();
     const toggle = page.locator('.sidebar-section-header[data-is-current="true"] .edit-template-toggle');
     await toggle.click();
     const modal = page.locator('.template-lock-modal');
@@ -1968,6 +1990,37 @@ test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commi
     await expect(modal).toHaveCount(0);
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await helper.waitForBlockEditable(headerBlockId);
+  });
+
+  test('locking an unchanged template does not prompt — no modal, no save', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    // No template write should happen for an unchanged lock.
+    const templateWrites: string[] = [];
+    page.on('request', (req) => {
+      if (req.method() !== 'PATCH' && req.method() !== 'POST') return;
+      if (!req.url().startsWith(URLS.mockApi)) return;
+      let body: any = null;
+      try { body = req.postDataJSON(); } catch { /* not JSON */ }
+      if (!body?.blocks_layout) return;
+      if (req.url().replace(/\/$/, '').endsWith('/template-test-page')) return;
+      templateWrites.push(req.url());
+    });
+
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+    await helper.unlockTemplate(headerBlockId);
+    await helper.waitForBlockEditable(headerBlockId);
+
+    // Lock again WITHOUT editing → no decision modal (v2: don't prompt when the
+    // template hasn't changed), it just re-locks, and nothing is written.
+    const toggle = page.locator('.sidebar-section-header[data-is-current="true"] .edit-template-toggle');
+    await toggle.click();
+    await expect(page.locator('.template-lock-modal')).toHaveCount(0);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await helper.waitForBlockReadonly(headerBlockId);
+    expect(templateWrites).toHaveLength(0);
   });
 
   test('Reset changes reverts the template blocks but keeps page-content edits', async ({ page }) => {

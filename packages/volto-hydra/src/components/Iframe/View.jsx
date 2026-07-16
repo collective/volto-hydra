@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { isEqual } from 'lodash';
 import { v4 as uuid } from 'uuid';
 import { useHistory } from 'react-router-dom';
 import Cookies from 'js-cookie';
@@ -1025,6 +1026,41 @@ const Iframe = (props) => {
   // Pending template edit exit - stores { requestId, prevInstanceId, mode } when
   // waiting for flush before a lock-commit reverse-merge.
   const pendingTemplateEditExitRef = useRef(null);
+
+  // True when the instance's blocks are identical to the snapshot taken at unlock
+  // (i.e. the template wasn't edited). Compares the instance's blocks + their
+  // top-level order; nested container/object_list changes live inside the block
+  // objects, so the deep compare of the blocks dict catches them too. Both sides
+  // are the Redux `properties` representation, so the compare is apples-to-apples;
+  // structural edits and (debounced) inline text edits are already reflected there.
+  const isInstanceUnchanged = useCallback((instanceId, formData) => {
+    const snap = templateSnapshotsRef.current[instanceId];
+    if (!snap) return true;
+    const pick = (fd) => {
+      const blocks = {};
+      for (const [id, b] of Object.entries(fd?.blocks || {})) {
+        if (b?.templateInstanceId === instanceId) blocks[id] = b;
+      }
+      const items = (fd?.blocks_layout?.items || []).filter(
+        (id) => fd?.blocks?.[id]?.templateInstanceId === instanceId,
+      );
+      return { blocks, items };
+    };
+    return isEqual(pick(snap), pick(formData));
+  }, []);
+
+  // Lock a template WITHOUT saving (used when it wasn't changed): drop it from the
+  // unlocked set, tell the iframe, and discard its snapshot. No reverse-merge, no
+  // template write.
+  const exitTemplateEditNoSave = useCallback((instanceId) => {
+    const next = (iframeSyncState.templateEditMode || []).filter((id) => id !== instanceId);
+    setIframeSyncState((prev) => ({
+      ...prev,
+      templateEditMode: (prev.templateEditMode || []).filter((id) => id !== instanceId),
+    }));
+    postTemplateEditMode(next);
+    delete templateSnapshotsRef.current[instanceId];
+  }, [iframeSyncState.templateEditMode, postTemplateEditMode]);
 
   // v2: broadcast the current set of unlocked template instance ids to the iframe
   // (multiple templates may be unlocked at once). Bridge gates editability/movement
@@ -4360,10 +4396,18 @@ const Iframe = (props) => {
   // enter/commit/reset run from the modal's buttons.
   const handleToggleTemplateEditMode = (instanceId) => {
     const unlocked = iframeSyncState.templateEditMode || [];
-    setTemplateModal({
-      kind: unlocked.includes(instanceId) ? 'lock' : 'unlock',
-      instanceId,
-    });
+    if (!unlocked.includes(instanceId)) {
+      // Unlocking → warn first.
+      setTemplateModal({ kind: 'unlock', instanceId });
+      return;
+    }
+    // Locking → if the template wasn't changed during the unlock session, lock
+    // silently (no prompt, no save); otherwise show the Change/Reset/Cancel modal.
+    if (isInstanceUnchanged(instanceId, properties)) {
+      exitTemplateEditNoSave(instanceId);
+    } else {
+      setTemplateModal({ kind: 'lock', instanceId });
+    }
   };
 
   return (
