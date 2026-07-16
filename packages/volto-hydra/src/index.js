@@ -322,8 +322,8 @@ const applyConfig = (config) => {
   }
 
   // Image block: url field is added to blockSchema (not schemaEnhancer) so that
-  // frontend's childBlockConfig recipe doesn't overwrite it.
-  // The schemaEnhancer from frontend config adds childBlockConfig behavior.
+  // a frontend-supplied schemaEnhancer recipe doesn't overwrite it when it
+  // replaces the block's schemaEnhancer.
 
   // Configure slateTable block schema for buildBlockPathMap traversal
   // Structure: block.table.rows[].cells[] with 'key' as idField
@@ -434,8 +434,8 @@ const applyConfig = (config) => {
 
   // Configure image block with blockSchema for schema inheritance
   // The default image block only has 'schema' (settings), not 'blockSchema' (data schema)
-  // We add 'url' field here (not in schemaEnhancer) so frontend's childBlockConfig
-  // recipe doesn't lose it when it replaces the schemaEnhancer.
+  // We add 'url' field here (not in schemaEnhancer) so a frontend-supplied
+  // schemaEnhancer recipe doesn't lose it when it replaces the schemaEnhancer.
   config.blocks.blocksConfig.image = {
     ...config.blocks.blocksConfig.image,
     mostUsed: true,
