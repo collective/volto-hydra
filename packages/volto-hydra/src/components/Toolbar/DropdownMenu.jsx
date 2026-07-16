@@ -268,9 +268,9 @@ const DropdownMenu = ({
           />
         </>
       )}
-      {/* Edit template / Done editing — labelled entry into template edit mode for a
-          top-level template instance. Complements the lock/unlock icon on the header
-          bar and the in-canvas Quanta toolbar lock. */}
+      {/* Edit template / Save template — labelled entry into (and out of) template
+          edit mode for a top-level template instance. Complements the lock/unlock
+          icon on the header bar and the in-canvas Quanta toolbar lock. */}
       {onToggleTemplateEdit && isTemplateInstance && (
         <>
           <div
@@ -290,7 +290,7 @@ const DropdownMenu = ({
               onToggleTemplateEdit();
             }}
           >
-            {isEditingTemplate ? 'Done editing template' : 'Edit template'}
+            {isEditingTemplate ? 'Save template' : 'Edit template'}
           </div>
           <div
             style={{

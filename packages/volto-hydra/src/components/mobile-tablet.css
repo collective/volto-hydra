@@ -449,7 +449,8 @@
   .container-block-chooser,
   .add-new-block-popup,
   .frontend-switcher-panel,
-  .frontend-settings-modal {
+  .frontend-settings-modal,
+  .template-edit-modal {
     position: fixed !important;
     bottom: 0 !important;
     left: 0 !important;
@@ -499,20 +500,37 @@
   body:has(.container-block-chooser),
   body:has(.add-new-block-popup),
   body:has(.frontend-switcher-panel),
-  body:has(.frontend-settings-modal) {
+  body:has(.frontend-settings-modal),
+  body:has(.template-edit-modal-overlay) {
     overflow: hidden;
   }
   body:has(.volto-hydra-dropdown-menu)::before,
   body:has(.container-block-chooser)::before,
   body:has(.add-new-block-popup)::before,
   body:has(.frontend-switcher-panel)::before,
-  body:has(.frontend-settings-modal)::before {
+  body:has(.frontend-settings-modal)::before,
+  body:has(.template-edit-modal-overlay)::before {
     content: '';
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.3);
     z-index: var(--hydra-z-sheet-backdrop);
     pointer-events: none;
+  }
+
+  /* One popup at a time: the settings sidebar is itself a full-screen popup
+   * (z 300, above the sheet ladder), so while a template-edit modal is up the
+   * sidebar must step aside — otherwise the sheet (z-sheet 201) renders behind
+   * it. Hiding it makes the modal REPLACE the settings popup; it returns when
+   * the modal closes. The overlay wrapper drops its desktop dimmer/centering and
+   * sits in the sheet ladder — the ::before backdrop above does the dimming, and
+   * `.template-edit-modal` is the slide-up sheet (shared rule above). */
+  body:has(.template-edit-modal-overlay) .sidebar-container:not(.collapsed) {
+    display: none !important;
+  }
+  .template-edit-modal-overlay {
+    background: transparent !important;
+    z-index: var(--hydra-z-sheet) !important;
   }
 
   /* Slate LinkEditor — pinned to the TOP, covering Quanta. The

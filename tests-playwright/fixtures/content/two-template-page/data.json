@@ -1,0 +1,130 @@
+{
+  "@id": "/two-template-page",
+  "@type": "Document",
+  "id": "two-template-page",
+  "title": "Two Template Page",
+  "description": "A page with TWO template instances, for multi-unlock template edit tests",
+  "blocks": {
+    "page-block-top": {
+      "@type": "slate",
+      "value": [
+        { "type": "p", "children": [{ "text": "Page block above both templates" }] }
+      ],
+      "plaintext": "Page block above both templates"
+    },
+    "i1-header": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "value": [
+        { "type": "h1", "children": [{ "text": "Stale i1 header" }] }
+      ],
+      "plaintext": "Stale i1 header",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "tpl-instance-1",
+      "slotId": "header"
+    },
+    "i1-content": {
+      "@type": "slate",
+      "fixed": false,
+      "readOnly": false,
+      "value": [
+        { "type": "p", "children": [{ "text": "Instance one editable content" }] }
+      ],
+      "plaintext": "Instance one editable content",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "tpl-instance-1",
+      "slotId": "primary"
+    },
+    "i1-footer": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "value": [
+        { "type": "p", "children": [{ "text": "Stale i1 footer" }] }
+      ],
+      "plaintext": "Stale i1 footer",
+      "templateId": "resolveuid/test-layout-template-uid",
+      "templateInstanceId": "tpl-instance-1",
+      "slotId": "footer"
+    },
+    "page-block-mid": {
+      "@type": "slate",
+      "value": [
+        { "type": "p", "children": [{ "text": "Page block between the two templates" }] }
+      ],
+      "plaintext": "Page block between the two templates"
+    },
+    "i2-header": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "value": [
+        { "type": "h1", "children": [{ "text": "Stale i2 header" }] }
+      ],
+      "plaintext": "Stale i2 header",
+      "templateId": "resolveuid/header-footer-layout-uid",
+      "templateInstanceId": "tpl-instance-2",
+      "slotId": "header"
+    },
+    "i2-content": {
+      "@type": "slate",
+      "fixed": false,
+      "readOnly": false,
+      "value": [
+        { "type": "p", "children": [{ "text": "Instance two editable content" }] }
+      ],
+      "plaintext": "Instance two editable content",
+      "templateId": "resolveuid/header-footer-layout-uid",
+      "templateInstanceId": "tpl-instance-2",
+      "slotId": "default"
+    },
+    "i2-footer": {
+      "@type": "slate",
+      "fixed": true,
+      "readOnly": true,
+      "value": [
+        { "type": "p", "children": [{ "text": "Stale i2 footer" }] }
+      ],
+      "plaintext": "Stale i2 footer",
+      "templateId": "resolveuid/header-footer-layout-uid",
+      "templateInstanceId": "tpl-instance-2",
+      "slotId": "footer"
+    },
+    "page-block-bottom": {
+      "@type": "slate",
+      "value": [
+        { "type": "p", "children": [{ "text": "Page block below both templates" }] }
+      ],
+      "plaintext": "Page block below both templates"
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "page-block-top",
+      "i1-header",
+      "i1-content",
+      "i1-footer",
+      "page-block-mid",
+      "i2-header",
+      "i2-content",
+      "i2-footer",
+      "page-block-bottom"
+    ]
+  },
+  "@components": {
+    "actions": {
+      "@id": "/two-template-page/@actions",
+      "object": [
+        { "@id": "/two-template-page/edit", "id": "edit", "title": "Edit" }
+      ],
+      "object_buttons": []
+    },
+    "breadcrumbs": {
+      "@id": "/two-template-page/@breadcrumbs",
+      "items": [
+        { "@id": "/two-template-page", "title": "Two Template Page" }
+      ]
+    }
+  }
+}

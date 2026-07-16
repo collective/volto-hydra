@@ -19,6 +19,7 @@ import imageSVG from '@plone/volto/icons/image.svg';
 import clearSVG from '@plone/volto/icons/clear.svg';
 import upSVG from '@plone/volto/icons/up.svg';
 import lockSVG from '@plone/volto/icons/lock.svg';
+import unlockSVG from '@plone/volto/icons/unlock.svg';
 import AddLinkForm from '@plone/volto/components/manage/AnchorPlugin/components/LinkButton/AddLinkForm';
 import { ImageInput } from '@plone/volto/components/manage/Widgets/ImageWidget';
 import { createLog } from '../../utils/log';
@@ -1167,6 +1168,29 @@ const SyncedSlateToolbar = ({
   const fieldName = blockUI?.focusedFieldName || 'value';
   const fieldValue = block[fieldName];
 
+  // Template instance the selected block belongs to (walk up to the TOP-level
+  // instance, skipping nested ones) so the ⋯ dropdown can offer "Edit template" /
+  // "Save template" straight from the Quanta toolbar — i.e. unlock AND
+  // lock/save a template WITHOUT opening the settings sidebar.
+  let toolbarTemplateInstanceId = null;
+  {
+    let cur = selectedBlock;
+    while (cur) {
+      const pi = blockPathMap?.[cur];
+      if (!pi) break;
+      if (pi.isTemplateInstance && !pi.isNestedTemplateInstance) toolbarTemplateInstanceId = cur;
+      cur = pi.parentId;
+    }
+  }
+  const toolbarTemplateId = toolbarTemplateInstanceId
+    ? blockPathMap?.[toolbarTemplateInstanceId]?.templateId
+    : null;
+  const canEditToolbarTemplate =
+    templatePermissions?.[toolbarTemplateId]?.can_edit ?? true;
+  const isEditingToolbarTemplate = (templateEditMode || []).includes(
+    toolbarTemplateInstanceId,
+  );
+
   // Determine if we should show format buttons based on field type
   // Also hide for readonly blocks (e.g., fixed template blocks, or blocks outside template in edit mode)
   const blockType = block?.['@type'];
@@ -1347,29 +1371,18 @@ const SyncedSlateToolbar = ({
         );
       })()}
 
-      {/* Drag handle or lock icon - only show for blocks, not page-level fields */}
+      {/* Drag handle + template lock/unlock toggle — only for blocks, not page fields.
+          A template block the user can edit shows a lock/unlock toggle in a CONSISTENT
+          spot next to the drag handle: 🔒 to enter template edit (unlock), 🔓 to lock &
+          save. While editing the block is movable, so the drag handle sits beside it —
+          same location for both lock and unlock. Clicking raises the unlock-warning /
+          lock-decision modal, so a template can be saved WITHOUT opening the sidebar. */}
       {(() => {
         if (!selectedBlock || selectedBlock === PAGE_BLOCK_UID) {
           return <div style={{ width: '8px' }} />; // Spacer for page-level fields
         }
         const block = getBlock(selectedBlock);
-
-        // Resolve the top-level template instance this block belongs to (walk up the
-        // parent chain to the outermost, non-nested instance). Drives the clickable
-        // lock (enter edit mode) below.
-        let instanceId = null;
-        {
-          let cur = selectedBlock;
-          while (cur) {
-            const pi = blockPathMap?.[cur];
-            if (!pi) break;
-            if (pi.isTemplateInstance && !pi.isNestedTemplateInstance) instanceId = cur;
-            cur = pi.parentId;
-          }
-        }
-        const tplInfo = instanceId ? blockPathMap?.[instanceId] : null;
-        const canEditTemplate =
-          templatePermissions?.[tplInfo?.templateId]?.can_edit ?? true;
+        const instanceId = toolbarTemplateInstanceId;
 
         const dragHandle = (
           <div
@@ -1391,50 +1404,63 @@ const SyncedSlateToolbar = ({
           </div>
         );
 
-        // The Quanta toolbar just shows the lock in place of the drag handle for a
-        // locked template block (below); the lock/unlock TOGGLE lives on the sidebar
-        // bar. In edit mode the block is movable, so the slot shows the drag handle.
-        const isLocked = isBlockPositionLocked(block, templateEditMode);
-        if (isLocked) {
-          // The lock only shows for template chrome (fixed blocks), so it's the
-          // discoverable entry point into template edit mode: clicking it edits that
-          // template (its fixed blocks become editable/movable).
-          const canEnterEdit =
-            !!instanceId && !!onToggleTemplateEditMode && canEditTemplate;
+        // The lock/unlock toggle shows for the template's fixed "chrome" (🔒, tap to
+        // edit) and for ANY block while its template is unlocked (🔓, tap to lock &
+        // save). Editable slot content in a LOCKED template is just normal movable
+        // content — it keeps the drag handle (below), no toggle.
+        const isPositionLocked = isBlockPositionLocked(block, templateEditMode);
+        const canToggleTemplate =
+          !!instanceId && !!onToggleTemplateEditMode && canEditToolbarTemplate;
+        if (canToggleTemplate && (isPositionLocked || isEditingToolbarTemplate)) {
+          const editing = isEditingToolbarTemplate;
+          const toggle = (
+            <button
+              type="button"
+              className="lock-icon template-lock-toggle"
+              aria-pressed={editing}
+              title={editing ? 'Lock template (review & save changes)' : 'Click to edit this template'}
+              aria-label={editing ? 'Lock template' : 'Unlock template to edit'}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleTemplateEditMode(instanceId);
+              }}
+              style={{
+                padding: '4px 6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+                color: '#999',
+                fontSize: '14px',
+                background: '#f5f5f5',
+                border: 'none',
+                borderRadius: '2px',
+              }}
+            >
+              <Icon name={editing ? unlockSVG : lockSVG} size="16px" color="#684cc9" />
+            </button>
+          );
+          // While editing the block is movable — the drag handle keeps its canonical
+          // (leftmost) position so DnD alignment is unaffected; the toggle sits to its
+          // right, next to it.
+          return editing ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+              {dragHandle}
+              {toggle}
+            </div>
+          ) : (
+            toggle
+          );
+        }
 
-          if (canEnterEdit) {
-            return (
-              <button
-                type="button"
-                className="lock-icon"
-                title="Click to edit this template"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleTemplateEditMode(instanceId);
-                }}
-                style={{
-                  padding: '4px 6px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  pointerEvents: 'auto',
-                  cursor: 'pointer',
-                  color: '#999',
-                  fontSize: '14px',
-                  background: '#f5f5f5',
-                  border: 'none',
-                  borderRadius: '2px',
-                }}
-              >
-                <Icon name={lockSVG} size="16px" color="#684cc9" />
-              </button>
-            );
-          }
+        // Fixed template block the user CANNOT toggle (no Modify permission) → static lock.
+        if (isPositionLocked) {
           return (
             <div
               className="lock-icon"
               title={
-                instanceId && !canEditTemplate
+                instanceId && !canEditToolbarTemplate
                   ? 'You don’t have permission to edit this template'
                   : 'This block is part of a template and cannot be moved'
               }
@@ -1695,6 +1721,16 @@ const SyncedSlateToolbar = ({
         isFixed={blockPathMap?.[selectedBlock]?.isFixed}
         isInTemplate={!!block?.templateId}
         onMakeTemplate={onMakeTemplate}
+        // Template edit/lock straight from the toolbar ⋯ menu (no sidebar needed):
+        // "Edit template" when locked, "Save template" (→ lock/save decision)
+        // while editing. Gated on Modify permission.
+        isTemplateInstance={!!toolbarTemplateInstanceId && canEditToolbarTemplate && !!onToggleTemplateEditMode}
+        isEditingTemplate={isEditingToolbarTemplate}
+        onToggleTemplateEdit={
+          toolbarTemplateInstanceId && onToggleTemplateEditMode
+            ? () => onToggleTemplateEditMode(toolbarTemplateInstanceId)
+            : null
+        }
         multiSelectedUids={isMultiSelected ? blockUI.multiSelectedUids : null}
         hasClipboard={!!(blocksClipboard?.cut || blocksClipboard?.copy)}
         pasteAllowed={pasteAllowed}
