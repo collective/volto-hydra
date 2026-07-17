@@ -365,6 +365,10 @@ function checkIntegrity(contentDir) {
     if (/^https?:\/\//.test(ref)) return null;             // external — well-formed, unverifiable offline
     if (/^(mailto:|tel:|data:)/.test(ref)) return null;    // known schemes
     if (ref.startsWith('#')) return null;                  // in-page anchor
+    // Static frontend media assets (e.g. generated doc demo clips served from
+    // the frontend's public/ dir, like `/docs/cards/x.mp4`) — not Plone
+    // content, verifiable only in a built frontend, like external URLs.
+    if (/\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i.test(ref)) return null;
     if (ref.startsWith('/') || ref.startsWith('../')) {
       // strip ../ prefixes, scale suffixes (@@images/…) and resource views (/++…)
       let base = ref.replace(/^(\.\.\/)+/, '');
