@@ -1021,6 +1021,46 @@ export class AdminUIHelper {
   }
 
   /**
+   * Demo recordings (Playwright ≥1.61): turn on the screencast CURSOR — an animated
+   * pointer that tracks between action points, over the admin iframe too (Playwright
+   * composites it into the recording, so unlike an injected DOM cursor it isn't trapped
+   * in one document). The per-action title overlays are suppressed (duration:0):
+   * "Click"/"Type" reads as noise — narrate deliberately with caption() instead. No-op
+   * when screencast is unavailable (older Playwright / video off), so it's safe to leave
+   * in any test.
+   */
+  async enableDemoCursor(cursor: 'pointer' | 'none' = 'pointer'): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sc = (this.page as any).screencast;
+    if (sc?.showActions) await sc.showActions({ cursor, duration: 0 });
+  }
+
+  /**
+   * High-level caption for a demo recording — a subtitle pill saying what's happening
+   * NEXT ("Unlock the shared footer template"). Rendered via screencast.showOverlay so
+   * it composites over everything (iframe included). Non-blocking: the pill stays up for
+   * `ms` while the following actions run, so place it right before a beat. No-op without
+   * screencast.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _lastCaption?: any;
+  async caption(text: string, ms: number = 15_000): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sc = (this.page as any).screencast;
+    if (!sc?.showOverlay) return;
+    // One caption at a time: drop the previous pill so this beat's replaces it.
+    if (this._lastCaption?.dispose) await this._lastCaption.dispose().catch(() => {});
+    const safe = text.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]!));
+    const html =
+      `<div style="position:fixed;left:50%;bottom:6%;transform:translateX(-50%);` +
+      `max-width:80%;background:rgba(18,20,26,.9);color:#fff;padding:10px 20px;` +
+      `border-radius:999px;font:600 16px/1.3 system-ui,-apple-system,sans-serif;` +
+      `text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.35);` +
+      `z-index:2147483647;">${safe}</div>`;
+    this._lastCaption = await sc.showOverlay(html, { duration: ms });
+  }
+
+  /**
    * Wait for a block to be shown as readonly (has hydra-locked class).
    * Used to verify template edit mode is active (blocks outside template get locked).
    * @param blockId - The block ID to check
