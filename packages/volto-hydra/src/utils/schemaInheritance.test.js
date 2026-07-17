@@ -9,7 +9,10 @@ vi.mock('../context', () => ({
   getLiveBlockData: () => undefined,
 }));
 
-import { applyBlockDefaultsWithContext } from './schemaInheritance';
+import {
+  applyBlockDefaultsWithContext,
+  createSchemaEnhancerFromRecipe,
+} from './schemaInheritance';
 
 /**
  * The store-on-add path: when a block is added into a slot region inside a
@@ -107,5 +110,93 @@ describe('applyBlockDefaultsWithContext — slotId inheritance on add', () => {
     expect(result.slotId).toBe('primary');
     expect(result.templateId).toBe('/t/test-layout');
     expect(result.templateInstanceId).toBe('inst-1');
+  });
+});
+
+/**
+ * fieldRules `contains` operator — array membership.
+ *
+ * The block schema pattern this enables: a multiselect field (e.g. a card's
+ * `elements: ['image', 'date', 'tag']`) that conditionally reveals each
+ * element's data field. Without an array-membership operator a multiselect
+ * can't drive conditional visibility (isSet only tells you the array is
+ * non-empty, not which values it holds). Tested through the public recipe
+ * entry, exactly as the frontend sends it.
+ */
+describe('fieldRules — contains operator (multiselect-driven visibility)', () => {
+  const baseSchema = () => ({
+    fieldsets: [{ id: 'default', title: 'Default', fields: ['elements', 'date'] }],
+    properties: {
+      elements: { title: 'Elements', type: 'array' },
+      date: { title: 'Date' },
+    },
+    required: [],
+  });
+
+  // Show `date` only when the `elements` multiselect includes 'date'.
+  const recipe = {
+    fieldRules: {
+      date: { when: { elements: { contains: 'date' } }, else: false },
+    },
+  };
+
+  test('keeps the field when the multiselect array includes the value', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { elements: ['image', 'date'] },
+    });
+    expect(out.properties.date).toBeDefined();
+    expect(out.fieldsets[0].fields).toContain('date');
+  });
+
+  test('hides the field when the multiselect array omits the value', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { elements: ['image', 'tag'] },
+    });
+    expect(out.properties.date).toBeUndefined();
+    expect(out.fieldsets[0].fields).not.toContain('date');
+  });
+
+  test('hides the field when the multiselect is empty or unset', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    for (const formData of [{ elements: [] }, {}]) {
+      const out = enhancer({ schema: baseSchema(), formData });
+      expect(out.properties.date).toBeUndefined();
+    }
+  });
+
+  // notContains is the inverse: keep the field UNLESS the array holds the value.
+  const notContainsRecipe = {
+    fieldRules: {
+      date: { when: { elements: { notContains: 'date' } }, else: false },
+    },
+  };
+
+  test('notContains keeps the field when the array omits the value', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(notContainsRecipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { elements: ['image', 'tag'] },
+    });
+    expect(out.properties.date).toBeDefined();
+  });
+
+  test('notContains hides the field when the array holds the value', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(notContainsRecipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { elements: ['image', 'date'] },
+    });
+    expect(out.properties.date).toBeUndefined();
+  });
+
+  test('notContains matches (keeps) when the multiselect is unset', () => {
+    // A non-array value contains nothing, so notContains is satisfied.
+    const enhancer = createSchemaEnhancerFromRecipe(notContainsRecipe);
+    const out = enhancer({ schema: baseSchema(), formData: {} });
+    expect(out.properties.date).toBeDefined();
   });
 });

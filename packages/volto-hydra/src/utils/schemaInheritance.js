@@ -1535,6 +1535,7 @@ function createEnhancerByType(type, config) {
  *   { fieldName: { isNot: v } }    — inequality
  *   { fieldName: { gte: n } }      — numeric comparison (gt, gte, lt, lte)
  *   { fieldName: { isSet: true } } — truthy check
+ *   { fieldName: { contains: v } } — array membership (multiselect includes v)
  *   { '../field': value }          — parent/root field path
  *
  * Field definitions can include a `fieldset` property to specify placement:
@@ -1746,11 +1747,14 @@ function evaluateWhenCondition(when, formData, args) {
 
 /**
  * Evaluate operator conditions against a value.
- * Operators: is, isNot, gt, gte, lt, lte, isSet, isNotSet
+ * Operators: is, isNot, gt, gte, lt, lte, isSet, isNotSet, contains, notContains
+ * `contains`/`notContains` test array membership (for multiselect fields):
+ * `{ contains: 'date' }` matches when `value` is an array that includes 'date'.
  * @private
  */
 function evaluateOperators(value, operators) {
-  const { is, isNot, gt, gte, lt, lte, isSet, isNotSet } = operators;
+  const { is, isNot, gt, gte, lt, lte, isSet, isNotSet, contains, notContains } =
+    operators;
 
   if (isSet !== undefined) {
     const hasValue = value !== undefined && value !== null && value !== '';
@@ -1759,6 +1763,14 @@ function evaluateOperators(value, operators) {
   if (isNotSet !== undefined) {
     const hasValue = value !== undefined && value !== null && value !== '';
     if (isNotSet ? hasValue : !hasValue) return false;
+  }
+  if (contains !== undefined) {
+    // Array membership: a non-array value (missing/unset multiselect) never
+    // contains anything, so the condition fails.
+    if (!Array.isArray(value) || !value.includes(contains)) return false;
+  }
+  if (notContains !== undefined) {
+    if (Array.isArray(value) && value.includes(notContains)) return false;
   }
   if (is !== undefined && value !== is) return false;
   if (isNot !== undefined && value === isNot) return false;
