@@ -9,7 +9,7 @@
  * No `regions` map, no synthesised 'items'.
  */
 
-import { getBlocksFieldNames, buildBlockPathMap, getPageAllowedBlocksFromRestricted } from './buildBlockPathMap.js';
+import { getBlocksFieldNames, buildBlockPathMap, getPageAllowedBlocksFromRestricted, addableSiblingTypes } from './buildBlockPathMap.js';
 import { mapLayoutItems } from './containerOps.js';
 
 describe('getBlocksFieldNames', () => {
@@ -140,5 +140,69 @@ describe('buildBlockPathMap — page blocks fields', () => {
       blocksConfig,
     );
     expect(map['footer-1']?.region).toBe('footer');
+  });
+});
+
+describe('addableSiblingTypes — synced container add restriction', () => {
+  const blocksConfig = {
+    grid: {
+      blockSchema: {
+        properties: {
+          items: {
+            widget: 'blocks_layout',
+            itemTypeField: 'variation',
+            allowedBlocks: ['card', 'contentBlock', 'image', 'listing'],
+          },
+          variation: { widget: 'blockTypeSelect' },
+        },
+      },
+    },
+    // Convertible item types (have an @default mapping).
+    card: { fieldMappings: { '@default': { '@id': 'url', title: 'title' } } },
+    contentBlock: { fieldMappings: { '@default': { '@id': 'url', title: 'title' } } },
+    image: { fieldMappings: { '@default': { '@id': 'url', image: 'image' } } },
+    // Structural child — no @default mapping.
+    listing: {},
+  };
+
+  test('restricts convertible item types to the synced one, keeps structural', () => {
+    const allowed = ['card', 'contentBlock', 'image', 'listing'];
+    const grid = { '@type': 'grid', variation: 'card' };
+    expect(addableSiblingTypes(allowed, 'variation', grid, blocksConfig)).toEqual([
+      'card',
+      'listing',
+    ]);
+  });
+
+  test('a plain field (no itemTypeField) is unchanged', () => {
+    expect(
+      addableSiblingTypes(['slate', 'image'], undefined, {}, blocksConfig),
+    ).toEqual(['slate', 'image']);
+  });
+
+  test('an unset synced type leaves the full list (no over-restriction)', () => {
+    const grid = { '@type': 'grid' };
+    expect(
+      addableSiblingTypes(['card', 'listing'], 'variation', grid, blocksConfig),
+    ).toEqual(['card', 'listing']);
+  });
+
+  test('buildBlockPathMap: a card grid child can only add the card + listing, not another item type', () => {
+    const formData = {
+      '@type': 'Document',
+      blocks: {
+        'grid-1': {
+          '@type': 'grid',
+          variation: 'card',
+          blocks: { 'card-1': { '@type': 'card' } },
+          blocks_layout: { items: ['card-1'] },
+        },
+      },
+      blocks_layout: { items: ['grid-1'] },
+    };
+    const map = buildBlockPathMap(formData, blocksConfig);
+    expect(map['card-1'].allowedSiblingTypes).toEqual(['card', 'listing']);
+    expect(map['card-1'].allowedSiblingTypes).not.toContain('contentBlock');
+    expect(map['card-1'].allowedSiblingTypes).not.toContain('image');
   });
 });
