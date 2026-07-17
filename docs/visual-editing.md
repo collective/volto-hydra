@@ -60,28 +60,48 @@ Add `data-linkable-allow` to elements that should navigate during edit mode (pag
 <select data-linkable-allow @change="handleFilter">...</select>
 ```
 
-## Path Syntax for Parent/Page Fields
+## Field Path Syntax
 
-The `data-edit-text|edit-media|edit-link` attributes support Unix-style paths to edit fields outside the current block:
+Every `data-edit-*` attribute — `data-edit-text`, `data-edit-link`,
+`data-edit-media` — takes a Unix-style **field path**, resolved the same way for
+all three. A path has two independent axes:
 
-- **`fieldName`** — edit the block's own field (default)
-- **`../fieldName`** — edit the parent block's field
-- **`../../fieldName`** — edit the grandparent's field
-- **`/fieldName`** — edit the page metadata field
+**Which block** (the leading part):
+
+- **`fieldName`** — this block's own field (default)
+- **`../fieldName`** — the parent **block**'s field
+- **`../../fieldName`** — the grandparent block's field
+- **`/fieldName`** — a page/root field
+
+`..` always steps up one **block** — never an object or region level (see below).
+
+**Where inside the block** (`/` descends objects):
+
+- **`content/headline`** — descend a [`widget: 'object'`](container-blocks.md#widget-object-nesting-fields-and-containers-inside-a-block-field)
+  field to a nested field (the key mirrors the storage path, `block.content.headline`)
+
+The two compose: `../content/headline` is "the parent block, its `content.headline`".
+`/` descends objects only — a region (`object_list` / `blocks_layout`) or a value
+is the end of a path (a region's children are separate blocks with their own
+`data-block-uid`).
 
 <!-- codeExample: html -->
 ```html
-<!-- Edit the page title (not inside any block) -->
+<!-- page fields (not inside any block) -->
 <h1 data-edit-text="/title">My Page Title</h1>
+<p  data-edit-text="/description">Page description here</p>
 
-<!-- Edit the page description -->
-<p data-edit-text="/description">Page description here</p>
-
-<!-- Inside a nested block, edit the parent container's title -->
+<!-- inside a nested block, edit the parent container's title -->
 <h3 data-edit-text="../title">Column Title</h3>
+
+<!-- fields nested on a widget:'object' — text, link and media all use the same path -->
+<h3 data-edit-text="content/headline">…</h3>
+<a  data-edit-link="content/href">…</a>
+<img data-edit-media="content/image" />
 ```
 
-This allows fixed parts of the page (like headers) to be editable without being inside a block.
+This lets fixed parts of the page (headers), parent-block fields, and fields
+grouped inside an object all be edited in place, with one addressing model.
 
 ## Readonly Regions
 
@@ -140,9 +160,10 @@ item to a paragraph (`[ul, p]`). Hydra normalizes that immediately:
   same container (`blocks_layout` or `object_list`). This is how pressing
   Enter in a text block produces a new block.
 - **Flatten** — when the field *can't* be split — a slate field of a
-  non-slate block (e.g. a `slateTable` cell's `value`), or a container
-  that's full or in table mode — the extra nodes' content merges back into
-  the first node. No text is lost.
+  non-slate block (e.g. a `slateTable` cell's `value`), a slate field nested
+  on a `widget: 'object'` (`content/headline`), or a container that's full or
+  in table mode — the extra nodes' content merges back into the first node.
+  No text is lost.
 
 A frontend renderer can therefore always assume one top-level node per
 slate field; it never has to handle a multi-node `value`.

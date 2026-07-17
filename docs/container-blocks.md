@@ -188,28 +188,23 @@ table: { widget: 'object', schema: { properties: {
   "table": { "blocks": { "b1": { /* … */ } }, "blocks_layout": { "body": ["b1"] } } }
 ```
 
-A **plain field** inside an object is edited in the canvas like any top-level field — you just address it by its **`/`-path**. A `data-edit-*` value is a path resolved against the schema:
-
-- `field` — this block's own field
-- `content/field` — descend the `content` object to a nested field (object keys mirror the storage path)
-- `..` — the parent **block** (never up an object level)
-- `/field` — a page/root field
-
-The **same `/`-path works for every inline field kind** — text, links, and media — because they all resolve a field the same way:
-
-<!-- codeExample: html -->
-```html
-<!-- all three fields live on the `content` object of this block -->
-<h3 data-edit-text="content/headline">…</h3>
-<a  data-edit-link="content/href">…</a>
-<img data-edit-media="content/image" />
-```
-
-Each writes back to its nested location (`block.content.headline`, `block.content.href`, `block.content.image`) — never a flat key.
+A **plain field** inside an object is edited in the canvas like any top-level field — address it inline with its `/`-path (`data-edit-text="content/headline"`, and the same for `data-edit-link` / `data-edit-media`). The object is *transparent*: `content/headline` writes back to `block.content.headline`, never a flat key. See [Field Path Syntax](visual-editing.md#field-path-syntax) for the full grammar (`/` object descent, `..` = parent block, `/field` = page).
 
 Blocks inside a nested container are edited in the canvas like any other container. The sidebar prefixes a nested container's **title** with the path (e.g. **Table / Rows**) so the nesting is visible.
 
 This replaces `dataPath`: declare the container inside the object rather than hoisting it to the block's top level with a `dataPath` back-reference.
+
+## Container schema reference
+
+A block's schema is a standard [Volto block schema](https://6.docs.plone.org/volto/blocks/editcomponent.html) (fieldsets, `properties`, widgets, `default`, etc.). Hydra reads three container-oriented `widget` values plus a few per-field keys — those are:
+
+| `widget` | Storage | Key fields |
+|---|---|---|
+| `blocks_layout` | children are ids in the parent's shared `blocks` dict; this field's name is a region key under `blocks_layout` | `allowedBlocks`, `maxLength`, `allowedTemplates` |
+| `object_list` | inline array on the field itself | `idField` (default `@id`), `schema` (item schema), `allowedBlocks` + `typeField` (typed items), `defaultBlockType`, `maxLength`, `addMode: 'table'` |
+| `object` | groups sub-fields under one key; sub-fields (plain OR the two container widgets above) nest inside | `schema` (the nested properties) |
+
+All three can nest inside `object`, and a container may mix a `blocks_layout` region and an `object_list` region. Everything else in a field def (`title`, `default`, `type`, `choices`, `mode`, …) is plain Volto and behaves as documented there.
 
 ## Rendering Containers in Your Frontend
 
