@@ -93,8 +93,13 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
 
   const iframe = page.frameLocator('iframe');
 
+  // Playwright 1.61 screencast: an animated pointer that tracks between action points,
+  // over the iframe too. Per-action labels are suppressed — caption() narrates each beat.
+  await helper.enableDemoCursor();
+
   // Beat 1 — type into a slate paragraph. Shows live preview updating.
   // Assert: the typed text actually lands in the iframe.
+  await helper.caption('Edit any text inline');
   await helper.clickBlockInIframe('intro');
   await helper.waitForBlockSelectedInAdmin('intro');
   await page.keyboard.press('End');
@@ -103,6 +108,7 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
     .toContainText('Edit anywhere.', { timeout: 5_000 });
   await beat(page, 'Edit any text, inline');
 
+  await helper.caption('Format with the toolbar');
   // Beat 2 — bold the phrase we just typed (Quanta toolbar).
   // No DOM-level assertion — Slate's bold rendering varies by frontend
   // (could be <strong>, <b>, or a styled span); the visual recording
@@ -112,6 +118,7 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   await page.keyboard.press('Meta+B');
   await beat(page, 'Format with the toolbar');
 
+  await helper.caption('Drag blocks to reorder');
   // Beat 3 — drop into block mode, drag the intro paragraph past the
   // adjacent column block to show DnD reflow. The dragBlockAfter helper
   // asserts the drop completed; the post-drop DOM order is implicit.
@@ -120,12 +127,14 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   await helper.dragBlockAfter('intro', 'after-columns');
   await beat(page, 'Drag blocks to reorder');
 
+  await helper.caption('Blocks nest in containers');
   // Beat 4 — click into the columns container. waitForBlockSelectedInAdmin
   // is the assertion; the helper fails if the selection state doesn't land.
   await helper.clickBlockInIframe('columns-1');
   await helper.waitForBlockSelectedInAdmin('columns-1');
   await beat(page, 'Select a container block');
 
+  await helper.caption('Same content — any frontend');
   // Beat 5 — open the frontend switcher panel, switch to mobile
   // viewport, then click F7 Mobile. The iframe swaps to the F7
   // frontend at mobile width showing the same content through a
