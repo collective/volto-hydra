@@ -372,6 +372,15 @@ function checkIntegrity(contentDir) {
       base = base.split('/@@')[0].split('/++')[0].replace(/\/+$/, '') || '/';
       return pathMap.has(base) ? null : `path not in content: ${base}`;
     }
+    // Plone action / browser-view URLs relative to the current context (they
+    // don't match the absolute-path branch above). These are UI actions, not
+    // content references — they resolve at runtime for whatever container the
+    // page lives in, so they can't (and shouldn't) be checked as content paths.
+    // e.g. `./add?type=Document` (add form), `./edit`, `@@some-view`, `++resource++…`.
+    const relAction = ref.replace(/^\.\//, '');
+    if (/^(@@|\+\+)/.test(relAction)) return null;
+    if (/^(add|edit|view|delete|sharing|contents|folder_contents|login|logout|history)(\?|\/|#|$)/.test(relAction))
+      return null;
     return `unrecognized reference form: ${ref.slice(0, 60)}`;
   }
 

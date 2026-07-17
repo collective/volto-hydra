@@ -15,7 +15,6 @@ import {
   deepEqual,
   findChangedUnit,
   isBlockReadonly,
-  isBlockInEditedTemplate,
   isBlockPositionLocked,
   getBlockAddability,
   isTextOnlyBlockChange,
@@ -260,7 +259,7 @@ export class Bridge {
     this._readonlyBlocks = new Set();
     // Template edit mode - when set to an instanceId, blocks inside that instance
     // become editable (even if readOnly), and blocks outside become locked
-    this.templateEditMode = null; // instanceId of template being edited
+    this.templateEditMode = []; // v2: set of unlocked template instance ids (string[])
     // Track iframe focus state via window focus/blur events.
     // document.hasFocus() is unreliable in headless browsers (always returns false),
     // but window focus/blur events are dispatched by Chromium's internal frame focus
@@ -439,18 +438,12 @@ export class Bridge {
   isBlockReadonly(blockUid) {
     const blockData = this.getBlockData(blockUid);
 
-    // In template edit mode the flat shared check (templateInstanceId match) is
-    // sufficient at any depth: the merge stamps every block with its resolved
-    // instance id, so same-template nested content carries the instance's id and a
-    // foreign embedded template carries its own — editable iff the stamped id
-    // matches the edited instance.
-    if (this.templateEditMode) {
-      const readonly = !isBlockInEditedTemplate(blockData, this.templateEditMode);
-      log('isBlockReadonly:', readonly ? 'TRUE' : 'FALSE', '(template edit mode) for:', blockUid);
-      return readonly;
-    }
-
-    // Normal mode: shared block.readOnly check + Bridge-specific registry
+    // v2: the shared gate handles both normal and template-edit cases at any
+    // depth. The merge stamps every block with its resolved instance id, so a
+    // block is editable iff its stamped instance is currently unlocked; every
+    // other block keeps its own readOnly flag (page blocks stay editable — a
+    // template being unlocked no longer locks the rest of the page). The
+    // Bridge-specific registry still force-locks its own set.
     const readonlyFromShared = isBlockReadonly(blockData, this.templateEditMode);
     if (this._readonlyBlocks.has(blockUid)) {
       log('isBlockReadonly: TRUE (registry) for:', blockUid);
@@ -4161,10 +4154,16 @@ export class Bridge {
           log('Received STEP_UP');
           this.stepUpSelection({ source: 'stepUpMessage' });
         } else if (event.data.type === 'TEMPLATE_EDIT_MODE') {
-          // Toggle template edit mode - affects which blocks are editable via isBlockReadonly
-          // instanceId: the template instance being edited, or null to exit edit mode
-          this.templateEditMode = event.data.instanceId;
-          log('Template edit mode:', this.templateEditMode ? `editing instance ${this.templateEditMode}` : 'disabled');
+          // v2: the set of currently-unlocked template instance ids (string[]).
+          // Multiple templates can be unlocked at once; an empty array means none.
+          // Affects which blocks are editable/movable via isBlockReadonly /
+          // isBlockPositionLocked.
+          this.templateEditMode = Array.isArray(event.data.instanceIds)
+            ? event.data.instanceIds
+            : [];
+          log('Template edit mode:', this.templateEditMode.length
+            ? `editing instances ${this.templateEditMode.join(', ')}`
+            : 'disabled');
 
           // Update visual state of all blocks (grey out readonly blocks)
           this.applyReadonlyVisuals();
@@ -7302,16 +7301,20 @@ export class Bridge {
   }
 
   /**
-   * Applies visual styling to readonly blocks.
-   * Blocks where isBlockReadonly() returns true get the hydra-locked class.
-   * This visually greys out:
-   * - In normal mode: readonly template blocks
-   * - In template edit mode: blocks outside the template being edited
+   * Marks readonly blocks so the admin/tests can detect the LIVE readonly state
+   * (it recomputes on every TEMPLATE_EDIT_MODE change), WITHOUT visually dimming
+   * them. Locked template blocks are no longer greyed out — the Quanta toolbar's
+   * lock icon (shown on selection) is the read-only affordance instead.
+   *
+   * A block is readonly when isBlockReadonly() returns true: in normal mode, a
+   * readonly template block; in template edit mode, a template block whose
+   * instance is not unlocked (the rest of the page is never locked in v2).
+   *
+   * Uses a dynamic CSS rule keyed by data-block-uid (resilient to framework
+   * re-renders) that sets the custom property `--hydra-block-locked: 1`. It has
+   * no visual effect; it's the marker the admin queries.
    */
   applyReadonlyVisuals() {
-    // Build a dynamic CSS rule targeting readonly blocks by data-block-uid.
-    // This is resilient to framework re-renders — CSS selectors keep matching
-    // even when Vue/React/Svelte replaces or patches DOM elements.
     const readonlyUids = [];
     const allBlocks = document.querySelectorAll('[data-block-uid]');
     allBlocks.forEach((blockElement) => {
@@ -7331,7 +7334,7 @@ export class Bridge {
     let newCSS = '';
     if (readonlyUids.length > 0) {
       const selector = readonlyUids.map(uid => `[data-block-uid="${uid}"]`).join(', ');
-      newCSS = `${selector} { filter: grayscale(0.5) opacity(0.6); }`;
+      newCSS = `${selector} { --hydra-block-locked: 1; }`;
     }
     // Only update DOM when CSS actually changes to avoid unnecessary style recalculations
     if (this._readonlyStyleEl.textContent !== newCSS) {

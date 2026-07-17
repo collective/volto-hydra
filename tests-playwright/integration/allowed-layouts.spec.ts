@@ -606,15 +606,8 @@ test.describe('allowedLayouts', () => {
       await expect(cell).toBeVisible({ timeout: 10000 });
       const cellId = await cell.getAttribute('data-block-uid');
 
-      // Enter template edit mode via the instance (branding -> parent instance).
-      await helper.clickBlockInIframe(brandingId);
-      await helper.waitForSidebarOpen();
-      await helper.escapeToParent();
-      const editToggle = page.locator('.edit-template-toggle');
-      await expect(editToggle).toBeVisible({ timeout: 5000 });
-      await editToggle.click();
-      const checkbox = page.locator('.edit-template-toggle');
-      await expect(checkbox).toHaveAttribute('aria-pressed', 'true', { timeout: 5000 });
+      // Unlock the template for editing.
+      await helper.unlockTemplate(brandingId);
 
       // Select the deeply-nested columns cell — it must unlock in edit mode
       // (approach B ancestry unlock; the bridge sets contenteditable on selection).
@@ -630,13 +623,10 @@ test.describe('allowedLayouts', () => {
       await page.keyboard.type(' FOOTEREDIT');
       await expect(iframe.locator(`[data-block-uid="${cellId}"]`)).toContainText('FOOTEREDIT', { timeout: 5000 });
 
-      // Exit edit mode.
-      await helper.clickBlockInIframe(brandingId);
-      await helper.escapeToParent();
-      await editToggle.click();
-      await expect(checkbox).toHaveAttribute('aria-pressed', 'false', { timeout: 5000 });
+      // Lock with "Change on all pages" — commits + saves the footer template.
+      await helper.lockTemplate(brandingId, 'commit');
 
-      // Save.
+      // Save the page too (allowed now that nothing is unlocked).
       await page.keyboard.press('Control+s');
       const pencilIcon = page.locator('.toolbar-actions .edit, [aria-label="Edit"]');
       await expect(pencilIcon).toBeVisible({ timeout: 10000 });
@@ -670,14 +660,8 @@ test.describe('allowedLayouts', () => {
       await expect(cell).toBeVisible({ timeout: 10000 });
       const cellId = await cell.getAttribute('data-block-uid');
 
-      // Enter template edit mode via the instance (branding -> parent instance).
-      await helper.clickBlockInIframe(brandingId);
-      await helper.waitForSidebarOpen();
-      await helper.escapeToParent();
-      const editToggle = page.locator('.edit-template-toggle');
-      await expect(editToggle).toBeVisible({ timeout: 5000 });
-      await editToggle.click();
-      await expect(page.locator('.edit-template-toggle')).toHaveAttribute('aria-pressed', 'true', { timeout: 5000 });
+      // Unlock the template for editing.
+      await helper.unlockTemplate(brandingId);
 
       // Navigate up to the columns container (cell -> column -> columns). This is a
       // container in the FOOTER region — the forced-region canAdd case the recursive
@@ -848,7 +832,7 @@ test.describe('allowedLayouts', () => {
       await helper.waitForSidebarOpen();
     });
 
-    test('footer block in template edit mode is readonly', async ({ page }) => {
+    test('unlocking a header template does not change the footer block’s editability (v2: no page lock)', async ({ page }) => {
       const helper = new AdminUIHelper(page);
       const iframe = helper.getIframe();
 
@@ -856,22 +840,29 @@ test.describe('allowedLayouts', () => {
       await helper.navigateToEdit('/template-test-page');
       await helper.waitForIframeReady();
 
-      // Select a template block to show template settings in sidebar
+      // The footer block's read-only marker is set by its OWN status: a plain page
+      // footer block (admin-mock) is editable; a readOnly footer-template block
+      // (admin-nuxt's forced footer) is not. Capture it BEFORE unlocking anything.
+      const footerBlock = iframe.locator('#footer-content [data-block-uid]').first();
+      await expect(footerBlock).toBeVisible({ timeout: 10000 });
+      const lockedBefore = (await footerBlock.evaluate((el) =>
+        getComputedStyle(el).getPropertyValue('--hydra-block-locked').trim(),
+      ));
+
+      // Select a header template block and unlock that template.
       const headerBlock = iframe.locator('main [data-block-uid], #content [data-block-uid]').filter({ hasText: 'Template Header' }).first();
       await expect(headerBlock).toBeVisible();
-      await headerBlock.click();
       const headerBlockId = await headerBlock.getAttribute('data-block-uid');
-      await helper.waitForBlockSelectedInAdmin(headerBlockId!);
+      await helper.unlockTemplate(headerBlockId!);
 
-      // Enter template edit mode — blocks outside the template become readonly
-      const editTemplateLabel = page.locator('.edit-template-toggle');
-      await editTemplateLabel.click();
-
-      // Footer block should be locked (outside the template)
-      const footerBlock = iframe.locator('#footer-content [data-block-uid]').first();
-      await expect(footerBlock).toBeVisible({ timeout: 5000 });
-      const footerBlockId = await footerBlock.getAttribute('data-block-uid');
-      await helper.waitForBlockReadonly(footerBlockId!);
+      // v2: unlocking the header template does NOT lock the rest of the page, so the
+      // footer's editability is UNCHANGED (whatever it was on its own).
+      await expect(async () => {
+        const lockedAfter = await footerBlock.evaluate((el) =>
+          getComputedStyle(el).getPropertyValue('--hydra-block-locked').trim(),
+        );
+        expect(lockedAfter).toBe(lockedBefore);
+      }).toPass({ timeout: 5000 });
     });
   });
 });

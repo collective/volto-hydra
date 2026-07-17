@@ -98,16 +98,9 @@ test.describe('Nuxt site footer', () => {
     const footer = iframe.locator('footer');
     await expect(footer).toBeVisible({ timeout: 15000 });
 
-    // Click the social links block then navigate up to template instance
+    // Unlock the template for editing.
     const { blockId: socialBlockId } = await helper.waitForBlockByContent('Follow us:');
-    await helper.clickBlockInIframe(socialBlockId);
-    await helper.waitForSidebarOpen();
-    await helper.escapeToParent();
-
-    // Toggle "Edit Template" in the sidebar
-    const editToggle = page.locator('.edit-template-toggle');
-    await expect(editToggle).toBeVisible({ timeout: 10000 });
-    await editToggle.click();
+    await helper.unlockTemplate(socialBlockId);
 
     // Click a link item — should now be editable
     const firstLink = footer.locator('[data-block-uid] a[target="_blank"]').first();
@@ -150,15 +143,9 @@ test.describe('Nuxt site footer', () => {
     const footer = iframe.locator('footer');
     await expect(footer).toBeVisible({ timeout: 15000 });
 
-    // Enter template edit mode
+    // Unlock the template for editing.
     const { blockId: socialBlockId } = await helper.waitForBlockByContent('Follow us:');
-    await helper.clickBlockInIframe(socialBlockId);
-    await helper.waitForSidebarOpen();
-    await helper.escapeToParent();
-
-    const editToggle = page.locator('.edit-template-toggle');
-    await expect(editToggle).toBeVisible({ timeout: 10000 });
-    await editToggle.click();
+    await helper.unlockTemplate(socialBlockId);
 
     // Click a link item and add a new one via iframe [+]
     const firstLink = footer.locator('[data-block-uid] a[target="_blank"]').first();

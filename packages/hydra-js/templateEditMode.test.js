@@ -1,52 +1,58 @@
 import { isBlockInEditedTemplate, isBlockReadonly } from '@volto-hydra/helpers';
 
 /**
- * Template edit mode unlocks a block via the FLAT predicate
- * (templateInstanceId === editedInstance).
+ * Template edit mode (v2) is a SET of unlocked template instance ids: multiple
+ * templates can be unlocked and edited on one page at once, and unlocking a
+ * template does NOT lock the rest of the page. `templateEditMode` is threaded as
+ * a string[] (postMessage-friendly). A block is unlocked via the FLAT predicate
+ * (its stamped templateInstanceId is a member of the set).
  *
- * This used to miss blocks nested in a container — they kept a DIFFERENT id, so a
- * separate ancestry walk (isBlockInEditedTemplateDeep / isBlockReadonlyDeep) was
- * needed, stopping at a foreign embedded template. The merge now STAMPS every
- * block with its RESOLVED instance id: same-template nested content keeps the
- * instance's id, a foreign embedded template starts its OWN id. So the flat check
- * is equivalent to the walk at every depth, and the Deep helpers were removed.
- *
- * Stamped instance ids the merge produces for an edited instance 'X' that embeds
- * a foreign template 'B':
- *   directChild  templateInstanceId 'X'  (direct child)
- *   cell         templateInstanceId 'X'  (nested in a same-template container)
- *   cellInB      templateInstanceId 'B'  (nested inside the foreign template)
+ * The merge STAMPS every block with its RESOLVED instance id: same-template nested
+ * content keeps the instance's id, a foreign embedded template starts its OWN id.
+ * So the flat membership check is equivalent to an ancestry walk at every depth.
  */
-describe('isBlockInEditedTemplate — flat unlock on stamped data', () => {
-  test('a direct child of the edited instance is inside it', () => {
-    expect(isBlockInEditedTemplate({ templateInstanceId: 'X' }, 'X')).toBe(true);
+describe('isBlockInEditedTemplate — flat membership on stamped data (v2)', () => {
+  test('a direct child of an unlocked instance is inside it', () => {
+    expect(isBlockInEditedTemplate({ templateInstanceId: 'X' }, ['X'])).toBe(true);
   });
 
-  test('a block nested in a same-template container is inside it (stamped same id)', () => {
-    // The merge stamps the nested cell with the instance id 'X' — no walk needed.
-    expect(isBlockInEditedTemplate({ templateInstanceId: 'X' }, 'X')).toBe(true);
+  test('nested same-template content is inside it (stamped same id)', () => {
+    expect(isBlockInEditedTemplate({ templateInstanceId: 'X' }, ['X'])).toBe(true);
   });
 
-  test('a block inside a foreign embedded template is NOT inside it (foreign stamped id)', () => {
-    expect(isBlockInEditedTemplate({ templateInstanceId: 'B' }, 'X')).toBe(false);
+  test('a block inside a foreign embedded template is NOT inside it', () => {
+    expect(isBlockInEditedTemplate({ templateInstanceId: 'B' }, ['X'])).toBe(false);
   });
 
-  test('not in template edit mode -> false', () => {
+  test('multiple unlocked instances: membership is by the whole set', () => {
+    expect(isBlockInEditedTemplate({ templateInstanceId: 'B' }, ['X', 'B'])).toBe(true);
+    expect(isBlockInEditedTemplate({ templateInstanceId: 'X' }, ['X', 'B'])).toBe(true);
+  });
+
+  test('nothing unlocked -> false (empty set or null)', () => {
+    expect(isBlockInEditedTemplate({ templateInstanceId: 'X' }, [])).toBe(false);
     expect(isBlockInEditedTemplate({ templateInstanceId: 'X' }, null)).toBe(false);
   });
 });
 
-describe('isBlockReadonly — flat, on stamped data', () => {
-  test('edit mode: editable inside the instance at any depth, locked in a foreign template', () => {
-    // readOnly:true would lock it in normal mode, but edit mode unlocks it because
-    // its stamped id matches the edited instance.
-    expect(isBlockReadonly({ templateInstanceId: 'X', readOnly: true }, 'X')).toBe(false);
-    // foreign embedded template (different stamped id) stays locked.
-    expect(isBlockReadonly({ templateInstanceId: 'B' }, 'X')).toBe(true);
+describe('isBlockReadonly — v2: own readOnly flag unless the block’s instance is unlocked', () => {
+  test('a readOnly block inside an unlocked instance becomes editable', () => {
+    expect(isBlockReadonly({ templateInstanceId: 'X', readOnly: true }, ['X'])).toBe(false);
+  });
+
+  test('a readOnly block in a locked (foreign / not-unlocked) template stays locked', () => {
+    expect(isBlockReadonly({ templateInstanceId: 'B', readOnly: true }, ['X'])).toBe(true);
+  });
+
+  test('a page block stays editable even while a template is unlocked (no page lock)', () => {
+    // The v2 headline: unlocking a template does NOT lock the rest of the page.
+    expect(isBlockReadonly({}, ['X'])).toBe(false);
+    // A non-readOnly block belonging to some other (locked) template also stays editable.
+    expect(isBlockReadonly({ templateInstanceId: 'B' }, ['X'])).toBe(false);
   });
 
   test('normal mode: falls back to the block.readOnly flag', () => {
-    expect(isBlockReadonly({ readOnly: true }, null)).toBe(true);
-    expect(isBlockReadonly({ readOnly: false }, null)).toBe(false);
+    expect(isBlockReadonly({ readOnly: true }, [])).toBe(true);
+    expect(isBlockReadonly({ readOnly: false }, [])).toBe(false);
   });
 });

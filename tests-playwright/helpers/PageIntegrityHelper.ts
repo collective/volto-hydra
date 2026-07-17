@@ -28,17 +28,35 @@ export interface PageIntegrityOptions {
 }
 
 /**
- * No rendered `<img>` should be broken (empty src, failed load).
- * Skips data: URIs (often inline placeholders).
+ * No *visible* rendered `<img>` should be broken (empty src, failed load).
+ * Skips data: URIs (often inline placeholders) and images that aren't actually
+ * displayed. A hidden image can't be a visible defect, and — crucially — an
+ * `<img loading="lazy">` inside hidden UI (e.g. a responsive mobile nav that is
+ * `display:none` at desktop width) never enters the viewport, so it never
+ * starts loading and legitimately reports `naturalWidth === 0`. Flagging that as
+ * "broken" is a false positive; only images the user can actually see count.
  */
 export async function verifyNoBrokenImages(page: Page): Promise<void> {
   const broken = await page.evaluate(() =>
     Array.from(document.querySelectorAll('img'))
-      .filter((img) =>
-        img.src &&
-        !img.src.startsWith('data:') &&
-        (!img.complete || img.naturalWidth === 0),
-      )
+      .filter((img) => {
+        if (!img.src || img.src.startsWith('data:')) return false;
+        // Skip images that aren't displayed. `offsetParent === null` catches an
+        // element with `display:none` on itself OR any ancestor — e.g. a
+        // responsive mobile nav hidden at desktop width, whose lazy <img> never
+        // enters the viewport, so it never loads and reports naturalWidth 0
+        // without being a real defect. (position:fixed also yields a null
+        // offsetParent but is visible; the nav/content images here aren't
+        // fixed.) A broken image in a *visible* container keeps a non-null
+        // offsetParent even if it collapses to zero size, so it's still caught.
+        const style = getComputedStyle(img);
+        const hidden =
+          (img.offsetParent === null && style.position !== 'fixed') ||
+          style.visibility === 'hidden' ||
+          style.display === 'none';
+        if (hidden) return false;
+        return !img.complete || img.naturalWidth === 0;
+      })
       .map((img) => ({ src: img.src, alt: img.alt })),
   );
   expect(broken, `Broken images on ${page.url()}:\n${JSON.stringify(broken, null, 2)}`).toEqual([]);
