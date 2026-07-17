@@ -18,6 +18,44 @@ import { getBlockType } from '@volto-hydra/helpers';
 // importing from @volto-hydra/hydra-js (which would pull in Volto deps).
 const PAGE_BLOCK_UID = '_page';
 
+/**
+ * The block types you can ADD into a container field — the single source of
+ * truth every add path reads (it becomes each child's `allowedSiblingTypes`,
+ * which the block chooser, Enter-to-add and drag validation all consume).
+ *
+ * A plain field allows all of `allowedBlocks`. A SYNCED field — one whose
+ * blocks-field def declares an `itemTypeField` (a sibling field, e.g.
+ * `variation`, that drives every child's `@type`) — holds a single item type
+ * chosen once on the parent. Adding must not introduce a *different*
+ * convertible item type, so the addable set is:
+ *   the currently-synced type  +  any structural blocks that aren't convertible
+ *   item types (no `fieldMappings['@default']` — e.g. a `listing`).
+ * The other convertible item types are reached by changing the parent's
+ * `itemTypeField`, not by adding a foreign block into the synced container.
+ *
+ * @param {string[]} allowedBlocks   the field's allowedBlocks
+ * @param {string} [itemTypeField]   the field's sync field name (undefined = not synced)
+ * @param {Object} [containerBlock]  the container block's data (source of the synced type)
+ * @param {Object} [blocksConfig]
+ * @returns {string[]}
+ */
+export function addableSiblingTypes(
+  allowedBlocks,
+  itemTypeField,
+  containerBlock,
+  blocksConfig,
+) {
+  if (!Array.isArray(allowedBlocks) || !itemTypeField) return allowedBlocks;
+  const syncedType = containerBlock?.[itemTypeField];
+  if (!syncedType) return allowedBlocks;
+  return allowedBlocks.filter(
+    (type) =>
+      type === syncedType ||
+      // structural (non-convertible) blocks stay addable alongside the item type
+      !blocksConfig?.[type]?.fieldMappings?.['@default'],
+  );
+}
+
 // Cache for getBlockTypeSchema — keyed by blockType
 const _typeSchemaCache = new Map();
 
@@ -578,7 +616,12 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         // set: that set is the UNION of all page regions' allowedBlocks, so it can't express
         // per-region restrictions (footer vs items may allow different blocks). effectiveAllowedBlocks
         // already IS the region's field def; the old intersection was a no-op (region ⊆ union).
-        allowedSiblingTypes: effectiveAllowedBlocks || defaultPageAllowedBlocks,
+        allowedSiblingTypes: addableSiblingTypes(
+          effectiveAllowedBlocks || defaultPageAllowedBlocks,
+          fieldDef.itemTypeField,
+          parent,
+          blocksConfig,
+        ),
         allowedTemplates: fieldDef.allowedTemplates || null,
         maxSiblings: effectiveMaxLength,
         siblingCount: layout.length, // Total siblings in this container
@@ -725,7 +768,14 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         _schemaRef: storeSchema(blockSchema), // Deduplicated schema reference
         itemSchema: effectiveItemSchema, // null for typed items (schema from blocksConfig)
         dataPath: effectiveDataPath, // Store for later use
-        allowedSiblingTypes: hasAllowedBlocks ? fieldDef.allowedBlocks : [virtualType],
+        allowedSiblingTypes: hasAllowedBlocks
+          ? addableSiblingTypes(
+              fieldDef.allowedBlocks,
+              fieldDef.itemTypeField,
+              parent,
+              blocksConfig,
+            )
+          : [virtualType],
         maxSiblings: fieldDef.maxLength || null,
         siblingCount: itemsArray.length,
         addMode, // Table mode for this container (e.g., rows)
