@@ -4213,7 +4213,7 @@
           "@id": "ref-table-schema-javascript-237d52",
           "label": "Schema",
           "language": "javascript",
-          "code": "{\n  \"slateTable\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"table\": {\n          \"title\": \"Table\"\n        }\n      }\n    }\n  }\n}"
+          "code": "{\n  \"slateTable\": {\n    \"addMode\": \"table\",\n    \"blockSchema\": {\n      \"properties\": {\n        \"table\": {\n          \"title\": \"Table\",\n          \"widget\": \"object\",\n          \"schema\": {\n            \"properties\": {\n              \"rows\": {\n                \"widget\": \"object_list\",\n                \"idField\": \"key\",\n                \"addMode\": \"table\",\n                \"schema\": {\n                  \"properties\": {\n                    \"cells\": {\n                      \"widget\": \"object_list\",\n                      \"idField\": \"key\",\n                      \"schema\": {\n                        \"properties\": {\n                          \"value\": {\n                            \"widget\": \"slate\"\n                          }\n                        }\n                      }\n                    }\n                  }\n                }\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}"
         }
       ]
     },

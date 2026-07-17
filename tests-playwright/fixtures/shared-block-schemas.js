@@ -458,7 +458,48 @@ export const sharedBlocksConfig = {
     // valid page blocks; the frontend still owns their rendering.
     search: { id: 'search', title: 'Search', group: 'common', blockSchema: { properties: {} } },
     heading: { id: 'heading', title: 'Heading', group: 'common', blockSchema: { properties: {} } },
-    slateTable: { id: 'slateTable', title: 'Table', group: 'common', blockSchema: { properties: {} } },
+    // slateTable has inline-editable cells, so it MUST declare its nested
+    // structure — table (object) → rows (object_list) → cells (object_list) →
+    // value (slate). A frontend's registered schema OVERRIDES the admin's
+    // baseline (mock-parent + View.jsx), so an empty schema here erases the
+    // table's rows/cells from the pathMap: they lose their pathInfo, cells
+    // resolve as plain-string fields, and table-mode 2D cursor navigation never
+    // engages (parentAddMode is undefined). Mirror the admin baseline exactly.
+    slateTable: {
+        id: 'slateTable',
+        title: 'Table',
+        group: 'common',
+        addMode: 'table',
+        blockSchema: {
+            properties: {
+                table: {
+                    widget: 'object',
+                    schema: {
+                        properties: {
+                            rows: {
+                                widget: 'object_list',
+                                idField: 'key',
+                                addMode: 'table',
+                                schema: {
+                                    properties: {
+                                        cells: {
+                                            widget: 'object_list',
+                                            idField: 'key',
+                                            schema: {
+                                                properties: {
+                                                    value: { widget: 'slate' },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
     maps: { id: 'maps', title: 'Map', group: 'common', blockSchema: { properties: {} } },
     video: { id: 'video', title: 'Video', group: 'common', blockSchema: { properties: {} } },
     // Code example block: tabbed code display with syntax highlighting
