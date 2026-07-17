@@ -22,15 +22,18 @@ import { fileURLToPath } from 'url';
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { PORTS, URLS } from '../ports';
+import { showCaption } from './caption';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SHOWCASE_PATH = '/showcase-page';
 const BEAT_MS = 900;
 const TRIM_MARKER_FILE = path.join(SCRIPT_DIR, '.recordings', 'trim-ms.txt');
 
-async function beat(page: import('@playwright/test').Page, label: string) {
-  // No-op marker that just paces the recording. `label` shows up in the
-  // playwright trace if anyone enables tracing for debugging.
+async function beat(page: import('@playwright/test').Page, caption: string) {
+  // Paces the recording AND shows `caption` as an on-screen caption burned
+  // into the video, so the loop reads as a narrated walkthrough. The caption
+  // also shows up in the playwright trace for debugging.
+  await showCaption(page, caption);
   await page.waitForTimeout(BEAT_MS);
 }
 
@@ -98,7 +101,7 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   await page.keyboard.type(' Edit anywhere.', { delay: 40 });
   await expect(iframe.locator('[data-block-uid="intro"]'))
     .toContainText('Edit anywhere.', { timeout: 5_000 });
-  await beat(page, 'slate edit');
+  await beat(page, 'Edit any text, inline');
 
   // Beat 2 — bold the phrase we just typed (Quanta toolbar).
   // No DOM-level assertion — Slate's bold rendering varies by frontend
@@ -107,21 +110,21 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   await page.keyboard.press('Shift+Home');
   await page.waitForTimeout(200);
   await page.keyboard.press('Meta+B');
-  await beat(page, 'format');
+  await beat(page, 'Format with the toolbar');
 
   // Beat 3 — drop into block mode, drag the intro paragraph past the
   // adjacent column block to show DnD reflow. The dragBlockAfter helper
   // asserts the drop completed; the post-drop DOM order is implicit.
   await helper.escapeFromEditing();
-  await beat(page, 'block mode');
+  await beat(page, 'Switch to block mode');
   await helper.dragBlockAfter('intro', 'after-columns');
-  await beat(page, 'dnd');
+  await beat(page, 'Drag blocks to reorder');
 
   // Beat 4 — click into the columns container. waitForBlockSelectedInAdmin
   // is the assertion; the helper fails if the selection state doesn't land.
   await helper.clickBlockInIframe('columns-1');
   await helper.waitForBlockSelectedInAdmin('columns-1');
-  await beat(page, 'container selected');
+  await beat(page, 'Select a container block');
 
   // Beat 5 — open the frontend switcher panel, switch to mobile
   // viewport, then click F7 Mobile. The iframe swaps to the F7
@@ -134,6 +137,7 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   // read the entry names (each frontend has a label like "Nuxt blog"
   // or "F7 Mobile") and see the mobile-width transition land before
   // the F7 frontend loads.
+  await showCaption(page, 'Preview in any frontend');
   await page.locator('#toolbar-frontend-switcher').click();
   const panel = page.locator('.frontend-switcher-panel');
   await panel.waitFor({ state: 'visible' });
@@ -142,6 +146,7 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
 
   // Switch to mobile viewport first so the F7 frontend lands at the
   // intended phone width rather than full-bleed desktop.
+  await showCaption(page, 'Switch to a mobile view');
   await panel.getByLabel('Mobile').click();
   // Allow the iframe-max-width transition to finish visibly.
   await page.waitForTimeout(1_500);
@@ -156,5 +161,6 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   }).toPass({ timeout: 5_000 });
   // Let the F7 frontend finish loading inside the iframe so the swap
   // is visibly captured (not just the URL change).
+  await showCaption(page, 'Same content, another design system');
   await page.waitForTimeout(3_000);
 });
