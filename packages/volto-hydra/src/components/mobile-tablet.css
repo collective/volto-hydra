@@ -524,8 +524,17 @@
    * it. Hiding it makes the modal REPLACE the settings popup; it returns when
    * the modal closes. The overlay wrapper drops its desktop dimmer/centering and
    * sits in the sheet ladder — the ::before backdrop above does the dimming, and
-   * `.template-edit-modal` is the slide-up sheet (shared rule above). */
-  body:has(.template-edit-modal-overlay) .sidebar-container:not(.collapsed) {
+   * `.template-edit-modal` is the slide-up sheet (shared rule above).
+   *
+   * Same for the block chooser: a container field's "Add block" opens
+   * `.container-block-chooser` (z-sheet 201) from INSIDE the settings sidebar, so
+   * without stepping the sidebar aside the chooser renders behind it and its
+   * buttons can't be tapped. (`.add-new-block-popup` is the canvas '+' chooser —
+   * the sidebar is normally collapsed then, so this is a no-op there, included for
+   * symmetry.) The chooser closes on pick and the sidebar returns. */
+  body:has(.template-edit-modal-overlay) .sidebar-container:not(.collapsed),
+  body:has(.container-block-chooser) .sidebar-container:not(.collapsed),
+  body:has(.add-new-block-popup) .sidebar-container:not(.collapsed) {
     display: none !important;
   }
   .template-edit-modal-overlay {

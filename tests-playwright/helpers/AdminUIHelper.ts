@@ -20,6 +20,11 @@ export class AdminUIHelper {
   // per test) gives each test its own isolated mock-api session.
   readonly authToken = `${TEST_AUTH_TOKEN}-${randomUUID()}`;
 
+  // Opt-in demo pacing: recorded demos set this (e.g. 1200) so viewport-branching
+  // steps that flash by — the mobile settings sheet opening/closing — linger long
+  // enough to read. Default 0: functional tests are completely unaffected.
+  demoPacingMs = 0;
+
   constructor(
     public readonly page: Page,
     public readonly adminUrl: string = URLS.voltoSsr,
@@ -955,6 +960,87 @@ export class AdminUIHelper {
   }
 
   /**
+   * True when the admin is rendering its mobile layout (viewport ≤ hydra's
+   * largestMobileScreen = 767). At that width the settings sidebar is a
+   * collapsed off-screen sheet and the main toolbar is pinned to the bottom;
+   * openSidebar/closeSidebar branch on this so callers don't have to.
+   */
+  isMobileViewport(): boolean {
+    const vp = this.page.viewportSize();
+    return !!vp && vp.width <= 767;
+  }
+
+  /**
+   * Ensure the settings sidebar is OPEN, on desktop and mobile alike.
+   * - Desktop edit mode: the sidebar is normally already open — no-op; if it was
+   *   collapsed to its right-edge sliver, click the `.trigger` to expand it.
+   * - Mobile: the sidebar starts as a collapsed off-screen sheet; the Settings
+   *   icon in the bottom toolbar (`.sidebar-toggle-toolbar-btn`) opens it
+   *   full-screen (mobile-tablet-admin-layout.spec: 'Settings icon … opens the sidebar').
+   * Idempotent: returns immediately if the sidebar is already expanded.
+   */
+  async openSidebar(timeout: number = 5000): Promise<void> {
+    // Branch on the `.collapsed` CLASS being present, NOT on the visibility of
+    // `:not(.collapsed)` — the latter races to false for a beat right after a
+    // selection changes the sidebar, and would then click the desktop `.trigger`
+    // sliver, which COLLAPSES an already-open sidebar (the exact opposite). If no
+    // collapsed container exists, the sidebar is already open — nothing to do.
+    const collapsed = this.page.locator('.sidebar-container.collapsed');
+    if ((await collapsed.count()) === 0) {
+      await this.waitForSidebarOpen(timeout).catch(() => {});
+      return;
+    }
+    if (this.isMobileViewport()) {
+      await this.page.locator('#toolbar-body .sidebar-toggle-toolbar-btn').click();
+    } else {
+      await this.page.locator('.sidebar-container .trigger').click();
+    }
+    await expect(this.page.locator('.sidebar-container.collapsed')).toHaveCount(0, { timeout });
+    await this.waitForSidebarOpen(timeout);
+    // Demo pacing: let the freshly-opened sheet be seen before the next action.
+    if (this.demoPacingMs) await this.page.waitForTimeout(this.demoPacingMs);
+  }
+
+  /**
+   * Ensure the sidebar is out of the way so canvas blocks are clickable again.
+   * - Mobile: the open sidebar is a full-screen sheet covering the iframe, so it
+   *   MUST be dismissed (its page-header X, `.sidebar-close-button`) before the
+   *   next block tap. Idempotent — no-op if already collapsed.
+   * - Desktop: an open sidebar sits beside the canvas and doesn't block clicks;
+   *   leaving it open is the normal edit state, so this is a no-op.
+   */
+  async closeSidebar(timeout: number = 5000): Promise<void> {
+    if (!this.isMobileViewport()) return;
+    const close = this.page.locator('.sidebar-container .sidebar-close-button');
+    if (await close.isVisible().catch(() => false)) {
+      // Demo pacing: hold on the sheet's final state before dismissing it.
+      if (this.demoPacingMs) await this.page.waitForTimeout(this.demoPacingMs);
+      await close.click();
+      await expect(this.page.locator('.sidebar-container.collapsed')).toBeAttached({ timeout });
+    }
+  }
+
+  /**
+   * Walk up the block hierarchy until THIS template instance's edit toggle is the
+   * current sidebar section, and return that toggle locator. A member block can
+   * sit several levels deep inside the template (e.g. a footer column's text), so
+   * one hop up is not enough — escape until the toggle appears. Works on mobile,
+   * where the sidebar is a sheet: reopen it each iteration in case navigation
+   * collapsed it. Caller must have selected a member block first.
+   */
+  private async reachTemplateToggle(maxHops: number = 8): Promise<import('@playwright/test').Locator> {
+    const toggle = this.page.locator('.sidebar-section-header[data-is-current="true"] .edit-template-toggle');
+    for (let i = 0; i < maxHops; i++) {
+      await this.openSidebar();
+      if (await toggle.isVisible().catch(() => false)) return toggle;
+      await this.escapeToParent();
+    }
+    await this.openSidebar();
+    await expect(toggle, 'template edit toggle never became the current sidebar section').toBeVisible({ timeout: 5000 });
+    return toggle;
+  }
+
+  /**
    * Wait for a block to be shown as readonly (has hydra-locked class).
    * Used to verify template edit mode is active (blocks outside template get locked).
    * @param blockId - The block ID to check
@@ -993,10 +1079,7 @@ export class AdminUIHelper {
    */
   async unlockTemplate(memberBlockId: string): Promise<void> {
     await this.clickBlockInIframe(memberBlockId);
-    await this.waitForSidebarOpen();
-    await this.escapeToParent();
-    const toggle = this.page.locator('.sidebar-section-header[data-is-current="true"] .edit-template-toggle');
-    await expect(toggle).toBeVisible({ timeout: 5000 });
+    const toggle = await this.reachTemplateToggle();
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
     await toggle.click();
     // v2: unlocking warns first — the template's edits will appear on every page
@@ -1006,6 +1089,9 @@ export class AdminUIHelper {
     await confirm.click();
     await expect(this.page.locator('.template-unlock-modal')).toHaveCount(0, { timeout: 5000 });
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    // Mobile: the toggle lives in a full-screen sheet covering the canvas. Dismiss
+    // it so the freshly-unlocked template blocks are tappable. Desktop: no-op.
+    await this.closeSidebar();
   }
 
   /**
@@ -1017,10 +1103,7 @@ export class AdminUIHelper {
    */
   async lockTemplate(memberBlockId: string, choice: 'commit' | 'reset' | 'cancel'): Promise<void> {
     await this.clickBlockInIframe(memberBlockId);
-    await this.waitForSidebarOpen();
-    await this.escapeToParent();
-    const toggle = this.page.locator('.sidebar-section-header[data-is-current="true"] .edit-template-toggle');
-    await expect(toggle).toBeVisible({ timeout: 5000 });
+    const toggle = await this.reachTemplateToggle();
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await toggle.click();
     const modal = this.page.locator('.template-lock-modal');
@@ -1035,6 +1118,8 @@ export class AdminUIHelper {
     if (choice !== 'cancel') {
       await expect(toggle).toHaveAttribute('aria-pressed', 'false', { timeout: 10000 });
     }
+    // Mobile: dismiss the full-screen settings sheet so the canvas is usable again.
+    await this.closeSidebar();
   }
 
   /**
@@ -4846,6 +4931,10 @@ export class AdminUIHelper {
     containerFieldTitle: string,
     blockType?: string,
   ): Promise<void> {
+    // The container field section lives in the settings sidebar, which on mobile is a
+    // collapsed off-screen sheet — open it first (no-op on desktop, where it's already
+    // beside the canvas). Caller must have selected the container block.
+    await this.openSidebar();
     // Find the container field section and its add button
     const section = this.page.locator('.container-field-section', {
       has: this.page.locator('.widget-title', { hasText: containerFieldTitle }),
@@ -4897,6 +4986,9 @@ export class AdminUIHelper {
         .waitFor({ state: 'visible', timeout: 1000 })
         .catch(() => {});
     }
+    // Mobile: dismiss the full-screen sheet so the newly-added block is tappable on
+    // the canvas for the next step. Desktop: no-op.
+    await this.closeSidebar();
   }
 
   /**
