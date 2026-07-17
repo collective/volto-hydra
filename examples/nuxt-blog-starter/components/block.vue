@@ -528,6 +528,24 @@
     </table>
   </div>
 
+  <!-- objectBlocks: fields grouped under a widget:'object' (#245). The headline
+       (slate) and href (link) live directly on block.content; the body is a
+       blocks_layout region nested at block.content.blocks_layout.body over the
+       object's own blocks dict (block.content.blocks). Field paths use the
+       `content/...` object-descent form. -->
+  <div v-else-if="block['@type'] == 'objectBlocks'" :data-block-uid="block_uid" class="object-blocks-block my-4">
+    <h3 v-if="(block.content?.headline || []).length" class="ob-headline" data-edit-text="content/headline">
+      <RichText v-for="node in block.content?.headline || []" :key="node" :node="node" />
+    </h3>
+    <a v-if="block.content?.href !== undefined" class="ob-link"
+       data-edit-link="content/href" :href="block.content?.href || '#'">Object link</a>
+    <div class="object-blocks-body">
+      <Block v-for="item in expand(block.content?.blocks_layout?.body || [], block.content?.blocks || {})"
+             :key="item['@uid']" :block_uid="item['@uid']" :block="item" :data="data"
+             :contained="true" data-block-add="bottom" />
+    </div>
+  </div>
+
   <div v-else-if="block['@type'] == 'button'" :data-block-uid="block_uid"
        :class="['my-4', {
            'text-center': block.inneralign === 'center',
