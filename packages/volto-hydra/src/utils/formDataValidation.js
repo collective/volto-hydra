@@ -12,6 +12,7 @@ import {
   isSlateFieldType,
   getChildFields,
   getChildBlockEntries,
+  getFieldValue,
 } from '@volto-hydra/helpers';
 
 // Re-export for convenience
@@ -182,7 +183,7 @@ export function validateBlock(blockId, blockData, blockFieldTypes = {}) {
   const slateFields = getSlateFieldsForBlockType(blockType, blockFieldTypes);
 
   for (const fieldName of slateFields) {
-    const fieldValue = blockData[fieldName];
+    const fieldValue = getFieldValue(blockData, fieldName);
     if (fieldValue && Array.isArray(fieldValue)) {
       errors.push(...validateSlateValue(fieldValue, blockId, fieldName));
     }

@@ -402,6 +402,46 @@ export const sharedBlocksConfig = {
             },
         },
     },
+    // Object-nested blocks_layout (#245): a `content` widget:'object' wrapper
+    // whose `body` region is a blocks_layout. The object holds its OWN shared
+    // `blocks` dict + `blocks_layout` — one level deeper than the block root
+    // (data: block.content.blocks / block.content.blocks_layout.body). Exercises
+    // the regionPath funnel path end-to-end.
+    objectBlocks: {
+        id: 'objectBlocks',
+        title: 'Object Blocks',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['content'] }],
+            properties: {
+                content: {
+                    widget: 'object',
+                    schema: {
+                        fieldsets: [{ id: 'default', title: 'Content', fields: ['headline', 'body'] }],
+                        properties: {
+                            // An inline-editable text field living directly on the
+                            // object — written to block.content.headline.
+                            headline: {
+                                title: 'Headline',
+                                widget: 'slate',
+                                default: [{ type: 'p', children: [{ text: '' }] }],
+                            },
+                            // An inline-editable LINK field on the object — proves
+                            // link editing routes through the central /-path API
+                            // (writes block.content.href, not a flat key).
+                            href: { title: 'Link', widget: 'object_browser', mode: 'link' },
+                            body: {
+                                title: 'Body',
+                                widget: 'blocks_layout',
+                                allowedBlocks: ['slate', 'image'],
+                                defaultBlockType: 'slate',
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
     // Separator (horizontal rule) — a simple leaf block with no editable fields.
     // Registered so it's a valid page-level block (it's used across the docs
     // content and inside accordions); without this it isn't in the page's
@@ -418,7 +458,48 @@ export const sharedBlocksConfig = {
     // valid page blocks; the frontend still owns their rendering.
     search: { id: 'search', title: 'Search', group: 'common', blockSchema: { properties: {} } },
     heading: { id: 'heading', title: 'Heading', group: 'common', blockSchema: { properties: {} } },
-    slateTable: { id: 'slateTable', title: 'Table', group: 'common', blockSchema: { properties: {} } },
+    // slateTable has inline-editable cells, so it MUST declare its nested
+    // structure — table (object) → rows (object_list) → cells (object_list) →
+    // value (slate). A frontend's registered schema OVERRIDES the admin's
+    // baseline (mock-parent + View.jsx), so an empty schema here erases the
+    // table's rows/cells from the pathMap: they lose their pathInfo, cells
+    // resolve as plain-string fields, and table-mode 2D cursor navigation never
+    // engages (parentAddMode is undefined). Mirror the admin baseline exactly.
+    slateTable: {
+        id: 'slateTable',
+        title: 'Table',
+        group: 'common',
+        addMode: 'table',
+        blockSchema: {
+            properties: {
+                table: {
+                    widget: 'object',
+                    schema: {
+                        properties: {
+                            rows: {
+                                widget: 'object_list',
+                                idField: 'key',
+                                addMode: 'table',
+                                schema: {
+                                    properties: {
+                                        cells: {
+                                            widget: 'object_list',
+                                            idField: 'key',
+                                            schema: {
+                                                properties: {
+                                                    value: { widget: 'slate' },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
     maps: { id: 'maps', title: 'Map', group: 'common', blockSchema: { properties: {} } },
     video: { id: 'video', title: 'Video', group: 'common', blockSchema: { properties: {} } },
     // Code example block: tabbed code display with syntax highlighting

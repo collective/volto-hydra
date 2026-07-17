@@ -393,6 +393,79 @@ export interface VerifyBlockRenderingOptions {
 }
 
 /**
+ * Schema-INDEPENDENT coverage check: every block/field the frontend actually
+ * renders as editable must be known to the bridge's blockPathMap.
+ *
+ * `checkSubBlocks` walks the OTHER direction (pathMap → DOM: "is every block
+ * the pathMap knows about rendered?"). That direction is blind to an
+ * incomplete schema: if a frontend registers e.g. `slateTable` with an empty
+ * schema, buildBlockPathMap can't see `table → rows → cells`, so the cells are
+ * simply ABSENT from the pathMap — yet the frontend still renders them from
+ * data. pathMap → DOM then iterates nothing and passes, while the cells are
+ * un-selectable / un-editable / un-navigable (no pathInfo → parentAddMode
+ * undefined, field type unresolved). That is precisely how an incomplete
+ * schema slipped through to a silent table-navigation failure.
+ *
+ * This check closes the gap by walking DOM → pathMap: for the rendered block
+ * subtree, assert every nested `[data-block-uid]` has a pathMap entry. It needs
+ * no blocksConfig — it reads the live bridge — so it runs in CI unconditionally
+ * (unlike the schema-driven discovery checks, which are gated on MOCK_PARENT_URL
+ * and traverse schema-first, so they can't see missing nested structure).
+ *
+ * Scope, to stay false-positive-free:
+ *  - Only rendered `[data-block-uid]`s are checked (a concrete "this is an
+ *    editable block" signal). We deliberately do NOT flag unresolved
+ *    `data-edit-*` fields: page-level fields (`/title`) and listing-projected
+ *    block fields (a teaser inside a grid) legitimately render edit
+ *    annotations that aren't in THIS block's editable pathMap.
+ *  - Read-only subtrees (`data-block-readonly` — listing results, teasers) are
+ *    skipped: their inner markup is projected content, not editable blocks.
+ *  - Items that reuse the parent's uid (listing expansion) are skipped.
+ */
+export async function verifyPathMapCoverage(
+  iframe: FrameLocator,
+  blockId: string,
+): Promise<void> {
+  const block = iframe.locator(`[data-block-uid="${blockId}"]`).first();
+  const orphans = await block.evaluate((el, parentUid) => {
+    const b = (window as any).__hydraBridge;
+    // No bridge (e.g. a pure render harness) → nothing to assert against.
+    if (!b?.blockPathMap) return null;
+    const pathMap = b.blockPathMap;
+
+    // Dynamic-container block types render interactive `data-block-uid`
+    // children that are intentionally NOT part of the editable pathMap:
+    // `search` (facets widget + results listing) and `listing`/
+    // `contextNavigation` (async-fetched results). Those are a different
+    // editability model, not the static-nested-editable-block class this
+    // guardrail targets — skip them wholesale to stay false-positive-free.
+    const DYNAMIC = new Set(['search', 'listing', 'contextNavigation']);
+    if (DYNAMIC.has(pathMap[parentUid]?.blockType)) return [];
+
+    const found: string[] = [];
+    el.querySelectorAll('[data-block-uid]').forEach((child: Element) => {
+      const uid = child.getAttribute('data-block-uid');
+      // Skip self, listing-expanded items reusing the parent uid, and read-only
+      // (projected) subtrees.
+      if (!uid || uid === parentUid) return;
+      if (child.closest('[data-block-readonly]')) return;
+      if (!pathMap[uid]) found.push(uid);
+    });
+    return Array.from(new Set(found));
+  }, blockId);
+
+  if (orphans === null) return; // no bridge
+
+  expect(
+    orphans,
+    `Blocks rendered inside "${blockId}" but ABSENT from the pathMap — they can't be ` +
+      `selected, edited, moved or navigated. This means their container field isn't ` +
+      `declared (or is incompletely declared) in the frontend's block schema, so ` +
+      `buildBlockPathMap never descended into it: ${orphans.join(', ')}`,
+  ).toEqual([]);
+}
+
+/**
  * Full block rendering verification: locate block, check text, check edit
  * annotations, verify sub-blocks, and click data-edit-text elements.
  *
@@ -494,6 +567,13 @@ export async function verifyBlockRendering(
   // Schema-driven slate check — checkSlateAnnotations pulls the schema
   // from the bridge itself (authoritative, schemaEnhancer-resolved).
   await checkSlateAnnotations(block, blockData);
+
+  // Schema-INDEPENDENT coverage: every rendered nested block + editable field
+  // must be known to the pathMap. Catches incomplete frontend schemas that the
+  // schema-driven checks (disabled in CI, and blind to gaps they have no
+  // schema path into) can't — e.g. a slateTable whose cells render but are
+  // absent from the pathMap. Runs off the live bridge, so it needs no config.
+  await verifyPathMapCoverage(iframe, blockId);
 
   // Verify sub-blocks (before clicking, which may toggle interactive
   // containers like accordions closed). Sub-blocks come from the bridge's

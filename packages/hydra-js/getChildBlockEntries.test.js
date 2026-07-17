@@ -36,10 +36,10 @@ describe('getChildBlockEntries — uniform child access across blocks_layout & o
     ]);
   });
 
-  test('object_list: reads the array at a nested dataPath (e.g. table.rows)', () => {
+  test('object_list: reads the array at a nested regionPath (e.g. table/rows)', () => {
     const parent = { table: { rows: [{ '@id': 'r1' }, { '@id': 'r2' }] } };
     expect(
-      getChildBlockEntries(parent, { isObjectList: true, dataPath: ['table', 'rows'] }).map((e) => e.id),
+      getChildBlockEntries(parent, { isObjectList: true, regionPath: ['table'], region: 'rows' }).map((e) => e.id),
     ).toEqual(['r1', 'r2']);
   });
 

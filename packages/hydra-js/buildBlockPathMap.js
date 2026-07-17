@@ -497,6 +497,14 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
     const layout = parent.blocks_layout?.[region];
     if (!blocks || !Array.isArray(layout) || layout.length === 0) return;
 
+    // Block-relative object prefix to the shared blocks dict + blocks_layout.
+    // Empty when the blocks live directly on the owning block (the ordinary
+    // case); [table] etc. when the blocks_layout is nested inside a
+    // widget:'object' wrapper (#245). The ops navigate here via regionPath —
+    // the blocks_layout analogue of object_list's dataPath.
+    const ownerPath = pathMap[parentId]?.path || [];
+    const regionPath = parentPath.slice(ownerPath.length);
+
     // Constraints come from the blocks field's own def, falling back to the
     // block-level config (the existing convention for Volto built-ins).
     const parentBlockConfig = blocksConfig?.[parent?.['@type']];
@@ -609,6 +617,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         path: blockPath,
         parentId: effectiveParentId,
         region, // The container field (region) this block lives in
+        ...(regionPath.length > 0 && { regionPath }), // object prefix to the blocks dict (#245)
         blockType, // Block type for uniform lookups (single source of truth)
         _schemaRef: storeSchema(blockSchema), // Deduplicated schema reference
         // A field's own allowedBlocks is authoritative at every level (same as the object_list
@@ -692,6 +701,16 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       addMode = blockConfig?.addMode || null;
     }
 
+    // Block-relative path from the enclosing block to this array — what the mutation
+    // ops navigate. The region's object-key PREFIX (the `/`-path object hops):
+    // [] when the array is directly on the parent, ['table'] when it's inside a
+    // `table` object wrapper (#245). Uniform with the blocks_layout regionPath —
+    // the array itself is at [...regionPath, region]. A nested object_list item
+    // (cells inside a row) is parent-relative, so its prefix is [].
+    const regionPath = parentPathInfo?.isObjectListItem
+      ? []
+      : parentPath.slice((parentPathInfo?.path || []).length);
+
     itemsArray.forEach((item, index) => {
       const itemId = item[idField];
       if (!itemId) return;
@@ -767,7 +786,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         ...(!canInsertAfter && { canInsertAfter: false }),
         _schemaRef: storeSchema(blockSchema), // Deduplicated schema reference
         itemSchema: effectiveItemSchema, // null for typed items (schema from blocksConfig)
-        dataPath: effectiveDataPath, // Store for later use
+        ...(regionPath.length > 0 && { regionPath }), // object prefix to the array (#245); array at [...regionPath, region]
         allowedSiblingTypes: hasAllowedBlocks
           ? addableSiblingTypes(
               fieldDef.allowedBlocks,

@@ -342,24 +342,34 @@ const applyConfig = (config) => {
         ...baseSchema,
         properties: {
           ...baseSchema.properties,
-          // Rows for container traversal - uses dataPath to avoid nesting inside widget: 'object'
-          rows: {
-            widget: 'object_list',
-            idField: 'key',
-            dataPath: ['table', 'rows'], // Where to find data in block
+          // #245: rows nest inside the `table` object (block.table.rows) as a
+          // first-class widget:'object' — no dataPath. The pathMap recurses into
+          // the object and resolves the object_list relative to it.
+          table: {
+            widget: 'object',
             schema: {
-              fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+              fieldsets: [{ id: 'default', title: 'Table', fields: ['rows'] }],
               properties: {
-                cells: {
+                rows: {
                   widget: 'object_list',
                   idField: 'key',
+                  addMode: 'table',
                   schema: {
-                    fieldsets: [{ id: 'default', title: 'Default', fields: ['value'] }],
+                    fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
                     properties: {
-                      value: {
-                        title: 'Content',
-                        widget: 'slate',
-                        default: [{ type: 'p', children: [{ text: '' }] }],
+                      cells: {
+                        widget: 'object_list',
+                        idField: 'key',
+                        schema: {
+                          fieldsets: [{ id: 'default', title: 'Default', fields: ['value'] }],
+                          properties: {
+                            value: {
+                              title: 'Content',
+                              widget: 'slate',
+                              default: [{ type: 'p', children: [{ text: '' }] }],
+                            },
+                          },
+                        },
                       },
                     },
                   },

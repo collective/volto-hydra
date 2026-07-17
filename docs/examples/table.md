@@ -9,10 +9,36 @@ This is a **built-in** block (registered as `slateTable`).
 ```json
 {
   "slateTable": {
+    "addMode": "table",
     "blockSchema": {
       "properties": {
         "table": {
-          "title": "Table"
+          "title": "Table",
+          "widget": "object",
+          "schema": {
+            "properties": {
+              "rows": {
+                "widget": "object_list",
+                "idField": "key",
+                "addMode": "table",
+                "schema": {
+                  "properties": {
+                    "cells": {
+                      "widget": "object_list",
+                      "idField": "key",
+                      "schema": {
+                        "properties": {
+                          "value": {
+                            "widget": "slate"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
