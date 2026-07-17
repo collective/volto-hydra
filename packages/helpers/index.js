@@ -1743,6 +1743,131 @@ export function isPlaceholderContent(block) {
 }
 
 /**
+ * Read the value at an array path (e.g. ['table','rows'] or ['content','headline']).
+ * Empty path returns `obj` itself. Missing segment returns undefined.
+ */
+export function getAtPath(obj, path) {
+  return (path || []).reduce((cur, key) => cur?.[key], obj);
+}
+
+/**
+ * Immutably descend `path` on `obj`, replacing each visited node with a shallow
+ * clone (so callers can mutate the returned node / its properties without
+ * touching the original references — INITIAL_DATA arrives deep-frozen). Returns
+ * the node at `path`. To set a leaf value: `ensureMutablePath(obj,
+ * path.slice(0, -1))[path.at(-1)] = value`.
+ */
+export function ensureMutablePath(obj, path) {
+  let cur = obj;
+  for (const key of path || []) {
+    cur[key] = { ...(cur[key] || {}) };
+    cur = cur[key];
+  }
+  return cur;
+}
+
+/**
+ * Resolve a field's schema def by an object-descent `path` (e.g.
+ * ['content','headline']). Descends ONLY through `widget:'object'` wrappers — a
+ * transparent grouping of fields. A REGION (`object_list` / `blocks_layout`) or
+ * a plain value is TERMINAL: you cannot path *through* it, because a region's
+ * children are separate blocks addressed by their own UID, not by continuing
+ * the field path (and a value has no sub-fields). Note object_list/blocks_layout
+ * ALSO carry a `.schema`, so the gate is on the widget, not on `.schema`.
+ * Returns the fieldDef at `path`, or undefined if a segment is missing or an
+ * intermediate segment is not an object wrapper.
+ */
+export function getFieldDefByPath(schema, path) {
+  let props = schema?.properties;
+  let def;
+  for (let i = 0; i < (path || []).length; i++) {
+    if (!props) return undefined;
+    def = props[path[i]];
+    if (!def) return undefined;
+    if (i < path.length - 1) {
+      if (def.widget !== 'object' || !def.schema?.properties) return undefined;
+      props = def.schema.properties;
+    }
+  }
+  return def;
+}
+
+// ── Central field access ──────────────────────────────────────────────────
+// The ONE API every inline-edit path (text / link / media) and the sidebar/
+// validation should use to read or write a block field by its `/`-path (the
+// object-descent grammar; #245). Never index `block[fieldName]` /
+// `schema.properties[fieldName]` directly — a nested field like `content/image`
+// would read undefined and write a stray flat key. `/`-scope and `..` (which
+// BLOCK) are resolved separately (DOM-relative, hydra-side) before these run.
+
+/** Read a block field value by `/`-path. "content/headline" → block.content.headline. */
+export function getFieldValue(block, fieldPath) {
+  return getAtPath(block, String(fieldPath).split('/'));
+}
+
+/**
+ * Return a NEW block with the field at `/`-path set (immutable — input untouched;
+ * intermediate object wrappers are cloned). Callers that want in-place mutation
+ * (hydra's live formData) reassign / Object.assign the result.
+ */
+export function setFieldValue(block, fieldPath, value) {
+  const parts = String(fieldPath).split('/');
+  const result = { ...block };
+  ensureMutablePath(result, parts.slice(0, -1))[parts[parts.length - 1]] = value;
+  return result;
+}
+
+/** Resolve a block field's schema def by `/`-path (descends `widget:'object'` only). */
+export function getFieldDef(schema, fieldPath) {
+  return getFieldDefByPath(schema, String(fieldPath).split('/'));
+}
+
+// Same value as hydra.js / buildBlockPathMap — inlined so this module stays
+// free of hydra-js deps.
+const PAGE_BLOCK_UID = '_page';
+
+/**
+ * The BLOCK-SCOPE half of the path grammar: resolve a `data-edit-*` path's
+ * leading `/` / `..` against the block hierarchy, returning `{ blockId,
+ * fieldName }` where `fieldName` is the remaining WITHIN-block object-descent
+ * path (feed it to getFieldDef / getFieldValue / setFieldValue). Pure — the
+ * pathMap is passed in, not read off a bridge.
+ *
+ *   'field'    → { blockId, 'field' }         this block's field
+ *   'a/b'      → { blockId, 'a/b' }           descend the block's objects
+ *   '/field'   → { _page, 'field' }           page/root field
+ *   '../field' → { parent block, 'field' }    up one BLOCK per `../`
+ *   '../a/b'   → { parent block, 'a/b' }       then descend objects
+ *
+ * `..` only ever crosses a BLOCK boundary (never an object/region level); past
+ * the top block it lands on the page.
+ *
+ * @param {string} fieldPath
+ * @param {string} blockId - current block (PAGE_BLOCK_UID for page-level)
+ * @param {Object} blockPathMap - blockId → { parentId } (for `../`)
+ * @returns {{ blockId: string, fieldName: string }}
+ */
+export function resolveFieldPath(fieldPath, blockId, blockPathMap) {
+  if (fieldPath.startsWith('/')) {
+    return { blockId: PAGE_BLOCK_UID, fieldName: fieldPath.slice(1) };
+  }
+  if (!blockId || blockId === PAGE_BLOCK_UID) {
+    return { blockId: PAGE_BLOCK_UID, fieldName: fieldPath };
+  }
+  let currentBlockId = blockId;
+  let remainingPath = fieldPath;
+  while (remainingPath.startsWith('../')) {
+    const pathInfo = blockPathMap?.[currentBlockId];
+    if (!pathInfo?.parentId || pathInfo.parentId === PAGE_BLOCK_UID) {
+      return { blockId: PAGE_BLOCK_UID, fieldName: remainingPath.slice(3) };
+    }
+    currentBlockId = pathInfo.parentId;
+    remainingPath = remainingPath.slice(3);
+  }
+  return { blockId: currentBlockId, fieldName: remainingPath };
+}
+
+/**
  * The child blocks at a container's region, as ordered {id, block} entries — uniform
  * across BOTH storages. blocks_layout and object_list are just two ways to lay out the
  * same thing (a container's ordered region of child blocks); any caller that needs the
@@ -1753,29 +1878,34 @@ export function isPlaceholderContent(block) {
  * (the admin derives it from the schema, the merge data-drivenly), but the read shape
  * is shared here so it isn't duplicated.
  *
+ * A descriptor's `regionPath` is the object-key prefix to where the region
+ * lives (e.g. ['table'] for a `table` object wrapper, [] for the block root) —
+ * the `/`-path grammar's object hops. For object_list the array is at
+ * `[...regionPath, region]`; for blocks_layout the shared dict + layout live on
+ * the node at `regionPath`. Same prefix, one representation, no `dataPath`.
+ *
  * @param {Object} parentBlock - the container block
- * @param {Object} descriptor - { isObjectList, dataPath, region='items', idField='@id' }
+ * @param {Object} descriptor - { isObjectList, regionPath, region='items', idField='@id' }
  * @returns {Array<{id: string, block: Object}>}
  */
 export function getChildBlockEntries(parentBlock, descriptor = {}) {
   const {
     isObjectList,
-    dataPath,
+    regionPath = [],
     region = 'items',
     idField = '@id',
   } = descriptor;
   if (isObjectList) {
-    // object_list: an array of block objects, possibly at a nested dataPath.
-    let arr = parentBlock;
-    for (const key of dataPath || [region]) {
-      arr = arr?.[key];
-    }
+    // object_list: an inline array at [...regionPath, region].
+    const arr = getAtPath(parentBlock, [...regionPath, region]);
     return [...(arr || [])].map((block) => ({ id: block[idField], block }));
   }
-  // blocks_layout: the region lists ids into the shared parent.blocks dict.
-  const ids = parentBlock?.blocks_layout?.[region] || [];
+  // blocks_layout: the region lists ids into a shared blocks dict on the node at
+  // regionPath (block root when empty, e.g. a `table` object wrapper otherwise).
+  const container = getAtPath(parentBlock, regionPath);
+  const ids = container?.blocks_layout?.[region] || [];
   return ids
-    .map((id) => ({ id, block: parentBlock?.blocks?.[id] }))
+    .map((id) => ({ id, block: container?.blocks?.[id] }))
     .filter((entry) => entry.block);
 }
 
@@ -1787,7 +1917,7 @@ export function getChildBlockEntries(parentBlock, descriptor = {}) {
  * field so callers iterate uniformly and never branch on storage.
  *
  * @param {Object} block - the container block
- * @returns {Array<{ region?: string, isObjectList?: boolean, dataPath?: string[] }>}
+ * @returns {Array<{ region?: string, isObjectList?: boolean, regionPath?: string[] }>}
  */
 export function getChildFields(block, idFieldMap = null) {
   const fields = [];
@@ -1807,7 +1937,7 @@ export function getChildFields(block, idFieldMap = null) {
     if (Array.isArray(val) && val.length > 0 && val[0]?.templateId) {
       fields.push({
         isObjectList: true,
-        dataPath: [key],
+        region: key, // top-level array field; regionPath defaults to []
         idField: typeIds?.[key] || '@id',
       });
     }
@@ -1820,44 +1950,43 @@ export function getChildFields(block, idFieldMap = null) {
  * paired with getChildBlockEntries, uniform across BOTH storages (the public mutator the
  * merge and the admin can share). For blocks_layout it ADDS the blocks to the shared
  * dict and sets the region's id list (call once per region — regions accumulate in the
- * one dict). For object_list it writes the array at the (possibly nested) dataPath,
+ * one dict). For object_list it writes the array at `[...regionPath, region]`,
  * cloning each level (INITIAL_DATA arrives deep-frozen).
  *
  * @param {Object} parentBlock - the container block to mutate
- * @param {Object} descriptor - { isObjectList, dataPath, region='items', idField='@id' }
+ * @param {Object} descriptor - { isObjectList, regionPath, region='items', idField='@id' }
  * @param {Array<{id: string, block: Object}>} entries
  */
 export function setChildBlockEntries(parentBlock, descriptor, entries) {
   const {
     isObjectList,
-    dataPath,
+    regionPath = [],
     region = 'items',
     idField = '@id',
   } = descriptor;
   if (isObjectList) {
-    const path = dataPath || [region];
-    let target = parentBlock;
-    for (let i = 0; i < path.length - 1; i++) {
-      target[path[i]] = { ...(target[path[i]] || {}) };
-      target = target[path[i]];
-    }
-    target[path[path.length - 1]] = entries.map((e) => ({
+    const parent = ensureMutablePath(parentBlock, regionPath);
+    parent[region] = entries.map((e) => ({
       ...e.block,
       [idField]: e.id,
     }));
     return;
   }
+  // blocks_layout: the shared blocks dict + blocks_layout may live under a
+  // widget:'object' wrapper (regionPath). Clone each level so the object's own
+  // dict is written (never the block root) and sibling object fields survive.
+  const container = ensureMutablePath(parentBlock, regionPath);
   for (const { id, block } of entries) {
     // Callers that manage the shared blocks dict themselves (e.g. the admin's
     // full-dict setContainerItems, whose blocksObj already reflects adds/deletes)
     // omit `block` — only write into the dict when a block is actually provided.
     if (block !== undefined) {
-      if (!parentBlock.blocks) parentBlock.blocks = {};
-      parentBlock.blocks[id] = block;
+      if (!container.blocks) container.blocks = {};
+      container.blocks[id] = block;
     }
   }
-  parentBlock.blocks_layout = {
-    ...(parentBlock.blocks_layout || {}),
+  container.blocks_layout = {
+    ...(container.blocks_layout || {}),
     [region]: entries.map((e) => e.id),
   };
 }
@@ -3279,7 +3408,7 @@ export function expandTemplatesSync(inputItems, options = {}) {
       let childSlotIds = undefined;
       for (const field of getChildFields(tplBlock)) {
         const key = field.isObjectList
-          ? field.dataPath[field.dataPath.length - 1]
+          ? field.region
           : 'blocks';
         for (const { block: child } of getChildBlockEntries(tplBlock, field)) {
           if (child && !child.fixed && child.slotId) {

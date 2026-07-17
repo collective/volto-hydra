@@ -10,7 +10,7 @@ import slateTransforms, { withEmptyInlineRemoval } from '../../utils/slateTransf
 import { syncCreateSlateBlock } from '@plone/volto-slate/utils/volto-blocks';
 import { getBlockById, updateBlockById } from '../../utils/blockPath';
 import { calculateDragHandlePosition, PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
-import { isSlateFieldType, isBlockPositionLocked, isBlockReadonly } from '@volto-hydra/helpers';
+import { isSlateFieldType, isBlockPositionLocked, isBlockReadonly, getFieldValue, getFieldDef } from '@volto-hydra/helpers';
 import { useDispatch, useSelector } from 'react-redux';
 import FormatDropdown from './FormatDropdown';
 import DropdownMenu from './DropdownMenu';
@@ -612,7 +612,7 @@ const SyncedSlateToolbar = ({
     if (!selectedBlock || !block) return;
 
     const fieldName = blockUI?.focusedFieldName || 'value';
-    const fieldValue = block[fieldName];
+    const fieldValue = getFieldValue(block, fieldName);
 
     // Only sync for slate fields
     const blockType = block?.['@type'];
@@ -1018,7 +1018,7 @@ const SyncedSlateToolbar = ({
       // Only call onChange if value actually changed (like Volto line 108)
       const block = getBlock(selectedBlock);
       const fieldName = blockUI?.focusedFieldName || 'value';
-      const currentFieldValue = block?.[fieldName];
+      const currentFieldValue = getFieldValue(block, fieldName);
       const currentText = currentFieldValue?.[0]?.children?.[0]?.text?.substring(0, 40);
 
       if (isEqual(newValue, currentFieldValue)) {
@@ -1166,7 +1166,7 @@ const SyncedSlateToolbar = ({
   }
 
   const fieldName = blockUI?.focusedFieldName || 'value';
-  const fieldValue = block[fieldName];
+  const fieldValue = getFieldValue(block, fieldName);
 
   // Template instance the selected block belongs to (walk up to the TOP-level
   // instance, skipping nested ones) so the ⋯ dropdown can offer "Edit template" /
@@ -1739,7 +1739,7 @@ const SyncedSlateToolbar = ({
 
     {/* Field Link Editor Popup - fixed position at toolbar */}
     {fieldLinkEditorOpen && fieldLinkEditorField && (() => {
-      const fieldDef = blockPathMap?.[selectedBlock]?.schema?.properties?.[fieldLinkEditorField];
+      const fieldDef = getFieldDef(blockPathMap?.[selectedBlock]?.schema, fieldLinkEditorField);
       const isObjectBrowserLink = fieldDef?.widget === 'object_browser' && fieldDef?.mode === 'link';
       return (
         <div
@@ -1753,7 +1753,7 @@ const SyncedSlateToolbar = ({
           }}
         >
           <AddLinkForm
-            data={{ url: getBlock(selectedBlock)?.[fieldLinkEditorField] || '' }}
+            data={{ url: getFieldValue(getBlock(selectedBlock), fieldLinkEditorField) || '' }}
             theme={{}}
             onChangeValue={(url) => {
               if (onFieldLinkChange) {
@@ -1795,7 +1795,7 @@ const SyncedSlateToolbar = ({
     {/* Media Field Overlays - show when block is selected, for each media field */}
     {/* Skip for readonly blocks - they shouldn't show media editing UI */}
     {blockUI?.mediaFields && !isBlockReadonly(getBlock(selectedBlock), templateEditMode) && Object.entries(blockUI.mediaFields).map(([fieldName, fieldData]) => {
-      const mediaValue = getBlock(selectedBlock)?.[fieldName];
+      const mediaValue = getFieldValue(getBlock(selectedBlock), fieldName);
       const hasMediaValue = mediaValue && (
         (Array.isArray(mediaValue) && mediaValue.length > 0) ||
         (typeof mediaValue === 'string' && mediaValue !== '')

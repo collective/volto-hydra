@@ -87,6 +87,22 @@ export function applySchemaDefaultsToBlock(blockData, schema) {
   const newData = { ...blockData };
 
   for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
+    // widget:'object' — recurse so the object's OWN fields (block.content.*)
+    // get their defaults/validation too. Descend objects only; a region
+    // (object_list/blocks_layout) is a container handled elsewhere and must NOT
+    // be walked here.
+    if (fieldDef.widget === 'object' && fieldDef.schema?.properties) {
+      const current = newData[fieldName];
+      if (current && typeof current === 'object' && !Array.isArray(current)) {
+        const nested = applySchemaDefaultsToBlock(current, fieldDef.schema);
+        if (nested !== current) {
+          newData[fieldName] = nested;
+          modified = true;
+        }
+      }
+      continue;
+    }
+
     const currentValue = blockData[fieldName];
 
     // First: validate current value - clear if invalid
@@ -100,6 +116,7 @@ export function applySchemaDefaultsToBlock(blockData, schema) {
 
   // Second pass: apply defaults to empty/null fields
   for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
+    if (fieldDef.widget === 'object') continue; // handled by recursion above
     if (fieldDef.default === undefined) continue;
 
     const currentValue = newData[fieldName];
@@ -137,6 +154,20 @@ export function applySchemaDefaultsToBlockWithContext(blockData, schema, context
   const newData = { ...blockData };
 
   for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
+    // widget:'object' — recurse (with context, for function defaults on nested
+    // fields). Descend objects only, never a region.
+    if (fieldDef.widget === 'object' && fieldDef.schema?.properties) {
+      const current = newData[fieldName];
+      if (current && typeof current === 'object' && !Array.isArray(current)) {
+        const nested = applySchemaDefaultsToBlockWithContext(current, fieldDef.schema, context);
+        if (nested !== current) {
+          newData[fieldName] = nested;
+          modified = true;
+        }
+      }
+      continue;
+    }
+
     const currentValue = blockData[fieldName];
     if (currentValue !== undefined && currentValue !== null) {
       if (!isValidValue(currentValue, fieldDef)) {
@@ -147,6 +178,7 @@ export function applySchemaDefaultsToBlockWithContext(blockData, schema, context
   }
 
   for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
+    if (fieldDef.widget === 'object') continue; // handled by recursion above
     if (fieldDef.default === undefined) continue;
 
     const currentValue = newData[fieldName];

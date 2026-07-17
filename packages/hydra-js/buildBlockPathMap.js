@@ -18,6 +18,44 @@ import { getBlockType } from '@volto-hydra/helpers';
 // importing from @volto-hydra/hydra-js (which would pull in Volto deps).
 const PAGE_BLOCK_UID = '_page';
 
+/**
+ * The block types you can ADD into a container field — the single source of
+ * truth every add path reads (it becomes each child's `allowedSiblingTypes`,
+ * which the block chooser, Enter-to-add and drag validation all consume).
+ *
+ * A plain field allows all of `allowedBlocks`. A SYNCED field — one whose
+ * blocks-field def declares an `itemTypeField` (a sibling field, e.g.
+ * `variation`, that drives every child's `@type`) — holds a single item type
+ * chosen once on the parent. Adding must not introduce a *different*
+ * convertible item type, so the addable set is:
+ *   the currently-synced type  +  any structural blocks that aren't convertible
+ *   item types (no `fieldMappings['@default']` — e.g. a `listing`).
+ * The other convertible item types are reached by changing the parent's
+ * `itemTypeField`, not by adding a foreign block into the synced container.
+ *
+ * @param {string[]} allowedBlocks   the field's allowedBlocks
+ * @param {string} [itemTypeField]   the field's sync field name (undefined = not synced)
+ * @param {Object} [containerBlock]  the container block's data (source of the synced type)
+ * @param {Object} [blocksConfig]
+ * @returns {string[]}
+ */
+export function addableSiblingTypes(
+  allowedBlocks,
+  itemTypeField,
+  containerBlock,
+  blocksConfig,
+) {
+  if (!Array.isArray(allowedBlocks) || !itemTypeField) return allowedBlocks;
+  const syncedType = containerBlock?.[itemTypeField];
+  if (!syncedType) return allowedBlocks;
+  return allowedBlocks.filter(
+    (type) =>
+      type === syncedType ||
+      // structural (non-convertible) blocks stay addable alongside the item type
+      !blocksConfig?.[type]?.fieldMappings?.['@default'],
+  );
+}
+
 // Cache for getBlockTypeSchema — keyed by blockType
 const _typeSchemaCache = new Map();
 
@@ -459,6 +497,14 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
     const layout = parent.blocks_layout?.[region];
     if (!blocks || !Array.isArray(layout) || layout.length === 0) return;
 
+    // Block-relative object prefix to the shared blocks dict + blocks_layout.
+    // Empty when the blocks live directly on the owning block (the ordinary
+    // case); [table] etc. when the blocks_layout is nested inside a
+    // widget:'object' wrapper (#245). The ops navigate here via regionPath —
+    // the blocks_layout analogue of object_list's dataPath.
+    const ownerPath = pathMap[parentId]?.path || [];
+    const regionPath = parentPath.slice(ownerPath.length);
+
     // Constraints come from the blocks field's own def, falling back to the
     // block-level config (the existing convention for Volto built-ins).
     const parentBlockConfig = blocksConfig?.[parent?.['@type']];
@@ -571,6 +617,7 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         path: blockPath,
         parentId: effectiveParentId,
         region, // The container field (region) this block lives in
+        ...(regionPath.length > 0 && { regionPath }), // object prefix to the blocks dict (#245)
         blockType, // Block type for uniform lookups (single source of truth)
         _schemaRef: storeSchema(blockSchema), // Deduplicated schema reference
         // A field's own allowedBlocks is authoritative at every level (same as the object_list
@@ -578,7 +625,12 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         // set: that set is the UNION of all page regions' allowedBlocks, so it can't express
         // per-region restrictions (footer vs items may allow different blocks). effectiveAllowedBlocks
         // already IS the region's field def; the old intersection was a no-op (region ⊆ union).
-        allowedSiblingTypes: effectiveAllowedBlocks || defaultPageAllowedBlocks,
+        allowedSiblingTypes: addableSiblingTypes(
+          effectiveAllowedBlocks || defaultPageAllowedBlocks,
+          fieldDef.itemTypeField,
+          parent,
+          blocksConfig,
+        ),
         allowedTemplates: fieldDef.allowedTemplates || null,
         maxSiblings: effectiveMaxLength,
         siblingCount: layout.length, // Total siblings in this container
@@ -648,6 +700,16 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
       const blockConfig = blocksConfig?.[blockType];
       addMode = blockConfig?.addMode || null;
     }
+
+    // Block-relative path from the enclosing block to this array — what the mutation
+    // ops navigate. The region's object-key PREFIX (the `/`-path object hops):
+    // [] when the array is directly on the parent, ['table'] when it's inside a
+    // `table` object wrapper (#245). Uniform with the blocks_layout regionPath —
+    // the array itself is at [...regionPath, region]. A nested object_list item
+    // (cells inside a row) is parent-relative, so its prefix is [].
+    const regionPath = parentPathInfo?.isObjectListItem
+      ? []
+      : parentPath.slice((parentPathInfo?.path || []).length);
 
     itemsArray.forEach((item, index) => {
       const itemId = item[idField];
@@ -724,8 +786,15 @@ export function buildBlockPathMap(formData, blocksConfig, intl = {}) {
         ...(!canInsertAfter && { canInsertAfter: false }),
         _schemaRef: storeSchema(blockSchema), // Deduplicated schema reference
         itemSchema: effectiveItemSchema, // null for typed items (schema from blocksConfig)
-        dataPath: effectiveDataPath, // Store for later use
-        allowedSiblingTypes: hasAllowedBlocks ? fieldDef.allowedBlocks : [virtualType],
+        ...(regionPath.length > 0 && { regionPath }), // object prefix to the array (#245); array at [...regionPath, region]
+        allowedSiblingTypes: hasAllowedBlocks
+          ? addableSiblingTypes(
+              fieldDef.allowedBlocks,
+              fieldDef.itemTypeField,
+              parent,
+              blocksConfig,
+            )
+          : [virtualType],
         maxSiblings: fieldDef.maxLength || null,
         siblingCount: itemsArray.length,
         addMode, // Table mode for this container (e.g., rows)

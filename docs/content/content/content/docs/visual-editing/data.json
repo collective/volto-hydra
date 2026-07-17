@@ -434,13 +434,13 @@
     },
     "h-14": {
       "@type": "slate",
-      "plaintext": "Path Syntax for Parent/Page Fields",
+      "plaintext": "Field Path Syntax",
       "value": [
         {
           "type": "h2",
           "children": [
             {
-              "text": "Path Syntax for Parent/Page Fields"
+              "text": "Field Path Syntax"
             }
           ]
         }
@@ -448,32 +448,98 @@
     },
     "p-15": {
       "@type": "slate",
-      "plaintext": "The `data-edit-text|edit-media|edit-link` attributes support Unix-style paths to edit fields outside the current block:",
+      "plaintext": "Every `data-edit-*` attribute — `data-edit-text`, `data-edit-link`, `data-edit-media` — takes a Unix-style **field path**, resolved the same way for all three. A path has two independent axes:",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "The "
+              "text": "Every "
             },
             {
               "type": "code",
               "children": [
                 {
-                  "text": "data-edit-text|edit-media|edit-link"
+                  "text": "data-edit-*"
                 }
               ]
             },
             {
-              "text": " attributes support Unix-style paths to edit fields outside the current block:"
+              "text": " attribute — "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-edit-text"
+                }
+              ]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-edit-link"
+                }
+              ]
+            },
+            {
+              "text": ", "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-edit-media"
+                }
+              ]
+            },
+            {
+              "text": " — takes a Unix-style "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "field path"
+                }
+              ]
+            },
+            {
+              "text": ", resolved the same way for all three. A path has two independent axes:"
             }
           ]
         }
       ]
     },
-    "ul-16": {
+    "p-16": {
       "@type": "slate",
-      "plaintext": "fieldName — edit the block's own field (default) ../fieldName — edit the parent block's field ../../fieldName — edit the grandparent's field /fieldName — edit the page metadata field",
+      "plaintext": "**Which block** (the leading part):",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Which block"
+                }
+              ]
+            },
+            {
+              "text": " (the leading part):"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-17": {
+      "@type": "slate",
+      "plaintext": "fieldName — this block's own field (default) ../fieldName — the parent block's field ../../fieldName — the grandparent block's field /fieldName — a page/root field",
       "value": [
         {
           "type": "ul",
@@ -490,7 +556,7 @@
                   ]
                 },
                 {
-                  "text": " — edit the block's own field (default)"
+                  "text": " — this block's own field (default)"
                 }
               ]
             },
@@ -506,7 +572,18 @@
                   ]
                 },
                 {
-                  "text": " — edit the parent block's field"
+                  "text": " — the parent "
+                },
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "block"
+                    }
+                  ]
+                },
+                {
+                  "text": "'s field"
                 }
               ]
             },
@@ -522,7 +599,7 @@
                   ]
                 },
                 {
-                  "text": " — edit the grandparent's field"
+                  "text": " — the grandparent block's field"
                 }
               ]
             },
@@ -538,7 +615,7 @@
                   ]
                 },
                 {
-                  "text": " — edit the page metadata field"
+                  "text": " — a page/root field"
                 }
               ]
             }
@@ -546,32 +623,241 @@
         }
       ]
     },
-    "ce-17": {
-      "@type": "codeExample",
-      "tabs": [
-        {
-          "@id": "ce-17-html-621a4c",
-          "label": "Html",
-          "language": "html",
-          "code": "<!-- Edit the page title (not inside any block) -->\n<h1 data-edit-text=\"/title\">My Page Title</h1>\n\n<!-- Edit the page description -->\n<p data-edit-text=\"/description\">Page description here</p>\n\n<!-- Inside a nested block, edit the parent container's title -->\n<h3 data-edit-text=\"../title\">Column Title</h3>"
-        }
-      ]
-    },
     "p-18": {
       "@type": "slate",
-      "plaintext": "This allows fixed parts of the page (like headers) to be editable without being inside a block.",
+      "plaintext": "`..` always steps up one **block** — never an object or region level (see below).",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "This allows fixed parts of the page (like headers) to be editable without being inside a block."
+              "type": "code",
+              "children": [
+                {
+                  "text": ".."
+                }
+              ]
+            },
+            {
+              "text": " always steps up one "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "block"
+                }
+              ]
+            },
+            {
+              "text": " — never an object or region level (see below)."
             }
           ]
         }
       ]
     },
-    "h-19": {
+    "p-19": {
+      "@type": "slate",
+      "plaintext": "**Where inside the block** (`/` descends objects):",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Where inside the block"
+                }
+              ]
+            },
+            {
+              "text": " ("
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "/"
+                }
+              ]
+            },
+            {
+              "text": " descends objects):"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-20": {
+      "@type": "slate",
+      "plaintext": "content/headline — descend a widget: 'object'",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`content/headline`"
+                    }
+                  ]
+                },
+                {
+                  "text": " — descend a "
+                },
+                {
+                  "type": "link",
+                  "data": {
+                    "url": "container-blocks.md#widget-object-nesting-fields-and-containers-inside-a-block-field"
+                  },
+                  "children": [
+                    {
+                      "text": "`widget: 'object'`"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-21": {
+      "@type": "slate",
+      "plaintext": "field to a nested field (the key mirrors the storage path, `block.content.headline`)",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "field to a nested field (the key mirrors the storage path, "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "block.content.headline"
+                }
+              ]
+            },
+            {
+              "text": ")"
+            }
+          ]
+        }
+      ]
+    },
+    "p-22": {
+      "@type": "slate",
+      "plaintext": "The two compose: `../content/headline` is \"the parent block, its `content.headline`\". `/` descends objects only — a region (`object_list` / `blocks_layout`) or a value is the end of a path (a region's children are separate blocks with their own `data-block-uid`).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The two compose: "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "../content/headline"
+                }
+              ]
+            },
+            {
+              "text": " is \"the parent block, its "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "content.headline"
+                }
+              ]
+            },
+            {
+              "text": "\". "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "/"
+                }
+              ]
+            },
+            {
+              "text": " descends objects only — a region ("
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "object_list"
+                }
+              ]
+            },
+            {
+              "text": " / "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "blocks_layout"
+                }
+              ]
+            },
+            {
+              "text": ") or a value is the end of a path (a region's children are separate blocks with their own "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-block-uid"
+                }
+              ]
+            },
+            {
+              "text": ")."
+            }
+          ]
+        }
+      ]
+    },
+    "ce-23": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-23-html-1a4c34",
+          "label": "Html",
+          "language": "html",
+          "code": "<!-- page fields (not inside any block) -->\n<h1 data-edit-text=\"/title\">My Page Title</h1>\n<p  data-edit-text=\"/description\">Page description here</p>\n\n<!-- inside a nested block, edit the parent container's title -->\n<h3 data-edit-text=\"../title\">Column Title</h3>\n\n<!-- fields nested on a widget:'object' — text, link and media all use the same path -->\n<h3 data-edit-text=\"content/headline\">…</h3>\n<a  data-edit-link=\"content/href\">…</a>\n<img data-edit-media=\"content/image\" />"
+        }
+      ]
+    },
+    "p-24": {
+      "@type": "slate",
+      "plaintext": "This lets fixed parts of the page (headers), parent-block fields, and fields grouped inside an object all be edited in place, with one addressing model.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This lets fixed parts of the page (headers), parent-block fields, and fields grouped inside an object all be edited in place, with one addressing model."
+            }
+          ]
+        }
+      ]
+    },
+    "h-25": {
       "@type": "slate",
       "plaintext": "Readonly Regions",
       "value": [
@@ -585,7 +871,7 @@
         }
       ]
     },
-    "p-20": {
+    "p-26": {
       "@type": "slate",
       "plaintext": "Add `data-block-readonly` (or `<!-- hydra block-readonly -->` comment) to disable inline editing for all fields inside an element:",
       "value": [
@@ -621,18 +907,18 @@
         }
       ]
     },
-    "ce-21": {
+    "ce-27": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-21-html-01cf34",
+          "@id": "ce-27-html-13c090",
           "label": "Html",
           "language": "html",
           "code": "<div class=\"teaser\" data-block-uid=\"teaser-1\">\n  <div data-block-readonly>\n    <h2 data-edit-text=\"title\">Target Page Title</h2>\n  </div>\n  <a data-edit-link=\"href\" href=\"/target\">Read more</a>\n</div>"
         }
       ]
     },
-    "p-22": {
+    "p-28": {
       "@type": "slate",
       "plaintext": "Or using comment syntax:",
       "value": [
@@ -646,18 +932,18 @@
         }
       ]
     },
-    "ce-23": {
+    "ce-29": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-23-html-1a4c34",
+          "@id": "ce-29-html-57107f",
           "label": "Html",
           "language": "html",
           "code": "<!-- hydra block-readonly -->\n<div class=\"listing-item\" data-block-uid=\"item-1\">...</div>"
         }
       ]
     },
-    "h-24": {
+    "h-30": {
       "@type": "slate",
       "plaintext": "Renderer Node-ID Rules",
       "value": [
@@ -671,7 +957,7 @@
         }
       ]
     },
-    "p-25": {
+    "p-31": {
       "@type": "slate",
       "plaintext": "When rendering Slate nodes to DOM, your renderer must follow these rules for `data-node-id`:",
       "value": [
@@ -696,7 +982,7 @@
         }
       ]
     },
-    "ol-26": {
+    "ol-32": {
       "@type": "slate",
       "plaintext": "Element nodes (p, strong, em, etc.) must have data-node-id matching the Slate node's nodeId Wrapper elements — If you add extra wrapper elements around a Slate node, ALL wrappers must have the same data-node-id as the inner element",
       "value": [
@@ -786,7 +1072,7 @@
         }
       ]
     },
-    "p-27": {
+    "p-33": {
       "@type": "slate",
       "plaintext": "hydra.js uses node-ids to map between Slate's data model and your DOM. When restoring cursor position after formatting changes, it walks your DOM counting Slate children.",
       "value": [
@@ -800,18 +1086,18 @@
         }
       ]
     },
-    "ce-28": {
+    "ce-34": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-28-html-ee6bed",
+          "@id": "ce-34-html-708bb2",
           "label": "Html",
           "language": "html",
           "code": "Valid wrapper pattern:\n<strong data-node-id=\"0.1\"><b data-node-id=\"0.1\">bold</b></strong>\nBoth elements have the same node-id, so they count as one Slate child.\n\nInvalid (missing node-id on wrapper):\n<span class=\"my-style\"><strong data-node-id=\"0.1\">bold</strong></span>\nThis breaks cursor positioning because hydra.js can't correlate DOM structure to Slate structure."
         }
       ]
     },
-    "h-29": {
+    "h-35": {
       "@type": "slate",
       "plaintext": "One top-level node per slate field",
       "value": [
@@ -825,7 +1111,7 @@
         }
       ]
     },
-    "p-30": {
+    "p-36": {
       "@type": "slate",
       "plaintext": "A slate field's `value` is an array, but it always holds exactly **one top-level node** — a single paragraph, heading, list, or blockquote. Inline content (bold, links, …) lives in that node's `children`.",
       "value": [
@@ -872,7 +1158,7 @@
         }
       ]
     },
-    "p-31": {
+    "p-37": {
       "@type": "slate",
       "plaintext": "Editing can transiently produce more than one top-level node — pasting multiple paragraphs, pressing Enter, or a Backspace that demotes a list item to a paragraph (`[ul, p]`). Hydra normalizes that immediately:",
       "value": [
@@ -897,7 +1183,7 @@
         }
       ]
     },
-    "ul-32": {
+    "ul-38": {
       "@type": "slate",
       "plaintext": "Split — when the field is the value of a slate block, each extra",
       "value": [
@@ -946,7 +1232,7 @@
         }
       ]
     },
-    "p-33": {
+    "p-39": {
       "@type": "slate",
       "plaintext": "node becomes its own `slate` block, inserted after the original in the   same container (`blocks_layout` or `object_list`). This is how pressing   Enter in a text block produces a new block.",
       "value": [
@@ -993,7 +1279,7 @@
         }
       ]
     },
-    "ul-34": {
+    "ul-40": {
       "@type": "slate",
       "plaintext": "Flatten — when the field can't be split — a slate field of a",
       "value": [
@@ -1031,9 +1317,9 @@
         }
       ]
     },
-    "p-35": {
+    "p-41": {
       "@type": "slate",
-      "plaintext": "non-slate block (e.g. a `slateTable` cell's `value`), or a container   that's full or in table mode — the extra nodes' content merges back into   the first node. No text is lost.",
+      "plaintext": "non-slate block (e.g. a `slateTable` cell's `value`), a slate field nested   on a `widget: 'object'` (`content/headline`), or a container that's full or   in table mode — the extra nodes' content merges back into the first node.   No text is lost.",
       "value": [
         {
           "type": "p",
@@ -1061,13 +1347,35 @@
               ]
             },
             {
-              "text": "), or a container   that's full or in table mode — the extra nodes' content merges back into   the first node. No text is lost."
+              "text": "), a slate field nested   on a "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "widget: 'object'"
+                }
+              ]
+            },
+            {
+              "text": " ("
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "content/headline"
+                }
+              ]
+            },
+            {
+              "text": "), or a container that's full or   in table mode — the extra nodes' content merges back into the first node.   No text is lost."
             }
           ]
         }
       ]
     },
-    "p-36": {
+    "p-42": {
       "@type": "slate",
       "plaintext": "A frontend renderer can therefore always assume one top-level node per slate field; it never has to handle a multi-node `value`.",
       "value": [
@@ -1092,7 +1400,7 @@
         }
       ]
     },
-    "h-37": {
+    "h-43": {
       "@type": "slate",
       "plaintext": "Complete Slate Rendering Example",
       "value": [
@@ -1106,7 +1414,7 @@
         }
       ]
     },
-    "p-38": {
+    "p-44": {
       "@type": "slate",
       "plaintext": "Slate data structure (value is an array but always contains a single root node):",
       "value": [
@@ -1120,18 +1428,18 @@
         }
       ]
     },
-    "ce-39": {
+    "ce-45": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-39-json-5d264e",
+          "@id": "ce-45-json-6a84b8",
           "label": "Json",
           "language": "json",
           "code": "{\n  \"value\": [\n    {\n      \"type\": \"p\", \"nodeId\": \"0\",\n      \"children\": [\n        { \"text\": \"Hello \" },\n        { \"type\": \"strong\", \"nodeId\": \"0.1\",\n          \"children\": [{ \"text\": \"world\" }] },\n        { \"text\": \"! Visit \" },\n        { \"type\": \"link\", \"nodeId\": \"0.3\",\n          \"data\": { \"url\": \"/about\" },\n          \"children\": [{ \"text\": \"our page\" }] }\n      ]\n    }\n  ]\n}"
         }
       ]
     },
-    "p-40": {
+    "p-46": {
       "@type": "slate",
       "plaintext": "Renderer:",
       "value": [
@@ -1145,18 +1453,18 @@
         }
       ]
     },
-    "ce-41": {
+    "ce-47": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-41-javascript-925664",
+          "@id": "ce-47-javascript-5e9bf2",
           "label": "Javascript",
           "language": "javascript",
           "code": "function renderSlate(nodes) {\n  return (nodes || []).map(node => {\n    if (node.text !== undefined) return escapeHtml(node.text);\n    const tag = { p:'p', h1:'h1', h2:'h2', strong:'strong',\n                  em:'em', link:'a' }[node.type] || 'span';\n    const attrs = node.type === 'link'\n      ? ` href=\"${node.data?.url || '#'}\"` : '';\n    return `<${tag} data-node-id=\"${node.nodeId}\"${attrs}>${renderSlate(node.children)}</${tag}>`;\n  }).join('');\n}"
         }
       ]
     },
-    "p-42": {
+    "p-48": {
       "@type": "slate",
       "plaintext": "Usage:",
       "value": [
@@ -1170,11 +1478,11 @@
         }
       ]
     },
-    "ce-43": {
+    "ce-49": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-43-html-79ffcf",
+          "@id": "ce-49-html-9b3b7f",
           "label": "Html",
           "language": "html",
           "code": "<div data-block-uid=\"block-1\" data-edit-text=\"value\">\n  <!-- renderSlate(block.value) output goes here -->\n</div>"
@@ -1200,34 +1508,40 @@
       "ce-13",
       "h-14",
       "p-15",
-      "ul-16",
-      "ce-17",
+      "p-16",
+      "ul-17",
       "p-18",
-      "h-19",
-      "p-20",
-      "ce-21",
+      "p-19",
+      "ul-20",
+      "p-21",
       "p-22",
       "ce-23",
-      "h-24",
-      "p-25",
-      "ol-26",
-      "p-27",
-      "ce-28",
-      "h-29",
-      "p-30",
+      "p-24",
+      "h-25",
+      "p-26",
+      "ce-27",
+      "p-28",
+      "ce-29",
+      "h-30",
       "p-31",
-      "ul-32",
+      "ol-32",
       "p-33",
-      "ul-34",
-      "p-35",
+      "ce-34",
+      "h-35",
       "p-36",
-      "h-37",
-      "p-38",
-      "ce-39",
-      "p-40",
-      "ce-41",
+      "p-37",
+      "ul-38",
+      "p-39",
+      "ul-40",
+      "p-41",
       "p-42",
-      "ce-43"
+      "h-43",
+      "p-44",
+      "ce-45",
+      "p-46",
+      "ce-47",
+      "p-48",
+      "ce-49"
     ]
   }
 }

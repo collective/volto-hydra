@@ -3573,14 +3573,24 @@ export class AdminUIHelper {
     // For insertBefore: indicator at TOP edge (within tolerance above block)
     const tolerance = 30; // Should be close to the edge
     const expectedEdge = insertAfter ? targetBottom : targetTop;
+    // The INNER bound (toward the block's centre) must never reach past the
+    // midpoint: for a block shorter than 2*tolerance the opposite edge would
+    // otherwise fall inside the window, so an indicator at the TOP edge
+    // (insertBefore) would satisfy an insertAfter check — and the drop then
+    // lands on the wrong side (the placeholder-region flake: tightly packed
+    // ~18px paragraphs). Keep the full tolerance on the OUTER side (the gap to
+    // the neighbouring block). Tall blocks are unaffected (min → tolerance).
+    const innerTol = Math.min(tolerance, (targetBottom - targetTop) / 2);
     let isNearTarget: boolean;
 
     if (insertAfter) {
-      // Indicator should be near bottom edge of target
-      isNearTarget = dropY >= targetBottom - tolerance && dropY <= targetBottom + tolerance;
+      // Indicator should be near bottom edge of target, on the after-side of
+      // the midpoint.
+      isNearTarget = dropY >= targetBottom - innerTol && dropY <= targetBottom + tolerance;
     } else {
-      // Indicator should be near top edge of target
-      isNearTarget = dropY >= targetTop - tolerance && dropY <= targetTop + tolerance;
+      // Indicator should be near top edge of target, on the before-side of
+      // the midpoint.
+      isNearTarget = dropY >= targetTop - tolerance && dropY <= targetTop + innerTol;
     }
 
     if (!isNearTarget) {

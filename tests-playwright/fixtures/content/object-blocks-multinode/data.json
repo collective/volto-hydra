@@ -1,0 +1,27 @@
+{
+  "@id": "http://localhost:8888/object-blocks-multinode",
+  "@type": "Document",
+  "UID": "object-blocks-multinode-uid",
+  "id": "object-blocks-multinode",
+  "title": "Object Blocks Multinode",
+  "blocks": {
+    "title-block": { "@type": "title" },
+    "obm-1": {
+      "@type": "objectBlocks",
+      "content": {
+        "headline": [
+          { "type": "h2", "children": [{ "text": "First para" }] },
+          { "type": "p", "children": [{ "text": "Second para" }] }
+        ],
+        "blocks": {
+          "obm-c1": {
+            "@type": "slate",
+            "value": [{ "type": "p", "children": [{ "text": "body block" }] }]
+          }
+        },
+        "blocks_layout": { "body": ["obm-c1"] }
+      }
+    }
+  },
+  "blocks_layout": { "items": ["title-block", "obm-1"] }
+}
