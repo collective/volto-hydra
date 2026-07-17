@@ -305,6 +305,33 @@ test.describe('Template Creation', () => {
     // Edit mode is active — the template's fixed block is now editable.
     await helper.waitForBlockEditable(headerBlockId);
   });
+
+  test('can toggle template edit mode from sidebar ON MOBILE (collapsed sheet)', async ({ page }) => {
+    // On a phone viewport the settings sidebar is a collapsed off-screen sheet, so
+    // the template edit toggle isn't on screen. unlockTemplate/lockTemplate must open
+    // the sheet (bottom-toolbar Settings icon), drive the toggle, then dismiss it so
+    // the canvas is usable — all viewport-aware in the helper, so the SAME calls work
+    // as on desktop. Regression guard for the mobile-admin footer demo.
+    await page.setViewportSize({ width: 375, height: 812 });
+    const helper = new AdminUIHelper(page);
+
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+
+    const { blockId: headerBlockId } = await helper.waitForBlockByContent(TEMPLATE_HEADER_CONTENT);
+
+    // Sidebar starts collapsed on mobile — unlock must open it itself.
+    await expect(page.locator('.sidebar-container.collapsed')).toBeAttached({ timeout: 5000 });
+    await helper.unlockTemplate(headerBlockId);
+    await helper.waitForBlockEditable(headerBlockId);
+
+    // unlock dismissed the sheet, so the canvas is reachable again.
+    await expect(page.locator('.sidebar-container.collapsed')).toBeAttached({ timeout: 5000 });
+
+    // And it locks back cleanly (drives the lock decision modal from the sheet).
+    await helper.lockTemplate(headerBlockId, 'commit');
+    await helper.waitForBlockReadonly(headerBlockId);
+  });
 });
 
 test.describe('Template Edit Mode - Save', () => {
