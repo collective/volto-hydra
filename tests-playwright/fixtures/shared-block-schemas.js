@@ -402,6 +402,46 @@ export const sharedBlocksConfig = {
             },
         },
     },
+    // Object-nested blocks_layout (#245): a `content` widget:'object' wrapper
+    // whose `body` region is a blocks_layout. The object holds its OWN shared
+    // `blocks` dict + `blocks_layout` — one level deeper than the block root
+    // (data: block.content.blocks / block.content.blocks_layout.body). Exercises
+    // the regionPath funnel path end-to-end.
+    objectBlocks: {
+        id: 'objectBlocks',
+        title: 'Object Blocks',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['content'] }],
+            properties: {
+                content: {
+                    widget: 'object',
+                    schema: {
+                        fieldsets: [{ id: 'default', title: 'Content', fields: ['headline', 'body'] }],
+                        properties: {
+                            // An inline-editable text field living directly on the
+                            // object — written to block.content.headline.
+                            headline: {
+                                title: 'Headline',
+                                widget: 'slate',
+                                default: [{ type: 'p', children: [{ text: '' }] }],
+                            },
+                            // An inline-editable LINK field on the object — proves
+                            // link editing routes through the central /-path API
+                            // (writes block.content.href, not a flat key).
+                            href: { title: 'Link', widget: 'object_browser', mode: 'link' },
+                            body: {
+                                title: 'Body',
+                                widget: 'blocks_layout',
+                                allowedBlocks: ['slate', 'image'],
+                                defaultBlockType: 'slate',
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
     // Separator (horizontal rule) — a simple leaf block with no editable fields.
     // Registered so it's a valid page-level block (it's used across the docs
     // content and inside accordions); without this it isn't in the page's

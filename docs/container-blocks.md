@@ -188,7 +188,26 @@ table: { widget: 'object', schema: { properties: {
   "table": { "blocks": { "b1": { /* … */ } }, "blocks_layout": { "body": ["b1"] } } }
 ```
 
-A nested field keeps its normal row in the parent's child widget; the sidebar prefixes the row **title** with the path (e.g. **Table / Rows**) so the nesting is visible. Blocks inside a nested container are edited in the canvas like any other container.
+A **plain field** inside an object is edited in the canvas like any top-level field — you just address it by its **`/`-path**. A `data-edit-*` value is a path resolved against the schema:
+
+- `field` — this block's own field
+- `content/field` — descend the `content` object to a nested field (object keys mirror the storage path)
+- `..` — the parent **block** (never up an object level)
+- `/field` — a page/root field
+
+The **same `/`-path works for every inline field kind** — text, links, and media — because they all resolve a field the same way:
+
+<!-- codeExample: html -->
+```html
+<!-- all three fields live on the `content` object of this block -->
+<h3 data-edit-text="content/headline">…</h3>
+<a  data-edit-link="content/href">…</a>
+<img data-edit-media="content/image" />
+```
+
+Each writes back to its nested location (`block.content.headline`, `block.content.href`, `block.content.image`) — never a flat key.
+
+Blocks inside a nested container are edited in the canvas like any other container. The sidebar prefixes a nested container's **title** with the path (e.g. **Table / Rows**) so the nesting is visible.
 
 This replaces `dataPath`: declare the container inside the object rather than hoisting it to the block's top level with a `dataPath` back-reference.
 

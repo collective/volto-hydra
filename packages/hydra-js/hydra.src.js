@@ -21,6 +21,12 @@ import {
   isTextOnlyBlockChange,
   findBlockInForm,
   slateNodesText,
+  getAtPath,
+  ensureMutablePath,
+  getFieldValue,
+  setFieldValue,
+  getFieldDef,
+  resolveFieldPath as resolveFieldPathHelper,
 } from '@volto-hydra/helpers';
 import { expelAllowedTypes, findOnlyEmptyChildUid } from './containerOps.js';
 
@@ -680,43 +686,13 @@ export class Bridge {
   }
 
   /**
-   * Resolve a field path to determine the target block and field name.
-   * Supports:
-   * - "fieldName" -> block's own field (or page if no block context)
-   * - "../fieldName" -> parent block's field (or page if at top level)
-   * - "/fieldName" -> page-level field
-   *
-   * @param {string} fieldPath - The field path from data-edit-text
-   * @param {string|null} blockId - Current block ID (PAGE_BLOCK_UID for page-level)
-   * @returns {Object} { blockId: string, fieldName: string }
+   * Resolve a data-edit path's block scope (`/`, `..`) to { blockId, fieldName }.
+   * Thin wrapper over the pure `resolveFieldPath` helper, passing this bridge's
+   * blockPathMap. The whole path grammar (block scope + object descent) lives in
+   * @volto-hydra/helpers.
    */
   resolveFieldPath(fieldPath, blockId) {
-    // Handle absolute path (page-level)
-    if (fieldPath.startsWith('/')) {
-      return { blockId: PAGE_BLOCK_UID, fieldName: fieldPath.slice(1) };
-    }
-
-    // If no block context or PAGE_BLOCK_UID, treat as page-level
-    if (!blockId || blockId === PAGE_BLOCK_UID) {
-      return { blockId: PAGE_BLOCK_UID, fieldName: fieldPath };
-    }
-
-    // Handle relative path with ../
-    let currentBlockId = blockId;
-    let remainingPath = fieldPath;
-
-    while (remainingPath.startsWith('../')) {
-      const pathInfo = this.blockPathMap?.[currentBlockId];
-      if (!pathInfo?.parentId || pathInfo.parentId === PAGE_BLOCK_UID) {
-        // Already at top level, next ../ goes to page
-        return { blockId: PAGE_BLOCK_UID, fieldName: remainingPath.slice(3) };
-      }
-      currentBlockId = pathInfo.parentId;
-      remainingPath = remainingPath.slice(3);
-    }
-
-    // Block field
-    return { blockId: currentBlockId, fieldName: remainingPath };
+    return resolveFieldPathHelper(fieldPath, blockId, this.blockPathMap);
   }
 
   /**
@@ -5649,11 +5625,11 @@ export class Bridge {
     const fieldName = editableField.getAttribute('data-edit-text');
     const blockData = this.getBlockData(blockUid);
 
-    if (!blockData || !blockData[fieldName]) {
+    if (!blockData || !getFieldValue(blockData, fieldName)) {
       return { valid: true }; // Can't validate without Slate value
     }
 
-    const slateValue = blockData[fieldName];
+    const slateValue = getFieldValue(blockData, fieldName);
     if (!Array.isArray(slateValue)) {
       return { valid: true }; // Not a Slate field
     }
@@ -7236,7 +7212,7 @@ export class Bridge {
       if (!fieldEl) continue;
 
       if (this.fieldTypeIsSlate(fieldType)) {
-        const slateValue = blockData[fieldName];
+        const slateValue = getFieldValue(blockData, fieldName);
         if (!slateValue || !Array.isArray(slateValue)) continue;
         const domValue = this.readSlateValueFromDOM(fieldEl, slateValue, { matchMetadataFromDom: true });
         if (!this._deepEqual(domValue, slateValue)) {
@@ -7250,7 +7226,7 @@ export class Bridge {
         // Non-slate text fields: compare using same read as handleTextChange
         const resolved = this.resolveFieldPath(fieldName, blockUid);
         const targetData = this.getBlockData(resolved.blockId);
-        const expected = targetData?.[resolved.fieldName] ?? '';
+        const expected = getFieldValue(targetData, resolved.fieldName) ?? '';
         const domText = this.stripZeroWidthSpaces(fieldEl.innerText || '');
         if (domText !== String(expected)) return false;
       }
@@ -7266,7 +7242,7 @@ export class Bridge {
     const editableFields = this.getEditableFields(blockElement);
     for (const [fieldName, fieldType] of Object.entries(editableFields)) {
       if (!this.fieldTypeIsSlate(fieldType)) continue;
-      const slateValue = blockData[fieldName];
+      const slateValue = getFieldValue(blockData, fieldName);
       if (!slateValue || !Array.isArray(slateValue)) continue;
 
       const fieldEl = blockElement.querySelector(`[data-edit-text="${fieldName}"]`)
@@ -10609,12 +10585,23 @@ export class Bridge {
       const schema = this.getBlockSchema(blockId);
       if (!schema?.properties) return;
 
-      Object.entries(schema.properties).forEach(([fieldName, fieldDef]) => {
-        if (isSlateFieldType(getFieldTypeString(fieldDef)) && block[fieldName]) {
-          block[fieldName] = this.addNodeIds(block[fieldName]);
-          slateCalls++;
-        }
-      });
+      // Walk the block's fields, descending into widget:'object' wrappers so a
+      // slate field nested on an object (e.g. content.headline, #245) also gets
+      // nodeIds — otherwise inline-editing it fails with "missing data-node-id".
+      const addToFields = (obj, props) => {
+        if (!obj || !props) return;
+        Object.entries(props).forEach(([fieldName, fieldDef]) => {
+          if (fieldDef.widget === 'object' && fieldDef.schema?.properties) {
+            addToFields(obj[fieldName], fieldDef.schema.properties);
+            return;
+          }
+          if (isSlateFieldType(getFieldTypeString(fieldDef)) && obj[fieldName]) {
+            obj[fieldName] = this.addNodeIds(obj[fieldName]);
+            slateCalls++;
+          }
+        });
+      };
+      addToFields(block, schema.properties);
     });
     log('addNodeIdsToAllSlateFields took', (performance.now() - t0).toFixed(1) + 'ms, slate fields:', slateCalls);
   }
@@ -10788,7 +10775,7 @@ export class Bridge {
       const resolved = this.resolveFieldPath(this.focusedFieldName, this.selectedBlockUid);
       const fieldData = this.getBlockData(resolved.blockId);
       const fieldType = this.getFieldType(this.selectedBlockUid, this.focusedFieldName);
-      const fieldValue = fieldData?.[resolved.fieldName];
+      const fieldValue = getFieldValue(fieldData, resolved.fieldName);
 
       // Find the block element for locating editable fields
       const blockElement = this.queryBlockElement(this.selectedBlockUid);
@@ -11323,11 +11310,22 @@ export class Bridge {
         const block = blocks[blockId];
         const schema = this.getBlockSchema(blockId);
         if (block && schema?.properties) {
-          for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
-            if (isSlateFieldType(getFieldTypeString(fieldDef)) && block[fieldName]) {
-              this.resetJsonNodeIds(block[fieldName]);
+          // Descend widget:'object' wrappers so a slate field nested on an
+          // object (content/headline, #245) is stripped too — top-level is just
+          // the depth-0 case of the same walk.
+          const stripFields = (obj, props) => {
+            if (!obj || !props) return;
+            for (const [fieldName, fieldDef] of Object.entries(props)) {
+              if (fieldDef.widget === 'object' && fieldDef.schema?.properties) {
+                stripFields(obj[fieldName], fieldDef.schema.properties);
+                continue;
+              }
+              if (isSlateFieldType(getFieldTypeString(fieldDef)) && obj[fieldName]) {
+                this.resetJsonNodeIds(obj[fieldName]);
+              }
             }
-          }
+          };
+          stripFields(block, schema.properties);
           // Also check nested blocks in container fields
           if (block.blocks) {
             stripNodeIdsFromSlateFields(block.blocks);
@@ -11360,8 +11358,8 @@ export class Bridge {
     let fieldA, fieldB;
     if (resolved.blockId === PAGE_BLOCK_UID) {
       // Page-level field - compare directly on formData
-      fieldA = formDataA?.[resolved.fieldName];
-      fieldB = formDataB?.[resolved.fieldName];
+      fieldA = getFieldValue(formDataA, resolved.fieldName);
+      fieldB = getFieldValue(formDataB, resolved.fieldName);
       log('focusedFieldValuesEqual (page-level):', fieldA === fieldB, 'field:', resolved.fieldName, 'A:', fieldA, 'B:', fieldB);
       return fieldA === fieldB;
     }
@@ -11386,8 +11384,8 @@ export class Bridge {
       return false; // Can't find block - assume not equal (safe default)
     }
     // Deep copy and strip nodeIds before comparing (old formData has nodeIds, incoming doesn't)
-    fieldA = blockA[resolved.fieldName];
-    fieldB = blockB[resolved.fieldName];
+    fieldA = getFieldValue(blockA, resolved.fieldName);
+    fieldB = getFieldValue(blockB, resolved.fieldName);
     if (fieldA === undefined || fieldB === undefined) {
       return fieldA === fieldB;
     }
@@ -11409,9 +11407,40 @@ export class Bridge {
   getFieldType(blockUid, fieldName) {
     const resolved = this.resolveFieldPath(fieldName, blockUid);
     const schema = this.getBlockSchema(resolved.blockId);
-    const fieldDef = schema?.properties?.[resolved.fieldName];
+    const fieldDef = this.getNestedFieldDef(schema, resolved.fieldName);
     if (!fieldDef) return undefined;
     return getFieldTypeString(fieldDef);
+  }
+
+  /**
+   * Resolve a `/`-path field name to its schema fieldDef, descending through
+   * widget:'object' wrappers (#245). "headline" reads schema.properties.headline;
+   * "content/headline" descends schema.properties.content.schema.properties.headline
+   * — the object key(s) mirror the storage path. The block-scope prefix (`/`, `..`)
+   * is consumed by resolveFieldPath before this; the remainder is `/`-separated
+   * object hops. Returns undefined if any segment is missing.
+   */
+  getNestedFieldDef(schema, fieldName) {
+    if (!fieldName) return undefined;
+    return getFieldDef(schema, fieldName);
+  }
+
+  /**
+   * Read a `/`-path field value from a block (central field-access API).
+   */
+  getFieldValueByPath(obj, fieldName) {
+    if (!obj || !fieldName) return undefined;
+    return getFieldValue(obj, fieldName);
+  }
+
+  /**
+   * Write a `/`-path field value into a block IN PLACE (hydra's `obj` is a live
+   * formData ref). Routes through the shared immutable setFieldValue, then
+   * Object.assign's the result back so the ref reflects the change.
+   */
+  setFieldValueByPath(obj, fieldName, value) {
+    if (!obj || !fieldName) return;
+    Object.assign(obj, setFieldValue(obj, fieldName, value));
   }
 
   /**
@@ -11444,7 +11473,7 @@ export class Bridge {
       }
     }
     // 2. Schema-level placeholder
-    const fieldDef = this.getBlockSchema(resolved.blockId)?.properties?.[resolved.fieldName];
+    const fieldDef = this.getNestedFieldDef(this.getBlockSchema(resolved.blockId), resolved.fieldName);
     if (fieldDef?.placeholder) return fieldDef.placeholder;
     // 3. Universal fallback
     return 'Click to edit';
@@ -11607,16 +11636,22 @@ export class Bridge {
       // The DOM is the source of truth for structure (which children exist,
       // their order, their text). Metadata (type, data, marks) comes from
       // the existing JSON via a nodeId → metadata map.
-      const block = this.getBlockData(blockUid);
-      if (!block || !block[editableField]) {
+      // Resolve blockId (../ , /) then read/write the field at its storage path,
+      // which may be nested inside a widget:'object' (dotted, e.g.
+      // content.headline, #245). getFieldValueByPath/setFieldValueByPath walk
+      // the dotted path so a bare "value" behaves exactly as before.
+      const resolved = this.resolveFieldPath(editableField, blockUid);
+      const block = this.getBlockData(resolved.blockId);
+      const currentValue = this.getFieldValueByPath(block, resolved.fieldName);
+      if (!block || !currentValue) {
         log('handleTextChange: block or field not found for', blockUid, editableField);
         return;
       }
 
-      const freshValue = this.readSlateValueFromDOM(target, block[editableField]);
+      const freshValue = this.readSlateValueFromDOM(target, currentValue);
 
       const freshStr = JSON.stringify(freshValue);
-      const currentStr = JSON.stringify(block[editableField]);
+      const currentStr = JSON.stringify(currentValue);
 
       if (freshStr === currentStr) {
         log('handleTextChange: DOM matches formData, skipping');
@@ -11627,7 +11662,7 @@ export class Bridge {
       log('handleTextChange: DIFF fresh=', freshStr);
       log('handleTextChange: DIFF current=', currentStr);
 
-      block[editableField] = freshValue;
+      this.setFieldValueByPath(block, resolved.fieldName, freshValue);
       log('handleTextChange: updated', editableField);
     } else {
       // Non-Slate field - update field directly with text content
@@ -11635,7 +11670,7 @@ export class Bridge {
       const resolved = this.resolveFieldPath(editableField, blockUid);
       const targetData = this.getBlockData(resolved.blockId);
       if (targetData) {
-        targetData[resolved.fieldName] = this.stripZeroWidthSpaces(target.innerText);
+        this.setFieldValueByPath(targetData, resolved.fieldName, this.stripZeroWidthSpaces(target.innerText));
         log('handleTextChange: updated field:', resolved.fieldName);
       }
     }

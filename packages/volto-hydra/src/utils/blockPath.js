@@ -15,6 +15,8 @@ import {
   getBlockType,
   setBlockType,
   clearBlockType,
+  getAtPath,
+  ensureMutablePath,
 } from '@volto-hydra/helpers';
 import {
   buildBlockPathMap as _buildBlockPathMap,
@@ -188,17 +190,31 @@ function reorderContainerItems(items, newOrder, containerConfig) {
  * @param {Object} [blocksObj] - For blocks containers, the blocks object to set
  * @returns {Object} Updated parent block
  */
+/**
+ * Navigate to the object that actually holds a blocks_layout region's shared
+ * `blocks` dict + `blocks_layout`. Usually the parent block itself; for a
+ * blocks_layout nested inside a widget:'object' wrapper (#245) it's the object
+ * at `regionPath` (e.g. parentBlock.table). Read-only — returns the live node.
+ */
+function getRegionContainer(parentBlock, regionPath) {
+  return getAtPath(parentBlock, regionPath) || parentBlock;
+}
+
 function setContainerItems(
   parentBlock,
   containerConfig,
   items,
   blocksObj = null,
 ) {
-  const { isObjectList, idField = '@id' } = containerConfig;
+  const { isObjectList, idField = '@id', regionPath } = containerConfig;
   const updatedParent = { ...parentBlock };
   if (!isObjectList) {
-    // Full-dict replace; setChildBlockEntries leaves it alone (block omitted below).
-    updatedParent.blocks = blocksObj || parentBlock.blocks;
+    // Full-dict replace at the region's blocks dict, which may live under a
+    // widget:'object' wrapper (regionPath, e.g. [table]). Clone each level;
+    // setChildBlockEntries below re-navigates the same path and spreads this
+    // clone, so the dict written here survives alongside the blocks_layout.
+    const container = ensureMutablePath(updatedParent, regionPath);
+    container.blocks = blocksObj || container.blocks;
   }
   const entries = isObjectList
     ? items.map((block) => ({ id: block[idField], block }))
@@ -421,6 +437,9 @@ export function getContainerFieldConfig(
   // The container field (region) this block lives in — same concept for blocks
   // and object_list. It is the schema property name.
   const region = pathInfo.region || 'items';
+  // Object prefix to the region's blocks dict when the blocks_layout is nested
+  // inside a widget:'object' wrapper (#245); [] for the ordinary block-root case.
+  const regionPath = pathInfo.regionPath || [];
 
   // If parent is a virtual template instance, use the instance's parent for storage operations
   // Template blocks are stored flat, so the actual container is the instance's parent
@@ -441,11 +460,11 @@ export function getContainerFieldConfig(
       defaultBlockType: pathInfo.blockType,
       maxLength: pathInfo.maxSiblings,
       isObjectList: true,
-      itemSchema: pathInfo.typeField ? null : fieldDef?.schema, // null for typed items
+      itemSchema: pathInfo.typeField ? null : pathInfo.itemSchema, // stored on pathInfo (nesting-safe); null for typed items
       itemIndex: pathInfo.path[pathInfo.path.length - 1], // Last element is index
       idField: pathInfo.idField,
       typeField: pathInfo.typeField || null, // Attribute name for item type (typed object_list)
-      dataPath: pathInfo.dataPath || fieldDef?.dataPath || null, // Path to actual data location
+      regionPath: pathInfo.regionPath || [], // object prefix; array at [...regionPath, region]
       addMode: pathInfo.addMode || null, // Table mode for this container
       parentAddMode: pathInfo.parentAddMode || null, // Inherited from parent
     };
@@ -468,13 +487,21 @@ export function getContainerFieldConfig(
   const parentType = blockPathMap[parentId]?.blockType;
   const parentConfig = blocksConfig?.[parentType];
 
-  // Check schema-defined blocks field (looked up by region = schema field name)
+  // Check schema-defined blocks field (looked up by region = schema field name).
+  // For a blocks_layout nested in a widget:'object', walk the schema through the
+  // object wrappers (regionPath) before the region lookup, and carry regionPath
+  // so the ops navigate to the object's own blocks dict.
   if (schema?.properties) {
-    const regionFieldDef = schema.properties[region];
+    let regionSchema = schema;
+    for (const key of regionPath) {
+      regionSchema = regionSchema?.properties?.[key]?.schema;
+    }
+    const regionFieldDef = regionSchema?.properties?.[region];
     if (regionFieldDef?.widget === 'blocks_layout') {
       return {
         region,
         parentId,
+        ...(regionPath.length > 0 && { regionPath }),
         ...resolveRegionConstraints(
           regionFieldDef,
           parentConfig,
@@ -631,18 +658,15 @@ export function getAllContainerFields(
   const pageDefaultBlockType = config.settings.defaultBlockType || null;
 
   // Helper to get current count for a container field
-  const getFieldCount = (region, isObjectList = false, dataPath = null) => {
+  const getFieldCount = (region, isObjectList = false, regionPath = []) => {
     if (isObjectList) {
-      // object_list: navigate via dataPath or the region (field name)
-      const path = dataPath || [region];
-      let data = block;
-      for (const key of path) {
-        data = data?.[key];
-      }
+      // object_list: the array lives at [...regionPath, region]
+      const data = getAtPath(block, [...regionPath, region]);
       return Array.isArray(data) ? data.length : 0;
     }
     // blocks container: the region is a key in the shared blocks_layout dict
-    return block.blocks_layout?.[region]?.length || 0;
+    // on the node at regionPath (block root when empty).
+    return getAtPath(block, regionPath)?.blocks_layout?.[region]?.length || 0;
   };
 
   const containerFields = [];
@@ -652,25 +676,61 @@ export function getAllContainerFields(
   // carries allowedBlocks/defaultBlockType), the default region is a blocks_layout named 'items'.
   // Synthesize that single field so it flows through the SAME loop below — the implicit case is
   // a default region, not a different code path.
-  let fieldEntries = Object.entries(schema?.properties || {}).filter(
-    ([, fd]) => fd.widget === 'blocks_layout' || fd.widget === 'object_list',
-  );
+  // Collect container fields, descending transparently through widget:'object'
+  // wrappers (the same way buildBlockPathMap's processItem does). A container
+  // nested inside an object — e.g. `rows` inside a `table` object — is block-
+  // relative at [...objectPath, fieldName], exactly the dataPath the pathMap
+  // stores, so the ops navigate it without any config-level dataPath.
+  // Title-case a schema field name for display (the object wrapper's own label
+  // when it declares no title): 'table' → 'Table'.
+  const titleize = (name) =>
+    name ? name.charAt(0).toUpperCase() + name.slice(1) : name;
+  const collectContainerFields = (properties, objectPath, titlePath) => {
+    const out = [];
+    for (const [fieldName, fd] of Object.entries(properties || {})) {
+      if (fd.widget === 'object' && fd.schema?.properties) {
+        out.push(
+          ...collectContainerFields(
+            fd.schema.properties,
+            [...objectPath, fieldName],
+            [...titlePath, fd.title || titleize(fieldName)],
+          ),
+        );
+      } else if (fd.widget === 'blocks_layout' || fd.widget === 'object_list') {
+        out.push([fieldName, fd, objectPath, titlePath]);
+      }
+    }
+    return out;
+  };
+  let fieldEntries = collectContainerFields(schema?.properties, [], []);
   if (fieldEntries.length === 0) {
     const isImplicitContainer =
       (block.blocks && block.blocks_layout?.items) ||
       blockConfig?.allowedBlocks ||
       blockConfig?.defaultBlockType;
     if (isImplicitContainer)
-      fieldEntries = [['items', { widget: 'blocks_layout' }]];
+      fieldEntries = [['items', { widget: 'blocks_layout' }, [], []]];
   }
 
-  for (const [fieldName, fieldDef] of fieldEntries) {
+  // Prefix a nested container's display title with its object path so the
+  // sidebar shows the nesting (e.g. "Table / Rows", "Content / Body"). Top-level
+  // fields (empty titlePath) are shown as-is.
+  const prefixTitle = (baseTitle, titlePath) =>
+    titlePath.length > 0 ? [...titlePath, baseTitle].join(' / ') : baseTitle;
+
+  for (const [fieldName, fieldDef, objectPath, titlePath] of fieldEntries) {
     if (fieldDef.widget === 'blocks_layout') {
       // A blocks field. Its name IS the region key inside the shared
       // blocks_layout dict; the data container field is always 'blocks_layout'.
       // Each blocks field has its own allowedBlocks / maxLength.
       const region = fieldName;
-      const layoutList = block.blocks_layout?.[region];
+      // The blocks dict + blocks_layout live under the object wrapper when this
+      // region is nested (objectPath, e.g. [table]); [] for the block-root case.
+      const regionContainer = objectPath.reduce(
+        (node, key) => node?.[key],
+        block,
+      );
+      const layoutList = regionContainer?.blocks_layout?.[region];
       const currentCount = Array.isArray(layoutList) ? layoutList.length : 0;
       // Same field → block → page precedence as getContainerFieldConfig (a container that
       // restricts nothing inherits the page's allowed list + default block type).
@@ -681,7 +741,11 @@ export function getAllContainerFields(
       const maxLengthOk = !rc.maxLength || currentCount < rc.maxLength;
       containerFields.push({
         region,
-        title: fieldDef.title || (region === 'items' ? 'Blocks' : region),
+        ...(objectPath.length > 0 && { regionPath: objectPath }),
+        title: prefixTitle(
+          fieldDef.title || (region === 'items' ? 'Blocks' : region),
+          titlePath,
+        ),
         allowedBlocks: rc.allowedBlocks,
         allowedTemplates: fieldDef.allowedTemplates || null,
         allowedLayouts: fieldDef.allowedLayouts || null,
@@ -697,13 +761,16 @@ export function getAllContainerFields(
       //   2. schema set (no allowedBlocks): single-schema items, virtual type blockType:fieldName
       const hasAllowedBlocks = !!fieldDef.allowedBlocks;
       const itemType = `${blockType}:${fieldName}`;
-      const dataPath = fieldDef.dataPath || null;
+      // Object prefix to the array (the `/`-path object hops): [] at the block
+      // root, [table] when nested in a `table` object. The array is at
+      // [...regionPath, fieldName].
       const maxLength = fieldDef.maxLength || null;
-      const currentCount = getFieldCount(fieldName, true, dataPath);
+      const currentCount = getFieldCount(fieldName, true, objectPath);
       const maxLengthOk = !maxLength || currentCount < maxLength;
       containerFields.push({
         region: fieldName,
-        title: fieldDef.title || fieldName,
+        ...(objectPath.length > 0 && { regionPath: objectPath }),
+        title: prefixTitle(fieldDef.title || fieldName, titlePath),
         allowedBlocks: hasAllowedBlocks ? fieldDef.allowedBlocks : [itemType],
         allowedTemplates: fieldDef.allowedTemplates || null,
         defaultBlockType:
@@ -715,7 +782,6 @@ export function getAllContainerFields(
         itemSchema: hasAllowedBlocks ? null : fieldDef.schema, // null for typed (schema from blocksConfig)
         idField: fieldDef.idField || '@id', // ID field name for items
         typeField: fieldDef.typeField || null, // Attribute name for item type (e.g., '@type')
-        dataPath,
       });
     }
   }
@@ -790,13 +856,21 @@ export function insertBlockInContainer(
     items.splice(insertIndex, 0, { [idField]: newBlockId, ...stamped });
     updatedParentBlock = setContainerItems(parentBlock, containerConfig, items);
   } else {
-    // Standard container: shared blocks dict + layout field
+    // Standard container: shared blocks dict + layout field. The dict may live
+    // under an object wrapper (regionPath) — read + rebuild it there.
+    const regionContainer = getRegionContainer(
+      parentBlock,
+      containerConfig.regionPath,
+    );
     const stamped = inheritTemplateMembership(
       newBlockData,
-      parentBlock.blocks?.[refBlockId] || parentBlock,
+      regionContainer.blocks?.[refBlockId] || parentBlock,
       { inheritFixed: !!parentBlock?.templateInstanceId },
     );
-    const newContainerBlocks = { ...parentBlock.blocks, [newBlockId]: stamped };
+    const newContainerBlocks = {
+      ...regionContainer.blocks,
+      [newBlockId]: stamped,
+    };
     const refIndex = items.indexOf(refBlockId);
     const insertIndex = getInsertIndex(items, refIndex);
     items.splice(insertIndex, 0, newBlockId);
@@ -1267,8 +1341,13 @@ export function deleteBlockFromContainer(
       filteredItems,
     );
   } else {
-    // Standard container: remove from shared blocks dict and layout
-    const { [blockId]: removed, ...remainingBlocks } = parentBlock.blocks;
+    // Standard container: remove from shared blocks dict and layout. The dict
+    // may live under an object wrapper (regionPath).
+    const regionContainer = getRegionContainer(
+      parentBlock,
+      containerConfig.regionPath,
+    );
+    const { [blockId]: removed, ...remainingBlocks } = regionContainer.blocks;
     const filteredItems = items.filter((id) => id !== blockId);
     updatedParentBlock = setContainerItems(
       parentBlock,
@@ -1503,7 +1582,7 @@ export function insertTableColumn(
   }
 
   // Get rows using dataPath
-  const dataPath = rowPathInfo.dataPath || ['rows'];
+  const dataPath = [...(rowPathInfo.regionPath || []), rowPathInfo.region || 'rows'];
   let rows = tableBlock;
   for (const key of dataPath) {
     rows = rows?.[key];
@@ -1607,7 +1686,7 @@ export function deleteTableColumn(formData, blockPathMap, cellId) {
   }
 
   // Get rows using dataPath
-  const dataPath = rowPathInfo.dataPath || ['rows'];
+  const dataPath = [...(rowPathInfo.regionPath || []), rowPathInfo.region || 'rows'];
   let rows = tableBlock;
   for (const key of dataPath) {
     rows = rows?.[key];
@@ -2300,21 +2379,18 @@ export function reorderBlocksInContainer(
     return formData;
   }
 
-  // Detect if this region is an object_list field (the region is the schema
-  // property name).
-  const schema = getResolvedSchema(
-    blockPathMap[effectiveParentId],
-    blockPathMap,
-  );
-  const fieldDef = schema?.properties?.[region];
-  const isObjectList = fieldDef?.widget === 'object_list';
-
-  // Build containerConfig from fieldDef for the funnel.
+  // Build containerConfig from a child's pathInfo, not the parent schema:
+  // an object_list nested inside a widget:'object' is not at
+  // schema.properties[region], and its object prefix (regionPath, e.g. [table])
+  // only lives on the child's pathInfo. Any child in the reordered set carries
+  // region/regionPath/idField for the whole container.
+  const sampleChild = blockPathMap[newOrder[0]];
+  const isObjectList = !!sampleChild?.isObjectListItem;
   const containerConfig = {
     region,
     isObjectList,
-    dataPath: fieldDef?.dataPath,
-    idField: fieldDef?.idField,
+    regionPath: sampleChild?.regionPath || [],
+    idField: sampleChild?.idField || '@id',
   };
 
   const items = getContainerItems(parentBlock, containerConfig);

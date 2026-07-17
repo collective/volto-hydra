@@ -283,6 +283,9 @@ async function renderBlock(blockId, block) {
         case 'slateTable':
             wrapper.innerHTML = renderSlateTableBlock(block);
             break;
+        case 'objectBlocks':
+            wrapper.innerHTML = await renderObjectBlocksBlock(block);
+            break;
         case 'search':
             wrapper.innerHTML = await renderSearchBlock(block, blockId);
             break;
@@ -1092,6 +1095,55 @@ function attachFormValidation(formEl, block) {
             formEl.appendChild(successDiv);
         }
     });
+}
+
+/**
+ * Object-nested blocks_layout (#245). The `content` object holds its OWN shared
+ * blocks dict + blocks_layout; the `body` region lists ids into content.blocks.
+ * Renders each child with data-block-uid so the bridge can select/edit them.
+ * @param {Object} block - objectBlocks data with block.content.{blocks,blocks_layout}
+ * @returns {Promise<string>} HTML string
+ */
+async function renderObjectBlocksBlock(block) {
+    const content = block.content || {};
+    const blocks = content.blocks || {};
+    const bodyItems = content.blocks_layout?.body || [];
+
+    // Inline-editable text field living directly on the object
+    // (block.content.headline) — a slate field, marked data-edit-text so hydra
+    // sets it contenteditable, exactly like a top-level slate field.
+    let html = '';
+    const headline = content.headline;
+    if (Array.isArray(headline) && headline[0]) {
+        const node = headline[0];
+        const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
+        const text = renderChildren(node.children);
+        html += `<h3 class="ob-headline" data-edit-text="content/headline"${nodeIdAttr}>${text}</h3>`;
+    }
+    // Inline-editable LINK field on the object (block.content.href) — addressed
+    // by its /-path, edited via the central field-access API.
+    if (content.href !== undefined) {
+        html += `<a class="ob-link" data-edit-link="content/href" href="${content.href || '#'}">Object link</a>`;
+    }
+    html += '<div class="object-blocks-body">';
+    for (const childId of bodyItems) {
+        const child = blocks[childId];
+        if (!child || !child['@type']) continue;
+        html += `<div data-block-uid="${childId}" data-block-add="bottom">`;
+        switch (child['@type']) {
+            case 'slate':
+                html += renderSlateBlock(child);
+                break;
+            case 'image':
+                html += renderImageBlock(child);
+                break;
+            default:
+                html += `<p data-unknown-block-type="${child['@type']}">[not implemented]</p>`;
+        }
+        html += '</div>';
+    }
+    html += '</div>';
+    return html;
 }
 
 /**

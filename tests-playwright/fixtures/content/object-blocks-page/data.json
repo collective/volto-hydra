@@ -1,0 +1,35 @@
+{
+  "@id": "http://localhost:8888/object-blocks-page",
+  "@type": "Document",
+  "UID": "object-blocks-page-uid",
+  "id": "object-blocks-page",
+  "title": "Object Blocks Page",
+  "blocks": {
+    "title-block": {
+      "@type": "title"
+    },
+    "ob-1": {
+      "@type": "objectBlocks",
+      "content": {
+        "headline": [{ "type": "p", "children": [{ "text": "Original headline" }] }],
+        "href": "https://old.example.com",
+        "blocks": {
+          "child-1": {
+            "@type": "slate",
+            "value": [{ "type": "p", "children": [{ "text": "First body block" }] }]
+          },
+          "child-2": {
+            "@type": "slate",
+            "value": [{ "type": "p", "children": [{ "text": "Second body block" }] }]
+          }
+        },
+        "blocks_layout": {
+          "body": ["child-1", "child-2"]
+        }
+      }
+    }
+  },
+  "blocks_layout": {
+    "items": ["title-block", "ob-1"]
+  }
+}

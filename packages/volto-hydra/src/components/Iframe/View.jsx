@@ -17,6 +17,8 @@ import {
   getBlockType,
   isBlockReadonly,
   isBlockPositionLocked,
+  getFieldValue,
+  setFieldValue,
 } from '@volto-hydra/helpers';
 import Api from '@plone/volto/helpers/Api/Api';
 
@@ -70,7 +72,7 @@ function countContainerItems(formData, blockPathMap, containerConfig) {
     getBlockById(formData, blockPathMap, containerConfig.parentId) || formData;
   if (containerConfig.isObjectList) {
     let arr = parent;
-    for (const key of containerConfig.dataPath || [containerConfig.region]) {
+    for (const key of [...(containerConfig.regionPath || []), containerConfig.region]) {
       arr = arr?.[key];
     }
     return Array.isArray(arr) ? arr.length : 0;
@@ -115,19 +117,37 @@ function splitMultiNodeSlateBlocks(formData, blockPathMap, blocksConfig, uuidGen
     const schema = getResolvedSchema(pathInfo, blockPathMap);
     if (!schema?.properties) continue;
 
-    for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
-      if (!isSlateFieldType(getFieldTypeString(fieldDef))) continue;
-      const value = block[fieldName];
+    // Slate field PATHS, descending widget:'object' so a nested slate field
+    // (content/headline) is enforced too — not just top-level fields.
+    const slateFieldPaths = [];
+    const collectSlate = (props, prefix) => {
+      for (const [fn, fd] of Object.entries(props)) {
+        if (fd.widget === 'object' && fd.schema?.properties) {
+          collectSlate(fd.schema.properties, `${prefix}${fn}/`);
+          continue;
+        }
+        if (isSlateFieldType(getFieldTypeString(fd))) {
+          slateFieldPaths.push(`${prefix}${fn}`);
+        }
+      }
+    };
+    collectSlate(schema.properties, '');
+
+    for (const fieldName of slateFieldPaths) {
+      const value = getFieldValue(block, fieldName);
       if (!Array.isArray(value) || value.length <= 1) continue;
 
       const restNodes = value.slice(1);
 
-      // Can this multi-node value be split into sibling slate blocks?
-      const containerConfig = blockType === 'slate'
+      // Can this multi-node value be split into sibling slate blocks? Only a
+      // TOP-LEVEL field of a slate block can (a nested object field has no
+      // region to add siblings to — it flattens instead).
+      const containerConfig = blockType === 'slate' && !fieldName.includes('/')
         ? getContainerFieldConfig(blockId, blockPathMap, result, blocksConfig)
         : null;
       const splittable =
         blockType === 'slate' &&
+        !fieldName.includes('/') &&
         !!containerConfig &&
         containerConfig.addMode !== 'table' &&
         (containerConfig.allowedBlocks == null ||
@@ -147,20 +167,19 @@ function splitMultiNodeSlateBlocks(formData, blockPathMap, blocksConfig, uuidGen
           ),
         };
         if (merged.children.length === 0) merged.children = [{ text: '' }];
-        result = updateBlockById(result, blockPathMap, blockId, {
-          ...block,
-          [fieldName]: [merged],
-        });
+        result = updateBlockById(result, blockPathMap, blockId,
+          setFieldValue(block, fieldName, [merged]),
+        );
         flattenedAny = true;
         continue;
       }
 
       // Split: keep the first node, each remaining node becomes a new
       // sibling slate block. Chain inserts so each goes after the previous.
-      result = updateBlockById(result, blockPathMap, blockId, {
-        ...block,
-        [fieldName]: [value[0]],
-      });
+      // (fieldName here is a top-level slate-block field, never nested.)
+      result = updateBlockById(result, blockPathMap, blockId,
+        setFieldValue(block, fieldName, [value[0]]),
+      );
       let afterBlockId = blockId;
       for (let i = 0; i < restNodes.length; i++) {
         const newBlockId = uuidGenerator();
@@ -346,50 +365,46 @@ const extractBlockFieldTypes = (intl, contentTypeSchema = null) => {
       if (!blockFieldTypes[blockType]) {
         blockFieldTypes[blockType] = {};
       }
-      Object.keys(schema.properties).forEach((fieldName) => {
-        const field = schema.properties[fieldName];
-        blockFieldTypes[blockType][fieldName] = getFieldTypeString(field);
+      // Walk a schema's properties, recording each field's type under `typeKey`
+      // and registering a virtual block type for every object_list field
+      // (`typeKey:fieldName`) so getBlockTypeSchema / getAllContainerFields can
+      // resolve object_list items (e.g. table rows/cells) by their virtual type.
+      //
+      // widget:'object' wrappers: the VIRTUAL TYPE key stays transparent (a
+      // container nested in an object, e.g. `rows` inside the `table` object,
+      // still registers as `slateTable:rows` — the object name never enters the
+      // key, matching buildBlockPathMap's processItem). But a field's TYPE is
+      // recorded under its `/`-path storage key (`content/headline`), so the map
+      // matches how object sub-fields are addressed for inline editing (#245).
+      // Arbitrary depth, both nesting kinds.
+      const registerFieldTypes = (typeKey, properties, fieldPrefix = '') => {
+        if (!blockFieldTypes[typeKey]) blockFieldTypes[typeKey] = {};
+        Object.keys(properties).forEach((fieldName) => {
+          const field = properties[fieldName];
 
-        // Handle object_list widgets (e.g., slides in slider block)
-        if (field.widget === 'object_list' && field.schema?.properties) {
-          // object_list widget: extract field types from itemSchema
-          // Store under virtual type key: blockType:fieldName
-          const itemTypeKey = `${blockType}:${fieldName}`;
-          blockFieldTypes[itemTypeKey] = {};
-
-          // Also register virtual type in blocksConfig so getAllContainerFields works
-          if (!config.blocks.blocksConfig[itemTypeKey]) {
-            config.blocks.blocksConfig[itemTypeKey] = {
-              blockSchema: field.schema,
-              disableCustomSidebarEditForm: true, // Virtual types use schema form in sidebar
-            };
+          // Object wrapper — descend with a `/`-path prefix, same typeKey.
+          if (field.widget === 'object' && field.schema?.properties) {
+            registerFieldTypes(typeKey, field.schema.properties, `${fieldPrefix}${fieldName}/`);
+            return;
           }
 
-          Object.keys(field.schema.properties).forEach((itemFieldName) => {
-            const itemField = field.schema.properties[itemFieldName];
-            blockFieldTypes[itemTypeKey][itemFieldName] = getFieldTypeString(itemField);
+          blockFieldTypes[typeKey][`${fieldPrefix}${fieldName}`] = getFieldTypeString(field);
 
-            // Handle nested object_list (e.g., rows containing cells)
-            if (itemField.widget === 'object_list' && itemField.schema?.properties) {
-              const nestedItemTypeKey = `${itemTypeKey}:${itemFieldName}`;
-              blockFieldTypes[nestedItemTypeKey] = {};
-
-              // Register nested virtual type in blocksConfig
-              if (!config.blocks.blocksConfig[nestedItemTypeKey]) {
-                config.blocks.blocksConfig[nestedItemTypeKey] = {
-                  blockSchema: itemField.schema,
-                  disableCustomSidebarEditForm: true,
-                };
-              }
-
-              Object.keys(itemField.schema.properties).forEach((nestedFieldName) => {
-                const nestedField = itemField.schema.properties[nestedFieldName];
-                blockFieldTypes[nestedItemTypeKey][nestedFieldName] = getFieldTypeString(nestedField);
-              });
+          if (field.widget === 'object_list' && field.schema?.properties) {
+            // Virtual type key is object-transparent (no prefix).
+            const itemTypeKey = `${typeKey}:${fieldName}`;
+            if (!config.blocks.blocksConfig[itemTypeKey]) {
+              config.blocks.blocksConfig[itemTypeKey] = {
+                blockSchema: field.schema,
+                disableCustomSidebarEditForm: true, // Virtual types use schema form in sidebar
+              };
             }
-          });
-        }
-      });
+            // Item fields are addressed relative to the item — reset the prefix.
+            registerFieldTypes(itemTypeKey, field.schema.properties);
+          }
+        });
+      };
+      registerFieldTypes(blockType, schema.properties);
 
       // Debug: Log what was added for hero
       if (blockType === 'hero') {
@@ -1640,19 +1655,15 @@ const Iframe = (props) => {
         let dataPath;
         if (action === 'inside') {
           tableBlock = getBlockById(formData, blockPathMap, blockId);
-          dataPath = fieldDef?.dataPath || [fieldName];
+          dataPath = [...(containerConfig?.regionPath || []), fieldName];
         } else {
-          // For before/after on a row, get the parent table
+          // For before/after on a row, get the parent table. The row's pathInfo
+          // carries the object prefix (regionPath, e.g. [table]) to the rows
+          // array — array is at [...regionPath, region].
           const rowPathInfo = blockPathMap?.[blockId];
           const parentId = rowPathInfo?.parentId;
           tableBlock = getBlockById(formData, blockPathMap, parentId);
-          // Get dataPath from the row's container field definition
-          const tableType = blockPathMap[parentId]?.blockType;
-          const tableBlockSchema = typeof mergedBlocksConfig?.[tableType]?.blockSchema === 'function'
-            ? mergedBlocksConfig[tableType].blockSchema({ formData, intl: { formatMessage: (m) => m.defaultMessage } })
-            : mergedBlocksConfig?.[tableType]?.blockSchema;
-          const rowsFieldDef = tableBlockSchema?.properties?.[rowPathInfo.region];
-          dataPath = rowsFieldDef?.dataPath || [rowPathInfo.region];
+          dataPath = [...(rowPathInfo?.regionPath || []), rowPathInfo?.region];
         }
         let rowsData = tableBlock;
         for (const key of dataPath) {
@@ -4792,7 +4803,7 @@ const Iframe = (props) => {
                       // Find the previous row and its corresponding cell
                       const newBlockPathMap = buildBlockPathMap(newFormData, blocksConfig, intl);
                       const tableBlock = getBlockByPath(newFormData, newBlockPathMap[rowPathInfo.parentId]?.path);
-                      const dataPath = containerConfig.dataPath || ['rows'];
+                      const dataPath = [...(containerConfig.regionPath || []), containerConfig.region || 'rows'];
                       let rows = tableBlock;
                       for (const key of dataPath) {
                         rows = rows?.[key];
@@ -4871,10 +4882,13 @@ const Iframe = (props) => {
                 const block = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
                 if (!block) return;
 
-                // For blocks, store url and image_scales separately (like Image block does)
-                const updatedBlock = metadata?.image_scales
-                  ? { ...block, [fieldName]: url, image_field: metadata.image_field, image_scales: metadata.image_scales }
-                  : { ...block, [fieldName]: url };
+                // For blocks, store url and image_scales separately (like Image block does).
+                // setFieldValue writes the url at its (possibly object-nested) /-path;
+                // image_field/image_scales stay at the block top level (Image-block shape).
+                let updatedBlock = setFieldValue(block, fieldName, url);
+                if (metadata?.image_scales) {
+                  updatedBlock = { ...updatedBlock, image_field: metadata.image_field, image_scales: metadata.image_scales };
+                }
                 // Use updateBlockById to handle both top-level and container blocks
                 updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, selectedBlock, updatedBlock);
               }
@@ -5319,7 +5333,7 @@ const Iframe = (props) => {
                 if (cellIndex != null && rowIndex > 0) {
                   const newBlockPathMap = buildBlockPathMap(newFormData, blocksConfig, intl);
                   const tableBlock = getBlockByPath(newFormData, newBlockPathMap[rowPathInfo.parentId]?.path);
-                  const dataPath = containerConfig.dataPath || ['rows'];
+                  const dataPath = [...(containerConfig.regionPath || []), containerConfig.region || 'rows'];
                   let rows = tableBlock;
                   for (const key of dataPath) {
                     rows = rows?.[key];
