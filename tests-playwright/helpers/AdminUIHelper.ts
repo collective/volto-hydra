@@ -1021,26 +1021,6 @@ export class AdminUIHelper {
   }
 
   /**
-   * Walk up the block hierarchy until THIS template instance's edit toggle is the
-   * current sidebar section, and return that toggle locator. A member block can
-   * sit several levels deep inside the template (e.g. a footer column's text), so
-   * one hop up is not enough — escape until the toggle appears. Works on mobile,
-   * where the sidebar is a sheet: reopen it each iteration in case navigation
-   * collapsed it. Caller must have selected a member block first.
-   */
-  private async reachTemplateToggle(maxHops: number = 8): Promise<import('@playwright/test').Locator> {
-    const toggle = this.page.locator('.sidebar-section-header[data-is-current="true"] .edit-template-toggle');
-    for (let i = 0; i < maxHops; i++) {
-      await this.openSidebar();
-      if (await toggle.isVisible().catch(() => false)) return toggle;
-      await this.escapeToParent();
-    }
-    await this.openSidebar();
-    await expect(toggle, 'template edit toggle never became the current sidebar section').toBeVisible({ timeout: 5000 });
-    return toggle;
-  }
-
-  /**
    * Wait for a block to be shown as readonly (has hydra-locked class).
    * Used to verify template edit mode is active (blocks outside template get locked).
    * @param blockId - The block ID to check
@@ -1069,45 +1049,47 @@ export class AdminUIHelper {
   }
 
   /**
-   * v2 template edit: UNLOCK a template for editing.
-   * Selects one of its member blocks, opens the template instance's sidebar bar,
-   * clicks the lock toggle, and confirms the "changes affect every page" warning
-   * modal. After this, the template's fixed blocks are editable (verify with
-   * waitForBlockEditable on a fixed member) while the rest of the page stays
-   * editable (v2: no page lock).
-   * @param memberBlockId - any block belonging to the template instance
+   * v2 template edit: UNLOCK a template for editing via the ON-CANVAS Quanta toolbar
+   * lock toggle (🔒). No sidebar on any width — `toolbarTemplateInstanceId` is derived
+   * from the selected block's ancestry, so tapping the toggle targets the template
+   * even from a deeply-nested member, and the "changes show on every page" warning
+   * modal renders on the canvas (visible, not buried in a settings sheet). Select a
+   * FIXED (locked) member so the toggle shows. demoPacingMs (opt-in) holds on the
+   * modal so recordings can read it.
+   * @param memberBlockId - a fixed/locked block belonging to the template instance
    */
   async unlockTemplate(memberBlockId: string): Promise<void> {
     await this.clickBlockInIframe(memberBlockId);
-    const toggle = await this.reachTemplateToggle();
+    const toggle = this.page.locator('.quanta-toolbar .template-lock-toggle');
+    await expect(toggle).toBeVisible({ timeout: 5000 });
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
     await toggle.click();
-    // v2: unlocking warns first — the template's edits will appear on every page
-    // that uses it once locked.
     const confirm = this.page.locator('.template-unlock-modal .template-confirm');
     await expect(confirm).toBeVisible({ timeout: 5000 });
+    // Demo pacing: hold on the warning modal before confirming.
+    if (this.demoPacingMs) await this.page.waitForTimeout(this.demoPacingMs);
     await confirm.click();
     await expect(this.page.locator('.template-unlock-modal')).toHaveCount(0, { timeout: 5000 });
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    // Mobile: the toggle lives in a full-screen sheet covering the canvas. Dismiss
-    // it so the freshly-unlocked template blocks are tappable. Desktop: no-op.
-    await this.closeSidebar();
   }
 
   /**
-   * v2 template edit: LOCK a template, choosing what to do with the edits.
-   * Re-selects the instance (edits may have moved the selection), clicks the
-   * unlocked toggle to raise the decision modal, and picks an option.
-   * @param memberBlockId - any surviving block belonging to the template instance
+   * v2 template edit: LOCK a template via the Quanta toolbar toggle (🔓), choosing
+   * what to do with the edits. Re-selects the member (edits may have moved the
+   * selection), taps the toggle to raise the decision modal, and picks an option.
+   * @param memberBlockId - a surviving block belonging to the template instance
    * @param choice - 'commit' (Change on all pages), 'reset' (Reset changes), or 'cancel'
    */
   async lockTemplate(memberBlockId: string, choice: 'commit' | 'reset' | 'cancel'): Promise<void> {
     await this.clickBlockInIframe(memberBlockId);
-    const toggle = await this.reachTemplateToggle();
+    const toggle = this.page.locator('.quanta-toolbar .template-lock-toggle');
+    await expect(toggle).toBeVisible({ timeout: 5000 });
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await toggle.click();
     const modal = this.page.locator('.template-lock-modal');
     await expect(modal).toBeVisible({ timeout: 5000 });
+    // Demo pacing: hold on the decision modal before choosing.
+    if (this.demoPacingMs) await this.page.waitForTimeout(this.demoPacingMs);
     const btn = { commit: '.template-commit', reset: '.template-reset', cancel: '.template-cancel' }[choice];
     await modal.locator(btn).click();
     await expect(modal).toHaveCount(0, { timeout: 5000 });
@@ -1118,8 +1100,6 @@ export class AdminUIHelper {
     if (choice !== 'cancel') {
       await expect(toggle).toHaveAttribute('aria-pressed', 'false', { timeout: 10000 });
     }
-    // Mobile: dismiss the full-screen settings sheet so the canvas is usable again.
-    await this.closeSidebar();
   }
 
   /**

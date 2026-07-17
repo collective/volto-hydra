@@ -526,15 +526,18 @@
    * sits in the sheet ladder — the ::before backdrop above does the dimming, and
    * `.template-edit-modal` is the slide-up sheet (shared rule above).
    *
-   * Same for the block chooser: a container field's "Add block" opens
-   * `.container-block-chooser` (z-sheet 201) from INSIDE the settings sidebar, so
-   * without stepping the sidebar aside the chooser renders behind it and its
-   * buttons can't be tapped. (`.add-new-block-popup` is the canvas '+' chooser —
-   * the sidebar is normally collapsed then, so this is a no-op there, included for
-   * symmetry.) The chooser closes on pick and the sidebar returns. */
-  body:has(.template-edit-modal-overlay) .sidebar-container:not(.collapsed),
+   * This applies to EVERY mobile popup, not just the modal: the settings sidebar
+   * sits at z 300, above the whole sheet ladder (z-sheet 201), so ANY popup opened
+   * while it's up renders behind it. The worst case is a container field's "Add
+   * block" (`.container-block-chooser`), opened from INSIDE the sidebar — its buttons
+   * were untappable. One rule for all of them (same list as the backdrop above):
+   * the popup replaces the sidebar, which returns when the popup closes. */
+  body:has(.volto-hydra-dropdown-menu) .sidebar-container:not(.collapsed),
   body:has(.container-block-chooser) .sidebar-container:not(.collapsed),
-  body:has(.add-new-block-popup) .sidebar-container:not(.collapsed) {
+  body:has(.add-new-block-popup) .sidebar-container:not(.collapsed),
+  body:has(.frontend-switcher-panel) .sidebar-container:not(.collapsed),
+  body:has(.frontend-settings-modal) .sidebar-container:not(.collapsed),
+  body:has(.template-edit-modal-overlay) .sidebar-container:not(.collapsed) {
     display: none !important;
   }
   .template-edit-modal-overlay {
