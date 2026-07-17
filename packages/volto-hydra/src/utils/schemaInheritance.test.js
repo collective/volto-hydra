@@ -167,4 +167,36 @@ describe('fieldRules — contains operator (multiselect-driven visibility)', () 
       expect(out.properties.date).toBeUndefined();
     }
   });
+
+  // notContains is the inverse: keep the field UNLESS the array holds the value.
+  const notContainsRecipe = {
+    fieldRules: {
+      date: { when: { elements: { notContains: 'date' } }, else: false },
+    },
+  };
+
+  test('notContains keeps the field when the array omits the value', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(notContainsRecipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { elements: ['image', 'tag'] },
+    });
+    expect(out.properties.date).toBeDefined();
+  });
+
+  test('notContains hides the field when the array holds the value', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(notContainsRecipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { elements: ['image', 'date'] },
+    });
+    expect(out.properties.date).toBeUndefined();
+  });
+
+  test('notContains matches (keeps) when the multiselect is unset', () => {
+    // A non-array value contains nothing, so notContains is satisfied.
+    const enhancer = createSchemaEnhancerFromRecipe(notContainsRecipe);
+    const out = enhancer({ schema: baseSchema(), formData: {} });
+    expect(out.properties.date).toBeDefined();
+  });
 });

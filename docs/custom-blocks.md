@@ -199,7 +199,20 @@ const bridge = initBridge({
 - `[rule, rule, ...]` — switch: first matching rule wins. A bare `false` in the array is a catch-all hide: `[{ when: A }, { when: B }, false]` shows on A or B, hides otherwise.
 - `'parent.child': false` — hide a field inside a widget's inner schema
 
-Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`.
+Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`, `contains`, `notContains`.
+
+`contains` / `notContains` test **array membership** — use them with a multiselect field to reveal each option's own field. `{ contains: 'date' }` matches when the value is an array that includes `'date'` (a non-array / unset multiselect never contains anything, so the condition fails):
+
+```javascript
+schemaEnhancer: {
+    fieldRules: {
+        // `elements` is a multiselect: ['image', 'date', 'tag'].
+        // Show each element's field only when it's selected.
+        date: { when: { elements: { contains: 'date' } }, else: false },
+        tag: { when: { elements: { contains: 'tag' } }, else: false },
+    },
+}
+```
 
 Field paths: `../field` for the parent block's field, `/field` for a page metadata field.
 
