@@ -57,7 +57,7 @@ describe('@querystring-search', () => {
         },
       ],
       b_start: 0,
-      b_size: 50,
+      b_size: 1000,
     });
 
     assert.ok(data.items_total > 0, 'should return items');
@@ -87,7 +87,7 @@ describe('@querystring-search', () => {
       sort_on: 'getObjPositionInParent',
       sort_order: 'ascending',
       b_start: 0,
-      b_size: 50,
+      b_size: 1000,
     });
 
     // Filter to direct children only (not nested template items etc.)
@@ -121,7 +121,7 @@ describe('@querystring-search', () => {
       sort_on: 'getObjPositionInParent',
       sort_order: 'ascending',
       b_start: 0,
-      b_size: 50,
+      b_size: 1000,
     });
     const desc = await querystringSearch('/_test_data', {
       query: [
@@ -134,7 +134,7 @@ describe('@querystring-search', () => {
       sort_on: 'getObjPositionInParent',
       sort_order: 'descending',
       b_start: 0,
-      b_size: 50,
+      b_size: 1000,
     });
 
     const ascIds = asc.items.map((i) => i.id);
