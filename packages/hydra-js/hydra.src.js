@@ -244,6 +244,7 @@ export class Bridge {
     this.scrollTimeout = null; // Timer for scroll debouncing
     this.expectedSelectionFromAdmin = null; // Selection we're restoring from Admin - suppress sending it back
     this.blockPathMap = {}; // Maps blockUid -> { path: [...], parentId: string|null }
+    this.conversionMap = {}; // { sourceType: [reachableTypes] } — for convert-reachable drop spots
     this.voltoConfig = null; // Store voltoConfig for allowedBlocks checking
     // Track active prospective inline element (link/format with ZWS) for Chrome workaround.
     // Chrome always positions cursor outside <a> elements, unlike <span> for bold.
@@ -3776,6 +3777,8 @@ export class Bridge {
             if (e.data.type === 'INITIAL_DATA') {
               // Central method sets formData, lastReceivedFormData, and blockPathMap
               this.setFormDataFromAdmin(e.data.data, 'INITIAL_DATA', e.data.blockPathMap);
+              // Static conversion graph for convert-reachable drop spots (drag).
+              if (e.data.conversionMap) this.conversionMap = e.data.conversionMap;
 
               // Store Slate configuration for keyboard shortcuts and toolbar
               this.slateConfig = e.data.slateConfig || { hotkeys: {}, toolbarButtons: [] };

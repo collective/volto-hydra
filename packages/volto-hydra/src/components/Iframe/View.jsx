@@ -270,6 +270,7 @@ import {
   populateTypeSchemaCache,
   syncChildBlockTypes,
   getConvertibleTypes,
+  getConversionMap,
   convertBlockType,
   validateFieldMappings,
 } from '../../utils/schemaInheritance';
@@ -1152,6 +1153,14 @@ const Iframe = (props) => {
     [intl],
   );
 
+  // Static conversion graph ({ sourceType: [reachableTypes] }) shipped to the
+  // iframe on INITIAL_DATA so it can offer convert-reachable drop spots during a
+  // drag. Derived once from blocksConfig (which doesn't change at runtime).
+  const conversionMap = useMemo(
+    () => getConversionMap(config.blocks.blocksConfig),
+    [],
+  );
+
 
   // Trigger for template sync effect - INIT increments this when templates need loading
   // This causes the effect to run and fetch templates, then send deferred INITIAL_DATA
@@ -2021,6 +2030,7 @@ const Iframe = (props) => {
                 type: 'INITIAL_DATA',
                 data: resendFormWithDefaults,
                 blockPathMap: stripBlockPathMapForPostMessage(resendBlockPathMap),
+                conversionMap,
                 selectedBlockUid: selectedBlock,
                 slateConfig: {
                   hotkeys: config.settings.slate?.hotkeys || {},
@@ -3696,6 +3706,7 @@ const Iframe = (props) => {
             type: 'INITIAL_DATA',
             data: formDataToSend,
             blockPathMap: stripBlockPathMapForPostMessage(blockPathMap),
+            conversionMap,
             selectedBlockUid: selectedBlock,
             slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
           }, origin);
@@ -3784,6 +3795,7 @@ const Iframe = (props) => {
           type: 'INITIAL_DATA',
           data: formDataToSend,
           blockPathMap: stripBlockPathMapForPostMessage(blockPathMap),
+          conversionMap,
           selectedBlockUid: selectedBlock,
           slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
         }, origin);
