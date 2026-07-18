@@ -189,6 +189,38 @@ export class AdminUIHelper {
   }
 
   /**
+   * Enter edit mode by clicking the toolbar Edit link (Volto's React-Router
+   * `<Link to="{path}/edit" className="edit">`) — an in-place SPA transition FROM
+   * the current view page. The admin does NOT reload; only the preview iframe
+   * re-navigates to `?_edit=true` (~0.6s blank, measured). Prefer this over
+   * navigateToEdit when you're already viewing the page and want the real
+   * view→edit transition to stay fast + on-camera: navigateToEdit's on-Volto path
+   * pushStates a malformed `//edit` for the ROOT (SecurityError), so callers drop
+   * to about:blank + a full page.goto that re-boots the whole admin (seconds). The
+   * actual Edit link routes correctly for the root too, so none of that is needed.
+   */
+  async enterEditInPlace(contentPath: string): Promise<void> {
+    if (!contentPath.startsWith('/')) contentPath = '/' + contentPath;
+    contentPath = `${this.contentPrefix}${contentPath}`;
+
+    const editLink = this.page.locator('a.edit').first();
+    await editLink.waitFor({ state: 'visible', timeout: 10000 });
+    await editLink.click();
+
+    // Volto's Edit link routes to `${path}/edit`; for the ROOT that's `/edit`
+    // (path=''), so don't build `${contentPath}/edit` (='//edit' for root) and
+    // string-match it. Match the normalised pathname ending in /edit instead.
+    await this.page.waitForURL(
+      (u) => /\/edit\/?$/.test(new URL(u).pathname.replace(/\/{2,}/g, '/')),
+      { timeout: 10000 },
+    );
+    await this.waitForIframeUrl(contentPath);
+    await this.waitForIframeReady();
+    await this.waitForBridgeConnected();
+    await this.getStableBlockCount();
+  }
+
+  /**
    * After entering edit mode, assert the Hydra bridge actually connected.
    *
    * hydra.js paints a "Hydra Bridge: Not Connected" overlay
