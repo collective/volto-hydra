@@ -18,7 +18,7 @@ import { useDispatch } from 'react-redux';
 import { defineMessages, useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
 import { searchContent } from '@plone/volto/actions/search/search';
-import { flattenToAppURL } from '@plone/volto/helpers/Url/Url';
+import { flattenToAppURL, isInternalURL } from '@plone/volto/helpers/Url/Url';
 import { useHydraSchemaContext, getLiveBlockData } from '../../context';
 import {
   getTargetId,
@@ -150,10 +150,17 @@ const CopyFromTargetField = (props) => {
 
   // Fresh target (lazy, session-cached) — the value a linked field is pulled to.
   const targetId = blockConfig && blockData && getTargetId(blockConfig, blockData);
-  const liveTarget = useLiveTarget(targetId);
+  // Only an INTERNAL link is a pull source: an external URL has no catalog item
+  // to @search, so we can't pull from it. Such a field falls back to a plain
+  // editable field (no toggle). (External unfurl via OpenGraph is a follow-up.)
+  const targetSupported = !!targetId && isInternalURL(targetId);
+  const liveTarget = useLiveTarget(targetSupported ? targetId : undefined);
 
   const linked =
-    !!blockConfig && !!blockData && isFieldLinked(props.id, blockConfig, blockData);
+    targetSupported &&
+    !!blockConfig &&
+    !!blockData &&
+    isFieldLinked(props.id, blockConfig, blockData);
   const targetValue = getTargetValueForField(props.id, blockConfig, blockData, liveTarget);
 
   // PULL: while linked, keep the field's stored value in sync with the target —
@@ -208,7 +215,9 @@ const CopyFromTargetField = (props) => {
   const BaseWidget = resolveWidget(baseProps);
 
   const label = intl.formatMessage(messages.linked);
-  const showToggle = !!targetId; // only when a target is actually selected
+  // Offer the toggle only for a supported (internal) target — an external URL
+  // can't be pulled from, so the field is just a normal editable field.
+  const showToggle = targetSupported;
 
   return (
     <>

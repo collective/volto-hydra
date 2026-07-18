@@ -63,6 +63,25 @@ test.describe('Copy-from-target — linked/custom toggle', () => {
       .toBe('Hand typed');
   });
 
+  test('an external link offers no toggle and cannot pull (plain editable field)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/copy-target-page');
+
+    await helper.clickBlockInIframe('btn-external');
+    await helper.waitForSidebarOpen();
+
+    // External URL → no catalog target to pull from → no toggle, value untouched.
+    await expect(page.locator('.copy-from-target-toggle')).toHaveCount(0);
+    expect(await helper.getSidebarFieldValue('title')).toBe('External label');
+
+    // Still a normal editable field.
+    await page.locator(titleInput).fill('Edited external');
+    await expect
+      .poll(async () => helper.getSidebarFieldValue('title'), { timeout: 5000 })
+      .toBe('Edited external');
+  });
+
   test('unticking a linked field keeps the current value as custom', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();

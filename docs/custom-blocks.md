@@ -308,6 +308,11 @@ picks up the new value. Search is used deliberately — the stored snapshot
 in the same shape (no transform, guaranteed field alignment). The fetch is
 transient — it never mutates the block, so opening a page has no side effects.
 
+Only an **internal** link is a pull source. An external URL has no catalog item
+to search, so a field linked to one can't pull — the toggle is hidden and the
+field behaves as a plain editable field. (Unfurling external links via
+OpenGraph is a future enhancement.)
+
 ### Conversion graph rules
 
 - Explicit `fieldMappings[typeName]` always creates a conversion edge.
