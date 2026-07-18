@@ -2843,7 +2843,7 @@ const Iframe = (props) => {
                   kind: 'convert',
                   blockId: bid,
                   allowedBlocks: options,
-                  pendingMove: { targetBlockId, insertAfter, targetParentId },
+                  pendingMove: { targetBlockId, insertAfter, targetParentId, replaceTargetId },
                 });
                 deferredToChooser = true;
                 break;
@@ -4340,6 +4340,18 @@ const Iframe = (props) => {
               updatedProperties, bpm2, chooser.blockId, pm.targetBlockId, pm.insertAfter,
               srcParent, pm.targetParentId, blocksConfig, intl,
             ) || updatedProperties;
+            // Dropped onto an empty-container placeholder → remove it so the
+            // converted block takes its place (mirrors the MOVE_BLOCKS replace path).
+            if (pm.replaceTargetId) {
+              const rbpm = buildBlockPathMap(updatedProperties, blocksConfig, intl);
+              const rdata = getBlockById(updatedProperties, rbpm, pm.replaceTargetId);
+              if (rdata?.['@type'] === 'empty') {
+                const rcfg = getContainerFieldConfig(pm.replaceTargetId, rbpm, updatedProperties, blocksConfig, intl);
+                if (rcfg) {
+                  updatedProperties = deleteBlockFromContainer(updatedProperties, rbpm, pm.replaceTargetId, rcfg);
+                }
+              }
+            }
           }
           onChangeFormData(updatedProperties);
           const newBlockPathMap = buildBlockPathMap(updatedProperties, blocksConfig, intl);

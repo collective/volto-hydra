@@ -41,6 +41,43 @@ test.describe('DnD / paste via conversion', () => {
       iframe.locator('[data-block-uid="box-1"] [data-conv-type="convTargetA"]'),
     ).toHaveCount(3);
     await expect(iframe.locator('[data-block-uid="src-1"] [data-conv-type="convSource"]')).toHaveCount(0);
+    // The mapped field (title → title) survives the conversion: src-1 is now a
+    // convTargetA still showing its original title.
+    await expect(
+      iframe.locator('[data-block-uid="src-1"] [data-conv-type="convTargetA"]'),
+    ).toHaveText('Draggable source 1');
+  });
+
+  test('a multi-block selection with a multi-option member is rejected by the container', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/dnd-convert-page');
+    const iframe = helper.getIframe();
+
+    await expect(
+      iframe.locator('[data-block-uid="boxm-1"] [data-conv-type="convTargetA"]'),
+    ).toHaveCount(2);
+
+    // Select src-1 + src-2. Each convSource has TWO options (A, B) in convBoxMulti,
+    // and a batch is auto-only (no popup chains) — so the container withholds the spot.
+    await helper.clickBlockInIframe('src-1');
+    await helper.waitForIframeBlockHandle('src-1');
+    await page.keyboard.press('Shift+ArrowDown');
+    await expect(page.locator('.quanta-toolbar')).toBeVisible({ timeout: 5000 });
+    const dragHandle = page.locator('.quanta-toolbar .drag-handle');
+    await expect(dragHandle).toBeVisible({ timeout: 3000 });
+
+    // Position inside convBoxMulti and release; the batch must not enter it.
+    const target = iframe.locator('[data-block-uid="b-1"]').first();
+    await helper.dragBlockWithMouseNoDrop(dragHandle, target, true);
+    await page.mouse.up();
+
+    await expect(
+      iframe.locator('[data-block-uid="boxm-1"] [data-conv-type="convTargetA"]'),
+    ).toHaveCount(2);
+    await expect(
+      iframe.locator('[data-block-uid="boxm-1"] [data-conv-type="convSource"]'),
+    ).toHaveCount(0);
   });
 
   test('multi-selected blocks each auto-convert into a single-option container', async ({ page }) => {
@@ -218,6 +255,38 @@ test.describe('DnD / paste via conversion', () => {
       iframe.locator('[data-block-uid="box-1"] [data-conv-type="convAlien"]'),
     ).toHaveCount(0);
     expect(await helper.blockExists('alien-1')).toBe(true);
+  });
+
+  test('dropping onto an empty container converts and replaces the placeholder', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/dnd-convert-page');
+    const iframe = helper.getIframe();
+
+    // boxe-1 is an empty convBoxMulti (only a synthetic 'empty' placeholder).
+    await expect(
+      iframe.locator('[data-block-uid="boxe-1"] [data-conv-type]'),
+    ).toHaveCount(0);
+
+    // Drag the convSource onto the empty container (the shade drop path).
+    await helper.clickBlockInIframe('src-1');
+    await helper.waitForIframeBlockHandle('src-1');
+    const dragHandle = await helper.getDragHandle();
+    const target = iframe.locator('[data-block-uid="boxe-1"]').first();
+    await helper.dragBlockWithMouseNoDrop(dragHandle, target, true);
+    await page.mouse.up();
+
+    // Two options → chooser; pick Conv Target B.
+    await expect(page.locator('.blocks-chooser')).toBeVisible();
+    await page.locator('.blocks-chooser').getByText('Conv Target B', { exact: false }).click();
+
+    // The converted block took the placeholder's place (not sitting beside it).
+    await expect(
+      iframe.locator('[data-block-uid="boxe-1"] [data-conv-type="convTargetB"]'),
+    ).toHaveCount(1);
+    await expect(
+      iframe.locator('[data-block-uid="boxe-1"] [data-conv-type]'),
+    ).toHaveCount(1);
   });
 
   test('cancelling the convert chooser leaves the block where it was', async ({ page }) => {

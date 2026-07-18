@@ -24,9 +24,14 @@
         "b-2": { "@type": "convTargetA", "title": "Multi B2" }
       },
       "blocks_layout": { "items": ["b-1", "b-2"] }
+    },
+    "boxe-1": {
+      "@type": "convBoxMulti",
+      "blocks": { "eseed-1": { "@type": "empty" } },
+      "blocks_layout": { "items": ["eseed-1"] }
     }
   },
   "blocks_layout": {
-    "items": ["title-block", "src-1", "src-2", "alien-1", "box-1", "boxm-1"]
+    "items": ["title-block", "src-1", "src-2", "alien-1", "box-1", "boxm-1", "boxe-1"]
   }
 }
