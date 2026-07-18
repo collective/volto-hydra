@@ -12,6 +12,7 @@ vi.mock('../context', () => ({
 import {
   applyBlockDefaultsWithContext,
   createSchemaEnhancerFromRecipe,
+  getConversionMap,
 } from './schemaInheritance';
 
 /**
@@ -198,5 +199,33 @@ describe('fieldRules — contains operator (multiselect-driven visibility)', () 
     const enhancer = createSchemaEnhancerFromRecipe(notContainsRecipe);
     const out = enhancer({ schema: baseSchema(), formData: {} });
     expect(out.properties.date).toBeDefined();
+  });
+});
+
+describe('getConversionMap', () => {
+  // Edge direction: `X.fieldMappings[Y]` means "X can be built FROM Y", i.e. Y→X.
+  // So the edge a→b→c is declared on the TARGETS: b.fieldMappings.a, c.fieldMappings.b.
+  const cfg = {
+    a: { id: 'a', fieldMappings: {} }, // valid source; reaches b then c
+    b: { id: 'b', fieldMappings: { a: { x: 'x' } } }, // a → b
+    c: { id: 'c', fieldMappings: { b: { y: 'y' } } }, // b → c
+    lone: { id: 'lone' }, // no fieldMappings → not convertible
+  };
+
+  test('maps each source type to its full reachable set (BFS)', () => {
+    const m = getConversionMap(cfg);
+    expect(new Set(m.a)).toEqual(new Set(['b', 'c']));
+    expect(new Set(m.b)).toEqual(new Set(['c']));
+    expect(m.c || []).toEqual([]);
+  });
+
+  test('empties types with no fieldMappings', () => {
+    const m = getConversionMap(cfg);
+    expect(m.lone || []).toEqual([]);
+  });
+
+  test('null/empty config → empty map', () => {
+    expect(getConversionMap(null)).toEqual({});
+    expect(getConversionMap({})).toEqual({});
   });
 });
