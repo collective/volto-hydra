@@ -218,13 +218,14 @@ Field paths: `../field` for the parent block's field, `/field` for a page metada
 
 ## Block Conversion & fieldMappings
 
-`fieldMappings` (plural) on a block config defines how fields map between block types. This enables three things:
+`fieldMappings` (plural) on a block config defines how fields map between block types (and from linked content). This enables:
 
 - **"Convert to..." UI action** — editors can convert a block to another type (e.g. teaser → image).
 - **Listing item types** — query results are mapped to item blocks via `@default` (see [Listings](listings.md)).
 - **Synchronised container children** — a parent controls child type, all children convert together (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)).
+- **Copy from a linked target** — a block pulls fields from the content item its link field points at, with per-field sync (see [`@target`](#target--copy-from-a-linked-content-item)).
 
-Each key in `fieldMappings` is either a **specific block type name** or **`@default`**.
+Each key in `fieldMappings` is either a **specific block type name**, **`@default`**, or **`@target`**.
 
 ### `@default` — the canonical content shape
 
@@ -255,6 +256,40 @@ image: {
 selectFacet:  { fieldMappings: { checkboxFacet: { title: 'title', field: 'field', hidden: 'hidden' } } },
 checkboxFacet: { fieldMappings: { selectFacet: { /* ... */ }, daterangeFacet: { /* ... */ } } },
 ```
+
+### `@target` — copy from a linked content item
+
+`@target` maps a **linked** content item's attributes onto this block's own
+fields — the generic version of the Volto teaser's "copy from target" button.
+It maps *source content attributes* (`Title`, `Description`, `image_scales`, …)
+to *this block's fields*. The item is whichever the block's **link field** points
+at (the `object_browser mode: 'link'` field — its `selectedItemAttrs` snapshot is
+the source), so you don't name a URL field separately: "the url is the link in
+the mapping".
+
+<!-- codeExample: javascript -->
+```javascript
+button: {
+    // The Label (title) syncs from the linked item's Title.
+    fieldMappings: {
+        '@target': {
+            Title: 'title',
+            Description: 'description',
+            // image fields declare the type so the value is assembled into the
+            // object_browser (mode=image) array form:
+            image_scales: { field: 'preview_image', type: 'image' },
+        },
+    },
+},
+```
+
+Declaring `@target` is the **only** opt-in — no per-block enhancer wiring. Each
+mapped field then shows a small **"reset to linked content"** control in the
+sidebar, shown *only when that field has diverged* from the target (so it doubles
+as an "overridden" indicator, replacing the teaser's all-or-nothing `overwrite`
+checkbox). String fields copy straight across; an `image`-typed mapping assembles
+the target's `@id` / `image_field` / `image_scales` into the shape an image field
+expects.
 
 ### Conversion graph rules
 

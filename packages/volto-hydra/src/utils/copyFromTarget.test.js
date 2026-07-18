@@ -49,6 +49,7 @@ const targetSnapshot = {
   Title: 'Big News',
   Description: 'It happened',
   head_title: 'Breaking',
+  image_field: 'image',
   image_scales: { image: [{ download: '/news/big/@@images/x.jpg' }] },
 };
 
@@ -117,6 +118,22 @@ describe('getTargetValueForField — typed extraction from the snapshot', () => 
   it('returns undefined when no target is selected', () => {
     expect(getTargetValueForField('title', teaserConfig, { href: [] })).toBeUndefined();
     expect(getTargetValueForField('title', teaserConfig, {})).toBeUndefined();
+  });
+
+  it('assembles an image field into the object_browser (mode=image) array form', () => {
+    const data = { href: [targetSnapshot] };
+    expect(getTargetValueForField('preview_image', teaserConfig, data)).toEqual([
+      {
+        '@id': '/news/big',
+        image_field: 'image',
+        image_scales: { image: [{ download: '/news/big/@@images/x.jpg' }] },
+      },
+    ]);
+  });
+
+  it('returns undefined for an image field when the target has no image', () => {
+    const noImage = { '@id': '/x', Title: 'T' };
+    expect(getTargetValueForField('preview_image', teaserConfig, { href: [noImage] })).toBeUndefined();
   });
 });
 

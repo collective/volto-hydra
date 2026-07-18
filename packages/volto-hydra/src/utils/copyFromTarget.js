@@ -82,10 +82,15 @@ export function applyCopyFromTargetToSchema(schema, blockConfig) {
   return changed ? { ...schema, properties } : schema;
 }
 
-/** Source attr in the @target mapping whose destination is `field`, or null. */
-function sourceAttrFor(field, mapping) {
+/**
+ * The @target mapping entry whose destination is `field`: its source attr and
+ * (optional) declared hydra type ({ field, type } form). Null if not mapped.
+ */
+function mappingEntryFor(field, mapping) {
   for (const [src, dest] of Object.entries(mapping)) {
-    if (getMappingTarget(dest) === field) return src;
+    if (getMappingTarget(dest) === field) {
+      return { src, type: typeof dest === 'object' ? dest.type : undefined };
+    }
   }
   return null;
 }
@@ -93,18 +98,36 @@ function sourceAttrFor(field, mapping) {
 /**
  * The value `field` should hold if synced from the currently-selected target,
  * or undefined when the field isn't mapped or no target is selected.
+ *
+ * Typed: an `image` field is assembled from the target's catalog-brain image
+ * attrs (`@id` / `image_field` / `image_scales`) into the array form an
+ * object_browser (mode=image) field expects. Plain fields pass the snapshot
+ * attribute through.
  */
 export function getTargetValueForField(field, blockConfig, blockData) {
   const mapping = getTargetMapping(blockConfig);
   if (!mapping) return undefined;
-  const src = sourceAttrFor(field, mapping);
-  if (!src) return undefined;
+  const entry = mappingEntryFor(field, mapping);
+  if (!entry) return undefined;
 
   const urlField = getUrlField(blockConfig);
   const snapshot = urlField ? blockData?.[urlField]?.[0] : undefined;
   if (!snapshot) return undefined;
 
-  return snapshot[src];
+  if (entry.type === 'image') {
+    if (snapshot.image_scales == null && snapshot.image_field == null) {
+      return undefined; // target has no image
+    }
+    return [
+      {
+        '@id': snapshot['@id'],
+        image_field: snapshot.image_field,
+        image_scales: snapshot.image_scales,
+      },
+    ];
+  }
+
+  return snapshot[entry.src];
 }
 
 /**
