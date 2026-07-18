@@ -18,7 +18,6 @@ import {
   isFieldDivergedFromTarget,
   installCopyFromTargetEnhancers,
   getTargetId,
-  contentToSnapshot,
   COPY_FROM_TARGET_WIDGET,
 } from './copyFromTarget';
 
@@ -184,27 +183,6 @@ describe('live target — divergence/sync against the CURRENT target, not the sn
     expect(isFieldDivergedFromTarget('title', teaserConfig, data, live)).toBe(true); // vs live
   });
 
-  it('contentToSnapshot maps a getContent response to the catalog-brain snapshot shape', () => {
-    const resp = {
-      '@id': 'http://backend/news/big',
-      '@type': 'News Item',
-      title: 'Big News',
-      description: 'It happened',
-      head_title: 'Breaking',
-      subjects: ['news', 'plone'],
-      image_field: 'image',
-      image_scales: { image: [{ download: '/news/big/@@images/x.jpg' }] },
-    };
-    const snap = contentToSnapshot(resp);
-    expect(snap.Title).toBe('Big News');
-    expect(snap.Description).toBe('It happened');
-    expect(snap.head_title).toBe('Breaking');
-    expect(snap.Subjects).toEqual(['news', 'plone']);
-    expect(snap.image_field).toBe('image');
-    expect(snap.image_scales).toEqual(resp.image_scales);
-    // @id is flattened to an app-relative path (backend origin stripped).
-    expect(snap['@id']).toBe('/news/big');
-  });
 });
 
 describe('isFieldDivergedFromTarget', () => {

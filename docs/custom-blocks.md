@@ -293,10 +293,13 @@ expects; multi-value fields (e.g. `Subjects` → tags) pass through as-is.
 
 Divergence is measured against the target **as it is now**, not the stale
 snapshot stored on the link field: the first time you edit a `@target` block in a
-session the target is fetched live (`getContent`, cached with a short TTL) so an
-override that matches the *old* target but not the *current* one still surfaces
-the sync control. The fetch is transient — it never mutates the block, so opening
-a page has no side effects.
+session the target is re-fetched via the catalog **search** (`metadata_fields:
+'_all'`, cached with a short TTL) so an override that matches the *old* target
+but not the *current* one still surfaces the sync control. Search is used
+deliberately — the stored snapshot (`selectedItemAttrs`) is itself a catalog
+brain, so the search result is already in the same shape (no transform,
+guaranteed field alignment). The fetch is transient — it never mutates the
+block, so opening a page has no side effects.
 
 ### Conversion graph rules
 

@@ -152,42 +152,6 @@ export function isFieldDivergedFromTarget(field, blockConfig, blockData, liveTar
   return JSON.stringify(current) !== JSON.stringify(targetValue);
 }
 
-/** Strip a URL to its app-relative path; passthrough for already-relative ids. */
-function defaultFlatten(id) {
-  if (typeof id !== 'string') return id;
-  try {
-    const p = new URL(id).pathname.replace(/\/$/, '');
-    return p || '/';
-  } catch {
-    return id;
-  }
-}
-
-/**
- * Transform a live `getContent` response into the catalog-brain snapshot shape
- * the mapping reads (`Title`, `Description`, `head_title`, `Subjects`,
- * `image_field`/`image_scales`) — the generic form of the teaser's
- * dataTransformer. Pass a Volto `flattenToAppURL` as `flatten` in the app;
- * the default only strips the origin.
- */
-export function contentToSnapshot(resp, flatten = defaultFlatten) {
-  if (!resp) return resp;
-  const snap = {
-    '@id': flatten(resp['@id']),
-    '@type': resp['@type'],
-    Title: resp.title,
-    Description: resp.description,
-    head_title: resp.head_title ?? null,
-    Subjects: resp.subjects,
-  };
-  if (resp.image_field != null || resp.image_scales != null) {
-    snap.image_field = resp.image_field;
-    snap.image_scales = resp.image_scales;
-    snap.hasPreviewImage = true;
-  }
-  return snap;
-}
-
 /**
  * A block schemaEnhancer that applies the copy-from-target field-widget swap.
  * Bound to the block's config at install time (so this module stays free of the
