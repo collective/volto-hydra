@@ -10,6 +10,16 @@ import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 
 test.describe('DnD / paste via conversion', () => {
+  // The toy conversion graph (convSource/convTargetA/convTargetB + convBox*)
+  // lives only in the MOCK frontend's shared-block-schemas.js. On admin-nuxt /
+  // admin-nextjs / admin-f7 those blocks aren't registered, so run mock-only.
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'admin-mock',
+      'mock-only synthetic conversion blocks',
+    );
+  });
+
   test('drag into a container that only accepts a convert-target auto-converts it', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -123,6 +133,34 @@ test.describe('DnD / paste via conversion', () => {
       iframe.locator('[data-block-uid="box-1"] [data-conv-type="convTargetA"]'),
     ).toHaveCount(3);
     await expect(iframe.locator('[data-block-uid="src-1"] [data-conv-type="convSource"]')).toHaveCount(1);
+  });
+
+  test('pasting a single block with multiple convert-targets opens the chooser', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/dnd-convert-page');
+    const iframe = helper.getIframe();
+
+    // Copy the convSource, then paste inside convBoxMulti (accepts A or B).
+    await helper.clickBlockInIframe('src-1');
+    await helper.waitForIframeBlockHandle('src-1');
+    await page.keyboard.press('ControlOrMeta+c');
+    await expect(page.locator('#toolbar-paste-blocks')).toBeVisible({ timeout: 3000 });
+    await helper.clickBlockInIframe('b-1');
+    await helper.waitForIframeBlockHandle('b-1');
+    await page.keyboard.press('ControlOrMeta+v');
+
+    // Ask-first: two options → chooser appears, nothing inserted yet.
+    await expect(page.locator('.blocks-chooser')).toBeVisible();
+    await expect(
+      iframe.locator('[data-block-uid="boxm-1"] [data-conv-type="convTargetB"]'),
+    ).toHaveCount(0);
+
+    // Pick Conv Target B → the pasted block is inserted, converted to B.
+    await page.locator('.blocks-chooser').getByText('Conv Target B', { exact: false }).click();
+    await expect(
+      iframe.locator('[data-block-uid="boxm-1"] [data-conv-type="convTargetB"]'),
+    ).toHaveCount(1);
   });
 
   test('cancelling the convert chooser leaves the block where it was', async ({ page }) => {
