@@ -66,8 +66,10 @@ function useLiveTarget(targetId) {
       )
         .then((resp) => {
           const items = resp?.items || [];
-          const brain =
-            items.find((i) => flattenToAppURL(i['@id']) === path) || items[0];
+          // ONLY the exact target — never fall back to some other result
+          // (e.g. a missing target would otherwise pick a wrong item and
+          // corrupt divergence). No match → undefined → use the stored snapshot.
+          const brain = items.find((i) => flattenToAppURL(i['@id']) === path);
           liveTargetCache.set(targetId, { brain, fetchedAt: Date.now(), promise: null });
           return brain;
         })
@@ -89,8 +91,8 @@ function useLiveTarget(targetId) {
 
 const messages = defineMessages({
   syncFromTarget: {
-    id: 'Reset to linked content',
-    defaultMessage: 'Reset to linked content',
+    id: 'pull from link',
+    defaultMessage: 'pull from link',
   },
 });
 
@@ -125,14 +127,7 @@ function resolveWidget(props) {
 
 const CopyFromTargetField = (props) => {
   const intl = useIntl();
-  // Restore the original field def the enhancer stashed, so the base widget
-  // resolves + renders exactly as Volto would (not as our wrapper).
   const { baseWidget, ...rest } = props;
-  // Restore the original field def. Crucially, reset `widget` to the ORIGINAL
-  // value (which may be undefined for a plain field) — otherwise `rest.widget`
-  // is still 'copyFromTargetField' and resolveWidget would recurse into us.
-  const baseProps = { ...rest, ...(baseWidget || {}), widget: baseWidget?.widget };
-  const BaseWidget = resolveWidget(baseProps);
 
   // Block-level context: which block is being edited + its config + live data,
   // so we can tell whether this field diverges from the linked target.
@@ -159,38 +154,41 @@ const CopyFromTargetField = (props) => {
     if (value !== undefined) props.onChange?.(props.id, value);
   };
 
+  // Restore the original field def; reset `widget` to the ORIGINAL value (else
+  // resolveWidget would recurse into this wrapper). We leave the field's own
+  // `description` untouched (a string) and render the sync in its OWN `.help`
+  // line right below — matching the help-text style/spacing without an extra
+  // gap, and without tripping widgets that PropType `description` as a string.
+  const baseProps = { ...rest, ...(baseWidget || {}), widget: baseWidget?.widget };
+  const BaseWidget = resolveWidget(baseProps);
+
+  const label = intl.formatMessage(messages.syncFromTarget);
+
   return (
     <>
       <BaseWidget {...baseProps} />
       {diverged ? (
-        <button
-          type="button"
-          className="copy-from-target-sync"
-          onClick={onSync}
-          aria-label={intl.formatMessage(messages.syncFromTarget)}
-          title={intl.formatMessage(messages.syncFromTarget)}
-          style={{
-            background: 'none',
-            border: 'none',
-            padding: '1px 2px',
-            marginTop: '2px',
-            color: '#64748b',
-            fontSize: '11px',
-            lineHeight: 1.2,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-            textDecoration: 'underline',
-            textUnderlineOffset: '2px',
-            textDecorationColor: 'rgba(100,116,139,0.4)',
-          }}
-        >
-          <span aria-hidden="true" style={{ fontSize: '12px' }}>
-            ↺
-          </span>
-          {intl.formatMessage(messages.syncFromTarget)}
-        </button>
+        <p className="help" style={{ marginTop: baseWidget?.description ? '2px' : '-6px' }}>
+          <a
+            className="copy-from-target-sync"
+            role="button"
+            tabIndex={0}
+            onClick={onSync}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') onSync(e);
+            }}
+            title={label}
+            style={{
+              cursor: 'pointer',
+              color: '#64748b',
+              whiteSpace: 'nowrap',
+              textDecoration: 'underline',
+              textUnderlineOffset: '2px',
+            }}
+          >
+            ↺ {label}
+          </a>
+        </p>
       ) : null}
     </>
   );
