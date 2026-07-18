@@ -16,10 +16,13 @@
  * The target snapshot rides on the block's link/url field (the object_browser
  * `selectedItemAttrs`), e.g. `block.href[0] = { Title, Description, … }`.
  *
+ * A mapped field is LINKED by default (it tracks the target) or CUSTOM (the
+ * editor's own value, recorded in the block's `_customFields`).
+ *
  * This module is the PURE core (no React): mapping lookup, schema field-widget
- * swap, and per-field typed value extraction / divergence. The enhancer that
- * installs it on every block and the `copyFromTargetField` wrapper widget build
- * on these.
+ * swap, per-field typed value extraction, and linked/custom state. The enhancer
+ * that installs it on every block and the `copyFromTargetField` wrapper widget
+ * build on these.
  */
 import { getMappingTarget, getFieldType } from './schemaInheritance';
 
@@ -105,10 +108,10 @@ export function getTargetId(blockConfig, blockData) {
  * The value `field` should hold if synced from the target, or undefined when
  * the field isn't mapped or no target is selected.
  *
- * `liveTarget` (snapshot-shaped, from a fresh getContent → contentToSnapshot)
- * overrides the stored link-field snapshot, so divergence/sync reflect the
- * target AS IT IS NOW, not as it was when it was last selected. Falls back to
- * the stored snapshot when no live target is available.
+ * `liveTarget` (snapshot-shaped, from a fresh catalog @search) overrides the
+ * stored link-field snapshot, so a linked field pulls the target AS IT IS NOW,
+ * not as it was when it was last selected. Falls back to the stored snapshot
+ * when no live target is available.
  *
  * Typed: an `image` field is assembled from the catalog-brain image attrs
  * (`@id` / `image_field` / `image_scales`) into the array form an
@@ -140,16 +143,43 @@ export function getTargetValueForField(field, blockConfig, blockData, liveTarget
   return snapshot[entry.src];
 }
 
+/** Block key holding the set of fields the editor has taken CUSTOM (overridden). */
+export const CUSTOM_FIELDS_KEY = '_customFields';
+
 /**
- * True when `field`'s current value differs from what the target would set —
- * i.e. it's been customised. False when there's no target selected (nothing to
- * diverge from) or the field isn't mapped.
+ * A mapped field is either LINKED (tracks the target — default) or CUSTOM (the
+ * editor's own value). Custom is explicit and stored, so there's no value
+ * comparison / divergence: a field is custom iff it's listed in _customFields.
  */
-export function isFieldDivergedFromTarget(field, blockConfig, blockData, liveTarget) {
-  const targetValue = getTargetValueForField(field, blockConfig, blockData, liveTarget);
-  if (targetValue === undefined) return false;
-  const current = blockData?.[field];
-  return JSON.stringify(current) !== JSON.stringify(targetValue);
+export function isFieldCustom(field, blockData) {
+  return (blockData?.[CUSTOM_FIELDS_KEY] || []).includes(field);
+}
+
+/**
+ * A mapped field is linked when it's mapped, a target is selected, and the
+ * editor hasn't taken it custom.
+ */
+export function isFieldLinked(field, blockConfig, blockData) {
+  if (!getTargetMapping(blockConfig)) return false;
+  if (!mappingEntryFor(field, getTargetMapping(blockConfig))) return false;
+  if (!getTargetId(blockConfig, blockData)) return false;
+  return !isFieldCustom(field, blockData);
+}
+
+/** Return blockData with `field` marked custom (immutable). */
+export function withFieldCustom(blockData, field) {
+  const set = new Set(blockData?.[CUSTOM_FIELDS_KEY] || []);
+  set.add(field);
+  return { ...blockData, [CUSTOM_FIELDS_KEY]: [...set] };
+}
+
+/** Return blockData with `field` marked linked again (removed from custom). */
+export function withFieldLinked(blockData, field) {
+  const next = (blockData?.[CUSTOM_FIELDS_KEY] || []).filter((f) => f !== field);
+  const out = { ...blockData };
+  if (next.length) out[CUSTOM_FIELDS_KEY] = next;
+  else delete out[CUSTOM_FIELDS_KEY];
+  return out;
 }
 
 /**

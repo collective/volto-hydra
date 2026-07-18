@@ -2,8 +2,12 @@
  * CopyFromTargetField — the wrapper the copy-from-target enhancer swaps mapped
  * destination fields to. It renders the field's ORIGINAL widget untouched
  * (that's why it works for any field type — object_browser, textarea, select…)
- * and adds a small "sync from target" affordance shown only when the field has
- * diverged from the linked target.
+ * and adds a small LINKED ⇄ CUSTOM toggle beneath it.
+ *
+ * A mapped field is LINKED by default: it tracks the linked target — pulled on
+ * block select and re-pulled when the target (href) changes. Editing the field,
+ * or unticking the toggle, flips it to CUSTOM (the editor's own value, stored in
+ * the block's `_customFields`). Re-ticking re-pulls the target value.
  *
  * The enhancer stashes the original field def under `baseWidget`; we restore it
  * and resolve the real widget with Volto's own resolution order so the base
@@ -19,13 +23,15 @@ import { useHydraSchemaContext, getLiveBlockData } from '../../context';
 import {
   getTargetId,
   getTargetValueForField,
-  isFieldDivergedFromTarget,
+  isFieldLinked,
+  withFieldCustom,
+  withFieldLinked,
 } from '../../utils/copyFromTarget';
 
-// Session cache of live targets, keyed by @id, so divergence is measured
-// against the CURRENT target — not the stale link-field snapshot. Lazy: fetched
-// the first time a @target block is edited this session; refreshed after the
-// TTL. Module-level so all fields of a block share one fetch.
+// Session cache of live targets, keyed by @id, so a linked field pulls the
+// CURRENT target — not the stale link-field snapshot. Lazy: fetched the first
+// time a @target block is edited this session; refreshed after the TTL.
+// Module-level so all fields of a block share one fetch.
 const LIVE_TARGET_TTL = 5 * 60 * 1000; // 5 minutes
 const liveTargetCache = new Map(); // id -> { brain, fetchedAt, promise }
 
@@ -35,7 +41,7 @@ const liveTargetCache = new Map(); // id -> { brain, fetchedAt, promise }
  * link-field snapshot (selectedItemAttrs) is itself a catalog brain, so the
  * search result is already in the same shape — no transform, guaranteed field
  * alignment. Undefined until the first fetch resolves (callers fall back to the
- * stored snapshot). Never mutates formData (no dirty state).
+ * stored snapshot). Never mutates formData directly (no dirty state).
  */
 function useLiveTarget(targetId) {
   const dispatch = useDispatch();
@@ -90,9 +96,13 @@ function useLiveTarget(targetId) {
 }
 
 const messages = defineMessages({
-  syncFromTarget: {
-    id: 'pull from link',
-    defaultMessage: 'pull from link',
+  linked: {
+    id: 'linked to content',
+    defaultMessage: 'linked',
+  },
+  linkedHint: {
+    id: 'Tracks the linked content; edit or untick to customise',
+    defaultMessage: 'tracks the linked content — edit to customise',
   },
 });
 
@@ -129,65 +139,98 @@ const CopyFromTargetField = (props) => {
   const intl = useIntl();
   const { baseWidget, ...rest } = props;
 
-  // Block-level context: which block is being edited + its config + live data,
-  // so we can tell whether this field diverges from the linked target.
+  // Block-level context + a block-level updater (so we can write the block's
+  // `_customFields` state, which a plain field onChange can't reach).
   const ctx = useHydraSchemaContext?.() || {};
   const blockData = getLiveBlockData?.(ctx.currentBlockId) || ctx.formData || null;
   const blockConfig = blockData?.['@type']
     ? ctx.blocksConfig?.[blockData['@type']]
     : null;
+  const updateBlock = (newData) => ctx.onChangeBlock?.(ctx.currentBlockId, newData);
 
-  // Fresh target (lazy, session-cached) so divergence reflects the target's
-  // CURRENT values, not the stale snapshot; falls back to the snapshot until
-  // the first fetch resolves.
+  // Fresh target (lazy, session-cached) — the value a linked field is pulled to.
   const targetId = blockConfig && blockData && getTargetId(blockConfig, blockData);
   const liveTarget = useLiveTarget(targetId);
 
-  const diverged =
-    blockConfig &&
-    blockData &&
-    isFieldDivergedFromTarget(props.id, blockConfig, blockData, liveTarget);
+  const linked =
+    !!blockConfig && !!blockData && isFieldLinked(props.id, blockConfig, blockData);
+  const targetValue = getTargetValueForField(props.id, blockConfig, blockData, liveTarget);
 
-  const onSync = (e) => {
-    e.preventDefault();
-    const value = getTargetValueForField(props.id, blockConfig, blockData, liveTarget);
-    if (value !== undefined) props.onChange?.(props.id, value);
+  // PULL: while linked, keep the field's stored value in sync with the target —
+  // on first block select (mount) and when the target changes (href / TTL
+  // refresh). Only writes when the value actually differs, so a settled linked
+  // field is a no-op (no spurious dirty state). Not a user edit: uses the raw
+  // field onChange (so it does NOT flip the field to custom, and is field-scoped
+  // so multiple linked fields never clobber each other).
+  //
+  // Deferred one frame: a synchronous onChange during the block's form mount is
+  // discarded (the form re-derives from its `data` prop on initial commit), so
+  // we write after that commit settles. cancelled on unmount/target change.
+  useEffect(() => {
+    if (!linked || targetValue === undefined) return undefined;
+    if (JSON.stringify(blockData?.[props.id]) === JSON.stringify(targetValue)) {
+      return undefined;
+    }
+    const raf = requestAnimationFrame(() => props.onChange?.(props.id, targetValue));
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linked, JSON.stringify(targetValue), props.id]);
+
+  // EDIT: a user edit to a LINKED field flips it to custom (and keeps the typed
+  // value). A custom field edits normally.
+  const onFieldChange = (id, value) => {
+    if (linked) {
+      updateBlock({ ...withFieldCustom(blockData, props.id), [props.id]: value });
+    } else {
+      props.onChange?.(id, value);
+    }
   };
 
-  // Restore the original field def; reset `widget` to the ORIGINAL value (else
-  // resolveWidget would recurse into this wrapper). We leave the field's own
-  // `description` untouched (a string) and render the sync in its OWN `.help`
-  // line right below — matching the help-text style/spacing without an extra
-  // gap, and without tripping widgets that PropType `description` as a string.
-  const baseProps = { ...rest, ...(baseWidget || {}), widget: baseWidget?.widget };
+  // TOGGLE: linked ⇄ custom. custom → linked re-pulls the target value.
+  const onToggle = () => {
+    if (linked) {
+      updateBlock(withFieldCustom(blockData, props.id));
+    } else {
+      let next = withFieldLinked(blockData, props.id);
+      if (targetValue !== undefined) next = { ...next, [props.id]: targetValue };
+      updateBlock(next);
+    }
+  };
+
+  // Restore the original field def; reset `widget` (else resolveWidget recurses
+  // into this wrapper) and intercept onChange for the edit→custom flip.
+  const baseProps = {
+    ...rest,
+    ...(baseWidget || {}),
+    widget: baseWidget?.widget,
+    onChange: onFieldChange,
+  };
   const BaseWidget = resolveWidget(baseProps);
 
-  const label = intl.formatMessage(messages.syncFromTarget);
+  const label = intl.formatMessage(messages.linked);
+  const showToggle = !!targetId; // only when a target is actually selected
 
   return (
     <>
       <BaseWidget {...baseProps} />
-      {diverged ? (
-        <p className="help" style={{ marginTop: baseWidget?.description ? '2px' : '-6px' }}>
-          <a
-            className="copy-from-target-sync"
-            role="button"
-            tabIndex={0}
-            onClick={onSync}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') onSync(e);
-            }}
-            title={label}
-            style={{
-              cursor: 'pointer',
-              color: '#64748b',
-              whiteSpace: 'nowrap',
-              textDecoration: 'underline',
-              textUnderlineOffset: '2px',
-            }}
+      {showToggle ? (
+        <p
+          className="help copy-from-target-toggle"
+          style={{ marginTop: baseWidget?.description ? '2px' : '-6px' }}
+        >
+          <label
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', cursor: 'pointer', color: '#64748b' }}
+            title={intl.formatMessage(messages.linkedHint)}
           >
-            ↺ {label}
-          </a>
+            <input
+              type="checkbox"
+              className="copy-from-target-linked"
+              checked={linked}
+              onChange={onToggle}
+              style={{ margin: 0, cursor: 'pointer' }}
+            />
+            🔗 {label}
+          </label>
         </p>
       ) : null}
     </>

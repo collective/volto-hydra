@@ -223,7 +223,7 @@ Field paths: `../field` for the parent block's field, `/field` for a page metada
 - **"Convert to..." UI action** — editors can convert a block to another type (e.g. teaser → image).
 - **Listing item types** — query results are mapped to item blocks via `@default` (see [Listings](listings.md)).
 - **Synchronised container children** — a parent controls child type, all children convert together (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)).
-- **Copy from a linked target** — a block pulls fields from the content item its link field points at, with per-field sync (see [`@target`](#target--copy-from-a-linked-content-item)).
+- **Copy from a linked target** — a block pulls fields from the content item its link field points at, with a per-field linked/custom toggle (see [`@target`](#target--copy-from-a-linked-content-item)).
 
 Each key in `fieldMappings` is either a **specific block type name**, **`@default`**, or **`@target`**.
 
@@ -284,22 +284,29 @@ button: {
 ```
 
 Declaring `@target` is the **only** opt-in — no per-block enhancer wiring. Each
-mapped field then shows a small **"reset to linked content"** control in the
-sidebar, shown *only when that field has diverged* from the target (so it doubles
-as an "overridden" indicator, replacing the teaser's all-or-nothing `overwrite`
-checkbox). String fields copy straight across; an `image`-typed mapping assembles
-the target's `@id` / `image_field` / `image_scales` into the shape an image field
+mapped field then shows a small **🔗 linked** toggle in the sidebar (only when a
+target is selected). Every mapped field is one of two states:
+
+- **Linked** (default) — the field *tracks the target*. Its value is pulled from
+  the target when you select the block and re-pulled when the link changes, so it
+  always mirrors the linked content. The toggle is ticked.
+- **Custom** — your own value, ignored by the target. A field becomes custom the
+  moment you edit it, or when you untick the toggle; re-ticking re-pulls the
+  target value. Custom fields are recorded in the block's `_customFields` array
+  (absence ⇒ linked), so the state persists with the block.
+
+String fields copy straight across; an `image`-typed mapping assembles the
+target's `@id` / `image_field` / `image_scales` into the shape an image field
 expects; multi-value fields (e.g. `Subjects` → tags) pass through as-is.
 
-Divergence is measured against the target **as it is now**, not the stale
-snapshot stored on the link field: the first time you edit a `@target` block in a
-session the target is re-fetched via the catalog **search** (`metadata_fields:
-'_all'`, cached with a short TTL) so an override that matches the *old* target
-but not the *current* one still surfaces the sync control. Search is used
-deliberately — the stored snapshot (`selectedItemAttrs`) is itself a catalog
-brain, so the search result is already in the same shape (no transform,
-guaranteed field alignment). The fetch is transient — it never mutates the
-block, so opening a page has no side effects.
+A linked field pulls from the target **as it is now**, not the stale snapshot
+stored on the link field: the first time you edit a `@target` block in a session
+the target is re-fetched via the catalog **search** (`metadata_fields: '_all'`,
+cached with a short TTL) so if the target changed upstream the linked field
+picks up the new value. Search is used deliberately — the stored snapshot
+(`selectedItemAttrs`) is itself a catalog brain, so the search result is already
+in the same shape (no transform, guaranteed field alignment). The fetch is
+transient — it never mutates the block, so opening a page has no side effects.
 
 ### Conversion graph rules
 

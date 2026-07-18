@@ -15,7 +15,10 @@ import {
   getTargetMapping,
   applyCopyFromTargetToSchema,
   getTargetValueForField,
-  isFieldDivergedFromTarget,
+  isFieldCustom,
+  isFieldLinked,
+  withFieldCustom,
+  withFieldLinked,
   installCopyFromTargetEnhancers,
   getTargetId,
   COPY_FROM_TARGET_WIDGET,
@@ -153,11 +156,6 @@ describe('getTargetValueForField — typed extraction from the snapshot', () => 
     const data = { href: [{ '@id': '/x', Subjects: ['news', 'plone'] }] };
     expect(getTargetValueForField('tags', tagsConfig, data)).toEqual(['news', 'plone']);
   });
-  it('array divergence uses a value compare (same tags → not diverged)', () => {
-    const data = { href: [{ '@id': '/x', Subjects: ['news', 'plone'] }], tags: ['news', 'plone'] };
-    expect(isFieldDivergedFromTarget('tags', tagsConfig, data)).toBe(false);
-    expect(isFieldDivergedFromTarget('tags', tagsConfig, { ...data, tags: ['news'] })).toBe(true);
-  });
 });
 
 describe('live target — divergence/sync against the CURRENT target, not the snapshot', () => {
@@ -175,26 +173,41 @@ describe('live target — divergence/sync against the CURRENT target, not the sn
     expect(getTargetValueForField('title', teaserConfig, data)).toBe('Big News');
   });
 
-  it('divergence is measured against the live target when provided', () => {
-    // Field matches the STALE snapshot but the live target changed → diverged.
-    const data = { href: [targetSnapshot], title: 'Big News' };
-    const live = { ...targetSnapshot, Title: 'Big News (updated)' };
-    expect(isFieldDivergedFromTarget('title', teaserConfig, data)).toBe(false); // vs stale
-    expect(isFieldDivergedFromTarget('title', teaserConfig, data, live)).toBe(true); // vs live
-  });
-
 });
 
-describe('isFieldDivergedFromTarget', () => {
-  const data = { href: [targetSnapshot], title: 'Custom title', description: 'It happened' };
-  it('true when the field value differs from the target', () => {
-    expect(isFieldDivergedFromTarget('title', teaserConfig, data)).toBe(true);
+describe('linked vs custom per-field state (_customFields)', () => {
+  const withTarget = { href: [targetSnapshot], title: 'Big News' };
+
+  it('a mapped field with a target is LINKED by default (not in _customFields)', () => {
+    expect(isFieldCustom('title', withTarget)).toBe(false);
+    expect(isFieldLinked('title', teaserConfig, withTarget)).toBe(true);
   });
-  it('false when the field matches the target', () => {
-    expect(isFieldDivergedFromTarget('description', teaserConfig, data)).toBe(false);
+
+  it('a field listed in _customFields is custom, not linked', () => {
+    const data = { ...withTarget, _customFields: ['title'] };
+    expect(isFieldCustom('title', data)).toBe(true);
+    expect(isFieldLinked('title', teaserConfig, data)).toBe(false);
+    // other mapped fields stay linked
+    expect(isFieldLinked('description', teaserConfig, data)).toBe(true);
   });
-  it('false when there is no target selected (nothing to diverge from)', () => {
-    expect(isFieldDivergedFromTarget('title', teaserConfig, { title: 'x', href: [] })).toBe(false);
+
+  it('nothing is linked when no target is selected', () => {
+    expect(isFieldLinked('title', teaserConfig, { href: [] })).toBe(false);
+  });
+
+  it('withFieldCustom / withFieldLinked update _customFields immutably', () => {
+    const a = withFieldCustom(withTarget, 'title');
+    expect(a._customFields).toEqual(['title']);
+    expect(withTarget._customFields).toBeUndefined(); // original untouched
+
+    const b = withFieldCustom(a, 'description');
+    expect(new Set(b._customFields)).toEqual(new Set(['title', 'description']));
+
+    const c = withFieldLinked(b, 'title');
+    expect(c._customFields).toEqual(['description']);
+
+    const d = withFieldLinked(c, 'description');
+    expect(d._customFields).toBeUndefined(); // key removed when empty
   });
 });
 

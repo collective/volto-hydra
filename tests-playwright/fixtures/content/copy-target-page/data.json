@@ -6,12 +6,19 @@
   "title": "Copy Target Page",
   "blocks": {
     "title-block": { "@type": "title" },
-    "btn-1": {
+    "btn-linked": {
       "@type": "button",
-      "title": "Custom Label",
+      "title": "Stale label",
       "href": [{ "@id": "/news/big", "Title": "Target Title" }],
+      "inneralign": "left"
+    },
+    "btn-custom": {
+      "@type": "button",
+      "title": "My own label",
+      "href": [{ "@id": "/news/big", "Title": "Target Title" }],
+      "_customFields": ["title"],
       "inneralign": "left"
     }
   },
-  "blocks_layout": { "items": ["title-block", "btn-1"] }
+  "blocks_layout": { "items": ["title-block", "btn-linked", "btn-custom"] }
 }
