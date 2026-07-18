@@ -9,8 +9,11 @@
     "src-1": { "@type": "convSource", "title": "Draggable source" },
     "box-1": {
       "@type": "convBox",
-      "blocks": { "a-1": { "@type": "convTargetA", "title": "Existing A" } },
-      "blocks_layout": { "items": ["a-1"] }
+      "blocks": {
+        "a-1": { "@type": "convTargetA", "title": "Existing A1" },
+        "a-2": { "@type": "convTargetA", "title": "Existing A2" }
+      },
+      "blocks_layout": { "items": ["a-1", "a-2"] }
     },
     "boxm-1": {
       "@type": "convBoxMulti",

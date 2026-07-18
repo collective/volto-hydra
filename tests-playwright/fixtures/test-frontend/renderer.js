@@ -250,7 +250,7 @@ async function renderBlock(blockId, block) {
             break;
         case 'convBox':
         case 'convBoxMulti':
-            wrapper.innerHTML = await renderSectionBlock(block);
+            wrapper.innerHTML = await renderConvBox(block);
             break;
         case 'contextNavigation': {
             // Return the <nav> directly so aria-label / class /
@@ -1267,6 +1267,33 @@ function renderColumnBlock(block) {
  * @param {Object} block
  * @returns {Promise<string>} HTML string
  */
+/**
+ * Conversion-test container renderer. Like renderSectionBlock but marks each
+ * child `data-block-add="bottom"` so getAddDirection treats the vertically
+ * stacked children as a vertical list (nested blocks default to 'right'/
+ * horizontal without this) — keeping drop-position resolution on the Y axis.
+ */
+async function renderConvBox(block) {
+    const blocks = block.blocks || {};
+    const items = block.blocks_layout?.items || [];
+    let html = '<div class="section-body" style="padding: 12px; border: 1px dashed #888; border-radius: 4px;">';
+    for (const childId of items) {
+        const child = blocks[childId];
+        if (!child) continue;
+        const rendered = await renderBlock(childId, child);
+        let el = rendered;
+        if (rendered instanceof DocumentFragment) {
+            const c = document.createElement('div');
+            c.appendChild(rendered);
+            el = c.firstElementChild;
+        }
+        if (el && el.setAttribute) el.setAttribute('data-block-add', 'bottom');
+        html += el ? el.outerHTML : '';
+    }
+    html += '</div>';
+    return html;
+}
+
 async function renderSectionBlock(block) {
     const blocks = block.blocks || {};
     const items = block.blocks_layout?.items || [];

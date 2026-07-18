@@ -28,6 +28,7 @@ import {
   resolveFieldPath as resolveFieldPathHelper,
 } from '@volto-hydra/helpers';
 import { expelAllowedTypes, findOnlyEmptyChildUid } from './containerOps.js';
+import { acceptableAt } from './conversionMap.js';
 
 /**
  * This IS a large file and it needs to be written in one file so for better understanding and
@@ -9072,9 +9073,13 @@ export class Bridge {
             const targetPathInfo = this.blockPathMap?.[validDropTargetUid];
             const allowedSiblingTypes = targetPathInfo?.allowedSiblingTypes;
 
-            // Check if drop is allowed here - all dragged block types must be allowed
-            const allTypesAllowed = !allowedSiblingTypes || draggedBlockTypes.length === 0 ||
-              draggedBlockTypes.every(type => allowedSiblingTypes.includes(type));
+            // Check if drop is allowed here — each dragged type must be allowed
+            // natively OR reachable via conversion (single-block: 1=auto, >1=popup;
+            // multi-block: auto-only). See acceptableAt / conversionMap.
+            const isMulti = draggedBlockTypes.length > 1;
+            const allTypesAllowed = draggedBlockTypes.length === 0 ||
+              draggedBlockTypes.every(type =>
+                acceptableAt(type, allowedSiblingTypes, isMulti, this.conversionMap));
             if (allTypesAllowed) {
               // Drop is allowed at this level
               break;
