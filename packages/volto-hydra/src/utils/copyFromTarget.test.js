@@ -135,6 +135,28 @@ describe('getTargetValueForField — typed extraction from the snapshot', () => 
     const noImage = { '@id': '/x', Title: 'T' };
     expect(getTargetValueForField('preview_image', teaserConfig, { href: [noImage] })).toBeUndefined();
   });
+
+  // Tags / other multi-value fields: a plain (non-typed) mapping passes the
+  // array through as-is; no special handling needed beyond image.
+  const tagsConfig = {
+    id: 'card',
+    fieldMappings: { '@target': { Subjects: 'tags' } },
+    blockSchema: {
+      properties: {
+        href: { widget: 'object_browser', mode: 'link' },
+        tags: { title: 'Tags', widget: 'array' },
+      },
+    },
+  };
+  it('passes a tags/array field through from the target', () => {
+    const data = { href: [{ '@id': '/x', Subjects: ['news', 'plone'] }] };
+    expect(getTargetValueForField('tags', tagsConfig, data)).toEqual(['news', 'plone']);
+  });
+  it('array divergence uses a value compare (same tags → not diverged)', () => {
+    const data = { href: [{ '@id': '/x', Subjects: ['news', 'plone'] }], tags: ['news', 'plone'] };
+    expect(isFieldDivergedFromTarget('tags', tagsConfig, data)).toBe(false);
+    expect(isFieldDivergedFromTarget('tags', tagsConfig, { ...data, tags: ['news'] })).toBe(true);
+  });
 });
 
 describe('isFieldDivergedFromTarget', () => {
