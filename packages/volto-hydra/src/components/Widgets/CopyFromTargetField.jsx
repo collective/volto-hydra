@@ -97,12 +97,12 @@ function useLiveTarget(targetId) {
 
 const messages = defineMessages({
   linked: {
-    id: 'linked to content',
-    defaultMessage: 'linked',
+    id: 'pull from linked',
+    defaultMessage: 'pull from linked',
   },
   linkedHint: {
-    id: 'Tracks the linked content; edit or untick to customise',
-    defaultMessage: 'tracks the linked content — edit to customise',
+    id: 'Pulls from the linked content; edit or untick to customise',
+    defaultMessage: 'pulls from the linked content — edit to customise',
   },
 });
 

@@ -284,16 +284,16 @@ button: {
 ```
 
 Declaring `@target` is the **only** opt-in — no per-block enhancer wiring. Each
-mapped field then shows a small **🔗 linked** toggle in the sidebar (only when a
-target is selected). Every mapped field is one of two states:
+mapped field then shows a small **🔗 pull from linked** toggle in the sidebar
+(only when a target is selected). Every mapped field is one of two states:
 
-- **Linked** (default) — the field *tracks the target*. Its value is pulled from
-  the target when you select the block and re-pulled when the link changes, so it
-  always mirrors the linked content. The toggle is ticked.
-- **Custom** — your own value, ignored by the target. A field becomes custom the
-  moment you edit it, or when you untick the toggle; re-ticking re-pulls the
-  target value. Custom fields are recorded in the block's `_customFields` array
-  (absence ⇒ linked), so the state persists with the block.
+- **Linked** (default, toggle ticked) — the field *pulls from the linked item*.
+  Its value is pulled from the target when you select the block and re-pulled
+  when the link changes, so it always mirrors the linked content.
+- **Custom** (toggle unticked) — your own value, ignored by the target. A field
+  becomes custom the moment you edit it, or when you untick the toggle;
+  re-ticking re-pulls the target value. Custom fields are recorded in the block's
+  `_customFields` array (absence ⇒ linked), so the state persists with the block.
 
 String fields copy straight across; an `image`-typed mapping assembles the
 target's `@id` / `image_field` / `image_scales` into the shape an image field
