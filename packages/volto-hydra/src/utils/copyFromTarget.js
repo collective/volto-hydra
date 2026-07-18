@@ -95,23 +95,33 @@ function mappingEntryFor(field, mapping) {
   return null;
 }
 
+/** The linked target's @id (from the link field), or undefined. */
+export function getTargetId(blockConfig, blockData) {
+  const urlField = getUrlField(blockConfig);
+  return urlField ? blockData?.[urlField]?.[0]?.['@id'] : undefined;
+}
+
 /**
- * The value `field` should hold if synced from the currently-selected target,
- * or undefined when the field isn't mapped or no target is selected.
+ * The value `field` should hold if synced from the target, or undefined when
+ * the field isn't mapped or no target is selected.
  *
- * Typed: an `image` field is assembled from the target's catalog-brain image
- * attrs (`@id` / `image_field` / `image_scales`) into the array form an
- * object_browser (mode=image) field expects. Plain fields pass the snapshot
- * attribute through.
+ * `liveTarget` (snapshot-shaped, from a fresh getContent → contentToSnapshot)
+ * overrides the stored link-field snapshot, so divergence/sync reflect the
+ * target AS IT IS NOW, not as it was when it was last selected. Falls back to
+ * the stored snapshot when no live target is available.
+ *
+ * Typed: an `image` field is assembled from the catalog-brain image attrs
+ * (`@id` / `image_field` / `image_scales`) into the array form an
+ * object_browser (mode=image) field expects. Plain fields pass through.
  */
-export function getTargetValueForField(field, blockConfig, blockData) {
+export function getTargetValueForField(field, blockConfig, blockData, liveTarget) {
   const mapping = getTargetMapping(blockConfig);
   if (!mapping) return undefined;
   const entry = mappingEntryFor(field, mapping);
   if (!entry) return undefined;
 
   const urlField = getUrlField(blockConfig);
-  const snapshot = urlField ? blockData?.[urlField]?.[0] : undefined;
+  const snapshot = liveTarget || (urlField ? blockData?.[urlField]?.[0] : undefined);
   if (!snapshot) return undefined;
 
   if (entry.type === 'image') {
@@ -135,11 +145,47 @@ export function getTargetValueForField(field, blockConfig, blockData) {
  * i.e. it's been customised. False when there's no target selected (nothing to
  * diverge from) or the field isn't mapped.
  */
-export function isFieldDivergedFromTarget(field, blockConfig, blockData) {
-  const targetValue = getTargetValueForField(field, blockConfig, blockData);
+export function isFieldDivergedFromTarget(field, blockConfig, blockData, liveTarget) {
+  const targetValue = getTargetValueForField(field, blockConfig, blockData, liveTarget);
   if (targetValue === undefined) return false;
   const current = blockData?.[field];
   return JSON.stringify(current) !== JSON.stringify(targetValue);
+}
+
+/** Strip a URL to its app-relative path; passthrough for already-relative ids. */
+function defaultFlatten(id) {
+  if (typeof id !== 'string') return id;
+  try {
+    const p = new URL(id).pathname.replace(/\/$/, '');
+    return p || '/';
+  } catch {
+    return id;
+  }
+}
+
+/**
+ * Transform a live `getContent` response into the catalog-brain snapshot shape
+ * the mapping reads (`Title`, `Description`, `head_title`, `Subjects`,
+ * `image_field`/`image_scales`) — the generic form of the teaser's
+ * dataTransformer. Pass a Volto `flattenToAppURL` as `flatten` in the app;
+ * the default only strips the origin.
+ */
+export function contentToSnapshot(resp, flatten = defaultFlatten) {
+  if (!resp) return resp;
+  const snap = {
+    '@id': flatten(resp['@id']),
+    '@type': resp['@type'],
+    Title: resp.title,
+    Description: resp.description,
+    head_title: resp.head_title ?? null,
+    Subjects: resp.subjects,
+  };
+  if (resp.image_field != null || resp.image_scales != null) {
+    snap.image_field = resp.image_field;
+    snap.image_scales = resp.image_scales;
+    snap.hasPreviewImage = true;
+  }
+  return snap;
 }
 
 /**

@@ -17,6 +17,8 @@ import {
   getTargetValueForField,
   isFieldDivergedFromTarget,
   installCopyFromTargetEnhancers,
+  getTargetId,
+  contentToSnapshot,
   COPY_FROM_TARGET_WIDGET,
 } from './copyFromTarget';
 
@@ -156,6 +158,52 @@ describe('getTargetValueForField — typed extraction from the snapshot', () => 
     const data = { href: [{ '@id': '/x', Subjects: ['news', 'plone'] }], tags: ['news', 'plone'] };
     expect(isFieldDivergedFromTarget('tags', tagsConfig, data)).toBe(false);
     expect(isFieldDivergedFromTarget('tags', tagsConfig, { ...data, tags: ['news'] })).toBe(true);
+  });
+});
+
+describe('live target — divergence/sync against the CURRENT target, not the snapshot', () => {
+  it('getTargetId reads the link field @id', () => {
+    expect(getTargetId(teaserConfig, { href: [targetSnapshot] })).toBe('/news/big');
+    expect(getTargetId(teaserConfig, { href: [] })).toBeUndefined();
+  });
+
+  it('getTargetValueForField uses the live target (snapshot-shaped) when provided', () => {
+    // Stored snapshot says 'Big News'; the live target has since changed.
+    const data = { href: [targetSnapshot] };
+    const live = { ...targetSnapshot, Title: 'Big News (updated)' };
+    expect(getTargetValueForField('title', teaserConfig, data, live)).toBe('Big News (updated)');
+    // …and falls back to the stored snapshot when no live target is passed.
+    expect(getTargetValueForField('title', teaserConfig, data)).toBe('Big News');
+  });
+
+  it('divergence is measured against the live target when provided', () => {
+    // Field matches the STALE snapshot but the live target changed → diverged.
+    const data = { href: [targetSnapshot], title: 'Big News' };
+    const live = { ...targetSnapshot, Title: 'Big News (updated)' };
+    expect(isFieldDivergedFromTarget('title', teaserConfig, data)).toBe(false); // vs stale
+    expect(isFieldDivergedFromTarget('title', teaserConfig, data, live)).toBe(true); // vs live
+  });
+
+  it('contentToSnapshot maps a getContent response to the catalog-brain snapshot shape', () => {
+    const resp = {
+      '@id': 'http://backend/news/big',
+      '@type': 'News Item',
+      title: 'Big News',
+      description: 'It happened',
+      head_title: 'Breaking',
+      subjects: ['news', 'plone'],
+      image_field: 'image',
+      image_scales: { image: [{ download: '/news/big/@@images/x.jpg' }] },
+    };
+    const snap = contentToSnapshot(resp);
+    expect(snap.Title).toBe('Big News');
+    expect(snap.Description).toBe('It happened');
+    expect(snap.head_title).toBe('Breaking');
+    expect(snap.Subjects).toEqual(['news', 'plone']);
+    expect(snap.image_field).toBe('image');
+    expect(snap.image_scales).toEqual(resp.image_scales);
+    // @id is flattened to an app-relative path (backend origin stripped).
+    expect(snap['@id']).toBe('/news/big');
   });
 });
 

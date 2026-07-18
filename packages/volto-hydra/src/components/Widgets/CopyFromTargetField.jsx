@@ -9,14 +9,74 @@
  * and resolve the real widget with Volto's own resolution order so the base
  * renders exactly as it always would.
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useDispatch } from 'react-redux';
 import { defineMessages, useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
+import { getContent } from '@plone/volto/actions/content/content';
+import { flattenToAppURL } from '@plone/volto/helpers/Url/Url';
 import { useHydraSchemaContext, getLiveBlockData } from '../../context';
 import {
+  getTargetId,
   getTargetValueForField,
   isFieldDivergedFromTarget,
+  contentToSnapshot,
 } from '../../utils/copyFromTarget';
+
+// Session cache of live targets (snapshot-shaped), keyed by @id, so divergence
+// is measured against the CURRENT target — not the stale link-field snapshot.
+// Lazy: fetched the first time a @target block is edited this session; refreshed
+// after the TTL. Module-level so all fields of a block share one fetch.
+const LIVE_TARGET_TTL = 5 * 60 * 1000; // 5 minutes
+const liveTargetCache = new Map(); // id -> { snapshot, fetchedAt, promise }
+
+/**
+ * Lazily fetch the live target once per session (TTL-refreshed) and return it
+ * in snapshot shape. Undefined until the first fetch resolves — callers fall
+ * back to the stored snapshot meanwhile. Never mutates formData (no dirty state).
+ */
+function useLiveTarget(targetId) {
+  const dispatch = useDispatch();
+  const [live, setLive] = useState(() => liveTargetCache.get(targetId)?.snapshot);
+
+  useEffect(() => {
+    if (!targetId) {
+      setLive(undefined);
+      return undefined;
+    }
+    const cached = liveTargetCache.get(targetId);
+    if (cached?.snapshot && Date.now() - cached.fetchedAt < LIVE_TARGET_TTL) {
+      setLive(cached.snapshot);
+      return undefined;
+    }
+    let cancelled = false;
+    const promise =
+      cached?.promise ||
+      Promise.resolve(
+        dispatch(
+          getContent(flattenToAppURL(targetId), null, `copy-from-target-${targetId}`),
+        ),
+      )
+        .then((resp) => {
+          const snapshot = contentToSnapshot(resp, flattenToAppURL);
+          liveTargetCache.set(targetId, { snapshot, fetchedAt: Date.now(), promise: null });
+          return snapshot;
+        })
+        .catch(() => {
+          liveTargetCache.delete(targetId); // let a later select retry
+          return undefined;
+        });
+    liveTargetCache.set(targetId, { ...(cached || {}), promise });
+    promise.then((snapshot) => {
+      if (!cancelled) setLive(snapshot);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [targetId, dispatch]);
+
+  return live;
+}
 
 const messages = defineMessages({
   syncFromTarget: {
@@ -73,14 +133,20 @@ const CopyFromTargetField = (props) => {
     ? ctx.blocksConfig?.[blockData['@type']]
     : null;
 
+  // Fresh target (lazy, session-cached) so divergence reflects the target's
+  // CURRENT values, not the stale snapshot; falls back to the snapshot until
+  // the first fetch resolves.
+  const targetId = blockConfig && blockData && getTargetId(blockConfig, blockData);
+  const liveTarget = useLiveTarget(targetId);
+
   const diverged =
     blockConfig &&
     blockData &&
-    isFieldDivergedFromTarget(props.id, blockConfig, blockData);
+    isFieldDivergedFromTarget(props.id, blockConfig, blockData, liveTarget);
 
   const onSync = (e) => {
     e.preventDefault();
-    const value = getTargetValueForField(props.id, blockConfig, blockData);
+    const value = getTargetValueForField(props.id, blockConfig, blockData, liveTarget);
     if (value !== undefined) props.onChange?.(props.id, value);
   };
 

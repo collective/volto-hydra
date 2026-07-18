@@ -289,7 +289,14 @@ sidebar, shown *only when that field has diverged* from the target (so it double
 as an "overridden" indicator, replacing the teaser's all-or-nothing `overwrite`
 checkbox). String fields copy straight across; an `image`-typed mapping assembles
 the target's `@id` / `image_field` / `image_scales` into the shape an image field
-expects.
+expects; multi-value fields (e.g. `Subjects` → tags) pass through as-is.
+
+Divergence is measured against the target **as it is now**, not the stale
+snapshot stored on the link field: the first time you edit a `@target` block in a
+session the target is fetched live (`getContent`, cached with a short TTL) so an
+override that matches the *old* target but not the *current* one still surfaces
+the sync control. The fetch is transient — it never mutates the block, so opening
+a page has no side effects.
 
 ### Conversion graph rules
 

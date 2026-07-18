@@ -2558,7 +2558,7 @@
     },
     "p-48": {
       "@type": "slate",
-      "plaintext": "Declaring `@target` is the **only** opt-in — no per-block enhancer wiring. Each mapped field then shows a small **\"reset to linked content\"** control in the sidebar, shown *only when that field has diverged* from the target (so it doubles as an \"overridden\" indicator, replacing the teaser's all-or-nothing `overwrite` checkbox). String fields copy straight across; an `image`-typed mapping assembles the target's `@id` / `image_field` / `image_scales` into the shape an image field expects.",
+      "plaintext": "Declaring `@target` is the **only** opt-in — no per-block enhancer wiring. Each mapped field then shows a small **\"reset to linked content\"** control in the sidebar, shown *only when that field has diverged* from the target (so it doubles as an \"overridden\" indicator, replacing the teaser's all-or-nothing `overwrite` checkbox). String fields copy straight across; an `image`-typed mapping assembles the target's `@id` / `image_field` / `image_scales` into the shape an image field expects; multi-value fields (e.g. `Subjects` → tags) pass through as-is.",
       "value": [
         {
           "type": "p",
@@ -2663,13 +2663,93 @@
               ]
             },
             {
-              "text": " into the shape an image field expects."
+              "text": " into the shape an image field expects; multi-value fields (e.g. "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "Subjects"
+                }
+              ]
+            },
+            {
+              "text": " → tags) pass through as-is."
             }
           ]
         }
       ]
     },
-    "h-49": {
+    "p-49": {
+      "@type": "slate",
+      "plaintext": "Divergence is measured against the target **as it is now**, not the stale snapshot stored on the link field: the first time you edit a `@target` block in a session the target is fetched live (`getContent`, cached with a short TTL) so an override that matches the *old* target but not the *current* one still surfaces the sync control. The fetch is transient — it never mutates the block, so opening a page has no side effects.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Divergence is measured against the target "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "as it is now"
+                }
+              ]
+            },
+            {
+              "text": ", not the stale snapshot stored on the link field: the first time you edit a "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "@target"
+                }
+              ]
+            },
+            {
+              "text": " block in a session the target is fetched live ("
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "getContent"
+                }
+              ]
+            },
+            {
+              "text": ", cached with a short TTL) so an override that matches the "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "old"
+                }
+              ]
+            },
+            {
+              "text": " target but not the "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "current"
+                }
+              ]
+            },
+            {
+              "text": " one still surfaces the sync control. The fetch is transient — it never mutates the block, so opening a page has no side effects."
+            }
+          ]
+        }
+      ]
+    },
+    "h-50": {
       "@type": "slate",
       "plaintext": "Conversion graph rules",
       "value": [
@@ -2683,7 +2763,7 @@
         }
       ]
     },
-    "ul-50": {
+    "ul-51": {
       "@type": "slate",
       "plaintext": "Explicit fieldMappings[typeName] always creates a conversion edge. @default only creates edges between types that both have valid @default mappings (keys from { @id, title, description, image }). Types with non-canonical @default keys are ignored. Types without fieldMappings never appear in the \"Convert to...\" menu. Transitive conversions use paths through intermediate types (e.g. hero → teaser → image). Unmapped fields are kept in the data so converting back restores them.",
       "value": [
@@ -2797,7 +2877,7 @@
         }
       ]
     },
-    "h-51": {
+    "h-52": {
       "@type": "slate",
       "plaintext": "Mapping value format",
       "value": [
@@ -2811,7 +2891,7 @@
         }
       ]
     },
-    "p-52": {
+    "p-53": {
       "@type": "slate",
       "plaintext": "A mapping value is either a string (simple field rename) or `{ field, type }` (rename with type conversion):",
       "value": [
@@ -2836,18 +2916,18 @@
         }
       ]
     },
-    "ce-53": {
+    "ce-54": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-53-json-17fd74",
+          "@id": "ce-54-json-a548a0",
           "label": "Json",
           "language": "json",
           "code": "{\n    \"@id\": { \"field\": \"href\", \"type\": \"link\" },\n    \"title\": \"title\",\n    \"description\": \"description\",\n    \"image\": \"preview_image\"\n}"
         }
       ]
     },
-    "p-54": {
+    "p-55": {
       "@type": "slate",
       "plaintext": "When `type` is specified, the value is converted at runtime:",
       "value": [
@@ -2872,7 +2952,7 @@
         }
       ]
     },
-    "tbl-55": {
+    "tbl-56": {
       "@type": "slateTable",
       "table": {
         "fixed": true,
@@ -2883,10 +2963,10 @@
         "striped": false,
         "rows": [
           {
-            "key": "tbl-55-r0",
+            "key": "tbl-56-r0",
             "cells": [
               {
-                "key": "tbl-55-r0c0",
+                "key": "tbl-56-r0c0",
                 "type": "header",
                 "value": [
                   {
@@ -2900,7 +2980,7 @@
                 ]
               },
               {
-                "key": "tbl-55-r0c1",
+                "key": "tbl-56-r0c1",
                 "type": "header",
                 "value": [
                   {
@@ -2916,10 +2996,10 @@
             ]
           },
           {
-            "key": "tbl-55-r1",
+            "key": "tbl-56-r1",
             "cells": [
               {
-                "key": "tbl-55-r1c0",
+                "key": "tbl-56-r1c0",
                 "type": "data",
                 "value": [
                   {
@@ -2938,7 +3018,7 @@
                 ]
               },
               {
-                "key": "tbl-55-r1c1",
+                "key": "tbl-56-r1c1",
                 "type": "data",
                 "value": [
                   {
@@ -2965,10 +3045,10 @@
             ]
           },
           {
-            "key": "tbl-55-r2",
+            "key": "tbl-56-r2",
             "cells": [
               {
-                "key": "tbl-55-r2c0",
+                "key": "tbl-56-r2c0",
                 "type": "data",
                 "value": [
                   {
@@ -2987,7 +3067,7 @@
                 ]
               },
               {
-                "key": "tbl-55-r2c1",
+                "key": "tbl-56-r2c1",
                 "type": "data",
                 "value": [
                   {
@@ -3014,10 +3094,10 @@
             ]
           },
           {
-            "key": "tbl-55-r3",
+            "key": "tbl-56-r3",
             "cells": [
               {
-                "key": "tbl-55-r3c0",
+                "key": "tbl-56-r3c0",
                 "type": "data",
                 "value": [
                   {
@@ -3036,7 +3116,7 @@
                 ]
               },
               {
-                "key": "tbl-55-r3c1",
+                "key": "tbl-56-r3c1",
                 "type": "data",
                 "value": [
                   {
@@ -3063,10 +3143,10 @@
             ]
           },
           {
-            "key": "tbl-55-r4",
+            "key": "tbl-56-r4",
             "cells": [
               {
-                "key": "tbl-55-r4c0",
+                "key": "tbl-56-r4c0",
                 "type": "data",
                 "value": [
                   {
@@ -3085,7 +3165,7 @@
                 ]
               },
               {
-                "key": "tbl-55-r4c1",
+                "key": "tbl-56-r4c1",
                 "type": "data",
                 "value": [
                   {
@@ -3109,10 +3189,10 @@
             ]
           },
           {
-            "key": "tbl-55-r5",
+            "key": "tbl-56-r5",
             "cells": [
               {
-                "key": "tbl-55-r5c0",
+                "key": "tbl-56-r5c0",
                 "type": "data",
                 "value": [
                   {
@@ -3131,7 +3211,7 @@
                 ]
               },
               {
-                "key": "tbl-55-r5c1",
+                "key": "tbl-56-r5c1",
                 "type": "data",
                 "value": [
                   {
@@ -3149,7 +3229,7 @@
         ]
       }
     },
-    "h-56": {
+    "h-57": {
       "@type": "slate",
       "plaintext": "FieldMappingWidget",
       "value": [
@@ -3163,7 +3243,7 @@
         }
       ]
     },
-    "p-57": {
+    "p-58": {
       "@type": "slate",
       "plaintext": "When a parent block has `mappingField` set in its `inheritSchemaFrom` recipe, the admin sidebar shows a widget that lets editors configure field mappings visually:",
       "value": [
@@ -3199,7 +3279,7 @@
         }
       ]
     },
-    "ul-58": {
+    "ul-59": {
       "@type": "slate",
       "plaintext": "Shows the @default source fields (@id, title, description, image) on the left. For each source field, lets the editor pick a field from the selected child type's schema. Auto-detects the conversion type from the target field definition (e.g. object_browser with mode=link → type: \"link\"). Saves the result as fieldMapping (singular) on the block data.",
       "value": [
@@ -3352,7 +3432,7 @@
         }
       ]
     },
-    "p-59": {
+    "p-60": {
       "@type": "slate",
       "plaintext": "The saved `fieldMapping` is read at render time by `expandListingBlocks` — no block registry access needed at render time.",
       "value": [
@@ -3388,7 +3468,7 @@
         }
       ]
     },
-    "h-60": {
+    "h-61": {
       "@type": "slate",
       "plaintext": "HTML Paste Support (TODO)",
       "value": [
@@ -3402,7 +3482,7 @@
         }
       ]
     },
-    "p-61": {
+    "p-62": {
       "@type": "slate",
       "plaintext": "When the editor pastes rich HTML into the page, Hydra will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:",
       "value": [
@@ -3416,18 +3496,18 @@
         }
       ]
     },
-    "ce-62": {
+    "ce-63": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-62-javascript-9dfc74",
+          "@id": "ce-63-javascript-7f9624",
           "label": "Javascript",
           "language": "javascript",
           "code": "video: {\n    fieldMappings: {\n        'css:video': { 'src': 'url', 'caption[@class=\"alt\"]': 'alt' },\n    },\n}"
         }
       ]
     },
-    "p-63": {
+    "p-64": {
       "@type": "slate",
       "plaintext": "The `css:<selector>` key in `fieldMappings` matches a pasted HTML element; the value maps element attributes to block fields. Not yet implemented — open question on whether this should run via `htmlTagsToSlate` (bypassing slate conversion) or be encoded into slate so attributes/classes survive.",
       "value": [
@@ -3526,21 +3606,22 @@
       "p-46",
       "ce-47",
       "p-48",
-      "h-49",
-      "ul-50",
-      "h-51",
-      "p-52",
-      "ce-53",
-      "p-54",
-      "tbl-55",
-      "h-56",
-      "p-57",
-      "ul-58",
-      "p-59",
-      "h-60",
-      "p-61",
-      "ce-62",
-      "p-63"
+      "p-49",
+      "h-50",
+      "ul-51",
+      "h-52",
+      "p-53",
+      "ce-54",
+      "p-55",
+      "tbl-56",
+      "h-57",
+      "p-58",
+      "ul-59",
+      "p-60",
+      "h-61",
+      "p-62",
+      "ce-63",
+      "p-64"
     ]
   }
 }
