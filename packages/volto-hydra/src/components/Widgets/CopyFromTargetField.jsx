@@ -167,9 +167,29 @@ const CopyFromTargetField = (props) => {
           type="button"
           className="copy-from-target-sync"
           onClick={onSync}
+          aria-label={intl.formatMessage(messages.syncFromTarget)}
           title={intl.formatMessage(messages.syncFromTarget)}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '1px 2px',
+            marginTop: '2px',
+            color: '#64748b',
+            fontSize: '11px',
+            lineHeight: 1.2,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            textDecoration: 'underline',
+            textUnderlineOffset: '2px',
+            textDecorationColor: 'rgba(100,116,139,0.4)',
+          }}
         >
-          ↺ {intl.formatMessage(messages.syncFromTarget)}
+          <span aria-hidden="true" style={{ fontSize: '12px' }}>
+            ↺
+          </span>
+          {intl.formatMessage(messages.syncFromTarget)}
         </button>
       ) : null}
     </>
