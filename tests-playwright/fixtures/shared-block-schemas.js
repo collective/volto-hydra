@@ -1139,6 +1139,7 @@ export const sharedBlocksConfig = {
     // Edge direction: `X.fieldMappings[Y]` = "X can be built FROM Y" (Y → X).
     convSource: {
         id: 'convSource',
+        restricted: true,
         title: 'Conv Source',
         group: 'common',
         fieldMappings: {}, // present (truthy) so it's a valid conversion source
@@ -1150,6 +1151,7 @@ export const sharedBlocksConfig = {
     },
     convTargetA: {
         id: 'convTargetA',
+        restricted: true,
         title: 'Conv Target A',
         group: 'common',
         fieldMappings: { convSource: { title: 'title' } }, // convSource → convTargetA
@@ -1161,6 +1163,7 @@ export const sharedBlocksConfig = {
     },
     convTargetB: {
         id: 'convTargetB',
+        restricted: true,
         title: 'Conv Target B',
         group: 'common',
         fieldMappings: { convSource: { title: 'title' } }, // convSource → convTargetB
@@ -1174,6 +1177,7 @@ export const sharedBlocksConfig = {
     // restricted container that doesn't list it rejects it outright.
     convAlien: {
         id: 'convAlien',
+        restricted: true,
         title: 'Conv Alien',
         group: 'common',
         blockSchema: {
@@ -1186,6 +1190,7 @@ export const sharedBlocksConfig = {
     // convGroupDst, carrying its children. Exercises convertContainerBlock on drop.
     convGroupSrc: {
         id: 'convGroupSrc',
+        restricted: true,
         title: 'Conv Group Src',
         group: 'common',
         fieldMappings: {}, // valid conversion source
@@ -1199,6 +1204,7 @@ export const sharedBlocksConfig = {
     },
     convGroupDst: {
         id: 'convGroupDst',
+        restricted: true,
         title: 'Conv Group Dst',
         group: 'common',
         fieldMappings: { convGroupSrc: {} }, // convGroupSrc → convGroupDst
@@ -1213,6 +1219,7 @@ export const sharedBlocksConfig = {
     // Restricted to convGroupDst → a dropped convGroupSrc auto-converts to it.
     convGroupBox: {
         id: 'convGroupBox',
+        restricted: true,
         title: 'Conv Group Box',
         group: 'common',
         blockSchema: {
@@ -1226,6 +1233,7 @@ export const sharedBlocksConfig = {
     // Container restricted to a SINGLE convert-target → convSource drops auto-convert.
     convBox: {
         id: 'convBox',
+        restricted: true,
         title: 'Convert Box',
         group: 'common',
         blockSchema: {
@@ -1239,6 +1247,7 @@ export const sharedBlocksConfig = {
     // Container restricted to TWO convert-targets → convSource drop opens the chooser.
     convBoxMulti: {
         id: 'convBoxMulti',
+        restricted: true,
         title: 'Convert Box (multi)',
         group: 'common',
         blockSchema: {
