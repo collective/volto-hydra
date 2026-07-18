@@ -1133,4 +1133,70 @@ export const sharedBlocksConfig = {
             required: [],
         },
     },
+    // --- Conversion drag/paste test graph (dnd-convert.spec.ts) ---
+    // A deterministic toy graph with EXPLICIT edges only (no '@default'), so
+    // convSource reaches exactly convTargetA + convTargetB and nothing else.
+    // Edge direction: `X.fieldMappings[Y]` = "X can be built FROM Y" (Y → X).
+    convSource: {
+        id: 'convSource',
+        title: 'Conv Source',
+        group: 'common',
+        fieldMappings: {}, // present (truthy) so it's a valid conversion source
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title'] }],
+            properties: { title: { title: 'Title', type: 'string' } },
+            required: [],
+        },
+    },
+    convTargetA: {
+        id: 'convTargetA',
+        title: 'Conv Target A',
+        group: 'common',
+        fieldMappings: { convSource: { title: 'title' } }, // convSource → convTargetA
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title'] }],
+            properties: { title: { title: 'Title', type: 'string' } },
+            required: [],
+        },
+    },
+    convTargetB: {
+        id: 'convTargetB',
+        title: 'Conv Target B',
+        group: 'common',
+        fieldMappings: { convSource: { title: 'title' } }, // convSource → convTargetB
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title'] }],
+            properties: { title: { title: 'Title', type: 'string' } },
+            required: [],
+        },
+    },
+    // Container restricted to a SINGLE convert-target → convSource drops auto-convert.
+    convBox: {
+        id: 'convBox',
+        title: 'Convert Box',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+            properties: {
+                items: { widget: 'blocks_layout', allowedBlocks: ['convTargetA'] },
+            },
+            required: [],
+        },
+    },
+    // Container restricted to TWO convert-targets → convSource drop opens the chooser.
+    convBoxMulti: {
+        id: 'convBoxMulti',
+        title: 'Convert Box (multi)',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+            properties: {
+                items: {
+                    widget: 'blocks_layout',
+                    allowedBlocks: ['convTargetA', 'convTargetB'],
+                },
+            },
+            required: [],
+        },
+    },
 };

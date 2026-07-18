@@ -240,6 +240,18 @@ async function renderBlock(blockId, block) {
         case 'section':
             wrapper.innerHTML = await renderSectionBlock(block);
             break;
+        // Conversion drag/paste test blocks (dnd-convert.spec.ts). Leaf types
+        // render a titled paragraph; the containers reuse the generic section
+        // renderer (children in blocks_layout.items, incl. a seeded empty).
+        case 'convSource':
+        case 'convTargetA':
+        case 'convTargetB':
+            wrapper.innerHTML = `<p data-conv-type="${block['@type']}">${escapeHtml(block.title || block['@type'])}</p>`;
+            break;
+        case 'convBox':
+        case 'convBoxMulti':
+            wrapper.innerHTML = await renderSectionBlock(block);
+            break;
         case 'contextNavigation': {
             // Return the <nav> directly so aria-label / class /
             // data-block-uid all live on the same element. The default

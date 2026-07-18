@@ -1,0 +1,22 @@
+{
+  "@id": "http://localhost:8888/dnd-convert-page",
+  "@type": "Document",
+  "UID": "dnd-convert-page-uid",
+  "id": "dnd-convert-page",
+  "title": "DnD Convert Page",
+  "blocks": {
+    "title-block": { "@type": "title" },
+    "src-1": { "@type": "convSource", "title": "Draggable source" },
+    "box-1": {
+      "@type": "convBox",
+      "blocks": { "a-1": { "@type": "convTargetA", "title": "Existing A" } },
+      "blocks_layout": { "items": ["a-1"] }
+    },
+    "boxm-1": {
+      "@type": "convBoxMulti",
+      "blocks": { "em-1": { "@type": "empty" } },
+      "blocks_layout": { "items": ["em-1"] }
+    }
+  },
+  "blocks_layout": { "items": ["title-block", "src-1", "box-1", "boxm-1"] }
+}
