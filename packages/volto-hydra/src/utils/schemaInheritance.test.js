@@ -12,6 +12,7 @@ vi.mock('../context', () => ({
 import {
   applyBlockDefaultsWithContext,
   createSchemaEnhancerFromRecipe,
+  getConvertibleTypes,
 } from './schemaInheritance';
 import config from '@plone/volto/registry';
 
@@ -245,5 +246,28 @@ describe('inheritSchemaFrom — idempotent (no doubled "… Defaults" fieldset)'
     ).toHaveLength(1);
 
     config.blocks.blocksConfig = prev;
+  });
+});
+
+describe('getConvertibleTypes — convert is disabled inside a type-synced container', () => {
+  const blocksConfig = {
+    card: { fieldMappings: { '@default': { '@id': 'url', title: 'title' } } },
+    link: { fieldMappings: { '@default': { '@id': 'url', title: 'title' } } },
+    image: { fieldMappings: { '@default': { '@id': 'url', image: 'image' } } },
+    listing: {}, // structural — no @default, not convertible
+  };
+
+  test('a synced child (allowedSiblingTypes = [syncedType, structural]) has no convert targets', () => {
+    // addableSiblingTypes restricts a card grid's children to ['card', 'listing'].
+    // A card is convertible to link/image, but neither is allowed here, so the
+    // convert chooser gets an empty list — and the convert control hides.
+    expect(getConvertibleTypes('card', blocksConfig, ['card', 'listing'])).toEqual([]);
+  });
+
+  test('an unsynced container (full allowed set) DOES offer the convert targets', () => {
+    const targets = getConvertibleTypes('card', blocksConfig, [
+      'card', 'link', 'image', 'listing',
+    ]);
+    expect(targets.map((t) => t.type).sort()).toEqual(['image', 'link']);
   });
 });
