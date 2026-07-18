@@ -32,4 +32,54 @@ test.describe('DnD / paste via conversion', () => {
     ).toHaveCount(3);
     await expect(iframe.locator('[data-conv-type="convSource"]')).toHaveCount(0);
   });
+
+  test('drag into a container with multiple convert-targets opens the chooser and commits atomically', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/dnd-convert-page');
+    const iframe = helper.getIframe();
+
+    // Drop the convSource between convBoxMulti's two children (options: A or B).
+    await helper.dragBlockAfterNoReorderAssert('src-1', 'b-1');
+
+    // Ask-first: the chooser appears and NOTHING has moved/converted yet.
+    await expect(page.locator('.blocks-chooser')).toBeVisible();
+    await expect(
+      iframe.locator('[data-block-uid="boxm-1"] [data-conv-type="convTargetB"]'),
+    ).toHaveCount(0);
+    await expect(iframe.locator('[data-conv-type="convSource"]')).toHaveCount(1);
+
+    // Choose Conv Target B → convert + move happen together.
+    await page.locator('.blocks-chooser').getByText('Conv Target B', { exact: false }).click();
+    await expect(
+      iframe.locator('[data-block-uid="boxm-1"] [data-conv-type="convTargetB"]'),
+    ).toHaveCount(1);
+    await expect(iframe.locator('[data-conv-type="convSource"]')).toHaveCount(0);
+
+    // One undo reverts BOTH the move and the conversion (single step).
+    await page.locator('#toolbar-body .undo').click();
+    await expect(
+      iframe.locator('[data-block-uid="boxm-1"] [data-conv-type="convTargetB"]'),
+    ).toHaveCount(0);
+    await expect(iframe.locator('[data-conv-type="convSource"]')).toHaveCount(1);
+  });
+
+  test('cancelling the convert chooser leaves the block where it was', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/dnd-convert-page');
+    const iframe = helper.getIframe();
+
+    await helper.dragBlockAfterNoReorderAssert('src-1', 'b-1');
+    await expect(page.locator('.blocks-chooser')).toBeVisible();
+
+    // Dismiss (outside click) → no-op: nothing moved or converted.
+    await page.mouse.click(5, 5);
+    await expect(page.locator('.blocks-chooser')).toBeHidden();
+    await expect(
+      iframe.locator('[data-block-uid="boxm-1"] [data-conv-type="convTargetB"]'),
+    ).toHaveCount(0);
+    await expect(iframe.locator('[data-conv-type="convSource"]')).toHaveCount(1);
+    expect(await helper.blockExists('src-1')).toBe(true);
+  });
 });

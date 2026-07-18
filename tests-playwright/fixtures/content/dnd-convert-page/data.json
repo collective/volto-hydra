@@ -17,8 +17,11 @@
     },
     "boxm-1": {
       "@type": "convBoxMulti",
-      "blocks": { "em-1": { "@type": "empty" } },
-      "blocks_layout": { "items": ["em-1"] }
+      "blocks": {
+        "b-1": { "@type": "convTargetA", "title": "Multi B1" },
+        "b-2": { "@type": "convTargetA", "title": "Multi B2" }
+      },
+      "blocks_layout": { "items": ["b-1", "b-2"] }
     }
   },
   "blocks_layout": { "items": ["title-block", "src-1", "box-1", "boxm-1"] }
