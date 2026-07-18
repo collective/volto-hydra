@@ -6,7 +6,8 @@
   "title": "DnD Convert Page",
   "blocks": {
     "title-block": { "@type": "title" },
-    "src-1": { "@type": "convSource", "title": "Draggable source" },
+    "src-1": { "@type": "convSource", "title": "Draggable source 1" },
+    "src-2": { "@type": "convSource", "title": "Draggable source 2" },
     "box-1": {
       "@type": "convBox",
       "blocks": {
@@ -24,5 +25,7 @@
       "blocks_layout": { "items": ["b-1", "b-2"] }
     }
   },
-  "blocks_layout": { "items": ["title-block", "src-1", "box-1", "boxm-1"] }
+  "blocks_layout": {
+    "items": ["title-block", "src-1", "src-2", "box-1", "boxm-1"]
+  }
 }

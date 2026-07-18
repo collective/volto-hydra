@@ -26,10 +26,42 @@ test.describe('DnD / paste via conversion', () => {
     await helper.dragBlockAfter('src-1', 'a-1');
 
     // After: the dropped convSource was auto-converted → box-1 has THREE convTargetA,
-    // and no convSource survives anywhere.
+    // and src-1 is no longer a convSource.
     await expect(
       iframe.locator('[data-block-uid="box-1"] [data-conv-type="convTargetA"]'),
     ).toHaveCount(3);
+    await expect(iframe.locator('[data-block-uid="src-1"] [data-conv-type="convSource"]')).toHaveCount(0);
+  });
+
+  test('multi-selected blocks each auto-convert into a single-option container', async ({ page }) => {
+    // The multi-block auto-only rule (a batch drops only where every block has
+    // exactly one convertible option) is unit-covered by acceptableAt; here we
+    // check the end-to-end auto path: two convSource blocks → two convTargetA.
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/dnd-convert-page');
+    const iframe = helper.getIframe();
+
+    await expect(
+      iframe.locator('[data-block-uid="box-1"] [data-conv-type="convTargetA"]'),
+    ).toHaveCount(2);
+
+    // Select src-1 + src-2 (two adjacent convSource blocks).
+    await helper.clickBlockInIframe('src-1');
+    await helper.waitForIframeBlockHandle('src-1');
+    await page.keyboard.press('Shift+ArrowDown');
+    const toolbar = page.locator('.quanta-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    const dragHandle = toolbar.locator('.drag-handle');
+    await expect(dragHandle).toBeVisible({ timeout: 3000 });
+
+    // Drag both between box-1's children → each auto-converts (single option).
+    const target = iframe.locator('[data-block-uid="a-1"]').first();
+    await helper.dragBlockWithMouse(dragHandle, target, true);
+
+    await expect(
+      iframe.locator('[data-block-uid="box-1"] [data-conv-type="convTargetA"]'),
+    ).toHaveCount(4);
     await expect(iframe.locator('[data-conv-type="convSource"]')).toHaveCount(0);
   });
 
@@ -47,21 +79,21 @@ test.describe('DnD / paste via conversion', () => {
     await expect(
       iframe.locator('[data-block-uid="boxm-1"] [data-conv-type="convTargetB"]'),
     ).toHaveCount(0);
-    await expect(iframe.locator('[data-conv-type="convSource"]')).toHaveCount(1);
+    await expect(iframe.locator('[data-block-uid="src-1"] [data-conv-type="convSource"]')).toHaveCount(1);
 
     // Choose Conv Target B → convert + move happen together.
     await page.locator('.blocks-chooser').getByText('Conv Target B', { exact: false }).click();
     await expect(
       iframe.locator('[data-block-uid="boxm-1"] [data-conv-type="convTargetB"]'),
     ).toHaveCount(1);
-    await expect(iframe.locator('[data-conv-type="convSource"]')).toHaveCount(0);
+    await expect(iframe.locator('[data-block-uid="src-1"] [data-conv-type="convSource"]')).toHaveCount(0);
 
     // One undo reverts BOTH the move and the conversion (single step).
     await page.locator('#toolbar-body .undo').click();
     await expect(
       iframe.locator('[data-block-uid="boxm-1"] [data-conv-type="convTargetB"]'),
     ).toHaveCount(0);
-    await expect(iframe.locator('[data-conv-type="convSource"]')).toHaveCount(1);
+    await expect(iframe.locator('[data-block-uid="src-1"] [data-conv-type="convSource"]')).toHaveCount(1);
   });
 
   test('pasting a block into a restricted container auto-converts it', async ({ page }) => {
@@ -90,7 +122,7 @@ test.describe('DnD / paste via conversion', () => {
     await expect(
       iframe.locator('[data-block-uid="box-1"] [data-conv-type="convTargetA"]'),
     ).toHaveCount(3);
-    await expect(iframe.locator('[data-conv-type="convSource"]')).toHaveCount(1);
+    await expect(iframe.locator('[data-block-uid="src-1"] [data-conv-type="convSource"]')).toHaveCount(1);
   });
 
   test('cancelling the convert chooser leaves the block where it was', async ({ page }) => {
@@ -108,7 +140,7 @@ test.describe('DnD / paste via conversion', () => {
     await expect(
       iframe.locator('[data-block-uid="boxm-1"] [data-conv-type="convTargetB"]'),
     ).toHaveCount(0);
-    await expect(iframe.locator('[data-conv-type="convSource"]')).toHaveCount(1);
+    await expect(iframe.locator('[data-block-uid="src-1"] [data-conv-type="convSource"]')).toHaveCount(1);
     expect(await helper.blockExists('src-1')).toBe(true);
   });
 });
