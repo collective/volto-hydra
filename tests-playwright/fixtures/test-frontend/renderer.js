@@ -246,6 +246,7 @@ async function renderBlock(blockId, block) {
         case 'convSource':
         case 'convTargetA':
         case 'convTargetB':
+        case 'convAlien':
             wrapper.innerHTML = `<p data-conv-type="${block['@type']}">${escapeHtml(block.title || block['@type'])}</p>`;
             break;
         case 'convBox':

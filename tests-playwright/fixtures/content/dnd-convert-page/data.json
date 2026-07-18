@@ -8,6 +8,7 @@
     "title-block": { "@type": "title" },
     "src-1": { "@type": "convSource", "title": "Draggable source 1" },
     "src-2": { "@type": "convSource", "title": "Draggable source 2" },
+    "alien-1": { "@type": "convAlien", "title": "Alien block" },
     "box-1": {
       "@type": "convBox",
       "blocks": {
@@ -26,6 +27,6 @@
     }
   },
   "blocks_layout": {
-    "items": ["title-block", "src-1", "src-2", "box-1", "boxm-1"]
+    "items": ["title-block", "src-1", "src-2", "alien-1", "box-1", "boxm-1"]
   }
 }

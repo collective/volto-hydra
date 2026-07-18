@@ -163,6 +163,63 @@ test.describe('DnD / paste via conversion', () => {
     ).toHaveCount(1);
   });
 
+  test('cut then paste converts into a restricted container (the mobile move path)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/dnd-convert-page');
+    const iframe = helper.getIframe();
+
+    await expect(
+      iframe.locator('[data-block-uid="box-1"] [data-conv-type="convTargetA"]'),
+    ).toHaveCount(2);
+
+    // Cut the convSource (mobile has no drag-convert → cut/paste is the move
+    // path). Cut removes the block immediately and holds it in the clipboard.
+    await helper.clickBlockInIframe('src-1');
+    await helper.waitForIframeBlockHandle('src-1');
+    await page.keyboard.press('ControlOrMeta+x');
+    await expect.poll(async () => helper.blockExists('src-1')).toBe(false);
+
+    // Select a block inside box-1 and paste after it → the moved block auto-converts.
+    await helper.clickBlockInIframe('a-1');
+    await helper.waitForIframeBlockHandle('a-1');
+    await expect(page.locator('#toolbar-paste-blocks')).toBeVisible({ timeout: 3000 });
+    await page.keyboard.press('ControlOrMeta+v');
+
+    // box-1 gains a third convTargetA; src-1 (moved, not copied) is now that
+    // converted block — no longer a convSource.
+    await expect(
+      iframe.locator('[data-block-uid="box-1"] [data-conv-type="convTargetA"]'),
+    ).toHaveCount(3);
+    await expect(
+      iframe.locator('[data-block-uid="src-1"] [data-conv-type="convSource"]'),
+    ).toHaveCount(0);
+  });
+
+  test('a block that cannot convert is rejected by a restricted container', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/dnd-convert-page');
+    const iframe = helper.getIframe();
+
+    await expect(
+      iframe.locator('[data-block-uid="box-1"] [data-conv-type="convTargetA"]'),
+    ).toHaveCount(2);
+
+    // alien-1 has no fieldMappings → not convertible to convTargetA, so box-1
+    // (allowedBlocks: [convTargetA]) must not accept it.
+    await helper.dragBlockAfterNoReorderAssert('alien-1', 'a-1');
+
+    // box-1 unchanged: still exactly 2 convTargetA, and no alien inside it.
+    await expect(
+      iframe.locator('[data-block-uid="box-1"] [data-conv-type="convTargetA"]'),
+    ).toHaveCount(2);
+    await expect(
+      iframe.locator('[data-block-uid="box-1"] [data-conv-type="convAlien"]'),
+    ).toHaveCount(0);
+    expect(await helper.blockExists('alien-1')).toBe(true);
+  });
+
   test('cancelling the convert chooser leaves the block where it was', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();

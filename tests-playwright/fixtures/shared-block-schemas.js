@@ -1170,6 +1170,18 @@ export const sharedBlocksConfig = {
             required: [],
         },
     },
+    // A block with NO fieldMappings → not convertible to anything, so a
+    // restricted container that doesn't list it rejects it outright.
+    convAlien: {
+        id: 'convAlien',
+        title: 'Conv Alien',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['title'] }],
+            properties: { title: { title: 'Title', type: 'string' } },
+            required: [],
+        },
+    },
     // Container restricted to a SINGLE convert-target → convSource drops auto-convert.
     convBox: {
         id: 'convBox',
