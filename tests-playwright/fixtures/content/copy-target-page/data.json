@@ -1,0 +1,17 @@
+{
+  "@id": "http://localhost:8888/copy-target-page",
+  "@type": "Document",
+  "UID": "copy-target-page-uid",
+  "id": "copy-target-page",
+  "title": "Copy Target Page",
+  "blocks": {
+    "title-block": { "@type": "title" },
+    "btn-1": {
+      "@type": "button",
+      "title": "Custom Label",
+      "href": [{ "@id": "/news/big", "Title": "Target Title" }],
+      "inneralign": "left"
+    }
+  },
+  "blocks_layout": { "items": ["title-block", "btn-1"] }
+}

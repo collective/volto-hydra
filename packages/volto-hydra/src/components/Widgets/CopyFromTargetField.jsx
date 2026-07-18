@@ -59,7 +59,10 @@ const CopyFromTargetField = (props) => {
   // Restore the original field def the enhancer stashed, so the base widget
   // resolves + renders exactly as Volto would (not as our wrapper).
   const { baseWidget, ...rest } = props;
-  const baseProps = { ...rest, ...(baseWidget || {}) };
+  // Restore the original field def. Crucially, reset `widget` to the ORIGINAL
+  // value (which may be undefined for a plain field) — otherwise `rest.widget`
+  // is still 'copyFromTargetField' and resolveWidget would recurse into us.
+  const baseProps = { ...rest, ...(baseWidget || {}), widget: baseWidget?.widget };
   const BaseWidget = resolveWidget(baseProps);
 
   // Block-level context: which block is being edited + its config + live data,

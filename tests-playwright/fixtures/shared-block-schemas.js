@@ -29,6 +29,12 @@ export const sharedBlocksConfig = {
         id: 'button',
         title: 'Button',
         group: 'common',
+        // Copy-from-target consumer: the button's Label (`title`) can be synced
+        // from the linked content item's Title. `href` is the link field that
+        // carries the target snapshot; declaring @target is the only opt-in.
+        fieldMappings: {
+            '@target': { Title: 'title' },
+        },
         blockSchema: {
             fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'href', 'inneralign'] }],
             properties: {
