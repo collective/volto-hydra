@@ -218,11 +218,12 @@ Field paths: `../field` for the parent block's field, `/field` for a page metada
 
 ## Block Conversion & fieldMappings
 
-`fieldMappings` (plural) on a block config defines how fields map between block types. This enables three things:
+`fieldMappings` (plural) on a block config defines how fields map between block types. This enables four things:
 
 - **"Convert to..." UI action** — editors can convert a block to another type (e.g. teaser → image).
 - **Listing item types** — query results are mapped to item blocks via `@default` (see [Listings](listings.md)).
 - **Synchronised container children** — a parent controls child type, all children convert together (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)).
+- **Drag / paste via conversion** — a block can be dropped or pasted into a container that only accepts a *convertible* type; it's converted on drop (see below).
 
 Each key in `fieldMappings` is either a **specific block type name** or **`@default`**.
 
@@ -263,6 +264,10 @@ checkboxFacet: { fieldMappings: { selectFacet: { /* ... */ }, daterangeFacet: { 
 - Types without `fieldMappings` never appear in the "Convert to..." menu.
 - Transitive conversions use paths through intermediate types (e.g. hero → teaser → image).
 - Unmapped fields are kept in the data so converting back restores them.
+
+### Drag / paste via conversion
+
+The same conversion graph gives drag-and-drop (and paste) more valid destinations: a block can be dropped or pasted into a container whose `allowedBlocks` only admits a type the block can *convert* to. On drop it's converted automatically when exactly one target type is reachable, or a chooser popup appears when several are (single-block only — the block moves only once you pick, so cancelling leaves it untouched). Multi-block selections and paste are auto-convert only. On mobile, conversion happens via cut → paste (drag/chevron move stays native-only). External-link and other type restrictions are unaffected; only the container's `allowedBlocks` gate is relaxed to "allowed or convertible".
 
 ### Mapping value format
 
