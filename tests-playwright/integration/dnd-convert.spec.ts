@@ -289,6 +289,40 @@ test.describe('DnD / paste via conversion', () => {
     ).toHaveCount(1);
   });
 
+  test('a container block with children converts on drop, carrying its children', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/dnd-convert-page');
+    const iframe = helper.getIframe();
+
+    // Before: grp-box-1 holds two convGroupDst; grp-src-1 (convGroupSrc) holds one child.
+    await expect(
+      iframe.locator('[data-block-uid="grp-box-1"] [data-container-type="convGroupDst"]'),
+    ).toHaveCount(2);
+    await expect(
+      iframe.locator('[data-block-uid="grp-src-1"] [data-conv-type="convTargetA"]'),
+    ).toHaveCount(1);
+
+    // Select the container itself (not its child), then drag it between
+    // grp-box-1's children (convGroupSrc → convGroupDst).
+    await helper.clickContainerBlockInIframe('grp-src-1');
+    const dragHandle = await helper.getDragHandle();
+    const target = iframe.locator('[data-block-uid="gd-1"]').first();
+    await helper.dragBlockWithMouse(dragHandle, target, true);
+
+    // grp-src-1 auto-converted to convGroupDst and moved in — via convertContainerBlock,
+    // so its child came along.
+    await expect(
+      iframe.locator('[data-block-uid="grp-box-1"] [data-container-type="convGroupDst"]'),
+    ).toHaveCount(3);
+    await expect(
+      iframe.locator('[data-block-uid="grp-src-1"] [data-container-type="convGroupDst"]'),
+    ).toHaveCount(1);
+    await expect(
+      iframe.locator('[data-block-uid="grp-src-1"] [data-conv-type="convTargetA"]'),
+    ).toHaveCount(1);
+  });
+
   test('cancelling the convert chooser leaves the block where it was', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();

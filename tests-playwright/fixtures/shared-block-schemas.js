@@ -1182,6 +1182,47 @@ export const sharedBlocksConfig = {
             required: [],
         },
     },
+    // Container-to-container conversion: convGroupSrc (holds children) converts to
+    // convGroupDst, carrying its children. Exercises convertContainerBlock on drop.
+    convGroupSrc: {
+        id: 'convGroupSrc',
+        title: 'Conv Group Src',
+        group: 'common',
+        fieldMappings: {}, // valid conversion source
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+            properties: {
+                items: { widget: 'blocks_layout', allowedBlocks: ['convTargetA'] },
+            },
+            required: [],
+        },
+    },
+    convGroupDst: {
+        id: 'convGroupDst',
+        title: 'Conv Group Dst',
+        group: 'common',
+        fieldMappings: { convGroupSrc: {} }, // convGroupSrc → convGroupDst
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+            properties: {
+                items: { widget: 'blocks_layout', allowedBlocks: ['convTargetA'] },
+            },
+            required: [],
+        },
+    },
+    // Restricted to convGroupDst → a dropped convGroupSrc auto-converts to it.
+    convGroupBox: {
+        id: 'convGroupBox',
+        title: 'Conv Group Box',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: [] }],
+            properties: {
+                items: { widget: 'blocks_layout', allowedBlocks: ['convGroupDst'] },
+            },
+            required: [],
+        },
+    },
     // Container restricted to a SINGLE convert-target → convSource drops auto-convert.
     convBox: {
         id: 'convBox',

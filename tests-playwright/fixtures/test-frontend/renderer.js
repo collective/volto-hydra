@@ -253,6 +253,11 @@ async function renderBlock(blockId, block) {
         case 'convBoxMulti':
             wrapper.innerHTML = await renderConvBox(block);
             break;
+        case 'convGroupSrc':
+        case 'convGroupDst':
+        case 'convGroupBox':
+            wrapper.innerHTML = await renderConvGroup(block);
+            break;
         case 'contextNavigation': {
             // Return the <nav> directly so aria-label / class /
             // data-block-uid all live on the same element. The default
@@ -1278,6 +1283,32 @@ async function renderConvBox(block) {
     const blocks = block.blocks || {};
     const items = block.blocks_layout?.items || [];
     let html = '<div class="section-body" style="padding: 12px; border: 1px dashed #888; border-radius: 4px;">';
+    for (const childId of items) {
+        const child = blocks[childId];
+        if (!child) continue;
+        const rendered = await renderBlock(childId, child);
+        let el = rendered;
+        if (rendered instanceof DocumentFragment) {
+            const c = document.createElement('div');
+            c.appendChild(rendered);
+            el = c.firstElementChild;
+        }
+        if (el && el.setAttribute) el.setAttribute('data-block-add', 'bottom');
+        html += el ? el.outerHTML : '';
+    }
+    html += '</div>';
+    return html;
+}
+
+/**
+ * Nested-container renderer for the container→container conversion test. Stamps
+ * `data-container-type` (the block's @type) so the test can assert a container's
+ * converted type, and renders children with `data-block-add="bottom"` (vertical).
+ */
+async function renderConvGroup(block) {
+    const blocks = block.blocks || {};
+    const items = block.blocks_layout?.items || [];
+    let html = `<div class="section-body" data-container-type="${block['@type']}" style="padding: 12px; border: 1px solid #4a90d9; border-radius: 4px;">`;
     for (const childId of items) {
         const child = blocks[childId];
         if (!child) continue;
