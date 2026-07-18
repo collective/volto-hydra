@@ -951,21 +951,44 @@ const Iframe = (props) => {
 
       const containerConfig = getContainerFieldConfig(afterBlockId, bpm, properties, blocksConfig, intl);
       const allowedTypes = containerConfig?.allowedBlocks;
+      // Resolve each pasted block against the container's allowedBlocks: native,
+      // or convertible (auto when one target type; a single pasted block with
+      // several options opens the chooser — ask-first). Multi-paste is auto-only.
+      let pasteBlocks = cloneWithIds;
       if (allowedTypes?.length > 0) {
-        const allAllowed = cloneWithIds.every(([, blockData]) =>
-          allowedTypes.includes(blockData?.['@type']),
-        );
-        if (!allAllowed) {
-          log('hydra-paste-blocks: blocked — types not allowed in container');
+        const singlePaste = cloneWithIds.length === 1;
+        const resolved = [];
+        for (const [newId, blockData] of cloneWithIds) {
+          const bType = blockData?.['@type'];
+          if (allowedTypes.includes(bType)) {
+            resolved.push([newId, blockData]); // native fit
+            continue;
+          }
+          const options = getConvertibleTypes(bType, blocksConfig, allowedTypes).map((t) => t.type);
+          if (options.length === 1) {
+            resolved.push([newId, convertBlockType(blockData, options[0], blocksConfig, '@type', intl)]);
+            continue;
+          }
+          if (options.length > 1 && singlePaste) {
+            // Ask-first: pick a target type, then insert the converted block.
+            setChooser({
+              kind: 'convert',
+              allowedBlocks: options,
+              pendingPaste: { newId, blockData, afterBlockId },
+            });
+            return; // insertion happens on chooser pick (commitChooser)
+          }
+          log('hydra-paste-blocks: blocked — type not allowed/convertible in container');
           return;
         }
+        pasteBlocks = resolved;
       }
 
-      log('hydra-paste-blocks:', cloneWithIds.length, 'blocks after', afterBlockId);
+      log('hydra-paste-blocks:', pasteBlocks.length, 'blocks after', afterBlockId);
       let newFormData = { ...properties };
       let currentBpm = bpm;
       let lastId = afterBlockId;
-      for (const [newId, blockData] of cloneWithIds) {
+      for (const [newId, blockData] of pasteBlocks) {
         newFormData = insertBlockInContainer(newFormData, currentBpm, lastId, newId, blockData, containerConfig, 'after');
         currentBpm = buildBlockPathMap(newFormData, blocksConfig, intl);
         lastId = newId;
@@ -4286,6 +4309,22 @@ const Iframe = (props) => {
         onChangeFormData(newFormData);
         if (onSetMultiSelected) onSetMultiSelected([]);
         if (onSelectBlock) onSelectBlock(newContainerId);
+      } else if (chooser.kind === 'convert' && chooser.pendingPaste) {
+        // Ask-first paste: insert a NEW block, converted to the chosen type,
+        // after the paste target. One update → one undo.
+        const pp = chooser.pendingPaste;
+        const converted = convertBlockType(pp.blockData, newType, blocksConfig, '@type', intl);
+        const cfg = getContainerFieldConfig(pp.afterBlockId, bpm, properties, blocksConfig, intl);
+        const updatedProperties = insertBlockInContainer(
+          properties, bpm, pp.afterBlockId, pp.newId, converted, cfg, 'after',
+        );
+        onChangeFormData(updatedProperties);
+        setIframeSyncState(prev => ({
+          ...prev,
+          formData: updatedProperties,
+          blockPathMap: buildBlockPathMap(updatedProperties, blocksConfig, intl),
+          toolbarRequestDone: `paste-convert-${Date.now()}`,
+        }));
       } else if (chooser.kind === 'convert') {
         const blockData = getBlockById(properties, bpm, chooser.blockId);
         if (blockData) {

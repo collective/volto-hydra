@@ -64,6 +64,35 @@ test.describe('DnD / paste via conversion', () => {
     await expect(iframe.locator('[data-conv-type="convSource"]')).toHaveCount(1);
   });
 
+  test('pasting a block into a restricted container auto-converts it', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/dnd-convert-page');
+    const iframe = helper.getIframe();
+
+    await expect(
+      iframe.locator('[data-block-uid="box-1"] [data-conv-type="convTargetA"]'),
+    ).toHaveCount(2);
+
+    // Copy the convSource (a non-editable block → selecting it IS block mode).
+    await helper.clickBlockInIframe('src-1');
+    await helper.waitForIframeBlockHandle('src-1');
+    await page.keyboard.press('ControlOrMeta+c');
+    await expect(page.locator('#toolbar-paste-blocks')).toBeVisible({ timeout: 3000 });
+
+    // Select a block inside box-1 and paste after it → auto-convert into the box.
+    await helper.clickBlockInIframe('a-1');
+    await helper.waitForIframeBlockHandle('a-1');
+    await page.keyboard.press('ControlOrMeta+v');
+
+    // box-1 gains a third convTargetA (the pasted convSource converted); the
+    // original src-1 (a copy) remains a convSource at page level.
+    await expect(
+      iframe.locator('[data-block-uid="box-1"] [data-conv-type="convTargetA"]'),
+    ).toHaveCount(3);
+    await expect(iframe.locator('[data-conv-type="convSource"]')).toHaveCount(1);
+  });
+
   test('cancelling the convert chooser leaves the block where it was', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
