@@ -1,0 +1,108 @@
+{
+  "@id": "/docs/examples/searchShortcuts",
+  "@type": "Document",
+  "UID": "docs-examples-searchShortcuts-001",
+  "allow_discussion": false,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "ref-searchShortcuts-schema": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-searchShortcuts",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-searchShortcuts-schema-javascript-980727",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  \"searchShortcuts\": {\n    \"id\": \"searchShortcuts\",\n    \"title\": \"Search Shortcuts\",\n    \"blockSchema\": {\n      \"fieldsets\": [\n        {\n          \"id\": \"default\",\n          \"title\": \"Default\",\n          \"fields\": [\n            \"index\",\n            \"pageField\",\n            \"searchUrl\",\n            \"variation\",\n            \"fieldMapping\"\n          ]\n        }\n      ],\n      \"properties\": {\n        \"index\": {\n          \"title\": \"Index\",\n          \"widget\": \"select_querystring_field\",\n          \"vocabulary\": {\n            \"@id\": \"plone.app.contenttypes.metadatafields\"\n          },\n          \"default\": \"Subject\"\n        },\n        \"pageField\": {\n          \"title\": \"This page field (optional)\",\n          \"widget\": \"schemaFieldSelect\",\n          \"fieldType\": \"keyword\"\n        },\n        \"searchUrl\": {\n          \"title\": \"Search page URL\",\n          \"widget\": \"url\"\n        },\n        \"variation\": {\n          \"title\": \"Item Type\",\n          \"widget\": \"blockTypeSelect\",\n          \"filterConvertibleFrom\": \"@default\",\n          \"default\": \"default\"\n        }\n      }\n    },\n    \"schemaEnhancer\": {\n      \"inheritSchemaFrom\": {\n        \"typeField\": \"variation\",\n        \"mappingField\": \"fieldMapping\",\n        \"defaultsField\": \"itemDefaults\"\n      }\n    }\n  }\n}"
+        }
+      ]
+    },
+    "ref-searchShortcuts-json-data": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-searchShortcuts",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-searchShortcuts-json-data-json-b402fc",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"searchShortcuts\",\n  \"index\": \"Subject\",\n  \"pageField\": \"subjects\",\n  \"searchUrl\": \"/search\",\n  \"variation\": \"default\"\n}"
+        }
+      ]
+    },
+    "ref-searchShortcuts-rendering": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-searchShortcuts",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-searchShortcuts-rendering-jsx-113816",
+          "label": "React",
+          "language": "jsx",
+          "code": ""
+        },
+        {
+          "@id": "ref-searchShortcuts-rendering-vue-d43e6a",
+          "label": "Vue",
+          "language": "vue",
+          "code": ""
+        },
+        {
+          "@id": "ref-searchShortcuts-rendering-svelte-43c411",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": ""
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "ref-searchShortcuts-schema",
+      "ref-searchShortcuts-json-data",
+      "ref-searchShortcuts-rendering"
+    ]
+  },
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "Renders a set of values as links into a faceted search — a \"tag cloud\" of shortcuts. Each value links to a search page with ?facet.<index>=<value> pre-set, which a Search block reads from the URL.",
+  "effective": null,
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "searchShortcuts",
+  "is_folderish": false,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {},
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/docs/examples",
+    "@type": "Document",
+    "UID": "docs-examples-folder-001",
+    "description": "Block reference: schema, JSON, and rendered examples for every block type Volto Hydra ships.",
+    "title": "Examples",
+    "type_title": "Page"
+  },
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Search Shortcuts Block",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {},
+  "working_copy": null,
+  "working_copy_of": null
+}

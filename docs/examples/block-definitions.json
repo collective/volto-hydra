@@ -2018,5 +2018,171 @@
         }
       }
     }
+  },
+  "relatedItemsListing": {
+    "blocks": {
+      "relatedItemsListing": {
+        "id": "relatedItemsListing",
+        "title": "Related Items",
+        "blockSchema": {
+          "fieldsets": [
+            {
+              "id": "default",
+              "title": "Default",
+              "fields": [
+                "relationField",
+                "variation",
+                "fieldMapping"
+              ]
+            }
+          ],
+          "properties": {
+            "relationField": {
+              "title": "Relation field",
+              "widget": "schemaFieldSelect",
+              "fieldType": "relation"
+            },
+            "variation": {
+              "title": "Item Type",
+              "widget": "blockTypeSelect",
+              "filterConvertibleFrom": "@default",
+              "default": "summary"
+            }
+          }
+        },
+        "schemaEnhancer": {
+          "inheritSchemaFrom": {
+            "typeField": "variation",
+            "mappingField": "fieldMapping",
+            "defaultsField": "itemDefaults"
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-relatedItemsListing": {
+        "@type": "relatedItemsListing",
+        "variation": "summary",
+        "relationField": "relatedItems"
+      }
+    }
+  },
+  "searchShortcuts": {
+    "blocks": {
+      "searchShortcuts": {
+        "id": "searchShortcuts",
+        "title": "Search Shortcuts",
+        "blockSchema": {
+          "fieldsets": [
+            {
+              "id": "default",
+              "title": "Default",
+              "fields": [
+                "index",
+                "pageField",
+                "searchUrl",
+                "variation",
+                "fieldMapping"
+              ]
+            }
+          ],
+          "properties": {
+            "index": {
+              "title": "Index",
+              "widget": "select_querystring_field",
+              "vocabulary": {
+                "@id": "plone.app.contenttypes.metadatafields"
+              },
+              "default": "Subject"
+            },
+            "pageField": {
+              "title": "This page field (optional)",
+              "widget": "schemaFieldSelect",
+              "fieldType": "keyword"
+            },
+            "searchUrl": {
+              "title": "Search page URL",
+              "widget": "url"
+            },
+            "variation": {
+              "title": "Item Type",
+              "widget": "blockTypeSelect",
+              "filterConvertibleFrom": "@default",
+              "default": "default"
+            }
+          }
+        },
+        "schemaEnhancer": {
+          "inheritSchemaFrom": {
+            "typeField": "variation",
+            "mappingField": "fieldMapping",
+            "defaultsField": "itemDefaults"
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-searchShortcuts": {
+        "@type": "searchShortcuts",
+        "index": "Subject",
+        "pageField": "subjects",
+        "searchUrl": "/search",
+        "variation": "default"
+      }
+    }
+  },
+  "rssFeed": {
+    "blocks": {
+      "rssFeed": {
+        "id": "rssFeed",
+        "title": "RSS Feed",
+        "blockSchema": {
+          "fieldsets": [
+            {
+              "id": "default",
+              "title": "Default",
+              "fields": [
+                "feedUrl",
+                "count",
+                "variation",
+                "fieldMapping"
+              ]
+            }
+          ],
+          "properties": {
+            "feedUrl": {
+              "title": "Feed URL",
+              "widget": "url"
+            },
+            "count": {
+              "title": "Max items",
+              "type": "number",
+              "default": 6
+            },
+            "variation": {
+              "title": "Item Type",
+              "widget": "blockTypeSelect",
+              "filterConvertibleFrom": "@default",
+              "default": "summary"
+            }
+          }
+        },
+        "schemaEnhancer": {
+          "inheritSchemaFrom": {
+            "typeField": "variation",
+            "mappingField": "fieldMapping",
+            "defaultsField": "itemDefaults"
+          }
+        }
+      }
+    },
+    "examples": {
+      "ex-rssFeed": {
+        "@type": "rssFeed",
+        "feedUrl": "https://example.com/feed.xml",
+        "count": 6,
+        "variation": "summary"
+      }
+    }
   }
 }

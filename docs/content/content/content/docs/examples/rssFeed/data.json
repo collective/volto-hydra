@@ -1,0 +1,108 @@
+{
+  "@id": "/docs/examples/rssFeed",
+  "@type": "Document",
+  "UID": "docs-examples-rssFeed-001",
+  "allow_discussion": false,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "ref-rssFeed-schema": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-rssFeed",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-rssFeed-schema-javascript-d79cf2",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  \"rssFeed\": {\n    \"id\": \"rssFeed\",\n    \"title\": \"RSS Feed\",\n    \"blockSchema\": {\n      \"fieldsets\": [\n        {\n          \"id\": \"default\",\n          \"title\": \"Default\",\n          \"fields\": [\n            \"feedUrl\",\n            \"count\",\n            \"variation\",\n            \"fieldMapping\"\n          ]\n        }\n      ],\n      \"properties\": {\n        \"feedUrl\": {\n          \"title\": \"Feed URL\",\n          \"widget\": \"url\"\n        },\n        \"count\": {\n          \"title\": \"Max items\",\n          \"type\": \"number\",\n          \"default\": 6\n        },\n        \"variation\": {\n          \"title\": \"Item Type\",\n          \"widget\": \"blockTypeSelect\",\n          \"filterConvertibleFrom\": \"@default\",\n          \"default\": \"summary\"\n        }\n      }\n    },\n    \"schemaEnhancer\": {\n      \"inheritSchemaFrom\": {\n        \"typeField\": \"variation\",\n        \"mappingField\": \"fieldMapping\",\n        \"defaultsField\": \"itemDefaults\"\n      }\n    }\n  }\n}"
+        }
+      ]
+    },
+    "ref-rssFeed-json-data": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-rssFeed",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-rssFeed-json-data-json-c55bf4",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"rssFeed\",\n  \"feedUrl\": \"https://example.com/feed.xml\",\n  \"count\": 6,\n  \"variation\": \"summary\"\n}"
+        }
+      ]
+    },
+    "ref-rssFeed-rendering": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-rssFeed",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-rssFeed-rendering-jsx-335e9c",
+          "label": "React",
+          "language": "jsx",
+          "code": ""
+        },
+        {
+          "@id": "ref-rssFeed-rendering-vue-2c0da5",
+          "label": "Vue",
+          "language": "vue",
+          "code": ""
+        },
+        {
+          "@id": "ref-rssFeed-rendering-svelte-6ffc72",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": ""
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "ref-rssFeed-schema",
+      "ref-rssFeed-json-data",
+      "ref-rssFeed-rendering"
+    ]
+  },
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "Renders entries from an external RSS feed, reusing the listing machinery. Each entry is rendered with a configurable item type (variation).",
+  "effective": null,
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "rssFeed",
+  "is_folderish": false,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {},
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/docs/examples",
+    "@type": "Document",
+    "UID": "docs-examples-folder-001",
+    "description": "Block reference: schema, JSON, and rendered examples for every block type Volto Hydra ships.",
+    "title": "Examples",
+    "type_title": "Page"
+  },
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "RSS Feed Block",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {},
+  "working_copy": null,
+  "working_copy_of": null
+}

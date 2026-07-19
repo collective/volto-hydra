@@ -1,0 +1,108 @@
+{
+  "@id": "/docs/examples/relatedItemsListing",
+  "@type": "Document",
+  "UID": "docs-examples-relatedItemsListing-001",
+  "allow_discussion": false,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "ref-relatedItemsListing-schema": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-relatedItemsListing",
+      "placeholder": "schema",
+      "tabs": [
+        {
+          "@id": "ref-relatedItemsListing-schema-javascript-a1a504",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  \"relatedItemsListing\": {\n    \"id\": \"relatedItemsListing\",\n    \"title\": \"Related Items\",\n    \"blockSchema\": {\n      \"fieldsets\": [\n        {\n          \"id\": \"default\",\n          \"title\": \"Default\",\n          \"fields\": [\n            \"relationField\",\n            \"variation\",\n            \"fieldMapping\"\n          ]\n        }\n      ],\n      \"properties\": {\n        \"relationField\": {\n          \"title\": \"Relation field\",\n          \"widget\": \"schemaFieldSelect\",\n          \"fieldType\": \"relation\"\n        },\n        \"variation\": {\n          \"title\": \"Item Type\",\n          \"widget\": \"blockTypeSelect\",\n          \"filterConvertibleFrom\": \"@default\",\n          \"default\": \"summary\"\n        }\n      }\n    },\n    \"schemaEnhancer\": {\n      \"inheritSchemaFrom\": {\n        \"typeField\": \"variation\",\n        \"mappingField\": \"fieldMapping\",\n        \"defaultsField\": \"itemDefaults\"\n      }\n    }\n  }\n}"
+        }
+      ]
+    },
+    "ref-relatedItemsListing-json-data": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-relatedItemsListing",
+      "placeholder": "json-data",
+      "tabs": [
+        {
+          "@id": "ref-relatedItemsListing-json-data-json-ba9577",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"relatedItemsListing\",\n  \"variation\": \"summary\",\n  \"relationField\": \"relatedItems\"\n}"
+        }
+      ]
+    },
+    "ref-relatedItemsListing-rendering": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-relatedItemsListing",
+      "placeholder": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-relatedItemsListing-rendering-jsx-050122",
+          "label": "React",
+          "language": "jsx",
+          "code": ""
+        },
+        {
+          "@id": "ref-relatedItemsListing-rendering-vue-c61844",
+          "label": "Vue",
+          "language": "vue",
+          "code": ""
+        },
+        {
+          "@id": "ref-relatedItemsListing-rendering-svelte-53b981",
+          "label": "Svelte",
+          "language": "svelte",
+          "code": ""
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "ref-relatedItemsListing-schema",
+      "ref-relatedItemsListing-json-data",
+      "ref-relatedItemsListing-rendering"
+    ]
+  },
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "Renders the current page's related items relation field (default relatedItems) as a list, reusing the listing machinery — each related item is rendered with a configurable item type (variation).",
+  "effective": null,
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "relatedItemsListing",
+  "is_folderish": false,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {},
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/docs/examples",
+    "@type": "Document",
+    "UID": "docs-examples-folder-001",
+    "description": "Block reference: schema, JSON, and rendered examples for every block type Volto Hydra ships.",
+    "title": "Examples",
+    "type_title": "Page"
+  },
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Related Items Block",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {},
+  "working_copy": null,
+  "working_copy_of": null
+}

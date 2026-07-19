@@ -670,6 +670,24 @@
           "nav-3"
         ]
       }
+    },
+    "ex-relatedItemsListing": {
+      "@type": "relatedItemsListing",
+      "variation": "summary",
+      "relationField": "relatedItems"
+    },
+    "ex-searchShortcuts": {
+      "@type": "searchShortcuts",
+      "index": "Subject",
+      "pageField": "subjects",
+      "searchUrl": "/search",
+      "variation": "default"
+    },
+    "ex-rssFeed": {
+      "@type": "rssFeed",
+      "feedUrl": "https://example.com/feed.xml",
+      "count": 6,
+      "variation": "summary"
     }
   },
   "blocks_layout": {
@@ -698,7 +716,10 @@
       "ex-toc",
       "ex-codeExample",
       "ex-grid",
-      "ex-contextnav"
+      "ex-contextnav",
+      "ex-relatedItemsListing",
+      "ex-searchShortcuts",
+      "ex-rssFeed"
     ]
   },
   "is_folderish": false,
