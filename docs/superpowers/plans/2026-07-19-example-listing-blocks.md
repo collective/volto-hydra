@@ -4,7 +4,7 @@
 
 **Goal:** Three example/reference blocks that reuse `expandListingBlocks` + a custom `fetchItems` fetcher — Related Items, Search Shortcuts, and RSS Feed — in the nuxt example + mock test frontend.
 
-**Architecture:** Each block is a new block type whose items come from a custom fetcher `async (block, { start, size }) => ({ items, total })` (the same contract as `ploneFetchItems`). Fetchers live in the shared `packages/helpers/index.js` (imported by both nuxt and the mock frontend). Block schemas go in `shared-block-schemas.js` (mock) + the nuxt example's registered blocks; renderers go in the mock `renderer.js` + nuxt `block.vue`. One small admin-side widget lists a type's relation fields for the Related Items override.
+**Architecture:** Each block is a new block type whose items come from a custom fetcher `async (block, { start, size }) => ({ items, total })` (the same contract as `ploneFetchItems`). Fetchers live in the shared `packages/helpers/index.js` (imported by every frontend). **No bespoke renderers:** each block expands via `expandListingBlocks` into standard item blocks (default/summary/teaser) that all frontends already render — Search Shortcuts included (each shortcut is a link *item* with an `href`, not a custom chip). So the only per-frontend work is registering the fetcher in that frontend's `fetchItems` map and letting the new block types flow through the existing listing-render path. That makes the blocks frontend-agnostic — they work anywhere the fetcher is registered. Block schemas go in `shared-block-schemas.js` (mock) + the nuxt example's registered blocks. One small admin-side widget (`schemaFieldSelect`, parameterized by field type) lists a content type's fields for the Related Items override.
 
 **Tech stack:** `@volto-hydra/helpers` (shared fetchers, jest-tested), mock test frontend (vite) + nuxt-blog-starter (Vue), Volto admin widgets (`packages/volto-hydra`), Playwright admin-mock.
 
@@ -29,7 +29,7 @@
 **Create:**
 - `packages/helpers/relatedItemsFetcher` / `searchShortcutsFetcher` / `rssFetcher` — three exported factories in `packages/helpers/index.js` (one file; they're small and belong with `ploneFetchItems`).
 - `packages/hydra-js/exampleListingFetchers.test.js` — jest unit tests for all three (mock `fetch`).
-- `packages/volto-hydra/src/components/Widgets/RelationFieldSelectWidget.jsx` — the `/@types` relation-field dropdown (Related Items override).
+- `packages/volto-hydra/src/components/Widgets/SchemaFieldSelectWidget.jsx` — a `/@types` field dropdown **parameterized by field type** (`fieldType: 'relation' | 'keyword' | …`); Related Items uses it with `fieldType: 'relation'`. Reusable for other field pickers.
 - `tests-playwright/fixtures/content/example-listings-page/data.json` — page fixture with the three blocks + `relatedItems` summaries + `subjects`.
 - `tests-playwright/integration/example-listings.spec.ts` — integration coverage.
 
@@ -37,9 +37,9 @@
 - `packages/helpers/index.js` — add the three fetchers.
 - `tests-playwright/fixtures/shared-block-schemas.js` — three block schemas (`relatedItemsListing`, `searchShortcuts`, `rssFeed`), `restricted` where they shouldn't clutter choosers.
 - `tests-playwright/fixtures/test-frontend/index.html` — add the three fetchers to the `fetchItems` map (`:232`), register in page `allowedBlocks`.
-- `tests-playwright/fixtures/test-frontend/renderer.js` — render cases + a chip renderer for Search Shortcuts.
+- `tests-playwright/fixtures/test-frontend/renderer.js` — recognize the new block types in the listing path (`hasListings` check + a `case` delegating to `renderListingBlock`); **no bespoke renderers**.
 - `examples/nuxt-blog-starter/components/ListingBlock.vue` (or `[...slug].vue`) — add the three fetchers to `fetchItems`.
-- `examples/nuxt-blog-starter/components/block.vue` — render cases.
+- `examples/nuxt-blog-starter/components/block.vue` — recognize the new types on the existing ListingBlock render path (no new render logic).
 - `packages/volto-hydra/src/index.js` — register the widget.
 - `tests-playwright/fixtures/mock-plone-api.cjs` — serve `/@types/<Type>` with relation fields; serve a stubbed RSS URL.
 - `tests-playwright/bridge/block-sanity.spec.ts` + `empty-region-sanity.spec.ts` — exclude the example blocks if they trip discovery (mirror #258's `conv` filter).
@@ -225,24 +225,24 @@ git commit -am "feat(helpers): rssFetcher — external RSS entries (client-side 
 
 ---
 
-## Task 4: Relation-field override widget (admin)
+## Task 4: `schemaFieldSelect` widget (admin, field-type parameterized)
 
 **Files:**
-- Create: `packages/volto-hydra/src/components/Widgets/RelationFieldSelectWidget.jsx`
-- Modify: `packages/volto-hydra/src/index.js` (register `config.widgets.widget.relationFieldSelect`)
+- Create: `packages/volto-hydra/src/components/Widgets/SchemaFieldSelectWidget.jsx`
+- Modify: `packages/volto-hydra/src/index.js` (register `config.widgets.widget.schemaFieldSelect`)
 
 - [ ] **Step 1** — inspect an existing simple select widget in `packages/volto-hydra/src/components/Widgets` (e.g. `BlockTypeSelectWidget.jsx`) for the shape (choices computed at render, `onChange(id, value)`).
 
-- [ ] **Step 2: Implement** — a widget that, on mount, fetches `/@types/${contentType}` (auth headers via the admin's token; get `contentType` from the Hydra schema context / `formData['@type']`), lists fields whose schema entry is a relation (`widget: 'relateditems'` or type/`items.vocabulary` relation markers), and renders a `<select>` (empty option = default `relatedItems`). Falls back to a free-text input if the fetch fails.
+- [ ] **Step 2: Implement** — a widget that reads a **`fieldType` parameter** from its schema entry (`props.fieldType` or `widgetOptions.frontendOptions.fieldType`, e.g. `'relation'`, `'keyword'`). On mount it fetches `/@types/${contentType}` (auth headers via the admin token; `contentType` from the Hydra schema context / `formData['@type']`), lists the schema fields matching that field type (relation → `widget: 'relateditems'` / relation markers; keyword → the tags/keyword widget), and renders a `<select>` (empty option = the block's default). Falls back to a free-text input if the fetch fails. `fieldType` unset → list all fields.
 
-- [ ] **Step 3** — register in `packages/volto-hydra/src/index.js`: `config.widgets.widget.relationFieldSelect = RelationFieldSelectWidget;`
+- [ ] **Step 3** — register in `packages/volto-hydra/src/index.js`: `config.widgets.widget.schemaFieldSelect = SchemaFieldSelectWidget;`
 
-- [ ] **Step 4** — no unit test (network widget); covered by the Task 9 integration test (dropdown lists the mock `/@types` relation fields).
+- [ ] **Step 4** — no unit test (network widget); covered by the Task 9 integration test (with `fieldType: 'relation'` the dropdown lists the mock `/@types` relation fields).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git commit -am "feat(widget): relationFieldSelect — /@types-backed relation field dropdown"
+git commit -am "feat(widget): schemaFieldSelect — /@types field dropdown, parameterized by field type"
 ```
 
 ---
@@ -252,7 +252,7 @@ git commit -am "feat(widget): relationFieldSelect — /@types-backed relation fi
 **Files:** Modify `tests-playwright/fixtures/shared-block-schemas.js` (mock) + the nuxt example's registered blocks (`examples/nuxt-blog-starter/pages/[...slug].vue` newBlocks, via sharedBlocksConfig import).
 
 - [ ] **Step 1** — add three block configs to `sharedBlocksConfig`:
-  - `relatedItemsListing`: `blockSchema` with `relationField` (widget `relationFieldSelect`), `variation` (item type), `fieldMapping`; `restricted: false` (it's a real addable block); item type via `inheritSchemaFrom` like `listing`.
+  - `relatedItemsListing`: `blockSchema` with `relationField` (widget `schemaFieldSelect`, `fieldType: 'relation'`), `variation` (item type), `fieldMapping`; `restricted: false` (it's a real addable block); item type via `inheritSchemaFrom` like `listing`.
   - `searchShortcuts`: `index` (widget `select_querystring_field`, vocabulary `plone.app.contenttypes.metadatafields`, default `Subject`), `searchUrl` (link widget), `pageField` (optional — `select_querystring_field` or text).
   - `rssFeed`: `feedUrl` (text), `count` (number, default 6).
 - [ ] **Step 2** — mirror the `listing` block's `inheritSchemaFrom`/`itemTypeField: 'variation'` so expanded items get the chosen item type.
@@ -264,31 +264,31 @@ git commit -am "feat(blocks): schemas for relatedItemsListing / searchShortcuts 
 
 ---
 
-## Task 6: Mock frontend renderers + fetchItems wiring
+## Task 6: Mock frontend — register fetchers + recognize the new types
 
-**Files:** Modify `tests-playwright/fixtures/test-frontend/renderer.js` + `index.html`.
+**Files:** Modify `tests-playwright/fixtures/test-frontend/index.html` + `renderer.js`. **No bespoke renderers** — the blocks expand via the existing listing path into standard item blocks.
 
 - [ ] **Step 1** — `index.html`: import the three fetchers from `/helpers.js`; add them to the `fetchItems` map at `:232` (and the `contextOverride` branch): `{ listing: fi, relatedItemsListing: relatedItemsFetcher({...}), searchShortcuts: searchShortcutsFetcher({...}), rssFeed: rssFetcher() }`. Add the three types to the page `allowedBlocks`.
-- [ ] **Step 2** — `renderer.js`: add `case 'relatedItemsListing'` / `'rssFeed'` that delegate to `renderListingBlock` (they expand to item blocks like listing). Add `case 'searchShortcuts'` → a small `renderSearchShortcuts` that renders the expanded items as `<a class="search-shortcut" href="…facet.…">value</a>` chips.
-- [ ] **Step 3** — verify a smoke: start servers, open the fixture page (Task 8), confirm the blocks render (leave assertion to Task 9).
+- [ ] **Step 2** — `renderer.js`: extend the listing recognition so the new types flow through the existing expansion — the `hasListings` check (`:40`, currently `=== 'listing'`) accepts the new types, and each new type's `case` in the block switch delegates to `renderListingBlock`. Search Shortcuts needs no chip renderer: its fetcher returns link items (title + `href`) which the existing `default`/link item renderer already renders as `<a href>`.
+- [ ] **Step 3** — smoke: start servers, open the fixture page (Task 8), confirm the blocks render (assertions in Task 9).
 - [ ] **Step 4: Commit**
 
 ```bash
-git commit -am "feat(mock-frontend): render + wire relatedItemsListing/searchShortcuts/rssFeed"
+git commit -am "feat(mock-frontend): register example fetchers + recognize the new listing types"
 ```
 
 ---
 
-## Task 7: Nuxt example renderers + fetchItems wiring
+## Task 7: Nuxt example — register fetchers + recognize the new types
 
-**Files:** Modify `examples/nuxt-blog-starter/components/ListingBlock.vue` (fetchItems map) + `block.vue` (render cases).
+**Files:** Modify `examples/nuxt-blog-starter/components/ListingBlock.vue` (fetchItems map) + `block.vue` (type recognition). No new render logic.
 
 - [ ] **Step 1** — add the three fetchers to `ListingBlock.vue`'s `fetchItems` (import from `@hydra-js/helpers`), keyed by the new block types.
-- [ ] **Step 2** — `block.vue`: `v-else-if` cases — `relatedItemsListing`/`rssFeed` reuse the ListingBlock rendering path; `searchShortcuts` renders a chip list of `<a :href>`.
+- [ ] **Step 2** — `block.vue`: route the new types onto the existing ListingBlock render path (extend the `isListing`/type checks). Search Shortcuts renders as link items via the existing item rendering — no bespoke chip markup.
 - [ ] **Step 3: Commit**
 
 ```bash
-git commit -am "feat(nuxt-example): render + wire the three example listing blocks"
+git commit -am "feat(nuxt-example): register example fetchers + recognize the new listing types"
 ```
 
 ---
