@@ -758,6 +758,10 @@ function getExamplesContent() {
   const blocks = {};
   const items = [];
   for (const page of Object.values(docPageDefinitions)) {
+    // Fetcher-based example blocks (related items, search shortcuts, rss) need
+    // per-frontend fetcher registration + a live backend, so they don't belong
+    // on this cross-frontend "one of each block" render-smoke page.
+    if (page.excludeFromExamplesPage) continue;
     for (const [blockId, blockData] of Object.entries(page.examples)) {
       blocks[blockId] = blockData;
       items.push(blockId);

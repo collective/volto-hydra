@@ -2065,7 +2065,8 @@
         "variation": "summary",
         "relationField": "relatedItems"
       }
-    }
+    },
+    "excludeFromExamplesPage": true
   },
   "searchShortcuts": {
     "blocks": {
@@ -2129,7 +2130,8 @@
         "searchUrl": "/search",
         "variation": "default"
       }
-    }
+    },
+    "excludeFromExamplesPage": true
   },
   "rssFeed": {
     "blocks": {
@@ -2183,6 +2185,7 @@
         "count": 6,
         "variation": "summary"
       }
-    }
+    },
+    "excludeFromExamplesPage": true
   }
 }
