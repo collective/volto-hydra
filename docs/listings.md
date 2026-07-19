@@ -105,6 +105,42 @@ This self-contained object has everything needed to resolve image URLs with scal
 
 For non-Plone backends (RSS feeds, external APIs, etc.), write your own fetcher: `async (block, { start, size }) => ({ items, total })`. `start` is the zero-based offset, `size` is the number of items to return (or `0` for total-only), and `total` in the return value is the full count, not just this page.
 
+## Example fetchers
+
+The same `fetchItems` seam powers other "collection" blocks — each is just a
+fetcher that returns raw result objects (`expandListingBlocks` maps `@id → href`
+etc. and repeats an item block per result, so they need **no bespoke renderer**;
+they render via the standard item types on every frontend). `@hydra-js/helpers`
+ships three reference fetchers:
+
+| Fetcher | Block | What it returns |
+|---------|-------|-----------------|
+| `relatedItemsFetcher({ apiUrl, contextPath })` | **Related Items** | the current page's relation field (default `relatedItems`) — its summaries, paged |
+| `searchShortcutsFetcher({ apiUrl, contextPath })` | **Search Shortcuts** | one link per value, each `@id` set to `${searchUrl}?facet.${index}=${value}` (a shortcut into a search page's facet). A linked `pageField` → this page's values; none → the index's site-wide unique values (e.g. `Keywords` for `Subject`) |
+| `rssFetcher()` | **RSS Feed** | entries from `block.feedUrl`, client-side `fetch` (best-effort — a CORS/parse error degrades to an empty feed); each entry's `@id` is its link |
+
+Register them alongside `listing` in the `fetchItems` map:
+
+<!-- codeExample: javascript -->
+```javascript
+const { items } = await expandListingBlocks(layout, {
+  blocks,
+  fetchItems: {
+    listing:             ploneFetchItems({ apiUrl, contextPath }),
+    relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }),
+    searchShortcuts:     searchShortcutsFetcher({ apiUrl, contextPath }),
+    rssFeed:             rssFetcher(),
+  },
+});
+```
+
+The **Search Shortcuts** link target reads Volto's search-block facet params — a
+page with a `search` block picks up `?facet.<index>=<value>` from the URL. The
+block's *index* uses the existing `select_querystring_field` widget; the optional
+*this-page field* uses `schemaFieldSelect` (a `/@types`-backed field dropdown,
+parameterized by `fieldType`), which **Related Items** also uses with
+`fieldType: 'relation'`.
+
 ## Field Mapping
 
 `fieldMapping` on a listing block controls which fields appear on expanded items — only mapped fields are included. Default: `{ @id → href, title → title, description → description, image → image }`. Values can be a string (rename) or `{ field, type }` for conversions:
