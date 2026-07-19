@@ -878,6 +878,25 @@ export function ploneFetchItems({
 }
 
 /**
+ * Fetcher for the Related Items example block: renders the CURRENT page's
+ * relation field (default `relatedItems`). Reads the context content and pages
+ * its relation summaries — no catalog query. A `fetchItems` value for
+ * `expandListingBlocks`, same contract as `ploneFetchItems`.
+ */
+export function relatedItemsFetcher({ apiUrl, contextPath = '/' } = {}) {
+  if (!apiUrl) throw new Error('relatedItemsFetcher requires apiUrl');
+  return async function fetchItems(block, { start, size }) {
+    const field = block.relationField || 'relatedItems';
+    const headers = _getAuthHeaders();
+    const res = await fetch(`${apiUrl}${contextPath}/++api++`, { headers });
+    const content = await res.json();
+    const all = Array.isArray(content?.[field]) ? content[field] : [];
+    const items = size ? all.slice(start, start + size) : [];
+    return { items, total: all.length };
+  };
+}
+
+/**
  * Re-order a flat result set into parent-before-children order,
  * position-sorted within each parent. Each item must have `@id` (used to
  * derive its path + parent path); `getObjPositionInParent` orders
