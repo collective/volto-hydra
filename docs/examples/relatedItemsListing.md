@@ -59,100 +59,29 @@ This is a **custom** example block — register its fetcher via `initBridge` (se
 }
 ```
 
-## Rendering
+## Fetcher
 
-Every list-style block renders the **same way**: call `expandListingBlocks`, then map over the items. `expandListingBlocks` picks the fetcher out of your `fetchItems` map by the block's `@type`, so the component never reads `relationField` itself — the fetcher does. The **only** block-specific line is which fetcher you register (`relatedItemsFetcher`); `apiUrl`/`contextPath` come from your app config. The component is generic — call it a `FetchedList`, not a "listing".
+The whole block is a **fetcher** — everything block-specific lives here. A fetcher is `async (block, { start, size }) => ({ items, total })`; `expandListingBlocks` calls it, keyed by the block's `@type`. This one reads the current page's relation field — Plone already serializes relations as summaries (`@id`/`title`/`description`/`image`), so there's no catalog query, just a read + page:
 
-The fetcher reads the current page's `relationField` (default `relatedItems`) — Plone serializes relations as summaries (`@id`/`title`/`description`/`image`), so no catalog query is needed. The optional field picker (`schemaFieldSelect`, `fieldType: 'relation'`) lists the content type's relation fields from `/@types`. See [Listings › Example fetchers](../listings.md#example-fetchers).
-
-### React
-
-```jsx
-import { useState, useEffect } from 'react';
-import { expandListingBlocks, relatedItemsFetcher } from '@hydra-js/helpers';
-
-function FetchedList({ block, blockId, apiUrl, contextPath }) {
-  const [items, setItems] = useState([]);
-  useEffect(() => {
-    expandListingBlocks([blockId], {
-      blocks: { [blockId]: block },
-      fetchItems: { relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }) }, // ← only block-specific line
-      itemTypeField: 'variation',
-    }).then((r) => setItems(r.items));
-  }, [block.relationField]);
-
-  return (
-    <div data-block-uid={blockId}>
-      {items.map((item, i) => <BlockRenderer key={i} block={item} />)}
-    </div>
-  );
+```javascript
+export function relatedItemsFetcher({ apiUrl, contextPath }) {
+  return async function fetchItems(block, { start, size }) {
+    const field = block.relationField || 'relatedItems';
+    const content = await (await fetch(`${apiUrl}${contextPath}/++api++`, { headers: authHeaders() })).json();
+    const all = Array.isArray(content[field]) ? content[field] : [];
+    return { items: all.slice(start, start + size), total: all.length };
+  };
 }
 ```
 
-### Vue
+The optional field picker (`schemaFieldSelect`, `fieldType: 'relation'`) lists the content type's relation fields from `/@types`, so an editor can point the block at a different relation field.
 
-```vue
-<template>
-  <div :data-block-uid="blockId">
-    <BlockRenderer v-for="(item, i) in items" :key="i" :block="item" />
-  </div>
-</template>
+## Rendering
 
-<script setup>
-import { ref, watch } from 'vue';
-import { expandListingBlocks, relatedItemsFetcher } from '@hydra-js/helpers';
+The render is **identical to every list block** — call `expandListingBlocks`, then map over the items; only the fetcher above is block-specific. Register it in `fetchItems`:
 
-const props = defineProps({ block: Object, blockId: String, apiUrl: String, contextPath: String });
-const items = ref([]);
-watch(() => props.block.relationField, async () => {
-  const r = await expandListingBlocks([props.blockId], {
-    blocks: { [props.blockId]: props.block },
-    fetchItems: { relatedItemsListing: relatedItemsFetcher({ apiUrl: props.apiUrl, contextPath: props.contextPath }) },
-    itemTypeField: 'variation',
-  });
-  items.value = r.items;
-}, { immediate: true });
-</script>
+```javascript
+fetchItems: { relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }) }
 ```
 
-### Svelte
-
-```svelte
-<script>
-  import { expandListingBlocks, relatedItemsFetcher } from '@hydra-js/helpers';
-  import BlockRenderer from './BlockRenderer.svelte';
-  export let block; export let blockId; export let apiUrl; export let contextPath;
-  let items = [];
-  $: block.relationField, load();
-  async function load() {
-    const r = await expandListingBlocks([blockId], {
-      blocks: { [blockId]: block },
-      fetchItems: { relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }) },
-      itemTypeField: 'variation',
-    });
-    items = r.items;
-  }
-</script>
-
-<div data-block-uid={blockId}>
-  {#each items as item, i (i)}<BlockRenderer block={item} />{/each}
-</div>
-```
-
-### Astro (server-rendered)
-
-```astro
----
-import { expandListingBlocks, relatedItemsFetcher } from '@hydra-js/helpers';
-import BlockRenderer from './BlockRenderer.astro';
-const { block, apiUrl, contextPath } = Astro.props;
-const blockId = block['@uid'];
-const { items } = await expandListingBlocks([{ ...block, '@uid': blockId }], {
-  fetchItems: { relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }) },
-  itemTypeField: 'variation',
-});
----
-<div data-block-uid={blockId}>
-  {items.map((item) => <BlockRenderer block={item} />)}
-</div>
-```
+See the [Listing block](./listing.md#rendering) for the per-stack (React / Vue / Svelte / Astro) render component and [Listings › Example fetchers](../listings.md#example-fetchers) for the full picture.

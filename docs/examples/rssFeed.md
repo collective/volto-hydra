@@ -65,100 +65,46 @@ This is a **custom** example block — register its fetcher via `initBridge` (se
 }
 ```
 
-## Rendering
+## Fetcher
 
-Every list-style block renders the **same way**: call `expandListingBlocks`, then map over the items it hands back. `expandListingBlocks` picks the fetcher out of your `fetchItems` map by the block's `@type`, so the component never reads `feedUrl` itself — the fetcher does. The **only** block-specific line is which fetcher you register (`rssFetcher`). The component is generic — call it a `FetchedList`, not a "listing".
+The whole block is a **fetcher** — everything block-specific lives here. A fetcher is `async (block, { start, size }) => ({ items, total })`; `expandListingBlocks` calls it, keyed by the block's `@type` in your `fetchItems` map. Return raw result objects — set each item's `@id` to what you want its link to be (here, the entry's link), and the default `@id → href` mapping turns it into a link item, so nothing renderer-side is special.
 
-RSS is client-side and best-effort: most feeds block cross-origin requests, so a CORS/parse failure degrades to an empty feed. For production, proxy the feed through your own server route. See [Listings › Example fetchers](../listings.md#example-fetchers).
+```javascript
+// packages/helpers — client-side, best-effort (CORS-permitting feeds).
+export function rssFetcher() {
+  return async function fetchItems(block, { start, size }) {
+    let entries = [];
+    try {
+      const res = await fetch(block.feedUrl);
+      entries = parseRssEntries(await res.text()); // → [{ '@id': link, title, description, pubDate }]
+    } catch {
+      return { items: [], total: 0 };              // CORS / parse failure → empty feed, never throws
+    }
+    if (block.count != null) entries = entries.slice(0, block.count);
+    return { items: entries.slice(start, start + size), total: entries.length };
+  };
+}
 
-### React
-
-```jsx
-import { useState, useEffect } from 'react';
-import { expandListingBlocks, rssFetcher } from '@hydra-js/helpers';
-
-function FetchedList({ block, blockId }) {
-  const [items, setItems] = useState([]);
-  useEffect(() => {
-    expandListingBlocks([blockId], {
-      blocks: { [blockId]: block },
-      fetchItems: { rssFeed: rssFetcher() }, // ← the only block-specific line
-      itemTypeField: 'variation',
-    }).then((r) => setItems(r.items));
-  }, [block.feedUrl]);
-
-  return (
-    <div data-block-uid={blockId}>
-      {items.map((item, i) => <BlockRenderer key={i} block={item} />)}
-    </div>
-  );
+// Dependency-free parse so it runs in the browser AND node (no DOMParser):
+function parseRssEntries(xml) {
+  const out = [];
+  const tag = (b, n) => (new RegExp(`<${n}\\b[^>]*>([\\s\\S]*?)<\\/${n}>`, 'i').exec(b) || [])[1];
+  for (const m of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)) {
+    const b = m[1];
+    out.push({ '@id': tag(b, 'link') || '', title: tag(b, 'title') || '', description: tag(b, 'description') || '', pubDate: tag(b, 'pubDate') });
+  }
+  return out;
 }
 ```
 
-### Vue
+Most feeds block cross-origin requests, so for production proxy the feed through your own server route and point `feedUrl` at it.
 
-```vue
-<template>
-  <div :data-block-uid="blockId">
-    <BlockRenderer v-for="(item, i) in items" :key="i" :block="item" />
-  </div>
-</template>
+## Rendering
 
-<script setup>
-import { ref, watch } from 'vue';
-import { expandListingBlocks, rssFetcher } from '@hydra-js/helpers';
+The render is **identical to every list block** — call `expandListingBlocks`, then map over the items; only the fetcher above is block-specific. Register it in `fetchItems`:
 
-const props = defineProps({ block: Object, blockId: String });
-const items = ref([]);
-watch(() => props.block.feedUrl, async () => {
-  const r = await expandListingBlocks([props.blockId], {
-    blocks: { [props.blockId]: props.block },
-    fetchItems: { rssFeed: rssFetcher() }, // ← the only block-specific line
-    itemTypeField: 'variation',
-  });
-  items.value = r.items;
-}, { immediate: true });
-</script>
+```javascript
+fetchItems: { rssFeed: rssFetcher() }
 ```
 
-### Svelte
-
-```svelte
-<script>
-  import { expandListingBlocks, rssFetcher } from '@hydra-js/helpers';
-  import BlockRenderer from './BlockRenderer.svelte';
-  export let block; export let blockId;
-  let items = [];
-  $: block.feedUrl, load();
-  async function load() {
-    const r = await expandListingBlocks([blockId], {
-      blocks: { [blockId]: block },
-      fetchItems: { rssFeed: rssFetcher() }, // ← the only block-specific line
-      itemTypeField: 'variation',
-    });
-    items = r.items;
-  }
-</script>
-
-<div data-block-uid={blockId}>
-  {#each items as item, i (i)}<BlockRenderer block={item} />{/each}
-</div>
-```
-
-### Astro (server-rendered)
-
-```astro
----
-import { expandListingBlocks, rssFetcher } from '@hydra-js/helpers';
-import BlockRenderer from './BlockRenderer.astro';
-const { block } = Astro.props;
-const blockId = block['@uid'];
-const { items } = await expandListingBlocks([{ ...block, '@uid': blockId }], {
-  fetchItems: { rssFeed: rssFetcher() }, // ← the only block-specific line
-  itemTypeField: 'variation',
-});
----
-<div data-block-uid={blockId}>
-  {items.map((item) => <BlockRenderer block={item} />)}
-</div>
-```
+See the [Listing block](./listing.md#rendering) for the per-stack (React / Vue / Svelte / Astro) render component and [Listings › Example fetchers](../listings.md#example-fetchers) for the full picture.
