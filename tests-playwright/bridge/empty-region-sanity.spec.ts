@@ -38,6 +38,11 @@ if (fs.existsSync(casesPath)) {
   cases = JSON.parse(fs.readFileSync(casesPath, 'utf-8'));
 }
 
+// Synthetic conversion-test containers (dnd-convert.spec.ts) are rendered only
+// by the mock frontend, so they aren't part of the cross-frontend empty-region
+// contract — exclude them (same rationale as block-sanity).
+cases = cases.filter((c) => !c.parentType.startsWith('conv'));
+
 // Same frontends as block-sanity — the ones with full block coverage.
 const SANITY_PROJECTS = new Set(['mock', 'nuxt', 'nextjs']);
 const EMPTY_CHILD_ID = 'sanity-empty-child';

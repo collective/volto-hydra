@@ -240,6 +240,24 @@ async function renderBlock(blockId, block) {
         case 'section':
             wrapper.innerHTML = await renderSectionBlock(block);
             break;
+        // Conversion drag/paste test blocks (dnd-convert.spec.ts). Leaf types
+        // render a titled paragraph; the containers reuse the generic section
+        // renderer (children in blocks_layout.items, incl. a seeded empty).
+        case 'convSource':
+        case 'convTargetA':
+        case 'convTargetB':
+        case 'convAlien':
+            wrapper.innerHTML = `<p data-conv-type="${block['@type']}">${escapeHtml(block.title || block['@type'])}</p>`;
+            break;
+        case 'convBox':
+        case 'convBoxMulti':
+            wrapper.innerHTML = await renderConvBox(block);
+            break;
+        case 'convGroupSrc':
+        case 'convGroupDst':
+        case 'convGroupBox':
+            wrapper.innerHTML = await renderConvGroup(block);
+            break;
         case 'contextNavigation': {
             // Return the <nav> directly so aria-label / class /
             // data-block-uid all live on the same element. The default
@@ -1255,6 +1273,59 @@ function renderColumnBlock(block) {
  * @param {Object} block
  * @returns {Promise<string>} HTML string
  */
+/**
+ * Conversion-test container renderer. Like renderSectionBlock but marks each
+ * child `data-block-add="bottom"` so getAddDirection treats the vertically
+ * stacked children as a vertical list (nested blocks default to 'right'/
+ * horizontal without this) — keeping drop-position resolution on the Y axis.
+ */
+async function renderConvBox(block) {
+    const blocks = block.blocks || {};
+    const items = block.blocks_layout?.items || [];
+    let html = '<div class="section-body" style="padding: 12px; border: 1px dashed #888; border-radius: 4px;">';
+    for (const childId of items) {
+        const child = blocks[childId];
+        if (!child) continue;
+        const rendered = await renderBlock(childId, child);
+        let el = rendered;
+        if (rendered instanceof DocumentFragment) {
+            const c = document.createElement('div');
+            c.appendChild(rendered);
+            el = c.firstElementChild;
+        }
+        if (el && el.setAttribute) el.setAttribute('data-block-add', 'bottom');
+        html += el ? el.outerHTML : '';
+    }
+    html += '</div>';
+    return html;
+}
+
+/**
+ * Nested-container renderer for the container→container conversion test. Stamps
+ * `data-container-type` (the block's @type) so the test can assert a container's
+ * converted type, and renders children with `data-block-add="bottom"` (vertical).
+ */
+async function renderConvGroup(block) {
+    const blocks = block.blocks || {};
+    const items = block.blocks_layout?.items || [];
+    let html = `<div class="section-body" data-container-type="${block['@type']}" style="padding: 12px; border: 1px solid #4a90d9; border-radius: 4px;">`;
+    for (const childId of items) {
+        const child = blocks[childId];
+        if (!child) continue;
+        const rendered = await renderBlock(childId, child);
+        let el = rendered;
+        if (rendered instanceof DocumentFragment) {
+            const c = document.createElement('div');
+            c.appendChild(rendered);
+            el = c.firstElementChild;
+        }
+        if (el && el.setAttribute) el.setAttribute('data-block-add', 'bottom');
+        html += el ? el.outerHTML : '';
+    }
+    html += '</div>';
+    return html;
+}
+
 async function renderSectionBlock(block) {
     const blocks = block.blocks || {};
     const items = block.blocks_layout?.items || [];

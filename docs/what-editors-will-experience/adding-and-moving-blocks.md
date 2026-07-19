@@ -34,7 +34,7 @@ Each selected block has a **drag handle** in the Quanta toolbar above it. Click 
 - A **shaded overlay** highlights the whole drop target when you hover over an empty container — dropping there places the block as the container's first child (replacing the empty placeholder rather than landing as a sibling).
 - The page auto-scrolls when you drag near the top or bottom of the viewport.
 
-Drop targets are filtered by `allowedBlocks` — you can't drop into a region that doesn't accept this block type. The line/shade indicator only appears over valid drop targets.
+Drop targets are filtered by `allowedBlocks` — the line/shade indicator only appears where the block can land. This **includes regions that don't accept the block directly but accept a type it can convert to**: dropping there converts the block on the fly — silently when only one target type is possible, or via a small chooser when several are (pick one, or dismiss to cancel the move). So a "Text" block can be dropped into a region that only takes "Cards" and it becomes a Card on drop.
 
 ### Reordering from the sidebar
 
@@ -48,7 +48,7 @@ Standard keyboard shortcuts work on the selected block(s):
 - `Cmd/Ctrl+X` — cut (block disappears from the original spot when you paste)
 - `Cmd/Ctrl+V` — paste at the current selection
 
-This works across pages — copy a block on one page, navigate to another, paste.
+This works across pages — copy a block on one page, navigate to another, paste. Paste also **converts** like drag-and-drop: pasting into a region that only accepts a type the block can convert to converts it on paste. On touch devices, where dragging between distant spots is awkward, cut-and-paste is the easiest way to move (and convert) a block.
 
 ### Block-mode keyboard
 

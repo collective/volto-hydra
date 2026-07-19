@@ -1981,7 +1981,7 @@
     },
     "p-37": {
       "@type": "slate",
-      "plaintext": "`fieldMappings` (plural) on a block config defines how fields map between block types. This enables three things:",
+      "plaintext": "`fieldMappings` (plural) on a block config defines how fields map between block types. This enables four things:",
       "value": [
         {
           "type": "p",
@@ -1995,7 +1995,7 @@
               ]
             },
             {
-              "text": " (plural) on a block config defines how fields map between block types. This enables three things:"
+              "text": " (plural) on a block config defines how fields map between block types. This enables four things:"
             }
           ]
         }
@@ -2003,7 +2003,7 @@
     },
     "ul-38": {
       "@type": "slate",
-      "plaintext": "\"Convert to...\" UI action — editors can convert a block to another type (e.g. teaser → image). Listing item types — query results are mapped to item blocks via @default (see Listings). Synchronised container children — a parent controls child type, all children convert together (see Container Blocks › Synchronised Block Types).",
+      "plaintext": "\"Convert to...\" UI action — editors can convert a block to another type (e.g. teaser → image). Listing item types — query results are mapped to item blocks via @default (see Listings). Synchronised container children — a parent controls child type, all children convert together (see Container Blocks › Synchronised Block Types). Drag / paste via conversion — a block can be dropped or pasted into a container that only accepts a convertible type; it's converted on drop (see below).",
       "value": [
         {
           "type": "ul",
@@ -2092,6 +2092,33 @@
                 },
                 {
                   "text": ")."
+                }
+              ]
+            },
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "Drag / paste via conversion"
+                    }
+                  ]
+                },
+                {
+                  "text": " — a block can be dropped or pasted into a container that only accepts a "
+                },
+                {
+                  "type": "em",
+                  "children": [
+                    {
+                      "text": "convertible"
+                    }
+                  ]
+                },
+                {
+                  "text": " type; it's converted on drop (see below)."
                 }
               ]
             }
@@ -2491,6 +2518,67 @@
     },
     "h-47": {
       "@type": "slate",
+      "plaintext": "Drag / paste via conversion",
+      "value": [
+        {
+          "type": "h3",
+          "children": [
+            {
+              "text": "Drag / paste via conversion"
+            }
+          ]
+        }
+      ]
+    },
+    "p-48": {
+      "@type": "slate",
+      "plaintext": "The same conversion graph gives drag-and-drop (and paste) more valid destinations: a block can be dropped or pasted into a container whose `allowedBlocks` only admits a type the block can *convert* to. On drop it's converted automatically when exactly one target type is reachable, or a chooser popup appears when several are (single-block only — the block moves only once you pick, so cancelling leaves it untouched). Multi-block selections and paste are auto-convert only. On mobile, conversion happens via cut → paste (drag/chevron move stays native-only). External-link and other type restrictions are unaffected; only the container's `allowedBlocks` gate is relaxed to \"allowed or convertible\".",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The same conversion graph gives drag-and-drop (and paste) more valid destinations: a block can be dropped or pasted into a container whose "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedBlocks"
+                }
+              ]
+            },
+            {
+              "text": " only admits a type the block can "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "convert"
+                }
+              ]
+            },
+            {
+              "text": " to. On drop it's converted automatically when exactly one target type is reachable, or a chooser popup appears when several are (single-block only — the block moves only once you pick, so cancelling leaves it untouched). Multi-block selections and paste are auto-convert only. On mobile, conversion happens via cut → paste (drag/chevron move stays native-only). External-link and other type restrictions are unaffected; only the container's "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "allowedBlocks"
+                }
+              ]
+            },
+            {
+              "text": " gate is relaxed to \"allowed or convertible\"."
+            }
+          ]
+        }
+      ]
+    },
+    "h-49": {
+      "@type": "slate",
       "plaintext": "Mapping value format",
       "value": [
         {
@@ -2503,7 +2591,7 @@
         }
       ]
     },
-    "p-48": {
+    "p-50": {
       "@type": "slate",
       "plaintext": "A mapping value is either a string (simple field rename) or `{ field, type }` (rename with type conversion):",
       "value": [
@@ -2528,18 +2616,18 @@
         }
       ]
     },
-    "ce-49": {
+    "ce-51": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-49-json-2e1a67",
+          "@id": "ce-51-json-620d51",
           "label": "Json",
           "language": "json",
           "code": "{\n    \"@id\": { \"field\": \"href\", \"type\": \"link\" },\n    \"title\": \"title\",\n    \"description\": \"description\",\n    \"image\": \"preview_image\"\n}"
         }
       ]
     },
-    "p-50": {
+    "p-52": {
       "@type": "slate",
       "plaintext": "When `type` is specified, the value is converted at runtime:",
       "value": [
@@ -2564,7 +2652,7 @@
         }
       ]
     },
-    "tbl-51": {
+    "tbl-53": {
       "@type": "slateTable",
       "table": {
         "fixed": true,
@@ -2575,10 +2663,10 @@
         "striped": false,
         "rows": [
           {
-            "key": "tbl-51-r0",
+            "key": "tbl-53-r0",
             "cells": [
               {
-                "key": "tbl-51-r0c0",
+                "key": "tbl-53-r0c0",
                 "type": "header",
                 "value": [
                   {
@@ -2592,7 +2680,7 @@
                 ]
               },
               {
-                "key": "tbl-51-r0c1",
+                "key": "tbl-53-r0c1",
                 "type": "header",
                 "value": [
                   {
@@ -2608,10 +2696,10 @@
             ]
           },
           {
-            "key": "tbl-51-r1",
+            "key": "tbl-53-r1",
             "cells": [
               {
-                "key": "tbl-51-r1c0",
+                "key": "tbl-53-r1c0",
                 "type": "data",
                 "value": [
                   {
@@ -2630,7 +2718,7 @@
                 ]
               },
               {
-                "key": "tbl-51-r1c1",
+                "key": "tbl-53-r1c1",
                 "type": "data",
                 "value": [
                   {
@@ -2657,10 +2745,10 @@
             ]
           },
           {
-            "key": "tbl-51-r2",
+            "key": "tbl-53-r2",
             "cells": [
               {
-                "key": "tbl-51-r2c0",
+                "key": "tbl-53-r2c0",
                 "type": "data",
                 "value": [
                   {
@@ -2679,7 +2767,7 @@
                 ]
               },
               {
-                "key": "tbl-51-r2c1",
+                "key": "tbl-53-r2c1",
                 "type": "data",
                 "value": [
                   {
@@ -2706,10 +2794,10 @@
             ]
           },
           {
-            "key": "tbl-51-r3",
+            "key": "tbl-53-r3",
             "cells": [
               {
-                "key": "tbl-51-r3c0",
+                "key": "tbl-53-r3c0",
                 "type": "data",
                 "value": [
                   {
@@ -2728,7 +2816,7 @@
                 ]
               },
               {
-                "key": "tbl-51-r3c1",
+                "key": "tbl-53-r3c1",
                 "type": "data",
                 "value": [
                   {
@@ -2755,10 +2843,10 @@
             ]
           },
           {
-            "key": "tbl-51-r4",
+            "key": "tbl-53-r4",
             "cells": [
               {
-                "key": "tbl-51-r4c0",
+                "key": "tbl-53-r4c0",
                 "type": "data",
                 "value": [
                   {
@@ -2777,7 +2865,7 @@
                 ]
               },
               {
-                "key": "tbl-51-r4c1",
+                "key": "tbl-53-r4c1",
                 "type": "data",
                 "value": [
                   {
@@ -2801,10 +2889,10 @@
             ]
           },
           {
-            "key": "tbl-51-r5",
+            "key": "tbl-53-r5",
             "cells": [
               {
-                "key": "tbl-51-r5c0",
+                "key": "tbl-53-r5c0",
                 "type": "data",
                 "value": [
                   {
@@ -2823,7 +2911,7 @@
                 ]
               },
               {
-                "key": "tbl-51-r5c1",
+                "key": "tbl-53-r5c1",
                 "type": "data",
                 "value": [
                   {
@@ -2841,7 +2929,7 @@
         ]
       }
     },
-    "h-52": {
+    "h-54": {
       "@type": "slate",
       "plaintext": "FieldMappingWidget",
       "value": [
@@ -2855,7 +2943,7 @@
         }
       ]
     },
-    "p-53": {
+    "p-55": {
       "@type": "slate",
       "plaintext": "When a parent block has `mappingField` set in its `inheritSchemaFrom` recipe, the admin sidebar shows a widget that lets editors configure field mappings visually:",
       "value": [
@@ -2891,7 +2979,7 @@
         }
       ]
     },
-    "ul-54": {
+    "ul-56": {
       "@type": "slate",
       "plaintext": "Shows the @default source fields (@id, title, description, image) on the left. For each source field, lets the editor pick a field from the selected child type's schema. Auto-detects the conversion type from the target field definition (e.g. object_browser with mode=link → type: \"link\"). Saves the result as fieldMapping (singular) on the block data.",
       "value": [
@@ -3044,7 +3132,7 @@
         }
       ]
     },
-    "p-55": {
+    "p-57": {
       "@type": "slate",
       "plaintext": "The saved `fieldMapping` is read at render time by `expandListingBlocks` — no block registry access needed at render time.",
       "value": [
@@ -3080,7 +3168,7 @@
         }
       ]
     },
-    "h-56": {
+    "h-58": {
       "@type": "slate",
       "plaintext": "HTML Paste Support (TODO)",
       "value": [
@@ -3094,7 +3182,7 @@
         }
       ]
     },
-    "p-57": {
+    "p-59": {
       "@type": "slate",
       "plaintext": "When the editor pastes rich HTML into the page, Hydra will eventually be able to recognise it as a custom block by matching against a CSS selector mapping. The proposed shape:",
       "value": [
@@ -3108,18 +3196,18 @@
         }
       ]
     },
-    "ce-58": {
+    "ce-60": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-58-javascript-81cc43",
+          "@id": "ce-60-javascript-47c624",
           "label": "Javascript",
           "language": "javascript",
           "code": "video: {\n    fieldMappings: {\n        'css:video': { 'src': 'url', 'caption[@class=\"alt\"]': 'alt' },\n    },\n}"
         }
       ]
     },
-    "p-59": {
+    "p-61": {
       "@type": "slate",
       "plaintext": "The `css:<selector>` key in `fieldMappings` matches a pasted HTML element; the value maps element attributes to block fields. Not yet implemented — open question on whether this should run via `htmlTagsToSlate` (bypassing slate conversion) or be encoded into slate so attributes/classes survive.",
       "value": [
@@ -3218,17 +3306,19 @@
       "ul-46",
       "h-47",
       "p-48",
-      "ce-49",
+      "h-49",
       "p-50",
-      "tbl-51",
-      "h-52",
-      "p-53",
-      "ul-54",
+      "ce-51",
+      "p-52",
+      "tbl-53",
+      "h-54",
       "p-55",
-      "h-56",
+      "ul-56",
       "p-57",
-      "ce-58",
-      "p-59"
+      "h-58",
+      "p-59",
+      "ce-60",
+      "p-61"
     ]
   }
 }

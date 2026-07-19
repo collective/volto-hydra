@@ -52,6 +52,11 @@ if (fs.existsSync(discoveredPath)) {
   discoveredBlocks = JSON.parse(fs.readFileSync(discoveredPath, 'utf-8'));
 }
 
+// Synthetic conversion-test blocks (dnd-convert.spec.ts) are drag/paste fixtures
+// with no editable fields and are only rendered by the mock test frontend — they
+// aren't part of the cross-frontend render contract, so exclude them from sanity.
+discoveredBlocks = discoveredBlocks.filter((b) => !b.blockType.startsWith('conv'));
+
 // Block sanity is the cross-cutting render contract. We only enforce it on
 // the three frontends that ship full block coverage and are the canonical
 // references for downstream consumers — the mock test frontend (the spec's
