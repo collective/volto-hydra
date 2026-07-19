@@ -322,7 +322,7 @@
 
 
   <!-- Listing block: async expansion with own paging (or shared paging from container) -->
-  <Suspense v-else-if="block['@type'] === 'listing'" :key="`listing-${block_uid}-pg${injectedPages[block_uid] || 0}-${JSON.stringify(block)}`">
+  <Suspense v-else-if="LISTING_TYPES.includes(block['@type'])" :key="`listing-${block_uid}-pg${injectedPages[block_uid] || 0}-${JSON.stringify(block)}`">
     <ListingBlock :id="block_uid" :block="block" :paging="paging"
       :api-url="effectiveApiUrl" :context-path="effectiveContextPath">
       <template #default="{ items }">
@@ -1041,7 +1041,7 @@ const gridBuildPagingUrl = (page) => {
 
 // Process grid children: listings marked for Suspense, static blocks filtered by paging window
 // staticBlocks and expandListingBlocks return { items, paging } — chain paging.seen for position tracking
-const LISTING_TYPES = ['listing'];
+const LISTING_TYPES = ['listing', 'relatedItemsListing', 'searchShortcuts', 'rssFeed'];
 const gridChildren = computed(() => {
   const layout = block.value.blocks_layout?.items || [];
   const blocks = block.value.blocks || {};
