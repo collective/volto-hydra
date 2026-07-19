@@ -1,6 +1,7 @@
 import {
   relatedItemsFetcher,
   searchShortcutsFetcher,
+  rssFetcher,
 } from '@volto-hydra/helpers';
 
 const API = 'http://api.test';
@@ -91,5 +92,51 @@ describe('searchShortcutsFetcher', () => {
       { start: 0, size: 10 },
     );
     expect(items[0]['@id']).toBe('/search?facet.Subject=a%20b%20%26%20c');
+  });
+});
+
+describe('rssFetcher', () => {
+  const RSS = `<?xml version="1.0"?><rss><channel>
+    <title>Feed</title>
+    <item><title>First</title><link>http://x/1</link><description>d1</description><pubDate>Mon, 01 Jan 2026</pubDate></item>
+    <item><title>Second</title><link>http://x/2</link><description>d2</description></item>
+  </channel></rss>`;
+
+  test('parses feed items into raw results (@id = entry link), paged', async () => {
+    global.fetch = async () => ({ ok: true, text: async () => RSS });
+    const { items, total } = await rssFetcher()(
+      { feedUrl: 'http://x/feed', count: 10 },
+      { start: 0, size: 10 },
+    );
+    expect(total).toBe(2);
+    expect(items[0]).toEqual({
+      '@id': 'http://x/1',
+      title: 'First',
+      description: 'd1',
+      pubDate: 'Mon, 01 Jan 2026',
+    });
+    expect(items[1]).toMatchObject({ '@id': 'http://x/2', title: 'Second' });
+  });
+
+  test('honours block.count as an upper bound', async () => {
+    global.fetch = async () => ({ ok: true, text: async () => RSS });
+    const { items, total } = await rssFetcher()(
+      { feedUrl: 'http://x/feed', count: 1 },
+      { start: 0, size: 10 },
+    );
+    expect(total).toBe(1);
+    expect(items).toHaveLength(1);
+  });
+
+  test('degrades to empty on fetch failure (best-effort CORS)', async () => {
+    global.fetch = async () => {
+      throw new Error('CORS');
+    };
+    const { items, total } = await rssFetcher()(
+      { feedUrl: 'http://x/feed' },
+      { start: 0, size: 10 },
+    );
+    expect(items).toEqual([]);
+    expect(total).toBe(0);
   });
 });
