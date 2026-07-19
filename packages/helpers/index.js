@@ -896,6 +896,50 @@ export function relatedItemsFetcher({ apiUrl, contextPath = '/' } = {}) {
   };
 }
 
+// Catalog index → vocabulary of its unique values (site-wide mode). Extend as
+// needed; falls back to a same-named vocabulary.
+const SEARCH_SHORTCUT_INDEX_VOCAB = {
+  Subject: 'plone.app.vocabularies.Keywords',
+};
+
+/**
+ * Fetcher for the Search Shortcuts example block. Produces one result per value,
+ * each a shortcut LINK into a search: `@id` is set to
+ * `${searchUrl}?facet.${index}=${value}` so expandListingBlocks' default
+ * @id→href mapping renders it as a link item — no special renderer.
+ *
+ * A linked `pageField` ⇒ THIS page's values of that field; no `pageField` ⇒ all
+ * unique values of the index, site-wide (from the index's vocabulary).
+ */
+export function searchShortcutsFetcher({ apiUrl, contextPath = '/' } = {}) {
+  if (!apiUrl) throw new Error('searchShortcutsFetcher requires apiUrl');
+  return async function fetchItems(block, { start, size }) {
+    const index = block.index || 'Subject';
+    const searchUrl = block.searchUrl || '';
+    const headers = _getAuthHeaders();
+
+    let values;
+    if (block.pageField) {
+      const res = await fetch(`${apiUrl}${contextPath}/++api++`, { headers });
+      const content = await res.json();
+      const v = content?.[block.pageField];
+      values = Array.isArray(v) ? v : v == null ? [] : [v];
+    } else {
+      const vocab = SEARCH_SHORTCUT_INDEX_VOCAB[index] || index;
+      const res = await fetch(`${apiUrl}/++api++/@vocabularies/${vocab}`, { headers });
+      const data = await res.json();
+      values = (data?.items || []).map((t) => t.token);
+    }
+
+    const all = values.map((value) => ({
+      '@id': `${searchUrl}?facet.${index}=${encodeURIComponent(value)}`,
+      title: value,
+    }));
+    const items = size ? all.slice(start, start + size) : [];
+    return { items, total: all.length };
+  };
+}
+
 /**
  * Re-order a flat result set into parent-before-children order,
  * position-sorted within each parent. Each item must have `@id` (used to
