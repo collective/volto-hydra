@@ -45,19 +45,19 @@
           "@id": "ref-searchShortcuts-rendering-jsx-113816",
           "label": "React",
           "language": "jsx",
-          "code": ""
+          "code": "import { useState, useEffect } from 'react';\nimport { expandListingBlocks, searchShortcutsFetcher } from '@hydra-js/helpers';\n\nfunction FetchedList({ block, blockId, apiUrl, contextPath }) {\n  const [items, setItems] = useState([]);\n  useEffect(() => {\n    expandListingBlocks([blockId], {\n      blocks: { [blockId]: block },\n      fetchItems: { searchShortcuts: searchShortcutsFetcher({ apiUrl, contextPath }) }, // ← only block-specific line\n      itemTypeField: 'variation',\n    }).then((r) => setItems(r.items));\n  }, [block.index, block.pageField]);\n\n  return (\n    <div data-block-uid={blockId}>\n      {items.map((item, i) => <BlockRenderer key={i} block={item} />)}\n    </div>\n  );\n}"
         },
         {
           "@id": "ref-searchShortcuts-rendering-vue-d43e6a",
           "label": "Vue",
           "language": "vue",
-          "code": ""
+          "code": "<template>\n  <div :data-block-uid=\"blockId\">\n    <BlockRenderer v-for=\"(item, i) in items\" :key=\"i\" :block=\"item\" />\n  </div>\n</template>\n\n<script setup>\nimport { ref, watch } from 'vue';\nimport { expandListingBlocks, searchShortcutsFetcher } from '@hydra-js/helpers';\n\nconst props = defineProps({ block: Object, blockId: String, apiUrl: String, contextPath: String });\nconst items = ref([]);\nwatch(() => [props.block.index, props.block.pageField], async () => {\n  const r = await expandListingBlocks([props.blockId], {\n    blocks: { [props.blockId]: props.block },\n    fetchItems: { searchShortcuts: searchShortcutsFetcher({ apiUrl: props.apiUrl, contextPath: props.contextPath }) },\n    itemTypeField: 'variation',\n  });\n  items.value = r.items;\n}, { immediate: true });\n</script>"
         },
         {
           "@id": "ref-searchShortcuts-rendering-svelte-43c411",
           "label": "Svelte",
           "language": "svelte",
-          "code": ""
+          "code": "<script>\n  import { expandListingBlocks, searchShortcutsFetcher } from '@hydra-js/helpers';\n  import BlockRenderer from './BlockRenderer.svelte';\n  export let block; export let blockId; export let apiUrl; export let contextPath;\n  let items = [];\n  $: block.index, block.pageField, load();\n  async function load() {\n    const r = await expandListingBlocks([blockId], {\n      blocks: { [blockId]: block },\n      fetchItems: { searchShortcuts: searchShortcutsFetcher({ apiUrl, contextPath }) },\n      itemTypeField: 'variation',\n    });\n    items = r.items;\n  }\n</script>\n\n<div data-block-uid={blockId}>\n  {#each items as item, i (i)}<BlockRenderer block={item} />{/each}\n</div>"
         }
       ]
     }

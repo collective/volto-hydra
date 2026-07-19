@@ -45,19 +45,19 @@
           "@id": "ref-rssFeed-rendering-jsx-335e9c",
           "label": "React",
           "language": "jsx",
-          "code": ""
+          "code": "import { useState, useEffect } from 'react';\nimport { expandListingBlocks, rssFetcher } from '@hydra-js/helpers';\n\nfunction FetchedList({ block, blockId }) {\n  const [items, setItems] = useState([]);\n  useEffect(() => {\n    expandListingBlocks([blockId], {\n      blocks: { [blockId]: block },\n      fetchItems: { rssFeed: rssFetcher() }, // ← the only block-specific line\n      itemTypeField: 'variation',\n    }).then((r) => setItems(r.items));\n  }, [block.feedUrl]);\n\n  return (\n    <div data-block-uid={blockId}>\n      {items.map((item, i) => <BlockRenderer key={i} block={item} />)}\n    </div>\n  );\n}"
         },
         {
           "@id": "ref-rssFeed-rendering-vue-2c0da5",
           "label": "Vue",
           "language": "vue",
-          "code": ""
+          "code": "<template>\n  <div :data-block-uid=\"blockId\">\n    <BlockRenderer v-for=\"(item, i) in items\" :key=\"i\" :block=\"item\" />\n  </div>\n</template>\n\n<script setup>\nimport { ref, watch } from 'vue';\nimport { expandListingBlocks, rssFetcher } from '@hydra-js/helpers';\n\nconst props = defineProps({ block: Object, blockId: String });\nconst items = ref([]);\nwatch(() => props.block.feedUrl, async () => {\n  const r = await expandListingBlocks([props.blockId], {\n    blocks: { [props.blockId]: props.block },\n    fetchItems: { rssFeed: rssFetcher() }, // ← the only block-specific line\n    itemTypeField: 'variation',\n  });\n  items.value = r.items;\n}, { immediate: true });\n</script>"
         },
         {
           "@id": "ref-rssFeed-rendering-svelte-6ffc72",
           "label": "Svelte",
           "language": "svelte",
-          "code": ""
+          "code": "<script>\n  import { expandListingBlocks, rssFetcher } from '@hydra-js/helpers';\n  import BlockRenderer from './BlockRenderer.svelte';\n  export let block; export let blockId;\n  let items = [];\n  $: block.feedUrl, load();\n  async function load() {\n    const r = await expandListingBlocks([blockId], {\n      blocks: { [blockId]: block },\n      fetchItems: { rssFeed: rssFetcher() }, // ← the only block-specific line\n      itemTypeField: 'variation',\n    });\n    items = r.items;\n  }\n</script>\n\n<div data-block-uid={blockId}>\n  {#each items as item, i (i)}<BlockRenderer block={item} />{/each}\n</div>"
         }
       ]
     }
