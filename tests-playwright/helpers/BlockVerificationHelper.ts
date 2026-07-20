@@ -9,6 +9,7 @@
  */
 import { expect } from '@playwright/test';
 import type { Page, FrameLocator, Locator } from '@playwright/test';
+import { recordSlateFieldContainer } from './field-coverage';
 
 export interface SubBlock {
   id: string;
@@ -307,15 +308,24 @@ export async function checkSlateAnnotations(
     slateHasValue = () => true;
   }
 
+  const blockType = (blockData?.['@type'] as string | undefined) ?? '(unknown)';
+  const coverageUid = (await block.getAttribute('data-block-uid')) ?? '(no uid)';
   for (const field of slateFields) {
     // Accept either a descendant [data-edit-text="<field>"] OR the block
     // element itself carrying the attribute (renderers are free to collapse
     // the block wrapper and the edit-text container onto one element).
     const blockHasAttr = (await block.getAttribute('data-edit-text')) === field;
     const container = blockHasAttr ? block : block.locator(`[data-edit-text="${field}"]`).first();
-    if (!(await container.count())) {
-      // Build a diagnostic showing what data-edit-text values ARE present in
-      // the block — usually it's a typo or a misplaced attribute.
+    const hasContainer = (await container.count()) > 0;
+
+    // Record editability rather than failing per-instance: a slate field only
+    // needs its edit container in ONE example of a block type. Some fields are
+    // gated by an optional synced element (e.g. a card's `description` behind
+    // the grid's `copy` element) and legitimately don't render in every
+    // example. A final aggregate test (slateFieldsNeverEditable) fails only if
+    // a field is never editable in ANY example. On a miss, capture which
+    // data-edit-text values ARE present for the aggregate's diagnostic.
+    if (!hasContainer) {
       const context = await block.evaluate((el) => {
         const outer = (el.outerHTML || '').slice(0, 200);
         const self = el.getAttribute('data-edit-text');
@@ -323,17 +333,21 @@ export async function checkSlateAnnotations(
           .map((d) => `${d.tagName.toLowerCase()}[data-edit-text="${d.getAttribute('data-edit-text')}"]`);
         return { outer, self, descendants };
       });
-      throw new Error(
-        `Slate field "${field}": no [data-edit-text="${field}"] container found.\n` +
-          `  block element's own data-edit-text: ${context.self ?? '(none)'}\n` +
-          `  descendants with data-edit-text: ${context.descendants.length ? context.descendants.join(', ') : '(none)'}\n` +
-          `  block outerHTML (truncated): ${context.outer}`,
+      recordSlateFieldContainer(
+        blockType,
+        field,
+        false,
+        `[${coverageUid}] own data-edit-text: ${context.self ?? '(none)'}; ` +
+          `descendants: ${context.descendants.length ? context.descendants.join(', ') : '(none)'}; ` +
+          `html: ${context.outer}`,
       );
+      continue;
     }
+    recordSlateFieldContainer(blockType, field, true, `[${coverageUid}]`);
 
-    // Empty/null slate fields still need the edit-text container (checked
-    // above) but nothing to round-trip — the renderer has no source value
-    // to mirror into the DOM.
+    // Empty/null slate fields have the edit-text container (checked above) but
+    // nothing to round-trip — the renderer has no source value to mirror into
+    // the DOM.
     if (!slateHasValue(field)) continue;
 
     // Round-trip via the bridge's own DOM→Slate reader. The bridge already

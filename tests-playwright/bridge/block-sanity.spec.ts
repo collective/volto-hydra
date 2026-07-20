@@ -17,6 +17,7 @@
 import { test as base, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { verifyBlockRendering } from '../helpers/BlockVerificationHelper';
+import { slateFieldsNeverEditable } from '../helpers/field-coverage';
 import { axeCheckBlock, formatViolations } from '../helpers/axe-sanity';
 import { getFrontendUrl } from './fixtures';
 import { URLS } from '../ports';
@@ -211,4 +212,23 @@ test.describe('Block sanity (auto-discovered)', () => {
       }
     });
   }
+
+  // Aggregate check: every schema-declared slate field must have its
+  // [data-edit-text] edit container in AT LEAST ONE discovered example of its
+  // block type. The per-example render checks above record coverage instead of
+  // failing individually, because a field can be gated by an optional synced
+  // element (e.g. a card's `description` behind the grid's `copy` element) and
+  // legitimately not render in every example. This runs last (defined after the
+  // per-block loop; block-sanity is serial) so coverage is fully accumulated.
+  test('every slate field is editable in at least one example', () => {
+    const never = slateFieldsNeverEditable();
+    expect(
+      never,
+      `Slate fields with NO [data-edit-text] container in ANY discovered example ` +
+        `(each is uneditable everywhere it appears):\n` +
+        never
+          .map((n) => `  - ${n.blockType}.${n.field}\n      e.g. ${n.example}`)
+          .join('\n'),
+    ).toEqual([]);
+  });
 });
