@@ -2181,7 +2181,7 @@
     "examples": {
       "ex-rssFeed": {
         "@type": "rssFeed",
-        "feedUrl": "https://example.com/feed.xml",
+        "feedUrl": "https://pypi.org/rss/project/plone/releases.xml",
         "count": 6,
         "variation": "summary"
       }

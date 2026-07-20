@@ -59,7 +59,7 @@ This is a **custom** example block — register its fetcher via `initBridge` (se
 ```json
 {
   "@type": "rssFeed",
-  "feedUrl": "https://example.com/feed.xml",
+  "feedUrl": "https://pypi.org/rss/project/plone/releases.xml",
   "count": 6,
   "variation": "summary"
 }
@@ -97,7 +97,7 @@ function parseRssEntries(xml) {
 }
 ```
 
-Most feeds block cross-origin requests, so for production proxy the feed through your own server route and point `feedUrl` at it.
+Because this fetch runs in the browser, the feed must send an `Access-Control-Allow-Origin` header — most feeds don't. This example points at the [PyPI Plone releases feed](https://pypi.org/rss/project/plone/releases.xml), which does. For an arbitrary feed, fetch it server-side (SSR/SSG) or proxy it through your own route and point `feedUrl` at that.
 
 ## Rendering
 

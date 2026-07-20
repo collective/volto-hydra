@@ -657,16 +657,29 @@ function updateCodeExampleTabs(block, tabUpdates) {
   return changed;
 }
 
-/** Build a slate paragraph block for a template slot. */
-function makeSlateBlock(blockId, templateInstanceId, slotId, text) {
+/** Build a slate paragraph block for a template slot. Pass `value` for rich
+ * content (e.g. links); otherwise a single plain paragraph is built from `text`. */
+function makeSlateBlock(blockId, templateInstanceId, slotId, text, value) {
   return {
     '@type': 'slate',
     templateId: TEMPLATE_ID,
     templateInstanceId,
     slotId,
     plaintext: text,
-    value: [{ type: 'p', children: [{ text }] }],
+    value: value || [{ type: 'p', children: [{ text }] }],
   };
+}
+
+/** Slate value: one paragraph mixing plain text and links. `parts` is an array of
+ * strings (plain runs) and { url, text } (links). Also returns the flattened text. */
+function slateParagraph(parts) {
+  const children = parts.map((p) =>
+    typeof p === 'string'
+      ? { text: p }
+      : { type: 'link', data: { url: p.url }, children: [{ text: p.text }] },
+  );
+  const plaintext = parts.map((p) => (typeof p === 'string' ? p : p.text)).join('');
+  return { value: [{ type: 'p', children }], plaintext };
 }
 
 /**
@@ -689,14 +702,16 @@ function ensureCodeExampleBlock(data, blockId, instanceId, slotId, tabs) {
   return updateCodeExampleTabs(existing, tabs);
 }
 
-/** Ensure a slate block exists with the given text; returns true if changed. */
-function ensureSlateBlock(data, blockId, instanceId, slotId, text) {
+/** Ensure a slate block exists with the given text (and optional rich `value`);
+ * returns true if changed. */
+function ensureSlateBlock(data, blockId, instanceId, slotId, text, value) {
   const existing = data.blocks[blockId];
+  const want = JSON.stringify(value || [{ type: 'p', children: [{ text }] }]);
   if (existing?.['@type'] === 'slate' && existing.slotId === slotId
-      && existing.plaintext === text) {
+      && existing.plaintext === text && JSON.stringify(existing.value) === want) {
     return false;
   }
-  data.blocks[blockId] = makeSlateBlock(blockId, instanceId, slotId, text);
+  data.blocks[blockId] = makeSlateBlock(blockId, instanceId, slotId, text, value);
   return true;
 }
 
@@ -814,10 +829,20 @@ for (const mdFile of mdFiles) {
   const isFetchingPage = sections.fetcher != null;
   let renderRegionIds;
   if (isFetchingPage) {
+    // The render is identical to any list block, so instead of repeating the
+    // per-framework render code we link to the Listing example (which shows it in
+    // React / Vue / Svelte) and the explanation pages. Only the fetcher is specific.
+    const intro = slateParagraph([
+      'This block has no bespoke renderer — register the fetcher below, then render its items exactly like any list block. See the ',
+      { url: '/docs/examples/listing', text: 'Listing example' },
+      ' for the render component in React, Vue and Svelte, ',
+      { url: '/docs/listings', text: 'Listings' },
+      ' for how expansion works, and ',
+      { url: '/docs/custom-blocks', text: 'Custom Blocks' },
+      ' for registering a block type. Only the fetcher below is block-specific.',
+    ]);
     if (ensureSlateBlock(data, renderIntroId, instanceId, 'rendering',
-      'This block ships no bespoke renderer: register a fetcher, then render its items '
-      + 'exactly like the Listing block. Only the fetcher below is block-specific.',
-    )) contentChanged = true;
+      intro.plaintext, intro.value)) contentChanged = true;
     if (ensureCodeExampleBlock(data, fetcherId, instanceId, 'rendering', [
       { label: 'Fetcher', language: 'javascript', code: sections.fetcher || '' },
     ])) contentChanged = true;
