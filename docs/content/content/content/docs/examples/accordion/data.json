@@ -2298,21 +2298,13 @@
     },
     "ref-accordion-description": {
       "@type": "slate",
-      "plaintext": "A collapsible panel group. Each panel is an object_list item with a title and a content area that holds child blocks.\n\nThis is a custom block — register it via initBridge.",
+      "plaintext": "A collapsible panel group. Each panel is an object_list item with a title and a content area that holds child blocks.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "A collapsible panel group. Each panel is an object_list item with a title and a content area that holds child blocks."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a custom block — register it via initBridge."
             }
           ]
         }

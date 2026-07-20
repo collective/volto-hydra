@@ -84,21 +84,13 @@
     },
     "ref-relatedItemsListing-description": {
       "@type": "slate",
-      "plaintext": "Renders the current page's related items relation field (default relatedItems) as a list, reusing the listing machinery — each related item is rendered with a configurable item type (variation).\n\nThis is a custom example block — register its fetcher via initBridge (see below).",
+      "plaintext": "Renders the current page's related items relation field (default relatedItems) as a list, reusing the listing machinery — each related item is rendered with a configurable item type (variation).",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "Renders the current page's related items relation field (default relatedItems) as a list, reusing the listing machinery — each related item is rendered with a configurable item type (variation)."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a custom example block — register its fetcher via initBridge (see below)."
             }
           ]
         }

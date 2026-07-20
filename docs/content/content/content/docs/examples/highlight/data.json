@@ -260,21 +260,13 @@
     },
     "ref-highlight-description": {
       "@type": "slate",
-      "plaintext": "A prominent content section with a background image, overlay, title, rich text body, and an optional call-to-action link. Used for feature callouts and banners.\n\nThis is a custom block — register it via initBridge.",
+      "plaintext": "A prominent content section with a background image, overlay, title, rich text body, and an optional call-to-action link. Used for feature callouts and banners.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "A prominent content section with a background image, overlay, title, rich text body, and an optional call-to-action link. Used for feature callouts and banners."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a custom block — register it via initBridge."
             }
           ]
         }

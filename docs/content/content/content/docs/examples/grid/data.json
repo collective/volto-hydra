@@ -84,21 +84,13 @@
     },
     "ref-grid-description": {
       "@type": "slate",
-      "plaintext": "A responsive grid that lays out child blocks in equal-width cells. The block uses Volto's standard shared-blocks shape — blocks is the dict of children, blocks_layout.items is their order — and constrains the allowed types via allowedBlocks.\n\nThis is a built-in block.",
+      "plaintext": "A responsive grid that lays out child blocks in equal-width cells. The block uses Volto's standard shared-blocks shape — blocks is the dict of children, blocks_layout.items is their order — and constrains the allowed types via allowedBlocks.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "A responsive grid that lays out child blocks in equal-width cells. The block uses Volto's standard shared-blocks shape — blocks is the dict of children, blocks_layout.items is their order — and constrains the allowed types via allowedBlocks."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a built-in block."
             }
           ]
         }

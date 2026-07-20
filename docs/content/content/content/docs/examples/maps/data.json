@@ -266,21 +266,13 @@
     },
     "ref-maps-description": {
       "@type": "slate",
-      "plaintext": "Embeds a map from a URL (Google Maps, OpenStreetMap, etc.) using an iframe. The url field should contain the embed URL, and title provides an accessible label.\n\nThis is a built-in block.",
+      "plaintext": "Embeds a map from a URL (Google Maps, OpenStreetMap, etc.) using an iframe. The url field should contain the embed URL, and title provides an accessible label.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "Embeds a map from a URL (Google Maps, OpenStreetMap, etc.) using an iframe. The url field should contain the embed URL, and title provides an accessible label."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a built-in block."
             }
           ]
         }

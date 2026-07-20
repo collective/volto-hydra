@@ -285,21 +285,13 @@
     },
     "ref-separator-description": {
       "@type": "slate",
-      "plaintext": "A horizontal rule used to visually divide sections of content. Supports an alignment style property.\n\nThis is a built-in block.",
+      "plaintext": "A horizontal rule used to visually divide sections of content. Supports an alignment style property.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "A horizontal rule used to visually divide sections of content. Supports an alignment style property."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a built-in block."
             }
           ]
         }

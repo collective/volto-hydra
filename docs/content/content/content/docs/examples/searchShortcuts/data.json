@@ -86,21 +86,13 @@
     },
     "ref-searchShortcuts-description": {
       "@type": "slate",
-      "plaintext": "Renders a set of values as links into a faceted search — a \"tag cloud\" of shortcuts. Each value links to a search page with ?facet.<index>=<value> pre-set, which a Search block reads from the URL.\n\nThis is a custom example block — register its fetcher via initBridge (see below).",
+      "plaintext": "Renders a set of values as links into a faceted search — a \"tag cloud\" of shortcuts. Each value links to a search page with ?facet.<index>=<value> pre-set, which a Search block reads from the URL.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "Renders a set of values as links into a faceted search — a \"tag cloud\" of shortcuts. Each value links to a search page with ?facet.<index>=<value> pre-set, which a Search block reads from the URL."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a custom example block — register its fetcher via initBridge (see below)."
             }
           ]
         }

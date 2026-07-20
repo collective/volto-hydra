@@ -138,21 +138,13 @@
     },
     "ref-introduction-description": {
       "@type": "slate",
-      "plaintext": "Displays the page's title and description as a styled header. The introduction block has no content of its own — it reads title and description from the page metadata.\n\nThis is a built-in block.",
+      "plaintext": "Displays the page's title and description as a styled header. The introduction block has no content of its own — it reads title and description from the page metadata.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "Displays the page's title and description as a styled header. The introduction block has no content of its own — it reads title and description from the page metadata."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a built-in block."
             }
           ]
         }

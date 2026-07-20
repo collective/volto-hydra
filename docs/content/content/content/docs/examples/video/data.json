@@ -261,21 +261,13 @@
     },
     "ref-video-description": {
       "@type": "slate",
-      "plaintext": "Embeds a video from a URL. Detects YouTube links and renders an iframe embed; otherwise falls back to an HTML5 <video> element.\n\nThis is a built-in block.",
+      "plaintext": "Embeds a video from a URL. Detects YouTube links and renders an iframe embed; otherwise falls back to an HTML5 <video> element.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "Embeds a video from a URL. Detects YouTube links and renders an iframe embed; otherwise falls back to an HTML5 <video> element."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a built-in block."
             }
           ]
         }

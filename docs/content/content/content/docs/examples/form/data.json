@@ -132,21 +132,13 @@
     },
     "ref-form-description": {
       "@type": "slate",
-      "plaintext": "A multi-field form with configurable field types, validation, and email submission. Fields are stored as a typed object_list — each field has a field_type that maps to a sub-block schema.\n\nThis is a custom block — register it via initBridge.",
+      "plaintext": "A multi-field form with configurable field types, validation, and email submission. Fields are stored as a typed object_list — each field has a field_type that maps to a sub-block schema.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "A multi-field form with configurable field types, validation, and email submission. Fields are stored as a typed object_list — each field has a field_type that maps to a sub-block schema."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a custom block — register it via initBridge."
             }
           ]
         }

@@ -220,21 +220,13 @@
     },
     "ref-heading-description": {
       "@type": "slate",
-      "plaintext": "A standalone heading block that renders as h1–h6 based on a configurable tag field. Unlike headings inside a slate block, this is a dedicated block type with its own heading text field.\n\nThis is a built-in block.",
+      "plaintext": "A standalone heading block that renders as h1–h6 based on a configurable tag field. Unlike headings inside a slate block, this is a dedicated block type with its own heading text field.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "A standalone heading block that renders as h1–h6 based on a configurable tag field. Unlike headings inside a slate block, this is a dedicated block type with its own heading text field."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a built-in block."
             }
           ]
         }

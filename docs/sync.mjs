@@ -708,22 +708,22 @@ function ensureCodeExampleBlock(data, blockId, instanceId, slotId, tabs) {
   return updateCodeExampleTabs(existing, tabs);
 }
 
-/** Convert a chunk of markdown prose into a plain (non-template) slate block: one
- * `p` per blank-line-separated paragraph, markdown emphasis/code/link syntax stripped
- * to text. Used for the page description (no template slot — it sits above the fold). */
+/** Convert a chunk of markdown prose into a plain (non-template) slate block. A slate
+ * block must have exactly ONE top-level node, so this uses the FIRST paragraph (the
+ * block's "what is this for" line; any following "this is a custom example block…"
+ * boilerplate is redundant with the reference section below). Markdown emphasis/code/
+ * link syntax is stripped to text. No template slot — it sits above the fold. */
 function makeProseSlate(blockId, markdown) {
-  const paras = markdown.split(/\r?\n\s*\r?\n/)
-    .map((p) => p.replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
-    .map((p) => p
-      .replace(/\*\*(.+?)\*\*/g, '$1')
-      .replace(/\*(?!\*)([^*]+?)\*/g, '$1')
-      .replace(/`([^`]+)`/g, '$1')
-      .replace(/\[(.+?)\]\([^)]*\)/g, '$1'));
+  const first = (markdown.split(/\r?\n\s*\r?\n/)[0] || '')
+    .replace(/\s+/g, ' ').trim()
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(?!\*)([^*]+?)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[(.+?)\]\([^)]*\)/g, '$1');
   return {
     '@type': 'slate',
-    plaintext: paras.join('\n\n'),
-    value: paras.map((p) => ({ type: 'p', children: [{ text: p }] })),
+    plaintext: first,
+    value: [{ type: 'p', children: [{ text: first }] }],
   };
 }
 

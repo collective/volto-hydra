@@ -458,21 +458,13 @@
     },
     "ref-button-description": {
       "@type": "slate",
-      "plaintext": "A call-to-action button with an editable label and link.\n\nThis is a custom block — register it via initBridge.",
+      "plaintext": "A call-to-action button with an editable label and link.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "A call-to-action button with an editable label and link."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a custom block — register it via initBridge."
             }
           ]
         }

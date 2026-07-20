@@ -84,21 +84,13 @@
     },
     "ref-rssFeed-description": {
       "@type": "slate",
-      "plaintext": "Renders entries from an external RSS feed, reusing the listing machinery. Each entry is rendered with a configurable item type (variation).\n\nThis is a custom example block — register its fetcher via initBridge (see below).",
+      "plaintext": "Renders entries from an external RSS feed, reusing the listing machinery. Each entry is rendered with a configurable item type (variation).",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "Renders entries from an external RSS feed, reusing the listing machinery. Each entry is rendered with a configurable item type (variation)."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a custom example block — register its fetcher via initBridge (see below)."
             }
           ]
         }

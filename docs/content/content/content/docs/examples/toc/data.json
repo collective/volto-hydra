@@ -392,21 +392,13 @@
     },
     "ref-toc-description": {
       "@type": "slate",
-      "plaintext": "Renders a table of contents generated from heading blocks on the current page. It scans sibling blocks for headings and builds a navigation list.\n\nThis is a built-in block.",
+      "plaintext": "Renders a table of contents generated from heading blocks on the current page. It scans sibling blocks for headings and builds a navigation list.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "Renders a table of contents generated from heading blocks on the current page. It scans sibling blocks for headings and builds a navigation list."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a built-in block."
             }
           ]
         }

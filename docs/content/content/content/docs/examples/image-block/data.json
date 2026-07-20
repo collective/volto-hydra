@@ -269,21 +269,13 @@
     },
     "ref-image-description": {
       "@type": "slate",
-      "plaintext": "Displays an image with optional alt text and link. Supports the image picker widget for selecting images from the Plone content tree or uploading new ones.\n\nThis is a built-in block.",
+      "plaintext": "Displays an image with optional alt text and link. Supports the image picker widget for selecting images from the Plone content tree or uploading new ones.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "Displays an image with optional alt text and link. Supports the image picker widget for selecting images from the Plone content tree or uploading new ones."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a built-in block."
             }
           ]
         }

@@ -4266,21 +4266,13 @@
     },
     "ref-table-description": {
       "@type": "slate",
-      "plaintext": "A table with rich text (Slate) content in each cell. Supports adding/removing rows and columns via toolbar actions.\n\nThis is a built-in block (registered as slateTable).",
+      "plaintext": "A table with rich text (Slate) content in each cell. Supports adding/removing rows and columns via toolbar actions.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "A table with rich text (Slate) content in each cell. Supports adding/removing rows and columns via toolbar actions."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a built-in block (registered as slateTable)."
             }
           ]
         }

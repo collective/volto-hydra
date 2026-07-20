@@ -202,21 +202,13 @@
     },
     "ref-teaser-description": {
       "@type": "slate",
-      "plaintext": "A content preview card that links to another page. Selecting a target page via the object browser auto-fills the title, description, and preview image from that page. Editors can toggle \"overwrite\" to customize these values.\n\nThis is a built-in block.",
+      "plaintext": "A content preview card that links to another page. Selecting a target page via the object browser auto-fills the title, description, and preview image from that page. Editors can toggle \"overwrite\" to customize these values.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "A content preview card that links to another page. Selecting a target page via the object browser auto-fills the title, description, and preview image from that page. Editors can toggle \"overwrite\" to customize these values."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a built-in block."
             }
           ]
         }

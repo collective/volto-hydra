@@ -63,21 +63,13 @@
     },
     "ref-slider-description": {
       "@type": "slate",
-      "plaintext": "A carousel/slider that cycles through slides. Slides are stored as an object_list — each slide has a title, description, image, and optional button.\n\nThis is a custom block — register it via initBridge.",
+      "plaintext": "A carousel/slider that cycles through slides. Slides are stored as an object_list — each slide has a title, description, image, and optional button.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "A carousel/slider that cycles through slides. Slides are stored as an object_list — each slide has a title, description, image, and optional button."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a custom block — register it via initBridge."
             }
           ]
         }

@@ -178,21 +178,13 @@
     },
     "ref-search-description": {
       "@type": "slate",
-      "plaintext": "A search interface with faceted filtering. Contains a child listing block for results and typed facets (checkbox, select, date range, toggle) for filtering.\n\nThis is a built-in block. The facet types are custom sub-blocks.",
+      "plaintext": "A search interface with faceted filtering. Contains a child listing block for results and typed facets (checkbox, select, date range, toggle) for filtering.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "A search interface with faceted filtering. Contains a child listing block for results and typed facets (checkbox, select, date range, toggle) for filtering."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a built-in block. The facet types are custom sub-blocks."
             }
           ]
         }

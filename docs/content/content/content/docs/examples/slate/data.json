@@ -342,21 +342,13 @@
     },
     "ref-text-description": {
       "@type": "slate",
-      "plaintext": "Rich text block powered by the Slate editor. Supports paragraphs, headings, lists, blockquotes, and inline formatting (bold, italic, strikethrough, underline, code, links).\n\nThis is a built-in block — no schema registration is needed. It's available by default when you include 'slate' in your page's allowedBlocks.",
+      "plaintext": "Rich text block powered by the Slate editor. Supports paragraphs, headings, lists, blockquotes, and inline formatting (bold, italic, strikethrough, underline, code, links).",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "Rich text block powered by the Slate editor. Supports paragraphs, headings, lists, blockquotes, and inline formatting (bold, italic, strikethrough, underline, code, links)."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a built-in block — no schema registration is needed. It's available by default when you include 'slate' in your page's allowedBlocks."
             }
           ]
         }

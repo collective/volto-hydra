@@ -63,21 +63,13 @@
     },
     "ref-hero-description": {
       "@type": "slate",
-      "plaintext": "A full-width hero section with heading, subheading, image, rich text description, and a call-to-action button. Demonstrates multiple field types in a single block: string, textarea, slate, image, and object_browser.\n\nThis is a custom block — register it via initBridge.",
+      "plaintext": "A full-width hero section with heading, subheading, image, rich text description, and a call-to-action button. Demonstrates multiple field types in a single block: string, textarea, slate, image, and object_browser.",
       "value": [
         {
           "type": "p",
           "children": [
             {
               "text": "A full-width hero section with heading, subheading, image, rich text description, and a call-to-action button. Demonstrates multiple field types in a single block: string, textarea, slate, image, and object_browser."
-            }
-          ]
-        },
-        {
-          "type": "p",
-          "children": [
-            {
-              "text": "This is a custom block — register it via initBridge."
             }
           ]
         }
