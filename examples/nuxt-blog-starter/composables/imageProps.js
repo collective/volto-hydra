@@ -1,5 +1,21 @@
 
 
+// Plone's default `plone.allowed_sizes` registry (scale name -> max width). plone.scale
+// generates these on demand at `<@id>/@@images/<field>/<name>`. An image block ships
+// only a `url` (a brain summary, no embedded scale URLs), so the block CONSTRUCTS its
+// scale URLs from this set rather than requesting the bare `<@id>/@@images/image`
+// original. The original is large + slow (a cold one hangs ~300s under the parallel SSG
+// prerender and 500s the build), and as a file named `image` it collides with the
+// `image/<scale>` directory form on IPX's disk cache (ENOTDIR). Building
+// `@@images/<field>/<scale>` keeps `image` a directory consistently and only ever
+// fetches small pre-generated scales. (Matches pretagov-site's imageProps.)
+const PLONE_SCALES = {
+    icon: 32, tile: 64, thumb: 128, mini: 200,
+    preview: 400, teaser: 600, large: 800,
+    larger: 1000, great: 1200, huge: 1600,
+};
+const DEFAULT_SIZES = "sm:100vw md:50vw lg:33vw";
+
 export default function imageProps(block, bgStyles=false, imageField='image') {
     const { optimizeImage } = useOptimizeImage()
     const runtimeConfig = useRuntimeConfig()
@@ -115,12 +131,19 @@ export default function imageProps(block, bgStyles=false, imageField='image') {
         image_url = `${image_url}/@@images/${block?.image_field}`;
     }
     else if ((block['@type'] == "image" || block['@type'] == "Image") && !image_url.includes('@@images') && !image_url.includes('@@download') && !image_url.includes('@@display-file') && !image_url.startsWith('data:')) {
-        // image block ("image") or a Plone Image content reference ("Image", e.g. a
-        // slider slide preview_image whose id ends in .jpg) without scale info —
-        // resolve through the @@images/image traversal. This keeps the id a
-        // DIRECTORY on disk during SSG; rendering it bare (a file) collides with the
-        // image_scales form (`<id>/@@images/image-1800.jpeg`, a directory) → ENOTDIR.
-        image_url = `${image_url}/@@images/image`;
+        // Image block / Plone Image reference with only a base path (no embedded
+        // scales). Construct the scale URLs from PLONE_SCALES rather than requesting
+        // the bare `<base>/@@images/image` original: the original is large + slow (a
+        // cold one hangs ~300s under the parallel SSG prerender), and as a file named
+        // `image` it collides with the `image/<scale>` directory form on IPX's cache
+        // (ENOTDIR). Every URL here is `@@images/<field>/<scale>`, so `image` is only
+        // ever a directory and only small pre-generated scales are fetched.
+        const fld = block?.image_field || 'image';
+        srcset = Object.entries(PLONE_SCALES)
+            .map(([name, w]) => `${image_url}/@@images/${fld}/${name} ${w}w`)
+            .join(", ");
+        sizes = DEFAULT_SIZES;
+        image_url = `${image_url}/@@images/${fld}/great`;
     }
     else if (!image_url.startsWith('data:') && !image_url.includes('@@images') && !image_url.includes('@@download') && !image_url.includes('@@display-file') && !/\.[a-zA-Z]+$/.test(image_url)) {
         image_url = "";
