@@ -282,11 +282,34 @@
       "alt": "The separator example block being edited in Volto Hydra",
       "align": "center",
       "size": "l"
+    },
+    "ref-separator-description": {
+      "@type": "slate",
+      "plaintext": "A horizontal rule used to visually divide sections of content. Supports an alignment style property.\n\nThis is a built-in block.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A horizontal rule used to visually divide sections of content. Supports an alignment style property."
+            }
+          ]
+        },
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This is a built-in block."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "47b1e791-6f01-4b9b-a923-6658e7bc7871",
+      "ref-separator-description",
       "editor-screenshot",
       "dee0a2a5-dda7-407d-be26-1cecf1ba55a6",
       "be9ea3ae-29e1-41b8-b338-f32070a82675",

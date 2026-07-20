@@ -43,9 +43,9 @@
       "tabs": [
         {
           "@id": "ref-rssFeed-rendering-javascript-df4061",
-          "label": "Register",
+          "label": "Render",
           "language": "javascript",
-          "code": "fetchItems: { rssFeed: rssFetcher() }"
+          "code": "// 1. Register the fetcher when you init the bridge (keyed by block @type)\ninitBridge(origin, { blocks, fetchItems: { rssFeed: rssFetcher() } });\n\n// 2. Render — identical to any list block\nconst { items } = await expandListingBlocks([blockId], {\n  blocks: { [blockId]: block },\n  fetchItems: { rssFeed: rssFetcher() },\n  itemTypeField: 'variation',\n});\nitems.forEach((item) => renderBlock(item)); // your normal per-block renderer"
         }
       ]
     },
@@ -81,6 +81,28 @@
       "@type": "rssFeed",
       "feedUrl": "https://pypi.org/rss/project/plone/releases.xml",
       "variation": "default"
+    },
+    "ref-rssFeed-description": {
+      "@type": "slate",
+      "plaintext": "Renders entries from an external RSS feed, reusing the listing machinery. Each entry is rendered with a configurable item type (variation).\n\nThis is a custom example block — register its fetcher via initBridge (see below).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Renders entries from an external RSS feed, reusing the listing machinery. Each entry is rendered with a configurable item type (variation)."
+            }
+          ]
+        },
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This is a custom example block — register its fetcher via initBridge (see below)."
+            }
+          ]
+        }
+      ]
     },
     "ref-rssFeed-rendering-intro": {
       "@type": "slate",
@@ -145,6 +167,7 @@
   "blocks_layout": {
     "items": [
       "title-1",
+      "ref-rssFeed-description",
       "rss-live-heading",
       "rss-live-1",
       "ref-rssFeed-schema",

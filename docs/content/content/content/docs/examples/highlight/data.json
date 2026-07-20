@@ -257,11 +257,34 @@
       "alt": "The highlight example block being edited in Volto Hydra",
       "align": "center",
       "size": "l"
+    },
+    "ref-highlight-description": {
+      "@type": "slate",
+      "plaintext": "A prominent content section with a background image, overlay, title, rich text body, and an optional call-to-action link. Used for feature callouts and banners.\n\nThis is a custom block — register it via initBridge.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A prominent content section with a background image, overlay, title, rich text body, and an optional call-to-action link. Used for feature callouts and banners."
+            }
+          ]
+        },
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This is a custom block — register it via initBridge."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "af3c704a-1f80-48c8-843b-dc29368d43d9",
+      "ref-highlight-description",
       "editor-screenshot",
       "8d932379-1247-4281-bd30-dfecd5b3c378",
       "417e7343-af04-4da4-96bf-29321a3e0fc6",

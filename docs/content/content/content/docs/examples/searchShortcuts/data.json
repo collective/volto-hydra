@@ -43,9 +43,9 @@
       "tabs": [
         {
           "@id": "ref-searchShortcuts-rendering-javascript-ab7111",
-          "label": "Register",
+          "label": "Render",
           "language": "javascript",
-          "code": "fetchItems: { searchShortcuts: searchShortcutsFetcher({ apiUrl, contextPath }) }"
+          "code": "// 1. Register the fetcher when you init the bridge (keyed by block @type)\ninitBridge(origin, { blocks, fetchItems: { searchShortcuts: searchShortcutsFetcher({ apiUrl, contextPath }) } });\n\n// 2. Render — identical to any list block\nconst { items } = await expandListingBlocks([blockId], {\n  blocks: { [blockId]: block },\n  fetchItems: { searchShortcuts: searchShortcutsFetcher({ apiUrl, contextPath }) },\n  itemTypeField: 'variation',\n});\nitems.forEach((item) => renderBlock(item)); // your normal per-block renderer"
         }
       ]
     },
@@ -83,6 +83,28 @@
       "pageField": "subjects",
       "searchUrl": "/search",
       "variation": "default"
+    },
+    "ref-searchShortcuts-description": {
+      "@type": "slate",
+      "plaintext": "Renders a set of values as links into a faceted search — a \"tag cloud\" of shortcuts. Each value links to a search page with ?facet.<index>=<value> pre-set, which a Search block reads from the URL.\n\nThis is a custom example block — register its fetcher via initBridge (see below).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Renders a set of values as links into a faceted search — a \"tag cloud\" of shortcuts. Each value links to a search page with ?facet.<index>=<value> pre-set, which a Search block reads from the URL."
+            }
+          ]
+        },
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This is a custom example block — register its fetcher via initBridge (see below)."
+            }
+          ]
+        }
+      ]
     },
     "ref-searchShortcuts-rendering-intro": {
       "@type": "slate",
@@ -147,6 +169,7 @@
   "blocks_layout": {
     "items": [
       "title-1",
+      "ref-searchShortcuts-description",
       "ss-live-heading",
       "ss-live-1",
       "ref-searchShortcuts-schema",

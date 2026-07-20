@@ -108,10 +108,19 @@ Pick the `index` with the existing `select_querystring_field` widget (e.g. `Subj
 
 ## Rendering
 
-The render is **identical to every list block** — call `expandListingBlocks`, then map over the items; only the fetcher above is block-specific. Register it in `fetchItems`:
+Register the fetcher (keyed by the block's `@type`), then render **exactly like any list block**: `expandListingBlocks` returns ready-to-render item blocks — map each through your normal block renderer. Only the fetcher above is block-specific.
 
 ```javascript
-fetchItems: { searchShortcuts: searchShortcutsFetcher({ apiUrl, contextPath }) }
+// 1. Register the fetcher when you init the bridge (keyed by block @type)
+initBridge(origin, { blocks, fetchItems: { searchShortcuts: searchShortcutsFetcher({ apiUrl, contextPath }) } });
+
+// 2. Render — identical to any list block
+const { items } = await expandListingBlocks([blockId], {
+  blocks: { [blockId]: block },
+  fetchItems: { searchShortcuts: searchShortcutsFetcher({ apiUrl, contextPath }) },
+  itemTypeField: 'variation',
+});
+items.forEach((item) => renderBlock(item)); // your normal per-block renderer
 ```
 
-See the [Listing block](./listing.md#rendering) for the per-stack (React / Vue / Svelte / Astro) render component and [Listings › Example fetchers](../listings.md#example-fetchers) for the full picture.
+See the [Listing block](./listing.md#rendering) for the full per-stack (React / Vue / Svelte / Astro) render components.

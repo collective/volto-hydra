@@ -528,7 +528,15 @@ function extractCodeBlocks(text) {
  * Returns { schema, json, react, vue } where each is a string or null.
  */
 function extractMdSections(mdContent) {
-  const result = { schema: null, json: null, fetcher: null, react: null, vue: null, svelte: null };
+  const result = { description: null, schema: null, json: null, fetcher: null, react: null, vue: null, svelte: null };
+
+  // Description: the prose between the H1 title and the first `## ` section — a
+  // plain-language "what this block is for". Rendered as a paragraph after the title.
+  const descMatch = mdContent.match(/^#\s+.+?\r?\n+([\s\S]*?)(?=\r?\n##\s)/);
+  if (descMatch) {
+    const desc = descMatch[1].trim();
+    if (desc) result.description = desc;
+  }
 
   // Split into top-level sections by ## headings
   const topSections = {};
@@ -646,13 +654,11 @@ function makeCodeExampleBlock(blockId, templateInstanceId, slotId, tabs) {
  */
 function updateCodeExampleTabs(block, tabUpdates) {
   let changed = false;
-  for (const { language, code } of tabUpdates) {
-    if (code == null) continue;
+  for (const { language, code, label } of tabUpdates) {
     const tab = block.tabs.find(t => t.language === language);
-    if (tab && tab.code !== code) {
-      tab.code = code;
-      changed = true;
-    }
+    if (!tab) continue;
+    if (code != null && tab.code !== code) { tab.code = code; changed = true; }
+    if (label != null && tab.label !== label) { tab.label = label; changed = true; }
   }
   return changed;
 }
@@ -700,6 +706,41 @@ function ensureCodeExampleBlock(data, blockId, instanceId, slotId, tabs) {
     return true;
   }
   return updateCodeExampleTabs(existing, tabs);
+}
+
+/** Convert a chunk of markdown prose into a plain (non-template) slate block: one
+ * `p` per blank-line-separated paragraph, markdown emphasis/code/link syntax stripped
+ * to text. Used for the page description (no template slot — it sits above the fold). */
+function makeProseSlate(blockId, markdown) {
+  const paras = markdown.split(/\r?\n\s*\r?\n/)
+    .map((p) => p.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .map((p) => p
+      .replace(/\*\*(.+?)\*\*/g, '$1')
+      .replace(/\*(?!\*)([^*]+?)\*/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/\[(.+?)\]\([^)]*\)/g, '$1'));
+  return {
+    '@type': 'slate',
+    plaintext: paras.join('\n\n'),
+    value: paras.map((p) => ({ type: 'p', children: [{ text: p }] })),
+  };
+}
+
+/** Ensure a standalone prose slate exists for the given markdown; returns true if
+ * changed. Deletes the block when `markdown` is empty. */
+function ensureProseSlate(data, blockId, markdown) {
+  if (!markdown) {
+    if (data.blocks[blockId]) { delete data.blocks[blockId]; return true; }
+    return false;
+  }
+  const next = makeProseSlate(blockId, markdown);
+  const cur = data.blocks[blockId];
+  if (cur && cur['@type'] === 'slate' && JSON.stringify(cur.value) === JSON.stringify(next.value)) {
+    return false;
+  }
+  data.blocks[blockId] = next;
+  return true;
 }
 
 /** Ensure a slate block exists with the given text (and optional rich `value`);
@@ -804,6 +845,22 @@ for (const mdFile of mdFiles) {
     contentChanged = true;
   }
 
+  // --- Description: what the block is for. A standalone prose slate right after the
+  // title (from the .md intro between the H1 and the first `##`). ---
+  const descriptionId = `${prefix}-description`;
+  if (ensureProseSlate(data, descriptionId, sections.description)) contentChanged = true;
+  if (sections.description) {
+    const items = data.blocks_layout.items;
+    const titleIdx = items.findIndex((id) => data.blocks[id]?.['@type'] === 'title');
+    const curIdx = items.indexOf(descriptionId);
+    const wantIdx = titleIdx >= 0 ? titleIdx + 1 : 0;
+    if (curIdx !== wantIdx) {
+      if (curIdx !== -1) items.splice(curIdx, 1);
+      items.splice(items.findIndex((id) => data.blocks[id]?.['@type'] === 'title') + 1, 0, descriptionId);
+      contentChanged = true;
+    }
+  }
+
   // Ensure the 3 codeExample blocks exist
   // --- Schema + JSON Block Data: one codeExample each (idempotent create/update) ---
   const schemaId = `${prefix}-schema`;
@@ -847,7 +904,7 @@ for (const mdFile of mdFiles) {
       { label: 'Fetcher', language: 'javascript', code: sections.fetcher || '' },
     ])) contentChanged = true;
     if (ensureCodeExampleBlock(data, renderingId, instanceId, 'rendering', [
-      { label: 'Register', language: 'javascript', code: sections.register || '' },
+      { label: 'Render', language: 'javascript', code: sections.register || '' },
     ])) contentChanged = true;
     renderRegionIds = [renderIntroId, fetcherId, renderingId];
   } else {

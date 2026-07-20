@@ -78,10 +78,19 @@ The optional field picker (`schemaFieldSelect`, `fieldType: 'relation'`) lists t
 
 ## Rendering
 
-The render is **identical to every list block** — call `expandListingBlocks`, then map over the items; only the fetcher above is block-specific. Register it in `fetchItems`:
+Register the fetcher (keyed by the block's `@type`), then render **exactly like any list block**: `expandListingBlocks` returns ready-to-render item blocks — map each through your normal block renderer. Only the fetcher above is block-specific.
 
 ```javascript
-fetchItems: { relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }) }
+// 1. Register the fetcher when you init the bridge (keyed by block @type)
+initBridge(origin, { blocks, fetchItems: { relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }) } });
+
+// 2. Render — identical to any list block
+const { items } = await expandListingBlocks([blockId], {
+  blocks: { [blockId]: block },
+  fetchItems: { relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }) },
+  itemTypeField: 'variation',
+});
+items.forEach((item) => renderBlock(item)); // your normal per-block renderer
 ```
 
-See the [Listing block](./listing.md#rendering) for the per-stack (React / Vue / Svelte / Astro) render component and [Listings › Example fetchers](../listings.md#example-fetchers) for the full picture.
+See the [Listing block](./listing.md#rendering) for the full per-stack (React / Vue / Svelte / Astro) render components.

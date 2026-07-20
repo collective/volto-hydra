@@ -60,11 +60,34 @@
         }
       ],
       "slotId": "rendering"
+    },
+    "ref-columns-description": {
+      "@type": "slate",
+      "plaintext": "A horizontal multi-column container. The block has one slot — columns — restricted to column children, capped at four. Each column is itself a container holding any of its allowed inner block types (slate, image, …).\n\nThis is a custom block — register it via initBridge.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A horizontal multi-column container. The block has one slot — columns — restricted to column children, capped at four. Each column is itself a container holding any of its allowed inner block types (slate, image, …)."
+            }
+          ]
+        },
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This is a custom block — register it via initBridge."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "title-1",
+      "ref-columns-description",
       "ref-columns-schema",
       "ref-columns-json-data",
       "ref-columns-rendering"

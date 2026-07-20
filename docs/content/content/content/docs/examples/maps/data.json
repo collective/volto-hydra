@@ -263,11 +263,34 @@
       "alt": "The maps example block being edited in Volto Hydra",
       "align": "center",
       "size": "l"
+    },
+    "ref-maps-description": {
+      "@type": "slate",
+      "plaintext": "Embeds a map from a URL (Google Maps, OpenStreetMap, etc.) using an iframe. The url field should contain the embed URL, and title provides an accessible label.\n\nThis is a built-in block.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Embeds a map from a URL (Google Maps, OpenStreetMap, etc.) using an iframe. The url field should contain the embed URL, and title provides an accessible label."
+            }
+          ]
+        },
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This is a built-in block."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "68370edd-bfe5-47fb-937e-16a19a3a92ad",
+      "ref-maps-description",
       "editor-screenshot",
       "e36a9020-5e7e-4ef5-97f7-862c45fea81c",
       "96789bf6-953b-4777-a022-0f4cd852be64",
