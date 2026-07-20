@@ -1264,14 +1264,18 @@ const getImageUrl = (value) => {
     return '';
   }
 
-  // Add @@images/image suffix for Plone internal paths
-  // Handles both relative paths (/) and full URLs with backend base URL
+  // Add a SCALE suffix (`@@images/image/great`) for Plone internal paths, NOT the
+  // bare `@@images/image` original. The bare form names `image` as a file, which
+  // collides with the `image/<scale>` directory form other <img> srcsets use — IPX's
+  // disk cache can't have `image` be both (EEXIST/ENOTDIR) and the bare original is
+  // the large slow variant that hangs the SSG prerender. A named scale keeps `image`
+  // a directory everywhere.
   const needsImageSuffix = !url.includes('@@images');
   const isRelativePath = url.startsWith('/');
   const isBackendUrl = backendBaseUrl && url.startsWith(backendBaseUrl);
 
   if (needsImageSuffix && (isRelativePath || isBackendUrl)) {
-    return url + '/@@images/image';
+    return url + '/@@images/image/great';
   }
   return url;
 };

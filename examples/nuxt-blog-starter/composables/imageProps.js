@@ -108,17 +108,33 @@ export default function imageProps(block, bgStyles=false, imageField='image') {
 
     if (block?.image_scales && block?.image_field && block.image_scales[block.image_field]?.[0]) {
         const field = block.image_field;
-        srcset = Object.keys(block.image_scales[field][0].scales).map((name) => {
-            const scale = block.image_scales[field][0].scales[name];
+        const meta = block.image_scales[field][0];
+        const scaleEntries = Object.values(meta.scales || {});
+        srcset = Object.keys(meta.scales || {}).map((name) => {
+            const scale = meta.scales[name];
             return `${image_url}/${scale.download} w${scale.width}`;
         }).join(", ");
-        sizes = Object.keys(block.image_scales[field][0].scales).map((name) => {
-            const scale = block.image_scales[field][0].scales[name];
+        sizes = Object.keys(meta.scales || {}).map((name) => {
+            const scale = meta.scales[name];
             return `${name}:${scale.width}px`;
         }).join(" ");
-        //image_url = image_url +  "/@@images/image";
-        image_url = `${image_url}/${block.image_scales[field][0].download}`;
-        //width = block.images_scales[field][0].scales[block.styles["size:noprefix"]].width;
+        // src must be a SCALE download (`@@images/<field>/<name>`), NOT the bare
+        // top-level `meta.download` (`@@images/image`). The srcset above uses the
+        // scale form, which needs `image` to be a DIRECTORY; a bare `image` src is a
+        // FILE at the same path → IPX's disk cache can't be both (EEXIST/ENOTDIR),
+        // and the bare original is the large slow variant that hangs the prerender.
+        // (pretagov-site gets away with meta.download only because theirs is the
+        // HASHED `image-<w>-<hash>.jpeg` — a unique file that never collides.)
+        const isHashed = /@@images\/[^/]+-\d+-[0-9a-f]+\./.test(meta.download || '');
+        if (isHashed) {
+            image_url = `${image_url}/${meta.download}`;
+        } else if (scaleEntries.length) {
+            // Largest available scale as the src.
+            const biggest = scaleEntries.reduce((a, b) => (b.width > a.width ? b : a));
+            image_url = `${image_url}/${biggest.download}`;
+        } else {
+            image_url = `${image_url}/@@images/${field}/great`;
+        }
     } else if (block?.scales) {
         srcset = Object.keys(block.scales).map((name) => {
             const scale = block.scales[name];
@@ -127,8 +143,15 @@ export default function imageProps(block, bgStyles=false, imageField='image') {
         image_url = block.download;
     } 
     else if (block?.url && block?.image_field) {
-        // image block with image_field and url
-        image_url = `${image_url}/@@images/${block?.image_field}`;
+        // image block with image_field + url. Use a named SCALE, not the bare
+        // `@@images/<field>` original — the bare form names the field a file and
+        // collides with the `<field>/<scale>` directory form (EEXIST/ENOTDIR) while
+        // being the large slow variant that hangs the SSG prerender.
+        srcset = Object.entries(PLONE_SCALES)
+            .map(([name, w]) => `${image_url}/@@images/${block.image_field}/${name} ${w}w`)
+            .join(", ");
+        sizes = DEFAULT_SIZES;
+        image_url = `${image_url}/@@images/${block?.image_field}/great`;
     }
     else if ((block['@type'] == "image" || block['@type'] == "Image") && !image_url.includes('@@images') && !image_url.includes('@@download') && !image_url.includes('@@display-file') && !image_url.startsWith('data:')) {
         // Image block / Plone Image reference with only a base path (no embedded
