@@ -17,6 +17,12 @@ export interface AxeViolation {
   tags: string[];
 }
 
+// WCAG 2.0/2.1 A + AA plus axe's best-practice preset (heading-order, region,
+// landmark, page-has-heading-one, …). best-practice findings are reported as
+// advisory, never blocking. Override the whole set with SANITY_AXE_TAGS (a
+// comma-separated list of axe tags, e.g. "wcag2a,wcag2aa,wcag2aaa").
+const DEFAULT_AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'];
+
 // Rules that need whole-page context. A block rendered in isolation in the sanity
 // harness isn't under a page's landmarks / heading outline, so these would
 // false-positive on every block — report them as advisory, never blocking.
@@ -57,27 +63,35 @@ export async function axeCheckBlock(
     }
   }, axeSource);
 
-  const raw = (await body.evaluate(async (_el, sel) => {
-    const results = await (
-      window as unknown as { axe: { run: (ctx: unknown, opts: unknown) => Promise<{ violations: unknown[] }> } }
-    ).axe.run(
-      { include: [sel] },
-      { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } },
-    );
-    return (results.violations as Array<Record<string, unknown>>).map((v) => ({
-      id: v.id as string,
-      impact: (v.impact as string) ?? null,
-      help: v.help as string,
-      nodes: (v.nodes as unknown[]).length,
-      tags: v.tags as string[],
-    }));
-  }, `[data-block-uid="${blockId}"]`)) as AxeViolation[];
+  const tags = process.env.SANITY_AXE_TAGS
+    ? process.env.SANITY_AXE_TAGS.split(',').map((t) => t.trim()).filter(Boolean)
+    : DEFAULT_AXE_TAGS;
+
+  const raw = (await body.evaluate(
+    async (_el, { sel, tags }: { sel: string; tags: string[] }) => {
+      const results = await (
+        window as unknown as { axe: { run: (ctx: unknown, opts: unknown) => Promise<{ violations: unknown[] }> } }
+      ).axe.run({ include: [sel] }, { runOnly: { type: 'tag', values: tags } });
+      return (results.violations as Array<Record<string, unknown>>).map((v) => ({
+        id: v.id as string,
+        impact: (v.impact as string) ?? null,
+        help: v.help as string,
+        nodes: (v.nodes as unknown[]).length,
+        tags: v.tags as string[],
+      }));
+    },
+    { sel: `[data-block-uid="${blockId}"]`, tags },
+  )) as AxeViolation[];
 
   const blocking: AxeViolation[] = [];
   const advisory: AxeViolation[] = [];
   for (const v of raw) {
     const severe = v.impact === 'serious' || v.impact === 'critical';
-    if (severe && !PAGE_LEVEL_RULES.has(v.id)) blocking.push(v);
+    // A best-practice-only rule (no WCAG tag) or a page-context rule can't be
+    // judged fairly on a block rendered in isolation — advisory, never blocking.
+    const bestPracticeOnly =
+      v.tags.includes('best-practice') && !v.tags.some((t) => t.startsWith('wcag'));
+    if (severe && !bestPracticeOnly && !PAGE_LEVEL_RULES.has(v.id)) blocking.push(v);
     else advisory.push(v);
   }
   return { blocking, advisory };
