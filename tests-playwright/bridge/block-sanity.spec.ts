@@ -17,6 +17,7 @@
 import { test as base, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { verifyBlockRendering } from '../helpers/BlockVerificationHelper';
+import { axeCheckBlock, formatViolations } from '../helpers/axe-sanity';
 import { getFrontendUrl } from './fixtures';
 import { URLS } from '../ports';
 import * as fs from 'fs';
@@ -191,6 +192,23 @@ test.describe('Block sanity (auto-discovered)', () => {
         // Skip data-edit-text clicks for discovered content — we just want rendering + annotation checks
         checkEditTextClicks: false,
       });
+
+      // Optional per-block accessibility pass (axe-core). Off by default; opt in
+      // with SANITY_AXE=1. Runs axe scoped to just this block — blocking =
+      // serious/critical WCAG A/AA that's block-level; advisory (moderate/minor
+      // or page-context rules) is logged but doesn't fail.
+      if (process.env.SANITY_AXE) {
+        const { blocking, advisory } = await axeCheckBlock(iframe, block.blockId);
+        if (advisory.length > 0) {
+          console.log(
+            `[axe] ${label}: ${advisory.length} advisory finding(s)\n${formatViolations(advisory)}`,
+          );
+        }
+        expect(
+          blocking,
+          `${label} has ${blocking.length} serious/critical a11y violation(s):\n${formatViolations(blocking)}`,
+        ).toEqual([]);
+      }
     });
   }
 });
