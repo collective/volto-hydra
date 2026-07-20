@@ -1666,7 +1666,14 @@ function createFieldRulesEnhancer(rulesConfig) {
       ...schema,
       properties: newProperties,
       fieldsets: newFieldsets,
-      required: schema.required || [],
+      // A hidden field can't be required — the editor can't supply a value it
+      // can't see, and a required-but-absent property would wedge the form. So
+      // drop any hidden field from `required`. This also gives *conditional*
+      // required for free: declare a field required in the base schema, gate it
+      // with a `when` rule, and it's required exactly when the rule shows it
+      // (e.g. a card's `image` is required only when the grid enables the image
+      // element).
+      required: (schema.required || []).filter((f) => !fieldsToHide.has(f)),
     };
   };
 
