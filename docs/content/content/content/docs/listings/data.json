@@ -950,6 +950,601 @@
     },
     "h-19": {
       "@type": "slate",
+      "plaintext": "Example fetchers",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Example fetchers"
+            }
+          ]
+        }
+      ]
+    },
+    "p-20": {
+      "@type": "slate",
+      "plaintext": "The same `fetchItems` seam powers other \"collection\" blocks — each is just a fetcher that returns raw result objects (`expandListingBlocks` maps `@id → href` etc. and repeats an item block per result, so they need **no bespoke renderer**; they render via the standard item types on every frontend). `@hydra-js/helpers` ships three reference fetchers:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The same "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "fetchItems"
+                }
+              ]
+            },
+            {
+              "text": " seam powers other \"collection\" blocks — each is just a fetcher that returns raw result objects ("
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "expandListingBlocks"
+                }
+              ]
+            },
+            {
+              "text": " maps "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "@id → href"
+                }
+              ]
+            },
+            {
+              "text": " etc. and repeats an item block per result, so they need "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "no bespoke renderer"
+                }
+              ]
+            },
+            {
+              "text": "; they render via the standard item types on every frontend). "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "@hydra-js/helpers"
+                }
+              ]
+            },
+            {
+              "text": " ships three reference fetchers:"
+            }
+          ]
+        }
+      ]
+    },
+    "tbl-21": {
+      "@type": "slateTable",
+      "table": {
+        "fixed": true,
+        "compact": false,
+        "basic": false,
+        "celled": true,
+        "inverted": false,
+        "striped": false,
+        "rows": [
+          {
+            "key": "tbl-21-r0",
+            "cells": [
+              {
+                "key": "tbl-21-r0c0",
+                "type": "header",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Fetcher"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-21-r0c1",
+                "type": "header",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "Block"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-21-r0c2",
+                "type": "header",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "What it returns"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-21-r1",
+            "cells": [
+              {
+                "key": "tbl-21-r1c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "relatedItemsFetcher({ apiUrl, contextPath })"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-21-r1c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "type": "strong",
+                        "children": [
+                          {
+                            "text": "Related Items"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-21-r1c2",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "the current page's relation field (default "
+                      },
+                      {
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "relatedItems"
+                          }
+                        ]
+                      },
+                      {
+                        "text": ") — its summaries, paged"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-21-r2",
+            "cells": [
+              {
+                "key": "tbl-21-r2c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "searchShortcutsFetcher({ apiUrl, contextPath })"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-21-r2c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "type": "strong",
+                        "children": [
+                          {
+                            "text": "Search Shortcuts"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-21-r2c2",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "one link per value, each "
+                      },
+                      {
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "@id"
+                          }
+                        ]
+                      },
+                      {
+                        "text": " set to "
+                      },
+                      {
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "${searchUrl}?facet.${index}=${value}"
+                          }
+                        ]
+                      },
+                      {
+                        "text": " (a shortcut into a search page's facet). A linked "
+                      },
+                      {
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "pageField"
+                          }
+                        ]
+                      },
+                      {
+                        "text": " → this page's values; none → the index's site-wide unique values (e.g. "
+                      },
+                      {
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "Keywords"
+                          }
+                        ]
+                      },
+                      {
+                        "text": " for "
+                      },
+                      {
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "Subject"
+                          }
+                        ]
+                      },
+                      {
+                        "text": ")"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "tbl-21-r3",
+            "cells": [
+              {
+                "key": "tbl-21-r3c0",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "rssFetcher()"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-21-r3c1",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "type": "strong",
+                        "children": [
+                          {
+                            "text": "RSS Feed"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "key": "tbl-21-r3c2",
+                "type": "data",
+                "value": [
+                  {
+                    "type": "p",
+                    "children": [
+                      {
+                        "text": "entries from "
+                      },
+                      {
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "block.feedUrl"
+                          }
+                        ]
+                      },
+                      {
+                        "text": ", client-side "
+                      },
+                      {
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "fetch"
+                          }
+                        ]
+                      },
+                      {
+                        "text": " (best-effort — a CORS/parse error degrades to an empty feed); each entry's "
+                      },
+                      {
+                        "type": "code",
+                        "children": [
+                          {
+                            "text": "@id"
+                          }
+                        ]
+                      },
+                      {
+                        "text": " is its link"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "p-22": {
+      "@type": "slate",
+      "plaintext": "Register them alongside `listing` in the `fetchItems` map:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Register them alongside "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "listing"
+                }
+              ]
+            },
+            {
+              "text": " in the "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "fetchItems"
+                }
+              ]
+            },
+            {
+              "text": " map:"
+            }
+          ]
+        }
+      ]
+    },
+    "ce-23": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-23-json-6d0894",
+          "label": "Javascript",
+          "language": "javascript",
+          "code": "const { items } = await expandListingBlocks(layout, {\n  blocks,\n  fetchItems: {\n    listing:             ploneFetchItems({ apiUrl, contextPath }),\n    relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }),\n    searchShortcuts:     searchShortcutsFetcher({ apiUrl, contextPath }),\n    rssFeed:             rssFetcher(),\n  },\n});"
+        }
+      ]
+    },
+    "p-24": {
+      "@type": "slate",
+      "plaintext": "The **Search Shortcuts** link target reads Volto's search-block facet params — a page with a `search` block picks up `?facet.<index>=<value>` from the URL. The block's *index* uses the existing `select_querystring_field` widget; the optional *this-page field* uses `schemaFieldSelect` (a `/@types`-backed field dropdown, parameterized by `fieldType`), which **Related Items** also uses with `fieldType: 'relation'`.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Search Shortcuts"
+                }
+              ]
+            },
+            {
+              "text": " link target reads Volto's search-block facet params — a page with a "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "search"
+                }
+              ]
+            },
+            {
+              "text": " block picks up "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "?facet.<index>=<value>"
+                }
+              ]
+            },
+            {
+              "text": " from the URL. The block's "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "index"
+                }
+              ]
+            },
+            {
+              "text": " uses the existing "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "select_querystring_field"
+                }
+              ]
+            },
+            {
+              "text": " widget; the optional "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "this-page field"
+                }
+              ]
+            },
+            {
+              "text": " uses "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "schemaFieldSelect"
+                }
+              ]
+            },
+            {
+              "text": " (a "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "/@types"
+                }
+              ]
+            },
+            {
+              "text": "-backed field dropdown, parameterized by "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "fieldType"
+                }
+              ]
+            },
+            {
+              "text": "), which "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Related Items"
+                }
+              ]
+            },
+            {
+              "text": " also uses with "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "fieldType: 'relation'"
+                }
+              ]
+            },
+            {
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    "h-25": {
+      "@type": "slate",
       "plaintext": "Field Mapping",
       "value": [
         {
@@ -962,7 +1557,7 @@
         }
       ]
     },
-    "p-20": {
+    "p-26": {
       "@type": "slate",
       "plaintext": "`fieldMapping` on a listing block controls which fields appear on expanded items — only mapped fields are included. Default: `{ @id → href, title → title, description → description, image → image }`. Values can be a string (rename) or `{ field, type }` for conversions:",
       "value": [
@@ -1006,7 +1601,7 @@
         }
       ]
     },
-    "p-21": {
+    "p-27": {
       "@type": "slate",
       "plaintext": "Built-in item types and the fields they expose:",
       "value": [
@@ -1020,7 +1615,7 @@
         }
       ]
     },
-    "tbl-22": {
+    "tbl-28": {
       "@type": "slateTable",
       "table": {
         "fixed": true,
@@ -1031,10 +1626,10 @@
         "striped": false,
         "rows": [
           {
-            "key": "tbl-22-r0",
+            "key": "tbl-28-r0",
             "cells": [
               {
-                "key": "tbl-22-r0c0",
+                "key": "tbl-28-r0c0",
                 "type": "header",
                 "value": [
                   {
@@ -1048,7 +1643,7 @@
                 ]
               },
               {
-                "key": "tbl-22-r0c1",
+                "key": "tbl-28-r0c1",
                 "type": "header",
                 "value": [
                   {
@@ -1064,10 +1659,10 @@
             ]
           },
           {
-            "key": "tbl-22-r1",
+            "key": "tbl-28-r1",
             "cells": [
               {
-                "key": "tbl-22-r1c0",
+                "key": "tbl-28-r1c0",
                 "type": "data",
                 "value": [
                   {
@@ -1086,7 +1681,7 @@
                 ]
               },
               {
-                "key": "tbl-22-r1c1",
+                "key": "tbl-28-r1c1",
                 "type": "data",
                 "value": [
                   {
@@ -1129,10 +1724,10 @@
             ]
           },
           {
-            "key": "tbl-22-r2",
+            "key": "tbl-28-r2",
             "cells": [
               {
-                "key": "tbl-22-r2c0",
+                "key": "tbl-28-r2c0",
                 "type": "data",
                 "value": [
                   {
@@ -1151,7 +1746,7 @@
                 ]
               },
               {
-                "key": "tbl-22-r2c1",
+                "key": "tbl-28-r2c1",
                 "type": "data",
                 "value": [
                   {
@@ -1205,10 +1800,10 @@
             ]
           },
           {
-            "key": "tbl-22-r3",
+            "key": "tbl-28-r3",
             "cells": [
               {
-                "key": "tbl-22-r3c0",
+                "key": "tbl-28-r3c0",
                 "type": "data",
                 "value": [
                   {
@@ -1227,7 +1822,7 @@
                 ]
               },
               {
-                "key": "tbl-22-r3c1",
+                "key": "tbl-28-r3c1",
                 "type": "data",
                 "value": [
                   {
@@ -1283,18 +1878,18 @@
         ]
       }
     },
-    "ce-23": {
+    "ce-29": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-23-json-6d0894",
+          "@id": "ce-29-json-a7c4dc",
           "label": "Json",
           "language": "json",
           "code": "\"fieldMapping\": {\n  \"@id\": { \"field\": \"href\", \"type\": \"link\" },\n  \"title\": \"title\",\n  \"image\": { \"field\": \"preview_image\", \"type\": \"image\" },\n  \"Subject\": { \"field\": \"tags\", \"type\": \"string\" }\n}\n\nTypes: string (array→join, image→URL), link (→[{@id}]), image (pass through)"
         }
       ]
     },
-    "h-24": {
+    "h-30": {
       "@type": "slate",
       "plaintext": "Item Type Selection",
       "value": [
@@ -1308,7 +1903,7 @@
         }
       ]
     },
-    "p-25": {
+    "p-31": {
       "@type": "slate",
       "plaintext": "Use `variation` on the listing block to control what `@type` expanded items get. Listings reuse the same `inheritSchemaFrom` recipe as container blocks (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)) but differ in one structural way: there's no blocks field to declare `itemTypeField` on, since listing children are *virtual* (produced from query results at render time, not authored as page data). Instead, declare the typeField directly on the `inheritSchemaFrom` recipe:",
       "value": [
@@ -1402,18 +1997,18 @@
         }
       ]
     },
-    "ce-26": {
+    "ce-32": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-26-javascript-18000c",
+          "@id": "ce-32-javascript-f6757f",
           "label": "Javascript",
           "language": "javascript",
           "code": "listing: {\n    blockSchema: {\n        properties: {\n            variation: {\n                widget: 'blockTypeSelect',\n                filterConvertibleFrom: '@default',  // only offer types with @default mappings\n            },\n            // FieldMappingWidget is added at sidebar render time by\n            // inheritSchemaFrom (the enhancer reads `mappingField` below);\n            // declare an empty placeholder so it appears in the auto-generated\n            // default fieldset alongside `variation`.\n            fieldMapping: {},\n        },\n    },\n    schemaEnhancer: {\n        inheritSchemaFrom: {\n            typeField: 'variation',     // listing has no blocks field — declare here\n            mappingField: 'fieldMapping',\n        },\n    },\n}"
         }
       ]
     },
-    "p-27": {
+    "p-33": {
       "@type": "slate",
       "plaintext": "`filterConvertibleFrom: '@default'` restricts the dropdown to types that have a `fieldMappings['@default']` entry — i.e. types that can be populated from the canonical content fields (`@id`, `title`, `description`, `image`) that listing queries return. Each item type's `fieldMappings['@default']` (on its own block config) defines how those source fields land on its schema; that static mapping is enough to render listings. Adding `mappingField` to the enhancer exposes the `FieldMappingWidget` so the editor can override the mapping per listing instance.",
       "value": [
@@ -1523,7 +2118,7 @@
         }
       ]
     },
-    "p-28": {
+    "p-34": {
       "@type": "slate",
       "plaintext": "The widget saves its output as `fieldMapping` (singular) on the block data. `expandListingBlocks` reads that at render time to translate each query result into an item block.",
       "value": [
@@ -1559,7 +2154,7 @@
         }
       ]
     },
-    "h-29": {
+    "h-35": {
       "@type": "slate",
       "plaintext": "Combining Listings with Container Syncing",
       "value": [
@@ -1573,7 +2168,7 @@
         }
       ]
     },
-    "p-30": {
+    "p-36": {
       "@type": "slate",
       "plaintext": "A container (e.g. `gridBlock`) can mix **manual children** AND **a listing** as children. Add `'listing'` to the blocks field's `allowedBlocks`, and the parent's typeField propagates everywhere:",
       "value": [
@@ -1642,18 +2237,18 @@
         }
       ]
     },
-    "ce-31": {
+    "ce-37": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-31-javascript-e988b9",
+          "@id": "ce-37-javascript-2ec596",
           "label": "Javascript",
           "language": "javascript",
           "code": "gridBlock: {\n    blockSchema: {\n        properties: {\n            slides: {\n                widget: 'blocks_layout',\n                itemTypeField: 'variation',\n                allowedBlocks: ['teaser', 'image', 'listing'],  // manual items + listing\n            },\n            variation: {\n                widget: 'blockTypeSelect',\n                filterConvertibleFrom: '@default',  // keeps 'listing' out of the dropdown\n            },\n        },\n    },\n    schemaEnhancer: { inheritSchemaFrom: {} },\n}"
         }
       ]
     },
-    "p-32": {
+    "p-38": {
       "@type": "slate",
       "plaintext": "`filterConvertibleFrom: '@default'` keeps `'listing'` out of the dropdown (it's a structural container, not an item type, so it has no `fieldMappings['@default']`) but it stays in `allowedBlocks` so a listing block can still exist as a structural child. The editor sees \"Teaser / Image / Summary\" in the picker; the listing is a structural choice they don't have to think about.",
       "value": [
@@ -1708,7 +2303,7 @@
         }
       ]
     },
-    "p-33": {
+    "p-39": {
       "@type": "slate",
       "plaintext": "When the editor changes `gridBlock.variation` to e.g. `'summary'`:",
       "value": [
@@ -1744,7 +2339,7 @@
         }
       ]
     },
-    "ul-34": {
+    "ul-40": {
       "@type": "slate",
       "plaintext": "Manual children (a teaser, an image) get their @type converted via the destination type's fieldMappings — teaser becomes summary. Listing child keeps @type: 'listing' but its own variation field is set to 'summary', so the listing now renders summary items.",
       "value": [
@@ -1842,7 +2437,7 @@
         }
       ]
     },
-    "p-35": {
+    "p-41": {
       "@type": "slate",
       "plaintext": "The sync walks recursively — if the listing held nested containers with their own typeFields, those would update too. Net effect: ONE picker on the parent controls the rendered type for every descendant, regardless of whether descendants are authored manually or expanded from a query.",
       "value": [
@@ -1856,7 +2451,7 @@
         }
       ]
     },
-    "h-36": {
+    "h-42": {
       "@type": "slate",
       "plaintext": "Path Transformation (pathToApiPath)",
       "value": [
@@ -1870,7 +2465,7 @@
         }
       ]
     },
-    "p-37": {
+    "p-43": {
       "@type": "slate",
       "plaintext": "If your frontend embeds state in the URL path (like pagination), you need to tell hydra.js how to transform the frontend path to the API/admin path. Otherwise, the admin will try to navigate to URLs that don't exist in the CMS.",
       "value": [
@@ -1884,18 +2479,18 @@
         }
       ]
     },
-    "ce-38": {
+    "ce-44": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-38-javascript-e44e5e",
+          "@id": "ce-44-javascript-82ad8e",
           "label": "Javascript",
           "language": "javascript",
           "code": "const bridge = initBridge({\n    page: { ... },\n    // Transform frontend path to API path by stripping paging segments\n    // e.g., /test-page/@pg_block-8-grid_1 -> /test-page\n    pathToApiPath: (path) => path.replace(/\\/@pg_[^/]+_\\d+/, ''),\n});"
         }
       ]
     },
-    "p-39": {
+    "p-45": {
       "@type": "slate",
       "plaintext": "The `pathToApiPath` function is called whenever hydra.js sends a `PATH_CHANGE` message to the admin, allowing your frontend to strip or transform URL segments that are frontend-specific (like pagination, filters, or other client-side state).",
       "value": [
@@ -1931,7 +2526,7 @@
         }
       ]
     },
-    "h-40": {
+    "h-46": {
       "@type": "slate",
       "plaintext": "Paging Values",
       "value": [
@@ -1945,7 +2540,7 @@
         }
       ]
     },
-    "p-41": {
+    "p-47": {
       "@type": "slate",
       "plaintext": "Both `expandListingBlocks` and `staticBlocks` return `{ items, paging }`. You pass `{ start, size }` as input (not mutated) and get back computed paging values:",
       "value": [
@@ -2003,7 +2598,7 @@
         }
       ]
     },
-    "ul-42": {
+    "ul-48": {
       "@type": "slate",
       "plaintext": "currentPage (number) — Zero-based current page index totalPages (number) — Total number of pages totalItems (number) — Total item count across all blocks prev (number | null) — Previous page index, or null on first page next (number | null) — Next page index, or null on last page pages (array) — Window of ~5 page objects: { start, page } where page is 1-based seen (number) — Running item count — pass to the next call's seen option for position tracking in grids",
       "value": [
@@ -2148,7 +2743,7 @@
         }
       ]
     },
-    "p-43": {
+    "p-49": {
       "@type": "slate",
       "plaintext": "Neither function mutates the input `paging` object — calling again with the same `{ start, size }` is safe.",
       "value": [
@@ -2184,7 +2779,7 @@
         }
       ]
     },
-    "p-44": {
+    "p-50": {
       "@type": "slate",
       "plaintext": "When multiple listings share a pager (e.g. a grid with several listings), `expandListingBlocks` walks them sequentially. Each fetch returns `{ items, total }`, so the total is learned from the response and used to compute where the next listing starts. One request per listing. Listings outside the page window are fetched with `size: 0` (total only, no items).",
       "value": [
@@ -2231,7 +2826,7 @@
         }
       ]
     },
-    "p-45": {
+    "p-51": {
       "@type": "slate",
       "plaintext": "When mixing listings with static blocks in a shared pager, use `staticBlocks(ids, { blocks, paging, seen })` for the non-listing blocks — it tracks their position in the paging window. Chain the returned `paging.seen` to the next call so each block knows its offset (see the React example above).",
       "value": [
@@ -2267,7 +2862,7 @@
         }
       ]
     },
-    "h-46": {
+    "h-52": {
       "@type": "slate",
       "plaintext": "Notes",
       "value": [
@@ -2281,7 +2876,7 @@
         }
       ]
     },
-    "p-47": {
+    "p-53": {
       "@type": "slate",
       "plaintext": "Expanded listing items share the listing block's `@uid`. Selecting any expanded item selects the parent listing block.",
       "value": [
@@ -2330,33 +2925,39 @@
       "p-18",
       "h-19",
       "p-20",
-      "p-21",
-      "tbl-22",
+      "tbl-21",
+      "p-22",
       "ce-23",
-      "h-24",
-      "p-25",
-      "ce-26",
+      "p-24",
+      "h-25",
+      "p-26",
       "p-27",
-      "p-28",
-      "h-29",
-      "p-30",
-      "ce-31",
-      "p-32",
+      "tbl-28",
+      "ce-29",
+      "h-30",
+      "p-31",
+      "ce-32",
       "p-33",
-      "ul-34",
-      "p-35",
-      "h-36",
-      "p-37",
-      "ce-38",
+      "p-34",
+      "h-35",
+      "p-36",
+      "ce-37",
+      "p-38",
       "p-39",
-      "h-40",
+      "ul-40",
       "p-41",
-      "ul-42",
+      "h-42",
       "p-43",
-      "p-44",
+      "ce-44",
       "p-45",
       "h-46",
-      "p-47"
+      "p-47",
+      "ul-48",
+      "p-49",
+      "p-50",
+      "p-51",
+      "h-52",
+      "p-53"
     ]
   }
 }

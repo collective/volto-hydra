@@ -1,0 +1,192 @@
+{
+  "@id": "/docs/examples/relatedItemsListing",
+  "@type": "Document",
+  "UID": "docs-examples-relatedItemsListing-001",
+  "allow_discussion": false,
+  "blocks": {
+    "title-1": {
+      "@type": "title"
+    },
+    "ref-relatedItemsListing-schema": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-relatedItemsListing",
+      "tabs": [
+        {
+          "@id": "ref-relatedItemsListing-schema-javascript-a1a504",
+          "label": "Schema",
+          "language": "javascript",
+          "code": "{\n  \"relatedItemsListing\": {\n    \"id\": \"relatedItemsListing\",\n    \"title\": \"Related Items\",\n    \"blockSchema\": {\n      \"fieldsets\": [\n        {\n          \"id\": \"default\",\n          \"title\": \"Default\",\n          \"fields\": [\n            \"relationField\",\n            \"variation\",\n            \"fieldMapping\"\n          ]\n        }\n      ],\n      \"properties\": {\n        \"relationField\": {\n          \"title\": \"Relation field\",\n          \"widget\": \"schemaFieldSelect\",\n          \"fieldType\": \"relation\"\n        },\n        \"variation\": {\n          \"title\": \"Item Type\",\n          \"widget\": \"blockTypeSelect\",\n          \"filterConvertibleFrom\": \"@default\",\n          \"default\": \"summary\"\n        }\n      }\n    },\n    \"schemaEnhancer\": {\n      \"inheritSchemaFrom\": {\n        \"typeField\": \"variation\",\n        \"mappingField\": \"fieldMapping\",\n        \"defaultsField\": \"itemDefaults\"\n      }\n    }\n  }\n}"
+        }
+      ],
+      "slotId": "schema"
+    },
+    "ref-relatedItemsListing-json-data": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-relatedItemsListing",
+      "tabs": [
+        {
+          "@id": "ref-relatedItemsListing-json-data-json-ba9577",
+          "label": "JSON Block Data",
+          "language": "json",
+          "code": "{\n  \"@type\": \"relatedItemsListing\",\n  \"variation\": \"summary\",\n  \"relationField\": \"relatedItems\"\n}"
+        }
+      ],
+      "slotId": "json-data"
+    },
+    "ref-relatedItemsListing-rendering": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-relatedItemsListing",
+      "slotId": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-relatedItemsListing-rendering-javascript-2b9d44",
+          "label": "Register",
+          "language": "javascript",
+          "code": "fetchItems: { relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }) }"
+        }
+      ]
+    },
+    "ref-relatedItemsListing-fetcher": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-relatedItemsListing",
+      "slotId": "rendering",
+      "tabs": [
+        {
+          "@id": "ref-relatedItemsListing-fetcher-javascript-1c975d",
+          "label": "Fetcher",
+          "language": "javascript",
+          "code": "export function relatedItemsFetcher({ apiUrl, contextPath }) {\n  return async function fetchItems(block, { start, size }) {\n    const field = block.relationField || 'relatedItems';\n    const content = await (await fetch(`${apiUrl}${contextPath}/++api++`, { headers: authHeaders() })).json();\n    const all = Array.isArray(content[field]) ? content[field] : [];\n    return { items: all.slice(start, start + size), total: all.length };\n  };\n}"
+        }
+      ]
+    },
+    "ri-live-heading": {
+      "@type": "slate",
+      "plaintext": "Live example",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Live example"
+            }
+          ]
+        }
+      ]
+    },
+    "ri-live-1": {
+      "@type": "relatedItemsListing",
+      "relationField": "relatedItems",
+      "variation": "summary"
+    },
+    "ref-relatedItemsListing-rendering-intro": {
+      "@type": "slate",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-relatedItemsListing",
+      "slotId": "rendering",
+      "plaintext": "This block has no bespoke renderer — register the fetcher below, then render its items exactly like any list block. See the Listing example for the render component in React, Vue and Svelte, Listings for how expansion works, and Custom Blocks for registering a block type. Only the fetcher below is block-specific.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "This block has no bespoke renderer — register the fetcher below, then render its items exactly like any list block. See the "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "/docs/examples/listing"
+              },
+              "children": [
+                {
+                  "text": "Listing example"
+                }
+              ]
+            },
+            {
+              "text": " for the render component in React, Vue and Svelte, "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "/docs/listings"
+              },
+              "children": [
+                {
+                  "text": "Listings"
+                }
+              ]
+            },
+            {
+              "text": " for how expansion works, and "
+            },
+            {
+              "type": "link",
+              "data": {
+                "url": "/docs/custom-blocks"
+              },
+              "children": [
+                {
+                  "text": "Custom Blocks"
+                }
+              ]
+            },
+            {
+              "text": " for registering a block type. Only the fetcher below is block-specific."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "blocks_layout": {
+    "items": [
+      "title-1",
+      "ri-live-heading",
+      "ri-live-1",
+      "ref-relatedItemsListing-schema",
+      "ref-relatedItemsListing-json-data",
+      "ref-relatedItemsListing-rendering-intro",
+      "ref-relatedItemsListing-fetcher",
+      "ref-relatedItemsListing-rendering"
+    ]
+  },
+  "contributors": [],
+  "created": "2025-01-01T00:00:00+00:00",
+  "creators": [
+    "admin"
+  ],
+  "description": "Renders the current page's related items relation field (default relatedItems) as a list, reusing the listing machinery — each related item is rendered with a configurable item type (variation).",
+  "effective": null,
+  "exclude_from_nav": false,
+  "expires": null,
+  "exportimport.constrains": {},
+  "exportimport.conversation": [],
+  "exportimport.versions": {},
+  "id": "relatedItemsListing",
+  "is_folderish": false,
+  "language": "##DEFAULT##",
+  "layout": "document_view",
+  "lock": {},
+  "modified": "2025-01-01T00:00:00+00:00",
+  "parent": {
+    "@id": "/docs/examples",
+    "@type": "Document",
+    "UID": "docs-examples-folder-001",
+    "description": "Block reference: schema, JSON, and rendered examples for every block type Volto Hydra ships.",
+    "title": "Examples",
+    "type_title": "Page"
+  },
+  "review_state": "published",
+  "rights": "",
+  "subjects": [],
+  "title": "Related Items Block",
+  "type_title": "Page",
+  "version": "current",
+  "workflow_history": {},
+  "working_copy": null,
+  "working_copy_of": null
+}

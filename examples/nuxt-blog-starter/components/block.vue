@@ -322,7 +322,7 @@
 
 
   <!-- Listing block: async expansion with own paging (or shared paging from container) -->
-  <Suspense v-else-if="block['@type'] === 'listing'" :key="`listing-${block_uid}-pg${injectedPages[block_uid] || 0}-${JSON.stringify(block)}`">
+  <Suspense v-else-if="LISTING_TYPES.includes(block['@type'])" :key="`listing-${block_uid}-pg${injectedPages[block_uid] || 0}-${JSON.stringify(block)}`">
     <ListingBlock :id="block_uid" :block="block" :paging="paging"
       :api-url="effectiveApiUrl" :context-path="effectiveContextPath">
       <template #default="{ items }">
@@ -1041,7 +1041,7 @@ const gridBuildPagingUrl = (page) => {
 
 // Process grid children: listings marked for Suspense, static blocks filtered by paging window
 // staticBlocks and expandListingBlocks return { items, paging } — chain paging.seen for position tracking
-const LISTING_TYPES = ['listing'];
+const LISTING_TYPES = ['listing', 'relatedItemsListing', 'searchShortcuts', 'rssFeed'];
 const gridChildren = computed(() => {
   const layout = block.value.blocks_layout?.items || [];
   const blocks = block.value.blocks || {};
@@ -1264,14 +1264,22 @@ const getImageUrl = (value) => {
     return '';
   }
 
-  // Add @@images/image suffix for Plone internal paths
-  // Handles both relative paths (/) and full URLs with backend base URL
+  // Add a SCALE suffix (`@@images/image/great`) for Plone internal paths, NOT the
+  // bare `@@images/image` original. The bare form names `image` as a file, which
+  // collides with the `image/<scale>` directory form other <img> srcsets use — IPX's
+  // disk cache can't have `image` be both (EEXIST/ENOTDIR) and the bare original is
+  // the large slow variant that hangs the SSG prerender. A named scale keeps `image`
+  // a directory everywhere.
   const needsImageSuffix = !url.includes('@@images');
   const isRelativePath = url.startsWith('/');
   const isBackendUrl = backendBaseUrl && url.startsWith(backendBaseUrl);
 
   if (needsImageSuffix && (isRelativePath || isBackendUrl)) {
-    return url + '/@@images/image';
+    // SVGs have no raster scales (Plone returns 0 bytes for a named scale → IPX 400),
+    // so serve the original. Rasters use a named scale, never the bare `@@images/image`
+    // original (which is slow/hangs and collides file-vs-dir with the scale form).
+    const isSvg = /\.svg($|[?#])/i.test(url);
+    return url + (isSvg ? '/@@images/image' : '/@@images/image/great');
   }
   return url;
 };

@@ -609,6 +609,72 @@ export const sharedBlocksConfig = {
             },
         },
     },
+    // --- Example listing-variant blocks (reuse expandListingBlocks + a custom
+    // fetchItems fetcher; render via the standard item types — no bespoke
+    // renderer). See packages/helpers/index.js for the fetchers. ---
+    relatedItemsListing: {
+        id: 'relatedItemsListing',
+        title: 'Related Items',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['relationField', 'variation', 'fieldMapping'] }],
+            properties: {
+                relationField: {
+                    title: 'Relation field',
+                    description: 'Which relation field to render (default: relatedItems)',
+                    widget: 'schemaFieldSelect',
+                    fieldType: 'relation',
+                },
+                variation: { title: 'Item Type', widget: 'blockTypeSelect', filterConvertibleFrom: '@default', default: 'summary' },
+            },
+        },
+        schemaEnhancer: {
+            inheritSchemaFrom: { typeField: 'variation', mappingField: 'fieldMapping', defaultsField: 'itemDefaults' },
+        },
+    },
+    searchShortcuts: {
+        id: 'searchShortcuts',
+        title: 'Search Shortcuts',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['index', 'pageField', 'searchUrl', 'variation', 'fieldMapping'] }],
+            properties: {
+                index: {
+                    title: 'Index',
+                    widget: 'select_querystring_field',
+                    vocabulary: { '@id': 'plone.app.contenttypes.metadatafields' },
+                    default: 'Subject',
+                },
+                pageField: {
+                    title: 'This page field (optional)',
+                    description: 'Linked → this page’s values; empty → all values site-wide',
+                    widget: 'schemaFieldSelect',
+                    fieldType: 'keyword',
+                },
+                searchUrl: { title: 'Search page URL', widget: 'url' },
+                variation: { title: 'Item Type', widget: 'blockTypeSelect', filterConvertibleFrom: '@default', default: 'default' },
+            },
+        },
+        schemaEnhancer: {
+            inheritSchemaFrom: { typeField: 'variation', mappingField: 'fieldMapping', defaultsField: 'itemDefaults' },
+        },
+    },
+    rssFeed: {
+        id: 'rssFeed',
+        title: 'RSS Feed',
+        group: 'common',
+        blockSchema: {
+            fieldsets: [{ id: 'default', title: 'Default', fields: ['feedUrl', 'count', 'variation', 'fieldMapping'] }],
+            properties: {
+                feedUrl: { title: 'Feed URL', widget: 'url' },
+                count: { title: 'Max items', type: 'number', default: 6 },
+                variation: { title: 'Item Type', widget: 'blockTypeSelect', filterConvertibleFrom: '@default', default: 'summary' },
+            },
+        },
+        schemaEnhancer: {
+            inheritSchemaFrom: { typeField: 'variation', mappingField: 'fieldMapping', defaultsField: 'itemDefaults' },
+        },
+    },
     // Listing item types — restricted child blocks, only usable inside listing containers
     summary: {
         restricted: true,

@@ -56,7 +56,15 @@ if (fs.existsSync(discoveredPath)) {
 // Synthetic conversion-test blocks (dnd-convert.spec.ts) are drag/paste fixtures
 // with no editable fields and are only rendered by the mock test frontend — they
 // aren't part of the cross-frontend render contract, so exclude them from sanity.
-discoveredBlocks = discoveredBlocks.filter((b) => !b.blockType.startsWith('conv'));
+//
+// The example listing-variant blocks (example-listings.spec.ts) expand via a
+// per-frontend fetcher registration and have no inline-editable fields; the RSS
+// one fetches an external feed that only resolves against the mock. They're
+// covered by their own integration spec (admin-mock), not this render contract.
+const NON_CONTRACT_BLOCKS = new Set(['relatedItemsListing', 'searchShortcuts', 'rssFeed']);
+discoveredBlocks = discoveredBlocks.filter(
+  (b) => !b.blockType.startsWith('conv') && !NON_CONTRACT_BLOCKS.has(b.blockType),
+);
 
 // Block sanity is the cross-cutting render contract. We only enforce it on
 // the three frontends that ship full block coverage and are the canonical

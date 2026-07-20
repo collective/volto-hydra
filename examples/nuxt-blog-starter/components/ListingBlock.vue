@@ -7,7 +7,7 @@
 
 <script setup>
 import { computed, ref, reactive, watch } from 'vue';
-import { expandListingBlocks, ploneFetchItems } from '@hydra-js/helpers';
+import { expandListingBlocks, ploneFetchItems, relatedItemsFetcher, searchShortcutsFetcher, rssFetcher } from '@hydra-js/helpers';
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -58,7 +58,12 @@ const paging = props.paging || reactive({ start: listingPage.value * DEFAULT_PAG
 async function fetchListing(query) {
   const opts = {
     blocks: { [props.id]: props.block },
-    fetchItems: { listing: ploneFetchItems({ apiUrl: props.apiUrl, contextPath: props.contextPath, extraCriteria: buildExtraCriteria(query) }) },
+    fetchItems: {
+      listing: ploneFetchItems({ apiUrl: props.apiUrl, contextPath: props.contextPath, extraCriteria: buildExtraCriteria(query) }),
+      relatedItemsListing: relatedItemsFetcher({ apiUrl: props.apiUrl, contextPath: props.contextPath }),
+      searchShortcuts: searchShortcutsFetcher({ apiUrl: props.apiUrl, contextPath: props.contextPath }),
+      rssFeed: rssFetcher(),
+    },
     seen: props.seen,
     itemTypeField: 'variation',
   };

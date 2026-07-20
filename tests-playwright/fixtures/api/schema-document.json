@@ -29,21 +29,50 @@
     },
     "blocks_layout": {
       "behavior": "volto.blocks",
-      "default": { "items": [] },
+      "default": {
+        "items": []
+      },
       "description": "The JSON representation of the object blocks layout. Must be a JSON array.",
       "factory": "JSONField",
       "title": "Blocks Layout",
       "type": "dict",
       "widget": "json"
+    },
+    "relatedItems": {
+      "title": "Related Items",
+      "description": "Related content",
+      "widget": "relateditems",
+      "type": "array"
+    },
+    "seeAlso": {
+      "title": "See also",
+      "widget": "relateditems",
+      "type": "array"
+    },
+    "subjects": {
+      "title": "Tags",
+      "type": "array",
+      "items": {
+        "vocabulary": {
+          "@id": "plone.app.vocabularies.Keywords"
+        }
+      }
     }
   },
-  "required": ["title"],
+  "required": [
+    "title"
+  ],
   "fieldsets": [
     {
       "id": "default",
       "title": "Default",
-      "fields": ["title", "description"]
+      "fields": [
+        "title",
+        "description"
+      ]
     }
   ],
-  "layouts": ["document_view"]
+  "layouts": [
+    "document_view"
+  ]
 }

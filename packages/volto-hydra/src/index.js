@@ -49,6 +49,7 @@ import HiddenBlocksWidget from './components/Widgets/HiddenBlocksWidget';
 import HiddenObjectListWidget from './components/Widgets/HiddenObjectListWidget';
 import FieldMappingWidget from './components/Widgets/FieldMappingWidget';
 import BlockTypeSelectWidget from './components/Widgets/BlockTypeSelectWidget';
+import SchemaFieldSelectWidget from './components/Widgets/SchemaFieldSelectWidget';
 import TableSchema, { TableBlockSchema } from '@plone/volto-slate/blocks/Table/schema';
 // Volto-slate ships TWO schemas for the slate block:
 //   ./schema.js          → "Block tab" form (override_toc / level / entry_text)
@@ -170,6 +171,7 @@ const applyConfig = (config) => {
   // Block-type select widget - choices computed from allowedBlocks at render time.
   // See README "Synchronised block types in a container".
   config.widgets.widget.blockTypeSelect = BlockTypeSelectWidget;
+  config.widgets.widget.schemaFieldSelect = SchemaFieldSelectWidget;
 
   // Add the slate block in the sidebar with proper initialization.
   // blockSchema is used by applyBlockDefaults to set initial values for new blocks.

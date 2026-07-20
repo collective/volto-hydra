@@ -36,8 +36,16 @@ function tfLog(...args) {
  * @param {string} containerId - Container ID for paging
  * @returns {Promise<{items: Object[], paging: Object|null}>}
  */
+// Block types that expand via expandListingBlocks (listing + the example
+// listing-variant blocks). Each has a fetcher registered in index.html.
+const LISTING_BLOCK_TYPES = ['listing', 'relatedItemsListing', 'searchShortcuts', 'rssFeed'];
+
 async function expandItems(blocks, layout, containerId, paging) {
-    const hasListings = layout.some(id => blocks[id]?.['@type'] === 'listing' && blocks[id]?.querystring?.query);
+    const hasListings = layout.some((id) => {
+        const t = blocks[id]?.['@type'];
+        if (t === 'listing') return !!blocks[id]?.querystring?.query;
+        return LISTING_BLOCK_TYPES.includes(t);
+    });
     if (hasListings && window._expandListingBlocks) {
         return await window._expandListingBlocks(blocks, layout, containerId, paging);
     }
@@ -320,6 +328,9 @@ async function renderBlock(blockId, block) {
             const summaryEl = document.createElement('div');
             summaryEl.innerHTML = renderSummaryItemBlock(block, blockId);
             return summaryEl.firstElementChild;
+        case 'relatedItemsListing':
+        case 'searchShortcuts':
+        case 'rssFeed':
         case 'listing':
             if (window._expandListingBlocks) {
                 return await renderListingBlock(block, blockId);
