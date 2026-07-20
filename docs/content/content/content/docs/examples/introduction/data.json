@@ -135,11 +135,26 @@
       "alt": "The introduction example block being edited in Volto Hydra",
       "align": "center",
       "size": "l"
+    },
+    "ref-introduction-description": {
+      "@type": "slate",
+      "plaintext": "Displays the page's title and description as a styled header. The introduction block has no content of its own — it reads title and description from the page metadata.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Displays the page's title and description as a styled header. The introduction block has no content of its own — it reads title and description from the page metadata."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "50727b9a-1f8a-4857-aab5-8acc6985bfc6",
+      "ref-introduction-description",
       "editor-screenshot",
       "d0438a28-aaaf-4db1-8887-c9b3351787d3",
       "d35f209e-12c1-4a30-ae36-52f84a4a0b7b",

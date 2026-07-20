@@ -4263,11 +4263,26 @@
       "alt": "The table example block being edited in Volto Hydra",
       "align": "center",
       "size": "l"
+    },
+    "ref-table-description": {
+      "@type": "slate",
+      "plaintext": "A table with rich text (Slate) content in each cell. Supports adding/removing rows and columns via toolbar actions.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A table with rich text (Slate) content in each cell. Supports adding/removing rows and columns via toolbar actions."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "fb451586-3dab-4b40-a5f8-f73056685165",
+      "ref-table-description",
       "editor-screenshot",
       "ff4fd61a-f5eb-4733-a883-816985c44348",
       "0d727fc0-71c0-4e2c-918a-35b726636569",

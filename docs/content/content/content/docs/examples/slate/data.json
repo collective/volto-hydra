@@ -339,11 +339,26 @@
       "alt": "The slate example block being edited in Volto Hydra",
       "align": "center",
       "size": "l"
+    },
+    "ref-text-description": {
+      "@type": "slate",
+      "plaintext": "Rich text block powered by the Slate editor. Supports paragraphs, headings, lists, blockquotes, and inline formatting (bold, italic, strikethrough, underline, code, links).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Rich text block powered by the Slate editor. Supports paragraphs, headings, lists, blockquotes, and inline formatting (bold, italic, strikethrough, underline, code, links)."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "ccff41c6-b733-4b88-b02e-4c07460a19e2",
+      "ref-text-description",
       "editor-screenshot",
       "da904eda-9add-496c-ab09-4fee9820af1f",
       "244197b5-ac86-4d92-b235-18986a351580",

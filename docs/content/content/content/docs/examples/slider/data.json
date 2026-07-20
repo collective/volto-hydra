@@ -60,11 +60,26 @@
         }
       ],
       "slotId": "rendering"
+    },
+    "ref-slider-description": {
+      "@type": "slate",
+      "plaintext": "A carousel/slider that cycles through slides. Slides are stored as an object_list — each slide has a title, description, image, and optional button.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A carousel/slider that cycles through slides. Slides are stored as an object_list — each slide has a title, description, image, and optional button."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "title-1",
+      "ref-slider-description",
       "ref-slider-schema",
       "ref-slider-json-data",
       "ref-slider-rendering"

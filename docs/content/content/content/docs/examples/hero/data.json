@@ -60,11 +60,26 @@
         }
       ],
       "slotId": "rendering"
+    },
+    "ref-hero-description": {
+      "@type": "slate",
+      "plaintext": "A full-width hero section with heading, subheading, image, rich text description, and a call-to-action button. Demonstrates multiple field types in a single block: string, textarea, slate, image, and object_browser.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A full-width hero section with heading, subheading, image, rich text description, and a call-to-action button. Demonstrates multiple field types in a single block: string, textarea, slate, image, and object_browser."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "title-1",
+      "ref-hero-description",
       "ref-hero-schema",
       "ref-hero-json-data",
       "ref-hero-rendering"
