@@ -1275,7 +1275,11 @@ const getImageUrl = (value) => {
   const isBackendUrl = backendBaseUrl && url.startsWith(backendBaseUrl);
 
   if (needsImageSuffix && (isRelativePath || isBackendUrl)) {
-    return url + '/@@images/image/great';
+    // SVGs have no raster scales (Plone returns 0 bytes for a named scale → IPX 400),
+    // so serve the original. Rasters use a named scale, never the bare `@@images/image`
+    // original (which is slow/hangs and collides file-vs-dir with the scale form).
+    const isSvg = /\.svg($|[?#])/i.test(url);
+    return url + (isSvg ? '/@@images/image' : '/@@images/image/great');
   }
   return url;
 };

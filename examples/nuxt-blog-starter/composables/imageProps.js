@@ -106,7 +106,18 @@ export default function imageProps(block, bgStyles=false, imageField='image') {
     var width = block?.width;
     const field = block?.image_field ? block.image_field : null;
 
-    if (block?.image_scales && block?.image_field && block.image_scales[block.image_field]?.[0]) {
+    // SVGs have no raster scales — Plone returns 0 bytes for `@@images/<field>/<scale>`,
+    // which IPX rejects (IPX_INVALID_IMAGE). Serve the ORIGINAL for SVGs: it's the real
+    // file, it's small (no prerender hang), and an SVG only ever uses the bare form, so
+    // `<field>` is consistently a file and never collides with the scale-directory form.
+    const imgMeta = Array.isArray(block?.image) ? block.image[0] : block?.image;
+    const isSvg = /svg/i.test(block?.['content-type'] || '')
+        || /svg/i.test(imgMeta?.['content-type'] || '')
+        || /\.svg($|[?#])/i.test(image_url);
+
+    if (isSvg && !image_url.includes('@@images') && !image_url.includes('@@download') && !image_url.startsWith('data:')) {
+        image_url = `${image_url}/@@images/${block?.image_field || 'image'}`;
+    } else if (block?.image_scales && block?.image_field && block.image_scales[block.image_field]?.[0]) {
         const field = block.image_field;
         const meta = block.image_scales[field][0];
         const scaleEntries = Object.values(meta.scales || {});
