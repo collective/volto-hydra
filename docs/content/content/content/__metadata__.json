@@ -990,16 +990,5 @@
     "site-footer-uid": 3,
     "quadrant-svg": 4
   },
-  "relations": [
-    {
-      "from_uuid": "docs-examples-relatedItemsListing-001",
-      "to_uuid": "6bd32a3367ea4254b295db642655b9d3",
-      "from_attribute": "relatedItems"
-    },
-    {
-      "from_uuid": "docs-examples-relatedItemsListing-001",
-      "to_uuid": "e090d954d0a448bca81c1a646e673a12",
-      "from_attribute": "relatedItems"
-    }
-  ]
+  "relations": []
 }
