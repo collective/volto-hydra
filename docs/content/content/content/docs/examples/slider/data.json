@@ -11,7 +11,6 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slider",
-      "placeholder": "schema",
       "tabs": [
         {
           "@id": "ref-slider-schema-javascript-ce9b5a",
@@ -19,13 +18,13 @@
           "language": "javascript",
           "code": "{\n  \"slider\": {\n    \"schemaEnhancer\": {\n      \"inheritSchemaFrom\": {}\n    },\n    \"blockSchema\": {\n      \"properties\": {\n        \"slides\": {\n          \"title\": \"Slides\",\n          \"widget\": \"object_list\",\n          \"allowedBlocks\": [\n            \"slide\",\n            \"image\",\n            \"listing\",\n            \"teaser\"\n          ],\n          \"typeField\": \"@type\",\n          \"itemTypeField\": \"variation\",\n          \"defaultBlockType\": \"slide\"\n        },\n        \"variation\": {\n          \"title\": \"Item Type\",\n          \"widget\": \"blockTypeSelect\",\n          \"filterConvertibleFrom\": \"@default\"\n        },\n        \"autoplayEnabled\": {\n          \"title\": \"Autoplay Enabled\",\n          \"type\": \"boolean\",\n          \"default\": false\n        },\n        \"autoplayDelay\": {\n          \"title\": \"Autoplay Delay\",\n          \"type\": \"integer\",\n          \"default\": 4000\n        },\n        \"autoplayJump\": {\n          \"title\": \"Autoplay Jump\",\n          \"type\": \"boolean\",\n          \"default\": false\n        }\n      }\n    }\n  },\n  \"slide\": {\n    \"fieldMappings\": {\n      \"@default\": {\n        \"@id\": \"href\",\n        \"title\": \"title\",\n        \"description\": \"description\",\n        \"image\": \"preview_image\"\n      }\n    },\n    \"blockSchema\": {\n      \"properties\": {\n        \"head_title\": {\n          \"title\": \"Kicker\"\n        },\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"description\": {\n          \"title\": \"Description\",\n          \"widget\": \"textarea\"\n        },\n        \"preview_image\": {\n          \"title\": \"Image Override\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"image\",\n          \"allowExternals\": true\n        },\n        \"buttonText\": {\n          \"title\": \"Button Text\"\n        },\n        \"hideButton\": {\n          \"title\": \"Hide Button\",\n          \"type\": \"boolean\"\n        }\n      }\n    }\n  }\n}"
         }
-      ]
+      ],
+      "slotId": "schema"
     },
     "ref-slider-json-data": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slider",
-      "placeholder": "json-data",
       "tabs": [
         {
           "@id": "ref-slider-json-data-json-c5167b",
@@ -33,13 +32,13 @@
           "language": "json",
           "code": "{\n  \"@type\": \"slider\",\n  \"autoplayEnabled\": false,\n  \"autoplayDelay\": 5000,\n  \"slides\": [\n    {\n      \"@id\": \"slide-1\",\n      \"@type\": \"slide\",\n      \"head_title\": \"New Release\",\n      \"title\": \"Product Launch 2025\",\n      \"description\": \"Discover our latest innovations.\",\n      \"preview_image\": [\n        {\n          \"@id\": \"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%235577aa%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ESlide 1%3C/text%3E%3C/svg%3E\"\n        }\n      ],\n      \"buttonText\": \"Learn More\"\n    },\n    {\n      \"@id\": \"slide-2\",\n      \"@type\": \"slide\",\n      \"head_title\": \"Featured\",\n      \"title\": \"Award-Winning Design\",\n      \"description\": \"Recognized for excellence in UX.\",\n      \"preview_image\": [\n        {\n          \"@id\": \"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%23aa5577%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3ESlide 2%3C/text%3E%3C/svg%3E\"\n        }\n      ],\n      \"buttonText\": \"See Details\"\n    }\n  ]\n}"
         }
-      ]
+      ],
+      "slotId": "json-data"
     },
     "ref-slider-rendering": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-slider",
-      "placeholder": "rendering",
       "tabs": [
         {
           "@id": "ref-slider-rendering-jsx-87bcad",
@@ -59,7 +58,8 @@
           "language": "svelte",
           "code": "<script>\n  import { getImageUrl } from './utils.js';\n  export let block;\n  let current = 0;\n  // Expand the slides object_list (keyed by @id). Edit-mode pass-through sets each slide's @uid.\n  $: slides = expandTemplatesSync(block.slides || [], { idField: '@id' });\n</script>\n\n<div data-block-uid={block['@uid']} class=\"slider-block\">\n  {#each slides as slide, i (slide['@id'])}\n    <div\n      data-block-uid={slide['@id']}\n      class=\"slide\"\n      style:display={i === current ? 'block' : 'none'}\n    >\n      {#if slide.preview_image}\n        <img\n          data-edit-media=\"preview_image\"\n          src={getImageUrl(slide.preview_image)}\n          alt=\"\"\n        />\n      {/if}\n      <span data-edit-text=\"head_title\">{slide.head_title}</span>\n      <h2 data-edit-text=\"title\">{slide.title}</h2>\n      <p data-edit-text=\"description\">{slide.description}</p>\n      <button data-edit-text=\"buttonText\">{slide.buttonText}</button>\n    </div>\n  {/each}\n  <div class=\"slider-dots\">\n    {#each slides as _, i}\n      <button on:click={() => current = i} class:active={i === current} />\n    {/each}\n  </div>\n</div>"
         }
-      ]
+      ],
+      "slotId": "rendering"
     }
   },
   "blocks_layout": {

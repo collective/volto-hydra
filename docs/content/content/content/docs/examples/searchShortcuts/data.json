@@ -11,7 +11,6 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-searchShortcuts",
-      "placeholder": "schema",
       "tabs": [
         {
           "@id": "ref-searchShortcuts-schema-javascript-980727",
@@ -19,13 +18,13 @@
           "language": "javascript",
           "code": "{\n  \"searchShortcuts\": {\n    \"id\": \"searchShortcuts\",\n    \"title\": \"Search Shortcuts\",\n    \"blockSchema\": {\n      \"fieldsets\": [\n        {\n          \"id\": \"default\",\n          \"title\": \"Default\",\n          \"fields\": [\n            \"index\",\n            \"pageField\",\n            \"searchUrl\",\n            \"variation\",\n            \"fieldMapping\"\n          ]\n        }\n      ],\n      \"properties\": {\n        \"index\": {\n          \"title\": \"Index\",\n          \"widget\": \"select_querystring_field\",\n          \"vocabulary\": {\n            \"@id\": \"plone.app.contenttypes.metadatafields\"\n          },\n          \"default\": \"Subject\"\n        },\n        \"pageField\": {\n          \"title\": \"This page field (optional)\",\n          \"widget\": \"schemaFieldSelect\",\n          \"fieldType\": \"keyword\"\n        },\n        \"searchUrl\": {\n          \"title\": \"Search page URL\",\n          \"widget\": \"url\"\n        },\n        \"variation\": {\n          \"title\": \"Item Type\",\n          \"widget\": \"blockTypeSelect\",\n          \"filterConvertibleFrom\": \"@default\",\n          \"default\": \"default\"\n        }\n      }\n    },\n    \"schemaEnhancer\": {\n      \"inheritSchemaFrom\": {\n        \"typeField\": \"variation\",\n        \"mappingField\": \"fieldMapping\",\n        \"defaultsField\": \"itemDefaults\"\n      }\n    }\n  }\n}"
         }
-      ]
+      ],
+      "slotId": "schema"
     },
     "ref-searchShortcuts-json-data": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-searchShortcuts",
-      "placeholder": "json-data",
       "tabs": [
         {
           "@id": "ref-searchShortcuts-json-data-json-b402fc",
@@ -33,31 +32,51 @@
           "language": "json",
           "code": "{\n  \"@type\": \"searchShortcuts\",\n  \"index\": \"Subject\",\n  \"pageField\": \"subjects\",\n  \"searchUrl\": \"/search\",\n  \"variation\": \"default\"\n}"
         }
-      ]
+      ],
+      "slotId": "json-data"
     },
     "ref-searchShortcuts-rendering": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-searchShortcuts",
-      "placeholder": "rendering",
+      "slotId": "rendering",
       "tabs": [
         {
-          "@id": "ref-searchShortcuts-rendering-jsx-113816",
-          "label": "React",
-          "language": "jsx",
-          "code": "import { useState, useEffect } from 'react';\nimport { expandListingBlocks, searchShortcutsFetcher } from '@hydra-js/helpers';\n\nfunction FetchedList({ block, blockId, apiUrl, contextPath }) {\n  const [items, setItems] = useState([]);\n  useEffect(() => {\n    expandListingBlocks([blockId], {\n      blocks: { [blockId]: block },\n      fetchItems: { searchShortcuts: searchShortcutsFetcher({ apiUrl, contextPath }) }, // ← only block-specific line\n      itemTypeField: 'variation',\n    }).then((r) => setItems(r.items));\n  }, [block.index, block.pageField]);\n\n  return (\n    <div data-block-uid={blockId}>\n      {items.map((item, i) => <BlockRenderer key={i} block={item} />)}\n    </div>\n  );\n}"
-        },
+          "@id": "ref-searchShortcuts-rendering-javascript-ab7111",
+          "label": "Register",
+          "language": "javascript",
+          "code": "fetchItems: { searchShortcuts: searchShortcutsFetcher({ apiUrl, contextPath }) }"
+        }
+      ]
+    },
+    "ref-searchShortcuts-fetcher": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-searchShortcuts",
+      "slotId": "rendering",
+      "tabs": [
         {
-          "@id": "ref-searchShortcuts-rendering-vue-d43e6a",
-          "label": "Vue",
-          "language": "vue",
-          "code": "<template>\n  <div :data-block-uid=\"blockId\">\n    <BlockRenderer v-for=\"(item, i) in items\" :key=\"i\" :block=\"item\" />\n  </div>\n</template>\n\n<script setup>\nimport { ref, watch } from 'vue';\nimport { expandListingBlocks, searchShortcutsFetcher } from '@hydra-js/helpers';\n\nconst props = defineProps({ block: Object, blockId: String, apiUrl: String, contextPath: String });\nconst items = ref([]);\nwatch(() => [props.block.index, props.block.pageField], async () => {\n  const r = await expandListingBlocks([props.blockId], {\n    blocks: { [props.blockId]: props.block },\n    fetchItems: { searchShortcuts: searchShortcutsFetcher({ apiUrl: props.apiUrl, contextPath: props.contextPath }) },\n    itemTypeField: 'variation',\n  });\n  items.value = r.items;\n}, { immediate: true });\n</script>"
-        },
+          "@id": "ref-searchShortcuts-fetcher-javascript-e7f760",
+          "label": "Fetcher",
+          "language": "javascript",
+          "code": "export function searchShortcutsFetcher({ apiUrl, contextPath }) {\n  return async function fetchItems(block, { start, size }) {\n    const index = block.index || 'Subject';\n    let values;\n    if (block.pageField) {\n      // Linked field → THIS page's values of that field.\n      const content = await (await fetch(`${apiUrl}${contextPath}/++api++`, { headers: authHeaders() })).json();\n      values = content[block.pageField] || [];\n    } else {\n      // No field → all unique values of the index, site-wide (its vocabulary).\n      const vocab = index === 'Subject' ? 'plone.app.vocabularies.Keywords' : index;\n      const data = await (await fetch(`${apiUrl}/++api++/@vocabularies/${vocab}`, { headers: authHeaders() })).json();\n      values = (data.items || []).map((t) => t.token);\n    }\n    // Each value → a shortcut link; @id is the facet-search URL.\n    const all = values.map((v) => ({\n      '@id': `${block.searchUrl}?facet.${index}=${encodeURIComponent(v)}`,\n      title: v,\n    }));\n    return { items: all.slice(start, start + size), total: all.length };\n  };\n}"
+        }
+      ]
+    },
+    "ref-searchShortcuts-rendering-intro": {
+      "@type": "slate",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-searchShortcuts",
+      "slotId": "rendering",
+      "plaintext": "This block ships no bespoke renderer: register a fetcher, then render its items exactly like the Listing block. Only the fetcher below is block-specific.",
+      "value": [
         {
-          "@id": "ref-searchShortcuts-rendering-svelte-43c411",
-          "label": "Svelte",
-          "language": "svelte",
-          "code": "<script>\n  import { expandListingBlocks, searchShortcutsFetcher } from '@hydra-js/helpers';\n  import BlockRenderer from './BlockRenderer.svelte';\n  export let block; export let blockId; export let apiUrl; export let contextPath;\n  let items = [];\n  $: block.index, block.pageField, load();\n  async function load() {\n    const r = await expandListingBlocks([blockId], {\n      blocks: { [blockId]: block },\n      fetchItems: { searchShortcuts: searchShortcutsFetcher({ apiUrl, contextPath }) },\n      itemTypeField: 'variation',\n    });\n    items = r.items;\n  }\n</script>\n\n<div data-block-uid={blockId}>\n  {#each items as item, i (i)}<BlockRenderer block={item} />{/each}\n</div>"
+          "type": "p",
+          "children": [
+            {
+              "text": "This block ships no bespoke renderer: register a fetcher, then render its items exactly like the Listing block. Only the fetcher below is block-specific."
+            }
+          ]
         }
       ]
     }
@@ -67,6 +86,8 @@
       "title-1",
       "ref-searchShortcuts-schema",
       "ref-searchShortcuts-json-data",
+      "ref-searchShortcuts-rendering-intro",
+      "ref-searchShortcuts-fetcher",
       "ref-searchShortcuts-rendering"
     ]
   },

@@ -11,7 +11,6 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-relatedItemsListing",
-      "placeholder": "schema",
       "tabs": [
         {
           "@id": "ref-relatedItemsListing-schema-javascript-a1a504",
@@ -19,13 +18,13 @@
           "language": "javascript",
           "code": "{\n  \"relatedItemsListing\": {\n    \"id\": \"relatedItemsListing\",\n    \"title\": \"Related Items\",\n    \"blockSchema\": {\n      \"fieldsets\": [\n        {\n          \"id\": \"default\",\n          \"title\": \"Default\",\n          \"fields\": [\n            \"relationField\",\n            \"variation\",\n            \"fieldMapping\"\n          ]\n        }\n      ],\n      \"properties\": {\n        \"relationField\": {\n          \"title\": \"Relation field\",\n          \"widget\": \"schemaFieldSelect\",\n          \"fieldType\": \"relation\"\n        },\n        \"variation\": {\n          \"title\": \"Item Type\",\n          \"widget\": \"blockTypeSelect\",\n          \"filterConvertibleFrom\": \"@default\",\n          \"default\": \"summary\"\n        }\n      }\n    },\n    \"schemaEnhancer\": {\n      \"inheritSchemaFrom\": {\n        \"typeField\": \"variation\",\n        \"mappingField\": \"fieldMapping\",\n        \"defaultsField\": \"itemDefaults\"\n      }\n    }\n  }\n}"
         }
-      ]
+      ],
+      "slotId": "schema"
     },
     "ref-relatedItemsListing-json-data": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-relatedItemsListing",
-      "placeholder": "json-data",
       "tabs": [
         {
           "@id": "ref-relatedItemsListing-json-data-json-ba9577",
@@ -33,31 +32,51 @@
           "language": "json",
           "code": "{\n  \"@type\": \"relatedItemsListing\",\n  \"variation\": \"summary\",\n  \"relationField\": \"relatedItems\"\n}"
         }
-      ]
+      ],
+      "slotId": "json-data"
     },
     "ref-relatedItemsListing-rendering": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-relatedItemsListing",
-      "placeholder": "rendering",
+      "slotId": "rendering",
       "tabs": [
         {
-          "@id": "ref-relatedItemsListing-rendering-jsx-050122",
-          "label": "React",
-          "language": "jsx",
-          "code": "import { useState, useEffect } from 'react';\nimport { expandListingBlocks, relatedItemsFetcher } from '@hydra-js/helpers';\n\nfunction FetchedList({ block, blockId, apiUrl, contextPath }) {\n  const [items, setItems] = useState([]);\n  useEffect(() => {\n    expandListingBlocks([blockId], {\n      blocks: { [blockId]: block },\n      fetchItems: { relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }) }, // ← only block-specific line\n      itemTypeField: 'variation',\n    }).then((r) => setItems(r.items));\n  }, [block.relationField]);\n\n  return (\n    <div data-block-uid={blockId}>\n      {items.map((item, i) => <BlockRenderer key={i} block={item} />)}\n    </div>\n  );\n}"
-        },
+          "@id": "ref-relatedItemsListing-rendering-javascript-2b9d44",
+          "label": "Register",
+          "language": "javascript",
+          "code": "fetchItems: { relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }) }"
+        }
+      ]
+    },
+    "ref-relatedItemsListing-fetcher": {
+      "@type": "codeExample",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-relatedItemsListing",
+      "slotId": "rendering",
+      "tabs": [
         {
-          "@id": "ref-relatedItemsListing-rendering-vue-c61844",
-          "label": "Vue",
-          "language": "vue",
-          "code": "<template>\n  <div :data-block-uid=\"blockId\">\n    <BlockRenderer v-for=\"(item, i) in items\" :key=\"i\" :block=\"item\" />\n  </div>\n</template>\n\n<script setup>\nimport { ref, watch } from 'vue';\nimport { expandListingBlocks, relatedItemsFetcher } from '@hydra-js/helpers';\n\nconst props = defineProps({ block: Object, blockId: String, apiUrl: String, contextPath: String });\nconst items = ref([]);\nwatch(() => props.block.relationField, async () => {\n  const r = await expandListingBlocks([props.blockId], {\n    blocks: { [props.blockId]: props.block },\n    fetchItems: { relatedItemsListing: relatedItemsFetcher({ apiUrl: props.apiUrl, contextPath: props.contextPath }) },\n    itemTypeField: 'variation',\n  });\n  items.value = r.items;\n}, { immediate: true });\n</script>"
-        },
+          "@id": "ref-relatedItemsListing-fetcher-javascript-1c975d",
+          "label": "Fetcher",
+          "language": "javascript",
+          "code": "export function relatedItemsFetcher({ apiUrl, contextPath }) {\n  return async function fetchItems(block, { start, size }) {\n    const field = block.relationField || 'relatedItems';\n    const content = await (await fetch(`${apiUrl}${contextPath}/++api++`, { headers: authHeaders() })).json();\n    const all = Array.isArray(content[field]) ? content[field] : [];\n    return { items: all.slice(start, start + size), total: all.length };\n  };\n}"
+        }
+      ]
+    },
+    "ref-relatedItemsListing-rendering-intro": {
+      "@type": "slate",
+      "templateId": "/templates/block-reference-layout",
+      "templateInstanceId": "tpl-inst-relatedItemsListing",
+      "slotId": "rendering",
+      "plaintext": "This block ships no bespoke renderer: register a fetcher, then render its items exactly like the Listing block. Only the fetcher below is block-specific.",
+      "value": [
         {
-          "@id": "ref-relatedItemsListing-rendering-svelte-53b981",
-          "label": "Svelte",
-          "language": "svelte",
-          "code": "<script>\n  import { expandListingBlocks, relatedItemsFetcher } from '@hydra-js/helpers';\n  import BlockRenderer from './BlockRenderer.svelte';\n  export let block; export let blockId; export let apiUrl; export let contextPath;\n  let items = [];\n  $: block.relationField, load();\n  async function load() {\n    const r = await expandListingBlocks([blockId], {\n      blocks: { [blockId]: block },\n      fetchItems: { relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }) },\n      itemTypeField: 'variation',\n    });\n    items = r.items;\n  }\n</script>\n\n<div data-block-uid={blockId}>\n  {#each items as item, i (i)}<BlockRenderer block={item} />{/each}\n</div>"
+          "type": "p",
+          "children": [
+            {
+              "text": "This block ships no bespoke renderer: register a fetcher, then render its items exactly like the Listing block. Only the fetcher below is block-specific."
+            }
+          ]
         }
       ]
     }
@@ -67,6 +86,8 @@
       "title-1",
       "ref-relatedItemsListing-schema",
       "ref-relatedItemsListing-json-data",
+      "ref-relatedItemsListing-rendering-intro",
+      "ref-relatedItemsListing-fetcher",
       "ref-relatedItemsListing-rendering"
     ]
   },
