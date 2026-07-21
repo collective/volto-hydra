@@ -36,7 +36,10 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "frontend"
+  ],
   "title": "Custom Blocks",
   "type_title": "Page",
   "version": "current",
