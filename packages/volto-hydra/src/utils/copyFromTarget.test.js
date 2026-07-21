@@ -23,6 +23,7 @@ import {
   getTargetId,
   COPY_FROM_TARGET_WIDGET,
 } from './copyFromTarget';
+import { createSchemaEnhancerFromRecipe } from './schemaInheritance';
 
 // A teaser-like block: `href` is the link/url field carrying the target
 // snapshot (selectedItemAttrs), and fieldMappings['@target'] maps target
@@ -250,5 +251,93 @@ describe('installCopyFromTargetEnhancers — auto-install, gated on @target', ()
     const out = cfg.teaser.schemaEnhancer({ schema: teaserConfig.blockSchema });
     expect(ran).toBe(true); // existing enhancer still runs
     expect(out.properties.title.widget).toBe(COPY_FROM_TARGET_WIDGET); // ours too
+  });
+});
+
+/**
+ * copy-from-target × fieldRules (optional target attributes).
+ *
+ * A card maps the linked/listing item's optional attributes — `image`, `date` —
+ * onto its own fields, and those fields are OPTIONAL card elements shown
+ * conditionally by a `fieldRules` recipe (the `elements` multiselect pattern).
+ * The real chain is: fieldRules (hide the element's field when off) THEN the
+ * copy-from-target swap (installCopyFromTargetEnhancers appends it). So a mapped
+ * field must be wrapped (toggle + pull) only when its element is enabled, and get
+ * NO wrapper when the rule hides it — no orphan "pull from linked" toggle on a
+ * field the editor can't see.
+ */
+describe('copy-from-target × fieldRules — conditional (optional) mapped fields', () => {
+  const intl = { formatMessage: (m) => (m && m.defaultMessage) || '' };
+
+  // A card whose `elements` multiselect reveals `image` / `date`. @target pulls
+  // both from the linked item (image_scales → image, effective → date) plus the
+  // always-shown title.
+  const makeCard = () => ({
+    id: 'card',
+    fieldMappings: {
+      '@target': {
+        Title: 'title',
+        effective: 'date',
+        image_scales: { field: 'image', type: 'image' },
+      },
+    },
+    // Recipe form, converted to a function BEFORE installCopyFromTargetEnhancers
+    // runs (exactly as index.js does), so the two compose.
+    schemaEnhancer: createSchemaEnhancerFromRecipe({
+      fieldRules: {
+        image: { when: { elements: { contains: 'image' } }, else: false },
+        date: { when: { elements: { contains: 'date' } }, else: false },
+      },
+    }),
+    blockSchema: {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'elements', 'image', 'date'] }],
+      properties: {},
+    },
+  });
+
+  const baseSchema = () => ({
+    fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'elements', 'image', 'date'] }],
+    properties: {
+      title: { title: 'Title' },
+      elements: { title: 'Elements', type: 'array' },
+      image: { title: 'Image', widget: 'image' },
+      date: { title: 'Date' },
+    },
+  });
+
+  const composed = (card) => {
+    const blocksConfig = { card };
+    installCopyFromTargetEnhancers(blocksConfig);
+    return blocksConfig.card.schemaEnhancer;
+  };
+
+  test('a mapped field hidden by its rule gets NO wrapper (no orphan toggle)', () => {
+    const card = makeCard();
+    const enhancer = composed(card);
+    // No elements enabled → both image and date are hidden by fieldRules.
+    const out = enhancer({ schema: baseSchema(), formData: { elements: [] }, intl });
+    expect(out.properties.image).toBeUndefined(); // dropped by fieldRules
+    expect(out.properties.date).toBeUndefined();
+    expect(out.properties.title.widget).toBe(COPY_FROM_TARGET_WIDGET); // always-shown mapped field is wrapped
+  });
+
+  test('a mapped field shown by its rule IS wrapped (toggle + pull)', () => {
+    const card = makeCard();
+    const enhancer = composed(card);
+    // Only the image element is on → image shown+wrapped, date still hidden.
+    const out = enhancer({ schema: baseSchema(), formData: { elements: ['image'] }, intl });
+    expect(out.properties.image).toBeDefined();
+    expect(out.properties.image.widget).toBe(COPY_FROM_TARGET_WIDGET);
+    expect(out.properties.image.baseWidget.widget).toBe('image'); // original widget preserved for re-resolution
+    expect(out.properties.date).toBeUndefined(); // its element is off
+    expect(out.properties.title.widget).toBe(COPY_FROM_TARGET_WIDGET);
+  });
+
+  test('toggling which element is on moves the wrapper to that field', () => {
+    const card = makeCard();
+    const enhancer = composed(card);
+    const withDate = enhancer({ schema: baseSchema(), formData: { elements: ['date'] }, intl });
+    expect(withDate.properties.date?.widget).toBe(COPY_FROM_TARGET_WIDGET);
+    expect(withDate.properties.image).toBeUndefined();
   });
 });
