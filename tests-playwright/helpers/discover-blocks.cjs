@@ -403,7 +403,7 @@ const UNDECLARED_EXEMPT = new Set([
 ]);
 
 function collectWidgetShapeIssues(
-  blockData, blockSchema, pagePath, blockId, out, blockType, undeclaredFields,
+  blockData, blockSchema, pagePath, blockId, out, blockType, undeclaredFields, blockConfig,
 ) {
   const props = blockSchema?.properties;
   if (!props || !blockData || typeof blockData !== 'object') return;
@@ -568,9 +568,22 @@ function collectWidgetShapeIssues(
   // data is stray. Collected per (blockType, field) so it reports ONCE per field
   // name, not once per instance. Structural / serialisation keys and Volto
   // slot-runtime fields (added by the slot editor, not authored data) are exempt.
+  // Synced-defaults prefix: a block with an `inheritSchemaFrom` recipe (a
+  // grid) stores its shared child defaults as flat `<defaultsField>_<field>`
+  // keys (itemDefaults_colour, ...). Those aren't in the static blockSchema —
+  // hydra builds them dynamically onto the "Item Defaults" fieldset from the
+  // child type's fields at edit time, so they ARE editable there. Full
+  // resolution needs the bridge's blockPathMap/registry and can't run offline
+  // in discovery, so exempt the prefix rather than flag it as undeclared.
+  const defaultsField =
+    blockConfig && blockConfig.schemaEnhancer &&
+    blockConfig.schemaEnhancer.inheritSchemaFrom &&
+    blockConfig.schemaEnhancer.inheritSchemaFrom.defaultsField;
+  const defaultsPrefix = defaultsField ? (defaultsField + '_') : null;
   if (blockType) {
     for (const key of Object.keys(blockData)) {
       if (key.startsWith('@') || UNDECLARED_EXEMPT.has(key) || props[key]) continue;
+      if (defaultsPrefix && key.startsWith(defaultsPrefix)) continue;
       const dedupeKey = `${blockType} ${key}`;
       if (!undeclaredFields.has(dedupeKey)) {
         undeclaredFields.set(dedupeKey, { blockType, field: key, pagePath, blockId });
@@ -720,6 +733,7 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         collectSlateIssues(blockData, pagePath, blockId, slateIssues, blockType);
         collectWidgetShapeIssues(
           blockData, schema, pagePath, blockId, shapeIssues, blockType, undeclaredFields,
+          blockType ? blocksConfig[blockType] : undefined,
         );
 
         // Unregistered block type: any real @type the frontend can't render is
