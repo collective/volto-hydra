@@ -271,7 +271,10 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "media"
+  ],
   "title": "Teaser",
   "type_title": "Page",
   "version": "current",

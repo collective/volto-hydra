@@ -113,7 +113,11 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "containers",
+    "media"
+  ],
   "title": "Slider Block",
   "type_title": "Page",
   "version": "current",

@@ -36,7 +36,9 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "frontend"
+  ],
   "title": "Build a frontend",
   "type_title": "Page",
   "version": "current",

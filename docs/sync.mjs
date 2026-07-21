@@ -1513,6 +1513,12 @@ for (const mdFile of docsMdFiles) {
   }
   const data = buildConceptShell(folder, mdContent);
 
+  // Preserve author-set `subjects` (tags) — the shell resets them to [] every run,
+  // but tags are hand-authored content, not derived from the markdown.
+  if (Array.isArray(prevData?.subjects) && prevData.subjects.length) {
+    data.subjects = prevData.subjects;
+  }
+
   // Preserve title-block id from previous JSON (default: title-1).
   const prevTitleEntry = prevData
     ? Object.entries(prevData.blocks || {}).find(([, b]) => b['@type'] === 'title')

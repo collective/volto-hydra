@@ -35,7 +35,7 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": ["frontend"],
   "title": "Static",
   "type_title": "Page",
   "version": "current",

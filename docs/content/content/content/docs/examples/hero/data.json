@@ -113,7 +113,10 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "media"
+  ],
   "title": "Hero Block",
   "type_title": "Page",
   "version": "current",

@@ -717,7 +717,9 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "content"
+  ],
   "title": "Page",
   "type_title": "Page",
   "version": "current",

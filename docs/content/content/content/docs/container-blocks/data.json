@@ -36,7 +36,10 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "containers",
+    "frontend"
+  ],
   "title": "Container Blocks",
   "type_title": "Page",
   "version": "current",

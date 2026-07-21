@@ -113,7 +113,11 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "navigation",
+    "templates"
+  ],
   "title": "Context Navigation Block",
   "type_title": "Page",
   "version": "current",
