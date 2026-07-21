@@ -45,7 +45,7 @@
           "@id": "ref-searchShortcuts-rendering-javascript-ab7111",
           "label": "Render",
           "language": "javascript",
-          "code": "// 1. Register the fetcher when you init the bridge (keyed by block @type)\ninitBridge(origin, { blocks, fetchItems: { searchShortcuts: searchShortcutsFetcher({ apiUrl, contextPath }) } });\n\n// 2. Render — identical to any list block\nconst { items } = await expandListingBlocks([blockId], {\n  blocks: { [blockId]: block },\n  fetchItems: { searchShortcuts: searchShortcutsFetcher({ apiUrl, contextPath }) },\n  itemTypeField: 'variation',\n});\nitems.forEach((item) => renderBlock(item)); // your normal per-block renderer"
+          "code": "// One fetchItems map, keyed by @type, holds every fetch-based block you use.\nconst fetchItems = {\n  listing: ploneFetchItems({ apiUrl, contextPath }),\n  searchShortcuts: searchShortcutsFetcher({ apiUrl, contextPath }), // ← this block\n};\n\n// Call this on each region you render (the list of block ids in that region).\nconst { items } = await expandListingBlocks(regionBlockIds, {\n  blocks, fetchItems, itemTypeField: 'variation',\n});\nitems.forEach((item) => renderBlock(item)); // your normal per-block renderer"
         }
       ]
     },
@@ -103,27 +103,13 @@
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-searchShortcuts",
       "slotId": "rendering",
-      "plaintext": "This block has no bespoke renderer — register the fetcher below, then render its items exactly like any list block. See the Listing example for the render component in React, Vue and Svelte, Listings for how expansion works, and Custom Blocks for registering a block type. Only the fetcher below is block-specific.",
+      "plaintext": "This block has no bespoke renderer. Add its fetcher to your fetchItems map (keyed by @type) and expandListingBlocks expands it in any region you render — the same seam that powers listings and other collection blocks. See Custom Blocks to define the block type. Only the fetcher below is block-specific.",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "This block has no bespoke renderer — register the fetcher below, then render its items exactly like any list block. See the "
-            },
-            {
-              "type": "link",
-              "data": {
-                "url": "/docs/examples/listing"
-              },
-              "children": [
-                {
-                  "text": "Listing example"
-                }
-              ]
-            },
-            {
-              "text": " for the render component in React, Vue and Svelte, "
+              "text": "This block has no bespoke renderer. Add its fetcher to your fetchItems map (keyed by @type) and expandListingBlocks expands it in any region you render — the same seam that powers "
             },
             {
               "type": "link",
@@ -132,12 +118,12 @@
               },
               "children": [
                 {
-                  "text": "Listings"
+                  "text": "listings"
                 }
               ]
             },
             {
-              "text": " for how expansion works, and "
+              "text": " and other collection blocks. See "
             },
             {
               "type": "link",
@@ -151,7 +137,7 @@
               ]
             },
             {
-              "text": " for registering a block type. Only the fetcher below is block-specific."
+              "text": " to define the block type. Only the fetcher below is block-specific."
             }
           ]
         }
