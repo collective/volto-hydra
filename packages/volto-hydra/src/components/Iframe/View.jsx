@@ -242,7 +242,7 @@ import './styles.css';
 import { useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
 import { BlockChooser, Icon, Toast } from '@plone/volto/components';
-import { Menu } from 'semantic-ui-react';
+import { Menu, Dimmer, Loader } from 'semantic-ui-react';
 import { createPortal, flushSync } from 'react-dom';
 import { usePopper } from 'react-popper';
 import { useSelector, useDispatch } from 'react-redux';
@@ -828,6 +828,13 @@ const Iframe = (props) => {
   const inlineEditCounterRef = useRef(0); // Count INLINE_EDIT_DATA messages from iframe
   const processedInlineEditCounterRef = useRef(0); // Count how many we've seen come back through Redux
   const editSequenceRef = useRef(-1); // Sequence counter for detecting stale iframe echoes (starts at -1 so first increment gives 0)
+  // "Latest ref" for the unlocked-template set. saveTemplatesRef.current is a
+  // useEffect closure; it captured templateEditMode one render behind, so a Ctrl+S
+  // fired the instant the toggle flipped to locked (render) hit a stale, still-
+  // unlocked set and wrongly raised the "Lock your templates first" gate. Updated
+  // DURING render below (single source of truth — always equals the last rendered
+  // state), so any callback reading it agrees with what the toggle shows.
+  const templateEditModeRef = useRef([]);
   // Combined state for iframe data - formData, selection, requestId, and transformAction updated atomically
   // This ensures toolbar sees all together in the same render
   const intl = useIntl();
@@ -854,10 +861,18 @@ const Iframe = (props) => {
     templateEditMode: [], // v2: array of unlocked template instance ids (multiple at once)
   }));
 
+  // Keep the latest-ref current as of this render (see templateEditModeRef).
+  templateEditModeRef.current = iframeSyncState.templateEditMode || [];
+
   // v2 template edit: the decision modal shown on unlock/lock/save-gate, and a
   // per-instance snapshot of formData taken at unlock time (so "Reset changes"
   // can revert only that template's blocks, keeping page edits).
   const [templateModal, setTemplateModal] = useState(null); // { kind, instanceId } | null
+  // True while a template lock-commit is persisting (flush → reverse-merge → PATCH →
+  // unlock). That round-trip can be slow and, unlike a page save, has no Volto request
+  // spinner — so show a Dimmer+Loader over the editor and block interaction until it
+  // settles (nothing can race the in-flight commit).
+  const [committingTemplate, setCommittingTemplate] = useState(false);
   const templateSnapshotsRef = useRef({});
 
   // Notify toolbar whether paste is allowed for the current selection + clipboard.
@@ -1202,7 +1217,10 @@ const Iframe = (props) => {
         }
         return null;
       };
-      const blockingUnlocked = (iframeSyncState.templateEditMode || []).filter(
+      // Read the latest-ref, not this effect closure's captured templateEditMode:
+      // the ref is refreshed during the same render that flips the toggle to locked,
+      // so a Ctrl+S fired the instant that lands sees the up-to-date set (no stale gate).
+      const blockingUnlocked = (templateEditModeRef.current || []).filter(
         (iid) => {
           const tid = findTemplateId(iid);
           const tpl = tid && templateCacheRef.current[tid];
@@ -1345,6 +1363,7 @@ const Iframe = (props) => {
       }));
       postTemplateEditMode(next);
       delete templateSnapshotsRef.current[prevInstanceId];
+      setCommittingTemplate(false); // commit round-trip done — drop the saving overlay
     };
 
     // Find the templateId for this instance.
@@ -4434,6 +4453,7 @@ const Iframe = (props) => {
     }
     const requestId = `tpl-commit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     pendingTemplateEditExitRef.current = { requestId, prevInstanceId: instanceId };
+    setCommittingTemplate(true); // show the saving overlay until finish() clears it
     if (referenceElement?.contentWindow) {
       referenceElement.contentWindow.postMessage({ type: 'FLUSH_BUFFER', requestId }, '*');
     }
@@ -4523,6 +4543,17 @@ const Iframe = (props) => {
 
   return (
     <div id="iframeContainer">
+      {/* Saving overlay: the template lock-commit round-trip (flush → reverse-merge →
+          PATCH → unlock) has no Volto request spinner and can be slow, so dim the
+          editor and block interaction until it settles. Portaled to body so it covers
+          the whole editor and can't be raced. */}
+      {committingTemplate &&
+        createPortal(
+          <Dimmer active page>
+            <Loader indeterminate>Saving template…</Loader>
+          </Dimmer>,
+          document.body,
+        )}
       {/* v2 template-edit decision modals: unlock warning, lock choice, save gate.
           Portaled to document.body so it escapes #iframeContainer's stacking
           context — otherwise on mobile it renders BEHIND the settings sidebar
