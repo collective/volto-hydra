@@ -1,0 +1,32 @@
+{
+  "@id": "http://localhost:8888/copy-target-page",
+  "@type": "Document",
+  "UID": "copy-target-page-uid",
+  "id": "copy-target-page",
+  "title": "Copy Target Page",
+  "blocks": {
+    "title-block": { "@type": "title" },
+    "btn-linked": {
+      "@type": "button",
+      "title": "Stale label",
+      "href": [{ "@id": "/news/big", "Title": "Target Title" }],
+      "inneralign": "left"
+    },
+    "btn-custom": {
+      "@type": "button",
+      "title": "My own label",
+      "href": [{ "@id": "/news/big", "Title": "Target Title" }],
+      "_customFields": ["title"],
+      "inneralign": "left"
+    },
+    "btn-external": {
+      "@type": "button",
+      "title": "External label",
+      "href": [{ "@id": "https://example.com", "title": "Example" }],
+      "inneralign": "left"
+    }
+  },
+  "blocks_layout": {
+    "items": ["title-block", "btn-linked", "btn-custom", "btn-external"]
+  }
+}

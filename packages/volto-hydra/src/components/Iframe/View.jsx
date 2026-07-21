@@ -274,6 +274,7 @@ import {
   convertBlockType,
   validateFieldMappings,
 } from '../../utils/schemaInheritance';
+import { installCopyFromTargetEnhancers } from '../../utils/copyFromTarget';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
 
@@ -3358,6 +3359,11 @@ const Iframe = (props) => {
           // additional claimed fields per child type via
           // `inheritSchemaFrom.parentControlled`.
           installChildBlockEnhancers(config.blocks.blocksConfig);
+
+          // 1d-bis. Auto-attach the copy-from-target enhancer to every block
+          // that declares fieldMappings['@target'] (e.g. teaser). The author's
+          // only opt-in is the mapping; no per-block wiring.
+          installCopyFromTargetEnhancers(config.blocks.blocksConfig);
 
           // 1e. Eager-populate the type schema cache. Done now (before any sidebar
           // rendering kicks off) so the cache is filled with no instance context

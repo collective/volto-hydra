@@ -1,0 +1,343 @@
+import { describe, it, expect, vi } from 'vitest';
+
+// HydraSchemaContext.js is JSX inside a .js file (the admin build uses babel;
+// vitest/vite can't transform JSX in .js). copyFromTarget → schemaInheritance
+// imports '../context', so stub it — same convention as schemaInheritance.test.js.
+vi.mock('../context', () => ({
+  getHydraSchemaContext: () => ({}),
+  setHydraSchemaContext: () => {},
+  getLiveBlockData: () => null,
+  HydraSchemaProvider: ({ children }) => children,
+  useHydraSchemaContext: () => ({}),
+}));
+
+import {
+  getTargetMapping,
+  applyCopyFromTargetToSchema,
+  getTargetValueForField,
+  isFieldCustom,
+  isFieldLinked,
+  withFieldCustom,
+  withFieldLinked,
+  installCopyFromTargetEnhancers,
+  getTargetId,
+  COPY_FROM_TARGET_WIDGET,
+} from './copyFromTarget';
+import { createSchemaEnhancerFromRecipe } from './schemaInheritance';
+
+// A teaser-like block: `href` is the link/url field carrying the target
+// snapshot (selectedItemAttrs), and fieldMappings['@target'] maps target
+// content attrs → this block's fields.
+const teaserConfig = {
+  id: 'teaser',
+  fieldMappings: {
+    '@target': {
+      Title: 'title',
+      Description: 'description',
+      head_title: 'head_title',
+      image_scales: { field: 'preview_image', type: 'image' },
+    },
+  },
+  blockSchema: {
+    properties: {
+      href: { widget: 'object_browser', mode: 'link' },
+      title: { title: 'Title' },
+      description: { title: 'Description', widget: 'textarea' },
+      head_title: { title: 'Kicker' },
+      preview_image: { title: 'Image', widget: 'object_browser', mode: 'image' },
+    },
+  },
+};
+
+const targetSnapshot = {
+  '@id': '/news/big',
+  Title: 'Big News',
+  Description: 'It happened',
+  head_title: 'Breaking',
+  image_field: 'image',
+  image_scales: { image: [{ download: '/news/big/@@images/x.jpg' }] },
+};
+
+const schemaOf = () => ({
+  properties: {
+    href: { widget: 'object_browser', mode: 'link' },
+    title: { title: 'Title' },
+    description: { title: 'Description', widget: 'textarea' },
+    head_title: { title: 'Kicker' },
+    preview_image: { title: 'Image', widget: 'object_browser', mode: 'image' },
+  },
+});
+
+describe('getTargetMapping', () => {
+  it('returns the @target mapping when declared', () => {
+    expect(getTargetMapping(teaserConfig)).toEqual(teaserConfig.fieldMappings['@target']);
+  });
+  it('returns null when there is no @target mapping', () => {
+    expect(getTargetMapping({ id: 'slate', fieldMappings: { '@default': { title: 'x' } } })).toBeNull();
+    expect(getTargetMapping({ id: 'slate' })).toBeNull();
+  });
+});
+
+describe('applyCopyFromTargetToSchema — gating + widget swap', () => {
+  it('is a no-op for a block without @target mapping', () => {
+    const schema = schemaOf();
+    const out = applyCopyFromTargetToSchema(schema, { id: 'slate' });
+    expect(out.properties.title.widget).toBeUndefined();
+  });
+
+  it('swaps each mapped DESTINATION field to the wrapper widget, stashing the original', () => {
+    const out = applyCopyFromTargetToSchema(schemaOf(), teaserConfig);
+    // Destinations are the mapping *values* (title, description, head_title, preview_image)
+    for (const field of ['title', 'description', 'head_title', 'preview_image']) {
+      expect(out.properties[field].widget).toBe(COPY_FROM_TARGET_WIDGET);
+      // original widget config preserved for faithful re-resolution
+      expect(out.properties[field].baseWidget).toBeDefined();
+    }
+  });
+
+  it('does NOT swap the URL field itself or unmapped fields', () => {
+    const out = applyCopyFromTargetToSchema(schemaOf(), teaserConfig);
+    expect(out.properties.href.widget).toBe('object_browser'); // url field untouched
+  });
+
+  it('is idempotent (re-running does not double-wrap)', () => {
+    const once = applyCopyFromTargetToSchema(schemaOf(), teaserConfig);
+    const twice = applyCopyFromTargetToSchema(once, teaserConfig);
+    expect(twice.properties.title.baseWidget).not.toBe(COPY_FROM_TARGET_WIDGET);
+    expect(twice.properties.title.widget).toBe(COPY_FROM_TARGET_WIDGET);
+  });
+});
+
+describe('getTargetValueForField — typed extraction from the snapshot', () => {
+  const data = { href: [targetSnapshot] };
+  it('extracts a plain string field', () => {
+    expect(getTargetValueForField('title', teaserConfig, data)).toBe('Big News');
+    expect(getTargetValueForField('head_title', teaserConfig, data)).toBe('Breaking');
+  });
+  it('extracts via the source→dest mapping (Description → description)', () => {
+    expect(getTargetValueForField('description', teaserConfig, data)).toBe('It happened');
+  });
+  it('returns undefined for an unmapped field', () => {
+    expect(getTargetValueForField('href', teaserConfig, data)).toBeUndefined();
+  });
+  it('returns undefined when no target is selected', () => {
+    expect(getTargetValueForField('title', teaserConfig, { href: [] })).toBeUndefined();
+    expect(getTargetValueForField('title', teaserConfig, {})).toBeUndefined();
+  });
+
+  it('assembles an image field into the object_browser (mode=image) array form', () => {
+    const data = { href: [targetSnapshot] };
+    expect(getTargetValueForField('preview_image', teaserConfig, data)).toEqual([
+      {
+        '@id': '/news/big',
+        image_field: 'image',
+        image_scales: { image: [{ download: '/news/big/@@images/x.jpg' }] },
+      },
+    ]);
+  });
+
+  it('returns undefined for an image field when the target has no image', () => {
+    const noImage = { '@id': '/x', Title: 'T' };
+    expect(getTargetValueForField('preview_image', teaserConfig, { href: [noImage] })).toBeUndefined();
+  });
+
+  // Tags / other multi-value fields: a plain (non-typed) mapping passes the
+  // array through as-is; no special handling needed beyond image.
+  const tagsConfig = {
+    id: 'card',
+    fieldMappings: { '@target': { Subjects: 'tags' } },
+    blockSchema: {
+      properties: {
+        href: { widget: 'object_browser', mode: 'link' },
+        tags: { title: 'Tags', widget: 'array' },
+      },
+    },
+  };
+  it('passes a tags/array field through from the target', () => {
+    const data = { href: [{ '@id': '/x', Subjects: ['news', 'plone'] }] };
+    expect(getTargetValueForField('tags', tagsConfig, data)).toEqual(['news', 'plone']);
+  });
+});
+
+describe('live target — divergence/sync against the CURRENT target, not the snapshot', () => {
+  it('getTargetId reads the link field @id', () => {
+    expect(getTargetId(teaserConfig, { href: [targetSnapshot] })).toBe('/news/big');
+    expect(getTargetId(teaserConfig, { href: [] })).toBeUndefined();
+  });
+
+  it('getTargetValueForField uses the live target (snapshot-shaped) when provided', () => {
+    // Stored snapshot says 'Big News'; the live target has since changed.
+    const data = { href: [targetSnapshot] };
+    const live = { ...targetSnapshot, Title: 'Big News (updated)' };
+    expect(getTargetValueForField('title', teaserConfig, data, live)).toBe('Big News (updated)');
+    // …and falls back to the stored snapshot when no live target is passed.
+    expect(getTargetValueForField('title', teaserConfig, data)).toBe('Big News');
+  });
+
+});
+
+describe('linked vs custom per-field state (_customFields)', () => {
+  const withTarget = { href: [targetSnapshot], title: 'Big News' };
+
+  it('a mapped field with a target is LINKED by default (not in _customFields)', () => {
+    expect(isFieldCustom('title', withTarget)).toBe(false);
+    expect(isFieldLinked('title', teaserConfig, withTarget)).toBe(true);
+  });
+
+  it('a field listed in _customFields is custom, not linked', () => {
+    const data = { ...withTarget, _customFields: ['title'] };
+    expect(isFieldCustom('title', data)).toBe(true);
+    expect(isFieldLinked('title', teaserConfig, data)).toBe(false);
+    // other mapped fields stay linked
+    expect(isFieldLinked('description', teaserConfig, data)).toBe(true);
+  });
+
+  it('nothing is linked when no target is selected', () => {
+    expect(isFieldLinked('title', teaserConfig, { href: [] })).toBe(false);
+  });
+
+  it('withFieldCustom / withFieldLinked update _customFields immutably', () => {
+    const a = withFieldCustom(withTarget, 'title');
+    expect(a._customFields).toEqual(['title']);
+    expect(withTarget._customFields).toBeUndefined(); // original untouched
+
+    const b = withFieldCustom(a, 'description');
+    expect(new Set(b._customFields)).toEqual(new Set(['title', 'description']));
+
+    const c = withFieldLinked(b, 'title');
+    expect(c._customFields).toEqual(['description']);
+
+    const d = withFieldLinked(c, 'description');
+    expect(d._customFields).toBeUndefined(); // key removed when empty
+  });
+});
+
+describe('installCopyFromTargetEnhancers — auto-install, gated on @target', () => {
+  const makeConfig = () => ({
+    teaser: { ...teaserConfig },
+    slate: { id: 'slate', blockSchema: { properties: { value: { widget: 'slate' } } } },
+  });
+
+  it('attaches an enhancer only to blocks with an @target mapping', () => {
+    const cfg = makeConfig();
+    installCopyFromTargetEnhancers(cfg);
+    expect(typeof cfg.teaser.schemaEnhancer).toBe('function');
+    expect(cfg.slate.schemaEnhancer).toBeUndefined(); // no @target → untouched
+  });
+
+  it("the installed enhancer swaps the teaser's mapped fields", () => {
+    const cfg = makeConfig();
+    installCopyFromTargetEnhancers(cfg);
+    const out = cfg.teaser.schemaEnhancer({ schema: teaserConfig.blockSchema });
+    expect(out.properties.title.widget).toBe(COPY_FROM_TARGET_WIDGET);
+  });
+
+  it('is idempotent (re-install does not stack enhancers)', () => {
+    const cfg = makeConfig();
+    installCopyFromTargetEnhancers(cfg);
+    const first = cfg.teaser.schemaEnhancer;
+    installCopyFromTargetEnhancers(cfg);
+    expect(cfg.teaser.schemaEnhancer).toBe(first);
+  });
+
+  it('composes with an existing block schemaEnhancer (runs both)', () => {
+    const cfg = makeConfig();
+    let ran = false;
+    cfg.teaser.schemaEnhancer = ({ schema }) => {
+      ran = true;
+      return schema;
+    };
+    installCopyFromTargetEnhancers(cfg);
+    const out = cfg.teaser.schemaEnhancer({ schema: teaserConfig.blockSchema });
+    expect(ran).toBe(true); // existing enhancer still runs
+    expect(out.properties.title.widget).toBe(COPY_FROM_TARGET_WIDGET); // ours too
+  });
+});
+
+/**
+ * copy-from-target × fieldRules (optional target attributes).
+ *
+ * A card maps the linked/listing item's optional attributes — `image`, `date` —
+ * onto its own fields, and those fields are OPTIONAL card elements shown
+ * conditionally by a `fieldRules` recipe (the `elements` multiselect pattern).
+ * The real chain is: fieldRules (hide the element's field when off) THEN the
+ * copy-from-target swap (installCopyFromTargetEnhancers appends it). So a mapped
+ * field must be wrapped (toggle + pull) only when its element is enabled, and get
+ * NO wrapper when the rule hides it — no orphan "pull from linked" toggle on a
+ * field the editor can't see.
+ */
+describe('copy-from-target × fieldRules — conditional (optional) mapped fields', () => {
+  const intl = { formatMessage: (m) => (m && m.defaultMessage) || '' };
+
+  // A card whose `elements` multiselect reveals `image` / `date`. @target pulls
+  // both from the linked item (image_scales → image, effective → date) plus the
+  // always-shown title.
+  const makeCard = () => ({
+    id: 'card',
+    fieldMappings: {
+      '@target': {
+        Title: 'title',
+        effective: 'date',
+        image_scales: { field: 'image', type: 'image' },
+      },
+    },
+    // Recipe form, converted to a function BEFORE installCopyFromTargetEnhancers
+    // runs (exactly as index.js does), so the two compose.
+    schemaEnhancer: createSchemaEnhancerFromRecipe({
+      fieldRules: {
+        image: { when: { elements: { contains: 'image' } }, else: false },
+        date: { when: { elements: { contains: 'date' } }, else: false },
+      },
+    }),
+    blockSchema: {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'elements', 'image', 'date'] }],
+      properties: {},
+    },
+  });
+
+  const baseSchema = () => ({
+    fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'elements', 'image', 'date'] }],
+    properties: {
+      title: { title: 'Title' },
+      elements: { title: 'Elements', type: 'array' },
+      image: { title: 'Image', widget: 'image' },
+      date: { title: 'Date' },
+    },
+  });
+
+  const composed = (card) => {
+    const blocksConfig = { card };
+    installCopyFromTargetEnhancers(blocksConfig);
+    return blocksConfig.card.schemaEnhancer;
+  };
+
+  test('a mapped field hidden by its rule gets NO wrapper (no orphan toggle)', () => {
+    const card = makeCard();
+    const enhancer = composed(card);
+    // No elements enabled → both image and date are hidden by fieldRules.
+    const out = enhancer({ schema: baseSchema(), formData: { elements: [] }, intl });
+    expect(out.properties.image).toBeUndefined(); // dropped by fieldRules
+    expect(out.properties.date).toBeUndefined();
+    expect(out.properties.title.widget).toBe(COPY_FROM_TARGET_WIDGET); // always-shown mapped field is wrapped
+  });
+
+  test('a mapped field shown by its rule IS wrapped (toggle + pull)', () => {
+    const card = makeCard();
+    const enhancer = composed(card);
+    // Only the image element is on → image shown+wrapped, date still hidden.
+    const out = enhancer({ schema: baseSchema(), formData: { elements: ['image'] }, intl });
+    expect(out.properties.image).toBeDefined();
+    expect(out.properties.image.widget).toBe(COPY_FROM_TARGET_WIDGET);
+    expect(out.properties.image.baseWidget.widget).toBe('image'); // original widget preserved for re-resolution
+    expect(out.properties.date).toBeUndefined(); // its element is off
+    expect(out.properties.title.widget).toBe(COPY_FROM_TARGET_WIDGET);
+  });
+
+  test('toggling which element is on moves the wrapper to that field', () => {
+    const card = makeCard();
+    const enhancer = composed(card);
+    const withDate = enhancer({ schema: baseSchema(), formData: { elements: ['date'] }, intl });
+    expect(withDate.properties.date?.widget).toBe(COPY_FROM_TARGET_WIDGET);
+    expect(withDate.properties.image).toBeUndefined();
+  });
+});
