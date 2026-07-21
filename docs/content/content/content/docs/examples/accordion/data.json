@@ -2356,7 +2356,10 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "containers"
+  ],
   "title": "Accordion",
   "type_title": "Page",
   "version": "current",

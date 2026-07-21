@@ -602,7 +602,9 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "content"
+  ],
   "title": "Typography - Page Title (H1, 48/56px)",
   "type_title": "Page",
   "version": "current",

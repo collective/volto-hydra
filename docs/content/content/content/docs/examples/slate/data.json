@@ -421,7 +421,11 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "text",
+    "editing"
+  ],
   "title": "Text",
   "type_title": "Page",
   "version": "current",

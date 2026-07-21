@@ -80,7 +80,6 @@
     "ss-live-1": {
       "@type": "searchShortcuts",
       "index": "Subject",
-      "pageField": "subjects",
       "searchUrl": "/search",
       "variation": "default"
     },
@@ -186,10 +185,8 @@
   "review_state": "published",
   "rights": "",
   "subjects": [
-    "plone",
-    "hydra",
     "blocks",
-    "volto"
+    "listings"
   ],
   "title": "Search Shortcuts Block",
   "type_title": "Page",

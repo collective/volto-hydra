@@ -360,7 +360,10 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "text"
+  ],
   "title": "Separator",
   "type_title": "Page",
   "version": "current",

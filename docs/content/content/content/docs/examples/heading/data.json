@@ -287,7 +287,10 @@
   "preview_image": null,
   "review_state": "published",
   "rights": null,
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "text"
+  ],
   "title": "Heading",
   "type_title": "Page",
   "version": "current",
