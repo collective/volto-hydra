@@ -14,6 +14,7 @@ import {
   createSchemaEnhancerFromRecipe,
   getConversionMap,
 } from './schemaInheritance';
+import config from '@plone/volto/registry';
 
 /**
  * The store-on-add path: when a block is added into a slot region inside a
@@ -279,5 +280,51 @@ describe('getConversionMap', () => {
   test('null/empty config → empty map', () => {
     expect(getConversionMap(null)).toEqual({});
     expect(getConversionMap({})).toEqual({});
+  });
+});
+
+describe('inheritSchemaFrom — idempotent (no doubled "… Defaults" fieldset)', () => {
+  const intl = { formatMessage: (m) => (m && m.defaultMessage) || '' };
+
+  // A grid whose child cards carry a parent-claimed field (`colour`, NOT in the
+  // card's fieldMappings['@default']) → the enhancer surfaces it as the grid's
+  // "Card Defaults" fieldset. Applying the enhancer twice (pathmap build +
+  // sidebar render both run the schemaEnhancer chain) must NOT add it twice.
+  test('applying the enhancer twice keeps a single inherited fieldset', () => {
+    const prev = config.blocks?.blocksConfig;
+    config.blocks = config.blocks || {};
+    config.blocks.blocksConfig = {
+      grid: { title: 'Grid' },
+      card: {
+        title: 'Card',
+        fieldMappings: { '@default': { title: 'title' } },
+        blockSchema: {
+          fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'colour'] }],
+          properties: { title: { title: 'Title' }, colour: { title: 'Colour' } },
+        },
+      },
+    };
+
+    const enhancer = createSchemaEnhancerFromRecipe({
+      inheritSchemaFrom: { typeField: 'variation', defaultsField: 'itemDefaults' },
+    });
+    const baseSchema = {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['items', 'variation'] }],
+      properties: { items: { title: 'Items' }, variation: { title: 'Item Type' } },
+    };
+    const formData = { '@type': 'grid', variation: 'card' };
+
+    const once = enhancer({ schema: baseSchema, formData, intl });
+    const inheritedOnce = once.fieldsets.filter((fs) => fs.id === 'inherited_fields');
+    expect(inheritedOnce).toHaveLength(1);
+    expect(inheritedOnce[0].fields).toContain('itemDefaults_colour');
+
+    // Re-apply to the already-enhanced schema — the bug pushed a 2nd fieldset.
+    const twice = enhancer({ schema: once, formData, intl });
+    expect(
+      twice.fieldsets.filter((fs) => fs.id === 'inherited_fields'),
+    ).toHaveLength(1);
+
+    config.blocks.blocksConfig = prev;
   });
 });

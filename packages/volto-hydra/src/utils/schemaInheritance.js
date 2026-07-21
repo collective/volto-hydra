@@ -858,11 +858,23 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
       if (schema.properties[typeField] && !typeFieldInFieldset) {
         inheritedFieldsetFields.unshift(typeField);
       }
-      newSchema.fieldsets.push({
+      // Idempotent: this enhancer can run more than once on the same schema
+      // (pathmap build + sidebar render). Replace an existing inherited fieldset
+      // rather than pushing a duplicate — otherwise the parent's "… Defaults"
+      // fieldset (and every field in it) renders twice in the sidebar.
+      const inheritedFieldset = {
         id: 'inherited_fields',
         title: `${referencedTitle} Defaults`,
         fields: inheritedFieldsetFields,
-      });
+      };
+      const existingIdx = newSchema.fieldsets.findIndex(
+        (fs) => fs.id === 'inherited_fields',
+      );
+      if (existingIdx >= 0) {
+        newSchema.fieldsets[existingIdx] = inheritedFieldset;
+      } else {
+        newSchema.fieldsets.push(inheritedFieldset);
+      }
 
       // Add field definitions
       for (const { name, def } of inheritedFields) {
@@ -877,6 +889,10 @@ export function inheritSchemaFrom(typeField, mappingField, defaultsField, typeFi
       const referencedTitle =
         blocksConfig[referencedType]?.title || referencedType;
 
+      // Idempotent (see above): don't add a second inherited fieldset.
+      if (schema.fieldsets?.some((fs) => fs.id === 'inherited_fields')) {
+        return schema;
+      }
       return {
         ...schema,
         fieldsets: [
