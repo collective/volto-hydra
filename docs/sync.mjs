@@ -886,17 +886,15 @@ for (const mdFile of mdFiles) {
   const isFetchingPage = sections.fetcher != null;
   let renderRegionIds;
   if (isFetchingPage) {
-    // The render is identical to any list block, so instead of repeating the
-    // per-framework render code we link to the Listing example (which shows it in
-    // React / Vue / Svelte) and the explanation pages. Only the fetcher is specific.
+    // This is a fetch/expand block: you provide a fetcher for its @type and
+    // expandListingBlocks expands it in any region — the same seam that powers
+    // listings and other collection blocks. Only the fetcher is block-specific.
     const intro = slateParagraph([
-      'This block has no bespoke renderer — register the fetcher below, then render its items exactly like any list block. See the ',
-      { url: '/docs/examples/listing', text: 'Listing example' },
-      ' for the render component in React, Vue and Svelte, ',
-      { url: '/docs/listings', text: 'Listings' },
-      ' for how expansion works, and ',
+      'This block has no bespoke renderer. Add its fetcher to your fetchItems map (keyed by @type) and expandListingBlocks expands it in any region you render — the same seam that powers ',
+      { url: '/docs/listings', text: 'listings' },
+      ' and other collection blocks. See ',
       { url: '/docs/custom-blocks', text: 'Custom Blocks' },
-      ' for registering a block type. Only the fetcher below is block-specific.',
+      ' to define the block type. Only the fetcher below is block-specific.',
     ]);
     if (ensureSlateBlock(data, renderIntroId, instanceId, 'rendering',
       intro.plaintext, intro.value)) contentChanged = true;
