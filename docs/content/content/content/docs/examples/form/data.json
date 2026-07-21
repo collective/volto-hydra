@@ -129,11 +129,26 @@
       "alt": "The form example block being edited in Volto Hydra",
       "align": "center",
       "size": "l"
+    },
+    "ref-form-description": {
+      "@type": "slate",
+      "plaintext": "A multi-field form with configurable field types, validation, and email submission. Fields are stored as a typed object_list — each field has a field_type that maps to a sub-block schema.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A multi-field form with configurable field types, validation, and email submission. Fields are stored as a typed object_list — each field has a field_type that maps to a sub-block schema."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "00e8d49b-5b99-4d2f-83b3-7d69bc80b893",
+      "ref-form-description",
       "editor-screenshot",
       "3687103d-0766-4d5e-8aae-fc7e65c457a6",
       "eb25b89c-d64a-4566-8e6e-71fd0f371964",
@@ -175,7 +190,10 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "forms"
+  ],
   "title": "Form",
   "type_title": "Page",
   "version": "current",

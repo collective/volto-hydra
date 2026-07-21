@@ -161,7 +161,9 @@
   "review_state": "published",
   "rights": "",
   "start": "2023-01-01T11:00:00+00:00",
-  "subjects": [],
+  "subjects": [
+    "events"
+  ],
   "sync_uid": null,
   "title": "Event",
   "type_title": "Event",

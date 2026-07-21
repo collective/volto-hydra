@@ -17,6 +17,8 @@
 import { test as base, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { verifyBlockRendering } from '../helpers/BlockVerificationHelper';
+import { slateFieldsNeverEditable } from '../helpers/field-coverage';
+import { axeCheckBlock, formatViolations } from '../helpers/axe-sanity';
 import { getFrontendUrl } from './fixtures';
 import { URLS } from '../ports';
 import * as fs from 'fs';
@@ -51,6 +53,19 @@ let discoveredBlocks: DiscoveredBlock[] = [];
 if (fs.existsSync(discoveredPath)) {
   discoveredBlocks = JSON.parse(fs.readFileSync(discoveredPath, 'utf-8'));
 }
+
+// Synthetic conversion-test blocks (dnd-convert.spec.ts) are drag/paste fixtures
+// with no editable fields and are only rendered by the mock test frontend — they
+// aren't part of the cross-frontend render contract, so exclude them from sanity.
+//
+// The example listing-variant blocks (example-listings.spec.ts) expand via a
+// per-frontend fetcher registration and have no inline-editable fields; the RSS
+// one fetches an external feed that only resolves against the mock. They're
+// covered by their own integration spec (admin-mock), not this render contract.
+const NON_CONTRACT_BLOCKS = new Set(['relatedItemsListing', 'searchShortcuts', 'rssFeed']);
+discoveredBlocks = discoveredBlocks.filter(
+  (b) => !b.blockType.startsWith('conv') && !NON_CONTRACT_BLOCKS.has(b.blockType),
+);
 
 // Block sanity is the cross-cutting render contract. We only enforce it on
 // the three frontends that ship full block coverage and are the canonical
@@ -186,6 +201,42 @@ test.describe('Block sanity (auto-discovered)', () => {
         // Skip data-edit-text clicks for discovered content — we just want rendering + annotation checks
         checkEditTextClicks: false,
       });
+
+      // Optional per-block accessibility pass (axe-core). Off by default; opt in
+      // with SANITY_AXE=1. Runs axe scoped to just this block — blocking =
+      // serious/critical WCAG A/AA that's block-level; advisory (moderate/minor
+      // or page-context rules) is logged but doesn't fail.
+      if (process.env.SANITY_AXE) {
+        const { blocking, advisory } = await axeCheckBlock(iframe, block.blockId);
+        if (advisory.length > 0) {
+          console.log(
+            `[axe] ${label}: ${advisory.length} advisory finding(s)\n${formatViolations(advisory)}`,
+          );
+        }
+        expect(
+          blocking,
+          `${label} has ${blocking.length} serious/critical a11y violation(s):\n${formatViolations(blocking)}`,
+        ).toEqual([]);
+      }
     });
   }
+
+  // Aggregate check: every schema-declared slate field must have its
+  // [data-edit-text] edit container in AT LEAST ONE discovered example of its
+  // block type. The per-example render checks above record coverage instead of
+  // failing individually, because a field can be gated by an optional synced
+  // element (e.g. a card's `description` behind the grid's `copy` element) and
+  // legitimately not render in every example. This runs last (defined after the
+  // per-block loop; block-sanity is serial) so coverage is fully accumulated.
+  test('every slate field is editable in at least one example', () => {
+    const never = slateFieldsNeverEditable();
+    expect(
+      never,
+      `Slate fields with NO [data-edit-text] container in ANY discovered example ` +
+        `(each is uneditable everywhere it appears):\n` +
+        never
+          .map((n) => `  - ${n.blockType}.${n.field}\n      e.g. ${n.example}`)
+          .join('\n'),
+    ).toEqual([]);
+  });
 });

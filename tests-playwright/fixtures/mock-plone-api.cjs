@@ -1909,6 +1909,35 @@ app.get('/@types/:typeName', (req, res) => {
 });
 
 /**
+ * GET /@vocabularies/:vocab — minimal vocabulary endpoint. The example Search
+ * Shortcuts block reads Keywords (Subject) unique values in site-wide mode.
+ */
+const VOCAB_ITEMS = {
+  'plone.app.vocabularies.Keywords': ['news', 'plone', 'events'],
+};
+app.get('/@vocabularies/:vocab', (req, res) => {
+  const values = VOCAB_ITEMS[req.params.vocab] || [];
+  res.json({
+    '@id': `http://localhost:${PORT}/@vocabularies/${req.params.vocab}`,
+    items: values.map((v) => ({ token: v, title: v })),
+    items_total: values.length,
+  });
+});
+
+/**
+ * GET /rss-stub — canned RSS feed for the RSS Feed example block (the block's
+ * feedUrl points here; same-origin so the client-side fetch succeeds).
+ */
+app.get('/rss-stub', (req, res) => {
+  res.type('application/xml').send(
+    `<?xml version="1.0"?><rss version="2.0"><channel><title>Stub Feed</title>` +
+      `<item><title>Feed One</title><link>http://feed.test/1</link><description>First entry</description><pubDate>Mon, 05 Jan 2026 00:00:00 GMT</pubDate></item>` +
+      `<item><title>Feed Two</title><link>http://feed.test/2</link><description>Second entry</description></item>` +
+      `</channel></rss>`,
+  );
+});
+
+/**
  * GET /@types  (and GET /<folder>/@types)
  * List addable content types for the current container. Volto's toolbar
  * Add button reads this to populate the type-picker menu — without it the

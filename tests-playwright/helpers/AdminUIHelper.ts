@@ -4157,6 +4157,24 @@ export class AdminUIHelper {
   }
 
   /**
+   * Drag a block after another block and RELEASE, without asserting a reorder.
+   * Use for drops that intentionally don't move immediately — e.g. a convert-drop
+   * with multiple options, which opens the chooser first (ask-first) and only
+   * moves once the user picks a type. Returns after the mouse is released.
+   * @param sourceBlockId - The block ID to drag
+   * @param targetBlockId - The block ID to drop after
+   */
+  async dragBlockAfterNoReorderAssert(sourceBlockId: string, targetBlockId: string): Promise<void> {
+    const iframe = this.getIframe();
+    await this.clickBlockInIframe(sourceBlockId);
+    await this.waitForBlockSelectedInAdmin(sourceBlockId);
+    const targetBlock = iframe.locator(`[data-block-uid="${targetBlockId}"]`).first();
+    // Position after the target with the mouse still down, then release.
+    await this.dragBlockWithMouseNoDrop(targetBlock, targetBlock, true);
+    await this.page.mouse.up();
+  }
+
+  /**
    * Drag a block before another block by their IDs.
    * First selects the source block, then drags it before the target block.
    * @param sourceBlockId - The block ID to drag

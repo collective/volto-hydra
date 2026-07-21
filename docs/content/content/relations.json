@@ -63,5 +63,15 @@
     "from_attribute": "isReferencing",
     "from_uuid": "1efc7b73b28e4edeaf40040709299d69",
     "to_uuid": "7ab9c48ede33415fa2a66a99549c8f70"
+  },
+  {
+    "from_attribute": "relatedItems",
+    "from_uuid": "docs-examples-relatedItemsListing-001",
+    "to_uuid": "6bd32a3367ea4254b295db642655b9d3"
+  },
+  {
+    "from_attribute": "relatedItems",
+    "from_uuid": "docs-examples-relatedItemsListing-001",
+    "to_uuid": "e090d954d0a448bca81c1a646e673a12"
   }
 ]

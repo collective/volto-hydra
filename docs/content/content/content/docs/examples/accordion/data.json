@@ -2295,11 +2295,26 @@
       "alt": "The accordion example block being edited in Volto Hydra",
       "align": "center",
       "size": "l"
+    },
+    "ref-accordion-description": {
+      "@type": "slate",
+      "plaintext": "A collapsible panel group. Each panel is an object_list item with a title and a content area that holds child blocks.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A collapsible panel group. Each panel is an object_list item with a title and a content area that holds child blocks."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "fec13476-1231-42fc-84d5-b110e8e3c6e7",
+      "ref-accordion-description",
       "editor-screenshot",
       "41a82a93-c00c-4a40-bac8-53a3e3420c8e",
       "8f68209e-220e-4230-9d42-8b0602573bd9",
@@ -2341,7 +2356,10 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "containers"
+  ],
   "title": "Accordion",
   "type_title": "Page",
   "version": "current",

@@ -11,7 +11,6 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-columns",
-      "placeholder": "schema",
       "tabs": [
         {
           "@id": "ref-columns-schema-javascript-45206c",
@@ -19,13 +18,13 @@
           "language": "javascript",
           "code": "{\n  \"columns\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"columns\": {\n          \"title\": \"Columns\",\n          \"widget\": \"blocks_layout\",\n          \"allowedBlocks\": [\n            \"column\"\n          ],\n          \"maxLength\": 4\n        }\n      }\n    }\n  },\n  \"column\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"title\": {\n          \"title\": \"Title\"\n        },\n        \"items\": {\n          \"title\": \"Content\",\n          \"widget\": \"blocks_layout\",\n          \"allowedBlocks\": [\n            \"slate\",\n            \"image\"\n          ],\n          \"defaultBlockType\": \"slate\"\n        }\n      }\n    }\n  }\n}"
         }
-      ]
+      ],
+      "slotId": "schema"
     },
     "ref-columns-json-data": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-columns",
-      "placeholder": "json-data",
       "tabs": [
         {
           "@id": "ref-columns-json-data-json-9ddfde",
@@ -33,13 +32,13 @@
           "language": "json",
           "code": "{\n  \"@type\": \"columns\",\n  \"title\": \"Our Services\",\n  \"blocks\": {\n    \"col-1\": {\n      \"@type\": \"column\",\n      \"title\": \"Design\",\n      \"blocks\": {\n        \"text-1\": {\n          \"@type\": \"slate\",\n          \"value\": [\n            {\n              \"type\": \"p\",\n              \"children\": [\n                {\n                  \"text\": \"We craft beautiful interfaces.\"\n                }\n              ]\n            }\n          ]\n        }\n      },\n      \"blocks_layout\": {\n        \"items\": [\n          \"text-1\"\n        ]\n      }\n    },\n    \"col-2\": {\n      \"@type\": \"column\",\n      \"title\": \"Engineering\",\n      \"blocks\": {\n        \"text-2\": {\n          \"@type\": \"slate\",\n          \"value\": [\n            {\n              \"type\": \"p\",\n              \"children\": [\n                {\n                  \"text\": \"We build robust systems.\"\n                }\n              ]\n            }\n          ]\n        }\n      },\n      \"blocks_layout\": {\n        \"items\": [\n          \"text-2\"\n        ]\n      }\n    }\n  },\n  \"blocks_layout\": {\n    \"columns\": [\n      \"col-1\",\n      \"col-2\"\n    ]\n  }\n}"
         }
-      ]
+      ],
+      "slotId": "json-data"
     },
     "ref-columns-rendering": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-columns",
-      "placeholder": "rendering",
       "tabs": [
         {
           "@id": "ref-columns-rendering-jsx-a52cb0",
@@ -59,12 +58,28 @@
           "language": "svelte",
           "code": "<script>\n  import ColumnBlock from './ColumnBlock.svelte';\n  export let block;\n</script>\n\n<div data-block-uid={block['@uid']} class=\"columns-block\">\n  <div style=\"display: flex; gap: 1rem\">\n    {#each block.blocks_layout?.columns || [] as id (id)}\n      <ColumnBlock block={{ ...block.blocks?.[id], '@uid': id }} />\n    {/each}\n  </div>\n</div>"
         }
+      ],
+      "slotId": "rendering"
+    },
+    "ref-columns-description": {
+      "@type": "slate",
+      "plaintext": "A horizontal multi-column container. The block has one slot — columns — restricted to column children, capped at four. Each column is itself a container holding any of its allowed inner block types (slate, image, …).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A horizontal multi-column container. The block has one slot — columns — restricted to column children, capped at four. Each column is itself a container holding any of its allowed inner block types (slate, image, …)."
+            }
+          ]
+        }
       ]
     }
   },
   "blocks_layout": {
     "items": [
       "title-1",
+      "ref-columns-description",
       "ref-columns-schema",
       "ref-columns-json-data",
       "ref-columns-rendering"
@@ -98,7 +113,10 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "containers"
+  ],
   "title": "Grid Block",
   "type_title": "Page",
   "version": "current",

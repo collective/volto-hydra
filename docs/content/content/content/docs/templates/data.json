@@ -36,7 +36,9 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "templates"
+  ],
   "title": "Templates & Layouts",
   "type_title": "Page",
   "version": "current",

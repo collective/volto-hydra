@@ -28,6 +28,7 @@ import {
   resolveFieldPath as resolveFieldPathHelper,
 } from '@volto-hydra/helpers';
 import { expelAllowedTypes, findOnlyEmptyChildUid } from './containerOps.js';
+import { acceptableAt } from './conversionMap.js';
 
 /**
  * This IS a large file and it needs to be written in one file so for better understanding and
@@ -244,6 +245,7 @@ export class Bridge {
     this.scrollTimeout = null; // Timer for scroll debouncing
     this.expectedSelectionFromAdmin = null; // Selection we're restoring from Admin - suppress sending it back
     this.blockPathMap = {}; // Maps blockUid -> { path: [...], parentId: string|null }
+    this.conversionMap = {}; // { sourceType: [reachableTypes] } — for convert-reachable drop spots
     this.voltoConfig = null; // Store voltoConfig for allowedBlocks checking
     // Track active prospective inline element (link/format with ZWS) for Chrome workaround.
     // Chrome always positions cursor outside <a> elements, unlike <span> for bold.
@@ -3776,6 +3778,8 @@ export class Bridge {
             if (e.data.type === 'INITIAL_DATA') {
               // Central method sets formData, lastReceivedFormData, and blockPathMap
               this.setFormDataFromAdmin(e.data.data, 'INITIAL_DATA', e.data.blockPathMap);
+              // Static conversion graph for convert-reachable drop spots (drag).
+              if (e.data.conversionMap) this.conversionMap = e.data.conversionMap;
 
               // Store Slate configuration for keyboard shortcuts and toolbar
               this.slateConfig = e.data.slateConfig || { hotkeys: {}, toolbarButtons: [] };
@@ -9069,9 +9073,13 @@ export class Bridge {
             const targetPathInfo = this.blockPathMap?.[validDropTargetUid];
             const allowedSiblingTypes = targetPathInfo?.allowedSiblingTypes;
 
-            // Check if drop is allowed here - all dragged block types must be allowed
-            const allTypesAllowed = !allowedSiblingTypes || draggedBlockTypes.length === 0 ||
-              draggedBlockTypes.every(type => allowedSiblingTypes.includes(type));
+            // Check if drop is allowed here — each dragged type must be allowed
+            // natively OR reachable via conversion (single-block: 1=auto, >1=popup;
+            // multi-block: auto-only). See acceptableAt / conversionMap.
+            const isMulti = draggedBlockTypes.length > 1;
+            const allTypesAllowed = draggedBlockTypes.length === 0 ||
+              draggedBlockTypes.every(type =>
+                acceptableAt(type, allowedSiblingTypes, isMulti, this.conversionMap));
             if (allTypesAllowed) {
               // Drop is allowed at this level
               break;
@@ -11793,6 +11801,16 @@ export class Bridge {
     // Non-format flushes (save, template exit) just sync text.
     if (setBlocking && this.selectedBlockUid) {
       this.setBlockProcessing(this.selectedBlockUid, true, requestId);
+    }
+
+    // Re-capture the CURRENT editor value before flushing. `pendingTextUpdate` can
+    // lag the live contenteditable: a debounced flush may already have shipped an
+    // intermediate value while the latest keystrokes' bufferUpdate hasn't run yet.
+    // A flush is supposed to give current state (its own contract), so snapshot the
+    // live DOM here — bufferUpdate reads it via getFormDataWithoutNodeIds() and its
+    // echo-guard makes this a no-op when nothing actually changed.
+    if (this.selectedBlockUid) {
+      this.bufferUpdate('flush');
     }
 
     // Flush with requestId - if there's pending text, it will be included in INLINE_EDIT_DATA
