@@ -218,14 +218,15 @@ Field paths: `../field` for the parent block's field, `/field` for a page metada
 
 ## Block Conversion & fieldMappings
 
-`fieldMappings` (plural) on a block config defines how fields map between block types. This enables four things:
+`fieldMappings` (plural) on a block config defines how fields map between block types (and from linked content). This enables:
 
 - **"Convert to..." UI action** — editors can convert a block to another type (e.g. teaser → image).
 - **Listing item types** — query results are mapped to item blocks via `@default` (see [Listings](listings.md)).
 - **Synchronised container children** — a parent controls child type, all children convert together (see [Container Blocks › Synchronised Block Types](container-blocks.md#synchronised-block-types-in-a-container)).
 - **Drag / paste via conversion** — a block can be dropped or pasted into a container that only accepts a *convertible* type; it's converted on drop (see below).
+- **Copy from a linked target** — a block pulls fields from the content item its link field points at, with a per-field linked/custom toggle (see [`@target`](#target--copy-from-a-linked-content-item)).
 
-Each key in `fieldMappings` is either a **specific block type name** or **`@default`**.
+Each key in `fieldMappings` is either a **specific block type name**, **`@default`**, or **`@target`**.
 
 ### `@default` — the canonical content shape
 
@@ -256,6 +257,62 @@ image: {
 selectFacet:  { fieldMappings: { checkboxFacet: { title: 'title', field: 'field', hidden: 'hidden' } } },
 checkboxFacet: { fieldMappings: { selectFacet: { /* ... */ }, daterangeFacet: { /* ... */ } } },
 ```
+
+### `@target` — copy from a linked content item
+
+`@target` maps a **linked** content item's attributes onto this block's own
+fields — the generic version of the Volto teaser's "copy from target" button.
+It maps *source content attributes* (`Title`, `Description`, `image_scales`, …)
+to *this block's fields*. The item is whichever the block's **link field** points
+at (the `object_browser mode: 'link'` field — its `selectedItemAttrs` snapshot is
+the source), so you don't name a URL field separately: "the url is the link in
+the mapping".
+
+<!-- codeExample: javascript -->
+```javascript
+button: {
+    // The Label (title) syncs from the linked item's Title.
+    fieldMappings: {
+        '@target': {
+            Title: 'title',
+            Description: 'description',
+            // image fields declare the type so the value is assembled into the
+            // object_browser (mode=image) array form:
+            image_scales: { field: 'preview_image', type: 'image' },
+        },
+    },
+},
+```
+
+Declaring `@target` is the **only** opt-in — no per-block enhancer wiring. Each
+mapped field then shows a small **🔗 pull from linked** toggle in the sidebar
+(only when a target is selected). Every mapped field is one of two states:
+
+- **Linked** (default, toggle ticked) — the field *pulls from the linked item*.
+  Its value is pulled from the target when you select the block and re-pulled
+  when the link changes, so it always mirrors the linked content.
+- **Custom** (toggle unticked) — your own value, ignored by the target. A field
+  becomes custom the moment you edit it, or when you untick the toggle;
+  re-ticking re-pulls the target value. Custom fields are recorded in the block's
+  `_customFields` array (absence ⇒ linked), so the state persists with the block.
+
+String fields copy straight across; an `image`-typed mapping assembles the
+target's `@id` / `image_field` / `image_scales` into the shape an image field
+expects; multi-value fields (e.g. `Subjects` → tags) pass through as-is.
+
+A linked field pulls from the target **as it is now**, not the stale snapshot
+stored on the link field: the first time you edit a `@target` block in a session
+the target is re-fetched via the catalog **search** (`metadata_fields: '_all'`,
+cached with a short TTL) so if the target changed upstream the linked field
+picks up the new value. Search is used deliberately — the stored snapshot
+(`selectedItemAttrs`) is itself a catalog brain, so the search result is already
+in the same shape (no transform, guaranteed field alignment). The fetch is
+transient — it never mutates the block, so opening a page has no side effects.
+
+Only an **internal** link is a pull source. An external URL has no catalog item
+to search, so a field linked to one can't pull — the toggle is hidden and the
+field behaves as a plain editable field. (Unfurling external links via
+OpenGraph is a future enhancement.)
 
 ### Conversion graph rules
 

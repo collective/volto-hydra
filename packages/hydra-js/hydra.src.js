@@ -11819,6 +11819,16 @@ export class Bridge {
       this.setBlockProcessing(this.selectedBlockUid, true, requestId);
     }
 
+    // Re-capture the CURRENT editor value before flushing. `pendingTextUpdate` can
+    // lag the live contenteditable: a debounced flush may already have shipped an
+    // intermediate value while the latest keystrokes' bufferUpdate hasn't run yet.
+    // A flush is supposed to give current state (its own contract), so snapshot the
+    // live DOM here — bufferUpdate reads it via getFormDataWithoutNodeIds() and its
+    // echo-guard makes this a no-op when nothing actually changed.
+    if (this.selectedBlockUid) {
+      this.bufferUpdate('flush');
+    }
+
     // Flush with requestId - if there's pending text, it will be included in INLINE_EDIT_DATA
     const hadPendingText = this.flushPendingTextUpdates(requestId);
 

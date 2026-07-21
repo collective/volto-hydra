@@ -36,7 +36,10 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "frontend",
+    "editing"
+  ],
   "title": "How Hydra Works",
   "type_title": "Page",
   "version": "current",

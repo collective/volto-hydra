@@ -49,6 +49,7 @@ import HiddenBlocksWidget from './components/Widgets/HiddenBlocksWidget';
 import HiddenObjectListWidget from './components/Widgets/HiddenObjectListWidget';
 import FieldMappingWidget from './components/Widgets/FieldMappingWidget';
 import BlockTypeSelectWidget from './components/Widgets/BlockTypeSelectWidget';
+import CopyFromTargetField from './components/Widgets/CopyFromTargetField';
 import SchemaFieldSelectWidget from './components/Widgets/SchemaFieldSelectWidget';
 import TableSchema, { TableBlockSchema } from '@plone/volto-slate/blocks/Table/schema';
 // Volto-slate ships TWO schemas for the slate block:
@@ -172,6 +173,11 @@ const applyConfig = (config) => {
   // See README "Synchronised block types in a container".
   config.widgets.widget.blockTypeSelect = BlockTypeSelectWidget;
   config.widgets.widget.schemaFieldSelect = SchemaFieldSelectWidget;
+
+  // Copy-from-target: mapped fields (via fieldMappings['@target']) are swapped
+  // to this wrapper by installCopyFromTargetEnhancers, which renders the field's
+  // real widget plus a per-field "reset to linked content" sync affordance.
+  config.widgets.widget.copyFromTargetField = CopyFromTargetField;
 
   // Add the slate block in the sidebar with proper initialization.
   // blockSchema is used by applyBlockDefaults to set initial values for new blocks.

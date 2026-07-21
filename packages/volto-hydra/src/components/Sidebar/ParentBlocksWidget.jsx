@@ -431,7 +431,7 @@ const ParentBlockSection = ({
           Parent blocks: render to their own target div
           Current block: render to sidebar-properties */}
       {BlockEdit && (
-        <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
+        <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef, onChangeBlock }}>
           <SidebarPortalTargetContext.Provider value={targetId}>
             {/* Hidden container - Edit component's center content is hidden, only sidebar renders */}
             {/* Key includes parentSchemaKey to force remount when parent's schema inheritance changes */}
@@ -473,7 +473,7 @@ const ParentBlockSection = ({
       {/* Fallback: If no Edit component but has schema, render BlockDataForm directly */}
       {!BlockEdit && schema && !isReadonly && !pathInfo?.isTemplateInstance && (() => {
         const formContent = (
-          <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
+          <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef, onChangeBlock }}>
             <BlockDataForm
               schema={schema}
               onChangeField={(fieldId, value) => {
@@ -539,7 +539,7 @@ const ParentBlockSection = ({
           idEditable: !!tplDoc?._isNew,
         });
         const formContent = isEditingThisTemplate ? (
-          <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
+          <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef, onChangeBlock }}>
             <BlockDataForm
               schema={templateSchema}
               onChangeField={(fieldId, value) => {
@@ -592,7 +592,7 @@ const ParentBlockSection = ({
         };
         const templateBlockSchema = getTemplateBlockSettingsSchema({ insideSlot });
         const formContent = (
-          <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef }}>
+          <HydraSchemaProvider value={{ blockPathMap, currentBlockId: blockId, formData, blocksConfig: config.blocks?.blocksConfig, liveBlockDataRef, onChangeBlock }}>
             <BlockDataForm
               schema={templateBlockSchema}
               onChangeField={(fieldId, value) => {

@@ -243,7 +243,11 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "listings",
+    "navigation"
+  ],
   "title": "Search",
   "type_title": "Page",
   "version": "current",

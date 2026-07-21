@@ -148,7 +148,10 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "containers"
+  ],
   "title": "Grid",
   "type_title": "Page",
   "version": "current",

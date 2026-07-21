@@ -334,7 +334,10 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "media"
+  ],
   "title": "Video",
   "type_title": "Page",
   "version": "current",

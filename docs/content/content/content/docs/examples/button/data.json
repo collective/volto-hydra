@@ -545,7 +545,9 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks"
+  ],
   "title": "Button",
   "type_title": "Page",
   "version": "current",
