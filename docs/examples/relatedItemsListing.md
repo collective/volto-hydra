@@ -1,8 +1,8 @@
 # Related Items Block
 
-Renders the current page's *related items* relation field (default `relatedItems`) as a list, reusing the listing machinery — each related item is rendered with a configurable item type (variation).
+Renders the current page's *related items* relation field (default `relatedItems`). Its items are fetched at render time and shown with a configurable item type (variation).
 
-This is a **custom** example block — register its fetcher via `initBridge` (see below).
+It's a custom block type whose items come from a fetcher; `expandListingBlocks` expands it in any region (see Rendering).
 
 ## Schema
 
@@ -78,19 +78,20 @@ The optional field picker (`schemaFieldSelect`, `fieldType: 'relation'`) lists t
 
 ## Rendering
 
-Register the fetcher (keyed by the block's `@type`), then render **exactly like any list block**: `expandListingBlocks` returns ready-to-render item blocks — map each through your normal block renderer. Only the fetcher above is block-specific.
+There's no bespoke renderer. Add this block's fetcher to your `fetchItems` map (keyed by `@type`) alongside any other fetch-based blocks, then expand each region with `expandListingBlocks` — it turns every block whose `@type` is in the map into ready-to-render item blocks. Only the fetcher above is block-specific.
 
 ```javascript
-// 1. Register the fetcher when you init the bridge (keyed by block @type)
-initBridge(origin, { blocks, fetchItems: { relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }) } });
+// One fetchItems map, keyed by @type, holds every fetch-based block you use.
+const fetchItems = {
+  listing: ploneFetchItems({ apiUrl, contextPath }),
+  relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }), // ← this block
+};
 
-// 2. Render — identical to any list block
-const { items } = await expandListingBlocks([blockId], {
-  blocks: { [blockId]: block },
-  fetchItems: { relatedItemsListing: relatedItemsFetcher({ apiUrl, contextPath }) },
-  itemTypeField: 'variation',
+// Call this on each region you render (the list of block ids in that region).
+const { items } = await expandListingBlocks(regionBlockIds, {
+  blocks, fetchItems, itemTypeField: 'variation',
 });
 items.forEach((item) => renderBlock(item)); // your normal per-block renderer
 ```
 
-See the [Listing block](./listing.md#rendering) for the full per-stack (React / Vue / Svelte / Astro) render components.
+See the [Listing block](./listing.md#rendering) for full per-stack (React / Vue / Svelte / Astro) render components, and [Listings](../listings.md) for the expand pattern.

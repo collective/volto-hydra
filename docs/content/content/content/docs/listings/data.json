@@ -36,7 +36,10 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "listings",
+    "frontend"
+  ],
   "title": "Listings & Dynamic Blocks",
   "type_title": "Page",
   "version": "current",

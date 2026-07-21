@@ -190,7 +190,10 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "forms"
+  ],
   "title": "Form",
   "type_title": "Page",
   "version": "current",

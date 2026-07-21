@@ -207,7 +207,10 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "text"
+  ],
   "title": "Introduction",
   "type_title": "Page",
   "version": "current",

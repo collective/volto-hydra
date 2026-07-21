@@ -942,7 +942,9 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "news"
+  ],
   "title": "News Item",
   "type_title": "News Item",
   "version": "current",
