@@ -195,13 +195,13 @@
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
       "slotId": "rendering-heading",
-      "plaintext": "Component",
+      "plaintext": "Rendering",
       "value": [
         {
           "type": "h3",
           "children": [
             {
-              "text": "Component"
+              "text": "Rendering"
             }
           ]
         }
@@ -214,24 +214,13 @@
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-block-ref-def",
       "slotId": "rendering-desc",
-      "plaintext": "Render component for your frontend framework. Add this to your block renderer's switch/map so it handles this block type.",
+      "plaintext": "How this block renders in your frontend. Add its handling to your renderer, or \u2014 for list-style blocks \u2014 register a fetcher and reuse your list rendering.",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "Render component for your frontend framework. Add this to your block renderer's switch/map so it handles this "
-            },
-            {
-              "type": "code",
-              "children": [
-                {
-                  "text": "@type"
-                }
-              ]
-            },
-            {
-              "text": "."
+              "text": "How this block renders in your frontend. Add its handling to your renderer, or \u2014 for list-style blocks \u2014 register a fetcher and reuse your list rendering."
             }
           ]
         }

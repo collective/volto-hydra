@@ -455,11 +455,26 @@
       "alt": "The button example block being edited in Volto Hydra",
       "align": "center",
       "size": "l"
+    },
+    "ref-button-description": {
+      "@type": "slate",
+      "plaintext": "A call-to-action button with an editable label and link.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A call-to-action button with an editable label and link."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "f3ee132b-6215-4e42-b26b-713f668eea61",
+      "ref-button-description",
       "editor-screenshot",
       "eab7123b-6a41-4537-8979-09e4fbbf317b",
       "b03e7ce7-b7b5-4413-bd2e-d42bff4bba9a",
@@ -530,7 +545,9 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks"
+  ],
   "title": "Button",
   "type_title": "Page",
   "version": "current",

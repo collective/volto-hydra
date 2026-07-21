@@ -258,11 +258,26 @@
       "alt": "The video example block being edited in Volto Hydra",
       "align": "center",
       "size": "l"
+    },
+    "ref-video-description": {
+      "@type": "slate",
+      "plaintext": "Embeds a video from a URL. Detects YouTube links and renders an iframe embed; otherwise falls back to an HTML5 <video> element.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Embeds a video from a URL. Detects YouTube links and renders an iframe embed; otherwise falls back to an HTML5 <video> element."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "604e5248-8521-403d-9e5f-3f50d1229454",
+      "ref-video-description",
       "editor-screenshot",
       "7ace8ba6-13cb-4a5c-ab1c-fc6f8ce8737c",
       "c97a926c-b2d2-4a73-9691-fc6e1aca6c52",
@@ -319,7 +334,10 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "media"
+  ],
   "title": "Video",
   "type_title": "Page",
   "version": "current",

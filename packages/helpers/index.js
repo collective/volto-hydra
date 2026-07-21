@@ -878,6 +878,126 @@ export function ploneFetchItems({
 }
 
 /**
+ * Fetcher for the Related Items example block: renders the CURRENT page's
+ * relation field (default `relatedItems`). Reads the context content and pages
+ * its relation summaries — no catalog query. A `fetchItems` value for
+ * `expandListingBlocks`, same contract as `ploneFetchItems`.
+ */
+export function relatedItemsFetcher({ apiUrl, contextPath = '/' } = {}) {
+  if (!apiUrl) throw new Error('relatedItemsFetcher requires apiUrl');
+  return async function fetchItems(block, { start, size }) {
+    const field = block.relationField || 'relatedItems';
+    const headers = _getAuthHeaders();
+    const res = await fetch(`${apiUrl}${contextPath}/++api++`, { headers });
+    const content = await res.json();
+    const all = Array.isArray(content?.[field]) ? content[field] : [];
+    const items = size ? all.slice(start, start + size) : [];
+    return { items, total: all.length };
+  };
+}
+
+// Catalog index → vocabulary of its unique values (site-wide mode). Extend as
+// needed; falls back to a same-named vocabulary.
+const SEARCH_SHORTCUT_INDEX_VOCAB = {
+  Subject: 'plone.app.vocabularies.Keywords',
+};
+
+/**
+ * Fetcher for the Search Shortcuts example block. Produces one result per value,
+ * each a shortcut LINK into a search: `@id` is set to
+ * `${searchUrl}?facet.${index}=${value}` so expandListingBlocks' default
+ * @id→href mapping renders it as a link item — no special renderer.
+ *
+ * A linked `pageField` ⇒ THIS page's values of that field; no `pageField` ⇒ all
+ * unique values of the index, site-wide (from the index's vocabulary).
+ */
+export function searchShortcutsFetcher({ apiUrl, contextPath = '/' } = {}) {
+  if (!apiUrl) throw new Error('searchShortcutsFetcher requires apiUrl');
+  return async function fetchItems(block, { start, size }) {
+    const index = block.index || 'Subject';
+    const searchUrl = block.searchUrl || '';
+    const headers = _getAuthHeaders();
+
+    let values;
+    if (block.pageField) {
+      const res = await fetch(`${apiUrl}${contextPath}/++api++`, { headers });
+      const content = await res.json();
+      const v = content?.[block.pageField];
+      values = Array.isArray(v) ? v : v == null ? [] : [v];
+    } else {
+      const vocab = SEARCH_SHORTCUT_INDEX_VOCAB[index] || index;
+      const res = await fetch(`${apiUrl}/++api++/@vocabularies/${vocab}`, { headers });
+      const data = await res.json();
+      values = (data?.items || []).map((t) => t.token);
+    }
+
+    const all = values.map((value) => ({
+      '@id': `${searchUrl}?facet.${index}=${encodeURIComponent(value)}`,
+      title: value,
+    }));
+    const items = size ? all.slice(start, start + size) : [];
+    return { items, total: all.length };
+  };
+}
+
+function _decodeXml(s) {
+  return s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+// Dependency-free RSS parse (no DOMParser → runs in the browser AND node/jest).
+// Good enough for the example; each <item> → a raw result whose @id is the link.
+function _parseRssEntries(xml) {
+  const out = [];
+  const itemRe = /<item\b[^>]*>([\s\S]*?)<\/item>/gi;
+  const tag = (block, name) => {
+    const mm = new RegExp(`<${name}\\b[^>]*>([\\s\\S]*?)<\\/${name}>`, 'i').exec(block);
+    if (!mm) return undefined;
+    return _decodeXml(
+      mm[1].replace(/^\s*<!\[CDATA\[/, '').replace(/\]\]>\s*$/, '').trim(),
+    );
+  };
+  let m;
+  while ((m = itemRe.exec(xml))) {
+    const b = m[1];
+    const entry = {
+      '@id': tag(b, 'link') || '',
+      title: tag(b, 'title') || '',
+      description: tag(b, 'description') || '',
+    };
+    const pub = tag(b, 'pubDate');
+    if (pub !== undefined) entry.pubDate = pub;
+    out.push(entry);
+  }
+  return out;
+}
+
+/**
+ * Fetcher for the RSS Feed example block: client-side `fetch` of `block.feedUrl`
+ * → parse entries. Best-effort — a CORS/parse failure degrades to an empty feed
+ * (never throws). Each entry's `@id` is its link, so expandListingBlocks renders
+ * it as a link item (no special renderer). `block.count` caps the feed length.
+ */
+export function rssFetcher() {
+  return async function fetchItems(block, { start, size }) {
+    let entries = [];
+    try {
+      const res = await fetch(block.feedUrl);
+      entries = _parseRssEntries(await res.text());
+    } catch {
+      return { items: [], total: 0 };
+    }
+    if (block.count != null) entries = entries.slice(0, block.count);
+    const items = size ? entries.slice(start, start + size) : [];
+    return { items, total: entries.length };
+  };
+}
+
+/**
  * Re-order a flat result set into parent-before-children order,
  * position-sorted within each parent. Each item must have `@id` (used to
  * derive its path + parent path); `getObjPositionInParent` orders

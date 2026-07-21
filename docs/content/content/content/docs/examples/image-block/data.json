@@ -266,11 +266,26 @@
       "alt": "The image-block example block being edited in Volto Hydra",
       "align": "center",
       "size": "l"
+    },
+    "ref-image-description": {
+      "@type": "slate",
+      "plaintext": "Displays an image with optional alt text and link. Supports the image picker widget for selecting images from the Plone content tree or uploading new ones.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Displays an image with optional alt text and link. Supports the image picker widget for selecting images from the Plone content tree or uploading new ones."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "4bfc973c-5fbf-45a3-819a-750a3eff4def",
+      "ref-image-description",
       "editor-screenshot",
       "ed863393-7692-4cc3-8b39-503591d4ea80",
       "bcc07f9d-7f53-450a-b3f4-20286fd66692",
@@ -333,7 +348,10 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "media"
+  ],
   "title": "Image",
   "type_title": "Page",
   "version": "current",

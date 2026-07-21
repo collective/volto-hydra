@@ -199,11 +199,26 @@
       "alt": "The teaser example block being edited in Volto Hydra",
       "align": "center",
       "size": "l"
+    },
+    "ref-teaser-description": {
+      "@type": "slate",
+      "plaintext": "A content preview card that links to another page. Selecting a target page via the object browser auto-fills the title, description, and preview image from that page. Editors can toggle \"overwrite\" to customize these values.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A content preview card that links to another page. Selecting a target page via the object browser auto-fills the title, description, and preview image from that page. Editors can toggle \"overwrite\" to customize these values."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "b986b92c-e180-42d3-b755-4728854e5a50",
+      "ref-teaser-description",
       "editor-screenshot",
       "61f0e286-0527-43a7-b8fe-29f1be40a8c3",
       "03fd3352-0845-4c70-9d01-805996bd127b",
@@ -256,7 +271,10 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "media"
+  ],
   "title": "Teaser",
   "type_title": "Page",
   "version": "current",

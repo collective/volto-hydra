@@ -11,7 +11,6 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-hero",
-      "placeholder": "schema",
       "tabs": [
         {
           "@id": "ref-hero-schema-javascript-698e6b",
@@ -19,13 +18,13 @@
           "language": "javascript",
           "code": "{\n  \"hero\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"heading\": {\n          \"title\": \"Heading\"\n        },\n        \"subheading\": {\n          \"title\": \"Subheading\",\n          \"widget\": \"textarea\"\n        },\n        \"buttonText\": {\n          \"title\": \"Button Text\"\n        },\n        \"buttonLink\": {\n          \"title\": \"Button Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\",\n          \"allowExternals\": true\n        },\n        \"image\": {\n          \"title\": \"Image\",\n          \"widget\": \"image\"\n        },\n        \"description\": {\n          \"title\": \"Description\",\n          \"widget\": \"slate\"\n        }\n      }\n    },\n    \"fieldMappings\": {\n      \"@default\": {\n        \"title\": \"heading\",\n        \"description\": \"subheading\",\n        \"@id\": \"buttonLink\",\n        \"image\": \"image\"\n      }\n    }\n  }\n}"
         }
-      ]
+      ],
+      "slotId": "schema"
     },
     "ref-hero-json-data": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-hero",
-      "placeholder": "json-data",
       "tabs": [
         {
           "@id": "ref-hero-json-data-json-fc17f8",
@@ -33,13 +32,13 @@
           "language": "json",
           "code": "{\n  \"@type\": \"hero\",\n  \"heading\": \"Welcome to Our Site\",\n  \"subheading\": \"Discover amazing content\\nacross multiple lines\",\n  \"buttonText\": \"Get Started\",\n  \"buttonLink\": [\n    {\n      \"@id\": \"/getting-started\"\n    }\n  ],\n  \"image\": \"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27800%27 height=%27400%27%3E%3Crect width=%27100%25%27 height=%27100%25%27 fill=%27%234a90d9%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 fill=%27white%27 text-anchor=%27middle%27 font-size=%2724%27%3EHero Image%3C/text%3E%3C/svg%3E\",\n  \"description\": [\n    {\n      \"type\": \"p\",\n      \"children\": [\n        {\n          \"text\": \"We build tools that make content editing delightful.\"\n        }\n      ]\n    }\n  ]\n}"
         }
-      ]
+      ],
+      "slotId": "json-data"
     },
     "ref-hero-rendering": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-hero",
-      "placeholder": "rendering",
       "tabs": [
         {
           "@id": "ref-hero-rendering-jsx-46a2e5",
@@ -59,12 +58,28 @@
           "language": "svelte",
           "code": "<script>\n  import SlateNode from './SlateNode.svelte';\n  import { getImageUrl } from './utils.js';\n  export let block;\n\n  $: subheadingHtml = (block.subheading || '').replace(/\\n/g, '<br>');\n  $: buttonLink = block.buttonLink?.[0]?.['@id'] || '';\n  $: heroImageSrc = getImageUrl(block.image);\n</script>\n\n<div data-block-uid={block['@uid']} class=\"hero-block\">\n  {#if block.image}\n    <img data-edit-media=\"image\" src={heroImageSrc} alt=\"Hero image\" />\n  {/if}\n  <h1 data-edit-text=\"heading\">{block.heading}</h1>\n  <p data-edit-text=\"subheading\">{@html subheadingHtml}</p>\n  <div class=\"hero-description\" data-edit-text=\"description\">\n    {#each block.description || [] as node, i (i)}\n      <SlateNode {node} />\n    {/each}\n  </div>\n  <a data-edit-text=\"buttonText\" data-edit-link=\"buttonLink\" href={buttonLink}>\n    {block.buttonText}\n  </a>\n</div>"
         }
+      ],
+      "slotId": "rendering"
+    },
+    "ref-hero-description": {
+      "@type": "slate",
+      "plaintext": "A full-width hero section with heading, subheading, image, rich text description, and a call-to-action button. Demonstrates multiple field types in a single block: string, textarea, slate, image, and object_browser.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A full-width hero section with heading, subheading, image, rich text description, and a call-to-action button. Demonstrates multiple field types in a single block: string, textarea, slate, image, and object_browser."
+            }
+          ]
+        }
       ]
     }
   },
   "blocks_layout": {
     "items": [
       "title-1",
+      "ref-hero-description",
       "ref-hero-schema",
       "ref-hero-json-data",
       "ref-hero-rendering"
@@ -98,7 +113,10 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "media"
+  ],
   "title": "Hero Block",
   "type_title": "Page",
   "version": "current",

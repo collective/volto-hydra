@@ -242,7 +242,7 @@ import './styles.css';
 import { useIntl } from 'react-intl';
 import config from '@plone/volto/registry';
 import { BlockChooser, Icon, Toast } from '@plone/volto/components';
-import { Menu } from 'semantic-ui-react';
+import { Menu, Dimmer, Loader } from 'semantic-ui-react';
 import { createPortal, flushSync } from 'react-dom';
 import { usePopper } from 'react-popper';
 import { useSelector, useDispatch } from 'react-redux';
@@ -270,6 +270,7 @@ import {
   populateTypeSchemaCache,
   syncChildBlockTypes,
   getConvertibleTypes,
+  getConversionMap,
   convertBlockType,
   validateFieldMappings,
 } from '../../utils/schemaInheritance';
@@ -828,6 +829,13 @@ const Iframe = (props) => {
   const inlineEditCounterRef = useRef(0); // Count INLINE_EDIT_DATA messages from iframe
   const processedInlineEditCounterRef = useRef(0); // Count how many we've seen come back through Redux
   const editSequenceRef = useRef(-1); // Sequence counter for detecting stale iframe echoes (starts at -1 so first increment gives 0)
+  // "Latest ref" for the unlocked-template set. saveTemplatesRef.current is a
+  // useEffect closure; it captured templateEditMode one render behind, so a Ctrl+S
+  // fired the instant the toggle flipped to locked (render) hit a stale, still-
+  // unlocked set and wrongly raised the "Lock your templates first" gate. Updated
+  // DURING render below (single source of truth — always equals the last rendered
+  // state), so any callback reading it agrees with what the toggle shows.
+  const templateEditModeRef = useRef([]);
   // Combined state for iframe data - formData, selection, requestId, and transformAction updated atomically
   // This ensures toolbar sees all together in the same render
   const intl = useIntl();
@@ -854,10 +862,18 @@ const Iframe = (props) => {
     templateEditMode: [], // v2: array of unlocked template instance ids (multiple at once)
   }));
 
+  // Keep the latest-ref current as of this render (see templateEditModeRef).
+  templateEditModeRef.current = iframeSyncState.templateEditMode || [];
+
   // v2 template edit: the decision modal shown on unlock/lock/save-gate, and a
   // per-instance snapshot of formData taken at unlock time (so "Reset changes"
   // can revert only that template's blocks, keeping page edits).
   const [templateModal, setTemplateModal] = useState(null); // { kind, instanceId } | null
+  // True while a template lock-commit is persisting (flush → reverse-merge → PATCH →
+  // unlock). That round-trip can be slow and, unlike a page save, has no Volto request
+  // spinner — so show a Dimmer+Loader over the editor and block interaction until it
+  // settles (nothing can race the in-flight commit).
+  const [committingTemplate, setCommittingTemplate] = useState(false);
   const templateSnapshotsRef = useRef({});
 
   // Notify toolbar whether paste is allowed for the current selection + clipboard.
@@ -951,21 +967,44 @@ const Iframe = (props) => {
 
       const containerConfig = getContainerFieldConfig(afterBlockId, bpm, properties, blocksConfig, intl);
       const allowedTypes = containerConfig?.allowedBlocks;
+      // Resolve each pasted block against the container's allowedBlocks: native,
+      // or convertible (auto when one target type; a single pasted block with
+      // several options opens the chooser — ask-first). Multi-paste is auto-only.
+      let pasteBlocks = cloneWithIds;
       if (allowedTypes?.length > 0) {
-        const allAllowed = cloneWithIds.every(([, blockData]) =>
-          allowedTypes.includes(blockData?.['@type']),
-        );
-        if (!allAllowed) {
-          log('hydra-paste-blocks: blocked — types not allowed in container');
+        const singlePaste = cloneWithIds.length === 1;
+        const resolved = [];
+        for (const [newId, blockData] of cloneWithIds) {
+          const bType = blockData?.['@type'];
+          if (allowedTypes.includes(bType)) {
+            resolved.push([newId, blockData]); // native fit
+            continue;
+          }
+          const options = getConvertibleTypes(bType, blocksConfig, allowedTypes).map((t) => t.type);
+          if (options.length === 1) {
+            resolved.push([newId, convertBlockType(blockData, options[0], blocksConfig, '@type', intl)]);
+            continue;
+          }
+          if (options.length > 1 && singlePaste) {
+            // Ask-first: pick a target type, then insert the converted block.
+            setChooser({
+              kind: 'convert',
+              allowedBlocks: options,
+              pendingPaste: { newId, blockData, afterBlockId },
+            });
+            return; // insertion happens on chooser pick (commitChooser)
+          }
+          log('hydra-paste-blocks: blocked — type not allowed/convertible in container');
           return;
         }
+        pasteBlocks = resolved;
       }
 
-      log('hydra-paste-blocks:', cloneWithIds.length, 'blocks after', afterBlockId);
+      log('hydra-paste-blocks:', pasteBlocks.length, 'blocks after', afterBlockId);
       let newFormData = { ...properties };
       let currentBpm = bpm;
       let lastId = afterBlockId;
-      for (const [newId, blockData] of cloneWithIds) {
+      for (const [newId, blockData] of pasteBlocks) {
         newFormData = insertBlockInContainer(newFormData, currentBpm, lastId, newId, blockData, containerConfig, 'after');
         currentBpm = buildBlockPathMap(newFormData, blocksConfig, intl);
         lastId = newId;
@@ -1154,6 +1193,7 @@ const Iframe = (props) => {
   );
 
 
+
   // Trigger for template sync effect - INIT increments this when templates need loading
   // This causes the effect to run and fetch templates, then send deferred INITIAL_DATA
   const [templateSyncTrigger, setTemplateSyncTrigger] = useState(0);
@@ -1178,7 +1218,10 @@ const Iframe = (props) => {
         }
         return null;
       };
-      const blockingUnlocked = (iframeSyncState.templateEditMode || []).filter(
+      // Read the latest-ref, not this effect closure's captured templateEditMode:
+      // the ref is refreshed during the same render that flips the toggle to locked,
+      // so a Ctrl+S fired the instant that lands sees the up-to-date set (no stale gate).
+      const blockingUnlocked = (templateEditModeRef.current || []).filter(
         (iid) => {
           const tid = findTemplateId(iid);
           const tpl = tid && templateCacheRef.current[tid];
@@ -1321,6 +1364,7 @@ const Iframe = (props) => {
       }));
       postTemplateEditMode(next);
       delete templateSnapshotsRef.current[prevInstanceId];
+      setCommittingTemplate(false); // commit round-trip done — drop the saving overlay
     };
 
     // Find the templateId for this instance.
@@ -2022,6 +2066,7 @@ const Iframe = (props) => {
                 type: 'INITIAL_DATA',
                 data: resendFormWithDefaults,
                 blockPathMap: stripBlockPathMapForPostMessage(resendBlockPathMap),
+                conversionMap: getConversionMap(config.blocks.blocksConfig),
                 selectedBlockUid: selectedBlock,
                 slateConfig: {
                   hotkeys: config.settings.slate?.hotkeys || {},
@@ -2793,23 +2838,53 @@ const Iframe = (props) => {
             ? getContainerFieldConfig(firstBlockId, currentBlockPathMap, currentFormData, blocksConfig, intl)
             : null;
 
-          // Check all block types are allowed in the target container
+          // Resolve each block against the target container's allowedBlocks:
+          // native fit, or convertible (auto when one target type; a single-block
+          // drag with several options opens the chooser — ask-first). A block that
+          // can't be placed rejects the whole move. Multi-block is auto-only.
           const targetContainerCfg = getContainerFieldConfig(targetBlockId, currentBlockPathMap, currentFormData, blocksConfig, intl);
           const targetAllowedTypes = targetContainerCfg?.allowedBlocks;
+          const dropConversions = {}; // bid -> type to convert to before moving
+          let rejectMove = false;
+          let deferredToChooser = false;
           if (targetAllowedTypes?.length > 0) {
-            const allAllowed = blocksToMove.every(bid => {
-              const blockData = getBlockById(currentFormData, currentBlockPathMap, bid);
-              return targetAllowedTypes.includes(blockData?.['@type']);
-            });
-            if (!allAllowed) {
-              log('MOVE_BLOCKS: blocked — block types not allowed in target container');
+            const singleDrag = blocksToMove.length === 1;
+            for (const bid of blocksToMove) {
+              const bType = getBlockById(currentFormData, currentBlockPathMap, bid)?.['@type'];
+              if (targetAllowedTypes.includes(bType)) continue; // native fit
+              const options = getConvertibleTypes(bType, blocksConfig, targetAllowedTypes).map((t) => t.type);
+              if (options.length === 1) {
+                dropConversions[bid] = options[0]; // auto-convert
+                continue;
+              }
+              if (options.length > 1 && singleDrag) {
+                // Ask-first: show the chooser; commitChooser converts + moves atomically.
+                setChooser({
+                  kind: 'convert',
+                  blockId: bid,
+                  allowedBlocks: options,
+                  pendingMove: { targetBlockId, insertAfter, targetParentId, replaceTargetId },
+                });
+                deferredToChooser = true;
+                break;
+              }
+              // 0 options, or a multi-option member of a multi-block batch → can't place.
+              log('MOVE_BLOCKS: blocked — type not allowed/convertible in target container');
+              rejectMove = true;
               break;
             }
           }
+          if (rejectMove || deferredToChooser) break;
 
           // Move all blocks in sequence, each one after the previous
           // Track insertAfter for each block (needed for template inheritance)
           let newFormData = currentFormData;
+          // Auto-convert (single-option) blocks BEFORE moving so each already
+          // fits the target container's allowedBlocks.
+          for (const [bid, toType] of Object.entries(dropConversions)) {
+            const cbpm = buildBlockPathMap(newFormData, config.blocks.blocksConfig, intl);
+            newFormData = convertBlockInPlace(newFormData, cbpm, bid, toType);
+          }
           let currentTarget = targetBlockId;
           let currentInsertAfter = insertAfter;
           const blockInsertAfterMap = {};
@@ -3702,6 +3777,7 @@ const Iframe = (props) => {
             type: 'INITIAL_DATA',
             data: formDataToSend,
             blockPathMap: stripBlockPathMapForPostMessage(blockPathMap),
+            conversionMap: getConversionMap(config.blocks.blocksConfig),
             selectedBlockUid: selectedBlock,
             slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
           }, origin);
@@ -3790,6 +3866,7 @@ const Iframe = (props) => {
           type: 'INITIAL_DATA',
           data: formDataToSend,
           blockPathMap: stripBlockPathMapForPostMessage(blockPathMap),
+          conversionMap: getConversionMap(config.blocks.blocksConfig),
           selectedBlockUid: selectedBlock,
           slateConfig: { hotkeys: config.settings.slate?.hotkeys || {}, toolbarButtons },
         }, origin);
@@ -4227,6 +4304,24 @@ const Iframe = (props) => {
     }
   }, [iframeAllowedBlocks, selectedBlock, insertAndSelectBlock]);
 
+  // Convert a block to newType IN PLACE (container-aware), returning new formData.
+  // Container blocks (any region with children) go through convertContainerBlock
+  // so their children carry over; a childless block converts its own fields.
+  // Shared by the chooser commit and the auto-convert-on-drop/paste paths.
+  const convertBlockInPlace = (props, bpm, blockId, newType) => {
+    const blockData = getBlockById(props, bpm, blockId);
+    if (!blockData) return props;
+    const hasChildren = getContainerRegionDescriptors(
+      blockData['@type'], blocksConfig, intl, blockData,
+    ).some((d) => getChildBlockEntries(blockData, d).length > 0);
+    if (hasChildren) {
+      return convertContainerBlock(props, bpm, blockId, newType, blocksConfig, intl);
+    }
+    const typeFieldName = bpm?.[blockId]?.typeField || '@type';
+    const newBlockData = convertBlockType(blockData, newType, blocksConfig, typeFieldName, intl);
+    return updateBlockById(props, bpm, blockId, newBlockData);
+  };
+
   // Commits a chooser action (wrap or convert) once the user picks a target type.
   const commitChooser = (newType) => {
     if (!chooser) return;
@@ -4239,25 +4334,49 @@ const Iframe = (props) => {
         onChangeFormData(newFormData);
         if (onSetMultiSelected) onSetMultiSelected([]);
         if (onSelectBlock) onSelectBlock(newContainerId);
+      } else if (chooser.kind === 'convert' && chooser.pendingPaste) {
+        // Ask-first paste: insert a NEW block, converted to the chosen type,
+        // after the paste target. One update → one undo.
+        const pp = chooser.pendingPaste;
+        const converted = convertBlockType(pp.blockData, newType, blocksConfig, '@type', intl);
+        const cfg = getContainerFieldConfig(pp.afterBlockId, bpm, properties, blocksConfig, intl);
+        const updatedProperties = insertBlockInContainer(
+          properties, bpm, pp.afterBlockId, pp.newId, converted, cfg, 'after',
+        );
+        onChangeFormData(updatedProperties);
+        setIframeSyncState(prev => ({
+          ...prev,
+          formData: updatedProperties,
+          blockPathMap: buildBlockPathMap(updatedProperties, blocksConfig, intl),
+          toolbarRequestDone: `paste-convert-${Date.now()}`,
+        }));
       } else if (chooser.kind === 'convert') {
         const blockData = getBlockById(properties, bpm, chooser.blockId);
         if (blockData) {
-          const blockType = blockData['@type'];
-          // Children across ALL regions (blocks_layout + object_list), not just the default.
-          const hasChildren = blockType
-            ? getContainerRegionDescriptors(blockData['@type'], blocksConfig, intl, blockData).some(
-                (d) => getChildBlockEntries(blockData, d).length > 0,
-              )
-            : false;
-          let updatedProperties;
-          if (hasChildren) {
-            updatedProperties = convertContainerBlock(
-              properties, bpm, chooser.blockId, newType, blocksConfig, intl,
-            );
-          } else {
-            const typeFieldName = bpm?.[chooser.blockId]?.typeField || '@type';
-            const newBlockData = convertBlockType(blockData, newType, blocksConfig, typeFieldName, intl);
-            updatedProperties = updateBlockById(properties, bpm, chooser.blockId, newBlockData);
+          let updatedProperties = convertBlockInPlace(properties, bpm, chooser.blockId, newType);
+          // Ask-first drop: the block hasn't moved yet. Move it (now that it's the
+          // chosen type) on the converted formData so convert + move is ONE update
+          // (single undo). Dismissing the chooser is a no-op — nothing was moved.
+          if (chooser.pendingMove) {
+            const bpm2 = buildBlockPathMap(updatedProperties, blocksConfig, intl);
+            const pm = chooser.pendingMove;
+            const srcParent = bpm2[chooser.blockId]?.parentId || null;
+            updatedProperties = moveBlockBetweenContainers(
+              updatedProperties, bpm2, chooser.blockId, pm.targetBlockId, pm.insertAfter,
+              srcParent, pm.targetParentId, blocksConfig, intl,
+            ) || updatedProperties;
+            // Dropped onto an empty-container placeholder → remove it so the
+            // converted block takes its place (mirrors the MOVE_BLOCKS replace path).
+            if (pm.replaceTargetId) {
+              const rbpm = buildBlockPathMap(updatedProperties, blocksConfig, intl);
+              const rdata = getBlockById(updatedProperties, rbpm, pm.replaceTargetId);
+              if (rdata?.['@type'] === 'empty') {
+                const rcfg = getContainerFieldConfig(pm.replaceTargetId, rbpm, updatedProperties, blocksConfig, intl);
+                if (rcfg) {
+                  updatedProperties = deleteBlockFromContainer(updatedProperties, rbpm, pm.replaceTargetId, rcfg);
+                }
+              }
+            }
           }
           onChangeFormData(updatedProperties);
           const newBlockPathMap = buildBlockPathMap(updatedProperties, blocksConfig, intl);
@@ -4340,6 +4459,7 @@ const Iframe = (props) => {
     }
     const requestId = `tpl-commit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     pendingTemplateEditExitRef.current = { requestId, prevInstanceId: instanceId };
+    setCommittingTemplate(true); // show the saving overlay until finish() clears it
     if (referenceElement?.contentWindow) {
       referenceElement.contentWindow.postMessage({ type: 'FLUSH_BUFFER', requestId }, '*');
     }
@@ -4429,6 +4549,17 @@ const Iframe = (props) => {
 
   return (
     <div id="iframeContainer">
+      {/* Saving overlay: the template lock-commit round-trip (flush → reverse-merge →
+          PATCH → unlock) has no Volto request spinner and can be slow, so dim the
+          editor and block interaction until it settles. Portaled to body so it covers
+          the whole editor and can't be raced. */}
+      {committingTemplate &&
+        createPortal(
+          <Dimmer active page>
+            <Loader indeterminate>Saving template…</Loader>
+          </Dimmer>,
+          document.body,
+        )}
       {/* v2 template-edit decision modals: unlock warning, lock choice, save gate.
           Portaled to document.body so it escapes #iframeContainer's stacking
           context — otherwise on mobile it renders BEHIND the settings sidebar

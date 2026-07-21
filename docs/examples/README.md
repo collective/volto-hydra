@@ -34,6 +34,9 @@ These blocks demonstrate common patterns. Register them via `initBridge({ blocks
 | [Form Block](./form.md) | A multi-field form with configurable field types, validation, and email submission. Fields are stored as a typed `object_list` — each field has a `field_type` that maps to a sub-block schema. |
 | [Hero Block](./hero.md) | A full-width hero section with heading, subheading, image, rich text description, and a call-to-action button. Demonstrates multiple field types in a single block: `string`, `textarea`, `slate`, `image`, and `object_browser`. |
 | [Highlight Block](./highlight.md) | A prominent content section with a background image, overlay, title, rich text body, and an optional call-to-action link. Used for feature callouts and banners. |
+| [Related Items Block](./relatedItemsListing.md) | Renders the current page's *related items* relation field (default `relatedItems`). Its items are fetched at render time and shown with a configurable item type (variation). |
+| [RSS Feed Block](./rssFeed.md) | Renders entries from an external RSS feed. Its items are fetched at render time (by a fetcher you provide) and shown with a configurable item type (variation). |
+| [Search Shortcuts Block](./searchShortcuts.md) | Renders a set of values as links into a faceted search — a "tag cloud" of shortcuts. Each value links to a search page with `?facet.<index>=<value>` pre-set, which a [Search block](./search.md) reads from the URL. |
 | [Slider Block](./slider.md) | A carousel/slider that cycles through slides. Slides are stored as an `object_list` — each slide has a title, description, image, and optional button. |
 ## Page Structure
 
@@ -90,7 +93,10 @@ image-block
 introduction
 listing
 maps
+relatedItemsListing
+rssFeed
 search
+searchShortcuts
 separator
 slate
 slider

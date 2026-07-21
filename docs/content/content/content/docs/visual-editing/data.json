@@ -36,7 +36,9 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "editing"
+  ],
   "title": "Visual Editing",
   "type_title": "Page",
   "version": "current",

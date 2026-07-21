@@ -81,11 +81,26 @@
           "code": "<script>\n  import BlockRenderer from './BlockRenderer.svelte';\n  export let block;\n  $: blocks = block.blocks || {};\n  $: items = block.blocks_layout?.items || [];\n</script>\n\n<div data-block-uid={block['@uid']} class=\"grid-block\">\n  <div style=\"display: grid; grid-template-columns: repeat({items.length}, 1fr); gap: 1rem\">\n    {#each items as id (id)}\n      <div class=\"grid-cell\">\n        <BlockRenderer block={{ ...blocks[id], '@uid': id }} />\n      </div>\n    {/each}\n  </div>\n</div>"
         }
       ]
+    },
+    "ref-grid-description": {
+      "@type": "slate",
+      "plaintext": "A responsive grid that lays out child blocks in equal-width cells. The block uses Volto's standard shared-blocks shape — blocks is the dict of children, blocks_layout.items is their order — and constrains the allowed types via allowedBlocks.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A responsive grid that lays out child blocks in equal-width cells. The block uses Volto's standard shared-blocks shape — blocks is the dict of children, blocks_layout.items is their order — and constrains the allowed types via allowedBlocks."
+            }
+          ]
+        }
+      ]
     }
   },
   "blocks_layout": {
     "items": [
       "d3f1c443-583f-4e8e-a682-3bf25752a300",
+      "ref-grid-description",
       "616b625c-b79f-4881-8536-b67a9e401a7d",
       "7624cf59-05d0-4055-8f55-5fd6597d84b0",
       "ref-grid-schema",
@@ -133,7 +148,10 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "containers"
+  ],
   "title": "Grid",
   "type_title": "Page",
   "version": "current",

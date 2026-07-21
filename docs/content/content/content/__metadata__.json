@@ -164,7 +164,10 @@
     "docs/examples/grid/grid-image/data.json",
     "docs/examples/grid/listing/data.json",
     "docs/examples/grid/teaser/data.json",
-    "docs/examples/grid/text/data.json"
+    "docs/examples/grid/text/data.json",
+    "docs/examples/relatedItemsListing/data.json",
+    "docs/examples/rssFeed/data.json",
+    "docs/examples/searchShortcuts/data.json"
   ],
   "default_page": {},
   "local_roles": {

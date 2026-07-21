@@ -453,8 +453,46 @@ function isOurTemplate(block) {
   return tid === TEMPLATE_ID || tid.endsWith('/block-reference-layout');
 }
 
-// Old placeholders to remove during migration
-const OLD_PLACEHOLDERS = new Set([
+// The slot ids the block-reference-layout template actually declares, loaded from
+// the template content so sync stays tied to the real contract. A page block whose
+// slotId isn't one of these can't be matched by expandTemplates and renders nothing
+// — which is exactly how the `placeholder`-instead-of-`slotId` bug shipped blank
+// example pages. Validating against this set makes that class of failure abort sync
+// (and therefore the deploy) instead of silently reaching production.
+const TEMPLATE_SLOT_IDS = (() => {
+  const tplPath = join(CONTENT_DIR, 'templates', 'block-reference-layout', 'data.json');
+  const tpl = JSON.parse(readFileSync(tplPath, 'utf-8'));
+  return new Set(
+    Object.values(tpl.blocks || {}).map((b) => b.slotId).filter(Boolean),
+  );
+})();
+
+/**
+ * Fail loudly if any template block in a generated example page carries a slotId
+ * that expandTemplates can't match. Throws — sync (and the deploy's Step 1) aborts.
+ */
+function assertValidSlotIds(mdFile, data) {
+  for (const [blockId, block] of Object.entries(data.blocks || {})) {
+    if (!isOurTemplate(block)) continue;
+    if (!block.slotId) {
+      throw new Error(
+        `sync: ${mdFile} block "${blockId}" has templateId ${block.templateId} but no ` +
+        `slotId. expandTemplates matches template slots by slotId, so this block would ` +
+        `render nothing. (A "placeholder" field is NOT read — it must be "slotId".)`,
+      );
+    }
+    if (!TEMPLATE_SLOT_IDS.has(block.slotId)) {
+      throw new Error(
+        `sync: ${mdFile} block "${blockId}" has slotId "${block.slotId}", which the ` +
+        `block-reference-layout template does not declare (known: ` +
+        `${[...TEMPLATE_SLOT_IDS].sort().join(', ')}). It would not expand.`,
+      );
+    }
+  }
+}
+
+// Old slot ids (block-id suffixes) to remove during migration
+const OLD_SLOT_IDS = new Set([
   'react-heading', 'vue-heading',
   'react-code', 'vue-code',
   'examples-desc',  // replaced by per-section descriptions
@@ -490,7 +528,15 @@ function extractCodeBlocks(text) {
  * Returns { schema, json, react, vue } where each is a string or null.
  */
 function extractMdSections(mdContent) {
-  const result = { schema: null, json: null, react: null, vue: null, svelte: null };
+  const result = { description: null, schema: null, json: null, fetcher: null, react: null, vue: null, svelte: null };
+
+  // Description: the prose between the H1 title and the first `## ` section — a
+  // plain-language "what this block is for". Rendered as a paragraph after the title.
+  const descMatch = mdContent.match(/^#\s+.+?\r?\n+([\s\S]*?)(?=\r?\n##\s)/);
+  if (descMatch) {
+    const desc = descMatch[1].trim();
+    if (desc) result.description = desc;
+  }
 
   // Split into top-level sections by ## headings
   const topSections = {};
@@ -512,6 +558,16 @@ function extractMdSections(mdContent) {
     const blocks = extractCodeBlocks(topSections['JSON Block Data']).filter(b => b.lang === 'json');
     if (blocks.length > 0) {
       result.json = blocks.map(b => b.content).join('\n\n');
+    }
+  }
+
+  // Fetcher: the block-specific data function (data-fetching example blocks only).
+  // Rendered as extra blocks inside the `rendering` region — a section is a region
+  // that can hold multiple blocks, so this needs no dedicated template slot.
+  if (topSections['Fetcher']) {
+    const blocks = extractCodeBlocks(topSections['Fetcher']).filter(b => b.lang === 'js' || b.lang === 'javascript');
+    if (blocks.length > 0) {
+      result.fetcher = blocks.map(b => b.content).join('\n\n');
     }
   }
 
@@ -556,6 +612,15 @@ function extractMdSections(mdContent) {
         }).join('\n\n');
       }
     }
+
+    // Data-fetching example pages have no per-stack ### subsections — their
+    // Rendering section is just the fetcher registration. Capture that plain
+    // js/javascript block so it can render next to the fetcher code.
+    if (!result.react && !result.vue && !result.svelte) {
+      const blocks = extractCodeBlocks(topSections['Rendering'])
+        .filter(b => b.lang === 'js' || b.lang === 'javascript');
+      if (blocks.length > 0) result.register = blocks.map(b => b.content).join('\n\n');
+    }
   }
 
   return result;
@@ -564,12 +629,16 @@ function extractMdSections(mdContent) {
 /**
  * Build a codeExample block with the given tabs.
  */
-function makeCodeExampleBlock(blockId, templateInstanceId, placeholder, tabs) {
+function makeCodeExampleBlock(blockId, templateInstanceId, slotId, tabs) {
   return {
     '@type': 'codeExample',
     templateId: TEMPLATE_ID,
     templateInstanceId,
-    placeholder,
+    // `slotId` is how the template system (template definition + expandTemplates)
+    // matches a page block to a template slot. It MUST be this exact field name —
+    // an earlier `placeholder` field was a dead synonym expandTemplates never read,
+    // so blocks carrying it silently failed to expand (rendered nothing).
+    slotId,
     tabs: tabs.map(t => ({
       '@id': `${blockId}-${t.language}-${hexSuffix()}`,
       label: t.label,
@@ -585,15 +654,106 @@ function makeCodeExampleBlock(blockId, templateInstanceId, placeholder, tabs) {
  */
 function updateCodeExampleTabs(block, tabUpdates) {
   let changed = false;
-  for (const { language, code } of tabUpdates) {
-    if (code == null) continue;
+  for (const { language, code, label } of tabUpdates) {
     const tab = block.tabs.find(t => t.language === language);
-    if (tab && tab.code !== code) {
-      tab.code = code;
-      changed = true;
-    }
+    if (!tab) continue;
+    if (code != null && tab.code !== code) { tab.code = code; changed = true; }
+    if (label != null && tab.label !== label) { tab.label = label; changed = true; }
   }
   return changed;
+}
+
+/** Build a slate paragraph block for a template slot. Pass `value` for rich
+ * content (e.g. links); otherwise a single plain paragraph is built from `text`. */
+function makeSlateBlock(blockId, templateInstanceId, slotId, text, value) {
+  return {
+    '@type': 'slate',
+    templateId: TEMPLATE_ID,
+    templateInstanceId,
+    slotId,
+    plaintext: text,
+    value: value || [{ type: 'p', children: [{ text }] }],
+  };
+}
+
+/** Slate value: one paragraph mixing plain text and links. `parts` is an array of
+ * strings (plain runs) and { url, text } (links). Also returns the flattened text. */
+function slateParagraph(parts) {
+  const children = parts.map((p) =>
+    typeof p === 'string'
+      ? { text: p }
+      : { type: 'link', data: { url: p.url }, children: [{ text: p.text }] },
+  );
+  const plaintext = parts.map((p) => (typeof p === 'string' ? p : p.text)).join('');
+  return { value: [{ type: 'p', children }], plaintext };
+}
+
+/**
+ * Ensure a codeExample block exists with the given slot + tab languages, updating
+ * code in place when the shape already matches (preserves tab @ids → idempotent),
+ * and rebuilding it when it's missing or its tab languages changed. Returns true
+ * if anything changed.
+ */
+function ensureCodeExampleBlock(data, blockId, instanceId, slotId, tabs) {
+  const existing = data.blocks[blockId];
+  const wantLangs = tabs.map(t => t.language).join(',');
+  const haveLangs = existing?.['@type'] === 'codeExample'
+    ? (existing.tabs || []).map(t => t.language).join(',')
+    : null;
+  if (!existing || existing['@type'] !== 'codeExample'
+      || existing.slotId !== slotId || haveLangs !== wantLangs) {
+    data.blocks[blockId] = makeCodeExampleBlock(blockId, instanceId, slotId, tabs);
+    return true;
+  }
+  return updateCodeExampleTabs(existing, tabs);
+}
+
+/** Convert a chunk of markdown prose into a plain (non-template) slate block. A slate
+ * block must have exactly ONE top-level node, so this uses the FIRST paragraph (the
+ * block's "what is this for" line; any following "this is a custom example block…"
+ * boilerplate is redundant with the reference section below). Markdown emphasis/code/
+ * link syntax is stripped to text. No template slot — it sits above the fold. */
+function makeProseSlate(blockId, markdown) {
+  const first = (markdown.split(/\r?\n\s*\r?\n/)[0] || '')
+    .replace(/\s+/g, ' ').trim()
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(?!\*)([^*]+?)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[(.+?)\]\([^)]*\)/g, '$1');
+  return {
+    '@type': 'slate',
+    plaintext: first,
+    value: [{ type: 'p', children: [{ text: first }] }],
+  };
+}
+
+/** Ensure a standalone prose slate exists for the given markdown; returns true if
+ * changed. Deletes the block when `markdown` is empty. */
+function ensureProseSlate(data, blockId, markdown) {
+  if (!markdown) {
+    if (data.blocks[blockId]) { delete data.blocks[blockId]; return true; }
+    return false;
+  }
+  const next = makeProseSlate(blockId, markdown);
+  const cur = data.blocks[blockId];
+  if (cur && cur['@type'] === 'slate' && JSON.stringify(cur.value) === JSON.stringify(next.value)) {
+    return false;
+  }
+  data.blocks[blockId] = next;
+  return true;
+}
+
+/** Ensure a slate block exists with the given text (and optional rich `value`);
+ * returns true if changed. */
+function ensureSlateBlock(data, blockId, instanceId, slotId, text, value) {
+  const existing = data.blocks[blockId];
+  const want = JSON.stringify(value || [{ type: 'p', children: [{ text }] }]);
+  if (existing?.['@type'] === 'slate' && existing.slotId === slotId
+      && existing.plaintext === text && JSON.stringify(existing.value) === want) {
+    return false;
+  }
+  data.blocks[blockId] = makeSlateBlock(blockId, instanceId, slotId, text, value);
+  return true;
 }
 
 for (const mdFile of mdFiles) {
@@ -615,16 +775,26 @@ for (const mdFile of mdFiles) {
   let prefix = null; // e.g., "ref-image"
   for (const [blockId, block] of Object.entries(data.blocks)) {
     if (!isOurTemplate(block)) continue;
-    tplBlocks[block.placeholder] = { blockId, block };
+    // Migrate any block still carrying the dead `placeholder` field to `slotId`,
+    // the field expandTemplates actually matches on. Without this, an existing
+    // page authored before the fix would keep rendering nothing.
+    if (block.placeholder != null && block.slotId == null) {
+      block.slotId = block.placeholder;
+      delete block.placeholder;
+      contentChanged = true;
+    } else if (block.placeholder != null) {
+      // Both present — the stray synonym is just noise; drop it.
+      delete block.placeholder;
+      contentChanged = true;
+    }
+    tplBlocks[block.slotId] = { blockId, block };
     if (!instanceId) instanceId = block.templateInstanceId;
     if (!prefix) {
       // Derive prefix from block ID: "ref-image-schema" -> "ref-image"
-      const parts = blockId.split('-');
-      // Find the name part: ref-<name>-<placeholder>
-      // The placeholder may contain hyphens (e.g., "json-data"), so match from known placeholders
-      for (const ph of [...OLD_PLACEHOLDERS, 'schema', 'json-data', 'rendering', 'sep', 'examples-heading', 'examples-desc', 'schema-heading', 'schema-desc', 'json-heading', 'json-desc', 'rendering-heading', 'rendering-desc']) {
-        if (blockId.endsWith(`-${ph}`)) {
-          prefix = blockId.slice(0, -(ph.length + 1));
+      // A slot id may contain hyphens (e.g. "json-data"), so match from known slot ids.
+      for (const sid of [...OLD_SLOT_IDS, 'schema', 'json-data', 'rendering', 'sep', 'examples-heading', 'examples-desc', 'schema-heading', 'schema-desc', 'json-heading', 'json-desc', 'rendering-heading', 'rendering-desc']) {
+        if (blockId.endsWith(`-${sid}`)) {
+          prefix = blockId.slice(0, -(sid.length + 1));
           break;
         }
       }
@@ -644,8 +814,8 @@ for (const mdFile of mdFiles) {
   const boilerplateSuffixes = [
     'sep', 'heading', 'schema-heading', 'schema-desc', 'json-heading', 'json-desc',
     'rendering-heading', 'rendering-desc',
-    // Old placeholder names
-    ...OLD_PLACEHOLDERS,
+    // Old slot ids
+    ...OLD_SLOT_IDS,
   ];
   for (const suffix of boilerplateSuffixes) {
     const blockId = `${prefix}-${suffix}`;
@@ -675,35 +845,81 @@ for (const mdFile of mdFiles) {
     contentChanged = true;
   }
 
-  // Ensure the 3 codeExample blocks exist
-  const schemaId = `${prefix}-schema`;
-  if (!data.blocks[schemaId] || data.blocks[schemaId]['@type'] !== 'codeExample') {
-    data.blocks[schemaId] = makeCodeExampleBlock(schemaId, instanceId, 'schema', [
-      { label: 'Schema', language: 'javascript', code: sections.schema || '' },
-    ]);
-    contentChanged = true;
+  // --- Description: what the block is for. A standalone prose slate right after the
+  // title (from the .md intro between the H1 and the first `##`). ---
+  const descriptionId = `${prefix}-description`;
+  if (ensureProseSlate(data, descriptionId, sections.description)) contentChanged = true;
+  if (sections.description) {
+    const items = data.blocks_layout.items;
+    const titleIdx = items.findIndex((id) => data.blocks[id]?.['@type'] === 'title');
+    const curIdx = items.indexOf(descriptionId);
+    const wantIdx = titleIdx >= 0 ? titleIdx + 1 : 0;
+    if (curIdx !== wantIdx) {
+      if (curIdx !== -1) items.splice(curIdx, 1);
+      items.splice(items.findIndex((id) => data.blocks[id]?.['@type'] === 'title') + 1, 0, descriptionId);
+      contentChanged = true;
+    }
   }
+
+  // Ensure the 3 codeExample blocks exist
+  // --- Schema + JSON Block Data: one codeExample each (idempotent create/update) ---
+  const schemaId = `${prefix}-schema`;
+  if (ensureCodeExampleBlock(data, schemaId, instanceId, 'schema', [
+    { label: 'Schema', language: 'javascript', code: sections.schema || '' },
+  ])) contentChanged = true;
 
   const jsonId = `${prefix}-json-data`;
-  if (!data.blocks[jsonId] || data.blocks[jsonId]['@type'] !== 'codeExample') {
-    data.blocks[jsonId] = makeCodeExampleBlock(jsonId, instanceId, 'json-data', [
-      { label: 'JSON Block Data', language: 'json', code: sections.json || '' },
-    ]);
-    contentChanged = true;
-  }
+  if (ensureCodeExampleBlock(data, jsonId, instanceId, 'json-data', [
+    { label: 'JSON Block Data', language: 'json', code: sections.json || '' },
+  ])) contentChanged = true;
 
+  // --- Rendering region ---
+  // A section is a region that can hold multiple blocks. A data-fetching example
+  // block (one with a ## Fetcher section) fills the `rendering` region with an
+  // intro + the block-specific fetcher + its registration, instead of per-stack
+  // component code — its render is identical to the Listing block. A plain block
+  // keeps a single component codeExample. Nothing fetcher-specific touches the
+  // shared template; the difference is purely how many blocks land in the slot.
   const renderingId = `${prefix}-rendering`;
-  if (!data.blocks[renderingId] || data.blocks[renderingId]['@type'] !== 'codeExample') {
-    data.blocks[renderingId] = makeCodeExampleBlock(renderingId, instanceId, 'rendering', [
+  const fetcherId = `${prefix}-fetcher`;
+  const renderIntroId = `${prefix}-rendering-intro`;
+  const isFetchingPage = sections.fetcher != null;
+  let renderRegionIds;
+  if (isFetchingPage) {
+    // This is a fetch/expand block: you provide a fetcher for its @type and
+    // expandListingBlocks expands it in any region — the same seam that powers
+    // listings and other collection blocks. Only the fetcher is block-specific.
+    const intro = slateParagraph([
+      'This block has no bespoke renderer. Add its fetcher to your fetchItems map (keyed by @type) and expandListingBlocks expands it in any region you render — the same seam that powers ',
+      { url: '/docs/listings', text: 'listings' },
+      ' and other collection blocks. See ',
+      { url: '/docs/custom-blocks', text: 'Custom Blocks' },
+      ' to define the block type. Only the fetcher below is block-specific.',
+    ]);
+    if (ensureSlateBlock(data, renderIntroId, instanceId, 'rendering',
+      intro.plaintext, intro.value)) contentChanged = true;
+    if (ensureCodeExampleBlock(data, fetcherId, instanceId, 'rendering', [
+      { label: 'Fetcher', language: 'javascript', code: sections.fetcher || '' },
+    ])) contentChanged = true;
+    if (ensureCodeExampleBlock(data, renderingId, instanceId, 'rendering', [
+      { label: 'Render', language: 'javascript', code: sections.register || '' },
+    ])) contentChanged = true;
+    renderRegionIds = [renderIntroId, fetcherId, renderingId];
+  } else {
+    // Plain built-in block — drop any fetching-only blocks, keep one component slot.
+    for (const id of [fetcherId, renderIntroId]) {
+      if (data.blocks[id]) { delete data.blocks[id]; contentChanged = true; }
+    }
+    if (ensureCodeExampleBlock(data, renderingId, instanceId, 'rendering', [
       { label: 'React', language: 'jsx', code: sections.react || '' },
       { label: 'Vue', language: 'vue', code: sections.vue || '' },
       { label: 'Svelte', language: 'svelte', code: sections.svelte || '' },
-    ]);
-    contentChanged = true;
+    ])) contentChanged = true;
+    renderRegionIds = [renderingId];
   }
 
-  // Rebuild layout: non-template blocks + the 3 codeExample blocks
-  const templateOrder = [schemaId, jsonId, renderingId];
+  // Rebuild layout: non-template blocks + the template region blocks, in order.
+  const templateOrder = [schemaId, jsonId, ...renderRegionIds];
   const nonTplItems = data.blocks_layout.items.filter(id => {
     const block = data.blocks[id];
     return block && !isOurTemplate(block);
@@ -715,27 +931,9 @@ for (const mdFile of mdFiles) {
     contentChanged = true;
   }
 
-  // --- Update tab content from markdown sections ---
-
-  if (data.blocks[schemaId]?.['@type'] === 'codeExample') {
-    if (updateCodeExampleTabs(data.blocks[schemaId], [
-      { language: 'javascript', code: sections.schema },
-    ])) contentChanged = true;
-  }
-
-  if (data.blocks[jsonId]?.['@type'] === 'codeExample') {
-    if (updateCodeExampleTabs(data.blocks[jsonId], [
-      { language: 'json', code: sections.json },
-    ])) contentChanged = true;
-  }
-
-  if (data.blocks[renderingId]?.['@type'] === 'codeExample') {
-    if (updateCodeExampleTabs(data.blocks[renderingId], [
-      { language: 'jsx', code: sections.react },
-      { language: 'vue', code: sections.vue },
-      { language: 'svelte', code: sections.svelte },
-    ])) contentChanged = true;
-  }
+  // Guard: every template block must carry a slotId expandTemplates can match.
+  // Runs on every page (changed or not) so a bad page already on disk still aborts.
+  assertValidSlotIds(mdFile, data);
 
   if (contentChanged) {
     const updatedJson = JSON.stringify(data, null, 2) + '\n';
@@ -758,6 +956,10 @@ function getExamplesContent() {
   const blocks = {};
   const items = [];
   for (const page of Object.values(docPageDefinitions)) {
+    // Fetcher-based example blocks (related items, search shortcuts, rss) need
+    // per-frontend fetcher registration + a live backend, so they don't belong
+    // on this cross-frontend "one of each block" render-smoke page.
+    if (page.excludeFromExamplesPage) continue;
     for (const [blockId, blockData] of Object.entries(page.examples)) {
       blocks[blockId] = blockData;
       items.push(blockId);
@@ -1310,6 +1512,12 @@ for (const mdFile of docsMdFiles) {
     console.log(`Created docs content JSON shell: docs/${folder}/data.json`);
   }
   const data = buildConceptShell(folder, mdContent);
+
+  // Preserve author-set `subjects` (tags) — the shell resets them to [] every run,
+  // but tags are hand-authored content, not derived from the markdown.
+  if (Array.isArray(prevData?.subjects) && prevData.subjects.length) {
+    data.subjects = prevData.subjects;
+  }
 
   // Preserve title-block id from previous JSON (default: title-1).
   const prevTitleEntry = prevData

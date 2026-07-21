@@ -108,7 +108,9 @@
   "preview_image": null,
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "content"
+  ],
   "title": "Another Page",
   "type_title": "Page",
   "version": "current",

@@ -12,6 +12,7 @@ vi.mock('../context', () => ({
 import {
   applyBlockDefaultsWithContext,
   createSchemaEnhancerFromRecipe,
+  getConversionMap,
 } from './schemaInheritance';
 
 /**
@@ -198,5 +199,85 @@ describe('fieldRules — contains operator (multiselect-driven visibility)', () 
     const enhancer = createSchemaEnhancerFromRecipe(notContainsRecipe);
     const out = enhancer({ schema: baseSchema(), formData: {} });
     expect(out.properties.date).toBeDefined();
+  });
+});
+
+/**
+ * fieldRules + `required` — a hidden field must not stay required.
+ *
+ * A field declared required in the base schema but hidden by a `when` rule is
+ * dropped from `required` too: the editor can't supply a value it can't see,
+ * and a required-but-absent property would wedge the form. This gives
+ * *conditional* required — required exactly when the rule shows the field, e.g.
+ * a card's `image` required only when the grid enables the image element.
+ */
+describe('fieldRules — hidden fields are dropped from required (conditional required)', () => {
+  const baseSchema = () => ({
+    fieldsets: [{ id: 'default', title: 'Default', fields: ['elements', 'image'] }],
+    properties: {
+      elements: { title: 'Elements', type: 'array' },
+      image: { title: 'Image', widget: 'image' },
+    },
+    required: ['image'],
+  });
+
+  // Show (and thus keep required) `image` only when `elements` includes 'image'.
+  const recipe = {
+    fieldRules: {
+      image: { when: { elements: { contains: 'image' } }, else: false },
+    },
+  };
+
+  test('keeps the field required when the rule shows it', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const out = enhancer({ schema: baseSchema(), formData: { elements: ['image'] } });
+    expect(out.properties.image).toBeDefined();
+    expect(out.required).toContain('image');
+  });
+
+  test('drops the field from required when the rule hides it', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const out = enhancer({ schema: baseSchema(), formData: { elements: ['date'] } });
+    expect(out.properties.image).toBeUndefined();
+    expect(out.required).not.toContain('image');
+  });
+
+  test('leaves an unrelated always-required field in place', () => {
+    const schema = baseSchema();
+    schema.required = ['title', 'image'];
+    schema.properties.title = { title: 'Title' };
+    schema.fieldsets[0].fields.unshift('title');
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const out = enhancer({ schema, formData: { elements: [] } });
+    expect(out.required).toContain('title'); // no rule → never hidden → stays
+    expect(out.required).not.toContain('image'); // hidden → dropped
+  });
+});
+
+describe('getConversionMap', () => {
+  // Edge direction: `X.fieldMappings[Y]` means "X can be built FROM Y", i.e. Y→X.
+  // So the edge a→b→c is declared on the TARGETS: b.fieldMappings.a, c.fieldMappings.b.
+  const cfg = {
+    a: { id: 'a', fieldMappings: {} }, // valid source; reaches b then c
+    b: { id: 'b', fieldMappings: { a: { x: 'x' } } }, // a → b
+    c: { id: 'c', fieldMappings: { b: { y: 'y' } } }, // b → c
+    lone: { id: 'lone' }, // no fieldMappings → not convertible
+  };
+
+  test('maps each source type to its full reachable set (BFS)', () => {
+    const m = getConversionMap(cfg);
+    expect(new Set(m.a)).toEqual(new Set(['b', 'c']));
+    expect(new Set(m.b)).toEqual(new Set(['c']));
+    expect(m.c || []).toEqual([]);
+  });
+
+  test('empties types with no fieldMappings', () => {
+    const m = getConversionMap(cfg);
+    expect(m.lone || []).toEqual([]);
+  });
+
+  test('null/empty config → empty map', () => {
+    expect(getConversionMap(null)).toEqual({});
+    expect(getConversionMap({})).toEqual({});
   });
 });

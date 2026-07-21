@@ -11,7 +11,6 @@
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-contextNavigation",
-      "placeholder": "schema",
       "tabs": [
         {
           "@id": "ref-contextNavigation-schema-javascript-38f58f",
@@ -19,13 +18,13 @@
           "language": "javascript",
           "code": "{\n  \"contextNavigation\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"ariaLabel\": {\n          \"title\": \"Aria label\",\n          \"default\": \"Section navigation\"\n        },\n        \"expandCurrentOnly\": {\n          \"title\": \"Expand current section only\",\n          \"type\": \"boolean\",\n          \"default\": true\n        },\n        \"includeTop\": {\n          \"title\": \"Include section root\",\n          \"type\": \"boolean\",\n          \"default\": false\n        },\n        \"items\": {\n          \"title\": \"Items\",\n          \"widget\": \"blocks_layout\",\n          \"allowedBlocks\": [\n            \"navItem\",\n            \"listing\"\n          ]\n        }\n      }\n    }\n  },\n  \"navItem\": {\n    \"blockSchema\": {\n      \"properties\": {\n        \"label\": {\n          \"title\": \"Label\"\n        },\n        \"href\": {\n          \"title\": \"Link\",\n          \"widget\": \"object_browser\",\n          \"mode\": \"link\"\n        }\n      }\n    }\n  }\n}"
         }
-      ]
+      ],
+      "slotId": "schema"
     },
     "ref-contextNavigation-json-data": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-contextNavigation",
-      "placeholder": "json-data",
       "tabs": [
         {
           "@id": "ref-contextNavigation-json-data-json-62b3b4",
@@ -33,13 +32,13 @@
           "language": "json",
           "code": "{\n  \"@type\": \"contextNavigation\",\n  \"ariaLabel\": \"Section navigation\",\n  \"blocks\": {\n    \"nav-1\": {\n      \"@type\": \"navItem\",\n      \"label\": \"Introduction\",\n      \"href\": [\n        {\n          \"@id\": \"/docs/introduction\"\n        }\n      ]\n    },\n    \"nav-2\": {\n      \"@type\": \"navItem\",\n      \"label\": \"Custom blocks\",\n      \"href\": [\n        {\n          \"@id\": \"/docs/custom-blocks\"\n        }\n      ]\n    },\n    \"nav-2a\": {\n      \"@type\": \"navItem\",\n      \"label\": \"Schema\",\n      \"href\": [\n        {\n          \"@id\": \"/docs/custom-blocks/schema\"\n        }\n      ]\n    },\n    \"nav-2b\": {\n      \"@type\": \"navItem\",\n      \"label\": \"Rendering\",\n      \"href\": [\n        {\n          \"@id\": \"/docs/custom-blocks/rendering\"\n        }\n      ]\n    },\n    \"nav-3\": {\n      \"@type\": \"navItem\",\n      \"label\": \"Listings\",\n      \"href\": [\n        {\n          \"@id\": \"/docs/listings\"\n        }\n      ]\n    }\n  },\n  \"blocks_layout\": {\n    \"items\": [\n      \"nav-1\",\n      \"nav-2\",\n      \"nav-2a\",\n      \"nav-2b\",\n      \"nav-3\"\n    ]\n  }\n}\n\n{\n  \"@type\": \"contextNavigation\",\n  \"items\": { \"items\": [\"cnav-listing\"] },\n  \"blocks\": {\n    \"cnav-listing\": {\n      \"@type\": \"listing\",\n      \"variation\": \"navItem\",\n      \"querystring\": {\n        \"query\": [\n          { \"i\": \"path\",\n            \"o\": \"plone.app.querystring.operation.string.relativePath\",\n            \"v\": \".\" },\n          { \"i\": \"exclude_from_nav\",\n            \"o\": \"plone.app.querystring.operation.boolean.isFalse\",\n            \"v\": \"\" }\n        ],\n        \"sort_on\": \"getObjPositionInParent\",\n        \"depth\": 2\n      }\n    }\n  }\n}"
         }
-      ]
+      ],
+      "slotId": "json-data"
     },
     "ref-contextNavigation-rendering": {
       "@type": "codeExample",
       "templateId": "/templates/block-reference-layout",
       "templateInstanceId": "tpl-inst-contextNavigation",
-      "placeholder": "rendering",
       "tabs": [
         {
           "@id": "ref-contextNavigation-rendering-jsx-25968a",
@@ -59,12 +58,28 @@
           "language": "svelte",
           "code": "<script>\n  import NavItem from './NavItem.svelte';\n  export let block;\n  export let blocks;\n  $: items = block.blocks_layout?.items || [];\n</script>\n\n<nav\n  data-block-uid={block['@uid']}\n  aria-label={block.ariaLabel || 'Section navigation'}\n  class=\"context-navigation\"\n>\n  <ul role=\"list\" class=\"context-navigation-list\">\n    {#each items as id (id)}\n      <li>\n        <NavItem block={{ ...blocks[id], '@uid': id }} />\n      </li>\n    {/each}\n  </ul>\n</nav>"
         }
+      ],
+      "slotId": "rendering"
+    },
+    "ref-contextNavigation-description": {
+      "@type": "slate",
+      "plaintext": "A vertical navigation list for grouped pages — a left sidebar on desktop and a collapsible disclosure at the top on mobile. Each row is a navItem (hand-added link) and/or a listing (auto-populated from a path query). The active link is detected from the current URL and gets aria-current=\"page\" plus a .current class. Named after Plone's @contextnavigation endpoint, which serves the same purpose.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "A vertical navigation list for grouped pages — a left sidebar on desktop and a collapsible disclosure at the top on mobile. Each row is a navItem (hand-added link) and/or a listing (auto-populated from a path query). The active link is detected from the current URL and gets aria-current=\"page\" plus a .current class. Named after Plone's @contextnavigation endpoint, which serves the same purpose."
+            }
+          ]
+        }
       ]
     }
   },
   "blocks_layout": {
     "items": [
       "title-1",
+      "ref-contextNavigation-description",
       "ref-contextNavigation-schema",
       "ref-contextNavigation-json-data",
       "ref-contextNavigation-rendering"
@@ -98,7 +113,11 @@
   },
   "review_state": "published",
   "rights": "",
-  "subjects": [],
+  "subjects": [
+    "blocks",
+    "navigation",
+    "templates"
+  ],
   "title": "Context Navigation Block",
   "type_title": "Page",
   "version": "current",

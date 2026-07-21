@@ -137,7 +137,7 @@
     <script src="/renderer.js"></script>
     <script type="module">
         import { initBridge, getAccessToken } from '/hydra.js';
-        import { expandListingBlocks, ploneFetchItems, expandTemplates, expandTemplatesSync, contentPath } from '/helpers.js';
+        import { expandListingBlocks, ploneFetchItems, relatedItemsFetcher, searchShortcutsFetcher, rssFetcher, expandTemplates, expandTemplatesSync, contentPath } from '/helpers.js';
         import { sharedBlocksConfig } from '/shared-block-schemas.js';
 
         // Parse page numbers from URL query params (format: ?pg_{blockId}={pageNumber})
@@ -217,6 +217,12 @@
             tfLog('extraCriteria from URL:', JSON.stringify(extraCriteria), 'search:', window.location.search);
             window._searchCriteria = extraCriteria; // Store for form handlers
             const fetchItems = ploneFetchItems({ apiUrl: window._apiOrigin, contextPath, extraCriteria });
+            // Example listing-variant fetchers (see packages/helpers/index.js).
+            const exampleFetchers = {
+                relatedItemsListing: relatedItemsFetcher({ apiUrl: window._apiOrigin, contextPath }),
+                searchShortcuts: searchShortcutsFetcher({ apiUrl: window._apiOrigin, contextPath }),
+                rssFeed: rssFetcher(),
+            };
 
             // Set up expansion helper for container renderers
             // Use 'variation' field for item type (matches Volto listing block schema)
@@ -229,7 +235,7 @@
                 const fi = contextOverride
                     ? ploneFetchItems({ apiUrl: window._apiOrigin, contextPath: contextOverride, extraCriteria })
                     : fetchItems;
-                return await expandListingBlocks(layout, { blocks, fetchItems: { listing: fi }, paging, itemTypeField: 'variation' });
+                return await expandListingBlocks(layout, { blocks, fetchItems: { listing: fi, ...exampleFetchers }, paging, itemTypeField: 'variation' });
             };
 
             // Convert layout IDs to block objects with @uid
@@ -455,7 +461,7 @@
                                 properties: {
                                     items: {
                                         title: 'Blocks',
-                                        allowedBlocks: ['slate', 'image', 'separator', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest', 'title', 'description', 'section', 'contextNavigation', 'codeExample', 'objectBlocks'],
+                                        allowedBlocks: ['slate', 'image', 'separator', 'hero', 'columns', 'slider', 'accordion', 'teaser', 'gridBlock', 'listing', 'search', 'skiplogicTest', 'title', 'description', 'section', 'contextNavigation', 'codeExample', 'objectBlocks', 'convSource', 'relatedItemsListing', 'searchShortcuts', 'rssFeed'],
                                         allowedTemplates: ['/_test_data/templates/test-layout'],
                                         allowedLayouts: contextNavLayoutForced
                                             || [null, '/_test_data/templates/test-layout', '/_test_data/templates/header-footer-layout', '/_test_data/templates/header-only-layout', '/_test_data/templates/editable-fixed-layout'],
