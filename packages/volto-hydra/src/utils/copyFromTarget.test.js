@@ -341,3 +341,64 @@ describe('copy-from-target × fieldRules — conditional (optional) mapped field
     expect(withDate.properties.image).toBeUndefined();
   });
 });
+
+/**
+ * On-by-default: a link-bearing block with a `@default` mapping (but no explicit
+ * `@target`) pulls from the link. The synthesized mapping normalizes @default's
+ * canonical keys (title/description/image) to the link snapshot's brain keys
+ * (Title/Description/image_scales); `@id` (the link itself) is not pulled.
+ */
+describe('copy-from-target — on by default via @default (link-bearing blocks)', () => {
+  const linkCard = {
+    id: 'linkcard',
+    fieldMappings: {
+      '@default': {
+        '@id': 'href',
+        title: 'heading',
+        description: 'summary',
+        image: 'picture',
+      },
+    },
+    blockSchema: {
+      properties: {
+        href: { title: 'Link', widget: 'object_browser', mode: 'link' },
+        heading: { title: 'Heading' },
+        summary: { title: 'Summary' },
+        picture: { title: 'Picture', widget: 'object_browser', mode: 'image' },
+      },
+    },
+  };
+
+  it('synthesizes a @target from @default (canonical → snapshot keys, @id skipped)', () => {
+    const m = getTargetMapping(linkCard);
+    expect(m).toEqual({
+      Title: 'heading',
+      Description: 'summary',
+      image_scales: { field: 'picture', type: 'image' },
+    });
+    // @id → href is the link itself, not pulled
+    expect(m['@id']).toBeUndefined();
+  });
+
+  it('a block with @default but NO link field is not default-on', () => {
+    const noLink = {
+      id: 'x',
+      fieldMappings: { '@default': { title: 'heading' } },
+      blockSchema: { properties: { heading: { title: 'Heading' } } },
+    };
+    expect(getTargetMapping(noLink)).toBeNull();
+  });
+
+  it('an explicit @target still wins over @default', () => {
+    const both = { ...linkCard, fieldMappings: { ...linkCard.fieldMappings, '@target': { Title: 'heading' } } };
+    expect(getTargetMapping(both)).toEqual({ Title: 'heading' });
+  });
+
+  it('pulls the target value through the synthesized mapping', () => {
+    const blockData = {
+      href: [{ '@id': '/p', Title: 'Live Title', Description: 'Live Desc' }],
+    };
+    expect(getTargetValueForField('heading', linkCard, blockData)).toBe('Live Title');
+    expect(getTargetValueForField('summary', linkCard, blockData)).toBe('Live Desc');
+  });
+});

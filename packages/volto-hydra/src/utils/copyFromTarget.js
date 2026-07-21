@@ -29,10 +29,43 @@ import { getMappingTarget, getFieldType } from './schemaInheritance';
 /** Widget name the mapped destination fields are swapped to (the wrapper). */
 export const COPY_FROM_TARGET_WIDGET = 'copyFromTargetField';
 
-/** The `@target` mapping ({ sourceAttr: destField | {field,type} }) or null. */
+// Canonical `@default` source keys (the lowercase listing/conversion shape) →
+// the keys the LINK snapshot (selectedItemAttrs) actually carries. @default and
+// a link snapshot are both catalog-shaped but historically cased differently: a
+// listing result serializes `title`, a link brain carries `Title`. So to reuse
+// `@default` as the target mapping we translate each canonical source to its
+// snapshot key. `@id` is the link itself (it populates the url field), not a
+// pulled display field, so it is intentionally omitted.
+const DEFAULT_SOURCE_TO_SNAPSHOT = {
+  title: { src: 'Title' },
+  description: { src: 'Description' },
+  image: { src: 'image_scales', type: 'image' },
+};
+
+/**
+ * The `@target` mapping ({ sourceAttr: destField | {field,type} }) or null.
+ *
+ * Copy-from-target is ON BY DEFAULT: a block with a link field but no explicit
+ * `@target` falls back to a normalized `@default` — so any link-bearing block
+ * that already declares its canonical content shape pulls from the link without
+ * extra wiring (the teaser case). An explicit `@target` always wins. A block
+ * with no link field (nothing to pull from) returns null.
+ */
 export function getTargetMapping(blockConfig) {
-  const m = blockConfig?.fieldMappings?.['@target'];
-  return m && Object.keys(m).length > 0 ? m : null;
+  const explicit = blockConfig?.fieldMappings?.['@target'];
+  if (explicit && Object.keys(explicit).length > 0) return explicit;
+
+  const def = blockConfig?.fieldMappings?.['@default'];
+  if (!def || !getUrlField(blockConfig)) return null;
+
+  const synthesized = {};
+  for (const [canonical, dest] of Object.entries(def)) {
+    const norm = DEFAULT_SOURCE_TO_SNAPSHOT[canonical]; // skips @id + unknowns
+    const destField = norm && getMappingTarget(dest);
+    if (!destField) continue;
+    synthesized[norm.src] = norm.type ? { field: destField, type: norm.type } : destField;
+  }
+  return Object.keys(synthesized).length > 0 ? synthesized : null;
 }
 
 /** Destination (block) field names the @target mapping writes to. */
