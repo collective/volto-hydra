@@ -24,9 +24,17 @@
       "title": "External label",
       "href": [{ "@id": "https://example.com", "title": "Example" }],
       "inneralign": "left"
+    },
+    "hero-linked": {
+      "@type": "hero",
+      "heading": "Author Heading",
+      "subheading": "",
+      "buttonText": "Go",
+      "buttonLink": [{ "@id": "/news/big" }],
+      "description": [{ "type": "p", "children": [{ "text": "" }] }]
     }
   },
   "blocks_layout": {
-    "items": ["title-block", "btn-linked", "btn-custom", "btn-external"]
+    "items": ["title-block", "btn-linked", "btn-custom", "btn-external", "hero-linked"]
   }
 }
