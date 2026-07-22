@@ -58,9 +58,34 @@
         }
       },
       "blocks_layout": { "items": ["nested-btn"] }
+    },
+    "hero-onload": {
+      "@type": "hero",
+      "heading": "Stale heading",
+      "subheading": "",
+      "buttonText": "Go",
+      "buttonLink": [
+        {
+          "@id": "/_test_data/another-page",
+          "title": "Another Page",
+          "description": "Another test page for linking",
+          "image_field": "preview_image",
+          "image_scales": {
+            "preview_image": [
+              {
+                "content-type": "image/svg+xml",
+                "download": "@@images/preview_image/preview",
+                "width": 400,
+                "height": 300
+              }
+            ]
+          }
+        }
+      ],
+      "description": [{ "type": "p", "children": [{ "text": "" }] }]
     }
   },
   "blocks_layout": {
-    "items": ["title-block", "btn-linked", "btn-custom", "btn-external", "hero-linked", "btn-pick", "hero-pick", "section-cft"]
+    "items": ["title-block", "btn-linked", "btn-custom", "btn-external", "hero-linked", "btn-pick", "hero-pick", "section-cft", "hero-onload"]
   }
 }

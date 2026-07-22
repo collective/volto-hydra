@@ -1769,13 +1769,12 @@ const SyncedSlateToolbar = ({
             }}
             onSelectItem={isObjectBrowserLink ? (url, item) => {
               if (onFieldLinkChange) {
-                // Use full item metadata for object_browser link fields
-                const linkValue = [{
-                  '@id': item?.['@id'] || url,
-                  title: item?.title || item?.Title || '',
-                  description: item?.description || item?.Description || '',
-                  hasPreviewImage: item?.hasPreviewImage ?? false,
-                }];
+                // Store the FULL picked-item metadata (the object browser fetches
+                // metadata_fields:'_all', so `item` carries image_scales/image_field,
+                // description, Subject, dates, …). Copy-from-target pulls every mapped
+                // field from this snapshot — dropping keys here is exactly what forced
+                // a redundant live @search before.
+                const linkValue = [{ ...item, '@id': item?.['@id'] || url }];
                 onFieldLinkChange(fieldLinkEditorField, linkValue);
               }
               setFieldLinkEditorOpen(false);

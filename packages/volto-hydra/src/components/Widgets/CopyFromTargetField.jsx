@@ -13,13 +13,11 @@
  * and resolve the real widget with Volto's own resolution order so the base
  * renders exactly as it always would.
  */
-import React, { useEffect, useState } from 'react';
-import { useDispatch } from 'react-redux';
+import React, { useEffect } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 import { Icon } from '@plone/volto/components';
 import config from '@plone/volto/registry';
-import { searchContent } from '@plone/volto/actions/search/search';
-import { flattenToAppURL, isInternalURL } from '@plone/volto/helpers/Url/Url';
+import { isInternalURL } from '@plone/volto/helpers/Url/Url';
 import linkSVG from '@plone/volto/icons/link.svg';
 import unlinkSVG from '@plone/volto/icons/unlink.svg';
 import { useHydraSchemaContext, getLiveBlockData } from '../../context';
@@ -29,74 +27,11 @@ import {
   isFieldLinked,
   withFieldCustom,
   withFieldLinked,
+  pullLinkedFields,
 } from '../../utils/copyFromTarget';
 
-// Session cache of live targets, keyed by @id, so a linked field pulls the
-// CURRENT target — not the stale link-field snapshot. Lazy: fetched the first
-// time a @target block is edited this session; refreshed after the TTL.
-// Module-level so all fields of a block share one fetch.
-const LIVE_TARGET_TTL = 5 * 60 * 1000; // 5 minutes
-const liveTargetCache = new Map(); // id -> { brain, fetchedAt, promise }
-
-/**
- * Lazily fetch the live target once per session (TTL-refreshed). We use the
- * catalog **search** (metadata_fields: '_all') rather than getContent: the
- * link-field snapshot (selectedItemAttrs) is itself a catalog brain, so the
- * search result is already in the same shape — no transform, guaranteed field
- * alignment. Undefined until the first fetch resolves (callers fall back to the
- * stored snapshot). Never mutates formData directly (no dirty state).
- */
-function useLiveTarget(targetId) {
-  const dispatch = useDispatch();
-  const [live, setLive] = useState(() => liveTargetCache.get(targetId)?.brain);
-
-  useEffect(() => {
-    if (!targetId) {
-      setLive(undefined);
-      return undefined;
-    }
-    const cached = liveTargetCache.get(targetId);
-    if (cached?.brain && Date.now() - cached.fetchedAt < LIVE_TARGET_TTL) {
-      setLive(cached.brain);
-      return undefined;
-    }
-    let cancelled = false;
-    const path = flattenToAppURL(targetId);
-    const promise =
-      cached?.promise ||
-      Promise.resolve(
-        dispatch(
-          searchContent(
-            path,
-            { 'path.depth': 0, metadata_fields: '_all', b_size: 1 },
-            `copy-from-target-${targetId}`,
-          ),
-        ),
-      )
-        .then((resp) => {
-          const items = resp?.items || [];
-          // ONLY the exact target — never fall back to some other result
-          // (e.g. a missing target would otherwise pick a wrong item and
-          // corrupt divergence). No match → undefined → use the stored snapshot.
-          const brain = items.find((i) => flattenToAppURL(i['@id']) === path);
-          liveTargetCache.set(targetId, { brain, fetchedAt: Date.now(), promise: null });
-          return brain;
-        })
-        .catch(() => {
-          liveTargetCache.delete(targetId); // let a later select retry
-          return undefined;
-        });
-    liveTargetCache.set(targetId, { ...(cached || {}), promise });
-    promise.then((brain) => {
-      if (!cancelled) setLive(brain);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [targetId, dispatch]);
-
-  return live;
-}
+// No live @search: the pick stores the full item metadata (metadata_fields:'_all')
+// into the link snapshot, so every mapped field pulls straight from that snapshot.
 
 const messages = defineMessages({
   linked: {
@@ -151,40 +86,34 @@ const CopyFromTargetField = (props) => {
     : null;
   const updateBlock = (newData) => ctx.onChangeBlock?.(ctx.currentBlockId, newData);
 
-  // Fresh target (lazy, session-cached) — the value a linked field is pulled to.
+  // The target snapshot lives on the link field (metadata_fields:'_all' at pick
+  // time), so the value a linked field pulls to comes straight from it.
   const targetId = blockConfig && blockData && getTargetId(blockConfig, blockData);
-  // Only an INTERNAL link is a pull source: an external URL has no catalog item
-  // to @search, so we can't pull from it. Such a field falls back to a plain
-  // editable field (no toggle). (External unfurl via OpenGraph is a follow-up.)
+  // Only an INTERNAL link is a pull source: an external URL has no catalog item,
+  // so the field falls back to a plain editable field (no toggle).
   const targetSupported = !!targetId && isInternalURL(targetId);
-  const liveTarget = useLiveTarget(targetSupported ? targetId : undefined);
 
   const linked =
     targetSupported &&
     !!blockConfig &&
     !!blockData &&
     isFieldLinked(props.id, blockConfig, blockData);
-  const targetValue = getTargetValueForField(props.id, blockConfig, blockData, liveTarget);
+  const targetValue = getTargetValueForField(props.id, blockConfig, blockData);
 
-  // PULL: while linked, keep the field's stored value in sync with the target —
-  // on first block select (mount) and when the target changes (href / TTL
-  // refresh). Only writes when the value actually differs, so a settled linked
-  // field is a no-op (no spurious dirty state). Not a user edit: uses the raw
-  // field onChange (so it does NOT flip the field to custom, and is field-scoped
-  // so multiple linked fields never clobber each other).
-  //
-  // Deferred one frame: a synchronous onChange during the block's form mount is
-  // discarded (the form re-derives from its `data` prop on initial commit), so
-  // we write after that commit settles. cancelled on unmount/target change.
+  // PULL (reactive): when the SELECTED block's link changes (canvas or sidebar) or
+  // a field is re-linked, fill every linked field from the snapshot in ONE
+  // block-level, idempotent write (settled block → same ref → no-op). Page open is
+  // handled by the `pullAllLinkedFields` pass in View; this covers editing. The
+  // snapshot already carries full metadata (the pick/type stored it) — no @search.
+  // Deferred a frame so the form's initial data re-derivation doesn't discard it.
   useEffect(() => {
-    if (!linked || targetValue === undefined) return undefined;
-    if (JSON.stringify(blockData?.[props.id]) === JSON.stringify(targetValue)) {
-      return undefined;
-    }
-    const raf = requestAnimationFrame(() => props.onChange?.(props.id, targetValue));
+    if (!targetSupported || !blockConfig || !blockData) return undefined;
+    const pulled = pullLinkedFields(blockConfig, blockData);
+    if (pulled === blockData) return undefined;
+    const raf = requestAnimationFrame(() => updateBlock(pulled));
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linked, JSON.stringify(targetValue), props.id]);
+  }, [targetSupported, JSON.stringify(blockData)]);
 
   // EDIT: a user edit to a LINKED field turns it CUSTOM (keeping the typed value).
   // The sidebar edit is only visible HERE (the widget lives in the sidebar form,

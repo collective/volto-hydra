@@ -29,9 +29,33 @@
  */
 import { getMappingTarget, getFieldType, widgetToTargetType } from './schemaInheritance';
 import { convertFieldValue, normalizeCatalogImage } from '@volto-hydra/helpers';
+import { isInternalURL } from '@plone/volto/helpers/Url/Url';
 
 /** Widget name the mapped destination fields are swapped to (the wrapper). */
 export const COPY_FROM_TARGET_WIDGET = 'copyFromTargetField';
+
+/**
+ * Catalog-brain keys a copy-from-target block could ever pull. The link field's
+ * object_browser widget keeps exactly these on a pick (its `selectedItemAttrs`),
+ * so the stored snapshot carries the full set — any mapped field pulls from it,
+ * and a field toggled custom stays re-pullable — without a live @search. `image`
+ * is the raw `image_scales` + `image_field` pair (normalizeCatalogImage folds
+ * them into a single `image` object at pull time).
+ */
+export const CANONICAL_SNAPSHOT_KEYS = [
+  'title',
+  'description',
+  'image_scales',
+  'image_field',
+  'hasPreviewImage',
+  'Subject',
+  'created',
+  'modified',
+  'effective',
+  'expires',
+  'start',
+  'end',
+];
 
 /**
  * The `@target` mapping ({ sourceAttr: destField | {field,type} }) or null.
@@ -108,6 +132,22 @@ export function applyCopyFromTargetToSchema(schema, blockConfig) {
       // Preserve the ORIGINAL field def so the wrapper can re-resolve the
       // real widget (object_browser/textarea/select/…) exactly as Volto would.
       baseWidget: def,
+    };
+    changed = true;
+  }
+
+  // Tell the link field's object_browser widget to KEEP every field we COULD ever
+  // pull when it stores a pick — not just the ones this block's mapping uses today
+  // (the widget projects the picked item to `[...selectedItemAttrs, '@id', 'title']`,
+  // and the object browser fetches metadata_fields:'_all', so the data is there).
+  // A block may map any of these; a field toggled custom must still be re-pullable.
+  // So the snapshot carries the full canonical set and every field pulls from it —
+  // no live @search.
+  const urlField = getUrlField(blockConfig);
+  if (urlField && properties[urlField]) {
+    properties[urlField] = {
+      ...properties[urlField],
+      selectedItemAttrs: [...CANONICAL_SNAPSHOT_KEYS],
     };
     changed = true;
   }
@@ -191,7 +231,10 @@ export function isFieldCustom(field, blockData) {
 export function isFieldLinked(field, blockConfig, blockData) {
   if (!getTargetMapping(blockConfig)) return false;
   if (!mappingEntryFor(field, getTargetMapping(blockConfig))) return false;
-  if (!getTargetId(blockConfig, blockData)) return false;
+  const targetId = getTargetId(blockConfig, blockData);
+  // Only an INTERNAL link is a pull source: an external URL has no catalog item
+  // to pull from, so its fields stay plain editable (no linked state, no pull).
+  if (!targetId || !isInternalURL(targetId)) return false;
   return !isFieldCustom(field, blockData);
 }
 
@@ -300,6 +343,46 @@ export function markEditedLinkedFieldsCustom(incoming, previous, blocksConfig) {
   const cloned = { ...incoming, blocks: { ...incoming.blocks } };
   visit(cloned.blocks, previous.blocks);
   return anyFlipped ? cloned : incoming;
+}
+
+/**
+ * Pull EVERY linked field of EVERY block from its stored snapshot — the on-load
+ * pass that fills all blocks when the page is opened for editing. Snapshot-based
+ * (no live @search): a canvas pick stores the full selectedItemAttrs, so its
+ * linked fields fill; a sidebar link that stored only `[{@id}]` has no metadata
+ * to pull from (the unsupported path). Custom fields are left untouched. Recurses
+ * nested container blocks. Returns the same formData when nothing changed, so a
+ * settled document is a no-op.
+ */
+export function pullAllLinkedFields(formData, blocksConfig) {
+  if (!formData?.blocks || !blocksConfig) return formData;
+  let anyPulled = false;
+
+  const visit = (blocks) => {
+    for (const id of Object.keys(blocks)) {
+      let block = blocks[id];
+      if (!block || typeof block !== 'object') continue;
+
+      const cfg = blocksConfig[block['@type']];
+      if (cfg) {
+        const pulled = pullLinkedFields(cfg, block);
+        if (pulled !== block) {
+          block = pulled;
+          blocks[id] = block;
+          anyPulled = true;
+        }
+      }
+      if (block.blocks) {
+        block = { ...block, blocks: { ...block.blocks } };
+        blocks[id] = block;
+        visit(block.blocks);
+      }
+    }
+  };
+
+  const cloned = { ...formData, blocks: { ...formData.blocks } };
+  visit(cloned.blocks);
+  return anyPulled ? cloned : formData;
 }
 
 /**
