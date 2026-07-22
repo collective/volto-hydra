@@ -33,8 +33,8 @@ const teaserConfig = {
   id: 'teaser',
   fieldMappings: {
     '@target': {
-      Title: 'title',
-      Description: 'description',
+      title: 'title',
+      description: 'description',
       head_title: 'head_title',
       image_scales: { field: 'preview_image', type: 'image' },
     },
@@ -52,8 +52,8 @@ const teaserConfig = {
 
 const targetSnapshot = {
   '@id': '/news/big',
-  Title: 'Big News',
-  Description: 'It happened',
+  title: 'Big News',
+  description: 'It happened',
   head_title: 'Breaking',
   image_field: 'image',
   image_scales: { image: [{ download: '/news/big/@@images/x.jpg' }] },
@@ -138,7 +138,7 @@ describe('getTargetValueForField — typed extraction from the snapshot', () => 
   });
 
   it('returns undefined for an image field when the target has no image', () => {
-    const noImage = { '@id': '/x', Title: 'T' };
+    const noImage = { '@id': '/x', title: 'T' };
     expect(getTargetValueForField('preview_image', teaserConfig, { href: [noImage] })).toBeUndefined();
   });
 
@@ -169,7 +169,7 @@ describe('live target — divergence/sync against the CURRENT target, not the sn
   it('getTargetValueForField uses the live target (snapshot-shaped) when provided', () => {
     // Stored snapshot says 'Big News'; the live target has since changed.
     const data = { href: [targetSnapshot] };
-    const live = { ...targetSnapshot, Title: 'Big News (updated)' };
+    const live = { ...targetSnapshot, title: 'Big News (updated)' };
     expect(getTargetValueForField('title', teaserConfig, data, live)).toBe('Big News (updated)');
     // …and falls back to the stored snapshot when no live target is passed.
     expect(getTargetValueForField('title', teaserConfig, data)).toBe('Big News');
@@ -322,7 +322,7 @@ describe('copy-from-target × fieldRules — conditional (optional) mapped field
     id: 'card',
     fieldMappings: {
       '@target': {
-        Title: 'title',
+        title: 'title',
         effective: 'date',
         image_scales: { field: 'image', type: 'image' },
       },
@@ -418,8 +418,8 @@ describe('copy-from-target — on by default via @default (link-bearing blocks)'
   it('synthesizes a @target from @default (canonical → snapshot keys, @id skipped)', () => {
     const m = getTargetMapping(linkCard);
     expect(m).toEqual({
-      Title: 'heading',
-      Description: 'summary',
+      title: 'heading',
+      description: 'summary',
       image_scales: { field: 'picture', type: 'image' },
     });
     // @id → href is the link itself, not pulled
@@ -436,13 +436,13 @@ describe('copy-from-target — on by default via @default (link-bearing blocks)'
   });
 
   it('an explicit @target still wins over @default', () => {
-    const both = { ...linkCard, fieldMappings: { ...linkCard.fieldMappings, '@target': { Title: 'heading' } } };
-    expect(getTargetMapping(both)).toEqual({ Title: 'heading' });
+    const both = { ...linkCard, fieldMappings: { ...linkCard.fieldMappings, '@target': { title: 'heading' } } };
+    expect(getTargetMapping(both)).toEqual({ title: 'heading' });
   });
 
   it('pulls the target value through the synthesized mapping', () => {
     const blockData = {
-      href: [{ '@id': '/p', Title: 'Live Title', Description: 'Live Desc' }],
+      href: [{ '@id': '/p', title: 'Live Title', description: 'Live Desc' }],
     };
     expect(getTargetValueForField('heading', linkCard, blockData)).toBe('Live Title');
     expect(getTargetValueForField('summary', linkCard, blockData)).toBe('Live Desc');

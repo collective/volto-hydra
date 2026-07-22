@@ -72,6 +72,11 @@
             }
           ]
         }
+      ],
+      "_customFields": [
+        "heading",
+        "subheading",
+        "image"
       ]
     },
     "block-5-linked-image": {

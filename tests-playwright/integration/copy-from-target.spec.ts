@@ -118,6 +118,36 @@ test.describe('Copy-from-target — linked/custom toggle', () => {
     await expect(page.locator(imageToggle)).toHaveAttribute('aria-pressed', 'false');
   });
 
+  test('picking a page in the object browser fills the linked title', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/copy-target-page');
+
+    // btn-pick starts empty (no href, no title). Pick a page via the REAL object
+    // browser — the only way a link gets a snapshot in the app — and the title
+    // must fill from the picked page. This is the core flow the feature exists for.
+    const iframe = helper.getIframe();
+    const btn = iframe.locator('[data-block-uid="btn-pick"] [data-edit-link="href"]');
+    await btn.click();
+    await helper.waitForSidebarOpen();
+
+    const linkButton = page.locator('.quanta-toolbar button[title*="Edit link"]');
+    await expect(linkButton).toBeVisible({ timeout: 5000 });
+    await linkButton.click();
+    await expect(page.locator('.field-link-editor .link-form-container')).toBeVisible({ timeout: 5000 });
+
+    const browse = await helper.getLinkEditorBrowseButton();
+    await browse.click();
+    const ob = await helper.waitForObjectBrowser();
+    await helper.objectBrowserSelectItem(ob, /Another Page/);
+    await helper.submitAddLinkFormIfOpen(page.locator('.field-link-editor'));
+
+    // The href now points at /another-page → the linked title fills from its title.
+    await expect
+      .poll(async () => helper.getSidebarFieldValue('title'), { timeout: 8000 })
+      .toBe('Another Page');
+  });
+
   test('an external link offers no toggle and cannot pull (plain editable field)', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();

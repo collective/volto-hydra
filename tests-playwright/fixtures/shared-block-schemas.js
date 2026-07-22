@@ -33,7 +33,7 @@ export const sharedBlocksConfig = {
         // from the linked content item's Title. `href` is the link field that
         // carries the target snapshot; declaring @target is the only opt-in.
         fieldMappings: {
-            '@target': { Title: 'title' },
+            '@target': { title: 'title' },
         },
         blockSchema: {
             fieldsets: [{ id: 'default', title: 'Default', fields: ['title', 'href', 'inneralign'] }],

@@ -29,16 +29,16 @@ import { getMappingTarget, getFieldType } from './schemaInheritance';
 /** Widget name the mapped destination fields are swapped to (the wrapper). */
 export const COPY_FROM_TARGET_WIDGET = 'copyFromTargetField';
 
-// Canonical `@default` source keys (the lowercase listing/conversion shape) →
-// the keys the LINK snapshot (selectedItemAttrs) actually carries. @default and
-// a link snapshot are both catalog-shaped but historically cased differently: a
-// listing result serializes `title`, a link brain carries `Title`. So to reuse
-// `@default` as the target mapping we translate each canonical source to its
-// snapshot key. `@id` is the link itself (it populates the url field), not a
-// pulled display field, so it is intentionally omitted.
+// Which `@default` source keys are pullable from a link snapshot, and the
+// snapshot key each reads. The object-browser snapshot (selectedItemAttrs) and
+// the `@search` brain are BOTH lowercase — the same shape hydra.js's listing
+// expander maps against (packages/helpers `DEFAULT_FIELD_MAPPING`: `title`,
+// `description`, …). So `title`/`description` pass through unchanged; only the
+// image reads the `image_scales` the brain carries. `@id` is the link itself (it
+// populates the url field), not a pulled display field, so it is omitted.
 const DEFAULT_SOURCE_TO_SNAPSHOT = {
-  title: { src: 'Title' },
-  description: { src: 'Description' },
+  title: { src: 'title' },
+  description: { src: 'description' },
   image: { src: 'image_scales', type: 'image' },
 };
 
