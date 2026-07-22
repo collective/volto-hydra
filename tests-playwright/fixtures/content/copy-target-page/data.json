@@ -38,9 +38,29 @@
       "title": "",
       "href": [],
       "inneralign": "left"
+    },
+    "hero-pick": {
+      "@type": "hero",
+      "heading": "",
+      "subheading": "",
+      "buttonText": "Go",
+      "buttonLink": [],
+      "description": [{ "type": "p", "children": [{ "text": "" }] }]
+    },
+    "section-cft": {
+      "@type": "section",
+      "blocks": {
+        "nested-btn": {
+          "@type": "button",
+          "title": "Stale nested",
+          "href": [{ "@id": "/news/big", "title": "Target Title" }],
+          "inneralign": "left"
+        }
+      },
+      "blocks_layout": { "items": ["nested-btn"] }
     }
   },
   "blocks_layout": {
-    "items": ["title-block", "btn-linked", "btn-custom", "btn-external", "hero-linked", "btn-pick"]
+    "items": ["title-block", "btn-linked", "btn-custom", "btn-external", "hero-linked", "btn-pick", "hero-pick", "section-cft"]
   }
 }

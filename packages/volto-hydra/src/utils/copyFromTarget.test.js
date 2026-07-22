@@ -22,6 +22,7 @@ import {
   markEditedLinkedFieldsCustom,
   installCopyFromTargetEnhancers,
   getTargetId,
+  pullLinkedFields,
   COPY_FROM_TARGET_WIDGET,
 } from './copyFromTarget';
 import { createSchemaEnhancerFromRecipe } from './schemaInheritance';
@@ -210,6 +211,38 @@ describe('linked vs custom per-field state (_customFields)', () => {
 
     const d = withFieldLinked(c, 'description');
     expect(d._customFields).toBeUndefined(); // key removed when empty
+  });
+});
+
+describe('pullLinkedFields — atomic multi-field pull on link change', () => {
+  it('fills EVERY linked mapped field in one write (no per-field clobber)', () => {
+    // Setting the link on an empty multi-field block must pull title, description,
+    // head_title AND the image together — the regression guard for the race where
+    // per-field pulls clobbered all but the last-written field.
+    const block = { '@type': 'teaser', href: [targetSnapshot] };
+    const out = pullLinkedFields(teaserConfig, block);
+    expect(out.title).toBe('Big News');
+    expect(out.description).toBe('It happened');
+    expect(out.head_title).toBe('Breaking');
+    expect(out.preview_image?.[0]?.['@id']).toBe('/news/big');
+  });
+
+  it('skips custom fields and leaves already-synced fields untouched', () => {
+    const block = {
+      '@type': 'teaser',
+      href: [targetSnapshot],
+      title: 'Big News', // already at target
+      description: 'my own words',
+      _customFields: ['description'], // custom → not pulled
+    };
+    const out = pullLinkedFields(teaserConfig, block);
+    expect(out.description).toBe('my own words'); // custom kept
+    expect(out.head_title).toBe('Breaking'); // linked, pulled
+  });
+
+  it('is a no-op with no target selected', () => {
+    const block = { '@type': 'teaser', href: [] };
+    expect(pullLinkedFields(teaserConfig, block)).toBe(block);
   });
 });
 

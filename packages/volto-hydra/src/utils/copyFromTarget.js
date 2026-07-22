@@ -227,6 +227,32 @@ function isEqualJson(a, b) {
 }
 
 /**
+ * Pull EVERY linked (non-custom) mapped field from the target in ONE write,
+ * returning a new block with all of them set. Call this synchronously when the
+ * source link changes (pick/type) so a multi-field @target block fills all its
+ * fields atomically.
+ *
+ * Without it, each field's widget pulls independently via a field-scoped
+ * onChange; those concurrent writes read the same stale block and clobber one
+ * another, so a single-field block (button → title) is fine but a multi-field
+ * @default block (hero → heading/subheading/image) keeps only the last-written
+ * field and loses the rest. Fields already at their target value, custom fields,
+ * and fields with no resolvable target value (e.g. a typed URL carrying no
+ * snapshot metadata) are left untouched.
+ */
+export function pullLinkedFields(blockConfig, blockData, liveTarget) {
+  let next = blockData;
+  for (const field of targetDestFields(blockConfig)) {
+    if (!isFieldLinked(field, blockConfig, blockData)) continue;
+    const value = getTargetValueForField(field, blockConfig, blockData, liveTarget);
+    if (value === undefined) continue;
+    if (isEqualJson(blockData?.[field], value)) continue;
+    next = { ...next, [field]: value };
+  }
+  return next;
+}
+
+/**
  * Turn a LINKED field CUSTOM the moment its value is edited — the ONE mechanism
  * for EVERY edit path (sidebar, inline canvas, image, link). Rather than hook each
  * path, compare by value: diff `incoming` against `previous` and flip any @target

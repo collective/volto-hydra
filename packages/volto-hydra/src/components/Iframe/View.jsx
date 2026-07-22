@@ -278,6 +278,7 @@ import {
   installCopyFromTargetEnhancers,
   markEditedLinkedFieldsCustom,
   getUrlField,
+  pullLinkedFields,
 } from '../../utils/copyFromTarget';
 import { flattenToAppURL, isInternalURL } from '@plone/volto/helpers/Url/Url';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
@@ -5246,6 +5247,13 @@ const Iframe = (props) => {
                 let updatedBlock = setFieldValue(block, fieldName, value);
                 if (metadata?.image_scales) {
                   updatedBlock = { ...updatedBlock, image_field: metadata.image_field, image_scales: metadata.image_scales };
+                }
+                // Setting the SOURCE link (pick/type) pulls every linked mapped
+                // field in ONE write — a multi-field @default block (hero) fills
+                // heading/subheading/image atomically instead of racing per-field
+                // widget pulls that clobber all but the last-written field.
+                if (blockCfg && getUrlField(blockCfg) === fieldName) {
+                  updatedBlock = pullLinkedFields(blockCfg, updatedBlock);
                 }
                 // Use updateBlockById to handle both top-level and container blocks
                 updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, selectedBlock, updatedBlock);

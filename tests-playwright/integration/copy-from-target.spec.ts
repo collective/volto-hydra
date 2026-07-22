@@ -139,12 +139,70 @@ test.describe('Copy-from-target — linked/custom toggle', () => {
     const browse = await helper.getLinkEditorBrowseButton();
     await browse.click();
     const ob = await helper.waitForObjectBrowser();
+    // Selecting applies via onSelectItem (carrying the item's metadata) — no submit.
     await helper.objectBrowserSelectItem(ob, /Another Page/);
-    await helper.submitAddLinkFormIfOpen(page.locator('.field-link-editor'));
 
     // The href now points at /another-page → the linked title fills from its title.
     await expect
       .poll(async () => helper.getSidebarFieldValue('title'), { timeout: 8000 })
+      .toBe('Another Page');
+  });
+
+  test('typing a relative URL into the link editor fills the linked title', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/copy-target-page');
+
+    // No pick — TYPE an internal relative path. There's no item metadata, so the
+    // value must resolve via a live @search of the @id and still fill the title.
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="btn-pick"] [data-edit-link="href"]').click();
+    await helper.waitForSidebarOpen();
+    await page.locator('.quanta-toolbar button[title*="Edit link"]').click();
+    const form = page.locator('.field-link-editor .link-form-container');
+    await expect(form).toBeVisible({ timeout: 5000 });
+    await form.locator('input[name="link"]').fill('/_test_data/another-page');
+    await form.locator('button[aria-label="Submit"]').click();
+
+    await expect
+      .poll(async () => helper.getSidebarFieldValue('title'), { timeout: 8000 })
+      .toBe('Another Page');
+  });
+
+  test('a copy-from-target block INSIDE a container pulls its linked field', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/copy-target-page');
+
+    // nested-btn lives inside section-cft; copy-from-target must work in containers,
+    // not just at the page level — its title pulls from its own href snapshot.
+    await helper.clickBlockInIframe('nested-btn');
+    await helper.waitForSidebarOpen();
+    await expect
+      .poll(async () => helper.getSidebarFieldValue('title'), { timeout: 5000 })
+      .toBe('Target Title');
+    await expect(page.locator(linkedToggle)).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('picking a page on a @default block (hero) fills the mapped heading', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/copy-target-page');
+
+    // hero-pick starts empty; the hero is default-on via @default (target title →
+    // heading). Pick a page through the hero's buttonLink → the heading fills.
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="hero-pick"] [data-edit-link="buttonLink"]').click();
+    await helper.waitForSidebarOpen();
+    await page.locator('.quanta-toolbar button[title*="Edit link"]').click();
+    await expect(page.locator('.field-link-editor .link-form-container')).toBeVisible({ timeout: 5000 });
+    const browse = await helper.getLinkEditorBrowseButton();
+    await browse.click();
+    const ob = await helper.waitForObjectBrowser();
+    await helper.objectBrowserSelectItem(ob, /Another Page/);
+
+    await expect
+      .poll(async () => helper.getSidebarFieldValue('heading'), { timeout: 8000 })
       .toBe('Another Page');
   });
 
