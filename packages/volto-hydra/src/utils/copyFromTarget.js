@@ -29,10 +29,43 @@ import { getMappingTarget, getFieldType } from './schemaInheritance';
 /** Widget name the mapped destination fields are swapped to (the wrapper). */
 export const COPY_FROM_TARGET_WIDGET = 'copyFromTargetField';
 
-/** The `@target` mapping ({ sourceAttr: destField | {field,type} }) or null. */
+// Canonical `@default` source keys (the lowercase listing/conversion shape) →
+// the keys the LINK snapshot (selectedItemAttrs) actually carries. @default and
+// a link snapshot are both catalog-shaped but historically cased differently: a
+// listing result serializes `title`, a link brain carries `Title`. So to reuse
+// `@default` as the target mapping we translate each canonical source to its
+// snapshot key. `@id` is the link itself (it populates the url field), not a
+// pulled display field, so it is intentionally omitted.
+const DEFAULT_SOURCE_TO_SNAPSHOT = {
+  title: { src: 'Title' },
+  description: { src: 'Description' },
+  image: { src: 'image_scales', type: 'image' },
+};
+
+/**
+ * The `@target` mapping ({ sourceAttr: destField | {field,type} }) or null.
+ *
+ * Copy-from-target is ON BY DEFAULT: a block with a link field but no explicit
+ * `@target` falls back to a normalized `@default` — so any link-bearing block
+ * that already declares its canonical content shape pulls from the link without
+ * extra wiring (the teaser case). An explicit `@target` always wins. A block
+ * with no link field (nothing to pull from) returns null.
+ */
 export function getTargetMapping(blockConfig) {
-  const m = blockConfig?.fieldMappings?.['@target'];
-  return m && Object.keys(m).length > 0 ? m : null;
+  const explicit = blockConfig?.fieldMappings?.['@target'];
+  if (explicit && Object.keys(explicit).length > 0) return explicit;
+
+  const def = blockConfig?.fieldMappings?.['@default'];
+  if (!def || !getUrlField(blockConfig)) return null;
+
+  const synthesized = {};
+  for (const [canonical, dest] of Object.entries(def)) {
+    const norm = DEFAULT_SOURCE_TO_SNAPSHOT[canonical]; // skips @id + unknowns
+    const destField = norm && getMappingTarget(dest);
+    if (!destField) continue;
+    synthesized[norm.src] = norm.type ? { field: destField, type: norm.type } : destField;
+  }
+  return Object.keys(synthesized).length > 0 ? synthesized : null;
 }
 
 /** Destination (block) field names the @target mapping writes to. */
@@ -180,6 +213,71 @@ export function withFieldLinked(blockData, field) {
   if (next.length) out[CUSTOM_FIELDS_KEY] = next;
   else delete out[CUSTOM_FIELDS_KEY];
   return out;
+}
+
+/** Mapped destination field names a @target mapping writes to, or []. */
+function targetDestFields(blockConfig) {
+  const mapping = getTargetMapping(blockConfig);
+  if (!mapping) return [];
+  return [...new Set(Object.values(mapping).map(getMappingTarget).filter(Boolean))];
+}
+
+function isEqualJson(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * Turn a LINKED field CUSTOM the moment its value is edited — the ONE mechanism
+ * for EVERY edit path (sidebar, inline canvas, image, link). Rather than hook each
+ * path, compare by value: diff `incoming` against `previous` and flip any @target
+ * destination whose value changed. This runs on every committed formData change,
+ * so three guards keep it correct:
+ *   1. it was LINKED in the previous (pre-edit) state — typing into a not-yet-
+ *      linked field (no target) doesn't flip it, so a later link still pulls it;
+ *   2. its value actually changed;
+ *   3. the NEW value differs from the TARGET value — this is what distinguishes a
+ *      user edit (writes something other than the target) from the PULL itself
+ *      (writes exactly the target). Without it, the pull would flip the very field
+ *      it just synced.
+ * Recurses into nested container blocks. Returns a shallow clone (=== previous
+ * content when nothing flipped, so callers can cheaply skip a no-op write).
+ */
+export function markEditedLinkedFieldsCustom(incoming, previous, blocksConfig) {
+  if (!incoming?.blocks || !previous?.blocks || !blocksConfig) return incoming;
+  let anyFlipped = false;
+
+  const visit = (inBlocks, prevBlocks) => {
+    for (const id of Object.keys(inBlocks)) {
+      let block = inBlocks[id];
+      const prevBlock = prevBlocks?.[id];
+      if (!block || typeof block !== 'object') continue;
+
+      const cfg = blocksConfig[block['@type']];
+      if (cfg && prevBlock) {
+        for (const field of targetDestFields(cfg)) {
+          if (
+            isFieldLinked(field, cfg, prevBlock) && // was linked BEFORE the edit
+            !isFieldCustom(field, block) && // not already flipped (idempotent)
+            !isEqualJson(block[field], prevBlock[field]) && // its value changed
+            !isEqualJson(block[field], getTargetValueForField(field, cfg, block)) // not the pull
+          ) {
+            block = withFieldCustom(block, field);
+            inBlocks[id] = block;
+            anyFlipped = true;
+          }
+        }
+      }
+      if (block.blocks) {
+        block = { ...block, blocks: { ...block.blocks } };
+        inBlocks[id] = block;
+        visit(block.blocks, prevBlock?.blocks);
+      }
+    }
+  };
+
+  const cloned = { ...incoming, blocks: { ...incoming.blocks } };
+  visit(cloned.blocks, previous.blocks);
+  return anyFlipped ? cloned : incoming;
 }
 
 /**

@@ -19,6 +19,7 @@ import {
   isFieldLinked,
   withFieldCustom,
   withFieldLinked,
+  markEditedLinkedFieldsCustom,
   installCopyFromTargetEnhancers,
   getTargetId,
   COPY_FROM_TARGET_WIDGET,
@@ -212,6 +213,51 @@ describe('linked vs custom per-field state (_customFields)', () => {
   });
 });
 
+describe('markEditedLinkedFieldsCustom — inline edit turns a linked field custom (value-compare)', () => {
+  const cfg = { teaser: teaserConfig };
+  const linkedBlock = () => ({ '@type': 'teaser', href: [targetSnapshot], title: 'Big News' });
+
+  it('flips a linked field whose value changed (typed on canvas)', () => {
+    const current = { blocks: { t1: linkedBlock() } };
+    const incoming = { blocks: { t1: { ...linkedBlock(), title: 'Typed on canvas' } } };
+    const out = markEditedLinkedFieldsCustom(incoming, current, cfg);
+    expect(out.blocks.t1.title).toBe('Typed on canvas'); // value kept
+    expect(out.blocks.t1._customFields).toContain('title'); // flipped custom
+  });
+
+  it('does NOT flip an unchanged linked field', () => {
+    const current = { blocks: { t1: linkedBlock() } };
+    const incoming = { blocks: { t1: linkedBlock() } };
+    const out = markEditedLinkedFieldsCustom(incoming, current, cfg);
+    expect(out).toBe(incoming); // untouched reference (cheap no-op)
+    expect(out.blocks.t1._customFields).toBeUndefined();
+  });
+
+  it('does NOT flip when the value changed TO the target (the pull, not an edit)', () => {
+    // A stale value being pulled up to the target must stay LINKED, not flip.
+    const current = { blocks: { t1: { '@type': 'teaser', href: [targetSnapshot], title: 'stale' } } };
+    const incoming = { blocks: { t1: { '@type': 'teaser', href: [targetSnapshot], title: 'Big News' } } };
+    const out = markEditedLinkedFieldsCustom(incoming, current, cfg);
+    expect(out.blocks.t1._customFields).toBeUndefined(); // pull → still linked
+  });
+
+  it('does NOT flip a field that was NOT linked pre-edit (no target → typing before a link)', () => {
+    // No href yet → not linked → typing the title must not turn it custom, so a
+    // later link still pulls it.
+    const current = { blocks: { t1: { '@type': 'teaser', title: '' } } };
+    const incoming = { blocks: { t1: { '@type': 'teaser', title: 'Typed before link' } } };
+    const out = markEditedLinkedFieldsCustom(incoming, current, cfg);
+    expect(out.blocks.t1._customFields).toBeUndefined();
+  });
+
+  it('flips linked fields inside nested container blocks', () => {
+    const current = { blocks: { grid: { '@type': 'grid', blocks: { t1: linkedBlock() } } } };
+    const incoming = { blocks: { grid: { '@type': 'grid', blocks: { t1: { ...linkedBlock(), title: 'Edited' } } } } };
+    const out = markEditedLinkedFieldsCustom(incoming, current, cfg);
+    expect(out.blocks.grid.blocks.t1._customFields).toContain('title');
+  });
+});
+
 describe('installCopyFromTargetEnhancers — auto-install, gated on @target', () => {
   const makeConfig = () => ({
     teaser: { ...teaserConfig },
@@ -339,5 +385,66 @@ describe('copy-from-target × fieldRules — conditional (optional) mapped field
     const withDate = enhancer({ schema: baseSchema(), formData: { elements: ['date'] }, intl });
     expect(withDate.properties.date?.widget).toBe(COPY_FROM_TARGET_WIDGET);
     expect(withDate.properties.image).toBeUndefined();
+  });
+});
+
+/**
+ * On-by-default: a link-bearing block with a `@default` mapping (but no explicit
+ * `@target`) pulls from the link. The synthesized mapping normalizes @default's
+ * canonical keys (title/description/image) to the link snapshot's brain keys
+ * (Title/Description/image_scales); `@id` (the link itself) is not pulled.
+ */
+describe('copy-from-target — on by default via @default (link-bearing blocks)', () => {
+  const linkCard = {
+    id: 'linkcard',
+    fieldMappings: {
+      '@default': {
+        '@id': 'href',
+        title: 'heading',
+        description: 'summary',
+        image: 'picture',
+      },
+    },
+    blockSchema: {
+      properties: {
+        href: { title: 'Link', widget: 'object_browser', mode: 'link' },
+        heading: { title: 'Heading' },
+        summary: { title: 'Summary' },
+        picture: { title: 'Picture', widget: 'object_browser', mode: 'image' },
+      },
+    },
+  };
+
+  it('synthesizes a @target from @default (canonical → snapshot keys, @id skipped)', () => {
+    const m = getTargetMapping(linkCard);
+    expect(m).toEqual({
+      Title: 'heading',
+      Description: 'summary',
+      image_scales: { field: 'picture', type: 'image' },
+    });
+    // @id → href is the link itself, not pulled
+    expect(m['@id']).toBeUndefined();
+  });
+
+  it('a block with @default but NO link field is not default-on', () => {
+    const noLink = {
+      id: 'x',
+      fieldMappings: { '@default': { title: 'heading' } },
+      blockSchema: { properties: { heading: { title: 'Heading' } } },
+    };
+    expect(getTargetMapping(noLink)).toBeNull();
+  });
+
+  it('an explicit @target still wins over @default', () => {
+    const both = { ...linkCard, fieldMappings: { ...linkCard.fieldMappings, '@target': { Title: 'heading' } } };
+    expect(getTargetMapping(both)).toEqual({ Title: 'heading' });
+  });
+
+  it('pulls the target value through the synthesized mapping', () => {
+    const blockData = {
+      href: [{ '@id': '/p', Title: 'Live Title', Description: 'Live Desc' }],
+    };
+    expect(getTargetValueForField('heading', linkCard, blockData)).toBe('Live Title');
+    expect(getTargetValueForField('summary', linkCard, blockData)).toBe('Live Desc');
   });
 });
