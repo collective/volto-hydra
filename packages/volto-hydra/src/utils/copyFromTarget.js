@@ -215,6 +215,71 @@ export function withFieldLinked(blockData, field) {
   return out;
 }
 
+/** Mapped destination field names a @target mapping writes to, or []. */
+function targetDestFields(blockConfig) {
+  const mapping = getTargetMapping(blockConfig);
+  if (!mapping) return [];
+  return [...new Set(Object.values(mapping).map(getMappingTarget).filter(Boolean))];
+}
+
+function isEqualJson(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * Turn a LINKED field CUSTOM the moment its value is edited — the ONE mechanism
+ * for EVERY edit path (sidebar, inline canvas, image, link). Rather than hook each
+ * path, compare by value: diff `incoming` against `previous` and flip any @target
+ * destination whose value changed. This runs on every committed formData change,
+ * so three guards keep it correct:
+ *   1. it was LINKED in the previous (pre-edit) state — typing into a not-yet-
+ *      linked field (no target) doesn't flip it, so a later link still pulls it;
+ *   2. its value actually changed;
+ *   3. the NEW value differs from the TARGET value — this is what distinguishes a
+ *      user edit (writes something other than the target) from the PULL itself
+ *      (writes exactly the target). Without it, the pull would flip the very field
+ *      it just synced.
+ * Recurses into nested container blocks. Returns a shallow clone (=== previous
+ * content when nothing flipped, so callers can cheaply skip a no-op write).
+ */
+export function markEditedLinkedFieldsCustom(incoming, previous, blocksConfig) {
+  if (!incoming?.blocks || !previous?.blocks || !blocksConfig) return incoming;
+  let anyFlipped = false;
+
+  const visit = (inBlocks, prevBlocks) => {
+    for (const id of Object.keys(inBlocks)) {
+      let block = inBlocks[id];
+      const prevBlock = prevBlocks?.[id];
+      if (!block || typeof block !== 'object') continue;
+
+      const cfg = blocksConfig[block['@type']];
+      if (cfg && prevBlock) {
+        for (const field of targetDestFields(cfg)) {
+          if (
+            isFieldLinked(field, cfg, prevBlock) && // was linked BEFORE the edit
+            !isFieldCustom(field, block) && // not already flipped (idempotent)
+            !isEqualJson(block[field], prevBlock[field]) && // its value changed
+            !isEqualJson(block[field], getTargetValueForField(field, cfg, block)) // not the pull
+          ) {
+            block = withFieldCustom(block, field);
+            inBlocks[id] = block;
+            anyFlipped = true;
+          }
+        }
+      }
+      if (block.blocks) {
+        block = { ...block, blocks: { ...block.blocks } };
+        inBlocks[id] = block;
+        visit(block.blocks, prevBlock?.blocks);
+      }
+    }
+  };
+
+  const cloned = { ...incoming, blocks: { ...incoming.blocks } };
+  visit(cloned.blocks, previous.blocks);
+  return anyFlipped ? cloned : incoming;
+}
+
 /**
  * A block schemaEnhancer that applies the copy-from-target field-widget swap.
  * Bound to the block's config at install time (so this module stays free of the

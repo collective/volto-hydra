@@ -16,9 +16,12 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { defineMessages, useIntl } from 'react-intl';
+import { Icon } from '@plone/volto/components';
 import config from '@plone/volto/registry';
 import { searchContent } from '@plone/volto/actions/search/search';
 import { flattenToAppURL, isInternalURL } from '@plone/volto/helpers/Url/Url';
+import linkSVG from '@plone/volto/icons/link.svg';
+import unlinkSVG from '@plone/volto/icons/unlink.svg';
 import { useHydraSchemaContext, getLiveBlockData } from '../../context';
 import {
   getTargetId,
@@ -183,8 +186,12 @@ const CopyFromTargetField = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linked, JSON.stringify(targetValue), props.id]);
 
-  // EDIT: a user edit to a LINKED field flips it to custom (and keeps the typed
-  // value). A custom field edits normally.
+  // EDIT: a user edit to a LINKED field turns it CUSTOM (keeping the typed value).
+  // The sidebar edit is only visible HERE (the widget lives in the sidebar form,
+  // not View), and the flip must be part of THIS update — a reactive after-the-fact
+  // flip re-renders mid-type and moves the cursor. It's the same rule the inline
+  // and image/link paths apply by value-compare; the widget just already knows the
+  // field. A custom field edits normally.
   const onFieldChange = (id, value) => {
     if (linked) {
       updateBlock({ ...withFieldCustom(blockData, props.id), [props.id]: value });
@@ -193,7 +200,8 @@ const CopyFromTargetField = (props) => {
     }
   };
 
-  // TOGGLE: linked ⇄ custom. custom → linked re-pulls the target value.
+  // TOGGLE: linked ⇄ custom. Explicit untick (not a value edit) marks custom;
+  // re-tick re-pulls the target value.
   const onToggle = () => {
     if (linked) {
       updateBlock(withFieldCustom(blockData, props.id));
@@ -214,35 +222,47 @@ const CopyFromTargetField = (props) => {
   };
   const BaseWidget = resolveWidget(baseProps);
 
-  const label = intl.formatMessage(messages.linked);
+  // Icon-only toggle: a checkbox + 🔗, the meaning carried by the hover tooltip.
+  // Ticked = linked (pulls from the linked content); untick to customise.
+  const hint = intl.formatMessage(messages.linkedHint);
   // Offer the toggle only for a supported (internal) target — an external URL
   // can't be pulled from, so the field is just a normal editable field.
   const showToggle = targetSupported;
 
+  // The toggle sits at the top-right of the field row (the end of the input line),
+  // not on a line of its own — a single click-to-toggle icon (no checkbox), using
+  // Volto's own link / unlink icons: linked = tracking the target, unlinked =
+  // custom. Meaning in the tooltip; `aria-pressed` exposes the state to AT/tests.
   return (
-    <>
+    <div style={{ position: 'relative' }} className="copy-from-target-field">
       <BaseWidget {...baseProps} />
       {showToggle ? (
-        <p
-          className="help copy-from-target-toggle"
-          style={{ marginTop: baseWidget?.description ? '2px' : '-6px' }}
+        <button
+          type="button"
+          className="copy-from-target-toggle copy-from-target-linked"
+          aria-pressed={linked}
+          onClick={onToggle}
+          title={hint}
+          aria-label={hint}
+          style={{
+            position: 'absolute',
+            top: '0',
+            right: '0',
+            border: 'none',
+            background: 'none',
+            padding: '2px',
+            cursor: 'pointer',
+            lineHeight: 0,
+          }}
         >
-          <label
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', cursor: 'pointer', color: '#64748b' }}
-            title={intl.formatMessage(messages.linkedHint)}
-          >
-            <input
-              type="checkbox"
-              className="copy-from-target-linked"
-              checked={linked}
-              onChange={onToggle}
-              style={{ margin: 0, cursor: 'pointer' }}
-            />
-            🔗 {label}
-          </label>
-        </p>
+          <Icon
+            name={linked ? linkSVG : unlinkSVG}
+            size="18px"
+            color={linked ? '#684cc9' : '#999'}
+          />
+        </button>
       ) : null}
-    </>
+    </div>
   );
 };
 

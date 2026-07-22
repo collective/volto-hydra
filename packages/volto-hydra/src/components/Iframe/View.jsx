@@ -274,7 +274,10 @@ import {
   convertBlockType,
   validateFieldMappings,
 } from '../../utils/schemaInheritance';
-import { installCopyFromTargetEnhancers } from '../../utils/copyFromTarget';
+import {
+  installCopyFromTargetEnhancers,
+  markEditedLinkedFieldsCustom,
+} from '../../utils/copyFromTarget';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
 
@@ -2237,17 +2240,27 @@ const Iframe = (props) => {
           const isNewEdit = incomingSequence > preMessageSeq;
 
           if (isNewEdit) {
-            // New edit from iframe - update everything
+            // New edit from iframe - update everything.
+            // Copy-from-target: turn any LINKED field edited inline CUSTOM, by the
+            // same value-compare used for image/link edits — the inline message
+            // carries the whole formData with no clue which field changed. Applied
+            // synchronously (part of THIS update) so it doesn't re-render mid-type
+            // and move the cursor.
             inlineEditCounterRef.current += 1;
+            const editedData = markEditedLinkedFieldsCustom(
+              event.data.data,
+              properties,
+              config.blocks.blocksConfig,
+            );
             // Debug: log full children structure to diagnose missing "w" bug
-            const debugBlock = event.data.data?.blocks?.['block-1-uuid'];
+            const debugBlock = editedData?.blocks?.['block-1-uuid'];
             if (debugBlock?.value?.[0]?.children) {
               log('INLINE_EDIT_DATA: full children structure:', JSON.stringify(debugBlock.value[0].children));
             }
             setIframeSyncState(prev => ({
               ...prev,
-              formData: event.data.data,
-              blockPathMap: buildBlockPathMap(event.data.data, config.blocks.blocksConfig, intl),
+              formData: editedData,
+              blockPathMap: buildBlockPathMap(editedData, config.blocks.blocksConfig, intl),
               selection: event.data.selection || null,
               _selectionSource: 'INLINE_EDIT_DATA:new',
               ...(event.data.flushRequestId ? { completedFlushRequestId: event.data.flushRequestId } : {}),
@@ -2255,7 +2268,7 @@ const Iframe = (props) => {
             // Strip _editSequence when updating Redux - sequence numbers are for iframe
             // echo detection only. Redux data doesn't need sequences since admin-side echo
             // prevention uses content comparison (processedInlineEditCounterRef + formDataContentEqual).
-            const { _editSequence: _, ...formDataWithoutSeq } = event.data.data;
+            const { _editSequence: _, ...formDataWithoutSeq } = editedData;
             log('INLINE_EDIT_DATA: calling onChangeFormData prop to update Redux (without _editSequence)');
             onChangeFormData(formDataWithoutSeq);
           } else {
@@ -5224,6 +5237,17 @@ const Iframe = (props) => {
                 }
                 // Use updateBlockById to handle both top-level and container blocks
                 updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, selectedBlock, updatedBlock);
+                // Turn a LINKED image/link destination CUSTOM via the SAME
+                // value-compare used everywhere else. Applied synchronously here
+                // (not left to the `properties` effect) because this handler also
+                // writes iframeSyncState.formData below and sends FORM_DATA — the
+                // flipped form must be the one that goes out, or the round-trip
+                // would clobber the async flip.
+                updatedProperties = markEditedLinkedFieldsCustom(
+                  updatedProperties,
+                  properties,
+                  config.blocks.blocksConfig,
+                );
               }
 
               // Update Redux via onChangeFormData

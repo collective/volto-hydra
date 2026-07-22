@@ -19,6 +19,7 @@ import {
   isFieldLinked,
   withFieldCustom,
   withFieldLinked,
+  markEditedLinkedFieldsCustom,
   installCopyFromTargetEnhancers,
   getTargetId,
   COPY_FROM_TARGET_WIDGET,
@@ -209,6 +210,51 @@ describe('linked vs custom per-field state (_customFields)', () => {
 
     const d = withFieldLinked(c, 'description');
     expect(d._customFields).toBeUndefined(); // key removed when empty
+  });
+});
+
+describe('markEditedLinkedFieldsCustom — inline edit turns a linked field custom (value-compare)', () => {
+  const cfg = { teaser: teaserConfig };
+  const linkedBlock = () => ({ '@type': 'teaser', href: [targetSnapshot], title: 'Big News' });
+
+  it('flips a linked field whose value changed (typed on canvas)', () => {
+    const current = { blocks: { t1: linkedBlock() } };
+    const incoming = { blocks: { t1: { ...linkedBlock(), title: 'Typed on canvas' } } };
+    const out = markEditedLinkedFieldsCustom(incoming, current, cfg);
+    expect(out.blocks.t1.title).toBe('Typed on canvas'); // value kept
+    expect(out.blocks.t1._customFields).toContain('title'); // flipped custom
+  });
+
+  it('does NOT flip an unchanged linked field', () => {
+    const current = { blocks: { t1: linkedBlock() } };
+    const incoming = { blocks: { t1: linkedBlock() } };
+    const out = markEditedLinkedFieldsCustom(incoming, current, cfg);
+    expect(out).toBe(incoming); // untouched reference (cheap no-op)
+    expect(out.blocks.t1._customFields).toBeUndefined();
+  });
+
+  it('does NOT flip when the value changed TO the target (the pull, not an edit)', () => {
+    // A stale value being pulled up to the target must stay LINKED, not flip.
+    const current = { blocks: { t1: { '@type': 'teaser', href: [targetSnapshot], title: 'stale' } } };
+    const incoming = { blocks: { t1: { '@type': 'teaser', href: [targetSnapshot], title: 'Big News' } } };
+    const out = markEditedLinkedFieldsCustom(incoming, current, cfg);
+    expect(out.blocks.t1._customFields).toBeUndefined(); // pull → still linked
+  });
+
+  it('does NOT flip a field that was NOT linked pre-edit (no target → typing before a link)', () => {
+    // No href yet → not linked → typing the title must not turn it custom, so a
+    // later link still pulls it.
+    const current = { blocks: { t1: { '@type': 'teaser', title: '' } } };
+    const incoming = { blocks: { t1: { '@type': 'teaser', title: 'Typed before link' } } };
+    const out = markEditedLinkedFieldsCustom(incoming, current, cfg);
+    expect(out.blocks.t1._customFields).toBeUndefined();
+  });
+
+  it('flips linked fields inside nested container blocks', () => {
+    const current = { blocks: { grid: { '@type': 'grid', blocks: { t1: linkedBlock() } } } };
+    const incoming = { blocks: { grid: { '@type': 'grid', blocks: { t1: { ...linkedBlock(), title: 'Edited' } } } } };
+    const out = markEditedLinkedFieldsCustom(incoming, current, cfg);
+    expect(out.blocks.grid.blocks.t1._customFields).toContain('title');
   });
 });
 
