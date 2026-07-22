@@ -2178,7 +2178,7 @@ function getResolvedSchema(blocksConfig, blockType, intl) {
  * @param {string} widget - The widget name from the schema field
  * @param {Object} fieldDef - The full field definition (to check mode, etc.)
  */
-function widgetToTargetType(widget, fieldDef) {
+export function widgetToTargetType(widget, fieldDef) {
   if (widget === 'object_browser') {
     // object_browser in image mode: array format [{ '@id': url, image_field?, image_scales? }]
     if (fieldDef?.mode === 'image') return 'image_link';

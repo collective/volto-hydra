@@ -37,7 +37,7 @@ const teaserConfig = {
       title: 'title',
       description: 'description',
       head_title: 'head_title',
-      image_scales: { field: 'preview_image', type: 'image' },
+      image: 'preview_image',
     },
   },
   blockSchema: {
@@ -453,7 +453,7 @@ describe('copy-from-target — on by default via @default (link-bearing blocks)'
     expect(m).toEqual({
       title: 'heading',
       description: 'summary',
-      image_scales: { field: 'picture', type: 'image' },
+      image: 'picture',
     });
     // @id → href is the link itself, not pulled
     expect(m['@id']).toBeUndefined();
@@ -479,5 +479,58 @@ describe('copy-from-target — on by default via @default (link-bearing blocks)'
     };
     expect(getTargetValueForField('heading', linkCard, blockData)).toBe('Live Title');
     expect(getTargetValueForField('summary', linkCard, blockData)).toBe('Live Desc');
+  });
+
+  // @default is pass-through, NOT an allowlist of title/description/image: any
+  // declared field flows (tags via `Subject`, dates via `created`/`effective`),
+  // reading its own snapshot key. Only `image` is special-cased and `@id` skipped.
+  const richCard = {
+    id: 'richcard',
+    fieldMappings: {
+      '@default': {
+        '@id': 'href',
+        title: 'heading',
+        image: 'picture',
+        Subject: 'tags',
+        created: 'createdOn',
+        effective: 'publishedOn',
+      },
+    },
+    blockSchema: {
+      properties: {
+        href: { title: 'Link', widget: 'object_browser', mode: 'link' },
+        heading: { title: 'Heading' },
+        picture: { title: 'Picture', widget: 'object_browser', mode: 'image' },
+        tags: { title: 'Tags', widget: 'array' },
+        createdOn: { title: 'Created', widget: 'date' },
+        publishedOn: { title: 'Published', widget: 'date' },
+      },
+    },
+  };
+
+  it('passes tags and dates through @default (not just title/description/image)', () => {
+    const m = getTargetMapping(richCard);
+    // plain source keys map straight through to their dest field
+    expect(m.Subject).toBe('tags');
+    expect(m.created).toBe('createdOn');
+    expect(m.effective).toBe('publishedOn');
+    // image passes through verbatim (type derived from the dest widget); @id skipped
+    expect(m.image).toBe('picture');
+    expect(m['@id']).toBeUndefined();
+  });
+
+  it('pulls tags (Subject) and dates (created/effective) from the snapshot', () => {
+    const blockData = {
+      href: [{
+        '@id': '/p',
+        title: 'Live Title',
+        Subject: ['news', 'plone'],
+        created: '2025-01-01T12:00:00+00:00',
+        effective: '2025-02-02T09:00:00+00:00',
+      }],
+    };
+    expect(getTargetValueForField('tags', richCard, blockData)).toEqual(['news', 'plone']);
+    expect(getTargetValueForField('createdOn', richCard, blockData)).toBe('2025-01-01T12:00:00+00:00');
+    expect(getTargetValueForField('publishedOn', richCard, blockData)).toBe('2025-02-02T09:00:00+00:00');
   });
 });

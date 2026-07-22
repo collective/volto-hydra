@@ -184,13 +184,16 @@ test.describe('Copy-from-target — linked/custom toggle', () => {
     await expect(page.locator(linkedToggle)).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('picking a page on a @default block (hero) fills the mapped heading', async ({ page }) => {
+  test('picking a page on a @default block (hero) fills EVERY mapped field from one URL change', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
     await helper.navigateToEdit('/copy-target-page');
 
-    // hero-pick starts empty; the hero is default-on via @default (target title →
-    // heading). Pick a page through the hero's buttonLink → the heading fills.
+    // hero-pick starts empty; the hero is default-on via @default mapping
+    // title→heading, description→subheading, image→image. Picking a page for the
+    // buttonLink (ONE URL change) must fill ALL of them together — this is the
+    // regression guard for the multi-field pull race where per-field pulls
+    // clobbered each other and only one field (subheading) survived.
     const iframe = helper.getIframe();
     await iframe.locator('[data-block-uid="hero-pick"] [data-edit-link="buttonLink"]').click();
     await helper.waitForSidebarOpen();
@@ -201,9 +204,19 @@ test.describe('Copy-from-target — linked/custom toggle', () => {
     const ob = await helper.waitForObjectBrowser();
     await helper.objectBrowserSelectItem(ob, /Another Page/);
 
+    // title → heading (from the pick's snapshot metadata, synchronously)
     await expect
       .poll(async () => helper.getSidebarFieldValue('heading'), { timeout: 8000 })
       .toBe('Another Page');
+    // description → subheading (the field that WON the race before — must still fill)
+    await expect
+      .poll(async () => helper.getSidebarFieldValue('subheading'), { timeout: 8000 })
+      .toBe('Another test page for linking');
+    // image → image: the target carries image_scales, resolved via the live
+    // @search, so the hero's rendered image points at the target's own image.
+    await expect(
+      iframe.locator('[data-block-uid="hero-pick"] [data-edit-media="image"]'),
+    ).toHaveAttribute('src', /another-page/, { timeout: 8000 });
   });
 
   test('an external link offers no toggle and cannot pull (plain editable field)', async ({ page }) => {
