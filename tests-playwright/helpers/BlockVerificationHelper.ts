@@ -9,7 +9,7 @@
  */
 import { expect } from '@playwright/test';
 import type { Page, FrameLocator, Locator } from '@playwright/test';
-import { recordSlateFieldContainer } from './field-coverage';
+import { recordSlateFieldContainer, recordFieldEditable } from './field-coverage';
 
 export interface SubBlock {
   id: string;
@@ -394,6 +394,55 @@ export async function checkSlateAnnotations(
           `    Expected: ${JSON.stringify(existing).slice(0, 400)}\n` +
           `  container outerHTML (truncated): ${dom}\n` +
           `  Likely causes: renderer missing data-node-id on some nodes; stray whitespace in template between sibling slate nodes; renderer emitting wrong element tag.`,
+      );
+    }
+  }
+
+  // Media (data-edit-media) and link (data-edit-link) fields get the SAME
+  // aggregate coverage as slate: each must expose its edit annotation in AT LEAST
+  // ONE example of its block type (an empty or gated example may legitimately omit
+  // it, so this records rather than throws — the aggregate fails only if a field
+  // is editable in NO example). Excluded on purpose: bare text/string fields
+  // (sidebar-only attribute fields like an image block's `alt` → the <img alt>
+  // attribute) AND `textarea` — sanity discovery proved textareas are not
+  // uniformly canvas content (a code block's `code` and a form's `send_message`
+  // are edited in the sidebar), so widget alone can't promise inline editability
+  // for them. Displayed plain text is covered by the DOM-gated check above; slate
+  // (always canvas rich-text) is recorded by the loop above.
+  if (blockSchema?.properties) {
+    const annotationFor = (
+      prop: Record<string, unknown>,
+    ): { kind: 'text' | 'media' | 'link'; attr: string } | null => {
+      const w = prop?.widget;
+      const mode = (prop as { mode?: string })?.mode;
+      if (w === 'image' || (w === 'object_browser' && mode === 'image'))
+        return { kind: 'media', attr: 'data-edit-media' };
+      if (w === 'object_browser' && mode === 'link')
+        return { kind: 'link', attr: 'data-edit-link' };
+      return null;
+    };
+    for (const [field, prop] of Object.entries(blockSchema.properties)) {
+      const a = annotationFor(prop as Record<string, unknown>);
+      if (!a) continue;
+      // The annotation value may carry a leading slash (some renderers emit
+      // `data-edit-media="/image"`) — normalize before comparing to the field.
+      const editable = await block.evaluate(
+        (el, args) => {
+          const { attr, field } = args as { attr: string; field: string };
+          const norm = (v: string | null) => (v || '').replace(/^\//, '');
+          if (norm(el.getAttribute(attr)) === field) return true;
+          return Array.from(el.querySelectorAll(`[${attr}]`)).some(
+            (d) => norm(d.getAttribute(attr)) === field,
+          );
+        },
+        { attr: a.attr, field },
+      );
+      recordFieldEditable(
+        a.kind,
+        blockType,
+        field,
+        editable,
+        `[${coverageUid}] widget=${(prop as { widget?: string })?.widget}`,
       );
     }
   }

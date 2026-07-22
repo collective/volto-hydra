@@ -3,44 +3,35 @@
  * the linked content item" behaviour, driven by `fieldMappings['@target']`.
  *
  * A block declares which target-content attributes map to which of its own
- * fields:
+ * fields, reading each brain key verbatim (same shape the listing expander uses):
  *
  *   fieldMappings: {
  *     '@target': {
- *       Title: 'title',
- *       Description: 'description',
- *       image_scales: { field: 'preview_image', type: 'image' },
+ *       title: 'title',
+ *       description: 'description',
+ *       Subject: 'tags',
+ *       image: 'preview_image',
  *     },
  *   }
  *
  * The target snapshot rides on the block's link/url field (the object_browser
- * `selectedItemAttrs`), e.g. `block.href[0] = { Title, Description, … }`.
+ * `selectedItemAttrs`), e.g. `block.href[0] = { title, description, … }`.
  *
  * A mapped field is LINKED by default (it tracks the target) or CUSTOM (the
  * editor's own value, recorded in the block's `_customFields`).
  *
  * This module is the PURE core (no React): mapping lookup, schema field-widget
- * swap, per-field typed value extraction, and linked/custom state. The enhancer
- * that installs it on every block and the `copyFromTargetField` wrapper widget
- * build on these.
+ * swap, and per-field value extraction — the last DELEGATED to the shared
+ * `convertFieldValue` + `widgetToTargetType` (the type is derived from the dest
+ * field's widget), so copy-from-target and the listing expander pull identically.
+ * The enhancer that installs it on every block and the `copyFromTargetField`
+ * wrapper widget build on these.
  */
-import { getMappingTarget, getFieldType } from './schemaInheritance';
+import { getMappingTarget, getFieldType, widgetToTargetType } from './schemaInheritance';
+import { convertFieldValue, normalizeCatalogImage } from '@volto-hydra/helpers';
 
 /** Widget name the mapped destination fields are swapped to (the wrapper). */
 export const COPY_FROM_TARGET_WIDGET = 'copyFromTargetField';
-
-// Canonical `@default` source keys (the lowercase listing/conversion shape) →
-// the keys the LINK snapshot (selectedItemAttrs) actually carries. @default and
-// a link snapshot are both catalog-shaped but historically cased differently: a
-// listing result serializes `title`, a link brain carries `Title`. So to reuse
-// `@default` as the target mapping we translate each canonical source to its
-// snapshot key. `@id` is the link itself (it populates the url field), not a
-// pulled display field, so it is intentionally omitted.
-const DEFAULT_SOURCE_TO_SNAPSHOT = {
-  title: { src: 'Title' },
-  description: { src: 'Description' },
-  image: { src: 'image_scales', type: 'image' },
-};
 
 /**
  * The `@target` mapping ({ sourceAttr: destField | {field,type} }) or null.
@@ -58,12 +49,18 @@ export function getTargetMapping(blockConfig) {
   const def = blockConfig?.fieldMappings?.['@default'];
   if (!def || !getUrlField(blockConfig)) return null;
 
+  // Pass-through, same contract as the listing expander (helpers `convertFieldValue`
+  // + `widgetToTargetType`): copy every declared source key VERBATIM to its dest
+  // field; the value's type is derived from the dest field's widget at pull time,
+  // so `title`, `description`, `Subject`, `created`, `image`, … all flow with no
+  // per-field wiring. `@id` is the link itself (it already populates the url field),
+  // never a pulled display field, so it is the one key skipped.
   const synthesized = {};
-  for (const [canonical, dest] of Object.entries(def)) {
-    const norm = DEFAULT_SOURCE_TO_SNAPSHOT[canonical]; // skips @id + unknowns
-    const destField = norm && getMappingTarget(dest);
+  for (const [source, dest] of Object.entries(def)) {
+    if (source === '@id') continue;
+    const destField = getMappingTarget(dest);
     if (!destField) continue;
-    synthesized[norm.src] = norm.type ? { field: destField, type: norm.type } : destField;
+    synthesized[source] = destField;
   }
   return Object.keys(synthesized).length > 0 ? synthesized : null;
 }
@@ -146,9 +143,12 @@ export function getTargetId(blockConfig, blockData) {
  * not as it was when it was last selected. Falls back to the stored snapshot
  * when no live target is available.
  *
- * Typed: an `image` field is assembled from the catalog-brain image attrs
- * (`@id` / `image_field` / `image_scales`) into the array form an
- * object_browser (mode=image) field expects. Plain fields pass through.
+ * Value handling is the SAME contract the listing expander uses: normalize the
+ * brain (package image_scales/image_field into a single `image` object), read the
+ * mapped source key verbatim, then `convertFieldValue` it to the shape the dest
+ * field's widget wants — object_browser image → array, ImageWidget → URL string,
+ * slate → nodes, and plain fields (tags, dates, strings) straight through. The
+ * type is derived from the widget (or an explicit `{type}` on the mapping wins).
  */
 export function getTargetValueForField(field, blockConfig, blockData, liveTarget) {
   const mapping = getTargetMapping(blockConfig);
@@ -157,23 +157,19 @@ export function getTargetValueForField(field, blockConfig, blockData, liveTarget
   if (!entry) return undefined;
 
   const urlField = getUrlField(blockConfig);
-  const snapshot = liveTarget || (urlField ? blockData?.[urlField]?.[0] : undefined);
-  if (!snapshot) return undefined;
+  const rawSnapshot = liveTarget || (urlField ? blockData?.[urlField]?.[0] : undefined);
+  if (!rawSnapshot) return undefined;
 
-  if (entry.type === 'image') {
-    if (snapshot.image_scales == null && snapshot.image_field == null) {
-      return undefined; // target has no image
-    }
-    return [
-      {
-        '@id': snapshot['@id'],
-        image_field: snapshot.image_field,
-        image_scales: snapshot.image_scales,
-      },
-    ];
-  }
+  const snapshot = normalizeCatalogImage(rawSnapshot);
+  const raw = snapshot[entry.src];
+  if (raw === undefined) return undefined;
 
-  return snapshot[entry.src];
+  // Derive the conversion type from the DESTINATION field's widget (the same
+  // rule block-type conversion uses), so we never hard-code per-field behaviour.
+  const rawDef = blockConfig?.blockSchema?.properties?.[field];
+  const destDef = rawDef?.widget === COPY_FROM_TARGET_WIDGET ? rawDef.baseWidget : rawDef;
+  const type = entry.type ?? widgetToTargetType(destDef?.widget, destDef);
+  return convertFieldValue(raw, type);
 }
 
 /** Block key holding the set of fields the editor has taken CUSTOM (overridden). */
@@ -224,6 +220,32 @@ function targetDestFields(blockConfig) {
 
 function isEqualJson(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * Pull EVERY linked (non-custom) mapped field from the target in ONE write,
+ * returning a new block with all of them set. Call this synchronously when the
+ * source link changes (pick/type) so a multi-field @target block fills all its
+ * fields atomically.
+ *
+ * Without it, each field's widget pulls independently via a field-scoped
+ * onChange; those concurrent writes read the same stale block and clobber one
+ * another, so a single-field block (button → title) is fine but a multi-field
+ * @default block (hero → heading/subheading/image) keeps only the last-written
+ * field and loses the rest. Fields already at their target value, custom fields,
+ * and fields with no resolvable target value (e.g. a typed URL carrying no
+ * snapshot metadata) are left untouched.
+ */
+export function pullLinkedFields(blockConfig, blockData, liveTarget) {
+  let next = blockData;
+  for (const field of targetDestFields(blockConfig)) {
+    if (!isFieldLinked(field, blockConfig, blockData)) continue;
+    const value = getTargetValueForField(field, blockConfig, blockData, liveTarget);
+    if (value === undefined) continue;
+    if (isEqualJson(blockData?.[field], value)) continue;
+    next = { ...next, [field]: value };
+  }
+  return next;
 }
 
 /**

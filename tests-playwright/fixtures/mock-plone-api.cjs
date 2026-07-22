@@ -2367,7 +2367,11 @@ app.get('*/@search', (req, res) => {
         const itemParts = itemPath.split('/').filter(Boolean);
         return itemParts.length === searchDepth + 1;
       })
-      .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl));
+      .map((itemPath) => loadContentFromDisk(itemPath))
+      // A dir with no parseable data.json (e.g. `templates/`) loads as null —
+      // skip it, don't crash formatSearchItem (same guard as the no-depth branch).
+      .filter((content) => content != null)
+      .map((content) => formatSearchItem(content, baseUrl));
 
     // For root searches, also include non-root mount points as virtual folders
     // so the object browser can navigate into them (e.g., _test_data)
@@ -2407,7 +2411,9 @@ app.get('*/@search', (req, res) => {
             const itemParts = itemPath.split('/').filter(Boolean);
             return itemParts.length === searchDepth + 1;
           })
-          .map((itemPath) => formatSearchItem(loadContentFromDisk(itemPath), baseUrl));
+          .map((itemPath) => loadContentFromDisk(itemPath))
+          .filter((content) => content != null)
+          .map((content) => formatSearchItem(content, baseUrl));
       }
     }
   } else {

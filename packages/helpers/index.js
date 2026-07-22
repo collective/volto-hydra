@@ -459,6 +459,28 @@ function textToSlate(text) {
  *   textarea → slate:  split on newlines into paragraph nodes
  *   * → string:      String(value)
  */
+/**
+ * Package a catalog brain's separate `image_field` + `image_scales` keys into a
+ * single self-contained `image` object `{ '@id', image_field, image_scales }`
+ * (with `@id` duplicated inside so a downstream scale URL can resolve relative
+ * paths), and drop the two separate keys. This is the ONE normalization that lets
+ * a mapping read a plain `image` source key and hand a single value to
+ * `convertFieldValue`. Shared by the listing fetcher and copy-from-target so both
+ * pull images the same way. A brain with no image is returned unchanged.
+ */
+export function normalizeCatalogImage(item) {
+  if (!item || !item.image_scales || !item.image_field) return item;
+  const normalized = { ...item };
+  normalized.image = {
+    '@id': item['@id'],
+    image_field: item.image_field,
+    image_scales: item.image_scales,
+  };
+  delete normalized.image_scales;
+  delete normalized.image_field;
+  return normalized;
+}
+
 export function convertFieldValue(value, targetType) {
   if (!targetType) return value; // No type specified = pass through
 
@@ -839,20 +861,9 @@ export function ploneFetchItems({
     const response = await res.json();
 
     const rawItems = response.items || [];
-    // Normalize: package image_field + image_scales into self-contained image object
-    // with @id duplicated inside (imageProps needs it as base URL for relative paths)
-    let items = rawItems.map((item) => {
-      if (!item.image_scales || !item.image_field) return item;
-      const normalized = { ...item };
-      normalized.image = {
-        '@id': item['@id'],
-        image_field: item.image_field,
-        image_scales: item.image_scales,
-      };
-      delete normalized.image_scales;
-      delete normalized.image_field;
-      return normalized;
-    });
+    // Normalize: package image_field + image_scales into a self-contained image
+    // object (imageProps needs the @id inside as base URL for relative paths).
+    let items = rawItems.map(normalizeCatalogImage);
 
     // `getObjPositionInParent` is the catalog's position-within-parent
     // index. Plone returns items in flat position order; for a query

@@ -277,7 +277,10 @@ import {
 import {
   installCopyFromTargetEnhancers,
   markEditedLinkedFieldsCustom,
+  getUrlField,
+  pullLinkedFields,
 } from '../../utils/copyFromTarget';
+import { flattenToAppURL, isInternalURL } from '@plone/volto/helpers/Url/Url';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
 
@@ -5228,12 +5231,29 @@ const Iframe = (props) => {
                 const block = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
                 if (!block) return;
 
+                // An object_browser link field holds the object_browser array shape
+                // `[{ '@id': … }]` (selectedItemAttrs), NOT a bare URL string — the
+                // inline link editor otherwise stores just the URL, so getTargetId
+                // (and copy-from-target's live @search of the target) can't resolve
+                // it and the linked title/description never fill. Wrap it here.
+                const blockCfg = config.blocks.blocksConfig[block['@type']];
+                let value = url;
+                if (typeof url === 'string' && url && blockCfg && getUrlField(blockCfg) === fieldName) {
+                  value = [{ '@id': isInternalURL(url) ? flattenToAppURL(url) : url }];
+                }
                 // For blocks, store url and image_scales separately (like Image block does).
                 // setFieldValue writes the url at its (possibly object-nested) /-path;
                 // image_field/image_scales stay at the block top level (Image-block shape).
-                let updatedBlock = setFieldValue(block, fieldName, url);
+                let updatedBlock = setFieldValue(block, fieldName, value);
                 if (metadata?.image_scales) {
                   updatedBlock = { ...updatedBlock, image_field: metadata.image_field, image_scales: metadata.image_scales };
+                }
+                // Setting the SOURCE link (pick/type) pulls every linked mapped
+                // field in ONE write — a multi-field @default block (hero) fills
+                // heading/subheading/image atomically instead of racing per-field
+                // widget pulls that clobber all but the last-written field.
+                if (blockCfg && getUrlField(blockCfg) === fieldName) {
+                  updatedBlock = pullLinkedFields(blockCfg, updatedBlock);
                 }
                 // Use updateBlockById to handle both top-level and container blocks
                 updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, selectedBlock, updatedBlock);

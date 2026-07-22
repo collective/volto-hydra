@@ -22,6 +22,7 @@ import {
   markEditedLinkedFieldsCustom,
   installCopyFromTargetEnhancers,
   getTargetId,
+  pullLinkedFields,
   COPY_FROM_TARGET_WIDGET,
 } from './copyFromTarget';
 import { createSchemaEnhancerFromRecipe } from './schemaInheritance';
@@ -33,10 +34,10 @@ const teaserConfig = {
   id: 'teaser',
   fieldMappings: {
     '@target': {
-      Title: 'title',
-      Description: 'description',
+      title: 'title',
+      description: 'description',
       head_title: 'head_title',
-      image_scales: { field: 'preview_image', type: 'image' },
+      image: 'preview_image',
     },
   },
   blockSchema: {
@@ -52,8 +53,8 @@ const teaserConfig = {
 
 const targetSnapshot = {
   '@id': '/news/big',
-  Title: 'Big News',
-  Description: 'It happened',
+  title: 'Big News',
+  description: 'It happened',
   head_title: 'Breaking',
   image_field: 'image',
   image_scales: { image: [{ download: '/news/big/@@images/x.jpg' }] },
@@ -138,7 +139,7 @@ describe('getTargetValueForField — typed extraction from the snapshot', () => 
   });
 
   it('returns undefined for an image field when the target has no image', () => {
-    const noImage = { '@id': '/x', Title: 'T' };
+    const noImage = { '@id': '/x', title: 'T' };
     expect(getTargetValueForField('preview_image', teaserConfig, { href: [noImage] })).toBeUndefined();
   });
 
@@ -169,7 +170,7 @@ describe('live target — divergence/sync against the CURRENT target, not the sn
   it('getTargetValueForField uses the live target (snapshot-shaped) when provided', () => {
     // Stored snapshot says 'Big News'; the live target has since changed.
     const data = { href: [targetSnapshot] };
-    const live = { ...targetSnapshot, Title: 'Big News (updated)' };
+    const live = { ...targetSnapshot, title: 'Big News (updated)' };
     expect(getTargetValueForField('title', teaserConfig, data, live)).toBe('Big News (updated)');
     // …and falls back to the stored snapshot when no live target is passed.
     expect(getTargetValueForField('title', teaserConfig, data)).toBe('Big News');
@@ -210,6 +211,38 @@ describe('linked vs custom per-field state (_customFields)', () => {
 
     const d = withFieldLinked(c, 'description');
     expect(d._customFields).toBeUndefined(); // key removed when empty
+  });
+});
+
+describe('pullLinkedFields — atomic multi-field pull on link change', () => {
+  it('fills EVERY linked mapped field in one write (no per-field clobber)', () => {
+    // Setting the link on an empty multi-field block must pull title, description,
+    // head_title AND the image together — the regression guard for the race where
+    // per-field pulls clobbered all but the last-written field.
+    const block = { '@type': 'teaser', href: [targetSnapshot] };
+    const out = pullLinkedFields(teaserConfig, block);
+    expect(out.title).toBe('Big News');
+    expect(out.description).toBe('It happened');
+    expect(out.head_title).toBe('Breaking');
+    expect(out.preview_image?.[0]?.['@id']).toBe('/news/big');
+  });
+
+  it('skips custom fields and leaves already-synced fields untouched', () => {
+    const block = {
+      '@type': 'teaser',
+      href: [targetSnapshot],
+      title: 'Big News', // already at target
+      description: 'my own words',
+      _customFields: ['description'], // custom → not pulled
+    };
+    const out = pullLinkedFields(teaserConfig, block);
+    expect(out.description).toBe('my own words'); // custom kept
+    expect(out.head_title).toBe('Breaking'); // linked, pulled
+  });
+
+  it('is a no-op with no target selected', () => {
+    const block = { '@type': 'teaser', href: [] };
+    expect(pullLinkedFields(teaserConfig, block)).toBe(block);
   });
 });
 
@@ -322,7 +355,7 @@ describe('copy-from-target × fieldRules — conditional (optional) mapped field
     id: 'card',
     fieldMappings: {
       '@target': {
-        Title: 'title',
+        title: 'title',
         effective: 'date',
         image_scales: { field: 'image', type: 'image' },
       },
@@ -418,9 +451,9 @@ describe('copy-from-target — on by default via @default (link-bearing blocks)'
   it('synthesizes a @target from @default (canonical → snapshot keys, @id skipped)', () => {
     const m = getTargetMapping(linkCard);
     expect(m).toEqual({
-      Title: 'heading',
-      Description: 'summary',
-      image_scales: { field: 'picture', type: 'image' },
+      title: 'heading',
+      description: 'summary',
+      image: 'picture',
     });
     // @id → href is the link itself, not pulled
     expect(m['@id']).toBeUndefined();
@@ -436,15 +469,68 @@ describe('copy-from-target — on by default via @default (link-bearing blocks)'
   });
 
   it('an explicit @target still wins over @default', () => {
-    const both = { ...linkCard, fieldMappings: { ...linkCard.fieldMappings, '@target': { Title: 'heading' } } };
-    expect(getTargetMapping(both)).toEqual({ Title: 'heading' });
+    const both = { ...linkCard, fieldMappings: { ...linkCard.fieldMappings, '@target': { title: 'heading' } } };
+    expect(getTargetMapping(both)).toEqual({ title: 'heading' });
   });
 
   it('pulls the target value through the synthesized mapping', () => {
     const blockData = {
-      href: [{ '@id': '/p', Title: 'Live Title', Description: 'Live Desc' }],
+      href: [{ '@id': '/p', title: 'Live Title', description: 'Live Desc' }],
     };
     expect(getTargetValueForField('heading', linkCard, blockData)).toBe('Live Title');
     expect(getTargetValueForField('summary', linkCard, blockData)).toBe('Live Desc');
+  });
+
+  // @default is pass-through, NOT an allowlist of title/description/image: any
+  // declared field flows (tags via `Subject`, dates via `created`/`effective`),
+  // reading its own snapshot key. Only `image` is special-cased and `@id` skipped.
+  const richCard = {
+    id: 'richcard',
+    fieldMappings: {
+      '@default': {
+        '@id': 'href',
+        title: 'heading',
+        image: 'picture',
+        Subject: 'tags',
+        created: 'createdOn',
+        effective: 'publishedOn',
+      },
+    },
+    blockSchema: {
+      properties: {
+        href: { title: 'Link', widget: 'object_browser', mode: 'link' },
+        heading: { title: 'Heading' },
+        picture: { title: 'Picture', widget: 'object_browser', mode: 'image' },
+        tags: { title: 'Tags', widget: 'array' },
+        createdOn: { title: 'Created', widget: 'date' },
+        publishedOn: { title: 'Published', widget: 'date' },
+      },
+    },
+  };
+
+  it('passes tags and dates through @default (not just title/description/image)', () => {
+    const m = getTargetMapping(richCard);
+    // plain source keys map straight through to their dest field
+    expect(m.Subject).toBe('tags');
+    expect(m.created).toBe('createdOn');
+    expect(m.effective).toBe('publishedOn');
+    // image passes through verbatim (type derived from the dest widget); @id skipped
+    expect(m.image).toBe('picture');
+    expect(m['@id']).toBeUndefined();
+  });
+
+  it('pulls tags (Subject) and dates (created/effective) from the snapshot', () => {
+    const blockData = {
+      href: [{
+        '@id': '/p',
+        title: 'Live Title',
+        Subject: ['news', 'plone'],
+        created: '2025-01-01T12:00:00+00:00',
+        effective: '2025-02-02T09:00:00+00:00',
+      }],
+    };
+    expect(getTargetValueForField('tags', richCard, blockData)).toEqual(['news', 'plone']);
+    expect(getTargetValueForField('createdOn', richCard, blockData)).toBe('2025-01-01T12:00:00+00:00');
+    expect(getTargetValueForField('publishedOn', richCard, blockData)).toBe('2025-02-02T09:00:00+00:00');
   });
 });

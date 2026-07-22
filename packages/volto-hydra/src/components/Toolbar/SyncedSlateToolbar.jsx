@@ -8,7 +8,7 @@ import { makeEditor, toggleInlineFormat, isBlockActive } from '@plone/volto-slat
 import { BlockButton } from '@plone/volto-slate/editor/ui';
 import slateTransforms, { withEmptyInlineRemoval } from '../../utils/slateTransforms';
 import { syncCreateSlateBlock } from '@plone/volto-slate/utils/volto-blocks';
-import { getBlockById, updateBlockById } from '../../utils/blockPath';
+import { getBlockById, updateBlockById, getResolvedSchema } from '../../utils/blockPath';
 import { calculateDragHandlePosition, PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import { isSlateFieldType, isBlockPositionLocked, isBlockReadonly, getFieldValue, getFieldDef } from '@volto-hydra/helpers';
 import { useDispatch, useSelector } from 'react-redux';
@@ -1739,7 +1739,12 @@ const SyncedSlateToolbar = ({
 
     {/* Field Link Editor Popup - fixed position at toolbar */}
     {fieldLinkEditorOpen && fieldLinkEditorField && (() => {
-      const fieldDef = getFieldDef(blockPathMap?.[selectedBlock]?.schema, fieldLinkEditorField);
+      // The block's schema lives in pathMap._schemas (deduped by ref), not on the
+      // entry as `.schema` — resolve it, or fieldDef is always undefined and
+      // isObjectBrowserLink is always false (so the object-browser pick's metadata
+      // is dropped and the linked title never fills).
+      const blockSchema = getResolvedSchema(blockPathMap?.[selectedBlock], blockPathMap);
+      const fieldDef = getFieldDef(blockSchema, fieldLinkEditorField);
       const isObjectBrowserLink = fieldDef?.widget === 'object_browser' && fieldDef?.mode === 'link';
       return (
         <div

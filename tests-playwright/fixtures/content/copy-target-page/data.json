@@ -9,13 +9,13 @@
     "btn-linked": {
       "@type": "button",
       "title": "Stale label",
-      "href": [{ "@id": "/news/big", "Title": "Target Title" }],
+      "href": [{ "@id": "/news/big", "title": "Target Title" }],
       "inneralign": "left"
     },
     "btn-custom": {
       "@type": "button",
       "title": "My own label",
-      "href": [{ "@id": "/news/big", "Title": "Target Title" }],
+      "href": [{ "@id": "/news/big", "title": "Target Title" }],
       "_customFields": ["title"],
       "inneralign": "left"
     },
@@ -32,9 +32,35 @@
       "buttonText": "Go",
       "buttonLink": [{ "@id": "/news/big" }],
       "description": [{ "type": "p", "children": [{ "text": "" }] }]
+    },
+    "btn-pick": {
+      "@type": "button",
+      "title": "",
+      "href": [],
+      "inneralign": "left"
+    },
+    "hero-pick": {
+      "@type": "hero",
+      "heading": "",
+      "subheading": "",
+      "buttonText": "Go",
+      "buttonLink": [],
+      "description": [{ "type": "p", "children": [{ "text": "" }] }]
+    },
+    "section-cft": {
+      "@type": "section",
+      "blocks": {
+        "nested-btn": {
+          "@type": "button",
+          "title": "Stale nested",
+          "href": [{ "@id": "/news/big", "title": "Target Title" }],
+          "inneralign": "left"
+        }
+      },
+      "blocks_layout": { "items": ["nested-btn"] }
     }
   },
   "blocks_layout": {
-    "items": ["title-block", "btn-linked", "btn-custom", "btn-external", "hero-linked"]
+    "items": ["title-block", "btn-linked", "btn-custom", "btn-external", "hero-linked", "btn-pick", "hero-pick", "section-cft"]
   }
 }
