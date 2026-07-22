@@ -38,13 +38,24 @@ test.describe('Copy-from-target — linked/custom toggle', () => {
     // The decided behaviour: all blocks update when the page opens for editing.
     // btn-linked stores title 'Stale label' but its href snapshot carries the
     // target's 'Target Title' — on open it must fill from the snapshot with NO
-    // click (the sidebar/widget pull only runs on select; this is the on-load pass).
+    // click (the widget pull only runs on select; this is the on-load pass).
     const iframe = helper.getIframe();
     await expect(iframe.locator('[data-block-uid="btn-linked"]')).toContainText('Target Title', {
       timeout: 8000,
     });
     // btn-custom is _customFields:['title'] → NOT pulled, keeps its own label.
     await expect(iframe.locator('[data-block-uid="btn-custom"]')).toContainText('My own label');
+
+    // hero-onload has a FULL saved snapshot (the shape a real pick stores: title,
+    // description, image_scales) with stale/empty fields. On open, EVERY mapped
+    // field fills from that snapshot — heading, subheading AND the image — with no
+    // click. This is what the single-field button above can't prove.
+    const heroOnload = iframe.locator('[data-block-uid="hero-onload"]');
+    await expect(heroOnload).toContainText('Another Page', { timeout: 8000 }); // heading (was 'Stale heading')
+    await expect(heroOnload).toContainText('Another test page for linking'); // subheading (was empty)
+    await expect(heroOnload.locator('img').first()).toHaveAttribute('src', /another-page/, {
+      timeout: 8000,
+    }); // image (from image_scales in the snapshot)
   });
 
   test('a custom field keeps its own value, toggle unchecked', async ({ page }) => {
