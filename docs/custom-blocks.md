@@ -230,7 +230,7 @@ Each key in `fieldMappings` is either a **specific block type name**, **`@defaul
 
 ### `@default` — the canonical content shape
 
-`@default` is a virtual type representing canonical Plone content item fields: `@id`, `title`, `description`, `image`. These are the same fields that listing query results provide. A block with `fieldMappings['@default']` is saying "I can be populated from standard content item fields." The keys in `@default` must only use these four canonical fields — using other keys (e.g. `label`, `field`, `required`) is invalid and produces a console warning.
+`@default` is a virtual type representing a linked content item's fields — anything a catalog **search** returns as metadata (`metadata_fields: '_all'`): `@id`, `title`, `description`, `image`, `Subject` (tags), `created`/`effective` dates, and so on. A block with `fieldMappings['@default']` is saying "I can be populated from a content item." The keys are content/metadata field names — not this block's own field names (e.g. `label`, `field`, `required` are not content metadata and are invalid).
 
 ### Explicit type-to-type mappings
 
@@ -262,23 +262,22 @@ checkboxFacet: { fieldMappings: { selectFacet: { /* ... */ }, daterangeFacet: { 
 
 `@target` maps a **linked** content item's attributes onto this block's own
 fields — the generic version of the Volto teaser's "copy from target" button.
-It maps *source content attributes* (`Title`, `Description`, `image_scales`, …)
-to *this block's fields*. The item is whichever the block's **link field** points
-at (the `object_browser mode: 'link'` field — its `selectedItemAttrs` snapshot is
-the source), so you don't name a URL field separately: "the url is the link in
-the mapping".
+It maps *source content attributes* (`title`, `description`, `image`, …) to
+*this block's fields*. The item is whichever the block's **link field** points at
+(the `object_browser mode: 'link'` field — its stored snapshot is the source), so
+you don't name a URL field separately: "the url is the link in the mapping".
 
 <!-- codeExample: javascript -->
 ```javascript
 button: {
-    // The Label (title) syncs from the linked item's Title.
+    // The Label (title) syncs from the linked item's title.
     fieldMappings: {
         '@target': {
-            Title: 'title',
-            Description: 'description',
-            // image fields declare the type so the value is assembled into the
-            // object_browser (mode=image) array form:
-            image_scales: { field: 'preview_image', type: 'image' },
+            title: 'title',
+            description: 'description',
+            // image: the conversion is derived from the destination field's
+            // widget, so the value is assembled into the shape it expects.
+            image: 'preview_image',
         },
     },
 },
@@ -289,25 +288,25 @@ mapped field then shows a small **🔗 pull from linked** toggle in the sidebar
 (only when a target is selected). Every mapped field is one of two states:
 
 - **Linked** (default, toggle ticked) — the field *pulls from the linked item*.
-  Its value is pulled from the target when you select the block and re-pulled
-  when the link changes, so it always mirrors the linked content.
+  Its value is filled from the target's snapshot when the page opens for editing
+  and re-pulled when you change the link, so it always mirrors the linked content.
 - **Custom** (toggle unticked) — your own value, ignored by the target. A field
   becomes custom the moment you edit it, or when you untick the toggle;
   re-ticking re-pulls the target value. Custom fields are recorded in the block's
   `_customFields` array (absence ⇒ linked), so the state persists with the block.
 
-String fields copy straight across; an `image`-typed mapping assembles the
-target's `@id` / `image_field` / `image_scales` into the shape an image field
-expects; multi-value fields (e.g. `Subjects` → tags) pass through as-is.
+Each field's value is converted to the shape its destination widget expects
+(derived from the widget): strings copy across, an image field is assembled from
+the target's `image_scales` / `image_field`, multi-value fields (e.g. `Subject` →
+tags) pass through as-is.
 
-A linked field pulls from the target **as it is now**, not the stale snapshot
-stored on the link field: the first time you edit a `@target` block in a session
-the target is re-fetched via the catalog **search** (`metadata_fields: '_all'`,
-cached with a short TTL) so if the target changed upstream the linked field
-picks up the new value. Search is used deliberately — the stored snapshot
-(`selectedItemAttrs`) is itself a catalog brain, so the search result is already
-in the same shape (no transform, guaranteed field alignment). The fetch is
-transient — it never mutates the block, so opening a page has no side effects.
+The pull is **snapshot-based** — there is no separate live fetch. When you pick
+or type a link, the url widget stores the target's **full** metadata onto the
+link field (the object browser already fetches every item with
+`metadata_fields: '_all'`, and the field's `selectedItemAttrs` keeps the whole
+canonical set), so the block carries its own source data. Every mapped field then
+pulls straight from that stored snapshot: **on page open** (all blocks fill at
+once) and again whenever you change the link.
 
 Only an **internal** link is a pull source. An external URL has no catalog item
 to search, so a field linked to one can't pull — the toggle is hidden and the

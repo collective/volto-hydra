@@ -1980,7 +1980,25 @@ export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId
  * provide (see DEFAULT_FIELD_MAPPING in expandListingBlocks).
  * A fieldMappings['@default'] entry must use only these keys.
  */
-const DEFAULT_TYPE_FIELDS = new Set(['@id', 'title', 'description', 'image']);
+// `@default` keys are a linked content item's fields as a catalog SEARCH returns
+// them (metadata_fields:'_all') — not just @id/title/description/image. A block
+// pulls any of these onto its own fields (copy-from-target). The set stays an
+// allowlist so genuine mistakes — this block's own field names / fieldRules keys
+// (label, field, required, hidden, …) put in @default — still warn.
+const DEFAULT_TYPE_FIELDS = new Set([
+  '@id',
+  'title',
+  'description',
+  'image',
+  'hasPreviewImage',
+  'Subject',
+  'created',
+  'modified',
+  'effective',
+  'expires',
+  'start',
+  'end',
+]);
 
 /**
  * Check if a block config has a valid @default mapping.
@@ -2008,9 +2026,10 @@ export function validateFieldMappings(blockType, blockConfig) {
     if (invalidKeys.length > 0) {
       console.warn(
         `[HYDRA] Block type "${blockType}" has fieldMappings['@default'] with ` +
-        `invalid keys: ${invalidKeys.join(', ')}. @default is a virtual type ` +
-        `whose keys must be from: ${[...DEFAULT_TYPE_FIELDS].join(', ')}. ` +
-        `Use explicit type-to-type mappings instead (e.g., fieldMappings: { otherType: { ... } }).`,
+        `invalid keys: ${invalidKeys.join(', ')}. @default keys are a linked ` +
+        `content item's search-metadata field names (title, description, image, ` +
+        `Subject, created, …) — not this block's own field names. Use explicit ` +
+        `type-to-type mappings for those (e.g., fieldMappings: { otherType: { ... } }).`,
       );
     }
   }
