@@ -279,8 +279,10 @@ import {
   markEditedLinkedFieldsCustom,
   getUrlField,
   pullLinkedFields,
+  pullAllLinkedFields,
 } from '../../utils/copyFromTarget';
 import { flattenToAppURL, isInternalURL } from '@plone/volto/helpers/Url/Url';
+import { searchContent } from '@plone/volto/actions/search/search';
 import ChildBlocksWidget from '../Sidebar/ChildBlocksWidget';
 import ParentBlocksWidget from '../Sidebar/ParentBlocksWidget';
 
@@ -3522,12 +3524,16 @@ const Iframe = (props) => {
           }
 
           // 6. Apply schema defaults (handles schemaEnhancer-computed defaults like fieldMapping)
-          const formWithDefaults = applySchemaDefaultsToFormData(
+          let formWithDefaults = applySchemaDefaultsToFormData(
             formWithPageFields,
             initialBlockPathMap,
             config.blocks.blocksConfig,
             intl,
           );
+          // 6b. On-load pull: every linked field fills from its stored snapshot
+          // when the page opens for editing (canvas-pick snapshots carry the data;
+          // sidebar `[{@id}]` links have nothing to pull).
+          formWithDefaults = pullAllLinkedFields(formWithDefaults, config.blocks.blocksConfig);
 
           setIframeSyncState(prev => ({
             ...prev,
@@ -3932,12 +3938,15 @@ const Iframe = (props) => {
     // This ensures fields like fieldMapping get smart defaults even on initial load.
     // IMPORTANT: Must apply before equality check so we compare apples-to-apples
     // (both formWithDefaults and iframeSyncState.formData have defaults applied)
-    const formWithDefaults = applySchemaDefaultsToFormData(
+    let formWithDefaults = applySchemaDefaultsToFormData(
       formToUse,
       newBlockPathMap,
       config.blocks.blocksConfig,
       intl,
     );
+    // On-load pull: fill every linked block from its (full-metadata) snapshot when
+    // the page opens. The widget's reactive pull covers editing the selected block.
+    formWithDefaults = pullAllLinkedFields(formWithDefaults, config.blocks.blocksConfig);
 
     // Also skip if content is identical (ignoring _editSequence metadata)
     // Compare defaults-applied versions to avoid infinite loops
@@ -5198,6 +5207,19 @@ const Iframe = (props) => {
             onFieldLinkChange={(fieldName, url, metadata) => {
               let updatedProperties;
 
+              // ONE finalize for every path (page-field, pick, typed, fetched):
+              // push the updated form data to Redux + the iframe, rebuild pathMap.
+              const finalizeLink = (up) => {
+                onChangeFormData(up);
+                const newBlockPathMap = buildBlockPathMap(up, config.blocks.blocksConfig, intl);
+                setIframeSyncState(prev => ({
+                  ...prev,
+                  formData: up,
+                  blockPathMap: newBlockPathMap,
+                  toolbarRequestDone: `field-link-${Date.now()}`,
+                }));
+              };
+
               if (selectedBlock === PAGE_BLOCK_UID) {
                 // Page-level field - update directly on properties
                 // For image fields with metadata, construct NamedBlobImage format
@@ -5231,56 +5253,55 @@ const Iframe = (props) => {
                 const block = getBlockById(properties, iframeSyncState.blockPathMap, selectedBlock);
                 if (!block) return;
 
-                // An object_browser link field holds the object_browser array shape
-                // `[{ '@id': … }]` (selectedItemAttrs), NOT a bare URL string — the
-                // inline link editor otherwise stores just the URL, so getTargetId
-                // (and copy-from-target's live @search of the target) can't resolve
-                // it and the linked title/description never fill. Wrap it here.
                 const blockCfg = config.blocks.blocksConfig[block['@type']];
+                const isUrlField = blockCfg && getUrlField(blockCfg) === fieldName;
+
+                // Store a link `value` (object_browser array shape) and its metadata,
+                // pull every linked field from the (now full) snapshot, flip edited
+                // fields custom, then push FORM_DATA. Shared by pick / typed / fetched.
+                const applyLinkValue = (value, extraMeta) => {
+                  let updatedBlock = setFieldValue(block, fieldName, value);
+                  const meta = extraMeta || metadata;
+                  if (meta?.image_scales) {
+                    updatedBlock = { ...updatedBlock, image_field: meta.image_field, image_scales: meta.image_scales };
+                  }
+                  // No pull here — storing the link (full snapshot) is enough; the
+                  // copy-from-target widget's reactive pull fills the mapped fields.
+                  let up = updateBlockById(properties, iframeSyncState.blockPathMap, selectedBlock, updatedBlock);
+                  up = markEditedLinkedFieldsCustom(up, properties, config.blocks.blocksConfig);
+                  finalizeLink(up);
+                };
+
+                // A TYPED internal URL carries no metadata (unlike a pick). Resolve
+                // the target's brain (metadata_fields:'_all') so the stored snapshot
+                // carries the full data — the same fetch the sidebar's manual-link
+                // input does — then every mapped field pulls from it. No copy-from-
+                // target @search: the data lives on the link field afterwards.
+                if (typeof url === 'string' && url && isUrlField && isInternalURL(url)) {
+                  const path = flattenToAppURL(url);
+                  Promise.resolve(
+                    dispatch(searchContent(path, { 'path.depth': 0, metadata_fields: '_all', b_size: 1 }, `copy-from-target-${path}`)),
+                  )
+                    .then((resp) => {
+                      const item = (resp?.items || []).find((i) => flattenToAppURL(i['@id']) === path);
+                      applyLinkValue([{ ...(item || {}), '@id': path }]);
+                    })
+                    .catch(() => applyLinkValue([{ '@id': path }]));
+                  return;
+                }
+
+                // Pick (value already an array with metadata) or an external typed
+                // URL (wrap the bare string into the array shape).
                 let value = url;
-                if (typeof url === 'string' && url && blockCfg && getUrlField(blockCfg) === fieldName) {
-                  value = [{ '@id': isInternalURL(url) ? flattenToAppURL(url) : url }];
+                if (typeof url === 'string' && url && isUrlField) {
+                  value = [{ '@id': url }];
                 }
-                // For blocks, store url and image_scales separately (like Image block does).
-                // setFieldValue writes the url at its (possibly object-nested) /-path;
-                // image_field/image_scales stay at the block top level (Image-block shape).
-                let updatedBlock = setFieldValue(block, fieldName, value);
-                if (metadata?.image_scales) {
-                  updatedBlock = { ...updatedBlock, image_field: metadata.image_field, image_scales: metadata.image_scales };
-                }
-                // Setting the SOURCE link (pick/type) pulls every linked mapped
-                // field in ONE write — a multi-field @default block (hero) fills
-                // heading/subheading/image atomically instead of racing per-field
-                // widget pulls that clobber all but the last-written field.
-                if (blockCfg && getUrlField(blockCfg) === fieldName) {
-                  updatedBlock = pullLinkedFields(blockCfg, updatedBlock);
-                }
-                // Use updateBlockById to handle both top-level and container blocks
-                updatedProperties = updateBlockById(properties, iframeSyncState.blockPathMap, selectedBlock, updatedBlock);
-                // Turn a LINKED image/link destination CUSTOM via the SAME
-                // value-compare used everywhere else. Applied synchronously here
-                // (not left to the `properties` effect) because this handler also
-                // writes iframeSyncState.formData below and sends FORM_DATA — the
-                // flipped form must be the one that goes out, or the round-trip
-                // would clobber the async flip.
-                updatedProperties = markEditedLinkedFieldsCustom(
-                  updatedProperties,
-                  properties,
-                  config.blocks.blocksConfig,
-                );
+                applyLinkValue(value);
+                return;
               }
 
-              // Update Redux via onChangeFormData
-              onChangeFormData(updatedProperties);
-
-              // Rebuild blockPathMap and send FORM_DATA to iframe
-              const newBlockPathMap = buildBlockPathMap(updatedProperties, config.blocks.blocksConfig, intl);
-              setIframeSyncState(prev => ({
-                ...prev,
-                formData: updatedProperties,
-                blockPathMap: newBlockPathMap,
-                toolbarRequestDone: `field-link-${Date.now()}`,
-              }));
+              // Page-level field path finalizes here (block-field path returned above).
+              finalizeLink(updatedProperties);
             }}
             onOpenObjectBrowser={(fieldName, blockUid) => {
               // Set pending state to trigger object browser via OpenObjectBrowser component

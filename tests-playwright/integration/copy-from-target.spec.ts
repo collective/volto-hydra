@@ -30,6 +30,23 @@ test.describe('Copy-from-target — linked/custom toggle', () => {
     await expect(page.locator(linkedToggle)).toHaveAttribute('aria-pressed', 'true');
   });
 
+  test('on load, every linked field is pulled from its snapshot WITHOUT selecting', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/copy-target-page');
+
+    // The decided behaviour: all blocks update when the page opens for editing.
+    // btn-linked stores title 'Stale label' but its href snapshot carries the
+    // target's 'Target Title' — on open it must fill from the snapshot with NO
+    // click (the sidebar/widget pull only runs on select; this is the on-load pass).
+    const iframe = helper.getIframe();
+    await expect(iframe.locator('[data-block-uid="btn-linked"]')).toContainText('Target Title', {
+      timeout: 8000,
+    });
+    // btn-custom is _customFields:['title'] → NOT pulled, keeps its own label.
+    await expect(iframe.locator('[data-block-uid="btn-custom"]')).toContainText('My own label');
+  });
+
   test('a custom field keeps its own value, toggle unchecked', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();
@@ -217,6 +234,68 @@ test.describe('Copy-from-target — linked/custom toggle', () => {
     await expect(
       iframe.locator('[data-block-uid="hero-pick"] [data-edit-media="image"]'),
     ).toHaveAttribute('src', /another-page/, { timeout: 8000 });
+  });
+
+  test('TYPING a relative URL on a @default block fills EVERY mapped field (no async race)', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/copy-target-page');
+
+    // No pick — TYPE the URL, so NO snapshot metadata rides along. Every mapped
+    // field (heading, subheading, image) must still fill, resolved via the live
+    // @search of the typed @id. The multi-field pull must be atomic here too —
+    // per-field async pulls would race and clobber all but one field.
+    const iframe = helper.getIframe();
+    await iframe.locator('[data-block-uid="hero-pick"] [data-edit-link="buttonLink"]').click();
+    await helper.waitForSidebarOpen();
+    await page.locator('.quanta-toolbar button[title*="Edit link"]').click();
+    const form = page.locator('.field-link-editor .link-form-container');
+    await expect(form).toBeVisible({ timeout: 5000 });
+    await form.locator('input[name="link"]').fill('/_test_data/another-page');
+    await form.locator('button[aria-label="Submit"]').click();
+
+    await expect
+      .poll(async () => helper.getSidebarFieldValue('heading'), { timeout: 8000 })
+      .toBe('Another Page');
+    await expect
+      .poll(async () => helper.getSidebarFieldValue('subheading'), { timeout: 8000 })
+      .toBe('Another test page for linking');
+    await expect(
+      iframe.locator('[data-block-uid="hero-pick"] [data-edit-media="image"]'),
+    ).toHaveAttribute('src', /another-page/, { timeout: 8000 });
+  });
+
+  test('changing the URL in the SIDEBAR object browser re-pulls the linked field', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/copy-target-page');
+
+    // btn-linked → /news/big → title 'Target Title'. Change its href in the
+    // SIDEBAR object browser to a different target → the linked title must
+    // re-pull to the NEW target's title.
+    await helper.clickBlockInIframe('btn-linked');
+    await helper.waitForSidebarOpen();
+    await expect
+      .poll(async () => helper.getSidebarFieldValue('title'), { timeout: 5000 })
+      .toBe('Target Title');
+
+    const linkField = page.locator('#sidebar-properties .field-wrapper-href');
+    const browseButton = linkField.locator('button[aria-label="Open object browser"]');
+    await expect(browseButton).toBeVisible({ timeout: 5000 });
+    await browseButton.click();
+    let ob;
+    try {
+      ob = await helper.waitForObjectBrowser(3000);
+    } catch {
+      await browseButton.click();
+      ob = await helper.waitForObjectBrowser();
+    }
+    await helper.objectBrowserNavigateToFolder(ob, /Test Data/);
+    await helper.objectBrowserSelectItem(ob, /Another Page/);
+
+    await expect
+      .poll(async () => helper.getSidebarFieldValue('title'), { timeout: 8000 })
+      .toBe('Another Page');
   });
 
   test('an external link offers no toggle and cannot pull (plain editable field)', async ({ page }) => {
