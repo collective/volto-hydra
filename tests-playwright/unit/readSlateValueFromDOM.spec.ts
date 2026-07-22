@@ -311,6 +311,73 @@ test.describe('Bridge.readSlateValueFromDOM()', () => {
     });
   });
 
+  // ── Non-editable / decorative chrome is skipped ───────────────────
+  //
+  // A frontend may render non-editable islands inside slate content — e.g. the
+  // DS external-link icon after a link's text. Such an element has no
+  // data-node-id and is marked contenteditable="false" (the caret skips it) and
+  // aria-hidden (decoration). It is NOT content, so the reader must skip it, not
+  // read its ligature text ("open_in_new") into the value — otherwise every
+  // edit / select / delete over the link would corrupt the Slate value. Either
+  // marker alone is enough to skip it; a framework wrapper span has neither and
+  // is still read as text (see 's1' above).
+
+  test('non-editable icon (contenteditable=false + aria-hidden) inside a link is not read as text', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'ne1',
+
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: 'An ' },
+        { type: 'link', nodeId: '0.1', data: { url: 'https://example.com' }, children: [{ text: 'external link' }] },
+        { text: '' },
+      ]}],
+
+      dom:
+        '<div data-edit-text="value">' +
+          '<p data-node-id="0">An ' +
+            '<a data-node-id="0.1">external link' +
+              '<span class="nsw-material-icons" aria-hidden="true" contenteditable="false">open_in_new</span>' +
+            '</a>' +
+          '</p>' +
+        '</div>',
+
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: 'An ' },
+        { type: 'link', nodeId: '0.1', data: { url: 'https://example.com' }, children: [{ text: 'external link' }] },
+        { text: '' },
+      ]}],
+    });
+  });
+
+  test('contenteditable=false alone (no aria-hidden) is also skipped', async () => {
+    const body = helper.getIframe().locator('body');
+    await testDomToSlate(body, {
+      id: 'ne2',
+
+      existing: [{ type: 'p', nodeId: '0', children: [
+        { text: 'A ' },
+        { type: 'link', nodeId: '0.1', data: { url: 'https://example.com' }, children: [{ text: 'widget link' }] },
+        { text: '' },
+      ]}],
+
+      dom:
+        '<div data-edit-text="value">' +
+          '<p data-node-id="0">A ' +
+            '<a data-node-id="0.1">widget link' +
+              '<span contenteditable="false">[chip]</span>' +
+            '</a>' +
+          '</p>' +
+        '</div>',
+
+      expected: [{ type: 'p', nodeId: '0', children: [
+        { text: 'A ' },
+        { type: 'link', nodeId: '0.1', data: { url: 'https://example.com' }, children: [{ text: 'widget link' }] },
+        { text: '' },
+      ]}],
+    });
+  });
+
   // ── Lists ─────────────────────────────────────────────────────────
 
   test('whitespace between list items is ignored (HTML indentation)', async () => {

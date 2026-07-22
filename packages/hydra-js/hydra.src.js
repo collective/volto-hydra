@@ -7041,6 +7041,22 @@ export class Bridge {
         const childNodeId = child.getAttribute('data-node-id');
         if (childNodeId && isValidNodeId(childNodeId)) {
           children.push(this.domNodeToSlate(child, metadataMap, matchMetadataFromDom));
+        } else if (
+          child.getAttribute('contenteditable') === 'false' ||
+          child.getAttribute('aria-hidden') === 'true'
+        ) {
+          // Non-editable / decorative island with no data-node-id — e.g. a
+          // frontend's external-link icon after a link's text, or any generated
+          // chrome the editor should ignore. `contenteditable="false"` is the
+          // browser's marker for a non-editable island (the caret steps over it,
+          // backspace deletes it whole); `aria-hidden` marks pure decoration.
+          // Either means "not editable content", so skip it rather than read its
+          // textContent into the value — reading it would corrupt the Slate
+          // value on every edit/select/delete over it. A framework wrapper span
+          // holds real text and carries NEITHER attribute, so it is still read
+          // below. (Frontends should set BOTH on such content: contenteditable
+          // =false so the caret skips it, aria-hidden if it is decorative.)
+          continue;
         } else {
           // Element without valid nodeId (e.g. Vue wrapper span, Next.js leaf span)
           // — treat its text content as a text node, including empty text which

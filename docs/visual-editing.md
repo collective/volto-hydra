@@ -145,6 +145,38 @@ Invalid (missing node-id on wrapper):
 This breaks cursor positioning because hydra.js can't correlate DOM structure to Slate structure.
 ```
 
+## Non-editable content inside a slate field
+
+Sometimes a renderer adds elements to slate output that are **not** part of the
+editable content — a decorative icon (an "opens in a new tab" glyph), a
+generated chip, an embedded non-editable widget. These have no `data-node-id`
+(they aren't Slate nodes), and they must be marked so that **both** the editor's
+caret and hydra's DOM→Slate reader skip them:
+
+- **`contenteditable="false"`** — the browser treats the element as a
+  non-editable island: the caret steps over it, backspace/delete removes it as a
+  unit, and selection includes it whole. Add this to anything that must not be
+  typed into.
+- **`aria-hidden="true"`** — for purely decorative chrome (e.g. icons), so
+  assistive tech ignores it too.
+
+hydra's DOM→Slate reader skips any child (without a `data-node-id`) that carries
+**either** attribute — treating it as chrome, not content. Without this, the
+element's text would be read back into the Slate value on every edit / select /
+delete over it, corrupting the value.
+
+<!-- codeExample: html -->
+```html
+An <a data-node-id="0.1">external link<span class="external-icon"
+  aria-hidden="true" contenteditable="false">&#8599;</span></a>
+The icon is decoration: the caret skips it and it never enters the value.
+```
+
+Contrast this with the wrapper rule above: a wrapper that holds real content
+carries the inner node's `data-node-id` (and neither of these attributes), so it
+IS read; decorative / non-editable chrome carries these attributes and is
+skipped.
+
 ## One top-level node per slate field
 
 A slate field's `value` is an array, but it always holds exactly **one
