@@ -2292,6 +2292,57 @@ const Iframe = (props) => {
           break;
         }
 
+        case 'LINKABLE_ANCHORS': {
+          // Iframe harvested data-linkable-id anchors from the rendered DOM,
+          // grouped by nearest data-block-uid. Reconcile block._linkableAnchors
+          // in formData so they persist with the registered `blocks` field.
+          const incoming = event.data.anchors || {};
+          const bpm = buildBlockPathMap(
+            properties,
+            config.blocks.blocksConfig,
+            intl,
+          );
+          let next = properties;
+          // Union: blocks named in the incoming map, plus blocks that currently
+          // store anchors (so a block that lost all its anchors gets cleared).
+          const uids = new Set(Object.keys(incoming));
+          for (const uid of Object.keys(bpm)) {
+            if (uid.startsWith('_')) continue; // skip meta keys (_schemas, ...)
+            const cur = getBlockById(next, bpm, uid);
+            if (cur && cur._linkableAnchors) uids.add(uid);
+          }
+          let changed = false;
+          for (const uid of uids) {
+            const block = getBlockById(next, bpm, uid);
+            if (!block) continue; // uid not in this page (stale) — skip
+            const want = incoming[uid];
+            const have = block._linkableAnchors;
+            if (
+              JSON.stringify(want || null) === JSON.stringify(have || null)
+            ) {
+              continue;
+            }
+            const updated = { ...block };
+            if (want && want.length) updated._linkableAnchors = want;
+            else delete updated._linkableAnchors;
+            next = updateBlockById(next, bpm, uid, updated);
+            changed = true;
+          }
+          if (changed) {
+            setIframeSyncState((prev) => ({
+              ...prev,
+              formData: next,
+              blockPathMap: buildBlockPathMap(
+                next,
+                config.blocks.blocksConfig,
+                intl,
+              ),
+            }));
+            onChangeFormData(next);
+          }
+          break;
+        }
+
         case 'BUFFER_FLUSHED':
           // Iframe had no pending text - update combined state with current form + requestId + selection
           log('Received BUFFER_FLUSHED (no pending text), requestId:', event.data.requestId);
