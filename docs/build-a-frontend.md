@@ -113,6 +113,21 @@ You can embed the Hydra tags directly if you want:
 `<p data-edit-text="title">A caption</p>`
 ```
 
+### Deep-link anchors (fragments)
+
+To let editors link to a spot *inside* a page, mark the element with a real `id`
+(the `#fragment` the browser scrolls to) **and** `data-linkable-id="Friendly Name"`
+(the label shown in the link picker):
+
+```html
+<h2 id="pricing" data-linkable-id="Pricing">Pricing</h2>
+```
+
+Hydra harvests these per block on render and stores them in the block's data, so the
+object browser offers them as `path#pricing` link targets. Both attributes must survive
+into your **published** render for the anchor to resolve at runtime — Hydra only reads
+them in edit mode.
+
 ## The steps
 
 The steps involved in creating a frontend are roughly the same for all these frameworks:
