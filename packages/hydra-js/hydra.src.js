@@ -29,6 +29,7 @@ import {
 } from '@volto-hydra/helpers';
 import { expelAllowedTypes, findOnlyEmptyChildUid } from './containerOps.js';
 import { acceptableAt } from './conversionMap.js';
+import { collectLinkableAnchors } from './linkableAnchors.js';
 
 /**
  * This IS a large file and it needs to be written in one file so for better understanding and
@@ -553,6 +554,7 @@ export class Bridge {
       'block-add': 'data-block-add',
       'block-selector': 'data-block-selector',
       'block-container': 'data-block-container',
+      'linkable-id': 'data-linkable-id',
     };
 
     for (const [name, entries] of Object.entries(attrs)) {
@@ -6907,11 +6909,29 @@ export class Bridge {
         }
         // Mark render complete AFTER observer reconnection
         this._renderInProgress = false;
+
+        // Harvest deep-link anchors from the freshly-rendered DOM and push any
+        // change to the admin so it can persist block._linkableAnchors.
+        this._maybeSendLinkableAnchors();
     };
 
     // _executeRender already ensured content is ready (via polling,
     // settlement, or fast path) before calling afterContentRender.
     doAfterContentRender();
+  }
+
+  /**
+   * Harvest linkable anchors from the live DOM and, when the full map changed
+   * since the last send, push it to the admin so it can persist
+   * block._linkableAnchors. Guarded by a JSON snapshot so a FORM_DATA echo →
+   * re-render never loops.
+   */
+  _maybeSendLinkableAnchors() {
+    const anchors = collectLinkableAnchors(document);
+    const json = JSON.stringify(anchors);
+    if (json === this._lastSentAnchors) return;
+    this._lastSentAnchors = json;
+    this.sendMessageToParent({ type: 'LINKABLE_ANCHORS', anchors });
   }
 
   /**
