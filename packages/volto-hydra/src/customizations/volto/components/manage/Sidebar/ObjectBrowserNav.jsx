@@ -220,8 +220,9 @@ const ObjectBrowserNav = ({
                 />
               )}
 
-              {/* Deep-link anchors: expand to pick an in-page fragment. */}
-              {mode === 'link' && !item.is_folderish && onToggleAnchors && (
+              {/* Deep-link anchors: expand to pick an in-page fragment. Shown
+                  for any content item (Plone Documents are folderish too). */}
+              {mode === 'link' && item['@id'] && onToggleAnchors && (
                 <button
                   type="button"
                   className="ob-anchors-toggle"

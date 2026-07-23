@@ -394,6 +394,14 @@ function renderSlateBlock(block) {
         // If missing in edit mode, hydra.js should add it - but we don't throw here to allow view mode
         const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
 
+        // Deep-link anchor: a heading node carrying data.anchorId renders a real
+        // id (the #fragment) + data-linkable-id (the picker label). hydra.js
+        // harvests these into block._linkableAnchors.
+        const a = node.data || {};
+        const anchorAttr = a.anchorId
+            ? ` id="${a.anchorId}" data-linkable-id="${a.anchorName || a.anchorId}"`
+            : '';
+
         const text = renderChildren(node.children);
         // Mark as editable field - hydra.js will read this and set contenteditable="true"
 
@@ -403,22 +411,22 @@ function renderSlateBlock(block) {
                 html += `<p data-edit-text="value"${nodeIdAttr}>${text}</p>`;
                 break;
             case 'h1':
-                html += `<h1 data-edit-text="value"${nodeIdAttr}>${text}</h1>`;
+                html += `<h1 data-edit-text="value"${nodeIdAttr}${anchorAttr}>${text}</h1>`;
                 break;
             case 'h2':
-                html += `<h2 data-edit-text="value"${nodeIdAttr}>${text}</h2>`;
+                html += `<h2 data-edit-text="value"${nodeIdAttr}${anchorAttr}>${text}</h2>`;
                 break;
             case 'h3':
-                html += `<h3 data-edit-text="value"${nodeIdAttr}>${text}</h3>`;
+                html += `<h3 data-edit-text="value"${nodeIdAttr}${anchorAttr}>${text}</h3>`;
                 break;
             case 'h4':
-                html += `<h4 data-edit-text="value"${nodeIdAttr}>${text}</h4>`;
+                html += `<h4 data-edit-text="value"${nodeIdAttr}${anchorAttr}>${text}</h4>`;
                 break;
             case 'h5':
-                html += `<h5 data-edit-text="value"${nodeIdAttr}>${text}</h5>`;
+                html += `<h5 data-edit-text="value"${nodeIdAttr}${anchorAttr}>${text}</h5>`;
                 break;
             case 'h6':
-                html += `<h6 data-edit-text="value"${nodeIdAttr}>${text}</h6>`;
+                html += `<h6 data-edit-text="value"${nodeIdAttr}${anchorAttr}>${text}</h6>`;
                 break;
             case 'blockquote':
                 html += `<blockquote data-edit-text="value"${nodeIdAttr}>${text}</blockquote>`;

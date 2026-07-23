@@ -1,0 +1,39 @@
+{
+  "@id": "http://localhost:8888/deep-link-page",
+  "@type": "Document",
+  "UID": "deep-link-page-uid",
+  "id": "deep-link-page",
+  "title": "Deep Link Page",
+  "blocks": {
+    "title-block": { "@type": "title" },
+    "s1": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "h2",
+          "data": { "anchorId": "intro", "anchorName": "Intro" },
+          "children": [{ "text": "Intro heading" }]
+        }
+      ]
+    },
+    "s2": {
+      "@type": "slate",
+      "value": [
+        {
+          "type": "h2",
+          "data": { "anchorId": "details", "anchorName": "Details" },
+          "children": [{ "text": "Details heading" }]
+        }
+      ]
+    },
+    "btn": {
+      "@type": "button",
+      "title": "Go",
+      "href": [],
+      "inneralign": "left"
+    }
+  },
+  "blocks_layout": {
+    "items": ["title-block", "s1", "s2", "btn"]
+  }
+}
