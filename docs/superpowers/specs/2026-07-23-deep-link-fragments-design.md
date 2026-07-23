@@ -96,6 +96,23 @@ Per browsable item, an "expand anchors" control:
 4. Render the list; picking an anchor yields the link value `targetPath#id`. Picking the
    page itself (no anchor) is unchanged.
 
+## Addendum — live-edited headings (added during implementation)
+
+The render-only harvest above misses anchors created by **inline typing**: a heading's
+`id` is renderer-computed, and inline editing doesn't re-render, so the DOM `id` stays
+stale and is never harvested. Two additions close this:
+
+- **Harvest on the normal inline-update path too** — `_maybeSendLinkableAnchors()` runs in
+  `flushPendingTextUpdates` (when `INLINE_EDIT_DATA` is sent), not only in
+  `afterContentRender`. So a typed heading's anchor reaches the admin without a re-render.
+- **Frontend keeps the anchor fresh on input** — the frontend (a choice, not a bridge
+  behaviour) tags headings by slugifying their text and updates `id`/`data-linkable-id`
+  live on `input`, so the DOM `id` is current when harvested.
+- **Read path is live for the page being edited** — the object browser collects anchors
+  from the live edit form (`state.form.global`) when the browsed item *is* the current
+  page, so a just-added heading is linkable without saving; other pages use persisted
+  `getContent`.
+
 ## Testing (TDD — red first)
 
 - **Fixture:** `test-frontend` renderer emits a block whose element carries `id` +

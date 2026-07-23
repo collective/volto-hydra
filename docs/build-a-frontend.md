@@ -128,6 +128,14 @@ object browser offers them as `path#pricing` link targets. Both attributes must 
 into your **published** render for the anchor to resolve at runtime — Hydra only reads
 them in edit mode.
 
+It's your choice which elements are linkable — a common pattern is to tag every heading,
+deriving its `id` from a slug of the heading text. If you want a heading to be linkable
+*while it's being edited* (before save), keep its `id`/`data-linkable-id` current as the
+text changes — e.g. a small `input` listener that re-slugifies the heading. Hydra harvests
+anchors both on render **and** when inline edits flush, so a freshly-typed heading becomes
+linkable on the page being edited without saving first; other pages use their last saved
+anchors.
+
 ## The steps
 
 The steps involved in creating a frontend are roughly the same for all these frameworks:
