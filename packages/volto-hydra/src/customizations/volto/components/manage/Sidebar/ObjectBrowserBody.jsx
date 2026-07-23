@@ -354,12 +354,25 @@ class ObjectBrowserBody extends Component {
       return;
     }
     if (!this.state.anchorsByItem[id]) {
-      // getContent's dispatched promise resolves with the full content body
-      // (blocks included) — see Teaser/Data.jsx.
-      const resp = await this.props.getContent(id, null, `anchors-${id}`);
-      const anchors = resp
+      // The page currently being edited → use LIVE anchors from the edit form
+      // (state.form.global, which the render-time harvest already updates), so a
+      // just-added heading is linkable without saving. Any other page → the
+      // persisted content via getContent (whose dispatched promise resolves with
+      // the full body, blocks included — see Teaser/Data.jsx).
+      const editingPath = this.props.pathname
+        ? this.props.pathname.replace(/\/(edit|add)$/, '')
+        : null;
+      const isCurrentPage =
+        editingPath &&
+        flattenToAppURL(editingPath) === id &&
+        this.props.formData &&
+        this.props.formData.blocks;
+      const source = isCurrentPage
+        ? this.props.formData
+        : await this.props.getContent(id, null, `anchors-${id}`);
+      const anchors = source
         ? collectAnchorsFromContent(
-            resp,
+            source,
             config.blocks.blocksConfig,
             this.props.intl,
           )
@@ -660,6 +673,10 @@ export default compose(
     (state) => ({
       searchSubrequests: state.search.subrequests,
       lang: state.intl.locale,
+      // Live edit-form data + current path, so anchors for the page being
+      // edited come from the unsaved form rather than persisted content.
+      formData: state.form.global,
+      pathname: state.router?.location?.pathname,
     }),
     { searchContent, getContent },
   ),

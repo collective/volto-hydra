@@ -386,6 +386,55 @@ async function renderBlock(blockId, block) {
  * @param {Object} block - Slate block data
  * @returns {string} HTML string
  */
+// Plain text of a slate node (recursively join leaf .text) — used to derive
+// heading anchor ids/labels.
+function slateNodeText(node) {
+    if (node == null) return '';
+    if (typeof node.text === 'string') return node.text;
+    return (node.children || []).map(slateNodeText).join('');
+}
+
+// URL-fragment slug from arbitrary text.
+function slugify(s) {
+    return s
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+// Keep heading anchors fresh WHILE editing. This frontend derives a heading's
+// id/data-linkable-id from its text, but inline editing changes the text without
+// re-running the renderer — so update them live on input. hydra harvests the id
+// on its next flush/render.
+if (typeof document !== 'undefined') {
+    document.addEventListener(
+        'input',
+        (e) => {
+            // The contenteditable host is the [data-edit-text] element; a heading
+            // may BE that element (this frontend) or a descendant (e.g. Nuxt).
+            const editable =
+                e.target && e.target.closest && e.target.closest('[data-edit-text]');
+            if (!editable) return;
+            const headings = [];
+            if (/^H[1-6]$/.test(editable.tagName)) headings.push(editable);
+            editable
+                .querySelectorAll('h1,h2,h3,h4,h5,h6')
+                .forEach((h) => headings.push(h));
+            for (const heading of headings) {
+                const text = (heading.textContent || '').trim();
+                if (text) {
+                    heading.id = slugify(text);
+                    heading.setAttribute('data-linkable-id', text);
+                } else {
+                    heading.removeAttribute('id');
+                    heading.removeAttribute('data-linkable-id');
+                }
+            }
+        },
+        true,
+    );
+}
+
 function renderSlateBlock(block) {
     const value = block.value || [];
     let html = '';
@@ -394,12 +443,21 @@ function renderSlateBlock(block) {
         // If missing in edit mode, hydra.js should add it - but we don't throw here to allow view mode
         const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
 
-        // Deep-link anchor: a heading node carrying data.anchorId renders a real
-        // id (the #fragment) + data-linkable-id (the picker label). hydra.js
-        // harvests these into block._linkableAnchors.
+        // Deep-link anchor. This frontend CHOOSES to make every heading linkable:
+        // a real id (the #fragment) + data-linkable-id (the picker label), which
+        // hydra.js harvests into block._linkableAnchors. Explicit node.data.anchorId
+        // wins; otherwise a heading's id/label are derived from its text. Tagging
+        // headings is a frontend decision — the bridge just harvests the attributes.
         const a = node.data || {};
-        const anchorAttr = a.anchorId
-            ? ` id="${a.anchorId}" data-linkable-id="${a.anchorName || a.anchorId}"`
+        const isHeading = /^h[1-6]$/.test(node.type || '');
+        const headingText = isHeading ? slateNodeText(node).trim() : '';
+        const anchorId = a.anchorId || (headingText ? slugify(headingText) : '');
+        const anchorName = (a.anchorName || headingText || anchorId).replace(
+            /"/g,
+            '&quot;',
+        );
+        const anchorAttr = anchorId
+            ? ` id="${anchorId}" data-linkable-id="${anchorName}"`
             : '';
 
         const text = renderChildren(node.children);

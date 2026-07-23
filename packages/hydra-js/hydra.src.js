@@ -11895,6 +11895,10 @@ export class Bridge {
       // This is needed because admin doesn't send FORM_DATA back for inline edits (echo prevention)
       this.lastReceivedFormData = JSON.parse(JSON.stringify(this.pendingTextUpdate.data));
       this.pendingTextUpdate = null;
+      // Inline edits don't trigger a re-render, so anchors derived from a
+      // live-edited heading (id kept fresh by the frontend on input) would
+      // otherwise never be harvested. Harvest on the normal update path too.
+      this._maybeSendLinkableAnchors();
       return true; // Had pending update
     }
     return false; // No pending update

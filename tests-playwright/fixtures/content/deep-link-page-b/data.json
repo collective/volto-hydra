@@ -1,0 +1,19 @@
+{
+  "@id": "http://localhost:8888/deep-link-page-b",
+  "@type": "Document",
+  "UID": "deep-link-page-b-uid",
+  "id": "deep-link-page-b",
+  "title": "Deep Link Page B",
+  "blocks": {
+    "title-block": { "@type": "title" },
+    "btnb": {
+      "@type": "button",
+      "title": "Go",
+      "href": [],
+      "inneralign": "left"
+    }
+  },
+  "blocks_layout": {
+    "items": ["title-block", "btnb"]
+  }
+}

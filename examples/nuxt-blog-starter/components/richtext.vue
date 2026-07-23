@@ -17,8 +17,8 @@
     >{{ node.text }}<RichText v-for="child in subs" :key="child.nodeId" :node="child"
   /></blockquote>
   <component v-else :is="node.type" :data-node-id="node.nodeId"
-    :id="node.data && node.data.anchorId ? node.data.anchorId : undefined"
-    :data-linkable-id="node.data && node.data.anchorId ? (node.data.anchorName || node.data.anchorId) : undefined"
+    :id="anchorId"
+    :data-linkable-id="anchorName"
     :style="node.textAlign ? { textAlign: node.textAlign } : undefined"
     >{{ node.text }}<RichText v-for="child in subs" :key="child.nodeId" :node="child"
   /></component>
@@ -37,6 +37,41 @@ export default {
     subs() {
       const { children } = this.node;
       return (children && children) || [];
+    },
+    // This frontend tags every heading as a deep-link anchor (a frontend
+    // choice). Explicit node.data.anchorId wins; otherwise a heading's id/label
+    // are derived from its text. Non-headings without an explicit id get none.
+    isHeading() {
+      return /^h[1-6]$/.test(this.node.type || '');
+    },
+    headingText() {
+      const collect = (n) =>
+        n == null
+          ? ''
+          : typeof n.text === 'string'
+            ? n.text
+            : (n.children || []).map(collect).join('');
+      return collect(this.node).trim();
+    },
+    anchorId() {
+      const explicit = this.node.data && this.node.data.anchorId;
+      if (explicit) return explicit;
+      return this.isHeading && this.headingText
+        ? this.slugify(this.headingText)
+        : undefined;
+    },
+    anchorName() {
+      if (!this.anchorId) return undefined;
+      const explicit = this.node.data && this.node.data.anchorName;
+      return explicit || this.headingText || this.anchorId;
+    },
+  },
+  methods: {
+    slugify(s) {
+      return s
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
     },
   },
 };
