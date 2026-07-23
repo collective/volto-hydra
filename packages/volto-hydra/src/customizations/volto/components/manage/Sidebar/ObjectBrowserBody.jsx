@@ -11,6 +11,8 @@ import join from 'lodash/join';
 // to cut circular import problems, this file should never use them. This is because of
 // the very nature of the functionality of the component and its relationship with others
 import { searchContent } from '@plone/volto/actions/search/search';
+import { getContent } from '@plone/volto/actions/content/content';
+import { collectAnchorsFromContent } from '../../../../../utils/linkableAnchors';
 import Icon from '@plone/volto/components/theme/Icon/Icon';
 import { flattenToAppURL, isInternalURL } from '@plone/volto/helpers/Url/Url';
 import config from '@plone/volto/registry';
@@ -157,6 +159,10 @@ class ObjectBrowserBody extends Component {
               ...(this.props.selectableTypes ?? []),
             ],
       view: this.props.mode === 'image' ? 'icons' : 'list',
+      // Deep-link anchors: which item's anchors are expanded, and a cache of
+      // the anchors fetched per item (keyed by flattened @id).
+      expandedAnchorsFor: null,
+      anchorsByItem: {},
     };
     this.searchInputRef = React.createRef();
   }
@@ -336,6 +342,39 @@ class ObjectBrowserBody extends Component {
       ...this.props.data,
       [key]: value,
     });
+  };
+
+  // Toggle the deep-link anchor list for an item. On first expand, fetch the
+  // FULL object (search metadata carries no blocks) and collect its anchors in
+  // document order.
+  onToggleAnchors = async (item) => {
+    const id = flattenToAppURL(item['@id']);
+    if (this.state.expandedAnchorsFor === id) {
+      this.setState({ expandedAnchorsFor: null });
+      return;
+    }
+    if (!this.state.anchorsByItem[id]) {
+      // getContent's dispatched promise resolves with the full content body
+      // (blocks included) — see Teaser/Data.jsx.
+      const resp = await this.props.getContent(id, null, `anchors-${id}`);
+      const anchors = resp
+        ? collectAnchorsFromContent(
+            resp,
+            config.blocks.blocksConfig,
+            this.props.intl,
+          )
+        : [];
+      this.setState((s) => ({
+        anchorsByItem: { ...s.anchorsByItem, [id]: anchors },
+      }));
+    }
+    this.setState({ expandedAnchorsFor: id });
+  };
+
+  // Pick a fragment: reuse the normal select path with `#id` appended so every
+  // link surface (sidebar widget, canvas editor) stores the deep link.
+  onSelectAnchor = (item, anchor) => {
+    this.onSelectItem({ ...item, '@id': `${item['@id']}#${anchor.id}` });
   };
 
   isSelectable = (item) => {
@@ -605,6 +644,10 @@ class ObjectBrowserBody extends Component {
           view={this.state.view}
           navigateTo={this.navigateTo}
           isSelectable={this.isSelectable}
+          onToggleAnchors={this.onToggleAnchors}
+          onSelectAnchor={this.onSelectAnchor}
+          expandedAnchorsFor={this.state.expandedAnchorsFor}
+          anchorsByItem={this.state.anchorsByItem}
         />
       </Segment.Group>
     );
@@ -618,6 +661,6 @@ export default compose(
       searchSubrequests: state.search.subrequests,
       lang: state.intl.locale,
     }),
-    { searchContent },
+    { searchContent, getContent },
   ),
 )(ObjectBrowserBody);

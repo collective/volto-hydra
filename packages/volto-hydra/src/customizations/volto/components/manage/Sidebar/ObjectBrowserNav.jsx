@@ -44,6 +44,10 @@ const ObjectBrowserNav = ({
   view,
   navigateTo,
   isSelectable,
+  onToggleAnchors,
+  onSelectAnchor,
+  expandedAnchorsFor,
+  anchorsByItem,
 }) => {
   const intl = useIntl();
   const isSelected = (item) => {
@@ -215,6 +219,45 @@ const ObjectBrowserNav = ({
                   size="24px"
                 />
               )}
+
+              {/* Deep-link anchors: expand to pick an in-page fragment. */}
+              {mode === 'link' && !item.is_folderish && onToggleAnchors && (
+                <button
+                  type="button"
+                  className="ob-anchors-toggle"
+                  aria-label={`Show anchors for ${item.title}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleAnchors(item);
+                  }}
+                >
+                  #
+                </button>
+              )}
+              {mode === 'link' &&
+                expandedAnchorsFor === flattenToAppURL(item['@id']) && (
+                  <ul className="ob-anchors-list">
+                    {(anchorsByItem?.[flattenToAppURL(item['@id'])] || []).map(
+                      (anchor) => (
+                        <li
+                          key={anchor.id}
+                          className="ob-anchor-item"
+                          role="presentation"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectAnchor(item, anchor);
+                          }}
+                        >
+                          {anchor.name}
+                        </li>
+                      ),
+                    )}
+                    {(anchorsByItem?.[flattenToAppURL(item['@id'])] || [])
+                      .length === 0 && (
+                      <li className="ob-anchor-empty">No anchors</li>
+                    )}
+                  </ul>
+                )}
             </li>
           ),
         )}
