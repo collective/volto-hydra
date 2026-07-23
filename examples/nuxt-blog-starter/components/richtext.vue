@@ -17,6 +17,8 @@
     >{{ node.text }}<RichText v-for="child in subs" :key="child.nodeId" :node="child"
   /></blockquote>
   <component v-else :is="node.type" :data-node-id="node.nodeId"
+    :id="node.data && node.data.anchorId ? node.data.anchorId : undefined"
+    :data-linkable-id="node.data && node.data.anchorId ? (node.data.anchorName || node.data.anchorId) : undefined"
     :style="node.textAlign ? { textAlign: node.textAlign } : undefined"
     >{{ node.text }}<RichText v-for="child in subs" :key="child.nodeId" :node="child"
   /></component>
