@@ -10,12 +10,18 @@ import join from 'lodash/join';
 // These absolute imports (without using the corresponding centralized index.js) are required
 // to cut circular import problems, this file should never use them. This is because of
 // the very nature of the functionality of the component and its relationship with others
+import loadable from '@loadable/component';
+import { readAsDataURL } from 'promise-file-reader';
 import { searchContent } from '@plone/volto/actions/search/search';
-import { getContent } from '@plone/volto/actions/content/content';
+import { getContent, createContent } from '@plone/volto/actions/content/content';
+import { validateFileUploadSize } from '@plone/volto/helpers/FormValidation/FormValidation';
 import { collectAnchorsFromContent } from '../../../../../utils/linkableAnchors';
+import { buildUploadPayload } from '../../../../../utils/uploadPayload';
 import Icon from '@plone/volto/components/theme/Icon/Icon';
 import { flattenToAppURL, isInternalURL } from '@plone/volto/helpers/Url/Url';
 import config from '@plone/volto/registry';
+
+const Dropzone = loadable(() => import('react-dropzone'));
 
 import backSVG from '@plone/volto/icons/back.svg';
 import folderSVG from '@plone/volto/icons/folder.svg';
@@ -58,6 +64,8 @@ const messages = defineMessages({
     defaultMessage: 'Home',
   },
   of: { id: 'Selected items - x of y', defaultMessage: 'of' },
+  upload: { id: 'Upload', defaultMessage: 'Upload' },
+  uploadingFile: { id: 'Uploading…', defaultMessage: 'Uploading…' },
 });
 
 function getParentURL(url) {
@@ -163,8 +171,11 @@ class ObjectBrowserBody extends Component {
       // the anchors fetched per item (keyed by flattened @id).
       expandedAnchorsFor: null,
       anchorsByItem: {},
+      // Upload-into-folder state.
+      uploading: false,
     };
     this.searchInputRef = React.createRef();
+    this.uploadInputRef = React.createRef();
   }
 
   /**
@@ -341,6 +352,47 @@ class ObjectBrowserBody extends Component {
     this.props.onChangeBlock(this.props.block, {
       ...this.props.data,
       [key]: value,
+    });
+  };
+
+  // Re-run the search that populates the current folder listing.
+  refreshListing = () => {
+    this.props.searchContent(
+      this.state.currentFolder,
+      {
+        'path.depth': 1,
+        sort_on: 'getObjPositionInParent',
+        metadata_fields: '_all',
+        b_size: 1000,
+      },
+      `${this.props.block}-${this.props.mode}`,
+    );
+  };
+
+  // Upload a file into the folder being browsed, then auto-select it. image/*
+  // becomes an Image, anything else a File (see buildUploadPayload). Reuses the
+  // image-widget upload mechanism (readAsDataURL + createContent).
+  handleUpload = (file) => {
+    if (!file) return;
+    if (!validateFileUploadSize(file, this.props.intl.formatMessage)) return;
+    this.setState({ uploading: true });
+    readAsDataURL(file).then((dataUrl) => {
+      const payload = buildUploadPayload(file, dataUrl);
+      this.props
+        .createContent(
+          this.state.currentFolder,
+          payload,
+          `${this.props.block}-ob-upload`,
+        )
+        .then((created) => {
+          this.setState({ uploading: false });
+          if (!created) return;
+          this.refreshListing();
+          // Auto-select via the normal path: select+close (link/image) or add
+          // to the selection (multiple).
+          this.handleSelectItem(created);
+        })
+        .catch(() => this.setState({ uploading: false }));
     });
   };
 
@@ -633,12 +685,31 @@ class ObjectBrowserBody extends Component {
             )}
           </Segment>
         )}
-        <ObjectBrowserNav
-          currentSearchResults={
-            this.props.searchSubrequests[
-              `${this.props.block}-${this.props.mode}`
-            ]
-          }
+        <Dropzone
+          noClick
+          multiple={false}
+          onDrop={(files) => files?.[0] && this.handleUpload(files[0])}
+        >
+          {({ getRootProps, getInputProps, open }) => (
+            <div {...getRootProps()} className="ob-upload-dropzone">
+              <Segment className="ob-upload-bar">
+                <input {...getInputProps({ className: 'ob-upload-input' })} />
+                <button
+                  type="button"
+                  className="ob-upload-button"
+                  onClick={open}
+                >
+                  {this.state.uploading
+                    ? this.props.intl.formatMessage(messages.uploadingFile)
+                    : this.props.intl.formatMessage(messages.upload)}
+                </button>
+              </Segment>
+              <ObjectBrowserNav
+                currentSearchResults={
+                  this.props.searchSubrequests[
+                    `${this.props.block}-${this.props.mode}`
+                  ]
+                }
           selected={
             this.props.mode === 'multiple'
               ? this.props.data
@@ -661,7 +732,10 @@ class ObjectBrowserBody extends Component {
           onSelectAnchor={this.onSelectAnchor}
           expandedAnchorsFor={this.state.expandedAnchorsFor}
           anchorsByItem={this.state.anchorsByItem}
-        />
+              />
+            </div>
+          )}
+        </Dropzone>
       </Segment.Group>
     );
   }
@@ -678,6 +752,6 @@ export default compose(
       formData: state.form.global,
       pathname: state.router?.location?.pathname,
     }),
-    { searchContent, getContent },
+    { searchContent, getContent, createContent },
   ),
 )(ObjectBrowserBody);
