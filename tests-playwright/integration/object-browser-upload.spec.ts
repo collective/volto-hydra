@@ -45,6 +45,12 @@ test.describe('object browser folder upload', () => {
       buffer: Buffer.from('hello world'),
     });
 
+    // The upload auto-selects and closes the browser — wait for it to be gone
+    // before re-opening the editor (else its overlay intercepts the click).
+    await expect(
+      page.getByRole('heading', { name: 'Choose Target' }),
+    ).toBeHidden({ timeout: 10000 });
+
     // The link is now set to the uploaded file inside upload-folder.
     await iframe.locator('[data-block-uid="btnb"] [data-edit-link="href"]').click();
     await page.locator('.quanta-toolbar button[title*="Edit link"]').click();
@@ -75,6 +81,10 @@ test.describe('object browser folder upload', () => {
       mimeType: 'image/png',
       buffer: pngData,
     });
+
+    await expect(
+      page.getByRole('heading', { name: 'Choose Target' }),
+    ).toBeHidden({ timeout: 10000 });
 
     await iframe.locator('[data-block-uid="btnb"] [data-edit-link="href"]').click();
     await page.locator('.quanta-toolbar button[title*="Edit link"]').click();
