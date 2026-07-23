@@ -1406,6 +1406,43 @@ app.post('/*', (req, res, next) => {
     return res.status(201).json(imageContent);
   }
 
+  if (contentType === 'File') {
+    // Non-image upload (object-browser folder upload). Id is derived from the
+    // filename, matching real Plone, so callers can link to a named file.
+    const rawName = body.file?.filename || body.title || 'file';
+    const fileId =
+      body.id ||
+      rawName
+        .toLowerCase()
+        .replace(/[^a-z0-9.]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    const filePath = `${parentPath === '/' ? '' : parentPath}/${fileId}`.replace(/\/+/g, '/');
+    const fileContent = {
+      '@id': `http://localhost:8888${filePath}`,
+      '@type': 'File',
+      'UID': `uid-${fileId}`,
+      'id': fileId,
+      'title': body.title || rawName,
+      'description': body.description || '',
+      'file': {
+        'content-type': body.file?.['content-type'] || 'application/octet-stream',
+        'download': `http://localhost:8888${filePath}/@@download/file`,
+        'filename': body.file?.filename || rawName,
+        'size': body.file?.data?.length || 0,
+      },
+      'review_state': 'published',
+    };
+
+    const sessionId = getSessionId(req);
+    setSessionContent(sessionId, filePath, fileContent);
+
+    if (process.env.DEBUG) {
+      console.log(`Created File: ${filePath}${sessionId ? ` (session: ${sessionId})` : ''}`);
+    }
+
+    return res.status(201).json(fileContent);
+  }
+
   if (contentType === 'Document') {
     // Plone populates server-side fields (UID, created, modified,
     // effective, review_state, etc.) on create — the client only sends
