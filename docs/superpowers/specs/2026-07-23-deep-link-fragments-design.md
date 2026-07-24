@@ -96,22 +96,34 @@ Per browsable item, an "expand anchors" control:
 4. Render the list; picking an anchor yields the link value `targetPath#id`. Picking the
    page itself (no anchor) is unchanged.
 
-## Addendum — live-edited headings (added during implementation)
+## Addendum — transient store + tag-driven (final architecture)
 
-The render-only harvest above misses anchors created by **inline typing**: a heading's
-`id` is renderer-computed, and inline editing doesn't re-render, so the DOM `id` stays
-stale and is never harvested. Two additions close this:
+Two problems surfaced in implementation and reshaped the design.
 
-- **Harvest on the normal inline-update path too** — `_maybeSendLinkableAnchors()` runs in
-  `flushPendingTextUpdates` (when `INLINE_EDIT_DATA` is sent), not only in
-  `afterContentRender`. So a typed heading's anchor reaches the admin without a re-render.
-- **Frontend keeps the anchor fresh on input** — the frontend (a choice, not a bridge
-  behaviour) tags headings by slugifying their text and updates `id`/`data-linkable-id`
-  live on `input`, so the DOM `id` is current when harvested.
-- **Read path is live for the page being edited** — the object browser collects anchors
-  from the live edit form (`state.form.global`) when the browsed item *is* the current
-  page, so a just-added heading is linkable without saving; other pages use persisted
-  `getContent`.
+**1. Live-edited anchors.** A heading's `id` is renderer-computed, and inline editing
+doesn't re-render, so a freshly-typed heading's `id`/`data-linkable-id` go stale. The
+frontend (its choice) keeps them fresh with a small `input` listener, and the bridge
+harvests on `flushPendingTextUpdates` (content update) as well as `afterContentRender`.
+
+**2. Anchors must NOT live in the blocks during editing.** Writing `_linkableAnchors`
+into `formData` on every harvest re-rendered the iframe (cursor loss, echo — broke the
+metadata title-edit and cursor-stability tests). So anchors are held **outside the
+blocks** while editing:
+
+- A transient Redux slice (`linkableAnchors`, `{ [blockUid]: [{id,name}] }`), driven by
+  `View`. The `LINKABLE_ANCHORS` handler only `dispatch`es — no `formData` mutation, no
+  re-render, no echo.
+- **On load**, the slice is seeded from the blocks' saved `_linkableAnchors`.
+- **On save**, `Form.onSubmit` merges the slice back into `formData.blocks` (and passes
+  that merged formData through `getOnlyFormModifiedValues`, which otherwise defaults to
+  the unmerged `state.formData`).
+- **Object browser** reads the slice for the page being edited (ordered against its block
+  layout), `getContent` for other pages.
+
+**Tag-driven, block-agnostic.** Harvest and refresh key off the `data-linkable-id` tag
+only — any element, multiple per block, never element/block/field type. The frontend tags
+what it wants (headings here); the page title has no tag, so it is never touched (no
+special-casing). The refresh listener only refreshes already-tagged elements.
 
 ## Testing (TDD — red first)
 
