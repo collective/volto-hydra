@@ -6909,13 +6909,6 @@ export class Bridge {
         }
         // Mark render complete AFTER observer reconnection
         this._renderInProgress = false;
-
-        // Harvest anchors from the freshly-rendered DOM into the admin's
-        // transient store. Cheap + echo-guarded (only sends when the anchor set
-        // changed), and it no longer mutates formData, so it never re-renders
-        // the iframe. Selection/click-to-edit does NOT run afterContentRender,
-        // so this stays out of that path.
-        this._maybeSendLinkableAnchors();
     };
 
     // _executeRender already ensured content is ready (via polling,
@@ -6932,7 +6925,10 @@ export class Bridge {
   _maybeSendLinkableAnchors() {
     const anchors = collectLinkableAnchors(document);
     const json = JSON.stringify(anchors);
-    if (json === this._lastSentAnchors) return;
+    // Treat an unset baseline as "{}" so a page with no anchors never sends a
+    // spurious empty map on its first flush — that dispatch would re-render the
+    // admin Form mid-edit and perturb inline-edit dirty tracking.
+    if (json === (this._lastSentAnchors ?? '{}')) return;
     this._lastSentAnchors = json;
     this.sendMessageToParent({ type: 'LINKABLE_ANCHORS', anchors });
   }

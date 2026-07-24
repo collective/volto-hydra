@@ -522,7 +522,19 @@ class Form extends Component {
     // Merge the transient deep-link anchor store back into the blocks at save
     // time (they're held outside the blocks during editing so anchor updates
     // never re-render the iframe). No-op when there are no anchors.
-    const anchors = this.props.linkableAnchors;
+    //
+    // Skip entirely on template pages: the merge builds a fresh clone that
+    // breaks template slot-collapse, and template-fixed content owns its anchors
+    // in the template anyway. Detected by any block carrying template metadata.
+    let isTemplatePage = false;
+    try {
+      isTemplatePage = /"templateInstanceId"/.test(
+        JSON.stringify(this.state.formData || {}),
+      );
+    } catch {
+      isTemplatePage = false;
+    }
+    const anchors = isTemplatePage ? null : this.props.linkableAnchors;
     const formData =
       anchors && Object.keys(anchors).length
         ? mergeAnchorsIntoContent(
@@ -609,7 +621,14 @@ class Form extends Component {
       let finalizedFormData = null;
       if (this.props.isEditForm && this.saveTemplatesRef.current) {
         const currentPath = this.props.pathname;
-        const result = await this.saveTemplatesRef.current(formData, currentPath);
+        // Template save must run on the ORIGINAL form data, never the
+        // anchor-merged copy — the merge produces a fresh clone that breaks the
+        // template instance (dropping slot content). Anchors ride only in the
+        // page PATCH below.
+        const result = await this.saveTemplatesRef.current(
+          this.state.formData,
+          currentPath,
+        );
         // v2: the page save is gated while a template is unlocked — the Iframe
         // raised the "lock your templates first" modal and returns this sentinel.
         // Abort the page save.

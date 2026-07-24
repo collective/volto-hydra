@@ -41,6 +41,19 @@ describe('collectLinkableAnchors', () => {
     expect(collectLinkableAnchors(root)).toEqual({});
   });
 
+  it('skips anchors inside readonly/forced-template blocks (template owns them)', () => {
+    const root = dom(`
+      <div data-block-uid="tmpl" data-block-readonly>
+        <h2 id="tmpl-head" data-linkable-id="Template Head">fixed</h2>
+      </div>
+      <div data-block-uid="editable">
+        <h2 id="mine" data-linkable-id="Mine">editable</h2>
+      </div>`);
+    expect(collectLinkableAnchors(root)).toEqual({
+      editable: [{ id: 'mine', name: 'Mine' }],
+    });
+  });
+
   it('a container block does NOT absorb a child block’s anchors', () => {
     const root = dom(`
       <div data-block-uid="col">

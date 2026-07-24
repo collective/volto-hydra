@@ -14,6 +14,10 @@ export function collectLinkableAnchors(rootEl) {
   for (const el of els) {
     const id = el.getAttribute('id');
     if (!id) continue;
+    // Skip anchors inside readonly/forced-template blocks: that content is owned
+    // by the template (which carries its own anchors), and persisting
+    // _linkableAnchors onto a template-fixed block corrupts slot-collapse on save.
+    if (el.closest('[data-block-readonly]')) continue;
     const owner = el.closest('[data-block-uid]');
     if (!owner) continue;
     const uid = owner.getAttribute('data-block-uid');

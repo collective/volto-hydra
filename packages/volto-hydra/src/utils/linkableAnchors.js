@@ -1,4 +1,4 @@
-import { buildBlockPathMap, getBlockById, updateBlockById } from './blockPath';
+import { buildBlockPathMap, getBlockById } from './blockPath';
 
 /**
  * Collect a content item's linkable anchors in document order.
@@ -59,21 +59,25 @@ export function collectAnchorsFromStore(content, anchorsMap, blocksConfig, intl 
  * Write the transient anchor store back into the blocks (for save). Sets
  * _linkableAnchors on blocks named in the map; clears it on blocks that lost
  * theirs. Returns new content (never mutates the input).
+ *
+ * Uses a deep clone + in-place mutation via each block's getBlockById reference,
+ * NOT updateBlockById — rebuilding the tree along a path drops sibling blocks on
+ * template/slot pages (observed: a newly-added slot block vanished on save).
  */
 export function mergeAnchorsIntoContent(content, anchorsMap, blocksConfig, intl = {}) {
-  const pmap = buildBlockPathMap(content, blocksConfig, intl);
-  let next = content;
+  const next = JSON.parse(JSON.stringify(content));
+  const pmap = buildBlockPathMap(next, blocksConfig, intl);
   for (const uid of Object.keys(pmap)) {
     if (uid.startsWith('_')) continue;
-    const block = getBlockById(next, pmap, uid);
+    const block = getBlockById(next, pmap, uid); // reference into `next`
     if (!block) continue;
+    // Never write anchors onto readonly/forced-template blocks — that content is
+    // re-derived from the template on save, and mutating it corrupts slot-collapse.
+    // Their anchors belong to the template, not this instance.
+    if (block.readOnly || block.fixed) continue;
     const want = anchorsMap?.[uid];
-    const have = block._linkableAnchors;
-    if (JSON.stringify(want || null) === JSON.stringify(have || null)) continue;
-    const updated = { ...block };
-    if (want && want.length) updated._linkableAnchors = want;
-    else delete updated._linkableAnchors;
-    next = updateBlockById(next, pmap, uid, updated);
+    if (want && want.length) block._linkableAnchors = want;
+    else delete block._linkableAnchors;
   }
   return next;
 }

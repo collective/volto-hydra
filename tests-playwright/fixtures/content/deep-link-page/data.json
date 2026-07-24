@@ -14,7 +14,8 @@
           "data": { "anchorId": "intro", "anchorName": "Intro" },
           "children": [{ "text": "Intro heading" }]
         }
-      ]
+      ],
+      "_linkableAnchors": [{ "id": "intro", "name": "Intro" }]
     },
     "s2": {
       "@type": "slate",
@@ -24,7 +25,8 @@
           "data": { "anchorId": "details", "anchorName": "Details" },
           "children": [{ "text": "Details heading" }]
         }
-      ]
+      ],
+      "_linkableAnchors": [{ "id": "details", "name": "Details" }]
     },
     "btn": {
       "@type": "button",
