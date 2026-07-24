@@ -197,10 +197,11 @@ function syncCnavOpenState() {
 async function renderBlock(blockId, block) {
     const wrapper = document.createElement('div');
     wrapper.setAttribute('data-block-uid', blockId);
-    // Template-fixed content is not user-editable — mark it readonly so hydra
-    // blocks edits and the anchor harvest skips it (its anchors belong to the
-    // template, not this instance).
-    if (block.readOnly || block.fixed) {
+    // Read-only template content is not user-editable — mark it readonly so hydra
+    // blocks edits and the anchor harvest skips it. NOTE: `fixed` alone does NOT
+    // mean readonly — a fixed-but-editable block (fixed:true, readOnly:false) can
+    // still be edited, so it must NOT be marked readonly.
+    if (block.readOnly) {
         wrapper.setAttribute('data-block-readonly', '');
     }
 

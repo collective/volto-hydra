@@ -71,10 +71,10 @@ export function mergeAnchorsIntoContent(content, anchorsMap, blocksConfig, intl 
     if (uid.startsWith('_')) continue;
     const block = getBlockById(next, pmap, uid); // reference into `next`
     if (!block) continue;
-    // Never write anchors onto readonly/forced-template blocks — that content is
-    // re-derived from the template on save, and mutating it corrupts slot-collapse.
-    // Their anchors belong to the template, not this instance.
-    if (block.readOnly || block.fixed) continue;
+    // Never write anchors onto readonly blocks — that content is owned by the
+    // template. A fixed-but-editable block (fixed:true, readOnly:false) is still
+    // editable, so its anchors DO belong to the instance — don't skip it.
+    if (block.readOnly) continue;
     const want = anchorsMap?.[uid];
     if (want && want.length) block._linkableAnchors = want;
     else delete block._linkableAnchors;
