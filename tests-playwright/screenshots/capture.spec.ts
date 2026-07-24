@@ -180,6 +180,36 @@ test.describe('Editor Guide screenshots', () => {
     await snap(page, 'link-picker');
   });
 
+  test('link-fragments — expand a page to pick a heading as the link target', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    // Shot on a page that HAS headings. Open the picker from the button block's
+    // own link field (as the deep-link tests do) — selecting a heading's text and
+    // linking it would rewrite the very heading we want to show as an anchor.
+    await helper.navigateToEdit('/deep-link-page');
+    const iframe = helper.getIframe();
+
+    await iframe.locator('[data-block-uid="btn"] [data-edit-link="href"]').click();
+    await page.locator('.quanta-toolbar button[title*="Edit link"]').click();
+    const browse = await helper.getLinkEditorBrowseButton();
+    await browse.click();
+    const ob = await helper.waitForObjectBrowser();
+    await helper.objectBrowserNavigateToFolder(ob, /Test Data/);
+
+    // The page being edited offers its headings live, straight from the edit form.
+    const row = page
+      .locator('.object-listing li')
+      .filter({ has: page.getByText(/^Deep Link Page$/, { exact: true }) })
+      .first();
+    await row.waitFor({ state: 'visible', timeout: 10000 });
+    await row.locator('.ob-anchors-toggle').click();
+    await expect(row.locator('.ob-anchor-item').first()).toBeVisible({
+      timeout: 5000,
+    });
+
+    await snap(page, 'link-fragments');
+  });
+
   test('edge-drag-ghost — mid-drag, ghost boundary visible', async ({ page }) => {
     const helper = new AdminUIHelper(page);
     await helper.login();

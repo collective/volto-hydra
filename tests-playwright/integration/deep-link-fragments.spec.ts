@@ -125,6 +125,67 @@ test.describe('deep-link fragments', () => {
     await page.locator('.quanta-toolbar button[title*="Edit link"]').click();
     await expect(page.locator('input[name="link"]')).toHaveValue(/#section-two$/);
   });
+
+  // Read-only for TEMPLATE content is hydra's call, from the merged block.readOnly
+  // — NOT something the frontend must mark. On a template page the fixed READ-ONLY
+  // header carries an auto-anchor, but its content belongs to the template, so hydra
+  // must skip it in the harvest. An EDITABLE slot heading's anchor must still be
+  // harvested. This runs on admin-mock AND admin-nuxt: the real Nuxt example never
+  // marks template read-only, so before hydra owned this the read-only anchor leaked
+  // there. template-test-page uses test-layout (read-only header "Template Header -
+  // From Template" + editable "primary" slot).
+  test('hydra skips read-only template anchors from data (not the renderer), keeps editable ones', async ({
+    page,
+  }) => {
+    const helper = new AdminUIHelper(page);
+    await helper.login();
+    await helper.navigateToEdit('/template-test-page');
+    await helper.waitForIframeReady();
+
+    // Record every anchor NAME hydra harvests (LINKABLE_ANCHORS → admin window).
+    await page.evaluate(() => {
+      (window as any).__harvestedNames = [];
+      window.addEventListener(
+        'message',
+        (e: MessageEvent) => {
+          if (e.data?.type !== 'LINKABLE_ANCHORS') return;
+          const map = e.data.anchors || {};
+          for (const list of Object.values<any>(map))
+            for (const a of list)
+              (window as any).__harvestedNames.push(a.name);
+        },
+        true,
+      );
+    });
+
+    // Turn an editable "primary" slot block into a heading so the harvest has an
+    // editable anchor to find (proves the harvest ran, not just that it was empty).
+    const { blockId } = await helper.waitForBlockByContent(
+      'User content - different from template default',
+    );
+    await helper.clickBlockInIframe(blockId);
+    const editor = await helper.getEditorLocator(blockId);
+    await expect(editor).toHaveAttribute('contenteditable', 'true', {
+      timeout: 5000,
+    });
+    await editor.click();
+    await page.keyboard.press('ControlOrMeta+A');
+    await editor.pressSequentially('## Editable Anchor Heading', { delay: 20 });
+
+    // The editable slot heading's anchor IS harvested (debounced flush → harvest)…
+    await expect
+      .poll(() => page.evaluate(() => (window as any).__harvestedNames), {
+        timeout: 10000,
+      })
+      .toContain('Editable Anchor Heading');
+
+    // …but the READ-ONLY template header's anchor is NEVER harvested — hydra knows
+    // it's read-only from block.readOnly, regardless of any render-side marking.
+    const names = await page.evaluate(
+      () => (window as any).__harvestedNames,
+    );
+    expect(names).not.toContain('Template Header - From Template');
+  });
 });
 
 // Add a slate block after `afterBlockId`, type `markdown` (e.g. '## Chapter One'),

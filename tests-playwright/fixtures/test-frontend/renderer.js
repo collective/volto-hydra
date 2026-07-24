@@ -197,13 +197,11 @@ function syncCnavOpenState() {
 async function renderBlock(blockId, block) {
     const wrapper = document.createElement('div');
     wrapper.setAttribute('data-block-uid', blockId);
-    // Read-only template content is not user-editable — mark it readonly so hydra
-    // blocks edits and the anchor harvest skips it. NOTE: `fixed` alone does NOT
-    // mean readonly — a fixed-but-editable block (fixed:true, readOnly:false) can
-    // still be edited, so it must NOT be marked readonly.
-    if (block.readOnly) {
-        wrapper.setAttribute('data-block-readonly', '');
-    }
+    // NOTE: a real frontend does NOT mark template read-only — hydra owns that
+    // from the merged block.readOnly (isBlockReadonly), so editability and the
+    // anchor harvest are consistent on every frontend without a render-side flag.
+    // data-block-readonly stays available as a frontend's OWN escape hatch to lock
+    // a block for its own reasons (see the teaser's overwrite handling below).
 
     switch (block['@type']) {
         case 'title':

@@ -19,6 +19,23 @@ The Quanta toolbar's link icon does the same thing and is available on slate tex
 The frontend can also mark certain links as **always navigable during edit mode** (paging buttons, facet controls, "next slide" arrows). Those still navigate when you click them, even in edit mode — the picker only opens for editorial links, not UI controls.
 ```
 
+## Linking to a spot inside a page
+
+Sometimes you don't want to link to the top of a page — you want to land the reader on a
+particular section. When you browse for a page, rows that have linkable spots show a **`#`
+button**. Click it to expand the page and see its headings; pick one and the link becomes
+`/that-page#that-heading`, so the browser scrolls straight to it.
+
+![Object browser with the "Deep Link Page" row expanded, listing its headings — Intro and Details — as deep-link targets.](_images/link-fragments.png)
+
+Which spots are offered is up to the site's design system — most sites make every heading
+linkable. Two things worth knowing:
+
+- **The page you're editing is live.** Add a heading and it's immediately available as a
+  target, before you save.
+- **Other pages use their last saved version.** If a heading was added to another page but
+  not saved yet, it won't appear until that page is saved.
+
 ## Uploading media
 
 When the frontend marks an image (or other media element) as inline-editable, you can:
