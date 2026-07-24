@@ -1194,6 +1194,40 @@ export class AdminUIHelper {
   }
 
   /**
+   * Set a media field's source via the inline canvas editor — the flow every
+   * media object (image, video) shares: click the block's `data-edit-media`
+   * element, open the media editor from the quanta toolbar, type a URL and
+   * submit. Consolidates what was duplicated inline across the media tests.
+   *
+   * @param blockUid The block whose media field to edit.
+   * @param field    The media field name (the `data-edit-media` value, e.g. "image" or "url").
+   * @param url      The media source URL to enter.
+   */
+  async setMediaFieldUrlInline(blockUid: string, field: string, url: string): Promise<void> {
+    const iframe = this.getIframe();
+    const media = iframe.locator(`[data-block-uid="${blockUid}"] [data-edit-media="${field}"]`);
+    await media.click();
+
+    // Focusing the media field reveals the "image" button in the quanta toolbar.
+    const imageButton = this.getQuantaToolbarFormatButton('image');
+    await expect(imageButton).toBeVisible({ timeout: 5000 });
+    await imageButton.click();
+
+    // The inline image editor overlay appears over the media element.
+    const overlay = this.page.locator('.empty-image-overlay');
+    await expect(overlay).toBeVisible({ timeout: 5000 });
+
+    // Enter the URL and submit (the arrow button); the overlay closes on success.
+    const urlInput = overlay.locator('input[name="link"]');
+    await expect(urlInput).toBeVisible({ timeout: 5000 });
+    await urlInput.fill(url);
+    const submit = overlay.locator('button[aria-label="Submit"]');
+    await expect(submit).toBeEnabled({ timeout: 5000 });
+    await submit.click();
+    await expect(overlay).not.toBeVisible({ timeout: 5000 });
+  }
+
+  /**
    * Check if a format button is visible in the Quanta toolbar.
    */
   async isFormatButtonVisible(formatName: string): Promise<boolean> {

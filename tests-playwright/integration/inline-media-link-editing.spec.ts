@@ -103,31 +103,10 @@ test.describe('Inline image editing', () => {
     const iframe = helper.getIframe();
     const heroImage = iframe.locator('[data-block-uid="block-4-hero"] [data-edit-media="image"]');
     await expect(heroImage).toBeVisible();
-    await heroImage.click();
 
-    // Wait for toolbar to appear with the image button
-    const imageButton = helper.getQuantaToolbarFormatButton('image');
-    await expect(imageButton).toBeVisible({ timeout: 5000 });
-
-    // Click the image button to open the image editor overlay (shown at image position)
-    await imageButton.click();
-
-    // Wait for the image editor overlay to appear (replaces image with ImageInput)
-    const imageEditorOverlay = page.locator('.empty-image-overlay');
-    await expect(imageEditorOverlay).toBeVisible({ timeout: 5000 });
-
-    // Wait for URL input to be visible and ready
-    const urlInput = imageEditorOverlay.locator('input[name="link"]');
-    await expect(urlInput).toBeVisible({ timeout: 5000 });
-    await urlInput.fill('https://picsum.photos/400/300');
-
-    // Click the submit button (arrow icon)
-    const submitButton = imageEditorOverlay.locator('button[aria-label="Submit"]');
-    await expect(submitButton).toBeEnabled({ timeout: 5000 });
-    await submitButton.click();
-
-    // Wait for overlay to close (indicates submission completed)
-    await expect(imageEditorOverlay).not.toBeVisible({ timeout: 5000 });
+    // Set the image via a typed URL through the shared inline media editor
+    // (click media → toolbar image button → overlay → type URL → submit).
+    await helper.setMediaFieldUrlInline('block-4-hero', 'image', 'https://picsum.photos/400/300');
 
     // Verify the image src was updated to the external URL
     // Use regex to match since Nuxt may transform the URL
