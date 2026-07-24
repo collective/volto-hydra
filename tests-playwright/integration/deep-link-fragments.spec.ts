@@ -49,19 +49,14 @@ test.describe('deep-link fragments', () => {
     await browse.click();
     const ob = await helper.waitForObjectBrowser();
 
-    // 5. OB opens at root (/) showing folders; deep-link-page lives under
-    //    Test Data. Navigate in, then expand the Deep Link Page row's anchors
-    //    (.object-listing li is the item structure the shadowed OB uses).
+    // 5. OB opens at root (/) showing folders; deep-link-page lives under Test
+    //    Data. Navigate in, then into the page itself and switch the level to
+    //    its fragments.
     await helper.objectBrowserNavigateToFolder(ob, /Test Data/);
-    const row = page
-      .locator('.object-listing li')
-      .filter({ hasText: 'Deep Link Page' })
-      .first();
-    await row.waitFor({ state: 'visible', timeout: 10000 });
-    await row.locator('.ob-anchors-toggle').click();
+    await navigateIntoItem(page, /^Deep Link Page$/);
+    const anchorItems = await showLevelFragments(page);
 
-    // 6. Anchors listed in DOCUMENT order (s1 before s2): Intro, then Details.
-    const anchorItems = row.locator('.ob-anchor-item');
+    // 6. Fragments listed in DOCUMENT order (s1 before s2): Intro, then Details.
     await expect(anchorItems).toHaveText(['Intro', 'Details']);
 
     // 7. Pick "Details" → the link becomes path#details.
@@ -89,12 +84,15 @@ test.describe('deep-link fragments', () => {
     // Page B: link its button to page A's "Chapter One" anchor.
     await helper.navigateToEdit('/deep-link-page-b');
     const iframeB = helper.getIframe();
-    await openPageAnchors(helper, page, iframeB, 'btnb', /^Deep Link Page$/);
-    const row = anchorRow(page, /^Deep Link Page$/);
-    await expect(
-      row.locator('.ob-anchor-item').filter({ hasText: 'Chapter One' }),
-    ).toBeVisible();
-    await row.locator('.ob-anchor-item').filter({ hasText: 'Chapter One' }).click();
+    const fragments = await openPageAnchors(
+      helper,
+      page,
+      iframeB,
+      'btnb',
+      /^Deep Link Page$/,
+    );
+    await expect(fragments.filter({ hasText: 'Chapter One' })).toBeVisible();
+    await fragments.filter({ hasText: 'Chapter One' }).click();
 
     await iframeB.locator('[data-block-uid="btnb"] [data-edit-link="href"]').click();
     await page.locator('.quanta-toolbar button[title*="Edit link"]').click();
@@ -114,12 +112,15 @@ test.describe('deep-link fragments', () => {
 
     // Link the same page's button to the just-added, UNSAVED heading. The object
     // browser reads live anchors from the current edit form (state.form.global).
-    await openPageAnchors(helper, page, iframe, 'btn', /^Deep Link Page$/);
-    const row = anchorRow(page, /^Deep Link Page$/);
-    await expect(
-      row.locator('.ob-anchor-item').filter({ hasText: 'Section Two' }),
-    ).toBeVisible();
-    await row.locator('.ob-anchor-item').filter({ hasText: 'Section Two' }).click();
+    const fragments = await openPageAnchors(
+      helper,
+      page,
+      iframe,
+      'btn',
+      /^Deep Link Page$/,
+    );
+    await expect(fragments.filter({ hasText: 'Section Two' })).toBeVisible();
+    await fragments.filter({ hasText: 'Section Two' }).click();
 
     await iframe.locator('[data-block-uid="btn"] [data-edit-link="href"]').click();
     await page.locator('.quanta-toolbar button[title*="Edit link"]').click();
@@ -158,19 +159,14 @@ test.describe('deep-link fragments', () => {
       );
     });
 
-    // Turn an editable "primary" slot block into a heading so the harvest has an
-    // editable anchor to find (proves the harvest ran, not just that it was empty).
+    // Add a heading in the editable "primary" slot so the harvest has an editable
+    // anchor to find (proves the harvest ran, not merely that it was empty). Use
+    // addHeadingBlock — converting an existing block in place by select-all and
+    // retyping doesn't reliably produce a tagged heading on every frontend.
     const { blockId } = await helper.waitForBlockByContent(
       'User content - different from template default',
     );
-    await helper.clickBlockInIframe(blockId);
-    const editor = await helper.getEditorLocator(blockId);
-    await expect(editor).toHaveAttribute('contenteditable', 'true', {
-      timeout: 5000,
-    });
-    await editor.click();
-    await page.keyboard.press('ControlOrMeta+A');
-    await editor.pressSequentially('## Editable Anchor Heading', { delay: 20 });
+    await addHeadingBlock(helper, page, blockId, '## Editable Anchor Heading');
 
     // The editable slot heading's anchor IS harvested (debounced flush → harvest)…
     await expect
@@ -211,16 +207,27 @@ async function addHeadingBlock(helper, page, afterBlockId, markdown) {
   return newUid;
 }
 
-// The .object-listing row for a content item, matched by exact title.
-function anchorRow(page, titleRe) {
-  return page
+// Navigate INTO a content item by clicking its row. Unlike the folder helper,
+// this doesn't wait for child items — a leaf page's listing is empty, which is
+// exactly the level whose fragments we want.
+async function navigateIntoItem(page, titleRe) {
+  const row = page
     .locator('.object-listing li')
     .filter({ has: page.getByText(titleRe, { exact: true }) })
     .first();
+  await row.waitFor({ state: 'visible', timeout: 10000 });
+  await row.click();
 }
 
-// Open the object browser for a button's link field, navigate to Test Data, and
-// expand the anchors for the page whose title matches `titleRe`.
+// Switch the level being browsed to its fragments and return the items locator.
+async function showLevelFragments(page) {
+  await page.locator('.ob-level-mode-fragments').click();
+  return page.locator('.ob-fragment-item');
+}
+
+// Open the object browser for a button's link field, navigate to Test Data and
+// then INTO the page whose title matches `titleRe`, and switch that level to
+// list its fragments. Returns the fragment items locator.
 async function openPageAnchors(helper, page, iframe, buttonUid, titleRe) {
   await iframe.locator(`[data-block-uid="${buttonUid}"] [data-edit-link="href"]`).click();
   await page.locator('.quanta-toolbar button[title*="Edit link"]').click();
@@ -228,5 +235,6 @@ async function openPageAnchors(helper, page, iframe, buttonUid, titleRe) {
   await browse.click();
   const ob = await helper.waitForObjectBrowser();
   await helper.objectBrowserNavigateToFolder(ob, /Test Data/);
-  await anchorRow(page, titleRe).locator('.ob-anchors-toggle').click();
+  await navigateIntoItem(page, titleRe);
+  return showLevelFragments(page);
 }

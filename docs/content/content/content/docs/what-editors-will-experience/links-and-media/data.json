@@ -227,24 +227,35 @@
     },
     "p-8": {
       "@type": "slate",
-      "plaintext": "Sometimes you don't want to link to the top of a page — you want to land the reader on a particular section. When you browse for a page, rows that have linkable spots show a **`#` button**. Click it to expand the page and see its headings; pick one and the link becomes `/that-page#that-heading`, so the browser scrolls straight to it.",
+      "plaintext": "Sometimes you don't want to link to the top of a page — you want to land the reader on a particular section. Browse to the page and **open it** in the picker: if it has no pages inside it, you'll go straight to its **Fragments** — the page's headings. Pick one and the link becomes `/that-page#that-heading`, so the browser scrolls straight to it.",
       "value": [
         {
           "type": "p",
           "children": [
             {
-              "text": "Sometimes you don't want to link to the top of a page — you want to land the reader on a particular section. When you browse for a page, rows that have linkable spots show a "
+              "text": "Sometimes you don't want to link to the top of a page — you want to land the reader on a particular section. Browse to the page and "
             },
             {
               "type": "strong",
               "children": [
                 {
-                  "text": "`#` button"
+                  "text": "open it"
                 }
               ]
             },
             {
-              "text": ". Click it to expand the page and see its headings; pick one and the link becomes "
+              "text": " in the picker: if it has no pages inside it, you'll go straight to its "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Fragments"
+                }
+              ]
+            },
+            {
+              "text": " — the page's headings. Pick one and the link becomes "
             },
             {
               "type": "code",
@@ -261,14 +272,50 @@
         }
       ]
     },
-    "img-9": {
+    "p-9": {
+      "@type": "slate",
+      "plaintext": "The two buttons at the top right switch between **Sub items** (pages inside this one) and **Fragments**, so you can always get back to either.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "The two buttons at the top right switch between "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Sub items"
+                }
+              ]
+            },
+            {
+              "text": " (pages inside this one) and "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "Fragments"
+                }
+              ]
+            },
+            {
+              "text": ", so you can always get back to either."
+            }
+          ]
+        }
+      ]
+    },
+    "img-10": {
       "@type": "image",
       "url": "/docs/images/link-fragments",
-      "alt": "Object browser with the \"Deep Link Page\" row expanded, listing its headings — Intro and Details — as deep-link targets.",
+      "alt": "Object browser opened on Deep Link Page with the top-right switch set to Fragments, listing the page's headings — Intro and Details — as link targets.",
       "align": "center",
       "size": "l"
     },
-    "p-10": {
+    "p-11": {
       "@type": "slate",
       "plaintext": "Which spots are offered is up to the site's design system — most sites make every heading linkable. Two things worth knowing:",
       "value": [
@@ -282,7 +329,7 @@
         }
       ]
     },
-    "ul-11": {
+    "ul-12": {
       "@type": "slate",
       "plaintext": "The page you're editing is live. Add a heading and it's immediately available as a",
       "value": [
@@ -309,7 +356,7 @@
         }
       ]
     },
-    "p-12": {
+    "p-13": {
       "@type": "slate",
       "plaintext": "target, before you save.",
       "value": [
@@ -323,7 +370,7 @@
         }
       ]
     },
-    "ul-13": {
+    "ul-14": {
       "@type": "slate",
       "plaintext": "Other pages use their last saved version. If a heading was added to another page but",
       "value": [
@@ -350,7 +397,7 @@
         }
       ]
     },
-    "p-14": {
+    "p-15": {
       "@type": "slate",
       "plaintext": "not saved yet, it won't appear until that page is saved.",
       "value": [
@@ -364,7 +411,7 @@
         }
       ]
     },
-    "h-15": {
+    "h-16": {
       "@type": "slate",
       "plaintext": "Uploading media",
       "value": [
@@ -378,7 +425,7 @@
         }
       ]
     },
-    "p-16": {
+    "p-17": {
       "@type": "slate",
       "plaintext": "When the frontend marks an image (or other media element) as inline-editable, you can:",
       "value": [
@@ -392,7 +439,7 @@
         }
       ]
     },
-    "h-17": {
+    "h-18": {
       "@type": "slate",
       "plaintext": "Empty media element",
       "value": [
@@ -406,7 +453,7 @@
         }
       ]
     },
-    "p-18": {
+    "p-19": {
       "@type": "slate",
       "plaintext": "You'll see an empty placeholder with a prompt to **upload, browse, or drag in** an image. Three ways:",
       "value": [
@@ -431,7 +478,7 @@
         }
       ]
     },
-    "ul-19": {
+    "ul-20": {
       "@type": "slate",
       "plaintext": "Click the placeholder → the media picker opens. Pick from existing CMS images or upload a new one. Drag an image file from your desktop and drop it directly onto the placeholder. Drag an image from another tab / source if your browser supports it.",
       "value": [
@@ -466,14 +513,14 @@
         }
       ]
     },
-    "img-20": {
+    "img-21": {
       "@type": "image",
       "url": "/docs/images/media-empty-placeholder",
       "alt": "Empty image block selected — placeholder with image icon, \"Browse the site, drop an image...\" input, sidebar showing \"NO IMAGE SELECTED\".",
       "align": "center",
       "size": "l"
     },
-    "h-21": {
+    "h-22": {
       "@type": "slate",
       "plaintext": "Replacing an existing media element",
       "value": [
@@ -487,7 +534,7 @@
         }
       ]
     },
-    "p-22": {
+    "p-23": {
       "@type": "slate",
       "plaintext": "Hover the image — controls appear. You can:",
       "value": [
@@ -501,7 +548,7 @@
         }
       ]
     },
-    "ul-23": {
+    "ul-24": {
       "@type": "slate",
       "plaintext": "Replace — opens the media picker to pick or upload a different image. Remove — clears the field, returns to the empty placeholder state. Drag and drop a new image directly onto the existing one to replace it.",
       "value": [
@@ -560,7 +607,7 @@
         }
       ]
     },
-    "p-24": {
+    "p-25": {
       "@type": "slate",
       "plaintext": "The same actions are available from the sidebar field if you'd rather not click into the preview.",
       "value": [
@@ -574,7 +621,7 @@
         }
       ]
     },
-    "h-25": {
+    "h-26": {
       "@type": "slate",
       "plaintext": "What gets stored",
       "value": [
@@ -588,7 +635,7 @@
         }
       ]
     },
-    "p-26": {
+    "p-27": {
       "@type": "slate",
       "plaintext": "When you pick or upload an image, what gets stored on the block isn't a URL string — it's a small object containing the image's CMS path, the field name, and the available scales. The frontend resolves a specific scale at render time (so the same image data renders at thumbnail size in a listing and full size in a hero). You don't have to think about scales as an editor; they're a developer concern.",
       "value": [
@@ -602,7 +649,7 @@
         }
       ]
     },
-    "h-27": {
+    "h-28": {
       "@type": "slate",
       "plaintext": "What's not (yet) inline-editable",
       "value": [
@@ -616,7 +663,7 @@
         }
       ]
     },
-    "p-28": {
+    "p-29": {
       "@type": "slate",
       "plaintext": "A few media types currently still require sidebar editing:",
       "value": [
@@ -630,7 +677,7 @@
         }
       ]
     },
-    "ul-29": {
+    "ul-30": {
       "@type": "slate",
       "plaintext": "File uploads (PDFs, downloads) — pickable from the sidebar but no drag-onto-preview support yet. Embedded video URLs — sidebar field; click-to-edit on the player isn't wired up.",
       "value": [
@@ -673,7 +720,7 @@
         }
       ]
     },
-    "p-30": {
+    "p-31": {
       "@type": "slate",
       "plaintext": "If your frontend doesn't expose a particular media field as inline-editable, you can always edit it from the sidebar — that's available for every field.",
       "value": [
@@ -699,28 +746,29 @@
       "p-6",
       "h-7",
       "p-8",
-      "img-9",
-      "p-10",
-      "ul-11",
-      "p-12",
-      "ul-13",
-      "p-14",
-      "h-15",
-      "p-16",
-      "h-17",
-      "p-18",
-      "ul-19",
-      "img-20",
-      "h-21",
-      "p-22",
-      "ul-23",
-      "p-24",
-      "h-25",
-      "p-26",
-      "h-27",
-      "p-28",
-      "ul-29",
-      "p-30"
+      "p-9",
+      "img-10",
+      "p-11",
+      "ul-12",
+      "p-13",
+      "ul-14",
+      "p-15",
+      "h-16",
+      "p-17",
+      "h-18",
+      "p-19",
+      "ul-20",
+      "img-21",
+      "h-22",
+      "p-23",
+      "ul-24",
+      "p-25",
+      "h-26",
+      "p-27",
+      "h-28",
+      "p-29",
+      "ul-30",
+      "p-31"
     ]
   }
 }

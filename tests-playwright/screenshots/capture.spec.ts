@@ -195,15 +195,16 @@ test.describe('Editor Guide screenshots', () => {
     await browse.click();
     const ob = await helper.waitForObjectBrowser();
     await helper.objectBrowserNavigateToFolder(ob, /Test Data/);
-
-    // The page being edited offers its headings live, straight from the edit form.
+    // Navigate INTO the page (click its row — a leaf page has no child items to
+    // wait for), then switch the level to list its fragments.
     const row = page
       .locator('.object-listing li')
       .filter({ has: page.getByText(/^Deep Link Page$/, { exact: true }) })
       .first();
     await row.waitFor({ state: 'visible', timeout: 10000 });
-    await row.locator('.ob-anchors-toggle').click();
-    await expect(row.locator('.ob-anchor-item').first()).toBeVisible({
+    await row.click();
+    await page.locator('.ob-level-mode-fragments').click();
+    await expect(page.locator('.ob-fragment-item').first()).toBeVisible({
       timeout: 5000,
     });
 

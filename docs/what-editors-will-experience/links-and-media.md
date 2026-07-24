@@ -22,11 +22,14 @@ The frontend can also mark certain links as **always navigable during edit mode*
 ## Linking to a spot inside a page
 
 Sometimes you don't want to link to the top of a page — you want to land the reader on a
-particular section. When you browse for a page, rows that have linkable spots show a **`#`
-button**. Click it to expand the page and see its headings; pick one and the link becomes
-`/that-page#that-heading`, so the browser scrolls straight to it.
+particular section. Browse to the page and **open it** in the picker: if it has no pages
+inside it, you'll go straight to its **Fragments** — the page's headings. Pick one and the
+link becomes `/that-page#that-heading`, so the browser scrolls straight to it.
 
-![Object browser with the "Deep Link Page" row expanded, listing its headings — Intro and Details — as deep-link targets.](_images/link-fragments.png)
+The two buttons at the top right switch between **Sub items** (pages inside this one) and
+**Fragments**, so you can always get back to either.
+
+![Object browser opened on Deep Link Page with the top-right switch set to Fragments, listing the page's headings — Intro and Details — as link targets.](_images/link-fragments.png)
 
 Which spots are offered is up to the site's design system — most sites make every heading
 linkable. Two things worth knowing:
