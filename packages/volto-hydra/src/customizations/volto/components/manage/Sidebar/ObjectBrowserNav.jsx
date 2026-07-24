@@ -215,6 +215,7 @@ const ObjectBrowserNav = ({
                   size="24px"
                 />
               )}
+
             </li>
           ),
         )}

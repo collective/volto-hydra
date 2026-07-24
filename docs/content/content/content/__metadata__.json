@@ -18,6 +18,7 @@
     "docs-images-highlight-edit-001/image/highlight-edit.png",
     "docs-images-image-block-edit-001/image/image-block-edit.png",
     "docs-images-introduction-edit-001/image/introduction-edit.png",
+    "docs-images-link-fragments-001/image/link-fragments.png",
     "docs-images-link-picker-001/image/link-picker.png",
     "docs-images-listing-edit-001/image/listing-edit.png",
     "docs-images-maps-edit-001/image/maps-edit.png",
@@ -34,6 +35,7 @@
     "docs-images-slate-edit-001/image/slate-edit.png",
     "docs-images-table-edit-001/image/table-edit.png",
     "docs-images-teaser-edit-001/image/teaser-edit.png",
+    "docs-images-template-edit-locked-001/image/template-edit-locked.png",
     "docs-images-template-locked-001/image/template-locked.png",
     "docs-images-toc-edit-001/image/toc-edit.png",
     "docs-images-video-edit-001/image/video-edit.png",
@@ -101,7 +103,10 @@
     "docs/examples/introduction/data.json",
     "docs/examples/listing/data.json",
     "docs/examples/maps/data.json",
+    "docs/examples/relatedItemsListing/data.json",
+    "docs/examples/rssFeed/data.json",
     "docs/examples/search/data.json",
+    "docs/examples/searchShortcuts/data.json",
     "docs/examples/separator/data.json",
     "docs/examples/slate/data.json",
     "docs/examples/slider/data.json",
@@ -121,6 +126,7 @@
     "docs-images-highlight-edit-001/data.json",
     "docs-images-image-block-edit-001/data.json",
     "docs-images-introduction-edit-001/data.json",
+    "docs-images-link-fragments-001/data.json",
     "docs-images-link-picker-001/data.json",
     "docs-images-listing-edit-001/data.json",
     "docs-images-maps-edit-001/data.json",
@@ -137,6 +143,7 @@
     "docs-images-slate-edit-001/data.json",
     "docs-images-table-edit-001/data.json",
     "docs-images-teaser-edit-001/data.json",
+    "docs-images-template-edit-locked-001/data.json",
     "docs-images-template-locked-001/data.json",
     "docs-images-toc-edit-001/data.json",
     "docs-images-video-edit-001/data.json",
@@ -164,10 +171,7 @@
     "docs/examples/grid/grid-image/data.json",
     "docs/examples/grid/listing/data.json",
     "docs/examples/grid/teaser/data.json",
-    "docs/examples/grid/text/data.json",
-    "docs/examples/relatedItemsListing/data.json",
-    "docs/examples/rssFeed/data.json",
-    "docs/examples/searchShortcuts/data.json"
+    "docs/examples/grid/text/data.json"
   ],
   "default_page": {},
   "local_roles": {
@@ -921,6 +925,41 @@
       }
     },
     "docs-server-rendered-frontends-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-examples-relatedItemsListing-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-examples-rssFeed-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-examples-searchShortcuts-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-link-fragments-001": {
+      "local_roles": {
+        "admin": [
+          "Owner"
+        ]
+      }
+    },
+    "docs-images-template-edit-locked-001": {
       "local_roles": {
         "admin": [
           "Owner"

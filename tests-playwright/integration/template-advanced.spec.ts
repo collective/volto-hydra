@@ -75,6 +75,86 @@ test.describe('Fixed Editable Blocks', () => {
     const dragHandle = toolbar.locator('.drag-handle');
     await expect(dragHandle).not.toBeVisible();
   });
+
+  // The round-trip nobody was covering: edit a fixed-but-editable block's
+  // content, save, and confirm (a) the edit persists on the INSTANCE after
+  // reload and (b) the shared TEMPLATE document is never written. An instance
+  // edit must stay instance-local.
+  test('editing a fixed-but-editable block persists on the instance without saving the template', async ({ page }) => {
+    const helper = new AdminUIHelper(page);
+    const iframe = helper.getIframe();
+
+    await helper.login();
+    await helper.navigateToEdit('/another-page');
+    await helper.waitForIframeReady();
+
+    // Apply the editable-fixed layout: its "Editable Header" is fixed:true with
+    // NO readOnly — the fixed-but-editable case.
+    await page.locator('.sidebar-section-header .section-title').click();
+    const layoutSelector = page.locator('.layout-selector select');
+    await expect(layoutSelector).toBeVisible({ timeout: 5000 });
+    await layoutSelector.selectOption('Editable Fixed Layout');
+    await page.locator('.apply-layout-btn').click();
+    const headerBlock = iframe
+      .locator('main [data-block-uid], #content [data-block-uid]')
+      .filter({ hasText: 'Editable Header' });
+    await expect(headerBlock).toBeVisible({ timeout: 10000 });
+
+    // Capture every write from here on so we can assert what was (and wasn't) saved.
+    const writes: Array<{ method: string; url: string }> = [];
+    page.on('request', (req) => {
+      const m = req.method();
+      if (m !== 'PATCH' && m !== 'POST') return;
+      if (!req.url().startsWith('http://localhost:8888')) return;
+      writes.push({ method: m, url: req.url() });
+    });
+
+    // Select the block first so it becomes editable (schema resolves), then edit.
+    await headerBlock.click();
+    await helper.waitForSidebarOpen();
+    const field = helper.getSlateField(headerBlock);
+    await field.click();
+    await expect(field).toHaveAttribute('contenteditable', 'true', {
+      timeout: 5000,
+    });
+    await field.pressSequentially(' EDITED', { delay: 25 });
+    await expect(headerBlock).toContainText('Editable Header EDITED', {
+      timeout: 10000,
+    });
+
+    await helper.saveContent();
+
+    // (a) The instance page WAS patched with the edit…
+    const instancePatches = writes.filter(
+      (w) =>
+        w.method === 'PATCH' &&
+        w.url.includes('/another-page') &&
+        !w.url.includes('/templates/'),
+    );
+    expect(
+      instancePatches.length,
+      `expected a PATCH to the instance /another-page; got ${JSON.stringify(writes)}`,
+    ).toBeGreaterThanOrEqual(1);
+
+    // (b) …but the shared TEMPLATE document must NOT be written.
+    const templateWrites = writes.filter((w) =>
+      w.url.includes('templates/editable-fixed-layout'),
+    );
+    expect(
+      templateWrites,
+      `editing an instance block must not save the template; got ${JSON.stringify(templateWrites)}`,
+    ).toHaveLength(0);
+
+    // (c) …and the edit persists after reload (stored on the instance, not
+    // overwritten by the template's fixed content when it re-expands).
+    await helper.navigateToEdit('/another-page');
+    await helper.waitForIframeReady();
+    await expect(
+      iframe
+        .locator('main [data-block-uid], #content [data-block-uid]')
+        .filter({ hasText: 'Editable Header EDITED' }),
+    ).toBeVisible({ timeout: 15000 });
+  });
 });
 
 test.describe('Remove Layout', () => {

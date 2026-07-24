@@ -47,6 +47,7 @@ import {
 import { v4 as uuid } from 'uuid';
 import { toast } from 'react-toastify';
 import { stripEmptyBlocks, ensureAllContainersHaveBlocks } from '../../../../../utils/blockPath';
+import { mergeAnchorsIntoContent } from '../../../../../utils/linkableAnchors';
 import { stripFixedInsideSlots } from '@volto-hydra/helpers';
 import { createLog } from '../../../../../utils/log';
 const log = createLog('FORM');
@@ -512,12 +513,38 @@ class Form extends Component {
   }
 
   /**
+   * Merge the transient deep-link anchor store back into a formData's blocks.
+   * Anchors are held OUTSIDE the blocks during editing (so anchor updates never
+   * re-render the iframe) and folded in only at save. No-op when there are no
+   * anchors. Readonly / forced-template blocks are skipped inside
+   * mergeAnchorsIntoContent. Returns the input unchanged when there's nothing to
+   * merge, so it's safe to wrap any save source.
+   * @param {Object} sourceFormData
+   * @returns {Object}
+   */
+  mergeAnchorsIntoFormData(sourceFormData) {
+    const anchors = this.props.linkableAnchors;
+    if (!anchors || !Object.keys(anchors).length) return sourceFormData;
+    return mergeAnchorsIntoContent(
+      sourceFormData,
+      anchors,
+      config.blocks.blocksConfig,
+      this.props.intl,
+    );
+  }
+
+  /**
    * Submit handler also validate form and collect errors
    * @method onSubmit
    * @param {Object} event Event object.
    * @returns {undefined}
    */
   async onSubmit(event) {
+    // formData for validation + the template-save pre-pass. Read here (pre-flush)
+    // exactly as upstream does — saveTemplatesRef flushes the iframe's pending
+    // inline edits itself and, when it returns nothing, Form re-reads its own
+    // POST-flush state for the PATCH (see below). Anchors are merged at the PATCH
+    // site, not here, so a just-typed edit saved before the debounce isn't lost.
     const formData = this.state.formData;
 
     if (event) {
@@ -604,15 +631,20 @@ class Form extends Component {
         finalizedFormData = result;
       }
 
-      // Then save the page
+      // Then save the page. Source the PATCH from this.state.formData READ HERE,
+      // after saveTemplatesRef has flushed the iframe's pending inline edits, so
+      // an edit typed and saved before the 300ms debounce still lands (a pre-flush
+      // snapshot taken at the top of onSubmit would drop it). finalizedFormData is
+      // only returned when a brand-new template's id was rewritten across the page
+      // — that narrow path keeps its own (id-rewritten) data, as upstream does.
+      // Merge the deep-link anchors into whichever we use — never a pre-flush copy.
+      const pageFormData = this.mergeAnchorsIntoFormData(
+        finalizedFormData || this.state.formData,
+      );
       if (this.props.isEditForm) {
-        this.props.onSubmit(
-          finalizedFormData
-            ? this.getOnlyFormModifiedValues(finalizedFormData)
-            : this.getOnlyFormModifiedValues(),
-        );
+        this.props.onSubmit(this.getOnlyFormModifiedValues(pageFormData));
       } else {
-        this.props.onSubmit(finalizedFormData || formData);
+        this.props.onSubmit(pageFormData);
       }
       if (this.props.resetAfterSubmit) {
         this.setState({
@@ -1059,6 +1091,7 @@ export default compose(
       uiState: state.form?.ui,
       metadataFieldsets: state.sidebar?.metadataFieldsets,
       metadataFieldFocus: state.sidebar?.metadataFieldFocus,
+      linkableAnchors: state.linkableAnchors?.anchors,
     }),
     {
       setMetadataFieldsets,

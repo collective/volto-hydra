@@ -945,7 +945,65 @@
         }
       ]
     },
-    "h-30": {
+    "p-30": {
+      "@type": "slate",
+      "plaintext": "`data-block-readonly` is *your* call — use it when your frontend wants to lock a block for its own reasons (a teaser mirroring another page, a listing item).",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-block-readonly"
+                }
+              ]
+            },
+            {
+              "text": " is "
+            },
+            {
+              "type": "em",
+              "children": [
+                {
+                  "text": "your"
+                }
+              ]
+            },
+            {
+              "text": " call — use it when your frontend wants to lock a block for its own reasons (a teaser mirroring another page, a listing item)."
+            }
+          ]
+        }
+      ]
+    },
+    "p-31": {
+      "@type": "slate",
+      "plaintext": "You do **not** need it for template content. Hydra already knows which blocks a template marks read-only from the block data and enforces that itself, so your renderer doesn't need to detect template blocks or mark them.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "You do "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "not"
+                }
+              ]
+            },
+            {
+              "text": " need it for template content. Hydra already knows which blocks a template marks read-only from the block data and enforces that itself, so your renderer doesn't need to detect template blocks or mark them."
+            }
+          ]
+        }
+      ]
+    },
+    "h-32": {
       "@type": "slate",
       "plaintext": "Renderer Node-ID Rules",
       "value": [
@@ -959,7 +1017,7 @@
         }
       ]
     },
-    "p-31": {
+    "p-33": {
       "@type": "slate",
       "plaintext": "When rendering Slate nodes to DOM, your renderer must follow these rules for `data-node-id`:",
       "value": [
@@ -984,7 +1042,7 @@
         }
       ]
     },
-    "ol-32": {
+    "ol-34": {
       "@type": "slate",
       "plaintext": "Element nodes (p, strong, em, etc.) must have data-node-id matching the Slate node's nodeId Wrapper elements — If you add extra wrapper elements around a Slate node, ALL wrappers must have the same data-node-id as the inner element",
       "value": [
@@ -1074,7 +1132,7 @@
         }
       ]
     },
-    "p-33": {
+    "p-35": {
       "@type": "slate",
       "plaintext": "hydra.js uses node-ids to map between Slate's data model and your DOM. When restoring cursor position after formatting changes, it walks your DOM counting Slate children.",
       "value": [
@@ -1088,18 +1146,233 @@
         }
       ]
     },
-    "ce-34": {
+    "ce-36": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-34-html-708bb2",
+          "@id": "ce-36-html-2456f3",
           "label": "Html",
           "language": "html",
           "code": "Valid wrapper pattern:\n<strong data-node-id=\"0.1\"><b data-node-id=\"0.1\">bold</b></strong>\nBoth elements have the same node-id, so they count as one Slate child.\n\nInvalid (missing node-id on wrapper):\n<span class=\"my-style\"><strong data-node-id=\"0.1\">bold</strong></span>\nThis breaks cursor positioning because hydra.js can't correlate DOM structure to Slate structure."
         }
       ]
     },
-    "h-35": {
+    "h-37": {
+      "@type": "slate",
+      "plaintext": "Non-editable content inside a slate field",
+      "value": [
+        {
+          "type": "h2",
+          "children": [
+            {
+              "text": "Non-editable content inside a slate field"
+            }
+          ]
+        }
+      ]
+    },
+    "p-38": {
+      "@type": "slate",
+      "plaintext": "Sometimes a renderer adds elements to slate output that are **not** part of the editable content — a decorative icon (an \"opens in a new tab\" glyph), a generated chip, an embedded non-editable widget. These have no `data-node-id` (they aren't Slate nodes), and they must be marked so that **both** the editor's caret and hydra's DOM→Slate reader skip them:",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Sometimes a renderer adds elements to slate output that are "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "not"
+                }
+              ]
+            },
+            {
+              "text": " part of the editable content — a decorative icon (an \"opens in a new tab\" glyph), a generated chip, an embedded non-editable widget. These have no "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-node-id"
+                }
+              ]
+            },
+            {
+              "text": " (they aren't Slate nodes), and they must be marked so that "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "both"
+                }
+              ]
+            },
+            {
+              "text": " the editor's caret and hydra's DOM→Slate reader skip them:"
+            }
+          ]
+        }
+      ]
+    },
+    "ul-39": {
+      "@type": "slate",
+      "plaintext": "contenteditable=\"false\" — the browser treats the element as a",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`contenteditable=\"false\"`"
+                    }
+                  ]
+                },
+                {
+                  "text": " — the browser treats the element as a"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-40": {
+      "@type": "slate",
+      "plaintext": "non-editable island: the caret steps over it, backspace/delete removes it as a   unit, and selection includes it whole. Add this to anything that must not be   typed into.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "non-editable island: the caret steps over it, backspace/delete removes it as a   unit, and selection includes it whole. Add this to anything that must not be   typed into."
+            }
+          ]
+        }
+      ]
+    },
+    "ul-41": {
+      "@type": "slate",
+      "plaintext": "aria-hidden=\"true\" — for purely decorative chrome (e.g. icons), so",
+      "value": [
+        {
+          "type": "ul",
+          "children": [
+            {
+              "type": "li",
+              "children": [
+                {
+                  "type": "strong",
+                  "children": [
+                    {
+                      "text": "`aria-hidden=\"true\"`"
+                    }
+                  ]
+                },
+                {
+                  "text": " — for purely decorative chrome (e.g. icons), so"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "p-42": {
+      "@type": "slate",
+      "plaintext": "assistive tech ignores it too.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "assistive tech ignores it too."
+            }
+          ]
+        }
+      ]
+    },
+    "p-43": {
+      "@type": "slate",
+      "plaintext": "hydra's DOM→Slate reader skips any child (without a `data-node-id`) that carries **either** attribute — treating it as chrome, not content. Without this, the element's text would be read back into the Slate value on every edit / select / delete over it, corrupting the value.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "hydra's DOM→Slate reader skips any child (without a "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-node-id"
+                }
+              ]
+            },
+            {
+              "text": ") that carries "
+            },
+            {
+              "type": "strong",
+              "children": [
+                {
+                  "text": "either"
+                }
+              ]
+            },
+            {
+              "text": " attribute — treating it as chrome, not content. Without this, the element's text would be read back into the Slate value on every edit / select / delete over it, corrupting the value."
+            }
+          ]
+        }
+      ]
+    },
+    "ce-44": {
+      "@type": "codeExample",
+      "tabs": [
+        {
+          "@id": "ce-44-html-dd894c",
+          "label": "Html",
+          "language": "html",
+          "code": "An <a data-node-id=\"0.1\">external link<span class=\"external-icon\"\n  aria-hidden=\"true\" contenteditable=\"false\">&#8599;</span></a>\nThe icon is decoration: the caret skips it and it never enters the value."
+        }
+      ]
+    },
+    "p-45": {
+      "@type": "slate",
+      "plaintext": "Contrast this with the wrapper rule above: a wrapper that holds real content carries the inner node's `data-node-id` (and neither of these attributes), so it IS read; decorative / non-editable chrome carries these attributes and is skipped.",
+      "value": [
+        {
+          "type": "p",
+          "children": [
+            {
+              "text": "Contrast this with the wrapper rule above: a wrapper that holds real content carries the inner node's "
+            },
+            {
+              "type": "code",
+              "children": [
+                {
+                  "text": "data-node-id"
+                }
+              ]
+            },
+            {
+              "text": " (and neither of these attributes), so it IS read; decorative / non-editable chrome carries these attributes and is skipped."
+            }
+          ]
+        }
+      ]
+    },
+    "h-46": {
       "@type": "slate",
       "plaintext": "One top-level node per slate field",
       "value": [
@@ -1113,7 +1386,7 @@
         }
       ]
     },
-    "p-36": {
+    "p-47": {
       "@type": "slate",
       "plaintext": "A slate field's `value` is an array, but it always holds exactly **one top-level node** — a single paragraph, heading, list, or blockquote. Inline content (bold, links, …) lives in that node's `children`.",
       "value": [
@@ -1160,7 +1433,7 @@
         }
       ]
     },
-    "p-37": {
+    "p-48": {
       "@type": "slate",
       "plaintext": "Editing can transiently produce more than one top-level node — pasting multiple paragraphs, pressing Enter, or a Backspace that demotes a list item to a paragraph (`[ul, p]`). Hydra normalizes that immediately:",
       "value": [
@@ -1185,7 +1458,7 @@
         }
       ]
     },
-    "ul-38": {
+    "ul-49": {
       "@type": "slate",
       "plaintext": "Split — when the field is the value of a slate block, each extra",
       "value": [
@@ -1234,7 +1507,7 @@
         }
       ]
     },
-    "p-39": {
+    "p-50": {
       "@type": "slate",
       "plaintext": "node becomes its own `slate` block, inserted after the original in the   same container (`blocks_layout` or `object_list`). This is how pressing   Enter in a text block produces a new block.",
       "value": [
@@ -1281,7 +1554,7 @@
         }
       ]
     },
-    "ul-40": {
+    "ul-51": {
       "@type": "slate",
       "plaintext": "Flatten — when the field can't be split — a slate field of a",
       "value": [
@@ -1319,7 +1592,7 @@
         }
       ]
     },
-    "p-41": {
+    "p-52": {
       "@type": "slate",
       "plaintext": "non-slate block (e.g. a `slateTable` cell's `value`), a slate field nested   on a `widget: 'object'` (`content/headline`), or a container that's full or   in table mode — the extra nodes' content merges back into the first node.   No text is lost.",
       "value": [
@@ -1377,7 +1650,7 @@
         }
       ]
     },
-    "p-42": {
+    "p-53": {
       "@type": "slate",
       "plaintext": "A frontend renderer can therefore always assume one top-level node per slate field; it never has to handle a multi-node `value`.",
       "value": [
@@ -1402,7 +1675,7 @@
         }
       ]
     },
-    "h-43": {
+    "h-54": {
       "@type": "slate",
       "plaintext": "Complete Slate Rendering Example",
       "value": [
@@ -1416,7 +1689,7 @@
         }
       ]
     },
-    "p-44": {
+    "p-55": {
       "@type": "slate",
       "plaintext": "Slate data structure (value is an array but always contains a single root node):",
       "value": [
@@ -1430,18 +1703,18 @@
         }
       ]
     },
-    "ce-45": {
+    "ce-56": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-45-json-6a84b8",
+          "@id": "ce-56-json-01bfa5",
           "label": "Json",
           "language": "json",
           "code": "{\n  \"value\": [\n    {\n      \"type\": \"p\", \"nodeId\": \"0\",\n      \"children\": [\n        { \"text\": \"Hello \" },\n        { \"type\": \"strong\", \"nodeId\": \"0.1\",\n          \"children\": [{ \"text\": \"world\" }] },\n        { \"text\": \"! Visit \" },\n        { \"type\": \"link\", \"nodeId\": \"0.3\",\n          \"data\": { \"url\": \"/about\" },\n          \"children\": [{ \"text\": \"our page\" }] }\n      ]\n    }\n  ]\n}"
         }
       ]
     },
-    "p-46": {
+    "p-57": {
       "@type": "slate",
       "plaintext": "Renderer:",
       "value": [
@@ -1455,18 +1728,18 @@
         }
       ]
     },
-    "ce-47": {
+    "ce-58": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-47-javascript-5e9bf2",
+          "@id": "ce-58-javascript-93da46",
           "label": "Javascript",
           "language": "javascript",
           "code": "function renderSlate(nodes) {\n  return (nodes || []).map(node => {\n    if (node.text !== undefined) return escapeHtml(node.text);\n    const tag = { p:'p', h1:'h1', h2:'h2', strong:'strong',\n                  em:'em', link:'a' }[node.type] || 'span';\n    const attrs = node.type === 'link'\n      ? ` href=\"${node.data?.url || '#'}\"` : '';\n    return `<${tag} data-node-id=\"${node.nodeId}\"${attrs}>${renderSlate(node.children)}</${tag}>`;\n  }).join('');\n}"
         }
       ]
     },
-    "p-48": {
+    "p-59": {
       "@type": "slate",
       "plaintext": "Usage:",
       "value": [
@@ -1480,11 +1753,11 @@
         }
       ]
     },
-    "ce-49": {
+    "ce-60": {
       "@type": "codeExample",
       "tabs": [
         {
-          "@id": "ce-49-html-9b3b7f",
+          "@id": "ce-60-html-396a1b",
           "label": "Html",
           "language": "html",
           "code": "<div data-block-uid=\"block-1\" data-edit-text=\"value\">\n  <!-- renderSlate(block.value) output goes here -->\n</div>"
@@ -1524,26 +1797,37 @@
       "ce-27",
       "p-28",
       "ce-29",
-      "h-30",
+      "p-30",
       "p-31",
-      "ol-32",
+      "h-32",
       "p-33",
-      "ce-34",
-      "h-35",
-      "p-36",
-      "p-37",
-      "ul-38",
-      "p-39",
-      "ul-40",
-      "p-41",
+      "ol-34",
+      "p-35",
+      "ce-36",
+      "h-37",
+      "p-38",
+      "ul-39",
+      "p-40",
+      "ul-41",
       "p-42",
-      "h-43",
-      "p-44",
-      "ce-45",
-      "p-46",
-      "ce-47",
+      "p-43",
+      "ce-44",
+      "p-45",
+      "h-46",
+      "p-47",
       "p-48",
-      "ce-49"
+      "ul-49",
+      "p-50",
+      "ul-51",
+      "p-52",
+      "p-53",
+      "h-54",
+      "p-55",
+      "ce-56",
+      "p-57",
+      "ce-58",
+      "p-59",
+      "ce-60"
     ]
   }
 }
