@@ -47,6 +47,7 @@ import {
 import { v4 as uuid } from 'uuid';
 import { toast } from 'react-toastify';
 import { stripEmptyBlocks, ensureAllContainersHaveBlocks } from '../../../../../utils/blockPath';
+import { mergeAnchorsIntoContent } from '../../../../../utils/linkableAnchors';
 import { stripFixedInsideSlots } from '@volto-hydra/helpers';
 import { createLog } from '../../../../../utils/log';
 const log = createLog('FORM');
@@ -518,7 +519,19 @@ class Form extends Component {
    * @returns {undefined}
    */
   async onSubmit(event) {
-    const formData = this.state.formData;
+    // Merge the transient deep-link anchor store back into the blocks at save
+    // time (they're held outside the blocks during editing so anchor updates
+    // never re-render the iframe). No-op when there are no anchors.
+    const anchors = this.props.linkableAnchors;
+    const formData =
+      anchors && Object.keys(anchors).length
+        ? mergeAnchorsIntoContent(
+            this.state.formData,
+            anchors,
+            config.blocks.blocksConfig,
+            this.props.intl,
+          )
+        : this.state.formData;
 
     if (event) {
       event.preventDefault();
@@ -609,7 +622,9 @@ class Form extends Component {
         this.props.onSubmit(
           finalizedFormData
             ? this.getOnlyFormModifiedValues(finalizedFormData)
-            : this.getOnlyFormModifiedValues(),
+            : // Use the anchor-merged formData (not the default state) so the
+              // deep-link anchors land in the PATCH.
+              this.getOnlyFormModifiedValues(formData),
         );
       } else {
         this.props.onSubmit(finalizedFormData || formData);
@@ -1059,6 +1074,7 @@ export default compose(
       uiState: state.form?.ui,
       metadataFieldsets: state.sidebar?.metadataFieldsets,
       metadataFieldFocus: state.sidebar?.metadataFieldFocus,
+      linkableAnchors: state.linkableAnchors?.anchors,
     }),
     {
       setMetadataFieldsets,

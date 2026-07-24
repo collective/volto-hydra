@@ -53,6 +53,9 @@ export default {
             : (n.children || []).map(collect).join('');
       return collect(this.node).trim();
     },
+    isAnchor() {
+      return this.isHeading || !!(this.node.data && this.node.data.anchorId);
+    },
     anchorId() {
       const explicit = this.node.data && this.node.data.anchorId;
       if (explicit) return explicit;
@@ -61,9 +64,11 @@ export default {
         : undefined;
     },
     anchorName() {
-      if (!this.anchorId) return undefined;
+      // Defined (even '') for every anchor element so data-linkable-id is always
+      // emitted — the tag-driven refresh needs the tag present on empty headings.
+      if (!this.isAnchor) return undefined;
       const explicit = this.node.data && this.node.data.anchorName;
-      return explicit || this.headingText || this.anchorId;
+      return explicit || this.headingText || '';
     },
   },
   methods: {

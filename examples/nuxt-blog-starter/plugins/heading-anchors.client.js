@@ -19,20 +19,18 @@ export default defineNuxtPlugin(() => {
       const editable =
         e.target && e.target.closest && e.target.closest('[data-edit-text]');
       if (!editable) return;
-      const headings = [];
-      if (/^H[1-6]$/.test(editable.tagName)) headings.push(editable);
+      // Refresh only elements already TAGGED with data-linkable-id (any element,
+      // multiple per block). Tag-driven — untagged elements (the page title) are
+      // never touched; no element/block/field special-casing.
+      const tagged = editable.matches('[data-linkable-id]') ? [editable] : [];
       editable
-        .querySelectorAll('h1,h2,h3,h4,h5,h6')
-        .forEach((h) => headings.push(h));
-      for (const heading of headings) {
-        const text = (heading.textContent || '').trim();
-        if (text) {
-          heading.id = slugify(text);
-          heading.setAttribute('data-linkable-id', text);
-        } else {
-          heading.removeAttribute('id');
-          heading.removeAttribute('data-linkable-id');
-        }
+        .querySelectorAll('[data-linkable-id]')
+        .forEach((el) => tagged.push(el));
+      for (const el of tagged) {
+        const text = (el.textContent || '').trim();
+        el.setAttribute('data-linkable-id', text);
+        if (text) el.id = slugify(text);
+        else el.removeAttribute('id');
       }
     },
     true,

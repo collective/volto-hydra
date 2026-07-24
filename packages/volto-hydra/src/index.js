@@ -32,7 +32,7 @@ const messages = defineMessages({
   },
 });
 import Cookies from 'js-cookie';
-import frontendPreviewUrl, { viewportPreset } from './reducers';
+import frontendPreviewUrl, { viewportPreset, linkableAnchors } from './reducers';
 import FrontendSwitcherPlug from './components/Toolbar/FrontendSwitcherPlug';
 import SidebarToggleToolbarPlug from './components/Toolbar/SidebarToggleToolbarPlug';
 import FrontendSwitcherPanel from './components/Toolbar/FrontendSwitcherPanel';
@@ -106,6 +106,7 @@ const applyConfig = (config) => {
   // Add reducers
   config.addonReducers.frontendPreviewUrl = frontendPreviewUrl;
   config.addonReducers.viewportPreset = viewportPreset;
+  config.addonReducers.linkableAnchors = linkableAnchors;
 
   // HYDRA: keep settings.publicURL pinned to the currently selected
   // iframe frontend. publicURL in Hydra means "where this content is

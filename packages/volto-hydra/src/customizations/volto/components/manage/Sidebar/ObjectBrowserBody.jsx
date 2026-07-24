@@ -15,7 +15,7 @@ import { readAsDataURL } from 'promise-file-reader';
 import { searchContent } from '@plone/volto/actions/search/search';
 import { getContent, createContent } from '@plone/volto/actions/content/content';
 import { validateFileUploadSize } from '@plone/volto/helpers/FormValidation/FormValidation';
-import { collectAnchorsFromContent } from '../../../../../utils/linkableAnchors';
+import { collectAnchorsFromContent, collectAnchorsFromStore } from '../../../../../utils/linkableAnchors';
 import { buildUploadPayload } from '../../../../../utils/uploadPayload';
 import Icon from '@plone/volto/components/theme/Icon/Icon';
 import { flattenToAppURL, isInternalURL } from '@plone/volto/helpers/Url/Url';
@@ -406,9 +406,9 @@ class ObjectBrowserBody extends Component {
       return;
     }
     if (!this.state.anchorsByItem[id]) {
-      // The page currently being edited → use LIVE anchors from the edit form
-      // (state.form.global, which the render-time harvest already updates), so a
-      // just-added heading is linkable without saving. Any other page → the
+      // The page currently being edited → LIVE anchors from the transient store
+      // (state.linkableAnchors), ordered against the current form's block layout,
+      // so a just-added heading is linkable without saving. Any other page → the
       // persisted content via getContent (whose dispatched promise resolves with
       // the full body, blocks included — see Teaser/Data.jsx).
       const editingPath = this.props.pathname
@@ -419,16 +419,24 @@ class ObjectBrowserBody extends Component {
         flattenToAppURL(editingPath) === id &&
         this.props.formData &&
         this.props.formData.blocks;
-      const source = isCurrentPage
-        ? this.props.formData
-        : await this.props.getContent(id, null, `anchors-${id}`);
-      const anchors = source
-        ? collectAnchorsFromContent(
-            source,
-            config.blocks.blocksConfig,
-            this.props.intl,
-          )
-        : [];
+      let anchors;
+      if (isCurrentPage) {
+        anchors = collectAnchorsFromStore(
+          this.props.formData,
+          this.props.linkableAnchors || {},
+          config.blocks.blocksConfig,
+          this.props.intl,
+        );
+      } else {
+        const resp = await this.props.getContent(id, null, `anchors-${id}`);
+        anchors = resp
+          ? collectAnchorsFromContent(
+              resp,
+              config.blocks.blocksConfig,
+              this.props.intl,
+            )
+          : [];
+      }
       this.setState((s) => ({
         anchorsByItem: { ...s.anchorsByItem, [id]: anchors },
       }));
@@ -747,9 +755,11 @@ export default compose(
     (state) => ({
       searchSubrequests: state.search.subrequests,
       lang: state.intl.locale,
-      // Live edit-form data + current path, so anchors for the page being
-      // edited come from the unsaved form rather than persisted content.
+      // Live edit-form data (for the current page's block order) + the transient
+      // anchor store + current path, so anchors for the page being edited come
+      // from the store rather than persisted content.
       formData: state.form.global,
+      linkableAnchors: state.linkableAnchors?.anchors,
       pathname: state.router?.location?.pathname,
     }),
     { searchContent, getContent, createContent },

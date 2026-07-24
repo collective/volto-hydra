@@ -259,6 +259,8 @@ import slateTransforms from '../../utils/slateTransforms';
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import { buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
+import { setLinkableAnchors } from '../../actions';
+import { seedAnchorsFromContent } from '../../utils/linkableAnchors';
 import { canContainAll, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
@@ -2293,53 +2295,12 @@ const Iframe = (props) => {
         }
 
         case 'LINKABLE_ANCHORS': {
-          // Iframe harvested data-linkable-id anchors from the rendered DOM,
-          // grouped by nearest data-block-uid. Reconcile block._linkableAnchors
-          // in formData so they persist with the registered `blocks` field.
-          const incoming = event.data.anchors || {};
-          const bpm = buildBlockPathMap(
-            properties,
-            config.blocks.blocksConfig,
-            intl,
-          );
-          let next = properties;
-          // Union: blocks named in the incoming map, plus blocks that currently
-          // store anchors (so a block that lost all its anchors gets cleared).
-          const uids = new Set(Object.keys(incoming));
-          for (const uid of Object.keys(bpm)) {
-            if (uid.startsWith('_')) continue; // skip meta keys (_schemas, ...)
-            const cur = getBlockById(next, bpm, uid);
-            if (cur && cur._linkableAnchors) uids.add(uid);
-          }
-          let changed = false;
-          for (const uid of uids) {
-            const block = getBlockById(next, bpm, uid);
-            if (!block) continue; // uid not in this page (stale) — skip
-            const want = incoming[uid];
-            const have = block._linkableAnchors;
-            if (
-              JSON.stringify(want || null) === JSON.stringify(have || null)
-            ) {
-              continue;
-            }
-            const updated = { ...block };
-            if (want && want.length) updated._linkableAnchors = want;
-            else delete updated._linkableAnchors;
-            next = updateBlockById(next, bpm, uid, updated);
-            changed = true;
-          }
-          if (changed) {
-            setIframeSyncState((prev) => ({
-              ...prev,
-              formData: next,
-              blockPathMap: buildBlockPathMap(
-                next,
-                config.blocks.blocksConfig,
-                intl,
-              ),
-            }));
-            onChangeFormData(next);
-          }
+          // Iframe harvested data-linkable-id anchors (full map, keyed by nearest
+          // data-block-uid). Hold them in a TRANSIENT store outside the blocks —
+          // writing formData here would trigger the FORM_DATA sync and re-render
+          // the iframe mid-edit (cursor loss / echo). The anchors are merged back
+          // into the blocks only on save (Form) and seeded from them on load.
+          dispatch(setLinkableAnchors(event.data.anchors || {}));
           break;
         }
 
@@ -3585,6 +3546,15 @@ const Iframe = (props) => {
           // when the page opens for editing (canvas-pick snapshots carry the data;
           // sidebar `[{@id}]` links have nothing to pull).
           formWithDefaults = pullAllLinkedFields(formWithDefaults, config.blocks.blocksConfig);
+
+          // Seed the transient anchor store from the loaded blocks' saved
+          // _linkableAnchors (the "read the initial version on load" step), so the
+          // object browser can offer this page's anchors before any edit.
+          dispatch(
+            setLinkableAnchors(
+              seedAnchorsFromContent(formWithDefaults, config.blocks.blocksConfig, intl),
+            ),
+          );
 
           setIframeSyncState(prev => ({
             ...prev,

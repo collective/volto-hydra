@@ -6910,8 +6910,11 @@ export class Bridge {
         // Mark render complete AFTER observer reconnection
         this._renderInProgress = false;
 
-        // Harvest deep-link anchors from the freshly-rendered DOM and push any
-        // change to the admin so it can persist block._linkableAnchors.
+        // Harvest anchors from the freshly-rendered DOM into the admin's
+        // transient store. Cheap + echo-guarded (only sends when the anchor set
+        // changed), and it no longer mutates formData, so it never re-renders
+        // the iframe. Selection/click-to-edit does NOT run afterContentRender,
+        // so this stays out of that path.
         this._maybeSendLinkableAnchors();
     };
 

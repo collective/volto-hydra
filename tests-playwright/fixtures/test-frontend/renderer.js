@@ -410,25 +410,22 @@ if (typeof document !== 'undefined') {
     document.addEventListener(
         'input',
         (e) => {
-            // The contenteditable host is the [data-edit-text] element; a heading
-            // may BE that element (this frontend) or a descendant (e.g. Nuxt).
             const editable =
                 e.target && e.target.closest && e.target.closest('[data-edit-text]');
             if (!editable) return;
-            const headings = [];
-            if (/^H[1-6]$/.test(editable.tagName)) headings.push(editable);
+            // Refresh only the elements this frontend already TAGGED with
+            // data-linkable-id (any element, multiple per block). It's purely
+            // tag-driven — untagged elements (the page title, plain text) are
+            // never touched, so no element/block/field special-casing is needed.
+            const tagged = editable.matches('[data-linkable-id]') ? [editable] : [];
             editable
-                .querySelectorAll('h1,h2,h3,h4,h5,h6')
-                .forEach((h) => headings.push(h));
-            for (const heading of headings) {
-                const text = (heading.textContent || '').trim();
-                if (text) {
-                    heading.id = slugify(text);
-                    heading.setAttribute('data-linkable-id', text);
-                } else {
-                    heading.removeAttribute('id');
-                    heading.removeAttribute('data-linkable-id');
-                }
+                .querySelectorAll('[data-linkable-id]')
+                .forEach((el) => tagged.push(el));
+            for (const el of tagged) {
+                const text = (el.textContent || '').trim();
+                el.setAttribute('data-linkable-id', text);
+                if (text) el.id = slugify(text);
+                else el.removeAttribute('id');
             }
         },
         true,
@@ -448,17 +445,19 @@ function renderSlateBlock(block) {
         // hydra.js harvests into block._linkableAnchors. Explicit node.data.anchorId
         // wins; otherwise a heading's id/label are derived from its text. Tagging
         // headings is a frontend decision — the bridge just harvests the attributes.
+        // This frontend CHOOSES to make headings deep-link anchors (a frontend
+        // decision — the bridge just harvests [data-linkable-id]). Always emit
+        // the tag on headings, even empty, so the tag-driven live refresh can
+        // update a freshly-typed one; the id is added once there's text to slug.
         const a = node.data || {};
         const isHeading = /^h[1-6]$/.test(node.type || '');
         const headingText = isHeading ? slateNodeText(node).trim() : '';
         const anchorId = a.anchorId || (headingText ? slugify(headingText) : '');
-        const anchorName = (a.anchorName || headingText || anchorId).replace(
-            /"/g,
-            '&quot;',
-        );
-        const anchorAttr = anchorId
-            ? ` id="${anchorId}" data-linkable-id="${anchorName}"`
-            : '';
+        const anchorName = (a.anchorName || headingText || '').replace(/"/g, '&quot;');
+        const anchorAttr =
+            isHeading || a.anchorId
+                ? `${anchorId ? ` id="${anchorId}"` : ''} data-linkable-id="${anchorName}"`
+                : '';
 
         const text = renderChildren(node.children);
         // Mark as editable field - hydra.js will read this and set contenteditable="true"
