@@ -396,10 +396,13 @@ function collectSlateIssues(blockData, pagePath, blockId, out, blockType) {
  */
 // Fields present in block data that are not schema properties but are never
 // authored/editable content: structural, serialisation, and Volto slot runtime.
+// The template trio (templateId/templateInstanceId/slotId) is written by the
+// template machinery to bind a block to its template instance and slot; it is
+// not sidebar-editable, so it must not be reported as an undeclared field.
 const UNDECLARED_EXEMPT = new Set([
   'id', 'blocks', 'blocks_layout', 'image_scales', 'plaintext', 'value',
   'styles', 'override', 'block',
-  'fixed', 'slotId', 'templateId', 'readOnly',
+  'fixed', 'slotId', 'templateId', 'templateInstanceId', 'readOnly',
 ]);
 
 function collectWidgetShapeIssues(
