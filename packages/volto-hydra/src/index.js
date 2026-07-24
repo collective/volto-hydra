@@ -45,6 +45,7 @@ import {
   getAllowedBlocksList,
   subscribeToAllowedBlocksListChanges,
 } from './utils/allowedBlockList';
+import ArrayAwareUrlWidget from './components/Widgets/ArrayAwareUrlWidget';
 import HiddenBlocksWidget from './components/Widgets/HiddenBlocksWidget';
 import HiddenObjectListWidget from './components/Widgets/HiddenObjectListWidget';
 import FieldMappingWidget from './components/Widgets/FieldMappingWidget';
@@ -159,6 +160,12 @@ const applyConfig = (config) => {
     { match: '/', component: SidebarToggleToolbarPlug },
     { match: '/', component: MobileSubmenuClose },
   ];
+
+  // Array-aware url widget. A `widget: 'url'` field's value is the object-browser
+  // link array ([{ '@id': url }], internal or external) — the shape the link/media
+  // editor writes. Volto's stock UrlWidget is string-only and throws on it; this
+  // one normalizes the array to its url string first.
+  config.widgets.widget.url = ArrayAwareUrlWidget;
 
   // Hide container block fields - ChildBlocksWidget handles their UI
   config.widgets.widget.blocks_layout = HiddenBlocksWidget;
