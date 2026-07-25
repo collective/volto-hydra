@@ -259,6 +259,8 @@ import slateTransforms from '../../utils/slateTransforms';
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import { buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
+import { setLinkableAnchors } from '../../actions';
+import { seedAnchorsFromContent } from '../../utils/linkableAnchors';
 import { canContainAll, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
@@ -2292,6 +2294,16 @@ const Iframe = (props) => {
           break;
         }
 
+        case 'LINKABLE_ANCHORS': {
+          // Iframe harvested data-linkable-id anchors (full map, keyed by nearest
+          // data-block-uid). Hold them in a TRANSIENT store outside the blocks —
+          // writing formData here would trigger the FORM_DATA sync and re-render
+          // the iframe mid-edit (cursor loss / echo). The anchors are merged back
+          // into the blocks only on save (Form) and seeded from them on load.
+          dispatch(setLinkableAnchors(event.data.anchors || {}));
+          break;
+        }
+
         case 'BUFFER_FLUSHED':
           // Iframe had no pending text - update combined state with current form + requestId + selection
           log('Received BUFFER_FLUSHED (no pending text), requestId:', event.data.requestId);
@@ -3534,6 +3546,15 @@ const Iframe = (props) => {
           // when the page opens for editing (canvas-pick snapshots carry the data;
           // sidebar `[{@id}]` links have nothing to pull).
           formWithDefaults = pullAllLinkedFields(formWithDefaults, config.blocks.blocksConfig);
+
+          // Seed the transient anchor store from the loaded blocks' saved
+          // _linkableAnchors (the "read the initial version on load" step), so the
+          // object browser can offer this page's anchors before any edit.
+          dispatch(
+            setLinkableAnchors(
+              seedAnchorsFromContent(formWithDefaults, config.blocks.blocksConfig, intl),
+            ),
+          );
 
           setIframeSyncState(prev => ({
             ...prev,

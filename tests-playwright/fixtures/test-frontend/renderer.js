@@ -197,6 +197,11 @@ function syncCnavOpenState() {
 async function renderBlock(blockId, block) {
     const wrapper = document.createElement('div');
     wrapper.setAttribute('data-block-uid', blockId);
+    // NOTE: a real frontend does NOT mark template read-only — hydra owns that
+    // from the merged block.readOnly (isBlockReadonly), so editability and the
+    // anchor harvest are consistent on every frontend without a render-side flag.
+    // data-block-readonly stays available as a frontend's OWN escape hatch to lock
+    // a block for its own reasons (see the teaser's overwrite handling below).
 
     switch (block['@type']) {
         case 'title':
@@ -386,6 +391,52 @@ async function renderBlock(blockId, block) {
  * @param {Object} block - Slate block data
  * @returns {string} HTML string
  */
+// Plain text of a slate node (recursively join leaf .text) — used to derive
+// heading anchor ids/labels.
+function slateNodeText(node) {
+    if (node == null) return '';
+    if (typeof node.text === 'string') return node.text;
+    return (node.children || []).map(slateNodeText).join('');
+}
+
+// URL-fragment slug from arbitrary text.
+function slugify(s) {
+    return s
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+// Keep heading anchors fresh WHILE editing. This frontend derives a heading's
+// id/data-linkable-id from its text, but inline editing changes the text without
+// re-running the renderer — so update them live on input. hydra harvests the id
+// on its next flush/render.
+if (typeof document !== 'undefined') {
+    document.addEventListener(
+        'input',
+        (e) => {
+            const editable =
+                e.target && e.target.closest && e.target.closest('[data-edit-text]');
+            if (!editable) return;
+            // Refresh only the elements this frontend already TAGGED with
+            // data-linkable-id (any element, multiple per block). It's purely
+            // tag-driven — untagged elements (the page title, plain text) are
+            // never touched, so no element/block/field special-casing is needed.
+            const tagged = editable.matches('[data-linkable-id]') ? [editable] : [];
+            editable
+                .querySelectorAll('[data-linkable-id]')
+                .forEach((el) => tagged.push(el));
+            for (const el of tagged) {
+                const text = (el.textContent || '').trim();
+                el.setAttribute('data-linkable-id', text);
+                if (text) el.id = slugify(text);
+                else el.removeAttribute('id');
+            }
+        },
+        true,
+    );
+}
+
 function renderSlateBlock(block) {
     const value = block.value || [];
     let html = '';
@@ -393,6 +444,25 @@ function renderSlateBlock(block) {
         // nodeId is required for edit mode (hydra.js adds it), but optional for view mode
         // If missing in edit mode, hydra.js should add it - but we don't throw here to allow view mode
         const nodeIdAttr = node.nodeId !== undefined ? ` data-node-id="${node.nodeId}"` : '';
+
+        // Deep-link anchor. This frontend CHOOSES to make every heading linkable:
+        // a real id (the #fragment) + data-linkable-id (the picker label), which
+        // hydra.js harvests into block._linkableAnchors. Explicit node.data.anchorId
+        // wins; otherwise a heading's id/label are derived from its text. Tagging
+        // headings is a frontend decision — the bridge just harvests the attributes.
+        // This frontend CHOOSES to make headings deep-link anchors (a frontend
+        // decision — the bridge just harvests [data-linkable-id]). Always emit
+        // the tag on headings, even empty, so the tag-driven live refresh can
+        // update a freshly-typed one; the id is added once there's text to slug.
+        const a = node.data || {};
+        const isHeading = /^h[1-6]$/.test(node.type || '');
+        const headingText = isHeading ? slateNodeText(node).trim() : '';
+        const anchorId = a.anchorId || (headingText ? slugify(headingText) : '');
+        const anchorName = (a.anchorName || headingText || '').replace(/"/g, '&quot;');
+        const anchorAttr =
+            isHeading || a.anchorId
+                ? `${anchorId ? ` id="${anchorId}"` : ''} data-linkable-id="${anchorName}"`
+                : '';
 
         const text = renderChildren(node.children);
         // Mark as editable field - hydra.js will read this and set contenteditable="true"
@@ -403,22 +473,22 @@ function renderSlateBlock(block) {
                 html += `<p data-edit-text="value"${nodeIdAttr}>${text}</p>`;
                 break;
             case 'h1':
-                html += `<h1 data-edit-text="value"${nodeIdAttr}>${text}</h1>`;
+                html += `<h1 data-edit-text="value"${nodeIdAttr}${anchorAttr}>${text}</h1>`;
                 break;
             case 'h2':
-                html += `<h2 data-edit-text="value"${nodeIdAttr}>${text}</h2>`;
+                html += `<h2 data-edit-text="value"${nodeIdAttr}${anchorAttr}>${text}</h2>`;
                 break;
             case 'h3':
-                html += `<h3 data-edit-text="value"${nodeIdAttr}>${text}</h3>`;
+                html += `<h3 data-edit-text="value"${nodeIdAttr}${anchorAttr}>${text}</h3>`;
                 break;
             case 'h4':
-                html += `<h4 data-edit-text="value"${nodeIdAttr}>${text}</h4>`;
+                html += `<h4 data-edit-text="value"${nodeIdAttr}${anchorAttr}>${text}</h4>`;
                 break;
             case 'h5':
-                html += `<h5 data-edit-text="value"${nodeIdAttr}>${text}</h5>`;
+                html += `<h5 data-edit-text="value"${nodeIdAttr}${anchorAttr}>${text}</h5>`;
                 break;
             case 'h6':
-                html += `<h6 data-edit-text="value"${nodeIdAttr}>${text}</h6>`;
+                html += `<h6 data-edit-text="value"${nodeIdAttr}${anchorAttr}>${text}</h6>`;
                 break;
             case 'blockquote':
                 html += `<blockquote data-edit-text="value"${nodeIdAttr}>${text}</blockquote>`;

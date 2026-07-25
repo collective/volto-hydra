@@ -1,4 +1,9 @@
-import { SET_FRONTEND_PREVIEW_URL, SET_VIEWPORT_PRESET, SET_VIEWPORT_WIDTHS } from './constants';
+import {
+  SET_FRONTEND_PREVIEW_URL,
+  SET_VIEWPORT_PRESET,
+  SET_VIEWPORT_WIDTHS,
+  SET_LINKABLE_ANCHORS,
+} from './constants';
 
 const initialState = {
   url: null,
@@ -28,6 +33,16 @@ export function viewportPreset(state = viewportInitialState, action = {}) {
   }
   if (action.type === SET_VIEWPORT_WIDTHS) {
     return { ...state, widths: { ...state.widths, ...action.widths } };
+  }
+  return state;
+}
+
+// Transient deep-link anchors for the page being edited (see setLinkableAnchors).
+const linkableAnchorsInitialState = { anchors: {} };
+
+export function linkableAnchors(state = linkableAnchorsInitialState, action = {}) {
+  if (action.type === SET_LINKABLE_ANCHORS) {
+    return { anchors: action.anchors || {} };
   }
   return state;
 }

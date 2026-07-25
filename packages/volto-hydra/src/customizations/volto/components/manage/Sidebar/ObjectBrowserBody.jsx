@@ -10,10 +10,18 @@ import join from 'lodash/join';
 // These absolute imports (without using the corresponding centralized index.js) are required
 // to cut circular import problems, this file should never use them. This is because of
 // the very nature of the functionality of the component and its relationship with others
+import loadable from '@loadable/component';
+import { readAsDataURL } from 'promise-file-reader';
 import { searchContent } from '@plone/volto/actions/search/search';
+import { getContent, createContent } from '@plone/volto/actions/content/content';
+import { validateFileUploadSize } from '@plone/volto/helpers/FormValidation/FormValidation';
+import { collectAnchorsFromContent, collectAnchorsFromStore } from '../../../../../utils/linkableAnchors';
+import { buildUploadPayload } from '../../../../../utils/uploadPayload';
 import Icon from '@plone/volto/components/theme/Icon/Icon';
 import { flattenToAppURL, isInternalURL } from '@plone/volto/helpers/Url/Url';
 import config from '@plone/volto/registry';
+
+const Dropzone = loadable(() => import('react-dropzone'));
 
 import backSVG from '@plone/volto/icons/back.svg';
 import folderSVG from '@plone/volto/icons/folder.svg';
@@ -23,6 +31,7 @@ import linkSVG from '@plone/volto/icons/link.svg';
 import homeSVG from '@plone/volto/icons/home.svg';
 import iconsSVG from '@plone/volto/icons/apps.svg';
 import listSVG from '@plone/volto/icons/list-bullet.svg';
+import headingSVG from '@plone/volto/icons/heading.svg';
 
 import ObjectBrowserNav from '@plone/volto/components/manage/Sidebar/ObjectBrowserNav';
 
@@ -56,6 +65,14 @@ const messages = defineMessages({
     defaultMessage: 'Home',
   },
   of: { id: 'Selected items - x of y', defaultMessage: 'of' },
+  upload: { id: 'Upload', defaultMessage: 'Upload' },
+  uploadingFile: { id: 'Uploading…', defaultMessage: 'Uploading…' },
+  subItems: { id: 'Sub items', defaultMessage: 'Sub items' },
+  fragments: { id: 'Fragments', defaultMessage: 'Fragments' },
+  noFragments: {
+    id: 'No fragments on this page',
+    defaultMessage: 'No fragments on this page',
+  },
 });
 
 function getParentURL(url) {
@@ -157,8 +174,21 @@ class ObjectBrowserBody extends Component {
               ...(this.props.selectableTypes ?? []),
             ],
       view: this.props.mode === 'image' ? 'icons' : 'list',
+      // What the CURRENT level lists: its child items, or its deep-link
+      // fragments. Toggled from the bar and reset to 'items' on navigation, so
+      // the fragments of one page never linger over another level's listing.
+      levelMode: 'items',
+      levelAnchors: [],
+      levelAnchorsLoading: false,
+      // Whether we've already auto-picked a mode for this level. A level with no
+      // sub-items opens on its fragments instead of a dead empty list — but only
+      // once, so switching back to Sub items by hand sticks.
+      levelAutoDecided: false,
+      // Upload-into-folder state.
+      uploading: false,
     };
     this.searchInputRef = React.createRef();
+    this.uploadInputRef = React.createRef();
   }
 
   /**
@@ -168,6 +198,35 @@ class ObjectBrowserBody extends Component {
    */
   componentDidMount() {
     this.initialSearch(this.props.mode);
+  }
+
+  /**
+   * A level with no sub-items (a leaf page) would otherwise show an empty list,
+   * so open it on its fragments instead. Runs once per level — `levelAutoDecided`
+   * means an explicit switch back to Sub items isn't undone on the next render.
+   */
+  componentDidUpdate() {
+    if (
+      this.props.mode !== 'link' ||
+      this.state.showSearchInput ||
+      this.state.currentFolder === '/' ||
+      this.state.levelMode !== 'items' ||
+      this.state.levelAutoDecided
+    ) {
+      return;
+    }
+    const results =
+      this.props.searchSubrequests[
+        `${this.props.block}-${this.props.mode}`
+      ];
+    if (!results || results.loading || !Array.isArray(results.items)) return;
+    if (results.items.length > 0) {
+      // Has sub-items — nothing to decide, and don't re-check this level.
+      this.setState({ levelAutoDecided: true });
+      return;
+    }
+    this.setState({ levelAutoDecided: true });
+    this.setLevelMode('fragments');
   }
 
   initialSearch = (mode) => {
@@ -217,6 +276,11 @@ class ObjectBrowserBody extends Component {
     this.setState(() => ({
       parentFolder: parent,
       currentFolder: id || '/',
+      // A new level starts on its items; if it turns out to have none,
+      // componentDidUpdate flips it to fragments once they've loaded.
+      levelMode: 'items',
+      levelAnchors: [],
+      levelAutoDecided: false,
     }));
   };
 
@@ -335,6 +399,103 @@ class ObjectBrowserBody extends Component {
     this.props.onChangeBlock(this.props.block, {
       ...this.props.data,
       [key]: value,
+    });
+  };
+
+  // Re-run the search that populates the current folder listing.
+  refreshListing = () => {
+    this.props.searchContent(
+      this.state.currentFolder,
+      {
+        'path.depth': 1,
+        sort_on: 'getObjPositionInParent',
+        metadata_fields: '_all',
+        b_size: 1000,
+      },
+      `${this.props.block}-${this.props.mode}`,
+    );
+  };
+
+  // Upload a file into the folder being browsed, then auto-select it. image/*
+  // becomes an Image, anything else a File (see buildUploadPayload). Reuses the
+  // image-widget upload mechanism (readAsDataURL + createContent).
+  handleUpload = (file) => {
+    if (!file) return;
+    if (!validateFileUploadSize(file, this.props.intl.formatMessage)) return;
+    this.setState({ uploading: true });
+    readAsDataURL(file).then((dataUrl) => {
+      const payload = buildUploadPayload(file, dataUrl);
+      this.props
+        .createContent(
+          this.state.currentFolder,
+          payload,
+          `${this.props.block}-ob-upload`,
+        )
+        .then((created) => {
+          this.setState({ uploading: false });
+          if (!created) return;
+          this.refreshListing();
+          // Auto-select via the normal path: select+close (link/image) or add
+          // to the selection (multiple).
+          this.handleSelectItem(created);
+        })
+        .catch(() => this.setState({ uploading: false }));
+    });
+  };
+
+  // Toggle the deep-link anchor list for an item. On first expand, fetch the
+  // FULL object (search metadata carries no blocks) and collect its anchors in
+  // document order.
+  // Switch what the current level lists. 'fragments' loads the deep-link
+  // anchors of the level itself (the page you have navigated into), so they get
+  // the full list area instead of being squeezed in beside a row.
+  setLevelMode = async (levelMode) => {
+    if (levelMode === this.state.levelMode) return;
+    if (levelMode === 'items') {
+      this.setState({ levelMode: 'items' });
+      return;
+    }
+    this.setState({ levelMode: 'fragments', levelAnchorsLoading: true });
+    const id = flattenToAppURL(this.state.currentFolder);
+    // The page currently being edited → LIVE anchors from the transient store
+    // (state.linkableAnchors), ordered against the current form's block layout,
+    // so a just-added heading is linkable without saving. Any other page → the
+    // persisted content via getContent (whose dispatched promise resolves with
+    // the full body, blocks included — see Teaser/Data.jsx).
+    const editingPath = this.props.pathname
+      ? this.props.pathname.replace(/\/(edit|add)$/, '')
+      : null;
+    const isCurrentPage =
+      editingPath &&
+      flattenToAppURL(editingPath) === id &&
+      this.props.formData &&
+      this.props.formData.blocks;
+    let anchors;
+    if (isCurrentPage) {
+      anchors = collectAnchorsFromStore(
+        this.props.formData,
+        this.props.linkableAnchors || {},
+        config.blocks.blocksConfig,
+        this.props.intl,
+      );
+    } else {
+      const resp = await this.props.getContent(id, null, `anchors-${id}`);
+      anchors = resp
+        ? collectAnchorsFromContent(
+            resp,
+            config.blocks.blocksConfig,
+            this.props.intl,
+          )
+        : [];
+    }
+    this.setState({ levelAnchors: anchors, levelAnchorsLoading: false });
+  };
+
+  // Pick a fragment of the level being browsed: select the level itself with
+  // `#id` appended, so every link surface stores the deep link.
+  onSelectLevelAnchor = (anchor) => {
+    this.onSelectItem({
+      '@id': `${this.state.currentFolder}#${anchor.id}`,
     });
   };
 
@@ -567,6 +728,45 @@ class ObjectBrowserBody extends Component {
               />
             </div>
           )}
+          {/* Switch what THIS level lists: its child items, or its deep-link
+              fragments. Scoped to the level (not a row) so fragments get the
+              whole list area. Link mode only — fragments are link targets. */}
+          {this.props.mode === 'link' &&
+            !this.state.showSearchInput &&
+            this.state.currentFolder !== '/' && (
+              <div className="ob-level-mode">
+                <button
+                  type="button"
+                  className={`ob-level-mode-items${
+                    this.state.levelMode === 'items' ? ' active' : ''
+                  }`}
+                  aria-pressed={this.state.levelMode === 'items'}
+                  aria-label={this.props.intl.formatMessage(messages.subItems)}
+                  onClick={() => this.setLevelMode('items')}
+                >
+                  <Icon
+                    name={listSVG}
+                    size="24px"
+                    title={this.props.intl.formatMessage(messages.subItems)}
+                  />
+                </button>
+                <button
+                  type="button"
+                  className={`ob-level-mode-fragments${
+                    this.state.levelMode === 'fragments' ? ' active' : ''
+                  }`}
+                  aria-pressed={this.state.levelMode === 'fragments'}
+                  aria-label={this.props.intl.formatMessage(messages.fragments)}
+                  onClick={() => this.setLevelMode('fragments')}
+                >
+                  <Icon
+                    name={headingSVG}
+                    size="24px"
+                    title={this.props.intl.formatMessage(messages.fragments)}
+                  />
+                </button>
+              </div>
+            )}
         </Segment>
         {this.props.mode === 'multiple' && (
           <Segment className="infos">
@@ -581,12 +781,57 @@ class ObjectBrowserBody extends Component {
             )}
           </Segment>
         )}
-        <ObjectBrowserNav
-          currentSearchResults={
-            this.props.searchSubrequests[
-              `${this.props.block}-${this.props.mode}`
-            ]
-          }
+        <Dropzone
+          noClick
+          multiple={false}
+          onDrop={(files) => files?.[0] && this.handleUpload(files[0])}
+        >
+          {({ getRootProps, getInputProps, open }) => (
+            <div {...getRootProps()} className="ob-upload-dropzone">
+              <Segment className="ob-upload-bar">
+                <input {...getInputProps({ className: 'ob-upload-input' })} />
+                <button
+                  type="button"
+                  className="ob-upload-button"
+                  onClick={open}
+                >
+                  {this.state.uploading
+                    ? this.props.intl.formatMessage(messages.uploadingFile)
+                    : this.props.intl.formatMessage(messages.upload)}
+                </button>
+              </Segment>
+              {this.state.levelMode === 'fragments' ? (
+                <Segment className="ob-fragments">
+                  {this.state.levelAnchorsLoading ? (
+                    <div className="ob-fragments-loading">
+                      <FormattedMessage id="Loading" defaultMessage="Loading" />
+                    </div>
+                  ) : this.state.levelAnchors.length ? (
+                    <ul className="ob-fragment-list">
+                      {this.state.levelAnchors.map((anchor) => (
+                        <li
+                          key={anchor.id}
+                          className="ob-fragment-item"
+                          role="presentation"
+                          onClick={() => this.onSelectLevelAnchor(anchor)}
+                        >
+                          {anchor.name}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="ob-fragments-empty">
+                      {this.props.intl.formatMessage(messages.noFragments)}
+                    </div>
+                  )}
+                </Segment>
+              ) : (
+              <ObjectBrowserNav
+                currentSearchResults={
+                  this.props.searchSubrequests[
+                    `${this.props.block}-${this.props.mode}`
+                  ]
+                }
           selected={
             this.props.mode === 'multiple'
               ? this.props.data
@@ -605,7 +850,11 @@ class ObjectBrowserBody extends Component {
           view={this.state.view}
           navigateTo={this.navigateTo}
           isSelectable={this.isSelectable}
-        />
+              />
+              )}
+            </div>
+          )}
+        </Dropzone>
       </Segment.Group>
     );
   }
@@ -617,7 +866,13 @@ export default compose(
     (state) => ({
       searchSubrequests: state.search.subrequests,
       lang: state.intl.locale,
+      // Live edit-form data (for the current page's block order) + the transient
+      // anchor store + current path, so anchors for the page being edited come
+      // from the store rather than persisted content.
+      formData: state.form.global,
+      linkableAnchors: state.linkableAnchors?.anchors,
+      pathname: state.router?.location?.pathname,
     }),
-    { searchContent },
+    { searchContent, getContent, createContent },
   ),
 )(ObjectBrowserBody);

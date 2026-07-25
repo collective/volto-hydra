@@ -298,6 +298,81 @@
   padding: 20px 0;
 }
 
+/* Object Browser: level mode switch — "Sub items" / "Fragments" for the level
+   being browsed. Sits at the right of the breadcrumb bar; the bar is laid out
+   as a row so the switch is pushed to the far end. */
+.object-browser .breadcrumbs {
+  display: flex;
+  align-items: center;
+}
+
+.object-browser .ob-level-mode {
+  display: inline-flex;
+  margin-left: auto;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* Volto's <Icon> sets an INLINE `fill: currentColor`, which beats any
+   stylesheet fill rule — so drive the glyph through `color` on the button and
+   let currentColor inherit. */
+.object-browser .ob-level-mode button {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: #826a6a;
+  cursor: pointer;
+}
+
+.object-browser .ob-level-mode button:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* Active mode reads as a selected toggle: tinted background + Volto blue. */
+.object-browser .ob-level-mode button.active {
+  background: rgba(9, 126, 184, 0.12);
+  color: #097eb8;
+}
+
+/* Object Browser: the level's fragments, listed in the full list area. */
+.object-browser .ob-fragment-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.object-browser .ob-fragment-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.object-browser .ob-fragment-item::before {
+  content: "#";
+  margin-right: 8px;
+  color: #999;
+  flex-shrink: 0;
+}
+
+.object-browser .ob-fragment-item:hover {
+  background: #f3f3f3;
+}
+
+.object-browser .ob-fragments-empty,
+.object-browser .ob-fragments-loading {
+  padding: 20px 12px;
+  color: #999;
+  text-align: center;
+}
+
 /* Object Browser: chevron on folderish items */
 .object-browser ul li .right-arrow-icon {
   opacity: 0.4;

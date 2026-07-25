@@ -125,6 +125,13 @@ Or using comment syntax:
 <div class="listing-item" data-block-uid="item-1">...</div>
 ```
 
+`data-block-readonly` is *your* call — use it when your frontend wants to lock a
+block for its own reasons (a teaser mirroring another page, a listing item).
+
+You do **not** need it for template content. Hydra already knows which blocks a
+template marks read-only from the block data and enforces that itself, so your
+renderer doesn't need to detect template blocks or mark them.
+
 ## Renderer Node-ID Rules
 
 When rendering Slate nodes to DOM, your renderer must follow these rules for `data-node-id`:

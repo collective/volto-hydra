@@ -10,6 +10,44 @@
  */
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
+import type { Page } from '@playwright/test';
+
+/**
+ * Read a column's stored slotId from the template-settings panel, robustly.
+ *
+ * Clicking a column selects its inner CELL, so click a known cell and escape up
+ * to the column, whose slotId then shows in `#sidebar-template-settings`. That
+ * panel re-renders async on selection; the old code read it immediately, which
+ * was a ~30% nuxt-admin flake (empty read). waitForSidebarOpen doesn't help — the
+ * sidebar is already open, so it's a no-op. A column's slotId is deterministic
+ * data, so an empty read only ever means the panel hasn't re-rendered yet, never
+ * a genuinely missing slotId — poll until it shows a value.
+ *
+ * `distinctFrom` guards the second read against a stale value from the previously
+ * selected column: require the field to differ from the neighbour's slotId, so we
+ * only accept the newly-selected column's OWN value (each column is its own slot).
+ */
+async function readColumnSlotId(
+  page: Page,
+  helper: AdminUIHelper,
+  cellId: string,
+  distinctFrom?: string,
+): Promise<string> {
+  await helper.clickBlockInIframe(cellId);
+  await helper.escapeToParent(); // cell -> column
+  const field = page.locator('#sidebar-template-settings #field-slotId');
+  let slotId = '';
+  await expect
+    .poll(
+      async () => {
+        slotId = await field.inputValue().catch(() => '');
+        return slotId && slotId !== distinctFrom ? slotId : '';
+      },
+      { timeout: 8000 },
+    )
+    .toBeTruthy();
+  return slotId;
+}
 
 test.describe('allowedLayouts', () => {
   test.describe('LayoutSelector Visibility', () => {
@@ -686,18 +724,12 @@ test.describe('allowedLayouts', () => {
       // instanceId, so a truthy read here proves membership (store-on-add inherited
       // template membership from its neighbour). A count-only assertion would still pass
       // if store-on-add produced a non-member.
-      // Clicking a column selects its inner cell, so select a cell and escape up to
-      // the column (the same nav the test uses above) to read the column's slotId.
-      await helper.clickBlockInIframe(cellId); // neighbour column's known cell
-      await helper.escapeToParent(); // -> neighbour column
-      await helper.waitForSidebarOpen();
-      const neighbourSlotId = await page.locator('#sidebar-template-settings #field-slotId').inputValue();
-
+      // Read each column's slotId from its template-settings panel (see helper —
+      // clicking a column selects its cell, so escape up; the read is hardened
+      // against the panel's async re-render).
       const newCellId = await columns.nth(1).locator('[data-block-uid]').first().getAttribute('data-block-uid');
-      await helper.clickBlockInIframe(newCellId); // new column's placeholder cell
-      await helper.escapeToParent(); // -> new column
-      await helper.waitForSidebarOpen();
-      const newSlotId = await page.locator('#sidebar-template-settings #field-slotId').inputValue();
+      const neighbourSlotId = await readColumnSlotId(page, helper, cellId);
+      const newSlotId = await readColumnSlotId(page, helper, newCellId!, neighbourSlotId);
 
       expect(neighbourSlotId).toBeTruthy(); // the existing fixed column is a member
       expect(newSlotId).toBeTruthy();       // the new column is ALSO a member (own stored slotId)

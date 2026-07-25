@@ -1,0 +1,10 @@
+{
+  "@id": "http://localhost:8888/upload-folder",
+  "@type": "Folder",
+  "UID": "upload-folder-uid",
+  "id": "upload-folder",
+  "title": "Upload Folder",
+  "is_folderish": true,
+  "blocks": {},
+  "blocks_layout": { "items": [] }
+}
