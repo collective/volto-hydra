@@ -117,6 +117,12 @@ test.describe('Fixed Editable Blocks', () => {
     await expect(field).toHaveAttribute('contenteditable', 'true', {
       timeout: 5000,
     });
+    // Place the cursor at the end before appending. Clicking a block-level field
+    // lands the caret wherever the click resolves — at the true end on the mock
+    // renderer (data-edit-text on the <h1> itself) but mid-text on Nuxt (attr on
+    // the wrapper, text nested in a child <h1>). End makes "append at end"
+    // explicit and renderer-independent — the real-user action for this intent.
+    await page.keyboard.press('End');
     await field.pressSequentially(' EDITED', { delay: 25 });
     await expect(headerBlock).toContainText('Editable Header EDITED', {
       timeout: 10000,
