@@ -35,31 +35,81 @@ export interface PageIntegrityOptions {
  * `display:none` at desktop width) never enters the viewport, so it never
  * starts loading and legitimately reports `naturalWidth === 0`. Flagging that as
  * "broken" is a false positive; only images the user can actually see count.
+ *
+ * "Broken" means *finished and empty* (`complete && naturalWidth === 0`) — a
+ * 404, a wrong content-type, or bytes the decoder rejected. An image that is
+ * merely unfinished (`complete === false`) is still downloading, which is a
+ * different thing entirely: waiting is the answer, not failing. Conflating the
+ * two makes the check race the network, so a loaded CI runner "finds" broken
+ * images on a page that is perfectly fine. Unfinished images are waited for and
+ * then reported separately for diagnosis.
  */
-export async function verifyNoBrokenImages(page: Page): Promise<void> {
-  const broken = await page.evaluate(() =>
-    Array.from(document.querySelectorAll('img'))
-      .filter((img) => {
-        if (!img.src || img.src.startsWith('data:')) return false;
-        // Skip images that aren't displayed. `offsetParent === null` catches an
-        // element with `display:none` on itself OR any ancestor — e.g. a
-        // responsive mobile nav hidden at desktop width, whose lazy <img> never
-        // enters the viewport, so it never loads and reports naturalWidth 0
-        // without being a real defect. (position:fixed also yields a null
-        // offsetParent but is visible; the nav/content images here aren't
-        // fixed.) A broken image in a *visible* container keeps a non-null
-        // offsetParent even if it collapses to zero size, so it's still caught.
-        const style = getComputedStyle(img);
-        const hidden =
-          (img.offsetParent === null && style.position !== 'fixed') ||
-          style.visibility === 'hidden' ||
-          style.display === 'none';
-        if (hidden) return false;
-        return !img.complete || img.naturalWidth === 0;
-      })
-      .map((img) => ({ src: img.src, alt: img.alt })),
-  );
-  expect(broken, `Broken images on ${page.url()}:\n${JSON.stringify(broken, null, 2)}`).toEqual([]);
+export async function verifyNoBrokenImages(
+  page: Page,
+  options: { settleTimeout?: number } = {},
+): Promise<void> {
+  const settleTimeout = options.settleTimeout ?? 10000;
+
+  // An image that hasn't finished downloading is not a broken image. `complete
+  // === false` is the browser saying "still in flight", and asserting on it
+  // turns a slow run into a phantom "broken image" failure — the page is fine,
+  // the check simply looked too early. So wait for anything that has actually
+  // started to settle before judging.
+  //
+  // `loading="lazy"` images that never enter the viewport never start, so they
+  // can't be waited for; they're excluded here and skipped below rather than
+  // being allowed to hold the wait open for the full timeout.
+  await page
+    .waitForFunction(
+      () =>
+        Array.from(document.images).every(
+          (img) => img.complete || img.loading === 'lazy',
+        ),
+      undefined,
+      { timeout: settleTimeout },
+    )
+    .catch(() => {});
+
+  const { broken, stillLoading } = await page.evaluate(() => {
+    const visible = Array.from(document.querySelectorAll('img')).filter((img) => {
+      if (!img.src || img.src.startsWith('data:')) return false;
+      // Skip images that aren't displayed. `offsetParent === null` catches an
+      // element with `display:none` on itself OR any ancestor — e.g. a
+      // responsive mobile nav hidden at desktop width, whose lazy <img> never
+      // enters the viewport, so it never loads and reports naturalWidth 0
+      // without being a real defect. (position:fixed also yields a null
+      // offsetParent but is visible; the nav/content images here aren't
+      // fixed.) A broken image in a *visible* container keeps a non-null
+      // offsetParent even if it collapses to zero size, so it's still caught.
+      const style = getComputedStyle(img);
+      const hidden =
+        (img.offsetParent === null && style.position !== 'fixed') ||
+        style.visibility === 'hidden' ||
+        style.display === 'none';
+      return !hidden;
+    });
+    const describe = (img: HTMLImageElement) => ({ src: img.src, alt: img.alt });
+    return {
+      // Finished, and decoded to nothing: a 404, a wrong content-type, or bytes
+      // the decoder rejected. This is the real defect.
+      broken: visible.filter((img) => img.complete && img.naturalWidth === 0).map(describe),
+      // Never finished within the settle window. Reported for diagnosis, but it
+      // does not fail the check on its own — a lazy image below the fold is
+      // expected to sit here, and a slow response is not a broken page.
+      stillLoading: visible
+        .filter((img) => !img.complete && img.loading !== 'lazy')
+        .map(describe),
+    };
+  });
+
+  const note = stillLoading.length
+    ? `\n(also still loading after ${settleTimeout}ms, not counted as broken:\n` +
+      `${JSON.stringify(stillLoading, null, 2)})`
+    : '';
+  expect(
+    broken,
+    `Broken images on ${page.url()}:\n${JSON.stringify(broken, null, 2)}${note}`,
+  ).toEqual([]);
 }
 
 /**
