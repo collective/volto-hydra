@@ -15,6 +15,7 @@ import { readAsDataURL } from 'promise-file-reader';
 import { searchContent } from '@plone/volto/actions/search/search';
 import { getContent, createContent } from '@plone/volto/actions/content/content';
 import { validateFileUploadSize } from '@plone/volto/helpers/FormValidation/FormValidation';
+import { buildAnchorTree } from '@volto-hydra/hydra-js';
 import { collectAnchorsFromContent, collectAnchorsFromStore } from '../../../../../utils/linkableAnchors';
 import { buildUploadPayload } from '../../../../../utils/uploadPayload';
 import Icon from '@plone/volto/components/theme/Icon/Icon';
@@ -499,47 +500,40 @@ class ObjectBrowserBody extends Component {
     });
   };
 
-  // Indentation depth for each fragment, so the picker SHOWS the heading
-  // hierarchy. Mirrors buildAnchorTree (hydra-js): a deeper heading level nests
-  // under the nearest preceding shallower one; a level-less leaf sits under the
-  // current heading. The shallowest heading on the page is depth 0 (a page whose
-  // top heading is h2 isn't needlessly indented). Anchors carry `level` from
-  // hydra's harvest (data-linkable-h{n} / inferred from the heading tag).
-  fragmentDepths = (anchors) => {
-    const stack = [];
-    return anchors.map((a) => {
-      if (a.level == null) return stack.length; // leaf under the current heading
-      while (stack.length && stack[stack.length - 1] >= a.level) stack.pop();
-      const depth = stack.length;
-      stack.push(a.level);
-      return depth;
-    });
-  };
-
-  renderFragmentList = () => {
-    const anchors = this.state.levelAnchors;
-    const depths = this.fragmentDepths(anchors);
-    return (
-      <ul className="ob-fragment-list">
-        {anchors.map((anchor, index) => (
-          <li
-            key={`${anchor.id}-${index}`}
-            className="ob-fragment-item"
-            role="presentation"
-            data-anchor-level={anchor.level ?? ''}
-            style={
-              depths[index]
-                ? { paddingInlineStart: `${depths[index] * 16}px` }
-                : undefined
-            }
-            onClick={() => this.onSelectLevelAnchor(anchor)}
+  // Render the fragments as a genuinely nested list, so the heading hierarchy is
+  // structural (a screen reader conveys it from the list nesting) rather than a
+  // visual indent. buildAnchorTree (hydra-js) turns the flat, document-ordered
+  // leveled list into the tree: a deeper heading nests under the nearest
+  // preceding shallower one, level-less leaves attach without opening a depth,
+  // and no levels → a flat list. Anchors carry `level` from hydra's harvest
+  // (data-linkable-h{n} / inferred from the heading tag).
+  renderFragmentTree = (nodes) => (
+    <ul className="ob-fragment-list">
+      {nodes.map((node, index) => (
+        <li
+          key={`${node.id}-${index}`}
+          className="ob-fragment-item"
+          data-anchor-level={node.level ?? ''}
+        >
+          <span
+            className="ob-fragment-label"
+            role="button"
+            tabIndex={0}
+            onClick={() => this.onSelectLevelAnchor(node)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.onSelectLevelAnchor(node);
+              }
+            }}
           >
-            {anchor.name}
-          </li>
-        ))}
-      </ul>
-    );
-  };
+            {node.name}
+          </span>
+          {node.children.length ? this.renderFragmentTree(node.children) : null}
+        </li>
+      ))}
+    </ul>
+  );
 
   isSelectable = (item) => {
     const {
@@ -849,7 +843,9 @@ class ObjectBrowserBody extends Component {
                       <FormattedMessage id="Loading" defaultMessage="Loading" />
                     </div>
                   ) : this.state.levelAnchors.length ? (
-                    this.renderFragmentList()
+                    this.renderFragmentTree(
+                      buildAnchorTree(this.state.levelAnchors),
+                    )
                   ) : (
                     <div className="ob-fragments-empty">
                       {this.props.intl.formatMessage(messages.noFragments)}

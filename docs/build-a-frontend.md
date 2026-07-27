@@ -134,7 +134,7 @@ block) can show a hierarchy:
 
 Hydra harvests these per block on render as `{ id, name, level }` and stores them in
 the block's data, so the object browser offers them as `path#pricing` link targets —
-indented by level to show the page's structure. Both attributes must survive into your
+as a nested list reflecting the page's structure. Both attributes must survive into your
 **published** render for the anchor to resolve at runtime — Hydra only reads them in
 edit mode.
 

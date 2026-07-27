@@ -12972,3 +12972,8 @@ const linkCancelSVG = `<svg width="20px" height="20px" xmlns="http://www.w3.org/
 // Container UX shared predicates / transforms (used by both iframe and admin).
 // canContainAll moved to @volto-hydra/helpers (SSR-safe).
 export { canContain, findConversionPath, mapLayoutItems } from './containerOps.js';
+
+// buildAnchorTree turns the flat, leveled deep-link anchor list into a nested
+// contents tree — re-exported so the admin (fragment picker) and frontends (an
+// in-page navigation block) build the hierarchy from ONE source.
+export { buildAnchorTree } from './linkableAnchors.js';

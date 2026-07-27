@@ -175,7 +175,8 @@ through save/load with no other change (backward compatible).
 `buildAnchorTree(anchors)` (hydra-js) turns the flat, document-ordered leveled list into
 a nested tree — deeper levels nest under the nearest preceding shallower one; level-less
 leaves attach without opening a depth; no levels → flat. The object-browser fragment
-picker indents each anchor by this depth to show the page's structure.
+picker renders this tree as a nested list, so the page's structure is conveyed by the
+list nesting (and to assistive tech), not a visual indent.
 
 `linkable-h1`…`linkable-h6` are registered in `applyHydraAttributes` alongside
 `linkable-id`, so comment-based frontends can declare leveled anchors too.
