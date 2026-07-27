@@ -555,6 +555,14 @@ export class Bridge {
       'block-selector': 'data-block-selector',
       'block-container': 'data-block-container',
       'linkable-id': 'data-linkable-id',
+      // Leveled heading anchors — the suffix carries the heading level so the
+      // harvested anchor list has a hierarchy (see linkableAnchors.js).
+      'linkable-h1': 'data-linkable-h1',
+      'linkable-h2': 'data-linkable-h2',
+      'linkable-h3': 'data-linkable-h3',
+      'linkable-h4': 'data-linkable-h4',
+      'linkable-h5': 'data-linkable-h5',
+      'linkable-h6': 'data-linkable-h6',
     };
 
     for (const [name, entries] of Object.entries(attrs)) {
