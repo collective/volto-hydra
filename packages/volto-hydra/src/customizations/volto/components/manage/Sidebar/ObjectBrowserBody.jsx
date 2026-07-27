@@ -499,6 +499,48 @@ class ObjectBrowserBody extends Component {
     });
   };
 
+  // Indentation depth for each fragment, so the picker SHOWS the heading
+  // hierarchy. Mirrors buildAnchorTree (hydra-js): a deeper heading level nests
+  // under the nearest preceding shallower one; a level-less leaf sits under the
+  // current heading. The shallowest heading on the page is depth 0 (a page whose
+  // top heading is h2 isn't needlessly indented). Anchors carry `level` from
+  // hydra's harvest (data-linkable-h{n} / inferred from the heading tag).
+  fragmentDepths = (anchors) => {
+    const stack = [];
+    return anchors.map((a) => {
+      if (a.level == null) return stack.length; // leaf under the current heading
+      while (stack.length && stack[stack.length - 1] >= a.level) stack.pop();
+      const depth = stack.length;
+      stack.push(a.level);
+      return depth;
+    });
+  };
+
+  renderFragmentList = () => {
+    const anchors = this.state.levelAnchors;
+    const depths = this.fragmentDepths(anchors);
+    return (
+      <ul className="ob-fragment-list">
+        {anchors.map((anchor, index) => (
+          <li
+            key={`${anchor.id}-${index}`}
+            className="ob-fragment-item"
+            role="presentation"
+            data-anchor-level={anchor.level ?? ''}
+            style={
+              depths[index]
+                ? { paddingInlineStart: `${depths[index] * 16}px` }
+                : undefined
+            }
+            onClick={() => this.onSelectLevelAnchor(anchor)}
+          >
+            {anchor.name}
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
   isSelectable = (item) => {
     const {
       maximumSelectionSize,
@@ -807,18 +849,7 @@ class ObjectBrowserBody extends Component {
                       <FormattedMessage id="Loading" defaultMessage="Loading" />
                     </div>
                   ) : this.state.levelAnchors.length ? (
-                    <ul className="ob-fragment-list">
-                      {this.state.levelAnchors.map((anchor) => (
-                        <li
-                          key={anchor.id}
-                          className="ob-fragment-item"
-                          role="presentation"
-                          onClick={() => this.onSelectLevelAnchor(anchor)}
-                        >
-                          {anchor.name}
-                        </li>
-                      ))}
-                    </ul>
+                    this.renderFragmentList()
                   ) : (
                     <div className="ob-fragments-empty">
                       {this.props.intl.formatMessage(messages.noFragments)}

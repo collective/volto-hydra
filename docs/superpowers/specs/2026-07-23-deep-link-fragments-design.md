@@ -154,3 +154,28 @@ special-casing). The refresh listener only refreshes already-tagged elements.
   internal-link pull path).
 - Anchor `id` uniqueness within a page — the frontend owns it; duplicates just produce
   duplicate picker entries pointing at the same `#fragment`.
+
+## Addendum — heading level + hierarchy (2026-07-27)
+
+The original anchor was flat `{ id, name }`, which loses the heading **level** — a
+consumer (e.g. an in-page-navigation / "On this page" block) then can't filter by level
+or build a contents tree without re-deriving structure from the block schema. The level
+is now encoded in the attribute:
+
+- `data-linkable-h1` … `data-linkable-h6="Label"` — a heading anchor **at that level**.
+- `data-linkable-id="Label"` — a **level-less leaf** (figure, defined term, …).
+
+`collectLinkableAnchors` emits `{ id, name, level }` (`level: null` for leaves). Level
+precedence is **explicit `data-linkable-h{n}` > the element's own heading tag > none**:
+a bare `data-linkable-id` on an `<h3>` infers `level: 3`, so existing frontends that tag
+headings with `data-linkable-id` gain a hierarchy with no change. `_linkableAnchors`
+gains `level`; the persistence/picker helpers spread the anchor objects, so it rides
+through save/load with no other change (backward compatible).
+
+`buildAnchorTree(anchors)` (hydra-js) turns the flat, document-ordered leveled list into
+a nested tree — deeper levels nest under the nearest preceding shallower one; level-less
+leaves attach without opening a depth; no levels → flat. The object-browser fragment
+picker indents each anchor by this depth to show the page's structure.
+
+`linkable-h1`…`linkable-h6` are registered in `applyHydraAttributes` alongside
+`linkable-id`, so comment-based frontends can declare leveled anchors too.

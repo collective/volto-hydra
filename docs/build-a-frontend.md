@@ -116,17 +116,35 @@ You can embed the Hydra tags directly if you want:
 ### Deep-link anchors (fragments)
 
 To let editors link to a spot *inside* a page, mark the element with a real `id`
-(the `#fragment` the browser scrolls to) **and** `data-linkable-id="Friendly Name"`
-(the label shown in the link picker):
+(the `#fragment` the browser scrolls to) **and** a linkable-anchor attribute
+carrying the label shown in the link picker. The attribute you pick also records
+the anchor's **level**, so the picker (and consumers like an in-page navigation
+block) can show a hierarchy:
+
+- `data-linkable-h1` … `data-linkable-h6="Label"` — a heading anchor **at that
+  level**. Use these on your headings; the suffix is the level.
+- `data-linkable-id="Label"` — a **level-less** anchor (a figure, a defined term,
+  any non-heading target).
 
 ```html
-<h2 id="pricing" data-linkable-id="Pricing">Pricing</h2>
+<h2 id="pricing" data-linkable-h2="Pricing">Pricing</h2>
+<h3 id="enterprise" data-linkable-h3="Enterprise plan">Enterprise plan</h3>
+<figure id="fig-1" data-linkable-id="Figure 1">…</figure>
 ```
 
-Hydra harvests these per block on render and stores them in the block's data, so the
-object browser offers them as `path#pricing` link targets. Both attributes must survive
-into your **published** render for the anchor to resolve at runtime — Hydra only reads
-them in edit mode.
+Hydra harvests these per block on render as `{ id, name, level }` and stores them in
+the block's data, so the object browser offers them as `path#pricing` link targets —
+indented by level to show the page's structure. Both attributes must survive into your
+**published** render for the anchor to resolve at runtime — Hydra only reads them in
+edit mode.
+
+**Level is optional / automatic.** If you use plain `data-linkable-id` on an element
+that is *itself* an `h1`–`h6`, Hydra infers the level from the tag — so tagging every
+heading with `data-linkable-id` still yields a hierarchy for free. Precedence is:
+explicit `data-linkable-h{n}` > the element's heading tag > none (a level-less leaf).
+Given the flat, document-ordered anchor list, `buildAnchorTree` (in
+`@volto-hydra/hydra-js`) turns the levels into a nested contents tree; no levels means
+a flat list.
 
 It's your choice which elements are linkable — a common pattern is to tag every heading,
 deriving its `id` from a slug of the heading text. If you want a heading to be linkable
