@@ -29,7 +29,10 @@ import {
 } from '@volto-hydra/helpers';
 import { expelAllowedTypes, findOnlyEmptyChildUid } from './containerOps.js';
 import { acceptableAt } from './conversionMap.js';
-import { collectLinkableAnchors } from './linkableAnchors.js';
+import {
+  collectLinkableAnchors,
+  collectLinkableAnchorsList,
+} from './linkableAnchors.js';
 
 /**
  * This IS a large file and it needs to be written in one file so for better understanding and
@@ -296,6 +299,12 @@ export class Bridge {
     } else if (options.onEditChange) {
       this.onEditChange(options.onEditChange);
     }
+    // onAnchorsChange(anchors): fired with the live, document-ordered deep-link
+    // anchor list ([{id, name, level, blockUid}]) every time hydra re-harvests
+    // (render-settle + inline-edit flush). Lets a frontend render an in-page
+    // navigation that stays correct WHILE editing — before edits are flushed to
+    // formData or saved. Local callback (like onEditChange), never forwarded.
+    this._onAnchorsChange = options.onAnchorsChange || null;
     this.init(options); // Initialize the bridge
   }
 
@@ -6931,6 +6940,19 @@ export class Bridge {
    * re-render never loops.
    */
   _maybeSendLinkableAnchors() {
+    // Live list for a frontend (in-page nav): the full document-ordered set from
+    // the DOM, so it reflects headings AS they're edited. Independent of the
+    // per-block map sent to the admin below (which drops read-only for
+    // persistence). Echo-guarded on its own serialisation.
+    if (this._onAnchorsChange) {
+      const list = collectLinkableAnchorsList(document);
+      const listJson = JSON.stringify(list);
+      if (listJson !== (this._lastAnchorsList ?? 'null')) {
+        this._lastAnchorsList = listJson;
+        this._onAnchorsChange(list);
+      }
+    }
+
     const anchors = collectLinkableAnchors(document);
     // Read-only for TEMPLATE content is hydra's call, not the frontend's — the
     // merge stamps block.readOnly, so isBlockReadonly knows it from the data on

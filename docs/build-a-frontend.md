@@ -154,6 +154,31 @@ anchors both on render **and** when inline edits flush, so a freshly-typed headi
 linkable on the page being edited without saving first; other pages use their last saved
 anchors.
 
+#### Reading the anchors back (`onAnchorsChange`)
+
+To build something *from* the anchors — an in-page navigation ("On this page") block —
+pass an `onAnchorsChange` callback to `initBridge`. Hydra calls it with the live,
+document-ordered list every time it re-harvests (on render and on each inline-edit
+flush), so your nav stays correct **while the page is being edited**, before anything is
+saved:
+
+```js
+initBridge({
+  // …
+  onAnchorsChange: (anchors) => {
+    // anchors: [{ id, name, level, blockUid }] in document order.
+    // level is 1–6 for headings (data-linkable-h{n} / heading tag), null for leaves.
+    renderInPageNav(anchors);
+  },
+});
+```
+
+The list includes **read-only** (template/section) headings too — unlike the persisted
+`block._linkableAnchors`, which omits them. Pair it with `buildAnchorTree(anchors)` (also
+from `@volto-hydra/hydra-js`) to render a nested contents list. In plain view mode (no
+bridge) derive the same list from the page content yourself; `onAnchorsChange` is the
+edit-mode source that reflects unsaved edits.
+
 ## The steps
 
 The steps involved in creating a frontend are roughly the same for all these frameworks:

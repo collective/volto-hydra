@@ -42,6 +42,37 @@ export function collectLinkableAnchors(rootEl) {
   return out;
 }
 
+/**
+ * Flat, document-ordered anchor list for a rendered subtree — what a frontend
+ * consumer (an in-page navigation block) wants: every linkable anchor in reading
+ * order with its level, tagged with the owning block uid.
+ *
+ * Unlike collectLinkableAnchors this does NOT drop read-only blocks: that skip
+ * exists to avoid PERSISTING anchors onto template-fixed content, which is
+ * irrelevant to a read-only display. So a nav built from this list includes the
+ * page's template/section headings too. Elements without an `id` are skipped.
+ *
+ * @param {ParentNode} rootEl
+ * @returns {Array<{id: string, name: string, level: (number|null), blockUid: (string|null)}>}
+ */
+export function collectLinkableAnchorsList(rootEl) {
+  const out = [];
+  for (const el of rootEl.querySelectorAll(LINKABLE_SELECTOR)) {
+    const id = el.getAttribute('id');
+    if (!id) continue;
+    const anchor = readAnchor(el);
+    if (!anchor) continue;
+    const owner = el.closest('[data-block-uid]');
+    out.push({
+      id,
+      name: anchor.name,
+      level: anchor.level,
+      blockUid: owner ? owner.getAttribute('data-block-uid') : null,
+    });
+  }
+  return out;
+}
+
 const HEADING_LEVEL = { H1: 1, H2: 2, H3: 3, H4: 4, H5: 5, H6: 6 };
 const LINKABLE_SELECTOR =
   '[data-linkable-id],[data-linkable-h1],[data-linkable-h2],[data-linkable-h3],[data-linkable-h4],[data-linkable-h5],[data-linkable-h6]';
