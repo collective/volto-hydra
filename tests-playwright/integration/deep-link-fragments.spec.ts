@@ -220,9 +220,12 @@ async function navigateIntoItem(page, titleRe) {
 }
 
 // Switch the level being browsed to its fragments and return the items locator.
+// The fragment picker is a nested list (the heading hierarchy is structural), so
+// target the label span — it carries the click handler and its text is just the
+// anchor name, without a parent <li> absorbing its nested children's text.
 async function showLevelFragments(page) {
   await page.locator('.ob-level-mode-fragments').click();
-  return page.locator('.ob-fragment-item');
+  return page.locator('.ob-fragment-label');
 }
 
 // Open the object browser for a button's link field, navigate to Test Data and

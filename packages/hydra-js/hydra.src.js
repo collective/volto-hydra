@@ -29,10 +29,7 @@ import {
 } from '@volto-hydra/helpers';
 import { expelAllowedTypes, findOnlyEmptyChildUid } from './containerOps.js';
 import { acceptableAt } from './conversionMap.js';
-import {
-  collectLinkableAnchors,
-  collectLinkableAnchorsList,
-} from './linkableAnchors.js';
+import { collectLinkableAnchors } from './linkableAnchors.js';
 
 /**
  * This IS a large file and it needs to be written in one file so for better understanding and
@@ -299,12 +296,6 @@ export class Bridge {
     } else if (options.onEditChange) {
       this.onEditChange(options.onEditChange);
     }
-    // onAnchorsChange(anchors): fired with the live, document-ordered deep-link
-    // anchor list ([{id, name, level, blockUid}]) every time hydra re-harvests
-    // (render-settle + inline-edit flush). Lets a frontend render an in-page
-    // navigation that stays correct WHILE editing — before edits are flushed to
-    // formData or saved. Local callback (like onEditChange), never forwarded.
-    this._onAnchorsChange = options.onAnchorsChange || null;
     this.init(options); // Initialize the bridge
   }
 
@@ -6935,24 +6926,12 @@ export class Bridge {
 
   /**
    * Harvest linkable anchors from the live DOM and, when the full map changed
-   * since the last send, push it to the admin so it can persist
-   * block._linkableAnchors. Guarded by a JSON snapshot so a FORM_DATA echo →
+   * since the last send, push it to the admin so it can merge
+   * block._linkableAnchors into the canonical formData (see the LINKABLE_ANCHORS
+   * handler in View.jsx). Guarded by a JSON snapshot so a FORM_DATA echo →
    * re-render never loops.
    */
   _maybeSendLinkableAnchors() {
-    // Live list for a frontend (in-page nav): the full document-ordered set from
-    // the DOM, so it reflects headings AS they're edited. Independent of the
-    // per-block map sent to the admin below (which drops read-only for
-    // persistence). Echo-guarded on its own serialisation.
-    if (this._onAnchorsChange) {
-      const list = collectLinkableAnchorsList(document);
-      const listJson = JSON.stringify(list);
-      if (listJson !== (this._lastAnchorsList ?? 'null')) {
-        this._lastAnchorsList = listJson;
-        this._onAnchorsChange(list);
-      }
-    }
-
     const anchors = collectLinkableAnchors(document);
     // Read-only for TEMPLATE content is hydra's call, not the frontend's — the
     // merge stamps block.readOnly, so isBlockReadonly knows it from the data on
@@ -10012,9 +9991,11 @@ export class Bridge {
       // why it belongs on the structural settle (like the rect/UI updates) and
       // not only on the inline-text flush, whose timing races the render that
       // finalizes the id (dropped a just-added heading's anchor intermittently).
-      // Safe to run on every settle now that anchors live in a transient store
-      // (LINKABLE_ANCHORS never mutates block formData → no iframe re-render); the
-      // echo guard in _maybeSendLinkableAnchors sends only when the map changes.
+      // Safe to run on every settle: the admin merges LINKABLE_ANCHORS into
+      // formData WITHOUT bouncing a FORM_DATA back (the inline-edit counter
+      // guard in View.jsx suppresses the send), so it never re-renders the
+      // iframe; the echo guard in _maybeSendLinkableAnchors sends only when the
+      // map changes.
       this._maybeSendLinkableAnchors();
       // Signal DOM settled — but only if no new mutations arrived during
       // this rAF callback. If new mutations come, the observer will fire

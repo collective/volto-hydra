@@ -47,7 +47,6 @@ import {
 import { v4 as uuid } from 'uuid';
 import { toast } from 'react-toastify';
 import { stripEmptyBlocks, ensureAllContainersHaveBlocks } from '../../../../../utils/blockPath';
-import { mergeAnchorsIntoContent } from '../../../../../utils/linkableAnchors';
 import { stripFixedInsideSlots } from '@volto-hydra/helpers';
 import { createLog } from '../../../../../utils/log';
 const log = createLog('FORM');
@@ -513,27 +512,6 @@ class Form extends Component {
   }
 
   /**
-   * Merge the transient deep-link anchor store back into a formData's blocks.
-   * Anchors are held OUTSIDE the blocks during editing (so anchor updates never
-   * re-render the iframe) and folded in only at save. No-op when there are no
-   * anchors. Readonly / forced-template blocks are skipped inside
-   * mergeAnchorsIntoContent. Returns the input unchanged when there's nothing to
-   * merge, so it's safe to wrap any save source.
-   * @param {Object} sourceFormData
-   * @returns {Object}
-   */
-  mergeAnchorsIntoFormData(sourceFormData) {
-    const anchors = this.props.linkableAnchors;
-    if (!anchors || !Object.keys(anchors).length) return sourceFormData;
-    return mergeAnchorsIntoContent(
-      sourceFormData,
-      anchors,
-      config.blocks.blocksConfig,
-      this.props.intl,
-    );
-  }
-
-  /**
    * Submit handler also validate form and collect errors
    * @method onSubmit
    * @param {Object} event Event object.
@@ -637,10 +615,9 @@ class Form extends Component {
       // snapshot taken at the top of onSubmit would drop it). finalizedFormData is
       // only returned when a brand-new template's id was rewritten across the page
       // — that narrow path keeps its own (id-rewritten) data, as upstream does.
-      // Merge the deep-link anchors into whichever we use — never a pre-flush copy.
-      const pageFormData = this.mergeAnchorsIntoFormData(
-        finalizedFormData || this.state.formData,
-      );
+      // Deep-link anchors already ride in formData (merged in as they're
+      // harvested), so there's nothing extra to fold in at save.
+      const pageFormData = finalizedFormData || this.state.formData;
       if (this.props.isEditForm) {
         this.props.onSubmit(this.getOnlyFormModifiedValues(pageFormData));
       } else {
@@ -1091,7 +1068,6 @@ export default compose(
       uiState: state.form?.ui,
       metadataFieldsets: state.sidebar?.metadataFieldsets,
       metadataFieldFocus: state.sidebar?.metadataFieldFocus,
-      linkableAnchors: state.linkableAnchors?.anchors,
     }),
     {
       setMetadataFieldsets,

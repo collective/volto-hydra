@@ -150,34 +150,27 @@ It's your choice which elements are linkable — a common pattern is to tag ever
 deriving its `id` from a slug of the heading text. If you want a heading to be linkable
 *while it's being edited* (before save), keep its `id`/`data-linkable-id` current as the
 text changes — e.g. a small `input` listener that re-slugifies the heading. Hydra harvests
-anchors both on render **and** when inline edits flush, so a freshly-typed heading becomes
-linkable on the page being edited without saving first; other pages use their last saved
-anchors.
+anchors both on render **and** when inline edits flush, merging them into the edit form's
+`block._linkableAnchors` so a freshly-typed heading becomes linkable on the page being
+edited without saving first; other pages use their last saved anchors.
 
-#### Reading the anchors back (`onAnchorsChange`)
+#### Building an in-page navigation
 
 To build something *from* the anchors — an in-page navigation ("On this page") block —
-pass an `onAnchorsChange` callback to `initBridge`. Hydra calls it with the live,
-document-ordered list every time it re-harvests (on render and on each inline-edit
-flush), so your nav stays correct **while the page is being edited**, before anything is
-saved:
+**derive the list from the page content you already render**, the same way you stamp the
+heading `id`s. That works identically published (no bridge, JS off) and while editing:
+structural edits (adding, removing, reordering heading blocks) re-render your frontend
+with fresh content, so the nav follows them. There is no bridge callback for this — the
+anchors ride in the ordinary edit-form data (`block._linkableAnchors`), which is what the
+object browser's link picker reads; a nav rebuilds itself from content on the next render.
 
-```js
-initBridge({
-  // …
-  onAnchorsChange: (anchors) => {
-    // anchors: [{ id, name, level, blockUid }] in document order.
-    // level is 1–6 for headings (data-linkable-h{n} / heading tag), null for leaves.
-    renderInPageNav(anchors);
-  },
-});
-```
+> One consequence: text typed into an *existing* heading updates the nav on the next
+> render (when you blur the block), not on every keystroke — inline text edits don't
+> re-render the frontend until they're flushed. Adding or removing headings updates it
+> immediately.
 
-The list includes **read-only** (template/section) headings too — unlike the persisted
-`block._linkableAnchors`, which omits them. Pair it with `buildAnchorTree(anchors)` (also
-from `@volto-hydra/hydra-js`) to render a nested contents list. In plain view mode (no
-bridge) derive the same list from the page content yourself; `onAnchorsChange` is the
-edit-mode source that reflects unsaved edits.
+If your anchors carry levels, pair the derived list with `buildAnchorTree(anchors)` (from
+`@volto-hydra/hydra-js`) to render a nested contents list; no levels means a flat list.
 
 ## The steps
 

@@ -16,7 +16,7 @@ import { searchContent } from '@plone/volto/actions/search/search';
 import { getContent, createContent } from '@plone/volto/actions/content/content';
 import { validateFileUploadSize } from '@plone/volto/helpers/FormValidation/FormValidation';
 import { buildAnchorTree } from '@volto-hydra/hydra-js';
-import { collectAnchorsFromContent, collectAnchorsFromStore } from '../../../../../utils/linkableAnchors';
+import { collectAnchorsFromContent } from '../../../../../utils/linkableAnchors';
 import { buildUploadPayload } from '../../../../../utils/uploadPayload';
 import Icon from '@plone/volto/components/theme/Icon/Icon';
 import { flattenToAppURL, isInternalURL } from '@plone/volto/helpers/Url/Url';
@@ -458,11 +458,11 @@ class ObjectBrowserBody extends Component {
     }
     this.setState({ levelMode: 'fragments', levelAnchorsLoading: true });
     const id = flattenToAppURL(this.state.currentFolder);
-    // The page currently being edited → LIVE anchors from the transient store
-    // (state.linkableAnchors), ordered against the current form's block layout,
-    // so a just-added heading is linkable without saving. Any other page → the
-    // persisted content via getContent (whose dispatched promise resolves with
-    // the full body, blocks included — see Teaser/Data.jsx).
+    // The page currently being edited → anchors from the live formData (hydra
+    // harvests them into the blocks as they're edited), ordered against its block
+    // layout. Any other page → the persisted content via getContent (whose
+    // dispatched promise resolves with the full body, blocks included — see
+    // Teaser/Data.jsx).
     const editingPath = this.props.pathname
       ? this.props.pathname.replace(/\/(edit|add)$/, '')
       : null;
@@ -473,9 +473,10 @@ class ObjectBrowserBody extends Component {
       this.props.formData.blocks;
     let anchors;
     if (isCurrentPage) {
-      anchors = collectAnchorsFromStore(
+      // Anchors ride in the live formData (hydra harvests them into the blocks as
+      // they're edited), so a just-added heading is linkable without saving.
+      anchors = collectAnchorsFromContent(
         this.props.formData,
-        this.props.linkableAnchors || {},
         config.blocks.blocksConfig,
         this.props.intl,
       );
@@ -893,11 +894,10 @@ export default compose(
     (state) => ({
       searchSubrequests: state.search.subrequests,
       lang: state.intl.locale,
-      // Live edit-form data (for the current page's block order) + the transient
-      // anchor store + current path, so anchors for the page being edited come
-      // from the store rather than persisted content.
+      // Live edit-form data (block order + each block's harvested
+      // _linkableAnchors) + current path, so anchors for the page being edited
+      // come straight from the form rather than persisted content.
       formData: state.form.global,
-      linkableAnchors: state.linkableAnchors?.anchors,
       pathname: state.router?.location?.pathname,
     }),
     { searchContent, getContent, createContent },

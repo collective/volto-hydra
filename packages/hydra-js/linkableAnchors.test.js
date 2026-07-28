@@ -1,9 +1,5 @@
 import { JSDOM } from 'jsdom';
-import {
-  buildAnchorTree,
-  collectLinkableAnchors,
-  collectLinkableAnchorsList,
-} from './linkableAnchors.js';
+import { buildAnchorTree, collectLinkableAnchors } from './linkableAnchors.js';
 
 // hydra-js jest env is 'node' (no global document); build DOM via jsdom directly.
 function dom(html) {
@@ -95,43 +91,6 @@ describe('collectLinkableAnchors', () => {
     expect(collectLinkableAnchors(root)).toEqual({
       child: [{ id: 'deep', name: 'Deep', level: 2 }],
     });
-  });
-});
-
-describe('collectLinkableAnchorsList', () => {
-  it('returns a flat, document-ordered list with level + owning blockUid', () => {
-    const root = dom(`
-      <div data-block-uid="b1">
-        <h2 id="one" data-linkable-id="One">1</h2>
-        <h3 id="two" data-linkable-h3="Two">2</h3>
-      </div>
-      <div data-block-uid="b2">
-        <figure id="fig" data-linkable-id="Fig">img</figure>
-      </div>`);
-    expect(collectLinkableAnchorsList(root)).toEqual([
-      { id: 'one', name: 'One', level: 2, blockUid: 'b1' },
-      { id: 'two', name: 'Two', level: 3, blockUid: 'b1' },
-      { id: 'fig', name: 'Fig', level: null, blockUid: 'b2' },
-    ]);
-  });
-
-  it('INCLUDES anchors in read-only blocks (unlike the persist harvest)', () => {
-    const root = dom(`
-      <div data-block-uid="tmpl" data-block-readonly>
-        <h2 id="section" data-linkable-id="Section">fixed template heading</h2>
-      </div>`);
-    // collectLinkableAnchors would drop this; the display list keeps it.
-    expect(collectLinkableAnchors(root)).toEqual({});
-    expect(collectLinkableAnchorsList(root)).toEqual([
-      { id: 'section', name: 'Section', level: 2, blockUid: 'tmpl' },
-    ]);
-  });
-
-  it('skips elements with no id', () => {
-    const root = dom(
-      `<div data-block-uid="b1"><h2 data-linkable-id="No Id">x</h2></div>`,
-    );
-    expect(collectLinkableAnchorsList(root)).toEqual([]);
   });
 });
 

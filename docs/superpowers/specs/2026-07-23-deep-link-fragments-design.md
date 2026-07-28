@@ -96,7 +96,7 @@ Per browsable item, an "expand anchors" control:
 4. Render the list; picking an anchor yields the link value `targetPath#id`. Picking the
    page itself (no anchor) is unchanged.
 
-## Addendum — transient store + tag-driven (final architecture)
+## Addendum — anchors ride in formData (final architecture)
 
 Two problems surfaced in implementation and reshaped the design.
 
@@ -105,20 +105,29 @@ doesn't re-render, so a freshly-typed heading's `id`/`data-linkable-id` go stale
 frontend (its choice) keeps them fresh with a small `input` listener, and the bridge
 harvests on `flushPendingTextUpdates` (content update) as well as `afterContentRender`.
 
-**2. Anchors must NOT live in the blocks during editing.** Writing `_linkableAnchors`
-into `formData` on every harvest re-rendered the iframe (cursor loss, echo — broke the
-metadata title-edit and cursor-stability tests). So anchors are held **outside the
-blocks** while editing:
+**2. Anchors ride in `formData`, without re-rendering the iframe.** The original concern
+was that writing `_linkableAnchors` into `formData` on every harvest would re-render the
+iframe (cursor loss, echo). The fix is *not* to keep anchors out of the blocks, but to
+merge them in **without bouncing a `FORM_DATA` back to the iframe** — reusing the same
+echo guard inline text edits already use:
 
-- A transient Redux slice (`linkableAnchors`, `{ [blockUid]: [{id,name}] }`), driven by
-  `View`. The `LINKABLE_ANCHORS` handler only `dispatch`es — no `formData` mutation, no
-  re-render, no echo.
-- **On load**, the slice is seeded from the blocks' saved `_linkableAnchors`.
-- **On save**, `Form.onSubmit` merges the slice back into `formData.blocks` (and passes
-  that merged formData through `getOnlyFormModifiedValues`, which otherwise defaults to
-  the unmerged `state.formData`).
-- **Object browser** reads the slice for the page being edited (ordered against its block
-  layout), `getContent` for other pages.
+- Hydra harvests the per-block map (read-only blocks dropped) and posts `LINKABLE_ANCHORS`
+  only when the map changes.
+- `View`'s `LINKABLE_ANCHORS` handler merges the map into the canonical `formData`
+  (`mergeAnchorsIntoContent` → `onChangeFormData`) and bumps `inlineEditCounterRef`, so the
+  UNIFIED FORM SYNC effect swallows the resulting `properties` change instead of sending a
+  `FORM_DATA` back. No re-render, no cursor loss — the metadata title-edit and
+  cursor-stability tests stay green.
+- **On load**, nothing special: the saved blocks already carry `_linkableAnchors`, so the
+  form has them from the start.
+- **On save**, nothing special: the anchors are already in `formData`, so the ordinary
+  `getOnlyFormModifiedValues` PATCH persists them — no save-time merge.
+- **Object browser** reads `block._linkableAnchors` straight from the live `formData` for
+  the page being edited (ordered against its block layout), `getContent` for other pages.
+
+There is no transient Redux slice and no `onAnchorsChange` bridge callback. A frontend
+in-page-nav derives its list from the page content it already renders (see
+`build-a-frontend.md`); the harvested anchors exist only to feed the link picker.
 
 **Tag-driven, block-agnostic.** Harvest and refresh key off the `data-linkable-id` tag
 only — any element, multiple per block, never element/block/field type. The frontend tags

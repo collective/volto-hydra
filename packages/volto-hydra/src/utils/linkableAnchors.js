@@ -25,40 +25,10 @@ export function collectAnchorsFromContent(content, blocksConfig, intl = {}) {
 }
 
 /**
- * Seed the transient anchor store from a content item's saved
- * block._linkableAnchors → { [blockUid]: [{id,name}] }. Used on load.
- */
-export function seedAnchorsFromContent(content, blocksConfig, intl = {}) {
-  const pmap = buildBlockPathMap(content, blocksConfig, intl);
-  const map = {};
-  for (const uid of Object.keys(pmap)) {
-    if (uid.startsWith('_')) continue;
-    const block = getBlockById(content, pmap, uid);
-    if (block?._linkableAnchors?.length) map[uid] = block._linkableAnchors;
-  }
-  return map;
-}
-
-/**
- * Ordered anchors for the page being edited, read from the transient store map
- * rather than the blocks (which don't carry _linkableAnchors during editing).
- */
-export function collectAnchorsFromStore(content, anchorsMap, blocksConfig, intl = {}) {
-  const pmap = buildBlockPathMap(content, blocksConfig, intl);
-  const anchors = [];
-  for (const uid of Object.keys(pmap)) {
-    if (uid.startsWith('_')) continue;
-    const list = anchorsMap?.[uid];
-    if (!list) continue;
-    for (const a of list) anchors.push({ ...a, blockUid: uid });
-  }
-  return anchors;
-}
-
-/**
- * Write the transient anchor store back into the blocks (for save). Sets
- * _linkableAnchors on blocks named in the map; clears it on blocks that lost
- * theirs. Returns new content (never mutates the input).
+ * Merge a harvested anchor map ({ [blockUid]: [{id,name,level}] }) into content's
+ * blocks. Sets _linkableAnchors on blocks named in the map; clears it on blocks
+ * that lost theirs. Returns new content (never mutates the input). Used by the
+ * admin's LINKABLE_ANCHORS handler to fold hydra's harvest into the live formData.
  *
  * Uses a deep clone + in-place mutation via each block's getBlockById reference,
  * NOT updateBlockById — rebuilding the tree along a path drops sibling blocks on
