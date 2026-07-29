@@ -2603,11 +2603,15 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  *  - a `from` field whose value is not an address -> 400, matching
  *    validate_email_fields.
  *
- * Deliberate divergence, documented rather than hidden: formsupport treats an
- * unresolvable `block_id` as an empty block and quietly does nothing, which in
- * a test double would mask the one bug multi-form pages can have. Here the
- * resolved block is recorded as `block_found` so a test can assert the id
- * pointed at a real form, and the submission is still accepted.
+ *  - a `block_id` that resolves to no form block -> 400, matching
+ *    validate_form's `block_form_not_found_label`;
+ *  - a form with neither `send` nor `store` -> 400, matching `missing_action`
+ *    ("You need to set at least one form action between send and store"). This
+ *    one is easy to author by accident and impossible to notice until a visitor
+ *    tries to submit.
+ *
+ * The resolved block is also recorded as `block_found`, so a multi-form test can
+ * assert the id pointed at the form it meant.
  */
 app.post('*/@submit-form', (req, res) => {
   const contentPath = req.path.replace(/\/@submit-form$/, '') || '/';
@@ -2623,11 +2627,30 @@ app.post('*/@submit-form', (req, res) => {
   const content = loadRawContentFromDisk(contentPath);
   const block = content ? findFormBlock(content, blockId) : null;
 
+  if (!blockId) {
+    return res.status(400).json({ type: 'BadRequest', message: 'Missing block_id' });
+  }
+
+  if (!block) {
+    return res.status(400).json({
+      type: 'BadRequest',
+      message: `Block with @type "form" and id "${blockId}" not found in this context: ${contentPath}`,
+    });
+  }
+
+  if (!block.store && !block.send) {
+    return res.status(400).json({
+      type: 'BadRequest',
+      message:
+        'You need to set at least one form action between "send" and "store".',
+    });
+  }
+
   if (data.length === 0 && Object.keys(attachments).length === 0) {
     return res.status(400).json({ type: 'BadRequest', message: 'Empty form data.' });
   }
 
-  if (block && block.captcha === 'honeypot') {
+  if (block.captcha === 'honeypot') {
     const captcha = body.captcha;
     if (!captcha || typeof captcha.value !== 'string' || captcha.value !== '') {
       return res
@@ -2636,16 +2659,17 @@ app.post('*/@submit-form', (req, res) => {
     }
   }
 
-  if (block) {
+  {
     const emailFields = (block.subblocks || [])
       .filter((f) => f && f.field_type === 'from')
       .map((f) => f.field_id);
     for (const entry of data) {
       if (emailFields.includes(entry.field_id) && entry.value) {
         if (!EMAIL_RE.test(String(entry.value))) {
-          return res
-            .status(400)
-            .json({ type: 'BadRequest', message: 'Email not valid.' });
+          return res.status(400).json({
+            type: 'BadRequest',
+            message: `Email not valid in "${entry.label || entry.field_id}" field.`,
+          });
         }
       }
     }
