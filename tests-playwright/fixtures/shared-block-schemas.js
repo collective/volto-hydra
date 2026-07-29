@@ -122,6 +122,10 @@ export const sharedBlocksConfig = {
         title: 'Columns',
         icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="2" y="3" width="8" height="18" rx="1"/><rect x="14" y="3" width="8" height="18" rx="1"/></svg>',
         group: 'common',
+        // Ancestor restriction: no `columns` anywhere in a columns block's subtree,
+        // even though a nested `column` cell otherwise allows it. Exercises
+        // disallowDescendantBlocks end-to-end (add / DnD / type picker).
+        disallowDescendantBlocks: ['columns'],
         blockSchema: {
             fieldsets: [
                 {
@@ -168,7 +172,10 @@ export const sharedBlocksConfig = {
                 items: {
                     title: 'Content',
                     widget: 'blocks_layout',
-                    allowedBlocks: ['slate', 'image', 'form'],
+                    // `columns` is allowed here so the columns ancestor's
+                    // disallowDescendantBlocks has something to strip (proves the
+                    // restriction, not a plain absence, blocks columns-in-columns).
+                    allowedBlocks: ['slate', 'image', 'form', 'columns'],
                     defaultBlockType: 'slate',
                 },
             },

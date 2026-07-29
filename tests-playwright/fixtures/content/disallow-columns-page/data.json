@@ -1,0 +1,58 @@
+{
+  "@id": "http://localhost:8888/disallow-columns-page",
+  "@type": "Document",
+  "UID": "disallow-columns-page-uid",
+  "id": "disallow-columns-page",
+  "title": "Disallow Columns Page",
+  "description": "Exercises disallowDescendantBlocks: a columns block forbids columns in its whole subtree, while columns stays addable at the page level.",
+  "review_state": "published",
+  "parent": {
+    "@id": "http://localhost:8888",
+    "@type": "Plone Site",
+    "title": "Site"
+  },
+  "blocks": {
+    "title-block": { "@type": "title" },
+    "outer": {
+      "@type": "columns",
+      "title": "Outer Columns",
+      "blocks": {
+        "cell": {
+          "@type": "column",
+          "title": "Cell",
+          "blocks": {
+            "inner-1": {
+              "@type": "slate",
+              "value": [{ "type": "p", "children": [{ "text": "inner content" }] }],
+              "plaintext": "inner content"
+            }
+          },
+          "blocks_layout": { "items": ["inner-1"] }
+        }
+      },
+      "blocks_layout": { "columns": ["cell"] }
+    },
+    "src-cols": {
+      "@type": "columns",
+      "title": "Source Columns",
+      "blocks": {
+        "src-cell": {
+          "@type": "column",
+          "title": "Source Cell",
+          "blocks": {
+            "src-slate": {
+              "@type": "slate",
+              "value": [{ "type": "p", "children": [{ "text": "source content" }] }],
+              "plaintext": "source content"
+            }
+          },
+          "blocks_layout": { "items": ["src-slate"] }
+        }
+      },
+      "blocks_layout": { "columns": ["src-cell"] }
+    }
+  },
+  "blocks_layout": {
+    "items": ["title-block", "outer", "src-cols"]
+  }
+}
