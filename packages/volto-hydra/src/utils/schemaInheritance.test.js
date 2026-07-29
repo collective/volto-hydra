@@ -228,6 +228,89 @@ describe('fieldRules — contains operator (multiselect-driven visibility)', () 
   });
 });
 
+describe('fieldRules — oneOf operator (scalar Choice-driven visibility)', () => {
+  const baseSchema = () => ({
+    fieldsets: [{ id: 'default', title: 'Default', fields: ['colour', 'invert'] }],
+    properties: {
+      colour: { title: 'Colour' },
+      invert: { title: 'Invert', type: 'boolean' },
+    },
+    required: [],
+  });
+
+  // Show `invert` only when the colour is one of the dark set — the inverse of
+  // `contains` (the SET is the operand, the field value is a scalar Choice).
+  const recipe = {
+    fieldRules: {
+      invert: {
+        when: { colour: { oneOf: ['brand-dark', 'black'] } },
+        else: false,
+      },
+    },
+  };
+
+  test('keeps the field when the value is in the set', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { colour: 'brand-dark' },
+    });
+    expect(out.properties.invert).toBeDefined();
+    expect(out.fieldsets[0].fields).toContain('invert');
+  });
+
+  test('hides the field when the value is outside the set', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { colour: 'off-white' },
+    });
+    expect(out.properties.invert).toBeUndefined();
+    expect(out.fieldsets[0].fields).not.toContain('invert');
+  });
+
+  test('hides the field when the value is unset', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const out = enhancer({ schema: baseSchema(), formData: {} });
+    expect(out.properties.invert).toBeUndefined();
+  });
+
+  // notOneOf is the inverse: keep the field UNLESS the value is in the set.
+  const notOneOfRecipe = {
+    fieldRules: {
+      invert: {
+        when: { colour: { notOneOf: ['off-white', 'white'] } },
+        else: false,
+      },
+    },
+  };
+
+  test('notOneOf keeps the field when the value is outside the set', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(notOneOfRecipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { colour: 'brand-dark' },
+    });
+    expect(out.properties.invert).toBeDefined();
+  });
+
+  test('notOneOf hides the field when the value is in the set', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(notOneOfRecipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { colour: 'off-white' },
+    });
+    expect(out.properties.invert).toBeUndefined();
+  });
+
+  test('notOneOf keeps the field when the value is unset', () => {
+    // An unset value is not in the set, so notOneOf is satisfied.
+    const enhancer = createSchemaEnhancerFromRecipe(notOneOfRecipe);
+    const out = enhancer({ schema: baseSchema(), formData: {} });
+    expect(out.properties.invert).toBeDefined();
+  });
+});
+
 /**
  * fieldRules + `required` — a hidden field must not stay required.
  *
