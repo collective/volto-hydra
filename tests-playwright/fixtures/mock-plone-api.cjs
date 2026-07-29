@@ -2559,9 +2559,139 @@ app.get('*/@contents', (req, res) => {
  * Form submission endpoint (collective.volto.formsupport)
  * Accepts { block_id, data: [{ field_id, label, value }] }
  */
+// Submissions recorded in memory, keyed by `${contentPath}::${block_id}` —
+// exactly how formsupport keys stored data (its records carry a `block_id` that
+// the CSV export and clear service filter on), so two forms on a page keep
+// separate result sets here too.
+const formSubmissions = new Map();
+
+const submissionKey = (contentPath, blockId) => `${contentPath}::${blockId || ''}`;
+
+/**
+ * Find a block by uid anywhere in a content item's block tree, top level or
+ * nested in a container. Mirrors formsupport's get_block_data, which resolves
+ * against a FLATTENED hierarchy and refuses anything that is not a form block.
+ */
+function findFormBlock(node, blockId) {
+  const blocks = node && node.blocks;
+  if (!blocks || typeof blocks !== 'object') return null;
+  if (blocks[blockId]) {
+    return blocks[blockId]['@type'] === 'form' ? blocks[blockId] : null;
+  }
+  for (const child of Object.values(blocks)) {
+    const found = findFormBlock(child, blockId);
+    if (found) return found;
+  }
+  return null;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * POST /:path/@submit-form
+ * Form submission endpoint (collective.volto.formsupport).
+ * Accepts { block_id, data: [{ field_id, label, value }], attachments, captcha }
+ *
+ * Records the submission so a test can assert on what the frontend actually
+ * sent, and reproduces the checks formsupport really performs, so a broken
+ * submission fails loudly here instead of silently succeeding:
+ *
+ *  - empty form data (no `data` entries and no attachments) -> 400, as
+ *    collective.volto.formsupport's post adapter does;
+ *  - the honeypot captcha -> 400 unless `captcha.value` is the empty string,
+ *    matching HoneypotSupport.verify;
+ *  - a `from` field whose value is not an address -> 400, matching
+ *    validate_email_fields.
+ *
+ * Deliberate divergence, documented rather than hidden: formsupport treats an
+ * unresolvable `block_id` as an empty block and quietly does nothing, which in
+ * a test double would mask the one bug multi-form pages can have. Here the
+ * resolved block is recorded as `block_found` so a test can assert the id
+ * pointed at a real form, and the submission is still accepted.
+ */
 app.post('*/@submit-form', (req, res) => {
+  const contentPath = req.path.replace(/\/@submit-form$/, '') || '/';
+  const body = req.body || {};
+  const blockId = body.block_id;
+  const data = Array.isArray(body.data) ? body.data : [];
+  const attachments = body.attachments || {};
+
   if (process.env.DEBUG) {
-    console.log(`POST @submit-form: path=${req.path}`);
+    console.log(`POST @submit-form: path=${contentPath} block=${blockId}`);
+  }
+
+  const content = loadRawContentFromDisk(contentPath);
+  const block = content ? findFormBlock(content, blockId) : null;
+
+  if (data.length === 0 && Object.keys(attachments).length === 0) {
+    return res.status(400).json({ type: 'BadRequest', message: 'Empty form data.' });
+  }
+
+  if (block && block.captcha === 'honeypot') {
+    const captcha = body.captcha;
+    if (!captcha || typeof captcha.value !== 'string' || captcha.value !== '') {
+      return res
+        .status(400)
+        .json({ type: 'BadRequest', message: 'Error submitting form.' });
+    }
+  }
+
+  if (block) {
+    const emailFields = (block.subblocks || [])
+      .filter((f) => f && f.field_type === 'from')
+      .map((f) => f.field_id);
+    for (const entry of data) {
+      if (emailFields.includes(entry.field_id) && entry.value) {
+        if (!EMAIL_RE.test(String(entry.value))) {
+          return res
+            .status(400)
+            .json({ type: 'BadRequest', message: 'Email not valid.' });
+        }
+      }
+    }
+  }
+
+  const key = submissionKey(contentPath, blockId);
+  const record = {
+    block_id: blockId,
+    block_found: Boolean(block),
+    data,
+    attachments,
+    captcha: body.captcha,
+    received: formSubmissions.get(key) ? formSubmissions.get(key).length : 0,
+  };
+  formSubmissions.set(key, [...(formSubmissions.get(key) || []), record]);
+
+  res.status(204).end();
+});
+
+/**
+ * GET /:path/@form-data?block_id=...
+ * Read back what was submitted — formsupport's own service, and how a test
+ * asserts that a form posted what it was supposed to. Without `block_id` every
+ * form on the page is returned.
+ */
+app.get('*/@form-data', (req, res) => {
+  const contentPath = req.path.replace(/\/@form-data$/, '') || '/';
+  const blockId = req.query.block_id;
+  const items = [];
+  for (const [key, records] of formSubmissions) {
+    const [path_, block] = key.split('::');
+    if (path_ !== contentPath) continue;
+    if (blockId && block !== blockId) continue;
+    items.push(...records);
+  }
+  res.json({ items, items_total: items.length });
+});
+
+/**
+ * DELETE /:path/@form-data
+ * Clear recorded submissions, so a test can start from a known state.
+ */
+app.delete('*/@form-data', (req, res) => {
+  const contentPath = req.path.replace(/\/@form-data$/, '') || '/';
+  for (const key of [...formSubmissions.keys()]) {
+    if (key.split('::')[0] === contentPath) formSubmissions.delete(key);
   }
   res.status(204).end();
 });
@@ -2977,4 +3107,4 @@ if (require.main === module) {
 }
 
 // Export for use by test frontend server or test harnesses
-module.exports = { app, server, contentDirMap, CONTENT_MOUNTS };
+module.exports = { app, server, contentDirMap, CONTENT_MOUNTS, formSubmissions };
