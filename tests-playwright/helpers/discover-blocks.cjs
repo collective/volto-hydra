@@ -11,10 +11,18 @@
  */
 
 /**
- * Build a map of blockType → { fieldName → idField } for object_list fields.
+ * Build a map of blockType → { fieldName → { idField, typeField } } for
+ * object_list fields.
  * Same logic as BlockVerificationHelper.buildObjectListFieldsMap but in plain JS.
+ *
+ * `typeField` matters as much as `idField`: an object_list may be TYPED, with
+ * each item naming its own registered block type in that field (a form's
+ * `subblocks` name theirs in `field_type`, so one is a `text` block and the next
+ * a `select`). Without it every item collapses into one virtual
+ * `<parent>:<field>` type, and the real per-item types look like registered
+ * blocks that no content example ever exercises.
  * @param {Object} blocksConfig - Block schemas from initBridge INIT message
- * @returns {Map<string, Map<string, string>>}
+ * @returns {Map<string, Map<string, {idField: string, typeField: string|null}>>}
  */
 function buildObjectListFieldsMap(blocksConfig) {
   const map = new Map();
@@ -24,8 +32,10 @@ function buildObjectListFieldsMap(blocksConfig) {
     for (const [fieldName, fieldDef] of Object.entries(props)) {
       if (fieldDef?.widget === 'object_list') {
         if (!map.has(blockType)) map.set(blockType, new Map());
-        const idField = fieldDef.idField || '@id';
-        map.get(blockType).set(fieldName, idField);
+        map.get(blockType).set(fieldName, {
+          idField: fieldDef.idField || '@id',
+          typeField: fieldDef.typeField || null,
+        });
       }
     }
   }
@@ -184,18 +194,26 @@ function extractBlocks(blocks, layout, objectListFields) {
     // Handle object_list fields from schema (clients items, features items, etc.)
     const knownListFields = objectListFields?.get(blockType);
     if (knownListFields) {
-      for (const [fieldName, idField] of knownListFields) {
+      for (const [fieldName, { idField, typeField }] of knownListFields) {
         const items = block[fieldName];
         if (!Array.isArray(items)) continue;
         for (const item of items) {
           if (!item || typeof item !== 'object') continue;
           const subId = item[idField];
           if (!subId) continue;
-          // Sub-blocks from object_list use the parent's @type as a virtual type
-          // e.g. clients items are "clients:item", features items are "features:item"
+          // A TYPED object_list names each item's own registered block type in
+          // `typeField` (a form's `subblocks` name theirs in `field_type`), so
+          // credit the item to that type — it has its own schema, its own
+          // sidebar and its own rendering, and is exactly what the coverage
+          // check below is asking for an example of. An UNTYPED list has no
+          // per-item type, so its items keep the parent's virtual type
+          // (`clients:items`, `features:items`).
+          const itemType =
+            (typeField && typeof item[typeField] === 'string' && item[typeField]) ||
+            `${blockType}:${fieldName}`;
           result.push({
             blockId: subId,
-            blockType: `${blockType}:${fieldName}`,
+            blockType: itemType,
             blockData: item,
           });
         }
@@ -405,8 +423,29 @@ const UNDECLARED_EXEMPT = new Set([
   'fixed', 'slotId', 'templateId', 'templateInstanceId', 'readOnly',
 ]);
 
+/**
+ * Names that are an object_list item's IDENTITY rather than its content: the
+ * `idField` and `typeField` every typed list declares (a form's `subblocks` use
+ * `field_id` and `field_type`). They are in the stored data of every item but in
+ * no item schema — they say which block this is, not what the author wrote — so
+ * flagging them as undeclared would ask for a sidebar field that must never
+ * exist. Derived from the schemas rather than hardcoded, so a list that keys on
+ * something else is covered too.
+ */
+function objectListKeyFields(blocksConfig) {
+  const names = new Set();
+  for (const fields of buildObjectListFieldsMap(blocksConfig).values()) {
+    for (const { idField, typeField } of fields.values()) {
+      if (idField) names.add(idField);
+      if (typeField) names.add(typeField);
+    }
+  }
+  return names;
+}
+
 function collectWidgetShapeIssues(
   blockData, blockSchema, pagePath, blockId, out, blockType, undeclaredFields, blockConfig,
+  exemptFields,
 ) {
   const props = blockSchema?.properties;
   if (!props || !blockData || typeof blockData !== 'object') return;
@@ -586,6 +625,7 @@ function collectWidgetShapeIssues(
   if (blockType) {
     for (const key of Object.keys(blockData)) {
       if (key.startsWith('@') || UNDECLARED_EXEMPT.has(key) || props[key]) continue;
+      if (exemptFields && exemptFields.has(key)) continue;
       if (defaultsPrefix && key.startsWith(defaultsPrefix)) continue;
       const dedupeKey = `${blockType} ${key}`;
       if (!undeclaredFields.has(dedupeKey)) {
@@ -634,6 +674,7 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
   // — skip these, they're not blocks.
   const PAGE_TYPES = new Set(['Document', 'Folder', 'Plone Site', 'News Item', 'Event']);
   const objectListFields = buildObjectListFieldsMap(blocksConfig);
+  const objectListKeys = objectListKeyFields(blocksConfig);
   const allowedBlocksList = buildAllowedBlocksList(blocksConfig);
 
   if (objectListFields.size > 0) {
@@ -705,7 +746,15 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         }
         if (!blockData || typeof blockData !== 'object') continue;
 
-        const blockType = blockData['@type']; // may be undefined for object_list items
+        // An object_list item has no `@type` of its own: a TYPED list names each
+        // item's registered block type in a `typeField` (a form's `subblocks`
+        // name theirs in `field_type`), and buildBlockPathMap has already
+        // resolved that into the entry's `blockType` — real type where the list
+        // is typed, virtual `<parent>:<field>` where it is not. Falling back to
+        // it is what lets a typed sub-block be credited as its own type: without
+        // this every form field looked like a registered block that no content
+        // example ever exercised, and the coverage check failed for all twelve.
+        const blockType = blockData['@type'] || entry.blockType;
         // Resolved schema for this entry — may be inline (object_list schema)
         // or come from blocksConfig[blockType].
         const schemaRef = entry._schemaRef;
@@ -736,7 +785,7 @@ async function discoverBlocks(apiUrl, maxPages = Infinity, blocksConfig = {}, fr
         collectSlateIssues(blockData, pagePath, blockId, slateIssues, blockType);
         collectWidgetShapeIssues(
           blockData, schema, pagePath, blockId, shapeIssues, blockType, undeclaredFields,
-          blockType ? blocksConfig[blockType] : undefined,
+          blockType ? blocksConfig[blockType] : undefined, objectListKeys,
         );
 
         // Unregistered block type: any real @type the frontend can't render is
