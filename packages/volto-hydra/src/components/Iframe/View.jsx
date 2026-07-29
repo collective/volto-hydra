@@ -2253,11 +2253,27 @@ const Iframe = (props) => {
             // synchronously (part of THIS update) so it doesn't re-render mid-type
             // and move the cursor.
             inlineEditCounterRef.current += 1;
-            const editedData = markEditedLinkedFieldsCustom(
+            let editedData = markEditedLinkedFieldsCustom(
               event.data.data,
               properties,
               config.blocks.blocksConfig,
             );
+            // Fold the deep-link anchors harvested with THIS edit into the same
+            // formData. They ride on INLINE_EDIT_DATA (this fresh iframe formData,
+            // adopted wholesale below) rather than a separate LINKABLE_ANCHORS
+            // message — so block._linkableAnchors is merged into the CURRENT edit,
+            // never a stale snapshot, and there's no extra re-render. Editing a
+            // heading re-slugs it each keystroke, so this is the common path; the
+            // separate LINKABLE_ANCHORS handler now only fires for structural
+            // changes (reorder/delete of heading blocks).
+            if (event.data.anchors) {
+              editedData = mergeAnchorsIntoContent(
+                editedData,
+                event.data.anchors,
+                config.blocks.blocksConfig,
+                intl,
+              );
+            }
             // Debug: log full children structure to diagnose missing "w" bug
             const debugBlock = editedData?.blocks?.['block-1-uuid'];
             if (debugBlock?.value?.[0]?.children) {

@@ -143,13 +143,19 @@ test.describe('deep-link fragments', () => {
     await helper.navigateToEdit('/template-test-page');
     await helper.waitForIframeReady();
 
-    // Record every anchor NAME hydra harvests (LINKABLE_ANCHORS → admin window).
+    // Record every anchor NAME hydra harvests. Anchors ride whichever message
+    // carries them: INLINE_EDIT_DATA for inline edits (a re-slugged heading title),
+    // LINKABLE_ANCHORS for structural settles (reorder/delete). Both carry `anchors`.
     await page.evaluate(() => {
       (window as any).__harvestedNames = [];
       window.addEventListener(
         'message',
         (e: MessageEvent) => {
-          if (e.data?.type !== 'LINKABLE_ANCHORS') return;
+          if (
+            e.data?.type !== 'LINKABLE_ANCHORS' &&
+            e.data?.type !== 'INLINE_EDIT_DATA'
+          )
+            return;
           const map = e.data.anchors || {};
           for (const list of Object.values<any>(map))
             for (const a of list)

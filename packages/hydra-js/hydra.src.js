@@ -6931,19 +6931,35 @@ export class Bridge {
    * handler in View.jsx). Guarded by a JSON snapshot so a FORM_DATA echo →
    * re-render never loops.
    */
-  _maybeSendLinkableAnchors() {
+  /**
+   * Harvest deep-link anchors from the live DOM, dropping any block hydra
+   * considers read-only. Read-only for TEMPLATE content is hydra's call, not the
+   * frontend's — the merge stamps block.readOnly, so isBlockReadonly knows it
+   * from the data on every frontend (a real frontend needn't mark
+   * data-block-readonly for template blocks). That content is owned by the
+   * template (which carries its own anchors), so it must not be harvested onto
+   * the instance. collectLinkableAnchors still honours a frontend's OWN
+   * data-block-readonly (its escape hatch to lock a block for its own reasons);
+   * this adds the template-aware determination. Shared by the inline fold-in and
+   * the structural-settle send.
+   */
+  _harvestLinkableAnchors() {
     const anchors = collectLinkableAnchors(document);
-    // Read-only for TEMPLATE content is hydra's call, not the frontend's — the
-    // merge stamps block.readOnly, so isBlockReadonly knows it from the data on
-    // every frontend (a real frontend needn't mark data-block-readonly for
-    // template blocks). Drop anchors on any block hydra considers read-only:
-    // that content is owned by the template (which carries its own anchors), so
-    // it must not be harvested onto the instance. collectLinkableAnchors still
-    // honours a frontend's OWN data-block-readonly (its escape hatch to lock a
-    // block for its own reasons); this adds the template-aware determination.
     for (const uid of Object.keys(anchors)) {
       if (this.isBlockReadonly(uid)) delete anchors[uid];
     }
+    return anchors;
+  }
+
+  /**
+   * STRUCTURAL path: after a settled render (add/remove/reorder heading blocks —
+   * no inline edit fired), push the anchors so the admin can fold them into
+   * formData. Inline edits do NOT come through here — they carry their anchors on
+   * the INLINE_EDIT_DATA message itself (see flushPendingTextUpdates), which is
+   * why this only sends when the map changed since the last send of EITHER path.
+   */
+  _maybeSendLinkableAnchors() {
+    const anchors = this._harvestLinkableAnchors();
     const json = JSON.stringify(anchors);
     // Treat an unset baseline as "{}" so a page with no anchors never sends a
     // spurious empty map on its first flush — that dispatch would re-render the
@@ -11916,6 +11932,17 @@ export class Bridge {
         this.pendingTextUpdate.flushRequestId = flushRequestId;
       }
 
+      // Fold the harvested anchors INTO this inline update. Editing a heading
+      // re-slugs it on every keystroke, so this is the common anchor-change path.
+      // Riding them on INLINE_EDIT_DATA — the message carrying the FRESH formData
+      // the admin adopts wholesale — means the admin never merges them into a
+      // stale snapshot (the cause of a lost-keystroke race), and there's no
+      // second message per keystroke. Keep _lastSentAnchors in sync so the
+      // structural-settle send (_maybeSendLinkableAnchors) doesn't re-emit these.
+      const anchors = this._harvestLinkableAnchors();
+      this.pendingTextUpdate.anchors = anchors;
+      this._lastSentAnchors = JSON.stringify(anchors);
+
       log('flushPendingTextUpdates: sending buffered update, seq:', seq,
           'anchor:', this.pendingTextUpdate.selection?.anchor,
           'focus:', this.pendingTextUpdate.selection?.focus);
@@ -11925,10 +11952,6 @@ export class Bridge {
       // This is needed because admin doesn't send FORM_DATA back for inline edits (echo prevention)
       this.lastReceivedFormData = JSON.parse(JSON.stringify(this.pendingTextUpdate.data));
       this.pendingTextUpdate = null;
-      // Inline edits don't trigger a re-render, so anchors derived from a
-      // live-edited heading (id kept fresh by the frontend on input) would
-      // otherwise never be harvested. Harvest on the normal update path too.
-      this._maybeSendLinkableAnchors();
       return true; // Had pending update
     }
     return false; // No pending update
