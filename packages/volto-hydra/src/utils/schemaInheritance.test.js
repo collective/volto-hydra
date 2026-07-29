@@ -229,6 +229,64 @@ describe('fieldRules — contains operator (multiselect-driven visibility)', () 
 });
 
 /**
+ * fieldRules `isSet` / `isNotSet` — an empty array is unset.
+ *
+ * The widgets that store arrays (multiselect, object_browser) leave `[]` behind
+ * when the author removes the last entry rather than dropping the key. A rule
+ * driven by "has the author picked anything?" has to read that as *nothing
+ * picked*, or a field they just cleared goes on hiding what it was hiding.
+ */
+describe('fieldRules — isSet treats an empty array as unset', () => {
+  const baseSchema = () => ({
+    fieldsets: [{ id: 'default', title: 'Default', fields: ['source', 'own'] }],
+    properties: {
+      source: { title: 'Source', widget: 'object_browser' },
+      own: { title: 'Own content' },
+    },
+    required: [],
+  });
+
+  // Author their own content only while no source is referenced.
+  const recipe = {
+    fieldRules: { own: { when: { source: { isNotSet: true } }, else: false } },
+  };
+
+  test.each([
+    ['unset', {}],
+    ['emptied', { source: [] }],
+    ['null', { source: null }],
+  ])('shows the field when the reference is %s', (_label, formData) => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const out = enhancer({ schema: baseSchema(), formData });
+    expect(out.properties.own).toBeDefined();
+  });
+
+  test('hides the field once something is referenced', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { source: [{ '@id': '/forms/contact' }] },
+    });
+    expect(out.properties.own).toBeUndefined();
+  });
+
+  test('isSet is the mirror image', () => {
+    const enhancer = createSchemaEnhancerFromRecipe({
+      fieldRules: { own: { when: { source: { isSet: true } }, else: false } },
+    });
+    expect(
+      enhancer({ schema: baseSchema(), formData: { source: [] } }).properties.own,
+    ).toBeUndefined();
+    expect(
+      enhancer({
+        schema: baseSchema(),
+        formData: { source: [{ '@id': '/forms/contact' }] },
+      }).properties.own,
+    ).toBeDefined();
+  });
+});
+
+/**
  * fieldRules + `required` — a hidden field must not stay required.
  *
  * A field declared required in the base schema but hidden by a `when` rule is

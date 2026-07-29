@@ -1779,12 +1779,20 @@ function evaluateOperators(value, operators) {
   const { is, isNot, gt, gte, lt, lte, isSet, isNotSet, contains, notContains } =
     operators;
 
+  // An empty array counts as unset. The widgets that store arrays — multiselect,
+  // object_browser — leave `[]` behind when the last entry is removed rather
+  // than dropping the key, so without this a field the author has just cleared
+  // still reads as answered.
+  const hasValue =
+    value !== undefined &&
+    value !== null &&
+    value !== '' &&
+    !(Array.isArray(value) && value.length === 0);
+
   if (isSet !== undefined) {
-    const hasValue = value !== undefined && value !== null && value !== '';
     if (isSet ? !hasValue : hasValue) return false;
   }
   if (isNotSet !== undefined) {
-    const hasValue = value !== undefined && value !== null && value !== '';
     if (isNotSet ? hasValue : !hasValue) return false;
   }
   if (contains !== undefined) {
