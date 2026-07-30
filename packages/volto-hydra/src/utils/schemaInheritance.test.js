@@ -312,6 +312,63 @@ describe('fieldRules — oneOf operator (scalar Choice-driven visibility)', () =
 });
 
 /**
+ * fieldRules `containsAny`/`containsAll` (and their inverses) — a multiselect
+ * ARRAY tested against a SET. The multi-value form of `contains`: gate a field
+ * on the multiselect sharing any of a set (`containsAny`) or holding all of it
+ * (`containsAll`), rather than one value at a time.
+ */
+describe('fieldRules — containsAny/containsAll operators (multiselect vs a set)', () => {
+  const baseSchema = () => ({
+    fieldsets: [{ id: 'default', title: 'Default', fields: ['elements', 'target'] }],
+    properties: {
+      elements: { title: 'Elements', type: 'array' },
+      target: { title: 'Target' },
+    },
+    required: [],
+  });
+  const recipe = (op, set) => ({
+    fieldRules: {
+      target: { when: { elements: { [op]: set } }, else: false },
+    },
+  });
+  const shows = (op, set, elements) => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe(op, set));
+    const out = enhancer({ schema: baseSchema(), formData: { elements } });
+    return out.properties.target !== undefined;
+  };
+  const showsUnset = (op, set) => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe(op, set));
+    return enhancer({ schema: baseSchema(), formData: {} }).properties.target !== undefined;
+  };
+
+  test('containsAny: shows when the array shares ANY value with the set', () => {
+    expect(shows('containsAny', ['image', 'video'], ['tag', 'image'])).toBe(true);
+    expect(shows('containsAny', ['image', 'video'], ['tag', 'date'])).toBe(false);
+    expect(showsUnset('containsAny', ['image', 'video'])).toBe(false);
+  });
+
+  test('notContainsAny: shows when the array shares NONE with the set', () => {
+    expect(shows('notContainsAny', ['image', 'video'], ['tag', 'date'])).toBe(true);
+    expect(shows('notContainsAny', ['image', 'video'], ['tag', 'image'])).toBe(false);
+    // An unset multiselect shares nothing, so notContainsAny is satisfied.
+    expect(showsUnset('notContainsAny', ['image', 'video'])).toBe(true);
+  });
+
+  test('containsAll: shows only when the array holds EVERY value in the set', () => {
+    expect(shows('containsAll', ['image', 'date'], ['image', 'date', 'tag'])).toBe(true);
+    expect(shows('containsAll', ['image', 'date'], ['image', 'tag'])).toBe(false);
+    expect(showsUnset('containsAll', ['image', 'date'])).toBe(false);
+  });
+
+  test('notContainsAll: shows unless the array holds EVERY value (missing ≥1)', () => {
+    expect(shows('notContainsAll', ['image', 'date'], ['image', 'tag'])).toBe(true);
+    expect(shows('notContainsAll', ['image', 'date'], ['image', 'date'])).toBe(false);
+    // Unset is missing all of them, so notContainsAll is satisfied.
+    expect(showsUnset('notContainsAll', ['image', 'date'])).toBe(true);
+  });
+});
+
+/**
  * fieldRules + `required` — a hidden field must not stay required.
  *
  * A field declared required in the base schema but hidden by a `when` rule is

@@ -199,7 +199,14 @@ const bridge = initBridge({
 - `[rule, rule, ...]` — switch: first matching rule wins. A bare `false` in the array is a catch-all hide: `[{ when: A }, { when: B }, false]` shows on A or B, hides otherwise.
 - `'parent.child': false` — hide a field inside a widget's inner schema
 
-Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`, `contains`, `notContains`.
+Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`, `contains`, `notContains`, `oneOf`, `notOneOf`, `containsAny`, `notContainsAny`, `containsAll`, `notContainsAll`.
+
+The membership operators cover both dimensions — a **scalar** field or an **array** (multiselect) field, tested against a single value or a **set**:
+
+| field value | single value | set (a list) |
+|---|---|---|
+| scalar (Choice) | `is` / `isNot` | `oneOf` / `notOneOf` — value is (not) one of the set |
+| array (multiselect) | `contains` / `notContains` — array (does not) include the value | `containsAny` / `notContainsAny` — array shares any / none with the set; `containsAll` / `notContainsAll` — array includes all / is missing some |
 
 `contains` / `notContains` test **array membership** — use them with a multiselect field to reveal each option's own field. `{ contains: 'date' }` matches when the value is an array that includes `'date'` (a non-array / unset multiselect never contains anything, so the condition fails):
 
@@ -210,9 +217,16 @@ schemaEnhancer: {
         // Show each element's field only when it's selected.
         date: { when: { elements: { contains: 'date' } }, else: false },
         tag: { when: { elements: { contains: 'tag' } }, else: false },
+        // Gate on a SET of selections rather than one value:
+        // show `layout` only when BOTH image and date are selected.
+        layout: { when: { elements: { containsAll: ['image', 'date'] } }, else: false },
+        // show `media` when EITHER image or video is selected.
+        media: { when: { elements: { containsAny: ['image', 'video'] } }, else: false },
     },
 }
 ```
+
+`oneOf` / `notOneOf` are the scalar equivalent — the field value is a single Choice and the **set** is the operand: `{ colour: { oneOf: ['brand-dark', 'black'] } }` matches when `colour` is one of those.
 
 Field paths: `../field` for the parent block's field, `/field` for a page metadata field.
 

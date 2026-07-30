@@ -1553,6 +1553,8 @@ function createEnhancerByType(type, config) {
  *   { fieldName: { isSet: true } } — truthy check
  *   { fieldName: { contains: v } } — array membership (multiselect includes v)
  *   { fieldName: { oneOf: [a,b] } }— scalar set membership (Choice value is a|b)
+ *   { fieldName: { containsAny: [a,b] } } — multiselect includes ANY of a,b
+ *   { fieldName: { containsAll: [a,b] } } — multiselect includes ALL of a,b
  *   { '../field': value }          — parent/root field path
  *
  * Field definitions can include a `fieldset` property to specify placement:
@@ -1772,12 +1774,18 @@ function evaluateWhenCondition(when, formData, args) {
 /**
  * Evaluate operator conditions against a value.
  * Operators: is, isNot, gt, gte, lt, lte, isSet, isNotSet, contains,
- * notContains, oneOf, notOneOf
+ * notContains, oneOf, notOneOf, containsAny, notContainsAny, containsAll,
+ * notContainsAll
  * `contains`/`notContains` test array membership (for multiselect fields):
  * `{ contains: 'date' }` matches when `value` is an array that includes 'date'.
  * `oneOf`/`notOneOf` test scalar set membership (for Choice fields):
  * `{ oneOf: ['a', 'b'] }` matches when `value` is one of the listed values —
  * the inverse of `contains` (the SET is the operand, not the field value).
+ * `containsAny`/`containsAll` test a multiselect array against a SET — the
+ * multi-value form of `contains`: `{ containsAny: ['a','b'] }` matches when the
+ * array includes any of a,b; `{ containsAll: [...] }` when it includes all.
+ * Each has a `not…` inverse. Together with oneOf these fill the value×operand
+ * matrix (scalar/array field × single/set operand).
  * @private
  */
 function evaluateOperators(value, operators) {
@@ -1794,6 +1802,10 @@ function evaluateOperators(value, operators) {
     notContains,
     oneOf,
     notOneOf,
+    containsAny,
+    notContainsAny,
+    containsAll,
+    notContainsAll,
   } = operators;
 
   if (isSet !== undefined) {
@@ -1818,6 +1830,47 @@ function evaluateOperators(value, operators) {
   }
   if (notOneOf !== undefined) {
     if (Array.isArray(notOneOf) && notOneOf.includes(value)) return false;
+  }
+  if (containsAny !== undefined) {
+    // Array ∩ set: the multiselect must include AT LEAST ONE listed value —
+    // the multi-value form of `contains`. A non-array value (unset multiselect)
+    // includes nothing, so it fails.
+    if (
+      !Array.isArray(value) ||
+      !Array.isArray(containsAny) ||
+      !containsAny.some((v) => value.includes(v))
+    )
+      return false;
+  }
+  if (notContainsAny !== undefined) {
+    // The multiselect must include NONE of the listed values (empty
+    // intersection). An unset multiselect includes none, so it matches.
+    if (
+      Array.isArray(value) &&
+      Array.isArray(notContainsAny) &&
+      notContainsAny.some((v) => value.includes(v))
+    )
+      return false;
+  }
+  if (containsAll !== undefined) {
+    // set ⊆ array: the multiselect must include EVERY listed value. (`[]`
+    // trivially matches any array — "contains all of nothing".)
+    if (
+      !Array.isArray(value) ||
+      !Array.isArray(containsAll) ||
+      !containsAll.every((v) => value.includes(v))
+    )
+      return false;
+  }
+  if (notContainsAll !== undefined) {
+    // The multiselect must be MISSING at least one listed value (not a
+    // superset). Fails only when the array holds all of them.
+    if (
+      Array.isArray(value) &&
+      Array.isArray(notContainsAll) &&
+      notContainsAll.every((v) => value.includes(v))
+    )
+      return false;
   }
   if (is !== undefined && value !== is) return false;
   if (isNot !== undefined && value === isNot) return false;
