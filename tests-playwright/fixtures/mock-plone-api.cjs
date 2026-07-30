@@ -1043,10 +1043,33 @@ function enrichContent(content, urlPath, baseUrl, expandList = []) {
   // 1. Resolve resolveuid/UID references to actual URLs (like Plone's serializer)
   // 2. Turn relation fields into summaries of their target (RelationChoiceFieldSerializer)
   // 3. Add image_scales to anything summary-shaped (image_field + @id)
-  return enrichImageBrains(
-    summarizeRelations(resolveUidUrls(enriched), baseUrl),
-    baseUrl,
+  // 4. Give every form block the validator catalogue its serializer injects
+  return addFormValidationSettings(
+    enrichImageBrains(
+      summarizeRelations(resolveUidUrls(enriched), baseUrl),
+      baseUrl,
+    ),
   );
+}
+
+/**
+ * collective.volto.formsupport's form serializer adds `validationSettings` to
+ * every form block on read — the catalogue of settable validators the sidebar
+ * builds its "Rule settings" widget from. It is regenerated on each GET, so it
+ * is a property of the RESPONSE, not of what is stored, and a fixture that
+ * carried one by hand would be testing its own copy instead of the contract.
+ */
+function addFormValidationSettings(node) {
+  if (Array.isArray(node)) return node.map(addFormValidationSettings);
+  if (!node || typeof node !== 'object') return node;
+  const out = {};
+  for (const [key, value] of Object.entries(node)) {
+    out[key] = addFormValidationSettings(value);
+  }
+  if (out['@type'] === 'form') {
+    out.validationSettings = { ...VALIDATION_SETTINGS_CATALOGUE };
+  }
+  return out;
 }
 
 /**
@@ -2588,6 +2611,108 @@ function findFormBlock(node, blockId) {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
+ * The field `validations` collective.volto.formsupport enforces.
+ *
+ * The real backend registers `Products.validation`'s base validators (minus
+ * `inNumericRange`) as named utilities, plus four custom ones that take a
+ * setting. This reproduces the four settable ones and the regex validators a
+ * form is realistically authored with — enough that a test can prove a rule is
+ * enforced SERVER-side, which is the whole point of moving these off our own
+ * invented `minLength`/`maxLength`/`pattern` keys.
+ *
+ * Messages are the real ones. The backend strips the
+ * `Validation failed(<id>): ` prefix its custom validators emit, so they read
+ * as a continuation of the field's label.
+ */
+const FORM_VALIDATORS = {
+  maxCharacters: (value, s) =>
+    value.length > Number(s.characters)
+      ? `is more than ${s.characters} characters long`
+      : null,
+  minCharacters: (value, s) =>
+    value.length < Number(s.characters)
+      ? `is less than ${s.characters} characters long`
+      : null,
+  maxWords: (value, s) =>
+    (value.match(/\w+/g) || []).length > Number(s.words)
+      ? `is more than ${s.words} words long`
+      : null,
+  minWords: (value, s) =>
+    (value.match(/\w+/g) || []).length < Number(s.words)
+      ? `is less than ${s.words} words long`
+      : null,
+  isEmail: (value) => (EMAIL_RE.test(value) ? null : 'is not a valid email address.'),
+  isURL: (value) => (/^\w+:\/\/\S+$/.test(value) ? null : 'is not a valid url.'),
+  isInt: (value) => (/^[+-]?\d+$/.test(value) ? null : 'is not an integer.'),
+  isDecimal: (value) =>
+    /^([+-]?)(?=\d|[.,]\d)\d*([.,]\d*)?([Ee][+-]?\d+)?$/.test(value)
+      ? null
+      : 'is not a decimal number.',
+  isPrintable: (value) =>
+    /^[a-zA-Z0-9\s]+$/.test(value) ? null : 'contains unprintable characters',
+};
+
+/**
+ * The block-level catalogue the form serializer injects on GET: every settable
+ * validator's parameter, keyed `<validatorId>-<settingName>`. The sidebar builds
+ * the "Rule settings" widget from this, so it has to be present on the block the
+ * editor loads, not just understood at submit time.
+ */
+const VALIDATION_SETTINGS_CATALOGUE = {
+  'maxCharacters-characters': {
+    validation_title: 'maxCharacters',
+    title: 'characters',
+    type: 'integer',
+    default: 0,
+  },
+  'minCharacters-characters': {
+    validation_title: 'minCharacters',
+    title: 'characters',
+    type: 'integer',
+    default: 0,
+  },
+  'maxWords-words': {
+    validation_title: 'maxWords',
+    title: 'words',
+    type: 'integer',
+    default: 0,
+  },
+  'minWords-words': {
+    validation_title: 'minWords',
+    title: 'words',
+    type: 'integer',
+    default: 0,
+  },
+};
+
+/**
+ * Run a field's authored rules, exactly as @submit-form does: the field names
+ * validators in `validations`, and their parameters live in a FLAT
+ * `validationSettings` keyed `<validatorId>-<settingName>` which the backend
+ * splits on the hyphen to rebuild `{validator: {setting: value}}`.
+ *
+ * Returns `{validatorId: message}` — the backend's per-field error shape.
+ */
+function runFieldValidations(field, value) {
+  const names = Array.isArray(field.validations) ? field.validations : [];
+  if (!names.length || !value) return null;
+  const settings = {};
+  for (const [key, val] of Object.entries(field.validationSettings || {})) {
+    const [id, setting] = key.split('-');
+    if (!id || !setting || !names.includes(id)) continue;
+    (settings[id] = settings[id] || {})[setting] = val;
+  }
+  const errors = {};
+  for (const name of names) {
+    const validator = FORM_VALIDATORS[name];
+    if (!validator) continue;
+    const message = validator(String(value), settings[name] || {});
+    if (message) errors[name] = message;
+  }
+  return Object.keys(errors).length ? errors : null;
+}
+
+/**
  * POST /:path/@submit-form
  * Form submission endpoint (collective.volto.formsupport).
  * Accepts { block_id, data: [{ field_id, label, value }], attachments, captcha }
@@ -2672,6 +2797,47 @@ app.post('*/@submit-form', (req, res) => {
           });
         }
       }
+    }
+  }
+
+  // The authored answer rules. A field whose skip-logic condition is not met is
+  // not validated — @submit-form resolves the trigger field first and only
+  // validates the ones it decided to show.
+  {
+    const byId = new Map(
+      (block.subblocks || [])
+        .filter((f) => f && f.field_id)
+        .map((f) => [f.field_id, f]),
+    );
+    const answered = new Map(data.map((e) => [e.field_id, e.value]));
+    const errors = {};
+    for (const entry of data) {
+      const field = byId.get(entry.field_id);
+      if (!field) continue;
+      // Skip logic: the backend looks the trigger up by `id`, so a field
+      // stored without one makes the whole submission fail there. Mirror the
+      // lookup (not the crash) so a missing `id` shows up as a test failure.
+      const when = field.show_when_when;
+      if (when && when !== 'always') {
+        const trigger = (block.subblocks || []).find((f) => f && f.id === when);
+        if (!trigger) {
+          return res.status(400).json({
+            type: 'BadRequest',
+            message: `Field "${field.field_id}" is shown when "${when}", but no field has that id — @submit-form resolves the trigger by id, not field_id.`,
+          });
+        }
+        const target = String(answered.get(trigger.field_id) ?? '');
+        const shown =
+          field.show_when_is === 'value_is_not'
+            ? target !== (field.show_when_to ?? '')
+            : target === (field.show_when_to ?? '');
+        if (!shown) continue;
+      }
+      const fieldErrors = runFieldValidations(field, entry.value);
+      if (fieldErrors) errors[entry.field_id] = fieldErrors;
+    }
+    if (Object.keys(errors).length) {
+      return res.status(400).json({ error: { type: 'Invalid', errors } });
     }
   }
 
