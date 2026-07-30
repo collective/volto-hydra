@@ -2775,12 +2775,32 @@ app.post('*/@submit-form', (req, res) => {
     return res.status(400).json({ type: 'BadRequest', message: 'Empty form data.' });
   }
 
+  // HoneypotSupport.verify has two branches, and only one of them is about the
+  // `captcha` object. A frontend that sends one (volto-form-block, and our
+  // Next.js action) is checked on its `value`; a frontend that does not — the
+  // Nuxt example here, for instance — falls back to looking for a FILLED
+  // honeypot field among the submitted data. An absent captcha is not by itself
+  // a rejection, and treating it as one fails every frontend that does not
+  // implement the token.
+  //
+  // The real fallback is `found_honeypot(form, required=True)`, which also
+  // rejects a submission MISSING the field. That rule depends on
+  // collective.honeypot's HONEYPOT_FIELD being configured in the environment —
+  // when it is unset the whole check short-circuits to "pass" — and there is no
+  // such environment here, so this models the "field is present and filled"
+  // half only.
   if (block.captcha === 'honeypot') {
     const captcha = body.captcha;
-    if (!captcha || typeof captcha.value !== 'string' || captcha.value !== '') {
-      return res
-        .status(400)
-        .json({ type: 'BadRequest', message: 'Error submitting form.' });
+    const reject = () =>
+      res.status(400).json({ type: 'BadRequest', message: 'Error submitting form.' });
+    if (captcha) {
+      if (typeof captcha.value !== 'string' || captcha.value !== '') return reject();
+    } else {
+      const honeypotId = (block.captcha_props || {}).id;
+      const trap = honeypotId
+        ? data.find((entry) => entry.field_id === honeypotId || entry.label === honeypotId)
+        : null;
+      if (trap && String(trap.value || '') !== '') return reject();
     }
   }
 
