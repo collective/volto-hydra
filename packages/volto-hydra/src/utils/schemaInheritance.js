@@ -1816,10 +1816,15 @@ function resolveWhenField(fieldPath, formData, args) {
   const def = schema ? getFieldDef(schema, fieldName) : undefined;
 
   // REGION → array of child block TYPES. object_list via widget, blocks_layout via
-  // the shared dict (incl. empty). A typed object_list stores its type in a
-  // `typeField`; blocks_layout children carry `@type` — getBlockType handles both.
+  // the shared dict (incl. empty) OR a schema-declared blocks_layout field (so a
+  // region with no data yet — e.g. pass-1 resolution with formData={} — counts 0
+  // rather than throwing on a numeric op, mirroring object_list). A typed
+  // object_list stores its type in a `typeField`; blocks_layout children carry
+  // `@type` — getBlockType handles both.
   const isObjectList = def?.widget === 'object_list';
-  const isBlocksLayoutRegion = Array.isArray(block?.blocks_layout?.[fieldName]);
+  const isBlocksLayoutRegion =
+    def?.widget === 'blocks_layout' ||
+    Array.isArray(block?.blocks_layout?.[fieldName]);
   if (isObjectList || isBlocksLayoutRegion) {
     const entries = getChildBlockEntries(block, { isObjectList, region: fieldName });
     const types = entries.map((e) => getBlockType(e.block, def?.typeField));
