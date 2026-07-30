@@ -259,8 +259,7 @@ import slateTransforms from '../../utils/slateTransforms';
 import OpenObjectBrowser from './OpenObjectBrowser';
 import SyncedSlateToolbar from '../Toolbar/SyncedSlateToolbar';
 import { buildBlockPathMap, buildIdFieldMap, stripBlockPathMapForPostMessage, getBlockByPath, getBlockById, updateBlockById, getChildBlockIds, getContainerFieldConfig, getSelectAfterDelete, insertBlockInContainer, deleteBlockFromContainer, mutateBlockInContainer, ensureEmptyBlockIfEmpty, initializeContainerBlock, moveBlockBetweenContainers, reorderBlocksInContainer, getAllContainerFields, insertTableColumn, deleteTableColumn, removeTemplateInstance, getContainerItems, getResolvedSchema, getCommonAncestor, wrapBlocksInContainer, unwrapContainer, convertContainerBlock, getEmptyBlockType, getContainerRegionDescriptors } from '../../utils/blockPath';
-import { setLinkableAnchors } from '../../actions';
-import { seedAnchorsFromContent } from '../../utils/linkableAnchors';
+import { mergeAnchorsIntoContent } from '../../utils/linkableAnchors';
 import { canContainAll, getChildBlockEntries, setBlockType, clearBlockType } from '@volto-hydra/helpers';
 import { mergeTemplatesIntoPage } from '../../utils/mergeTemplates.mjs';
 import {
@@ -2254,11 +2253,27 @@ const Iframe = (props) => {
             // synchronously (part of THIS update) so it doesn't re-render mid-type
             // and move the cursor.
             inlineEditCounterRef.current += 1;
-            const editedData = markEditedLinkedFieldsCustom(
+            let editedData = markEditedLinkedFieldsCustom(
               event.data.data,
               properties,
               config.blocks.blocksConfig,
             );
+            // Fold the deep-link anchors harvested with THIS edit into the same
+            // formData. They ride on INLINE_EDIT_DATA (this fresh iframe formData,
+            // adopted wholesale below) rather than a separate LINKABLE_ANCHORS
+            // message — so block._linkableAnchors is merged into the CURRENT edit,
+            // never a stale snapshot, and there's no extra re-render. Editing a
+            // heading re-slugs it each keystroke, so this is the common path; the
+            // separate LINKABLE_ANCHORS handler now only fires for structural
+            // changes (reorder/delete of heading blocks).
+            if (event.data.anchors) {
+              editedData = mergeAnchorsIntoContent(
+                editedData,
+                event.data.anchors,
+                config.blocks.blocksConfig,
+                intl,
+              );
+            }
             // Debug: log full children structure to diagnose missing "w" bug
             const debugBlock = editedData?.blocks?.['block-1-uuid'];
             if (debugBlock?.value?.[0]?.children) {
@@ -2296,11 +2311,28 @@ const Iframe = (props) => {
 
         case 'LINKABLE_ANCHORS': {
           // Iframe harvested data-linkable-id anchors (full map, keyed by nearest
-          // data-block-uid). Hold them in a TRANSIENT store outside the blocks —
-          // writing formData here would trigger the FORM_DATA sync and re-render
-          // the iframe mid-edit (cursor loss / echo). The anchors are merged back
-          // into the blocks only on save (Form) and seeded from them on load.
-          dispatch(setLinkableAnchors(event.data.anchors || {}));
+          // data-block-uid). Merge them straight into the canonical formData so
+          // block._linkableAnchors rides the normal update flow — the object
+          // browser reads them from the form and they persist on the ordinary
+          // save (no transient store, no save-time merge). To avoid re-rendering
+          // the iframe mid-edit (cursor loss), reuse the INLINE_EDIT_DATA echo
+          // guard: bump inlineEditCounterRef so the UNIFIED FORM SYNC effect
+          // swallows the resulting properties change instead of bouncing a
+          // FORM_DATA back. hydra already echo-guards the send (only on a DOM-map
+          // change), and we skip the dispatch when the merge is a no-op.
+          const base = properties || form;
+          if (base?.blocks) {
+            const merged = mergeAnchorsIntoContent(
+              base,
+              event.data.anchors || {},
+              config.blocks.blocksConfig,
+              intl,
+            );
+            if (JSON.stringify(merged) !== JSON.stringify(base)) {
+              inlineEditCounterRef.current += 1;
+              onChangeFormData(merged);
+            }
+          }
           break;
         }
 
@@ -3547,14 +3579,9 @@ const Iframe = (props) => {
           // sidebar `[{@id}]` links have nothing to pull).
           formWithDefaults = pullAllLinkedFields(formWithDefaults, config.blocks.blocksConfig);
 
-          // Seed the transient anchor store from the loaded blocks' saved
-          // _linkableAnchors (the "read the initial version on load" step), so the
-          // object browser can offer this page's anchors before any edit.
-          dispatch(
-            setLinkableAnchors(
-              seedAnchorsFromContent(formWithDefaults, config.blocks.blocksConfig, intl),
-            ),
-          );
+          // No anchor seeding needed: the loaded blocks already carry their saved
+          // _linkableAnchors in formData, so the object browser reads them straight
+          // from the form (anchors ride the normal update flow now).
 
           setIframeSyncState(prev => ({
             ...prev,

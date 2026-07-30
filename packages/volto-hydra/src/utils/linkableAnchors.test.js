@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   collectAnchorsFromContent,
-  collectAnchorsFromStore,
-  seedAnchorsFromContent,
   mergeAnchorsIntoContent,
 } from './linkableAnchors';
 
@@ -53,44 +51,8 @@ describe('collectAnchorsFromContent', () => {
   });
 });
 
-describe('seedAnchorsFromContent', () => {
-  it('reads block._linkableAnchors into a { uid: [...] } map', () => {
-    const content = {
-      blocks: {
-        b1: { '@type': 'slate', _linkableAnchors: [{ id: 'one', name: 'One' }] },
-        b2: { '@type': 'slate' },
-      },
-      blocks_layout: { items: ['b1', 'b2'] },
-    };
-    expect(seedAnchorsFromContent(content, blocksConfig)).toEqual({
-      b1: [{ id: 'one', name: 'One' }],
-    });
-  });
-});
-
-describe('collectAnchorsFromStore', () => {
-  it('orders anchors from the store map by document order, ignoring block._linkableAnchors', () => {
-    const content = {
-      blocks: {
-        // blocks carry NO _linkableAnchors during editing
-        b2: { '@type': 'slate' },
-        b1: { '@type': 'slate' },
-      },
-      blocks_layout: { items: ['b1', 'b2'] },
-    };
-    const store = {
-      b2: [{ id: 'two', name: 'Two' }],
-      b1: [{ id: 'one', name: 'One' }],
-    };
-    expect(collectAnchorsFromStore(content, store, blocksConfig)).toEqual([
-      { id: 'one', name: 'One', blockUid: 'b1' },
-      { id: 'two', name: 'Two', blockUid: 'b2' },
-    ]);
-  });
-});
-
 describe('mergeAnchorsIntoContent', () => {
-  it('writes the store map into blocks and clears blocks that lost anchors', () => {
+  it('writes the harvested map into blocks and clears blocks that lost anchors', () => {
     const content = {
       blocks: {
         b1: { '@type': 'slate' }, // gains an anchor
