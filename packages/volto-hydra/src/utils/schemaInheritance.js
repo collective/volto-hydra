@@ -1549,7 +1549,9 @@ function createEnhancerByType(type, config) {
  * Condition format (when):
  *   { fieldName: value }           — equality: formData[fieldName] === value
  *   { fieldName: { isNot: v } }    — inequality
- *   { fieldName: { gte: n } }      — numeric comparison (gt, gte, lt, lte)
+ *   { fieldName: { gte: n } }      — numeric comparison (gt, gte, lt, lte); on an
+ *                                    array (object_list) or blocks_layout field the
+ *                                    operand is the sub-item COUNT
  *   { fieldName: { isSet: true } } — truthy check
  *   { fieldName: { contains: v } } — array membership (multiselect includes v)
  *   { fieldName: { oneOf: [a,b] } }— scalar set membership (Choice value is a|b)
@@ -1875,7 +1877,12 @@ function evaluateOperators(value, operators) {
   if (is !== undefined && value !== is) return false;
   if (isNot !== undefined && value === isNot) return false;
 
-  const numValue = typeof value === 'number' ? value : parseFloat(value);
+  // Numeric comparison. On a COUNTABLE field the operand is the sub-item count,
+  // so gt/gte/lt/lte gate on "how many": an array (object_list / multiselect) →
+  // its length; a blocks_layout regions dict (all values are ordering arrays) →
+  // the total sub-items across regions. A plain number/numeric-string compares
+  // as-is; anything else is NaN and the numeric checks are skipped.
+  const numValue = numericOperand(value);
   if (!isNaN(numValue)) {
     if (gt !== undefined && !(numValue > gt)) return false;
     if (gte !== undefined && !(numValue >= gte)) return false;
@@ -1884,6 +1891,28 @@ function evaluateOperators(value, operators) {
   }
 
   return true;
+}
+
+/**
+ * Coerce a field value to the number the numeric operators compare against.
+ * Arrays and region dicts count their sub-items so gt/gte/lt/lte express
+ * "number of sub-items"; scalars use the number / parsed numeric string.
+ * @private
+ */
+function numericOperand(value) {
+  if (typeof value === 'number') return value;
+  if (Array.isArray(value)) return value.length;
+  if (value && typeof value === 'object') {
+    // A blocks_layout regions dict is all-arrays ({ items: [...], footer: [...] });
+    // count the total sub-items. A non-region object (e.g. widget:'object') has
+    // non-array values → not countable → NaN (numeric checks skipped).
+    const vals = Object.values(value);
+    if (vals.length && vals.every(Array.isArray)) {
+      return vals.reduce((n, arr) => n + arr.length, 0);
+    }
+    return NaN;
+  }
+  return parseFloat(value);
 }
 
 /**

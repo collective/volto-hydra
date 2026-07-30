@@ -493,3 +493,120 @@ describe('inheritSchemaFrom — idempotent (no doubled "… Defaults" fieldset)'
     config.blocks.blocksConfig = prev;
   });
 });
+
+/**
+ * OPERATOR × VALUE-TYPE MATRIX.
+ *
+ * One table mapping every `when` operator against the field-value types it can
+ * meet — scalar (string/number), array (object_list / multiselect), blocks_layout
+ * regions dict, and unset/empty — with the expected match result. This is the
+ * single source of truth for "what does operator X do on field type Y", exercised
+ * through the public recipe path exactly as a frontend sends it.
+ *
+ * Notes the table pins down:
+ *  - Numeric ops (gt/gte/lt/lte) COUNT sub-items on arrays and region dicts.
+ *  - A value that isn't countable/numeric (a plain string, or an UNSET field)
+ *    makes the numeric checks NaN → skipped → the condition passes. In practice a
+ *    container field is an empty array/region (count 0), not undefined.
+ *  - contains-family require an actual array, so they never match a scalar string.
+ *  - isSet treats an empty array/object as "set" (non-null).
+ */
+describe('fieldRules — operator × value-type matrix', () => {
+  const baseSchema = () => ({
+    fieldsets: [{ id: 'default', title: 'Default', fields: ['f', 'target'] }],
+    properties: { f: { title: 'F' }, target: { title: 'Target' } },
+    required: [],
+  });
+  // Does `target` survive when field `f` holds `value` and the rule is `when f: op`?
+  const shows = (op, value) => {
+    const recipe = { fieldRules: { target: { when: { f: op }, else: false } } };
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const formData = value === undefined ? {} : { f: value };
+    return enhancer({ schema: baseSchema(), formData }).properties.target !== undefined;
+  };
+
+  // Field-value fixtures spanning the type space.
+  const V = {
+    str: 'date',
+    num: 5,
+    numStr: '5',
+    empty: '',
+    arr: ['image', 'date'], // array (object_list / multiselect), length 2
+    arrEmpty: [], // empty array
+    region: { items: ['a', 'b'], footer: ['c'] }, // blocks_layout, 3 sub-items
+    regionEmpty: { items: [] }, // blocks_layout, 0 sub-items
+    obj: { title: 'x' }, // non-region object (widget:'object') — not countable
+    unset: undefined,
+  };
+
+  // [description, operator, valueKey, expected]
+  const cases = [
+    // equality — scalars
+    ['is: matches scalar', { is: 'date' }, 'str', true],
+    ['is: no match', { is: 'x' }, 'str', false],
+    ['is: unset', { is: 'date' }, 'unset', false],
+    ['isNot: differs', { isNot: 'x' }, 'str', true],
+    ['isNot: equal', { isNot: 'date' }, 'str', false],
+
+    // presence — empty array/object are "set" (non-null)
+    ['isSet: scalar set', { isSet: true }, 'str', true],
+    ['isSet: empty string is unset', { isSet: true }, 'empty', false],
+    ['isSet: unset', { isSet: true }, 'unset', false],
+    ['isSet: empty array counts as set', { isSet: true }, 'arrEmpty', true],
+    ['isNotSet: unset', { isNotSet: true }, 'unset', true],
+    ['isNotSet: scalar set', { isNotSet: true }, 'str', false],
+
+    // numeric on scalars
+    ['gt: number 5 > 2', { gt: 2 }, 'num', true],
+    ['lt: number 5 < 2', { lt: 2 }, 'num', false],
+    ['gte: numeric string "5" >= 5', { gte: 5 }, 'numStr', true],
+    ['gt: non-numeric string → skipped (matches)', { gt: 0 }, 'str', true],
+    ['gt: unset → skipped (matches)', { gt: 0 }, 'unset', true],
+
+    // numeric as COUNT on arrays (object_list / multiselect)
+    ['gt: array count 2 > 1', { gt: 1 }, 'arr', true],
+    ['gt: array count 2 > 2', { gt: 2 }, 'arr', false],
+    ['gte: array count 2 >= 2', { gte: 2 }, 'arr', true],
+    ['gt: empty array count 0 > 0', { gt: 0 }, 'arrEmpty', false],
+    ['lt: empty array count 0 < 1', { lt: 1 }, 'arrEmpty', true],
+
+    // numeric as COUNT on blocks_layout regions (total across regions)
+    ['gte: region count 3 >= 3', { gte: 3 }, 'region', true],
+    ['gt: region count 3 > 3', { gt: 3 }, 'region', false],
+    ['gt: empty region count 0 > 0', { gt: 0 }, 'regionEmpty', false],
+    ['lte: empty region count 0 <= 0', { lte: 0 }, 'regionEmpty', true],
+    ['gt: non-region object → skipped (matches)', { gt: 0 }, 'obj', true],
+
+    // contains / notContains — array membership of a single value
+    ['contains: array has value', { contains: 'date' }, 'arr', true],
+    ['contains: array lacks value', { contains: 'x' }, 'arr', false],
+    ['contains: string is not an array → never matches', { contains: 'da' }, 'str', false],
+    ['contains: unset', { contains: 'x' }, 'unset', false],
+    ['notContains: array lacks', { notContains: 'x' }, 'arr', true],
+    ['notContains: array has', { notContains: 'date' }, 'arr', false],
+    ['notContains: unset → matches', { notContains: 'x' }, 'unset', true],
+
+    // oneOf / notOneOf — scalar in a set
+    ['oneOf: scalar in set', { oneOf: ['date', 'tag'] }, 'str', true],
+    ['oneOf: scalar out of set', { oneOf: ['x', 'y'] }, 'str', false],
+    ['oneOf: unset', { oneOf: ['date'] }, 'unset', false],
+    ['notOneOf: out of set', { notOneOf: ['x'] }, 'str', true],
+    ['notOneOf: in set', { notOneOf: ['date'] }, 'str', false],
+    ['notOneOf: unset → matches', { notOneOf: ['date'] }, 'unset', true],
+
+    // containsAny / containsAll — array vs a set
+    ['containsAny: shares one', { containsAny: ['image', 'x'] }, 'arr', true],
+    ['containsAny: shares none', { containsAny: ['x', 'y'] }, 'arr', false],
+    ['containsAny: unset', { containsAny: ['image'] }, 'unset', false],
+    ['containsAll: has all', { containsAll: ['image', 'date'] }, 'arr', true],
+    ['containsAll: missing one', { containsAll: ['image', 'x'] }, 'arr', false],
+    ['notContainsAny: shares none', { notContainsAny: ['x'] }, 'arr', true],
+    ['notContainsAny: shares one', { notContainsAny: ['image'] }, 'arr', false],
+    ['notContainsAll: missing one', { notContainsAll: ['image', 'x'] }, 'arr', true],
+    ['notContainsAll: has all', { notContainsAll: ['image', 'date'] }, 'arr', false],
+  ];
+
+  test.each(cases)('%s', (_desc, op, key, expected) => {
+    expect(shows(op, V[key])).toBe(expected);
+  });
+});
