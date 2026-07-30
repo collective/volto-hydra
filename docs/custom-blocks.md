@@ -199,49 +199,45 @@ const bridge = initBridge({
 - `[rule, rule, ...]` — switch: first matching rule wins. A bare `false` in the array is a catch-all hide: `[{ when: A }, { when: B }, false]` shows on A or B, hides otherwise.
 - `'parent.child': false` — hide a field inside a widget's inner schema
 
-Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `gt`, `gte`, `lt`, `lte`, `contains`, `notContains`, `oneOf`, `notOneOf`, `containsAny`, `notContainsAny`, `containsAll`, `notContainsAll`.
+Condition operators: `is`, `isNot`, `isSet`, `isNotSet`, `oneOf`, `notOneOf`, `contains`, `notContains`, `containsAny`, `notContainsAny`, `containsAll`, `notContainsAll`, `regex`, `notRegex`, `gt`, `gte`, `lt`, `lte`. A bare value (`{ mode: 'advanced' }`) is shorthand for `is`.
 
-The membership operators cover both dimensions — a **scalar** field or an **array** (multiselect) field, tested against a single value or a **set**:
+Each operator is driven by the field's **declared type**, never the value shape. A field reduces to one of four **surfaces**, and an operator used off its surface raises an error (a mis-authored rule fails loudly rather than silently mismatching):
 
-| field value | single value | set (a list) |
+| surface | fields | operators |
 |---|---|---|
-| scalar (Choice) | `is` / `isNot` | `oneOf` / `notOneOf` — value is (not) one of the set |
-| array (multiselect) | `contains` / `notContains` — array (does not) include the value | `containsAny` / `notContainsAny` — array shares any / none with the set; `containsAll` / `notContainsAll` — array includes all / is missing some |
+| **string** | text, textarea, url, Choice, **slate** (its plaintext) | `is`/`isNot`, `isSet`, `oneOf`/`notOneOf`, `contains`/`notContains` = **substring**, `regex`/`notRegex` |
+| **number** | integer, float, number | `is`/`isNot`, `oneOf`, `isSet`, `gt`/`gte`/`lt`/`lte` = compare |
+| **boolean** | boolean | `is`/`isNot`, `isSet` |
+| **array** | multiselect (its values), **region** (its child block **types**) | `isSet`, `is`/`isNot` = **set-equality**, `contains`/`notContains` = membership, `containsAny`/`containsAll` (+inverses), `gt`/`gte`/`lt`/`lte` = **count** |
 
-`contains` / `notContains` test **array membership** — use them with a multiselect field to reveal each option's own field. `{ contains: 'date' }` matches when the value is an array that includes `'date'` (a non-array / unset multiselect never contains anything, so the condition fails):
+`oneOf` (scalar value ∈ set) and `containsAny` (array shares any with a set) differ only on the field side — `oneOf` is for a single-valued field, `containsAny` for a multiselect; `oneOf` on an array throws (use `containsAny`).
 
 ```javascript
 schemaEnhancer: {
     fieldRules: {
-        // `elements` is a multiselect: ['image', 'date', 'tag'].
-        // Show each element's field only when it's selected.
+        // multiselect `elements: ['image','date','tag']` — reveal each option's field
         date: { when: { elements: { contains: 'date' } }, else: false },
-        tag: { when: { elements: { contains: 'tag' } }, else: false },
-        // Gate on a SET of selections rather than one value:
-        // show `layout` only when BOTH image and date are selected.
-        layout: { when: { elements: { containsAll: ['image', 'date'] } }, else: false },
-        // show `media` when EITHER image or video is selected.
         media: { when: { elements: { containsAny: ['image', 'video'] } }, else: false },
+        layout: { when: { elements: { containsAll: ['image', 'date'] } }, else: false },
+        // scalar Choice
+        invert: { when: { colour: { oneOf: ['brand-dark', 'black'] } }, else: false },
+        // text: substring / pattern
+        cta: { when: { title: { contains: 'Sale' } }, else: false },
+        year: { when: { title: { regex: { pattern: '\\b20\\d\\d\\b', flags: 'i' } } }, else: false },
     },
 }
 ```
 
-`oneOf` / `notOneOf` are the scalar equivalent — the field value is a single Choice and the **set** is the operand: `{ colour: { oneOf: ['brand-dark', 'black'] } }` matches when `colour` is one of those.
-
-The numeric operators (`gt`, `gte`, `lt`, `lte`) are driven by the field's **declared type**, never the value shape:
-
-- a **numeric** field (`integer` / `float` / `number`) compares the value itself (unset/blank never matches);
-- a **list** field counts its items — a **multiselect** counts its selected values, and a **region** counts its child blocks. A region is named by its field: an `object_list` field, or a single `blocks_layout` region by its region name (`columns`, `footer`, …). Each region counts **only its own** children — never a cross-region total;
-- any other field type (e.g. a text field) is a mis-authored rule and raises an error.
-
-So you can reveal a field only once a container has enough children:
+For a **region** (an `object_list` field, or a single `blocks_layout` region named by its region key), the array surface is its **child block types**, and the numeric operators **count** that region's children — only its own, never a cross-region total:
 
 ```javascript
 schemaEnhancer: {
     fieldRules: {
-        // Offer the "columns layout" option only once the `columns` region has ≥2 blocks.
+        // reveal a caption field only when the `body` region has an image block
+        caption: { when: { body: { contains: 'image' } }, else: false },
+        // offer "columns layout" only once the `columns` region has ≥2 blocks
         columnsLayout: { when: { columns: { gte: 2 } }, else: false },
-        // Show a "carousel options" field only when the `slides` object_list has >1 item.
+        // "carousel options" only when the `slides` object_list has >1 item
         carouselOptions: { when: { slides: { gt: 1 } }, else: false },
     },
 }

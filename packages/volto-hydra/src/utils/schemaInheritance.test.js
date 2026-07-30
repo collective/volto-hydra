@@ -495,150 +495,220 @@ describe('inheritSchemaFrom — idempotent (no doubled "… Defaults" fieldset)'
 });
 
 /**
- * NON-NUMERIC OPERATOR × VALUE MATRIX.
- *
- * Equality / presence / membership operators are VALUE-based — they act on the
- * resolved field value regardless of the field's declared type — so one table
- * pins "what does operator X do on value Y". Numeric operators are covered
- * separately below because they are driven by the field's declared TYPE, not the
- * value shape.
- *
- * Notes the table pins down:
- *  - contains-family require an actual array, so they never match a scalar string.
- *  - isSet treats an empty array as "set" (non-null); an empty string is unset.
+ * SURFACE MODEL — each field reduces to a comparison surface (string / number /
+ * boolean / array) and every operator is valid only for specific surfaces,
+ * throwing otherwise. These describes are the single source of truth for
+ * "operator X on a Y field". count-vs-compare, membership-vs-substring, etc. are
+ * driven by the field's declared type, never the value shape.
  */
-describe('fieldRules — non-numeric operator × value matrix', () => {
-  const baseSchema = () => ({
+
+// Declare field `f` with `fieldDef`; does `target` survive under `when`?
+const runField = (fieldDef, value, when) => {
+  const recipe = { fieldRules: { target: { when, else: false } } };
+  const enhancer = createSchemaEnhancerFromRecipe(recipe);
+  const schema = {
     fieldsets: [{ id: 'default', title: 'Default', fields: ['f', 'target'] }],
-    properties: { f: { title: 'F' }, target: { title: 'Target' } },
+    properties: { f: { title: 'F', ...fieldDef }, target: { title: 'Target' } },
     required: [],
+  };
+  const formData = value === undefined ? {} : { f: value };
+  return enhancer({ schema, formData }).properties.target !== undefined;
+};
+
+describe('fieldRules — string surface (text / Choice / url)', () => {
+  const run = (value, when, fieldDef = {}) => runField(fieldDef, value, when);
+
+  test('is / isNot — exact match; bare value is shorthand for is', () => {
+    expect(run('draft', { f: { is: 'draft' } })).toBe(true);
+    expect(run('draft', { f: { is: 'live' } })).toBe(false);
+    expect(run('draft', { f: { isNot: 'live' } })).toBe(true);
+    expect(run('draft', { f: 'draft' })).toBe(true);
+    expect(run('draft', { f: 'live' })).toBe(false);
   });
-  // Does `target` survive when field `f` holds `value` and the rule is `when f: op`?
-  const shows = (op, value) => {
-    const recipe = { fieldRules: { target: { when: { f: op }, else: false } } };
-    const enhancer = createSchemaEnhancerFromRecipe(recipe);
-    const formData = value === undefined ? {} : { f: value };
-    return enhancer({ schema: baseSchema(), formData }).properties.target !== undefined;
-  };
 
-  // Field-value fixtures spanning the value space (no numeric ops here).
-  const V = {
-    str: 'date',
-    empty: '',
-    arr: ['image', 'date'], // array (multiselect), length 2
-    arrEmpty: [], // empty array
-    unset: undefined,
-  };
+  test('isSet / isNotSet — empty string is unset', () => {
+    expect(run('x', { f: { isSet: true } })).toBe(true);
+    expect(run('', { f: { isSet: true } })).toBe(false);
+    expect(run(undefined, { f: { isSet: true } })).toBe(false);
+    expect(run('', { f: { isNotSet: true } })).toBe(true);
+  });
 
-  // [description, operator, valueKey, expected]
-  const cases = [
-    // equality — scalars
-    ['is: matches scalar', { is: 'date' }, 'str', true],
-    ['is: no match', { is: 'x' }, 'str', false],
-    ['is: unset', { is: 'date' }, 'unset', false],
-    ['isNot: differs', { isNot: 'x' }, 'str', true],
-    ['isNot: equal', { isNot: 'date' }, 'str', false],
+  test('oneOf / notOneOf — value in a set', () => {
+    expect(run('brand-dark', { f: { oneOf: ['brand-dark', 'black'] } })).toBe(true);
+    expect(run('white', { f: { oneOf: ['brand-dark', 'black'] } })).toBe(false);
+    expect(run('white', { f: { notOneOf: ['brand-dark'] } })).toBe(true);
+  });
 
-    // presence — empty array is "set" (non-null), empty string is unset
-    ['isSet: scalar set', { isSet: true }, 'str', true],
-    ['isSet: empty string is unset', { isSet: true }, 'empty', false],
-    ['isSet: unset', { isSet: true }, 'unset', false],
-    ['isSet: empty array counts as set', { isSet: true }, 'arrEmpty', true],
-    ['isNotSet: unset', { isNotSet: true }, 'unset', true],
-    ['isNotSet: scalar set', { isNotSet: true }, 'str', false],
+  test('contains / notContains — SUBSTRING', () => {
+    expect(run('Chapter 3: Intro', { f: { contains: 'Chapter' } })).toBe(true);
+    expect(run('Intro', { f: { contains: 'Chapter' } })).toBe(false);
+    expect(run('Intro', { f: { notContains: 'Chapter' } })).toBe(true);
+    expect(run(undefined, { f: { contains: 'x' } })).toBe(false); // unset → ''
+  });
 
-    // contains / notContains — array membership of a single value
-    ['contains: array has value', { contains: 'date' }, 'arr', true],
-    ['contains: array lacks value', { contains: 'x' }, 'arr', false],
-    ['contains: string is not an array → never matches', { contains: 'da' }, 'str', false],
-    ['contains: unset', { contains: 'x' }, 'unset', false],
-    ['notContains: array lacks', { notContains: 'x' }, 'arr', true],
-    ['notContains: array has', { notContains: 'date' }, 'arr', false],
-    ['notContains: unset → matches', { notContains: 'x' }, 'unset', true],
+  test('regex / notRegex — pattern, with optional flags', () => {
+    expect(run('Chapter 12', { f: { regex: '^Chapter \\d+$' } })).toBe(true);
+    expect(run('chapter 12', { f: { regex: '^Chapter' } })).toBe(false); // case-sensitive
+    expect(run('chapter 12', { f: { regex: { pattern: '^chapter', flags: 'i' } } })).toBe(true);
+    expect(run('Intro', { f: { notRegex: '^Chapter' } })).toBe(true);
+  });
 
-    // oneOf / notOneOf — scalar in a set
-    ['oneOf: scalar in set', { oneOf: ['date', 'tag'] }, 'str', true],
-    ['oneOf: scalar out of set', { oneOf: ['x', 'y'] }, 'str', false],
-    ['oneOf: unset', { oneOf: ['date'] }, 'unset', false],
-    ['notOneOf: out of set', { notOneOf: ['x'] }, 'str', true],
-    ['notOneOf: in set', { notOneOf: ['date'] }, 'str', false],
-    ['notOneOf: unset → matches', { notOneOf: ['date'] }, 'unset', true],
-
-    // containsAny / containsAll — array vs a set
-    ['containsAny: shares one', { containsAny: ['image', 'x'] }, 'arr', true],
-    ['containsAny: shares none', { containsAny: ['x', 'y'] }, 'arr', false],
-    ['containsAny: unset', { containsAny: ['image'] }, 'unset', false],
-    ['containsAll: has all', { containsAll: ['image', 'date'] }, 'arr', true],
-    ['containsAll: missing one', { containsAll: ['image', 'x'] }, 'arr', false],
-    ['notContainsAny: shares none', { notContainsAny: ['x'] }, 'arr', true],
-    ['notContainsAny: shares one', { notContainsAny: ['image'] }, 'arr', false],
-    ['notContainsAll: missing one', { notContainsAll: ['image', 'x'] }, 'arr', true],
-    ['notContainsAll: has all', { notContainsAll: ['image', 'date'] }, 'arr', false],
-  ];
-
-  test.each(cases)('%s', (_desc, op, key, expected) => {
-    expect(shows(op, V[key])).toBe(expected);
+  test('array / number ops throw on a string field; invalid regex throws', () => {
+    expect(() => run('x', { f: { containsAny: ['a'] } })).toThrow(
+      /operator "containsAny" is not valid/i,
+    );
+    expect(() => run('x', { f: { gt: 1 } })).toThrow(/is not valid/i);
+    expect(() => run('x', { f: { regex: '(' } })).toThrow(/invalid pattern/i);
   });
 });
 
-/**
- * NUMERIC OPERATORS ARE DRIVEN BY THE DECLARED FIELD TYPE.
- *
- * gt/gte/lt/lte don't sniff the value shape — they consult the field's schema:
- *  - a numeric field (integer/float/number) → compares the number; an unset/blank
- *    value is NaN → the comparison is FALSE (no "skip-and-match").
- *  - a list field — a multiselect (type 'array') or an object_list region
- *    (widget 'object_list') — → counts its items.
- *  - anything else (a string/text field) → a numeric op is a mis-authored recipe
- *    and THROWS (fail loudly), never silently passes.
- */
-describe('fieldRules — numeric operators are schema-type-driven', () => {
-  // Declare field `f` with `fieldDef`; does `target` survive under `when f: op`?
-  const shows = (fieldDef, value, op) => {
-    const recipe = { fieldRules: { target: { when: { f: op }, else: false } } };
+describe('fieldRules — slate surface (rich text → plaintext)', () => {
+  const nodes = (text) => [{ type: 'p', children: [{ text }] }];
+  const run = (text, when) => runField({ widget: 'slate' }, nodes(text), when);
+
+  test('contains / regex read the serialized plaintext', () => {
+    expect(run('Hello brave world', { f: { contains: 'brave' } })).toBe(true);
+    expect(run('Hello world', { f: { contains: 'brave' } })).toBe(false);
+    expect(run('Draft 2026', { f: { regex: '\\d{4}' } })).toBe(true);
+  });
+
+  test('isSet — empty slate is unset', () => {
+    expect(run('hi', { f: { isSet: true } })).toBe(true);
+    expect(runField({ widget: 'slate' }, [], { f: { isSet: true } })).toBe(false);
+  });
+});
+
+describe('fieldRules — number surface', () => {
+  const run = (value, when) => runField({ type: 'integer' }, value, when);
+
+  test('gt/gte/lt/lte compare the number (numeric strings coerce)', () => {
+    expect(run(5, { f: { gt: 2 } })).toBe(true);
+    expect(run(5, { f: { lt: 2 } })).toBe(false);
+    expect(run(5, { f: { gte: 5 } })).toBe(true);
+    expect(run('5', { f: { gte: 5 } })).toBe(true);
+    expect(runField({ type: 'float' }, 1.5, { f: { gt: 1 } })).toBe(true);
+  });
+
+  test('unset / blank → every comparison is false', () => {
+    expect(run(undefined, { f: { gt: 0 } })).toBe(false);
+    expect(run('', { f: { gte: 1 } })).toBe(false);
+  });
+
+  test('is / oneOf — numeric equality / membership; 0 is set', () => {
+    expect(run(5, { f: { is: 5 } })).toBe(true);
+    expect(run('5', { f: { is: 5 } })).toBe(true);
+    expect(run(2, { f: { oneOf: [1, 2, 3] } })).toBe(true);
+    expect(run(9, { f: { oneOf: [1, 2, 3] } })).toBe(false);
+    expect(run(0, { f: { isSet: true } })).toBe(true);
+    expect(run(undefined, { f: { isSet: true } })).toBe(false);
+  });
+
+  test('contains / regex throw on a number field', () => {
+    expect(() => run(5, { f: { contains: 5 } })).toThrow(/operator "contains" is not valid/i);
+    expect(() => run(5, { f: { regex: '5' } })).toThrow(/operator "regex" is not valid/i);
+  });
+});
+
+describe('fieldRules — boolean surface', () => {
+  const run = (value, when) => runField({ type: 'boolean' }, value, when);
+
+  test('is true/false; false is "set"', () => {
+    expect(run(true, { f: { is: true } })).toBe(true);
+    expect(run(false, { f: { is: true } })).toBe(false);
+    expect(run(false, { f: { isSet: true } })).toBe(true);
+    expect(run(undefined, { f: { isSet: true } })).toBe(false);
+  });
+});
+
+describe('fieldRules — multiselect surface (array of values)', () => {
+  const run = (value, when) => runField({ type: 'array' }, value, when);
+
+  test('contains / containsAny / containsAll — membership', () => {
+    expect(run(['image', 'date'], { f: { contains: 'date' } })).toBe(true);
+    expect(run(['image'], { f: { contains: 'date' } })).toBe(false);
+    expect(run(['image', 'date'], { f: { containsAny: ['x', 'image'] } })).toBe(true);
+    expect(run(['image', 'date'], { f: { containsAll: ['image', 'date'] } })).toBe(true);
+    expect(run(['image'], { f: { containsAll: ['image', 'date'] } })).toBe(false);
+  });
+
+  test('is / isNot — SET equality (order-independent)', () => {
+    expect(run(['image', 'date'], { f: { is: ['date', 'image'] } })).toBe(true);
+    expect(run(['image'], { f: { is: ['image', 'date'] } })).toBe(false);
+    expect(run(['image', 'date'], { f: { isNot: ['image'] } })).toBe(true);
+  });
+
+  test('gt/gte/lt/lte — COUNT the selected values', () => {
+    expect(run(['image', 'date'], { f: { gte: 2 } })).toBe(true);
+    expect(run(['image'], { f: { gte: 2 } })).toBe(false);
+    expect(run([], { f: { gt: 0 } })).toBe(false);
+    expect(run(undefined, { f: { gt: 0 } })).toBe(false);
+  });
+
+  test('isSet — empty selection is unset', () => {
+    expect(run(['image'], { f: { isSet: true } })).toBe(true);
+    expect(run([], { f: { isSet: true } })).toBe(false);
+  });
+
+  test('oneOf and regex throw on an array field', () => {
+    expect(() => run(['image'], { f: { oneOf: ['image', 'date'] } })).toThrow(
+      /operator "oneOf" is not valid/i,
+    );
+    expect(() => run(['image'], { f: { regex: 'x' } })).toThrow(
+      /operator "regex" is not valid/i,
+    );
+  });
+});
+
+describe('fieldRules — region surface (child block TYPES, not UIDs)', () => {
+  // blocks_layout container: `body` region holds [image, slate, image].
+  const blocksLayoutBlock = () => ({
+    '@type': 'grid',
+    blocks: {
+      a: { '@type': 'image' },
+      b: { '@type': 'slate' },
+      c: { '@type': 'image' },
+    },
+    blocks_layout: { body: ['a', 'b', 'c'] },
+  });
+  const runRegion = (when, formData, schema) => {
+    const recipe = { fieldRules: { target: { when, else: false } } };
     const enhancer = createSchemaEnhancerFromRecipe(recipe);
-    const schema = {
-      fieldsets: [{ id: 'default', title: 'Default', fields: ['f', 'target'] }],
-      properties: { f: { title: 'F', ...fieldDef }, target: { title: 'Target' } },
+    const s = schema || {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['target'] }],
+      properties: { target: { title: 'Target' } },
       required: [],
     };
-    const formData = value === undefined ? {} : { f: value };
-    return enhancer({ schema, formData }).properties.target !== undefined;
+    return enhancer({ schema: s, formData }).properties.target !== undefined;
   };
-  const items = (n) =>
-    Array.from({ length: n }, (_, i) => ({ '@id': `i${i}`, '@type': 'x' }));
 
-  test('numeric field compares the number', () => {
-    expect(shows({ type: 'integer' }, 5, { gt: 2 })).toBe(true);
-    expect(shows({ type: 'integer' }, 5, { lt: 2 })).toBe(false);
-    expect(shows({ type: 'integer' }, 5, { gte: 5 })).toBe(true);
-    expect(shows({ type: 'integer' }, '5', { gte: 5 })).toBe(true); // numeric string
-    expect(shows({ type: 'float' }, 1.5, { gt: 1 })).toBe(true);
+  test('contains matches on child block TYPE (blocks_layout, by @type)', () => {
+    const b = blocksLayoutBlock();
+    expect(runRegion({ body: { contains: 'image' } }, b)).toBe(true);
+    expect(runRegion({ body: { contains: 'video' } }, b)).toBe(false);
+    expect(runRegion({ body: { containsAny: ['video', 'slate'] } }, b)).toBe(true);
+    expect(runRegion({ body: { containsAll: ['image', 'slate'] } }, b)).toBe(true);
+    expect(runRegion({ body: { containsAll: ['image', 'video'] } }, b)).toBe(false);
   });
 
-  test('unset / blank numeric field → comparison is false', () => {
-    expect(shows({ type: 'integer' }, undefined, { gt: 0 })).toBe(false);
-    expect(shows({ type: 'integer' }, '', { gte: 1 })).toBe(false);
+  test('gt/gte/lt/lte count the region children', () => {
+    const b = blocksLayoutBlock();
+    expect(runRegion({ body: { gte: 3 } }, b)).toBe(true);
+    expect(runRegion({ body: { gt: 3 } }, b)).toBe(false);
   });
 
-  test('multiselect (array) field counts its selected values', () => {
-    expect(shows({ type: 'array' }, ['image', 'date'], { gte: 2 })).toBe(true);
-    expect(shows({ type: 'array' }, ['image'], { gte: 2 })).toBe(false);
-    expect(shows({ type: 'array' }, [], { gt: 0 })).toBe(false);
-    expect(shows({ type: 'array' }, undefined, { gt: 0 })).toBe(false); // unset → 0
-  });
-
-  test('object_list region counts its items (by field name)', () => {
-    expect(shows({ widget: 'object_list' }, items(3), { gte: 3 })).toBe(true);
-    expect(shows({ widget: 'object_list' }, items(1), { gte: 2 })).toBe(false);
-    expect(shows({ widget: 'object_list' }, [], { gt: 0 })).toBe(false);
-    expect(shows({ widget: 'object_list' }, undefined, { gt: 0 })).toBe(false);
-  });
-
-  test('numeric op on a non-numeric, non-list field throws (fail loudly)', () => {
-    expect(() => shows({ type: 'string' }, 'hello', { gt: 2 })).toThrow(
-      /numeric or list/i,
-    );
+  test('object_list region: contains matches typed item type via typeField', () => {
+    const schema = {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['panels', 'target'] }],
+      properties: {
+        panels: { title: 'Panels', widget: 'object_list', typeField: 'field_type' },
+        target: { title: 'Target' },
+      },
+      required: [],
+    };
+    const formData = { panels: [{ field_type: 'faq' }, { field_type: 'cta' }] };
+    expect(runRegion({ panels: { contains: 'faq' } }, formData, schema)).toBe(true);
+    expect(runRegion({ panels: { contains: 'missing' } }, formData, schema)).toBe(false);
+    expect(runRegion({ panels: { gte: 2 } }, formData, schema)).toBe(true);
   });
 });
 
