@@ -495,23 +495,19 @@ describe('inheritSchemaFrom — idempotent (no doubled "… Defaults" fieldset)'
 });
 
 /**
- * OPERATOR × VALUE-TYPE MATRIX.
+ * NON-NUMERIC OPERATOR × VALUE MATRIX.
  *
- * One table mapping every `when` operator against the field-value types it can
- * meet — scalar (string/number), array (object_list / multiselect), blocks_layout
- * regions dict, and unset/empty — with the expected match result. This is the
- * single source of truth for "what does operator X do on field type Y", exercised
- * through the public recipe path exactly as a frontend sends it.
+ * Equality / presence / membership operators are VALUE-based — they act on the
+ * resolved field value regardless of the field's declared type — so one table
+ * pins "what does operator X do on value Y". Numeric operators are covered
+ * separately below because they are driven by the field's declared TYPE, not the
+ * value shape.
  *
  * Notes the table pins down:
- *  - Numeric ops (gt/gte/lt/lte) COUNT sub-items on arrays and region dicts.
- *  - A value that isn't countable/numeric (a plain string, or an UNSET field)
- *    makes the numeric checks NaN → skipped → the condition passes. In practice a
- *    container field is an empty array/region (count 0), not undefined.
  *  - contains-family require an actual array, so they never match a scalar string.
- *  - isSet treats an empty array/object as "set" (non-null).
+ *  - isSet treats an empty array as "set" (non-null); an empty string is unset.
  */
-describe('fieldRules — operator × value-type matrix', () => {
+describe('fieldRules — non-numeric operator × value matrix', () => {
   const baseSchema = () => ({
     fieldsets: [{ id: 'default', title: 'Default', fields: ['f', 'target'] }],
     properties: { f: { title: 'F' }, target: { title: 'Target' } },
@@ -525,17 +521,12 @@ describe('fieldRules — operator × value-type matrix', () => {
     return enhancer({ schema: baseSchema(), formData }).properties.target !== undefined;
   };
 
-  // Field-value fixtures spanning the type space.
+  // Field-value fixtures spanning the value space (no numeric ops here).
   const V = {
     str: 'date',
-    num: 5,
-    numStr: '5',
     empty: '',
-    arr: ['image', 'date'], // array (object_list / multiselect), length 2
+    arr: ['image', 'date'], // array (multiselect), length 2
     arrEmpty: [], // empty array
-    region: { items: ['a', 'b'], footer: ['c'] }, // blocks_layout, 3 sub-items
-    regionEmpty: { items: [] }, // blocks_layout, 0 sub-items
-    obj: { title: 'x' }, // non-region object (widget:'object') — not countable
     unset: undefined,
   };
 
@@ -548,34 +539,13 @@ describe('fieldRules — operator × value-type matrix', () => {
     ['isNot: differs', { isNot: 'x' }, 'str', true],
     ['isNot: equal', { isNot: 'date' }, 'str', false],
 
-    // presence — empty array/object are "set" (non-null)
+    // presence — empty array is "set" (non-null), empty string is unset
     ['isSet: scalar set', { isSet: true }, 'str', true],
     ['isSet: empty string is unset', { isSet: true }, 'empty', false],
     ['isSet: unset', { isSet: true }, 'unset', false],
     ['isSet: empty array counts as set', { isSet: true }, 'arrEmpty', true],
     ['isNotSet: unset', { isNotSet: true }, 'unset', true],
     ['isNotSet: scalar set', { isNotSet: true }, 'str', false],
-
-    // numeric on scalars
-    ['gt: number 5 > 2', { gt: 2 }, 'num', true],
-    ['lt: number 5 < 2', { lt: 2 }, 'num', false],
-    ['gte: numeric string "5" >= 5', { gte: 5 }, 'numStr', true],
-    ['gt: non-numeric string → skipped (matches)', { gt: 0 }, 'str', true],
-    ['gt: unset → skipped (matches)', { gt: 0 }, 'unset', true],
-
-    // numeric as COUNT on arrays (object_list / multiselect)
-    ['gt: array count 2 > 1', { gt: 1 }, 'arr', true],
-    ['gt: array count 2 > 2', { gt: 2 }, 'arr', false],
-    ['gte: array count 2 >= 2', { gte: 2 }, 'arr', true],
-    ['gt: empty array count 0 > 0', { gt: 0 }, 'arrEmpty', false],
-    ['lt: empty array count 0 < 1', { lt: 1 }, 'arrEmpty', true],
-
-    // numeric as COUNT on blocks_layout regions (total across regions)
-    ['gte: region count 3 >= 3', { gte: 3 }, 'region', true],
-    ['gt: region count 3 > 3', { gt: 3 }, 'region', false],
-    ['gt: empty region count 0 > 0', { gt: 0 }, 'regionEmpty', false],
-    ['lte: empty region count 0 <= 0', { lte: 0 }, 'regionEmpty', true],
-    ['gt: non-region object → skipped (matches)', { gt: 0 }, 'obj', true],
 
     // contains / notContains — array membership of a single value
     ['contains: array has value', { contains: 'date' }, 'arr', true],
@@ -608,5 +578,116 @@ describe('fieldRules — operator × value-type matrix', () => {
 
   test.each(cases)('%s', (_desc, op, key, expected) => {
     expect(shows(op, V[key])).toBe(expected);
+  });
+});
+
+/**
+ * NUMERIC OPERATORS ARE DRIVEN BY THE DECLARED FIELD TYPE.
+ *
+ * gt/gte/lt/lte don't sniff the value shape — they consult the field's schema:
+ *  - a numeric field (integer/float/number) → compares the number; an unset/blank
+ *    value is NaN → the comparison is FALSE (no "skip-and-match").
+ *  - a list field — a multiselect (type 'array') or an object_list region
+ *    (widget 'object_list') — → counts its items.
+ *  - anything else (a string/text field) → a numeric op is a mis-authored recipe
+ *    and THROWS (fail loudly), never silently passes.
+ */
+describe('fieldRules — numeric operators are schema-type-driven', () => {
+  // Declare field `f` with `fieldDef`; does `target` survive under `when f: op`?
+  const shows = (fieldDef, value, op) => {
+    const recipe = { fieldRules: { target: { when: { f: op }, else: false } } };
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const schema = {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['f', 'target'] }],
+      properties: { f: { title: 'F', ...fieldDef }, target: { title: 'Target' } },
+      required: [],
+    };
+    const formData = value === undefined ? {} : { f: value };
+    return enhancer({ schema, formData }).properties.target !== undefined;
+  };
+  const items = (n) =>
+    Array.from({ length: n }, (_, i) => ({ '@id': `i${i}`, '@type': 'x' }));
+
+  test('numeric field compares the number', () => {
+    expect(shows({ type: 'integer' }, 5, { gt: 2 })).toBe(true);
+    expect(shows({ type: 'integer' }, 5, { lt: 2 })).toBe(false);
+    expect(shows({ type: 'integer' }, 5, { gte: 5 })).toBe(true);
+    expect(shows({ type: 'integer' }, '5', { gte: 5 })).toBe(true); // numeric string
+    expect(shows({ type: 'float' }, 1.5, { gt: 1 })).toBe(true);
+  });
+
+  test('unset / blank numeric field → comparison is false', () => {
+    expect(shows({ type: 'integer' }, undefined, { gt: 0 })).toBe(false);
+    expect(shows({ type: 'integer' }, '', { gte: 1 })).toBe(false);
+  });
+
+  test('multiselect (array) field counts its selected values', () => {
+    expect(shows({ type: 'array' }, ['image', 'date'], { gte: 2 })).toBe(true);
+    expect(shows({ type: 'array' }, ['image'], { gte: 2 })).toBe(false);
+    expect(shows({ type: 'array' }, [], { gt: 0 })).toBe(false);
+    expect(shows({ type: 'array' }, undefined, { gt: 0 })).toBe(false); // unset → 0
+  });
+
+  test('object_list region counts its items (by field name)', () => {
+    expect(shows({ widget: 'object_list' }, items(3), { gte: 3 })).toBe(true);
+    expect(shows({ widget: 'object_list' }, items(1), { gte: 2 })).toBe(false);
+    expect(shows({ widget: 'object_list' }, [], { gt: 0 })).toBe(false);
+    expect(shows({ widget: 'object_list' }, undefined, { gt: 0 })).toBe(false);
+  });
+
+  test('numeric op on a non-numeric, non-list field throws (fail loudly)', () => {
+    expect(() => shows({ type: 'string' }, 'hello', { gt: 2 })).toThrow(
+      /numeric or list/i,
+    );
+  });
+});
+
+/**
+ * A numeric operator counts ONE blocks_layout region — the region named by the
+ * field path — NOT the sum across all regions. blocks_layout regions aren't schema
+ * properties; the region name resolves through the central storage-agnostic reader.
+ */
+describe('fieldRules — numeric operators count ONE blocks_layout region', () => {
+  // Container block: `columns` region has 3 children, `footer` has 1.
+  const container = () => ({
+    '@type': 'columnsBlock',
+    blocks: { c1: {}, c2: {}, c3: {}, f1: {} },
+    blocks_layout: { columns: ['c1', 'c2', 'c3'], footer: ['f1'] },
+  });
+  const shows = (region, op) => {
+    const recipe = { fieldRules: { target: { when: { [region]: op }, else: false } } };
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const schema = {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['target'] }],
+      properties: { target: { title: 'Target' } },
+      required: [],
+    };
+    return enhancer({ schema, formData: container() }).properties.target !== undefined;
+  };
+
+  test('counts the named region, independent of sibling regions (not summed)', () => {
+    expect(shows('columns', { gte: 3 })).toBe(true); // columns has 3
+    expect(shows('columns', { gt: 3 })).toBe(false); // 3, NOT 3+1=4 (would pass if summed)
+    expect(shows('footer', { gte: 1 })).toBe(true); // footer has 1
+    expect(shows('footer', { gte: 2 })).toBe(false); // 1, NOT the 4-item total
+    expect(shows('footer', { gt: 1 })).toBe(false);
+  });
+
+  test('an empty blocks_layout region counts 0', () => {
+    const recipe = { fieldRules: { target: { when: { sidebar: { gt: 0 } }, else: false } } };
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const schema = {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['target'] }],
+      properties: { target: { title: 'Target' } },
+      required: [],
+    };
+    const formData = {
+      '@type': 'columnsBlock',
+      blocks: {},
+      blocks_layout: { sidebar: [] },
+    };
+    expect(enhancer({ schema, formData }).properties.target !== undefined).toBe(
+      false,
+    );
   });
 });

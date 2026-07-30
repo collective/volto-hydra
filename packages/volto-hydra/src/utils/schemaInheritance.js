@@ -35,7 +35,13 @@
 import config from '@plone/volto/registry';
 import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField } from './blockPath';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
-import { convertFieldValue } from '@volto-hydra/helpers';
+import {
+  convertFieldValue,
+  resolveFieldPath as resolveBlockFieldPath,
+  getFieldValue,
+  getFieldDef,
+  getChildBlockEntries,
+} from '@volto-hydra/helpers';
 import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context';
 // Pure validation/default-application logic lives in schemaValidation.js
 // (no dependencies — safe to import from CI scripts and test runners).
@@ -1549,9 +1555,14 @@ function createEnhancerByType(type, config) {
  * Condition format (when):
  *   { fieldName: value }           — equality: formData[fieldName] === value
  *   { fieldName: { isNot: v } }    — inequality
- *   { fieldName: { gte: n } }      — numeric comparison (gt, gte, lt, lte); on an
- *                                    array (object_list) or blocks_layout field the
- *                                    operand is the sub-item COUNT
+ *   { fieldName: { gte: n } }      — numeric comparison (gt, gte, lt, lte),
+ *                                    driven by the field's declared type: a numeric
+ *                                    field compares the number; a list field — a
+ *                                    multiselect or a region (object_list OR one
+ *                                    blocks_layout region, named by its field) —
+ *                                    counts its items; any other type throws
+ *   { regionName: { gte: n } }     — counts the items in THAT region only (not a
+ *                                    cross-region total)
  *   { fieldName: { isSet: true } } — truthy check
  *   { fieldName: { contains: v } } — array membership (multiselect includes v)
  *   { fieldName: { oneOf: [a,b] } }— scalar set membership (Choice value is a|b)
@@ -1752,6 +1763,71 @@ function evaluateFieldRule(rule, formData, args) {
 }
 
 /**
+ * Resolve a `when` field path to the data it addresses, plus the flags the
+ * numeric operators need — WITHOUT sniffing the value shape. Uses the central
+ * field-access API (the SAME one inline-edit / the sidebar use): the block-scope
+ * resolver (`/`, `..`) → `{ blockId, fieldName }`, then `getFieldValue` /
+ * `getFieldDef` / the storage-agnostic region reader.
+ *
+ * A field is classified as:
+ *   - a REGION (object_list OR blocks_layout) — named by its schema field name;
+ *     its `value` is the ordered child list (ids) read via getChildBlockEntries,
+ *     `isList` true. blocks_layout regions aren't schema properties, so they're
+ *     detected from the shared `blocks_layout` dict; object_list from its widget.
+ *   - else a plain field — `value` = getFieldValue; `isList`/`isNumeric` come
+ *     from the DECLARED type (array = multiselect; integer/float/number).
+ *
+ * Only the current block carries a schema here (`args.schema`); `../`/`/` refs
+ * resolve their value + region-ness (via the target's `blocks_layout`) but have
+ * no schema, so a numeric op on such a non-region, non-numeric ref will throw.
+ * @private
+ */
+function resolveWhenField(fieldPath, formData, args) {
+  const hydraContext = getHydraSchemaContext?.();
+  const blockPathMap = args?.blockPathMap || hydraContext?.blockPathMap;
+  const curBlockId =
+    args?.blockId ?? hydraContext?.currentBlockId ?? PAGE_BLOCK_UID;
+  const { blockId: targetBlockId, fieldName } = resolveBlockFieldPath(
+    fieldPath,
+    curBlockId,
+    blockPathMap,
+  );
+
+  // Which block owns the field, and (only for the current block) its schema.
+  let block;
+  let schema;
+  if (targetBlockId === curBlockId) {
+    block = formData;
+    schema = args?.schema;
+  } else if (targetBlockId === PAGE_BLOCK_UID) {
+    block = args?.pageFormData || hydraContext?.formData;
+  } else {
+    block = getLiveBlockData?.(targetBlockId, {
+      formData: args?.pageFormData,
+      blockPathMap,
+    });
+  }
+
+  const def = schema ? getFieldDef(schema, fieldName) : undefined;
+
+  // Region? object_list via widget, blocks_layout via the shared dict (incl. empty).
+  const isObjectList = def?.widget === 'object_list';
+  const isBlocksLayoutRegion = Array.isArray(block?.blocks_layout?.[fieldName]);
+  if (isObjectList || isBlocksLayoutRegion) {
+    const entries = getChildBlockEntries(block, { isObjectList, region: fieldName });
+    return { value: entries.map((e) => e.id), isList: true, isNumeric: false };
+  }
+
+  const value = block ? getFieldValue(block, fieldName) : undefined;
+  const type = def?.type;
+  return {
+    value,
+    isList: type === 'array',
+    isNumeric: ['integer', 'int', 'float', 'number'].includes(type),
+  };
+}
+
+/**
  * Evaluate a 'when' condition against form data.
  * Format: { fieldPath: expectedValue, ... } or { fieldPath: { operator: value }, ... }
  * All entries must match (AND logic).
@@ -1759,11 +1835,16 @@ function evaluateFieldRule(rule, formData, args) {
  */
 function evaluateWhenCondition(when, formData, args) {
   for (const [fieldPath, expected] of Object.entries(when)) {
-    const value = resolveFieldPath(fieldPath, formData, args);
+    const { value, isList, isNumeric } = resolveWhenField(
+      fieldPath,
+      formData,
+      args,
+    );
 
     // Object with operators: { isNot: v, gte: n, isSet: true, ... }
     if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
-      if (!evaluateOperators(value, expected)) return false;
+      if (!evaluateOperators(value, expected, { isList, isNumeric, fieldPath }))
+        return false;
       continue;
     }
 
@@ -1788,9 +1869,16 @@ function evaluateWhenCondition(when, formData, args) {
  * array includes any of a,b; `{ containsAll: [...] }` when it includes all.
  * Each has a `not…` inverse. Together with oneOf these fill the value×operand
  * matrix (scalar/array field × single/set operand).
+ *
+ * The numeric operators (gt/gte/lt/lte) are driven by the field's DECLARED type
+ * (via `ctx` from resolveWhenField), never the value shape: a list field
+ * (multiselect / object_list / blocks_layout region) counts its items; a numeric
+ * field compares the number (unset/blank → NaN → false); any other field type is
+ * a mis-authored recipe and throws.
  * @private
  */
-function evaluateOperators(value, operators) {
+function evaluateOperators(value, operators, ctx = {}) {
+  const { isList = false, isNumeric = false, fieldPath } = ctx;
   const {
     is,
     isNot,
@@ -1877,13 +1965,29 @@ function evaluateOperators(value, operators) {
   if (is !== undefined && value !== is) return false;
   if (isNot !== undefined && value === isNot) return false;
 
-  // Numeric comparison. On a COUNTABLE field the operand is the sub-item count,
-  // so gt/gte/lt/lte gate on "how many": an array (object_list / multiselect) →
-  // its length; a blocks_layout regions dict (all values are ordering arrays) →
-  // the total sub-items across regions. A plain number/numeric-string compares
-  // as-is; anything else is NaN and the numeric checks are skipped.
-  const numValue = numericOperand(value);
-  if (!isNaN(numValue)) {
+  // Numeric comparison — driven by the field's declared type, not the value shape.
+  const hasNumericOp =
+    gt !== undefined ||
+    gte !== undefined ||
+    lt !== undefined ||
+    lte !== undefined;
+  if (hasNumericOp) {
+    let numValue;
+    if (isList) {
+      // A list field (multiselect / object_list / blocks_layout region): the
+      // operand is the item COUNT. `value` is always the item/id array here.
+      numValue = Array.isArray(value) ? value.length : 0;
+    } else if (isNumeric) {
+      // A numeric field: compare the number. Unset/blank → NaN → every
+      // comparison below is false (no "skip-and-match").
+      numValue = value === '' || value == null ? NaN : Number(value);
+    } else {
+      throw new Error(
+        `fieldRules: gt/gte/lt/lte require a numeric or list field${
+          fieldPath ? ` (field "${fieldPath}")` : ''
+        }`,
+      );
+    }
     if (gt !== undefined && !(numValue > gt)) return false;
     if (gte !== undefined && !(numValue >= gte)) return false;
     if (lt !== undefined && !(numValue < lt)) return false;
@@ -1891,75 +1995,6 @@ function evaluateOperators(value, operators) {
   }
 
   return true;
-}
-
-/**
- * Coerce a field value to the number the numeric operators compare against.
- * Arrays and region dicts count their sub-items so gt/gte/lt/lte express
- * "number of sub-items"; scalars use the number / parsed numeric string.
- * @private
- */
-function numericOperand(value) {
-  if (typeof value === 'number') return value;
-  if (Array.isArray(value)) return value.length;
-  if (value && typeof value === 'object') {
-    // A blocks_layout regions dict is all-arrays ({ items: [...], footer: [...] });
-    // count the total sub-items. A non-region object (e.g. widget:'object') has
-    // non-array values → not countable → NaN (numeric checks skipped).
-    const vals = Object.values(value);
-    if (vals.length && vals.every(Array.isArray)) {
-      return vals.reduce((n, arr) => n + arr.length, 0);
-    }
-    return NaN;
-  }
-  return parseFloat(value);
-}
-
-/**
- * Resolve a field path to its value.
- * Supports: 'field' (current), '../field' (parent), '/field' (root)
- * @private
- */
-function resolveFieldPath(fieldPath, formData, args) {
-  if (!fieldPath) return undefined;
-
-  // Root path: /field
-  if (fieldPath.startsWith('/')) {
-    const rootField = fieldPath.slice(1);
-    // args may have rootFormData for accessing page-level fields
-    const rootData = args.rootFormData || formData;
-    return rootData?.[rootField];
-  }
-
-  // Parent path: ../field
-  if (fieldPath.startsWith('../')) {
-    const parentField = fieldPath.slice(3);
-    // Two valid sources for blockPathMap/blockId, see inheritSchemaFrom and
-    // hideParentOwnedFields for the full design note. Args drives the
-    // buildBlockPathMap pass 2 path; hydraContext drives sidebar render.
-    const hydraContext = getHydraSchemaContext?.();
-    const blockPathMap = args?.blockPathMap || hydraContext?.blockPathMap;
-    const blockId = args?.blockId ?? hydraContext?.currentBlockId;
-    if (blockPathMap && blockId) {
-      const pathInfo = blockPathMap[blockId];
-      if (pathInfo?.parentId && pathInfo.parentId !== PAGE_BLOCK_UID) {
-        // Nested block - get parent block data
-        const liveFallback = { formData: args?.pageFormData, blockPathMap };
-        const parentBlock = getLiveBlockData?.(pathInfo.parentId, liveFallback);
-        return parentBlock?.[parentField];
-      } else {
-        // Top-level block - parent is the page, use page-level formData
-        const pageFormData = args?.pageFormData || hydraContext?.formData;
-        return pageFormData?.[parentField];
-      }
-    }
-    // Last resort: pageFormData was passed but pathmap/blockId weren't.
-    // Treat ../field as a page-level lookup.
-    return args?.pageFormData?.[parentField];
-  }
-
-  // Current block path: field
-  return formData?.[fieldPath];
 }
 
 /**

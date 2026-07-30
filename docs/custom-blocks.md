@@ -228,20 +228,24 @@ schemaEnhancer: {
 
 `oneOf` / `notOneOf` are the scalar equivalent — the field value is a single Choice and the **set** is the operand: `{ colour: { oneOf: ['brand-dark', 'black'] } }` matches when `colour` is one of those.
 
-The numeric operators (`gt`, `gte`, `lt`, `lte`) gate on the **sub-item count** when the field is a list — an `object_list` (or multiselect) counts its entries, and a `blocks_layout` container field counts its blocks across regions. So you can reveal a field only once a container has enough children:
+The numeric operators (`gt`, `gte`, `lt`, `lte`) are driven by the field's **declared type**, never the value shape:
+
+- a **numeric** field (`integer` / `float` / `number`) compares the value itself (unset/blank never matches);
+- a **list** field counts its items — a **multiselect** counts its selected values, and a **region** counts its child blocks. A region is named by its field: an `object_list` field, or a single `blocks_layout` region by its region name (`columns`, `footer`, …). Each region counts **only its own** children — never a cross-region total;
+- any other field type (e.g. a text field) is a mis-authored rule and raises an error.
+
+So you can reveal a field only once a container has enough children:
 
 ```javascript
 schemaEnhancer: {
     fieldRules: {
-        // Offer the "columns layout" option only once there are at least 2 columns.
+        // Offer the "columns layout" option only once the `columns` region has ≥2 blocks.
         columnsLayout: { when: { columns: { gte: 2 } }, else: false },
-        // Show a "carousel options" field only when the slider has more than 1 slide.
+        // Show a "carousel options" field only when the `slides` object_list has >1 item.
         carouselOptions: { when: { slides: { gt: 1 } }, else: false },
     },
 }
 ```
-
-On a scalar number (or numeric string) the operators compare the value itself, as before.
 
 Field paths: `../field` for the parent block's field, `/field` for a page metadata field.
 
