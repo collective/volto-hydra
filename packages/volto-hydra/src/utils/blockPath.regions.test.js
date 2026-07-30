@@ -135,6 +135,95 @@ describe('moveBlockBetweenContainers — cross-region within one field', () => {
   });
 });
 
+describe('moveBlockBetweenContainers — disallowDescendantBlocks (DnD rejection)', () => {
+  // The exact validation a drag runs: moveBlockBetweenContainers checks the
+  // dragged block's type against the target's allowedSiblingTypes. With a
+  // columns ancestor's disallowDescendantBlocks:['columns'], a cell's addable
+  // set excludes columns, so dropping a columns block into the cell is rejected
+  // (returns null). This is the deterministic counterpart to the admin DnD.
+  const makeCfg = (disallow) => ({
+    _page: {
+      id: '_page',
+      schema: () => ({
+        properties: {
+          items: { widget: 'blocks_layout', allowedBlocks: ['slate', 'columns'] },
+        },
+      }),
+    },
+    slate: { id: 'slate' },
+    columns: {
+      id: 'columns',
+      ...(disallow ? { disallowDescendantBlocks: ['columns'] } : {}),
+      blockSchema: {
+        properties: {
+          items: { widget: 'blocks_layout', allowedBlocks: ['column'] },
+        },
+      },
+    },
+    column: {
+      id: 'column',
+      blockSchema: {
+        properties: {
+          items: { widget: 'blocks_layout', allowedBlocks: ['slate', 'columns'] },
+        },
+      },
+    },
+  });
+
+  const makeColsForm = () => ({
+    '@type': 'Document',
+    blocks: {
+      outer: {
+        '@type': 'columns',
+        blocks: {
+          cell: {
+            '@type': 'column',
+            blocks: { inner: { '@type': 'slate' } },
+            blocks_layout: { items: ['inner'] },
+          },
+        },
+        blocks_layout: { items: ['cell'] },
+      },
+      src: {
+        '@type': 'columns',
+        blocks: {
+          scell: {
+            '@type': 'column',
+            blocks: { sinner: { '@type': 'slate' } },
+            blocks_layout: { items: ['sinner'] },
+          },
+        },
+        blocks_layout: { items: ['scell'] },
+      },
+    },
+    blocks_layout: { items: ['outer', 'src'] },
+  });
+
+  test('rejects dragging a columns block into a columns cell', () => {
+    const cfg = makeCfg(true);
+    const form = makeColsForm();
+    const map = buildBlockPathMap(form, cfg, intl);
+    // The cell's addable set excludes columns (ancestor disallow).
+    expect(map['inner'].allowedSiblingTypes).not.toContain('columns');
+    // Drag `src` (a columns block) after `inner` (inside the cell) → rejected.
+    const result = moveBlockBetweenContainers(
+      form, map, 'src', 'inner', true, PAGE, 'cell', cfg, intl,
+    );
+    expect(result).toBeNull();
+  });
+
+  test('control: the same move is allowed without the disallow declaration', () => {
+    const cfg = makeCfg(false);
+    const form = makeColsForm();
+    const map = buildBlockPathMap(form, cfg, intl);
+    expect(map['inner'].allowedSiblingTypes).toContain('columns');
+    const result = moveBlockBetweenContainers(
+      form, map, 'src', 'inner', true, PAGE, 'cell', cfg, intl,
+    );
+    expect(result).not.toBeNull();
+  });
+});
+
 describe('empty-region seeding', () => {
   const cfg = {
     _page: {
