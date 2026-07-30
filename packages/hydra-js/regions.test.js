@@ -206,3 +206,218 @@ describe('addableSiblingTypes — synced container add restriction', () => {
     expect(map['card-1'].allowedSiblingTypes).not.toContain('image');
   });
 });
+
+describe('addableSiblingTypes — ancestor disallowDescendantBlocks', () => {
+  test('subtracts disallowed types from a plain field', () => {
+    expect(
+      addableSiblingTypes(['slate', 'section', 'columns'], undefined, {}, {}, [
+        'columns',
+      ]),
+    ).toEqual(['slate', 'section']);
+  });
+
+  test('accepts a Set as well as an array', () => {
+    expect(
+      addableSiblingTypes(
+        ['slate', 'columns'],
+        undefined,
+        {},
+        {},
+        new Set(['columns']),
+      ),
+    ).toEqual(['slate']);
+  });
+
+  test('empty/absent disallow leaves the list unchanged (back-compat)', () => {
+    expect(
+      addableSiblingTypes(['slate', 'columns'], undefined, {}, {}),
+    ).toEqual(['slate', 'columns']);
+    expect(
+      addableSiblingTypes(['slate', 'columns'], undefined, {}, {}, []),
+    ).toEqual(['slate', 'columns']);
+  });
+
+  test('composes with synced-field narrowing (both applied, in one call)', () => {
+    const blocksConfig = {
+      card: { fieldMappings: { '@default': {} } },
+      contentBlock: { fieldMappings: { '@default': {} } },
+      listing: {},
+    };
+    const grid = { variation: 'card' };
+    // Sync narrows convertible types to `card` (+ structural `listing`); the
+    // disallow set then drops `listing`. One function, both effects.
+    expect(
+      addableSiblingTypes(
+        ['card', 'contentBlock', 'listing'],
+        'variation',
+        grid,
+        blocksConfig,
+        ['listing'],
+      ),
+    ).toEqual(['card']);
+  });
+});
+
+describe('buildBlockPathMap — disallowDescendantBlocks (ancestor restriction)', () => {
+  // Mirrors the columns/section setup: a `columns` block whose cells are
+  // `section`s, `section` allows `columns` (columns-in-section), and `columns`
+  // forbids `columns` in its whole subtree — so columns-in-columns is impossible
+  // at any depth while columns-in-a-top-level-section still works.
+  const blocksConfig = {
+    _page: {
+      id: '_page',
+      schema: () => ({
+        properties: {
+          items: {
+            widget: 'blocks_layout',
+            allowedBlocks: ['slate', 'section', 'columns'],
+          },
+        },
+      }),
+    },
+    slate: { id: 'slate' },
+    columns: {
+      id: 'columns',
+      disallowDescendantBlocks: ['columns'],
+      blockSchema: {
+        properties: {
+          items: { widget: 'blocks_layout', allowedBlocks: ['section'] },
+        },
+      },
+    },
+    section: {
+      id: 'section',
+      blockSchema: {
+        properties: {
+          items: {
+            widget: 'blocks_layout',
+            allowedBlocks: ['slate', 'section', 'columns'],
+          },
+        },
+      },
+    },
+  };
+
+  const sec = (id, childId) => ({
+    '@type': 'section',
+    blocks: { [childId]: { '@type': 'slate' } },
+    blocks_layout: { items: [childId] },
+  });
+
+  test('columns IS addable in a top-level section (no disallowing ancestor)', () => {
+    const formData = {
+      '@type': 'Document',
+      blocks: { 'sec-1': sec('sec-1', 'slate-1') },
+      blocks_layout: { items: ['sec-1'] },
+    };
+    const map = buildBlockPathMap(formData, blocksConfig);
+    expect(map['slate-1'].allowedSiblingTypes).toContain('columns');
+  });
+
+  test('columns is NOT addable inside a columns cell section', () => {
+    const formData = {
+      '@type': 'Document',
+      blocks: {
+        'columns-1': {
+          '@type': 'columns',
+          blocks: { 'cell-1': sec('cell-1', 'slate-1') },
+          blocks_layout: { items: ['cell-1'] },
+        },
+      },
+      blocks_layout: { items: ['columns-1'] },
+    };
+    const map = buildBlockPathMap(formData, blocksConfig);
+    expect(map['slate-1'].allowedSiblingTypes).toEqual(
+      expect.arrayContaining(['slate', 'section']),
+    );
+    expect(map['slate-1'].allowedSiblingTypes).not.toContain('columns');
+  });
+
+  test('the restriction reaches arbitrary depth (grandchild)', () => {
+    const formData = {
+      '@type': 'Document',
+      blocks: {
+        'columns-1': {
+          '@type': 'columns',
+          blocks: {
+            'cell-1': {
+              '@type': 'section',
+              blocks: { 'sec-2': sec('sec-2', 'slate-deep') },
+              blocks_layout: { items: ['sec-2'] },
+            },
+          },
+          blocks_layout: { items: ['cell-1'] },
+        },
+      },
+      blocks_layout: { items: ['columns-1'] },
+    };
+    const map = buildBlockPathMap(formData, blocksConfig);
+    expect(map['sec-2'].allowedSiblingTypes).not.toContain('columns');
+    expect(map['slate-deep'].allowedSiblingTypes).not.toContain('columns');
+    expect(map['slate-deep'].allowedSiblingTypes).toContain('section');
+  });
+
+  test('a sibling subtree outside the columns is unaffected', () => {
+    const formData = {
+      '@type': 'Document',
+      blocks: {
+        'columns-1': {
+          '@type': 'columns',
+          blocks: { 'cell-1': sec('cell-1', 'slate-in') },
+          blocks_layout: { items: ['cell-1'] },
+        },
+        'sec-top': sec('sec-top', 'slate-out'),
+      },
+      blocks_layout: { items: ['columns-1', 'sec-top'] },
+    };
+    const map = buildBlockPathMap(formData, blocksConfig);
+    expect(map['slate-in'].allowedSiblingTypes).not.toContain('columns');
+    expect(map['slate-out'].allowedSiblingTypes).toContain('columns');
+  });
+
+  test('records descendantDisallowedTypes on the declaring container (for the type picker)', () => {
+    const formData = {
+      '@type': 'Document',
+      blocks: {
+        'columns-1': {
+          '@type': 'columns',
+          blocks: {
+            'cell-1': { '@type': 'section', blocks: {}, blocks_layout: { items: [] } },
+          },
+          blocks_layout: { items: ['cell-1'] },
+        },
+      },
+      blocks_layout: { items: ['columns-1'] },
+    };
+    const map = buildBlockPathMap(formData, blocksConfig);
+    expect(map['columns-1'].descendantDisallowedTypes).toEqual(['columns']);
+  });
+
+  test('no declaration anywhere → allowedSiblingTypes unchanged (back-compat)', () => {
+    const plainConfig = {
+      ...blocksConfig,
+      columns: {
+        id: 'columns',
+        blockSchema: {
+          properties: {
+            items: { widget: 'blocks_layout', allowedBlocks: ['section'] },
+          },
+        },
+      },
+    };
+    const formData = {
+      '@type': 'Document',
+      blocks: {
+        'columns-1': {
+          '@type': 'columns',
+          blocks: { 'cell-1': sec('cell-1', 'slate-1') },
+          blocks_layout: { items: ['cell-1'] },
+        },
+      },
+      blocks_layout: { items: ['columns-1'] },
+    };
+    const map = buildBlockPathMap(formData, plainConfig);
+    expect(map['slate-1'].allowedSiblingTypes).toContain('columns');
+    expect(map['columns-1'].descendantDisallowedTypes).toBeUndefined();
+  });
+});

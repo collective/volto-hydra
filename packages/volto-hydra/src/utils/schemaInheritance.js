@@ -34,6 +34,7 @@
  */
 import config from '@plone/volto/registry';
 import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField } from './blockPath';
+import { addableSiblingTypes } from '../../../hydra-js/buildBlockPathMap.js';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
 import { convertFieldValue } from '@volto-hydra/helpers';
 import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context';
@@ -1935,13 +1936,14 @@ export function getBlockTypeChoices(options, blocksConfig, blockPathMap, blockId
       const blockType = formData['@type'];
       const blockSchema = getBlockTypeSchema(blockType, intl, blocksConfig);
       const fieldDef = blockSchema?.properties?.[effectiveBlocksField];
-      if (fieldDef?.allowedBlocks) {
-        // Get allowedBlocks from the field definition in schema
-        types = fieldDef.allowedBlocks;
-      } else {
-        // For implicit containers (blocks/blocks_layout), check block config's allowedBlocks
-        types = blocksConfig[blockType]?.allowedBlocks;
-      }
+      // Field def's allowedBlocks, else the block config's (implicit containers).
+      const raw = fieldDef?.allowedBlocks ?? blocksConfig[blockType]?.allowedBlocks;
+      // Subtract any ancestor `disallowDescendantBlocks` via the SAME helper the
+      // pathMap uses, so the type picker agrees with add/DnD. No sync-narrowing
+      // here (itemTypeField undefined) — the picker enumerates ALL type choices;
+      // the set applying to this container's children was recorded on its entry.
+      const disallow = blockPathMap?.[blockId]?.descendantDisallowedTypes;
+      types = addableSiblingTypes(raw, undefined, formData, blocksConfig, disallow);
     }
   }
 

@@ -14,6 +14,7 @@ import {
   createSchemaEnhancerFromRecipe,
   getConversionMap,
   validateFieldMappings,
+  getBlockTypeChoices,
 } from './schemaInheritance';
 import config from '@plone/volto/registry';
 
@@ -38,6 +39,61 @@ describe('validateFieldMappings — @default accepts any search-metadata field',
 
   test('block-field names (fieldRules keys) still warn — the guardrail', () => {
     expect(warnFor({ title: 'title', label: 'x', required: 'y' })).toBe(true);
+  });
+});
+
+/**
+ * getBlockTypeChoices computes the type/convert picker's options. Its
+ * explicit-blocksField branch reads the container's own field allowedBlocks
+ * directly (not the resolved allowedSiblingTypes), so it must apply the same
+ * ancestor `disallowDescendantBlocks` restriction — via the shared
+ * addableSiblingTypes helper, using the set buildBlockPathMap records on the
+ * container entry. Otherwise the type picker could offer a type that add/DnD
+ * forbid.
+ */
+describe('getBlockTypeChoices — respects ancestor disallowDescendantBlocks', () => {
+  const intl = { formatMessage: (m) => (m && m.defaultMessage) || '' };
+  const blocksConfig = {
+    grid: {
+      id: 'grid',
+      title: 'Grid',
+      blockSchema: {
+        properties: {
+          items: { widget: 'blocks_layout', allowedBlocks: ['card', 'columns'] },
+        },
+      },
+    },
+    card: { id: 'card', title: 'Card' },
+    columns: { id: 'columns', title: 'Columns' },
+  };
+
+  test('subtracts the recorded disallow set from the field allowedBlocks', () => {
+    const blockPathMap = {
+      'grid-1': { blockType: 'grid', descendantDisallowedTypes: ['columns'] },
+    };
+    const values = getBlockTypeChoices(
+      { blocksField: 'items' },
+      blocksConfig,
+      blockPathMap,
+      'grid-1',
+      { '@type': 'grid' },
+      intl,
+    ).map(([v]) => v);
+    expect(values).toContain('card');
+    expect(values).not.toContain('columns');
+  });
+
+  test('no disallow set → field allowedBlocks unchanged (back-compat)', () => {
+    const blockPathMap = { 'grid-1': { blockType: 'grid' } };
+    const values = getBlockTypeChoices(
+      { blocksField: 'items' },
+      blocksConfig,
+      blockPathMap,
+      'grid-1',
+      { '@type': 'grid' },
+      intl,
+    ).map(([v]) => v);
+    expect(values).toEqual(expect.arrayContaining(['card', 'columns']));
   });
 });
 
