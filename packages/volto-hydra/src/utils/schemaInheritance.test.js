@@ -284,6 +284,146 @@ describe('fieldRules — contains operator (multiselect-driven visibility)', () 
   });
 });
 
+describe('fieldRules — oneOf operator (scalar Choice-driven visibility)', () => {
+  const baseSchema = () => ({
+    fieldsets: [{ id: 'default', title: 'Default', fields: ['colour', 'invert'] }],
+    properties: {
+      colour: { title: 'Colour' },
+      invert: { title: 'Invert', type: 'boolean' },
+    },
+    required: [],
+  });
+
+  // Show `invert` only when the colour is one of the dark set — the inverse of
+  // `contains` (the SET is the operand, the field value is a scalar Choice).
+  const recipe = {
+    fieldRules: {
+      invert: {
+        when: { colour: { oneOf: ['brand-dark', 'black'] } },
+        else: false,
+      },
+    },
+  };
+
+  test('keeps the field when the value is in the set', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { colour: 'brand-dark' },
+    });
+    expect(out.properties.invert).toBeDefined();
+    expect(out.fieldsets[0].fields).toContain('invert');
+  });
+
+  test('hides the field when the value is outside the set', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { colour: 'off-white' },
+    });
+    expect(out.properties.invert).toBeUndefined();
+    expect(out.fieldsets[0].fields).not.toContain('invert');
+  });
+
+  test('hides the field when the value is unset', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const out = enhancer({ schema: baseSchema(), formData: {} });
+    expect(out.properties.invert).toBeUndefined();
+  });
+
+  // notOneOf is the inverse: keep the field UNLESS the value is in the set.
+  const notOneOfRecipe = {
+    fieldRules: {
+      invert: {
+        when: { colour: { notOneOf: ['off-white', 'white'] } },
+        else: false,
+      },
+    },
+  };
+
+  test('notOneOf keeps the field when the value is outside the set', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(notOneOfRecipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { colour: 'brand-dark' },
+    });
+    expect(out.properties.invert).toBeDefined();
+  });
+
+  test('notOneOf hides the field when the value is in the set', () => {
+    const enhancer = createSchemaEnhancerFromRecipe(notOneOfRecipe);
+    const out = enhancer({
+      schema: baseSchema(),
+      formData: { colour: 'off-white' },
+    });
+    expect(out.properties.invert).toBeUndefined();
+  });
+
+  test('notOneOf keeps the field when the value is unset', () => {
+    // An unset value is not in the set, so notOneOf is satisfied.
+    const enhancer = createSchemaEnhancerFromRecipe(notOneOfRecipe);
+    const out = enhancer({ schema: baseSchema(), formData: {} });
+    expect(out.properties.invert).toBeDefined();
+  });
+});
+
+/**
+ * fieldRules `containsAny`/`containsAll` (and their inverses) — a multiselect
+ * ARRAY tested against a SET. The multi-value form of `contains`: gate a field
+ * on the multiselect sharing any of a set (`containsAny`) or holding all of it
+ * (`containsAll`), rather than one value at a time.
+ */
+describe('fieldRules — containsAny/containsAll operators (multiselect vs a set)', () => {
+  const baseSchema = () => ({
+    fieldsets: [{ id: 'default', title: 'Default', fields: ['elements', 'target'] }],
+    properties: {
+      elements: { title: 'Elements', type: 'array' },
+      target: { title: 'Target' },
+    },
+    required: [],
+  });
+  const recipe = (op, set) => ({
+    fieldRules: {
+      target: { when: { elements: { [op]: set } }, else: false },
+    },
+  });
+  const shows = (op, set, elements) => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe(op, set));
+    const out = enhancer({ schema: baseSchema(), formData: { elements } });
+    return out.properties.target !== undefined;
+  };
+  const showsUnset = (op, set) => {
+    const enhancer = createSchemaEnhancerFromRecipe(recipe(op, set));
+    return enhancer({ schema: baseSchema(), formData: {} }).properties.target !== undefined;
+  };
+
+  test('containsAny: shows when the array shares ANY value with the set', () => {
+    expect(shows('containsAny', ['image', 'video'], ['tag', 'image'])).toBe(true);
+    expect(shows('containsAny', ['image', 'video'], ['tag', 'date'])).toBe(false);
+    expect(showsUnset('containsAny', ['image', 'video'])).toBe(false);
+  });
+
+  test('notContainsAny: shows when the array shares NONE with the set', () => {
+    expect(shows('notContainsAny', ['image', 'video'], ['tag', 'date'])).toBe(true);
+    expect(shows('notContainsAny', ['image', 'video'], ['tag', 'image'])).toBe(false);
+    // An unset multiselect shares nothing, so notContainsAny is satisfied.
+    expect(showsUnset('notContainsAny', ['image', 'video'])).toBe(true);
+  });
+
+  test('containsAll: shows only when the array holds EVERY value in the set', () => {
+    expect(shows('containsAll', ['image', 'date'], ['image', 'date', 'tag'])).toBe(true);
+    expect(shows('containsAll', ['image', 'date'], ['image', 'tag'])).toBe(false);
+    expect(showsUnset('containsAll', ['image', 'date'])).toBe(false);
+  });
+
+  test('notContainsAll: shows unless the array holds EVERY value (missing ≥1)', () => {
+    expect(shows('notContainsAll', ['image', 'date'], ['image', 'tag'])).toBe(true);
+    expect(shows('notContainsAll', ['image', 'date'], ['image', 'date'])).toBe(false);
+    // Unset is missing all of them, so notContainsAll is satisfied.
+    expect(showsUnset('notContainsAll', ['image', 'date'])).toBe(true);
+  });
+});
+
 /**
  * fieldRules + `required` — a hidden field must not stay required.
  *
@@ -407,5 +547,273 @@ describe('inheritSchemaFrom — idempotent (no doubled "… Defaults" fieldset)'
     ).toHaveLength(1);
 
     config.blocks.blocksConfig = prev;
+  });
+});
+
+/**
+ * SURFACE MODEL — each field reduces to a comparison surface (string / number /
+ * boolean / array) and every operator is valid only for specific surfaces,
+ * throwing otherwise. These describes are the single source of truth for
+ * "operator X on a Y field". count-vs-compare, membership-vs-substring, etc. are
+ * driven by the field's declared type, never the value shape.
+ */
+
+// Declare field `f` with `fieldDef`; does `target` survive under `when`?
+const runField = (fieldDef, value, when) => {
+  const recipe = { fieldRules: { target: { when, else: false } } };
+  const enhancer = createSchemaEnhancerFromRecipe(recipe);
+  const schema = {
+    fieldsets: [{ id: 'default', title: 'Default', fields: ['f', 'target'] }],
+    properties: { f: { title: 'F', ...fieldDef }, target: { title: 'Target' } },
+    required: [],
+  };
+  const formData = value === undefined ? {} : { f: value };
+  return enhancer({ schema, formData }).properties.target !== undefined;
+};
+
+describe('fieldRules — string surface (text / Choice / url)', () => {
+  const run = (value, when, fieldDef = {}) => runField(fieldDef, value, when);
+
+  test('is / isNot — exact match; bare value is shorthand for is', () => {
+    expect(run('draft', { f: { is: 'draft' } })).toBe(true);
+    expect(run('draft', { f: { is: 'live' } })).toBe(false);
+    expect(run('draft', { f: { isNot: 'live' } })).toBe(true);
+    expect(run('draft', { f: 'draft' })).toBe(true);
+    expect(run('draft', { f: 'live' })).toBe(false);
+  });
+
+  test('isSet / isNotSet — empty string is unset', () => {
+    expect(run('x', { f: { isSet: true } })).toBe(true);
+    expect(run('', { f: { isSet: true } })).toBe(false);
+    expect(run(undefined, { f: { isSet: true } })).toBe(false);
+    expect(run('', { f: { isNotSet: true } })).toBe(true);
+  });
+
+  test('oneOf / notOneOf — value in a set', () => {
+    expect(run('brand-dark', { f: { oneOf: ['brand-dark', 'black'] } })).toBe(true);
+    expect(run('white', { f: { oneOf: ['brand-dark', 'black'] } })).toBe(false);
+    expect(run('white', { f: { notOneOf: ['brand-dark'] } })).toBe(true);
+  });
+
+  test('contains / notContains — SUBSTRING', () => {
+    expect(run('Chapter 3: Intro', { f: { contains: 'Chapter' } })).toBe(true);
+    expect(run('Intro', { f: { contains: 'Chapter' } })).toBe(false);
+    expect(run('Intro', { f: { notContains: 'Chapter' } })).toBe(true);
+    expect(run(undefined, { f: { contains: 'x' } })).toBe(false); // unset → ''
+  });
+
+  test('regex / notRegex — pattern, with optional flags', () => {
+    expect(run('Chapter 12', { f: { regex: '^Chapter \\d+$' } })).toBe(true);
+    expect(run('chapter 12', { f: { regex: '^Chapter' } })).toBe(false); // case-sensitive
+    expect(run('chapter 12', { f: { regex: { pattern: '^chapter', flags: 'i' } } })).toBe(true);
+    expect(run('Intro', { f: { notRegex: '^Chapter' } })).toBe(true);
+  });
+
+  test('array / number ops throw on a string field; invalid regex throws', () => {
+    expect(() => run('x', { f: { containsAny: ['a'] } })).toThrow(
+      /operator "containsAny" is not valid/i,
+    );
+    expect(() => run('x', { f: { gt: 1 } })).toThrow(/is not valid/i);
+    expect(() => run('x', { f: { regex: '(' } })).toThrow(/invalid pattern/i);
+  });
+});
+
+describe('fieldRules — slate surface (rich text → plaintext)', () => {
+  const nodes = (text) => [{ type: 'p', children: [{ text }] }];
+  const run = (text, when) => runField({ widget: 'slate' }, nodes(text), when);
+
+  test('contains / regex read the serialized plaintext', () => {
+    expect(run('Hello brave world', { f: { contains: 'brave' } })).toBe(true);
+    expect(run('Hello world', { f: { contains: 'brave' } })).toBe(false);
+    expect(run('Draft 2026', { f: { regex: '\\d{4}' } })).toBe(true);
+  });
+
+  test('isSet — empty slate is unset', () => {
+    expect(run('hi', { f: { isSet: true } })).toBe(true);
+    expect(runField({ widget: 'slate' }, [], { f: { isSet: true } })).toBe(false);
+  });
+});
+
+describe('fieldRules — number surface', () => {
+  const run = (value, when) => runField({ type: 'integer' }, value, when);
+
+  test('gt/gte/lt/lte compare the number (numeric strings coerce)', () => {
+    expect(run(5, { f: { gt: 2 } })).toBe(true);
+    expect(run(5, { f: { lt: 2 } })).toBe(false);
+    expect(run(5, { f: { gte: 5 } })).toBe(true);
+    expect(run('5', { f: { gte: 5 } })).toBe(true);
+    expect(runField({ type: 'float' }, 1.5, { f: { gt: 1 } })).toBe(true);
+  });
+
+  test('unset / blank → every comparison is false', () => {
+    expect(run(undefined, { f: { gt: 0 } })).toBe(false);
+    expect(run('', { f: { gte: 1 } })).toBe(false);
+  });
+
+  test('is / oneOf — numeric equality / membership; 0 is set', () => {
+    expect(run(5, { f: { is: 5 } })).toBe(true);
+    expect(run('5', { f: { is: 5 } })).toBe(true);
+    expect(run(2, { f: { oneOf: [1, 2, 3] } })).toBe(true);
+    expect(run(9, { f: { oneOf: [1, 2, 3] } })).toBe(false);
+    expect(run(0, { f: { isSet: true } })).toBe(true);
+    expect(run(undefined, { f: { isSet: true } })).toBe(false);
+  });
+
+  test('contains / regex throw on a number field', () => {
+    expect(() => run(5, { f: { contains: 5 } })).toThrow(/operator "contains" is not valid/i);
+    expect(() => run(5, { f: { regex: '5' } })).toThrow(/operator "regex" is not valid/i);
+  });
+});
+
+describe('fieldRules — boolean surface', () => {
+  const run = (value, when) => runField({ type: 'boolean' }, value, when);
+
+  test('is true/false; false is "set"', () => {
+    expect(run(true, { f: { is: true } })).toBe(true);
+    expect(run(false, { f: { is: true } })).toBe(false);
+    expect(run(false, { f: { isSet: true } })).toBe(true);
+    expect(run(undefined, { f: { isSet: true } })).toBe(false);
+  });
+});
+
+describe('fieldRules — multiselect surface (array of values)', () => {
+  const run = (value, when) => runField({ type: 'array' }, value, when);
+
+  test('contains / containsAny / containsAll — membership', () => {
+    expect(run(['image', 'date'], { f: { contains: 'date' } })).toBe(true);
+    expect(run(['image'], { f: { contains: 'date' } })).toBe(false);
+    expect(run(['image', 'date'], { f: { containsAny: ['x', 'image'] } })).toBe(true);
+    expect(run(['image', 'date'], { f: { containsAll: ['image', 'date'] } })).toBe(true);
+    expect(run(['image'], { f: { containsAll: ['image', 'date'] } })).toBe(false);
+  });
+
+  test('is / isNot — SET equality (order-independent)', () => {
+    expect(run(['image', 'date'], { f: { is: ['date', 'image'] } })).toBe(true);
+    expect(run(['image'], { f: { is: ['image', 'date'] } })).toBe(false);
+    expect(run(['image', 'date'], { f: { isNot: ['image'] } })).toBe(true);
+  });
+
+  test('gt/gte/lt/lte — COUNT the selected values', () => {
+    expect(run(['image', 'date'], { f: { gte: 2 } })).toBe(true);
+    expect(run(['image'], { f: { gte: 2 } })).toBe(false);
+    expect(run([], { f: { gt: 0 } })).toBe(false);
+    expect(run(undefined, { f: { gt: 0 } })).toBe(false);
+  });
+
+  test('isSet — empty selection is unset', () => {
+    expect(run(['image'], { f: { isSet: true } })).toBe(true);
+    expect(run([], { f: { isSet: true } })).toBe(false);
+  });
+
+  test('oneOf and regex throw on an array field', () => {
+    expect(() => run(['image'], { f: { oneOf: ['image', 'date'] } })).toThrow(
+      /operator "oneOf" is not valid/i,
+    );
+    expect(() => run(['image'], { f: { regex: 'x' } })).toThrow(
+      /operator "regex" is not valid/i,
+    );
+  });
+});
+
+describe('fieldRules — region surface (child block TYPES, not UIDs)', () => {
+  // blocks_layout container: `body` region holds [image, slate, image].
+  const blocksLayoutBlock = () => ({
+    '@type': 'grid',
+    blocks: {
+      a: { '@type': 'image' },
+      b: { '@type': 'slate' },
+      c: { '@type': 'image' },
+    },
+    blocks_layout: { body: ['a', 'b', 'c'] },
+  });
+  const runRegion = (when, formData, schema) => {
+    const recipe = { fieldRules: { target: { when, else: false } } };
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const s = schema || {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['target'] }],
+      properties: { target: { title: 'Target' } },
+      required: [],
+    };
+    return enhancer({ schema: s, formData }).properties.target !== undefined;
+  };
+
+  test('contains matches on child block TYPE (blocks_layout, by @type)', () => {
+    const b = blocksLayoutBlock();
+    expect(runRegion({ body: { contains: 'image' } }, b)).toBe(true);
+    expect(runRegion({ body: { contains: 'video' } }, b)).toBe(false);
+    expect(runRegion({ body: { containsAny: ['video', 'slate'] } }, b)).toBe(true);
+    expect(runRegion({ body: { containsAll: ['image', 'slate'] } }, b)).toBe(true);
+    expect(runRegion({ body: { containsAll: ['image', 'video'] } }, b)).toBe(false);
+  });
+
+  test('gt/gte/lt/lte count the region children', () => {
+    const b = blocksLayoutBlock();
+    expect(runRegion({ body: { gte: 3 } }, b)).toBe(true);
+    expect(runRegion({ body: { gt: 3 } }, b)).toBe(false);
+  });
+
+  test('object_list region: contains matches typed item type via typeField', () => {
+    const schema = {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['panels', 'target'] }],
+      properties: {
+        panels: { title: 'Panels', widget: 'object_list', typeField: 'field_type' },
+        target: { title: 'Target' },
+      },
+      required: [],
+    };
+    const formData = { panels: [{ field_type: 'faq' }, { field_type: 'cta' }] };
+    expect(runRegion({ panels: { contains: 'faq' } }, formData, schema)).toBe(true);
+    expect(runRegion({ panels: { contains: 'missing' } }, formData, schema)).toBe(false);
+    expect(runRegion({ panels: { gte: 2 } }, formData, schema)).toBe(true);
+  });
+});
+
+/**
+ * A numeric operator counts ONE blocks_layout region — the region named by the
+ * field path — NOT the sum across all regions. blocks_layout regions aren't schema
+ * properties; the region name resolves through the central storage-agnostic reader.
+ */
+describe('fieldRules — numeric operators count ONE blocks_layout region', () => {
+  // Container block: `columns` region has 3 children, `footer` has 1.
+  const container = () => ({
+    '@type': 'columnsBlock',
+    blocks: { c1: {}, c2: {}, c3: {}, f1: {} },
+    blocks_layout: { columns: ['c1', 'c2', 'c3'], footer: ['f1'] },
+  });
+  const shows = (region, op) => {
+    const recipe = { fieldRules: { target: { when: { [region]: op }, else: false } } };
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const schema = {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['target'] }],
+      properties: { target: { title: 'Target' } },
+      required: [],
+    };
+    return enhancer({ schema, formData: container() }).properties.target !== undefined;
+  };
+
+  test('counts the named region, independent of sibling regions (not summed)', () => {
+    expect(shows('columns', { gte: 3 })).toBe(true); // columns has 3
+    expect(shows('columns', { gt: 3 })).toBe(false); // 3, NOT 3+1=4 (would pass if summed)
+    expect(shows('footer', { gte: 1 })).toBe(true); // footer has 1
+    expect(shows('footer', { gte: 2 })).toBe(false); // 1, NOT the 4-item total
+    expect(shows('footer', { gt: 1 })).toBe(false);
+  });
+
+  test('an empty blocks_layout region counts 0', () => {
+    const recipe = { fieldRules: { target: { when: { sidebar: { gt: 0 } }, else: false } } };
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const schema = {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['target'] }],
+      properties: { target: { title: 'Target' } },
+      required: [],
+    };
+    const formData = {
+      '@type': 'columnsBlock',
+      blocks: {},
+      blocks_layout: { sidebar: [] },
+    };
+    expect(enhancer({ schema, formData }).properties.target !== undefined).toBe(
+      false,
+    );
   });
 });

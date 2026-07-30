@@ -36,7 +36,17 @@ import config from '@plone/volto/registry';
 import { getBlockTypeSchema, getBlockById, updateBlockById, getChildBlockIds, getChildField, getChildBlockIdsInField } from './blockPath';
 import { addableSiblingTypes } from '../../../hydra-js/buildBlockPathMap.js';
 import { PAGE_BLOCK_UID } from '@volto-hydra/hydra-js';
-import { convertFieldValue } from '@volto-hydra/helpers';
+import {
+  convertFieldValue,
+  resolveFieldPath as resolveBlockFieldPath,
+  getFieldValue,
+  getFieldDef,
+  getFieldTypeString,
+  getChildBlockEntries,
+  getBlockType,
+  isSlateFieldType,
+  slateNodesText,
+} from '@volto-hydra/helpers';
 import { getHydraSchemaContext, setHydraSchemaContext, getLiveBlockData } from '../context';
 // Pure validation/default-application logic lives in schemaValidation.js
 // (no dependencies — safe to import from CI scripts and test runners).
@@ -1547,12 +1557,21 @@ function createEnhancerByType(type, config) {
  *                                  — conditional definition override
  *   [ rule, rule, ... ]            — switch: first matching rule wins
  *
- * Condition format (when):
- *   { fieldName: value }           — equality: formData[fieldName] === value
- *   { fieldName: { isNot: v } }    — inequality
- *   { fieldName: { gte: n } }      — numeric comparison (gt, gte, lt, lte)
- *   { fieldName: { isSet: true } } — truthy check
- *   { fieldName: { contains: v } } — array membership (multiselect includes v)
+ * Condition format (when) — every operator is driven by the field's declared
+ * type (its SURFACE) and throws when used off-surface; see resolveWhenField /
+ * evaluateOperators for the full table:
+ *   { fieldName: value }           — equality (bare value ≡ { is: value })
+ *   { fieldName: { isNot: v } }    — inequality (arrays: set-equality)
+ *   { fieldName: { isSet: true } } — presence ('' / [] / unset are not set)
+ *   { fieldName: { oneOf: [a,b] } }— scalar (string/number) value ∈ set
+ *   { fieldName: { contains: v } } — STRING: substring; ARRAY: membership (a
+ *                                    multiselect value, or a region's block TYPE)
+ *   { fieldName: { containsAny: [a,b] } } — ARRAY shares any / (All) holds all
+ *   { fieldName: { regex: 're' } } — STRING (incl. slate plaintext) matches a
+ *                                    pattern ('re' or { pattern, flags })
+ *   { fieldName: { gte: n } }      — NUMBER compares; ARRAY (multiselect / a
+ *                                    region, named by its field) COUNTS its items
+ *                                    (one region only, never a cross-region total)
  *   { '../field': value }          — parent/root field path
  *
  * Field definitions can include a `fieldset` property to specify placement:
@@ -1748,113 +1767,282 @@ function evaluateFieldRule(rule, formData, args) {
 }
 
 /**
+ * Reduce a `when` field path to a comparison SURFACE — the single abstraction the
+ * operators act on — WITHOUT sniffing the value shape. Uses the central
+ * field-access API (the SAME one inline-edit / the sidebar use): the block-scope
+ * resolver (`/`, `..`) → `{ blockId, fieldName }`, then `getFieldValue` /
+ * `getFieldDef` / the storage-agnostic region reader.
+ *
+ * A surface is `{ kind, value, fieldPath }` where kind ∈:
+ *   - `'string'`  — text / textarea / url / Choice → the string; a SLATE field →
+ *                   its plaintext (`slateNodesText`), so contains/regex read prose.
+ *   - `'number'`  — integer / float / number → the number.
+ *   - `'boolean'` — boolean → true/false.
+ *   - `'array'`   — a MULTISELECT (type 'array') → its selected values; a REGION
+ *                   (object_list widget OR a blocks_layout region key) → the
+ *                   ordered list of its child block TYPES (`getBlockType`, so
+ *                   `contains: 'image'` means "has an image block").
+ *
+ * Only the current block carries a schema here (`args.schema`); a `../`/`/` ref
+ * has none, so its non-region value defaults to the string surface.
+ * @private
+ */
+function resolveWhenField(fieldPath, formData, args) {
+  const hydraContext = getHydraSchemaContext?.();
+  const blockPathMap = args?.blockPathMap || hydraContext?.blockPathMap;
+  const curBlockId =
+    args?.blockId ?? hydraContext?.currentBlockId ?? PAGE_BLOCK_UID;
+  const { blockId: targetBlockId, fieldName } = resolveBlockFieldPath(
+    fieldPath,
+    curBlockId,
+    blockPathMap,
+  );
+
+  // Which block owns the field, and (only for the current block) its schema.
+  let block;
+  let schema;
+  if (targetBlockId === curBlockId) {
+    block = formData;
+    schema = args?.schema;
+  } else if (targetBlockId === PAGE_BLOCK_UID) {
+    block = args?.pageFormData || hydraContext?.formData;
+  } else {
+    block = getLiveBlockData?.(targetBlockId, {
+      formData: args?.pageFormData,
+      blockPathMap,
+    });
+  }
+
+  const def = schema ? getFieldDef(schema, fieldName) : undefined;
+
+  // REGION → array of child block TYPES. object_list via widget, blocks_layout via
+  // the shared dict (incl. empty). A typed object_list stores its type in a
+  // `typeField`; blocks_layout children carry `@type` — getBlockType handles both.
+  const isObjectList = def?.widget === 'object_list';
+  const isBlocksLayoutRegion = Array.isArray(block?.blocks_layout?.[fieldName]);
+  if (isObjectList || isBlocksLayoutRegion) {
+    const entries = getChildBlockEntries(block, { isObjectList, region: fieldName });
+    const types = entries.map((e) => getBlockType(e.block, def?.typeField));
+    return { kind: 'array', value: types, fieldPath };
+  }
+
+  const raw = block ? getFieldValue(block, fieldName) : undefined;
+  const typeStr = def ? getFieldTypeString(def) : undefined;
+  const type = def?.type;
+
+  // SLATE / rich text → plaintext string (checked before 'array', since slate can
+  // be `array:slate`).
+  if (isSlateFieldType(typeStr)) {
+    return { kind: 'string', value: slateNodesText(raw), fieldPath };
+  }
+  if (type === 'array') {
+    return { kind: 'array', value: Array.isArray(raw) ? raw : [], fieldPath };
+  }
+  if (['integer', 'int', 'float', 'number'].includes(type)) {
+    return { kind: 'number', value: raw, fieldPath };
+  }
+  if (type === 'boolean') {
+    return { kind: 'boolean', value: raw, fieldPath };
+  }
+  // Default scalar surface: text / textarea / url / Choice (and schemaless refs).
+  return { kind: 'string', value: raw, fieldPath };
+}
+
+/**
  * Evaluate a 'when' condition against form data.
  * Format: { fieldPath: expectedValue, ... } or { fieldPath: { operator: value }, ... }
- * All entries must match (AND logic).
+ * All entries must match (AND logic). A bare value is shorthand for `{ is: value }`.
  * @private
  */
 function evaluateWhenCondition(when, formData, args) {
   for (const [fieldPath, expected] of Object.entries(when)) {
-    const value = resolveFieldPath(fieldPath, formData, args);
-
-    // Object with operators: { isNot: v, gte: n, isSet: true, ... }
-    if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
-      if (!evaluateOperators(value, expected)) return false;
-      continue;
-    }
-
-    // Simple equality
-    if (value !== expected) return false;
+    const surface = resolveWhenField(fieldPath, formData, args);
+    const operators =
+      expected && typeof expected === 'object' && !Array.isArray(expected)
+        ? expected
+        : { is: expected };
+    if (!evaluateOperators(surface, operators)) return false;
   }
   return true;
 }
 
+/** Throw when an operator is used on a field surface it can't act on. @private */
+function assertKind(op, surface, allowed) {
+  if (!allowed.includes(surface.kind)) {
+    throw new Error(
+      `fieldRules: operator "${op}" is not valid for a ${surface.kind} field${
+        surface.fieldPath ? ` ("${surface.fieldPath}")` : ''
+      }; it applies to ${allowed.join('/')} fields`,
+    );
+  }
+}
+
+/** The set operand of oneOf/containsAny/… — must be an array. @private */
+function requireSet(op, operand) {
+  if (!Array.isArray(operand)) {
+    throw new Error(`fieldRules: operator "${op}" expects an array (a set)`);
+  }
+  return operand;
+}
+
+/** Does the field have a meaningful value? '' / [] / null / undefined are unset. @private */
+function isPresent({ kind, value }) {
+  if (value === undefined || value === null) return false;
+  if (kind === 'string') return value !== '';
+  if (kind === 'array') return Array.isArray(value) && value.length > 0;
+  return true; // number 0 and boolean false are present
+}
+
+/** Coerce a number surface's value for comparison; '' / null → NaN. @private */
+function numberOf(value) {
+  return value === '' || value == null ? NaN : Number(value);
+}
+
+/** Equality per surface: set-equality for arrays, numeric for numbers, === else. @private */
+function surfaceEquals(surface, operand) {
+  const { kind, value } = surface;
+  if (kind === 'array') {
+    const set = requireSet('is', operand);
+    const a = new Set(value);
+    const b = new Set(set);
+    return a.size === b.size && [...a].every((v) => b.has(v));
+  }
+  if (kind === 'number') return numberOf(value) === numberOf(operand);
+  return value === operand;
+}
+
+/** Compile a regex operand — `'pattern'` or `{ pattern, flags }`. @private */
+function toRegExp(op, operand) {
+  const pattern = typeof operand === 'string' ? operand : operand?.pattern;
+  const flags = typeof operand === 'string' ? undefined : operand?.flags;
+  try {
+    return new RegExp(pattern, flags);
+  } catch (e) {
+    throw new Error(`fieldRules: operator "${op}" has an invalid pattern: ${e.message}`);
+  }
+}
+
 /**
- * Evaluate operator conditions against a value.
- * Operators: is, isNot, gt, gte, lt, lte, isSet, isNotSet, contains, notContains
- * `contains`/`notContains` test array membership (for multiselect fields):
- * `{ contains: 'date' }` matches when `value` is an array that includes 'date'.
+ * Evaluate operator conditions against a field SURFACE (from resolveWhenField).
+ * Every operator is valid only for specific surface kinds and THROWS otherwise —
+ * count-vs-compare, membership-vs-substring, etc. are driven by the surface, never
+ * the value shape:
+ *   is / isNot        — any surface (arrays: set-equality; numbers: numeric)
+ *   isSet / isNotSet  — any surface (presence)
+ *   oneOf / notOneOf  — string | number | boolean: the scalar is (not) in the set
+ *   contains          — string: substring · array: membership (a value, or a
+ *   / notContains       region's child block TYPE)
+ *   containsAny/All   — array: the array shares any / holds all of the set
+ *   (+ inverses)
+ *   regex / notRegex  — string: matches a pattern (`'re'` or `{ pattern, flags }`)
+ *   gt/gte/lt/lte     — number: compare · array: COUNT its items
  * @private
  */
-function evaluateOperators(value, operators) {
-  const { is, isNot, gt, gte, lt, lte, isSet, isNotSet, contains, notContains } =
-    operators;
+function evaluateOperators(surface, operators) {
+  const { kind, value } = surface;
+  const {
+    is,
+    isNot,
+    gt,
+    gte,
+    lt,
+    lte,
+    isSet,
+    isNotSet,
+    contains,
+    notContains,
+    oneOf,
+    notOneOf,
+    containsAny,
+    notContainsAny,
+    containsAll,
+    notContainsAll,
+    regex,
+    notRegex,
+  } = operators;
 
-  if (isSet !== undefined) {
-    const hasValue = value !== undefined && value !== null && value !== '';
-    if (isSet ? !hasValue : hasValue) return false;
+  if (isSet !== undefined && (isSet ? !isPresent(surface) : isPresent(surface)))
+    return false;
+  if (
+    isNotSet !== undefined &&
+    (isNotSet ? isPresent(surface) : !isPresent(surface))
+  )
+    return false;
+
+  if (is !== undefined && !surfaceEquals(surface, is)) return false;
+  if (isNot !== undefined && surfaceEquals(surface, isNot)) return false;
+
+  if (oneOf !== undefined) {
+    // Scalar set membership — the field's single value is (not) in the set.
+    assertKind('oneOf', surface, ['string', 'number', 'boolean']);
+    const v = kind === 'number' ? numberOf(value) : value;
+    if (!requireSet('oneOf', oneOf).includes(v)) return false;
   }
-  if (isNotSet !== undefined) {
-    const hasValue = value !== undefined && value !== null && value !== '';
-    if (isNotSet ? hasValue : !hasValue) return false;
+  if (notOneOf !== undefined) {
+    assertKind('notOneOf', surface, ['string', 'number', 'boolean']);
+    const v = kind === 'number' ? numberOf(value) : value;
+    if (requireSet('notOneOf', notOneOf).includes(v)) return false;
   }
+
   if (contains !== undefined) {
-    // Array membership: a non-array value (missing/unset multiselect) never
-    // contains anything, so the condition fails.
-    if (!Array.isArray(value) || !value.includes(contains)) return false;
+    // string → substring; array → membership (a value, or a region's block type).
+    assertKind('contains', surface, ['string', 'array']);
+    const hay = kind === 'array' ? value : String(value ?? '');
+    if (!hay.includes(contains)) return false;
   }
   if (notContains !== undefined) {
-    if (Array.isArray(value) && value.includes(notContains)) return false;
+    assertKind('notContains', surface, ['string', 'array']);
+    const hay = kind === 'array' ? value : String(value ?? '');
+    if (hay.includes(notContains)) return false;
   }
-  if (is !== undefined && value !== is) return false;
-  if (isNot !== undefined && value === isNot) return false;
 
-  const numValue = typeof value === 'number' ? value : parseFloat(value);
-  if (!isNaN(numValue)) {
-    if (gt !== undefined && !(numValue > gt)) return false;
-    if (gte !== undefined && !(numValue >= gte)) return false;
-    if (lt !== undefined && !(numValue < lt)) return false;
-    if (lte !== undefined && !(numValue <= lte)) return false;
+  if (containsAny !== undefined) {
+    assertKind('containsAny', surface, ['array']);
+    if (!requireSet('containsAny', containsAny).some((v) => value.includes(v)))
+      return false;
+  }
+  if (notContainsAny !== undefined) {
+    assertKind('notContainsAny', surface, ['array']);
+    if (requireSet('notContainsAny', notContainsAny).some((v) => value.includes(v)))
+      return false;
+  }
+  if (containsAll !== undefined) {
+    assertKind('containsAll', surface, ['array']);
+    if (!requireSet('containsAll', containsAll).every((v) => value.includes(v)))
+      return false;
+  }
+  if (notContainsAll !== undefined) {
+    assertKind('notContainsAll', surface, ['array']);
+    if (requireSet('notContainsAll', notContainsAll).every((v) => value.includes(v)))
+      return false;
+  }
+
+  if (regex !== undefined) {
+    assertKind('regex', surface, ['string']);
+    if (!toRegExp('regex', regex).test(value ?? '')) return false;
+  }
+  if (notRegex !== undefined) {
+    assertKind('notRegex', surface, ['string']);
+    if (toRegExp('notRegex', notRegex).test(value ?? '')) return false;
+  }
+
+  const hasNumericOp =
+    gt !== undefined ||
+    gte !== undefined ||
+    lt !== undefined ||
+    lte !== undefined;
+  if (hasNumericOp) {
+    // number → compare the value; array → COUNT its items. Unset/blank number →
+    // NaN → every comparison is false (no "skip-and-match").
+    assertKind('gt/gte/lt/lte', surface, ['number', 'array']);
+    const n = kind === 'array' ? value.length : numberOf(value);
+    if (gt !== undefined && !(n > gt)) return false;
+    if (gte !== undefined && !(n >= gte)) return false;
+    if (lt !== undefined && !(n < lt)) return false;
+    if (lte !== undefined && !(n <= lte)) return false;
   }
 
   return true;
-}
-
-/**
- * Resolve a field path to its value.
- * Supports: 'field' (current), '../field' (parent), '/field' (root)
- * @private
- */
-function resolveFieldPath(fieldPath, formData, args) {
-  if (!fieldPath) return undefined;
-
-  // Root path: /field
-  if (fieldPath.startsWith('/')) {
-    const rootField = fieldPath.slice(1);
-    // args may have rootFormData for accessing page-level fields
-    const rootData = args.rootFormData || formData;
-    return rootData?.[rootField];
-  }
-
-  // Parent path: ../field
-  if (fieldPath.startsWith('../')) {
-    const parentField = fieldPath.slice(3);
-    // Two valid sources for blockPathMap/blockId, see inheritSchemaFrom and
-    // hideParentOwnedFields for the full design note. Args drives the
-    // buildBlockPathMap pass 2 path; hydraContext drives sidebar render.
-    const hydraContext = getHydraSchemaContext?.();
-    const blockPathMap = args?.blockPathMap || hydraContext?.blockPathMap;
-    const blockId = args?.blockId ?? hydraContext?.currentBlockId;
-    if (blockPathMap && blockId) {
-      const pathInfo = blockPathMap[blockId];
-      if (pathInfo?.parentId && pathInfo.parentId !== PAGE_BLOCK_UID) {
-        // Nested block - get parent block data
-        const liveFallback = { formData: args?.pageFormData, blockPathMap };
-        const parentBlock = getLiveBlockData?.(pathInfo.parentId, liveFallback);
-        return parentBlock?.[parentField];
-      } else {
-        // Top-level block - parent is the page, use page-level formData
-        const pageFormData = args?.pageFormData || hydraContext?.formData;
-        return pageFormData?.[parentField];
-      }
-    }
-    // Last resort: pageFormData was passed but pathmap/blockId weren't.
-    // Treat ../field as a page-level lookup.
-    return args?.pageFormData?.[parentField];
-  }
-
-  // Current block path: field
-  return formData?.[fieldPath];
 }
 
 /**
