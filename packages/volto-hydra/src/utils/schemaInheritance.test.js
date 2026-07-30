@@ -816,4 +816,30 @@ describe('fieldRules — numeric operators count ONE blocks_layout region', () =
       false,
     );
   });
+
+  test('a schema-declared region, absent from data, counts 0 (does not throw)', () => {
+    // A container (e.g. the columns block) declares its region in the schema as
+    // `widget: 'blocks_layout'` and drives a count-aware switch off it. In
+    // buildBlockPathMap pass-1 the enhancer runs with formData={} — the region
+    // has no data yet. Detection must fall back to the SCHEMA widget (as
+    // object_list already does), so an absent region counts 0 rather than
+    // falling through to the scalar path and throwing "numeric or list".
+    const recipe = {
+      fieldRules: { target: { when: { items: { gte: 3 } }, else: false } },
+    };
+    const enhancer = createSchemaEnhancerFromRecipe(recipe);
+    const schema = {
+      fieldsets: [{ id: 'default', title: 'Default', fields: ['items', 'target'] }],
+      properties: {
+        items: { title: 'Items', widget: 'blocks_layout', allowedBlocks: ['card'] },
+        target: { title: 'Target' },
+      },
+      required: [],
+    };
+    // No blocks_layout in the data at all (pass-1 / a freshly-added block).
+    expect(() => enhancer({ schema, formData: {} })).not.toThrow();
+    expect(
+      enhancer({ schema, formData: {} }).properties.target !== undefined,
+    ).toBe(false);
+  });
 });
