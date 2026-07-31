@@ -22,18 +22,19 @@ import { fileURLToPath } from 'url';
 import { test, expect } from '../fixtures';
 import { AdminUIHelper } from '../helpers/AdminUIHelper';
 import { PORTS, URLS } from '../ports';
-import { showCaption } from './caption';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SHOWCASE_PATH = '/showcase-page';
 const BEAT_MS = 900;
 const TRIM_MARKER_FILE = path.join(SCRIPT_DIR, '.recordings', 'trim-ms.txt');
 
-async function beat(page: import('@playwright/test').Page, caption: string) {
-  // Paces the recording AND shows `caption` as an on-screen caption burned
-  // into the video, so the loop reads as a narrated walkthrough. The caption
-  // also shows up in the playwright trace for debugging.
-  await showCaption(page, caption);
+async function beat(page: import('@playwright/test').Page) {
+  // Paces the recording so a viewer can absorb what just happened. Narration is
+  // NOT done here — each beat opens with `helper.caption()`, which renders through
+  // Playwright's screencast overlay and therefore composites over the admin iframe
+  // too. (An earlier DOM-injected caption overlay lived in ./caption.ts; it was
+  // trapped in whichever document it was injected into, so it couldn't caption the
+  // iframe swap at the end of this demo. Removed in favour of the screencast one.)
   await page.waitForTimeout(BEAT_MS);
 }
 
@@ -106,7 +107,7 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   await page.keyboard.type(' Edit anywhere.', { delay: 40 });
   await expect(iframe.locator('[data-block-uid="intro"]'))
     .toContainText('Edit anywhere.', { timeout: 5_000 });
-  await beat(page, 'Edit any text, inline');
+  await beat(page);
 
   await helper.caption('Format with the toolbar');
   // Beat 2 — bold the phrase we just typed (Quanta toolbar).
@@ -116,25 +117,25 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   await page.keyboard.press('Shift+Home');
   await page.waitForTimeout(200);
   await page.keyboard.press('Meta+B');
-  await beat(page, 'Format with the toolbar');
+  await beat(page);
 
-  await helper.caption('Drag blocks to reorder');
   // Beat 3 — drop into block mode, drag the intro paragraph past the
   // adjacent column block to show DnD reflow. The dragBlockAfter helper
   // asserts the drop completed; the post-drop DOM order is implicit.
+  await helper.caption('Switch to block mode');
   await helper.escapeFromEditing();
-  await beat(page, 'Switch to block mode');
+  await beat(page);
+  await helper.caption('Drag blocks to reorder');
   await helper.dragBlockAfter('intro', 'after-columns');
-  await beat(page, 'Drag blocks to reorder');
+  await beat(page);
 
   await helper.caption('Blocks nest in containers');
   // Beat 4 — click into the columns container. waitForBlockSelectedInAdmin
   // is the assertion; the helper fails if the selection state doesn't land.
   await helper.clickBlockInIframe('columns-1');
   await helper.waitForBlockSelectedInAdmin('columns-1');
-  await beat(page, 'Select a container block');
+  await beat(page);
 
-  await helper.caption('Same content — any frontend');
   // Beat 5 — open the frontend switcher panel, switch to mobile
   // viewport, then click F7 Mobile. The iframe swaps to the F7
   // frontend at mobile width showing the same content through a
@@ -146,7 +147,7 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   // read the entry names (each frontend has a label like "Nuxt blog"
   // or "F7 Mobile") and see the mobile-width transition land before
   // the F7 frontend loads.
-  await showCaption(page, 'Preview in any frontend');
+  await helper.caption('Preview in any frontend');
   await page.locator('#toolbar-frontend-switcher').click();
   const panel = page.locator('.frontend-switcher-panel');
   await panel.waitFor({ state: 'visible' });
@@ -155,7 +156,7 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
 
   // Switch to mobile viewport first so the F7 frontend lands at the
   // intended phone width rather than full-bleed desktop.
-  await showCaption(page, 'Switch to a mobile view');
+  await helper.caption('Switch to a mobile view');
   await panel.getByLabel('Mobile').click();
   // Allow the iframe-max-width transition to finish visibly.
   await page.waitForTimeout(1_500);
@@ -170,6 +171,6 @@ test('hydra-demo — homepage hero loop', async ({ page }) => {
   }).toPass({ timeout: 5_000 });
   // Let the F7 frontend finish loading inside the iframe so the swap
   // is visibly captured (not just the URL change).
-  await showCaption(page, 'Same content, another design system');
+  await helper.caption('Same content, another design system');
   await page.waitForTimeout(3_000);
 });

@@ -3,6 +3,7 @@
  */
 import { Page, Locator, FrameLocator, expect, ElementHandle } from '@playwright/test';
 import { TEST_DATA_PREFIX } from './test-paths';
+import { showCaption, clearCaption } from './caption';
 import { URLS } from '../ports';
 import { randomUUID } from 'node:crypto';
 
@@ -1069,27 +1070,22 @@ export class AdminUIHelper {
 
   /**
    * High-level caption for a demo recording — a subtitle pill saying what's happening
-   * NEXT ("Unlock the shared footer template"). Rendered via screencast.showOverlay so
-   * it composites over everything (iframe included). Non-blocking: the pill stays up for
-   * `ms` while the following actions run, so place it right before a beat. No-op without
-   * screencast.
+   * NEXT ("Unlock the shared footer template"). Non-blocking: the pill stays up for
+   * `ms` while the following actions run, so place it right before a beat.
+   *
+   * Delegates to the shared caption module, which prefers Playwright >= 1.61's
+   * screencast overlay (composited into the video, so nothing is injected into the
+   * app being demoed) and falls back to a DOM overlay otherwise. `showCaption` from
+   * `demo-video/caption` is the same implementation — there is only one, so a demo
+   * can mix the two call styles without ending up with two pills on screen.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _lastCaption?: any;
   async caption(text: string, ms: number = 15_000): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sc = (this.page as any).screencast;
-    if (!sc?.showOverlay) return;
-    // One caption at a time: drop the previous pill so this beat's replaces it.
-    if (this._lastCaption?.dispose) await this._lastCaption.dispose().catch(() => {});
-    const safe = text.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]!));
-    const html =
-      `<div style="position:fixed;left:50%;bottom:6%;transform:translateX(-50%);` +
-      `max-width:80%;background:rgba(18,20,26,.9);color:#fff;padding:10px 20px;` +
-      `border-radius:999px;font:600 16px/1.3 system-ui,-apple-system,sans-serif;` +
-      `text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.35);` +
-      `z-index:2147483647;">${safe}</div>`;
-    this._lastCaption = await sc.showOverlay(html, { duration: ms });
+    await showCaption(this.page, text, ms);
+  }
+
+  /** Remove the caption pill entirely (see `caption()`). */
+  async clearCaption(): Promise<void> {
+    await clearCaption(this.page);
   }
 
   /**
