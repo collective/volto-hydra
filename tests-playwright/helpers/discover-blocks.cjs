@@ -403,6 +403,10 @@ const UNDECLARED_EXEMPT = new Set([
   'id', 'blocks', 'blocks_layout', 'image_scales', 'plaintext', 'value',
   'styles', 'override', 'block',
   'fixed', 'slotId', 'templateId', 'templateInstanceId', 'readOnly',
+  // Deep-link anchors hydra harvests + persists on the owning block (#273/#281).
+  // Not sidebar-authored — a consumer (in-page nav) reads them; exempt like the
+  // other serialisation/runtime fields above.
+  '_linkableAnchors',
 ]);
 
 function collectWidgetShapeIssues(
