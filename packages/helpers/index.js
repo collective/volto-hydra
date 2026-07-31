@@ -400,6 +400,16 @@ function computePagingUI(paging) {
       paging.currentPage < paging.totalPages - 1
         ? paging.currentPage + 1
         : null;
+  } else {
+    // No results (or no page size): leave a well-formed empty paging object so
+    // consumers can rely on `pages`/`totalPages` always being present rather
+    // than `undefined` (which would throw on `paging.pages.map`).
+    paging.currentPage = 0;
+    paging.totalPages = 0;
+    paging.totalItems = total || 0;
+    paging.pages = [];
+    paging.prev = null;
+    paging.next = null;
   }
 }
 
