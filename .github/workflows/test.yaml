@@ -130,7 +130,6 @@ jobs:
           CI: true
           NO_WEBSERVER: true
           SKIP_VOLTO_CHECK: true
-          COVERAGE: true
           DISCOVER_BLOCKS_API: http://localhost:8888
       - name: Upload test results
         if: failure()
@@ -141,14 +140,6 @@ jobs:
             playwright-report/
             test-results/**/*.png
           retention-days: 7
-      - name: Upload coverage
-        if: always()
-        continue-on-error: true
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage/lcov.info
-          flags: bridge-unit
-          fail_ci_if_error: false
 
   # ── Admin integration tests (mock frontend) ─────────────────────────────
   test-admin-mock:
@@ -224,7 +215,6 @@ jobs:
           CI: true
           NO_WEBSERVER: true
           USE_PREBUILT: true
-          COVERAGE: true
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4
@@ -234,14 +224,6 @@ jobs:
             playwright-report/
             test-results/**/*.png
           retention-days: 7
-      - name: Upload coverage
-        if: always()
-        continue-on-error: true
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage/lcov.info
-          flags: admin-mock
-          fail_ci_if_error: false
 
   # ── Nuxt bridge tests (no Volto needed) ─────────────────────────────────
   test-nuxt-bridge:
@@ -476,7 +458,6 @@ jobs:
           CI: true
           NO_WEBSERVER: true
           SKIP_VOLTO_CHECK: true
-          COVERAGE: true
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4
@@ -486,11 +467,3 @@ jobs:
             playwright-report/
             test-results/**/*.png
           retention-days: 7
-      - name: Upload coverage
-        if: always()
-        continue-on-error: true
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage/lcov.info
-          flags: nextjs-f7
-          fail_ci_if_error: false

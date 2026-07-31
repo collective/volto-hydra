@@ -19,35 +19,6 @@ const needsAstro = projectArg?.includes('astro');
 const needsNextjs = projectArg?.includes('nextjs');
 const needsF7 = projectArg?.includes('f7');
 
-// Only import coverage reporter when COVERAGE is enabled (CI)
-// This prevents V8 coverage collection overhead locally
-const coverageReporter = process.env.COVERAGE
-  ? (() => {
-      const { defineCoverageReporterConfig } = require('@bgotink/playwright-coverage');
-      return [
-        [
-          '@bgotink/playwright-coverage',
-          defineCoverageReporterConfig({
-            sourceRoot: __dirname,
-            exclude: [
-              '**/node_modules/**',
-              '**/tests-playwright/**',
-              '**/core/**',
-              '**/*.spec.ts',
-              '**/examples/**',
-            ],
-            resultDir: path.join(__dirname, 'coverage'),
-            reports: [
-              ['html'],
-              ['lcovonly', { file: 'lcov.info' }],
-              ['text-summary', { file: null }],
-            ],
-          }),
-        ] as const,
-      ];
-    })()
-  : [];
-
 /**
  * Playwright Test configuration for Volto Hydra tests.
  *
@@ -75,11 +46,7 @@ export default defineConfig({
   workers: process.env.CI ? undefined : undefined,
 
   /* Reporter to use */
-  reporter: [
-    ['html', { open: 'never' }],
-    // Code coverage reporter - only enabled when COVERAGE=1 (CI)
-    ...coverageReporter,
-  ],
+  reporter: [['html', { open: 'never' }]],
 
   /* Shared settings for all the projects below */
   use: {
