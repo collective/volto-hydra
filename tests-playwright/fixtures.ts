@@ -1,11 +1,8 @@
 /**
- * Playwright test fixtures with optional code coverage support.
+ * Playwright test fixtures.
  *
  * All test files should import `test` and `expect` from this file instead of
  * directly from @playwright/test.
- *
- * Coverage is only enabled when COVERAGE=1 (set in CI). Locally, tests run
- * without coverage collection overhead (~90MB per test).
  *
  * Usage in test files:
  *   import { test, expect } from '../fixtures';
@@ -14,17 +11,9 @@
  */
 
 import { test as playwrightTest, expect } from '@playwright/test';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-
-// Only use coverage test fixture when COVERAGE is enabled (CI)
-// This prevents ~90MB of V8 coverage data per test locally
-const baseTest = process.env.COVERAGE
-  ? require('@bgotink/playwright-coverage').test
-  : playwrightTest;
 
 // Extend test to capture console logs from page and iframe
-const test = baseTest.extend({
+const test = playwrightTest.extend({
   page: async ({ page }, use, testInfo) => {
     // Session isolation is handled via auth tokens - each login generates a unique
     // token (based on timestamp) which the mock API uses as the session identifier.

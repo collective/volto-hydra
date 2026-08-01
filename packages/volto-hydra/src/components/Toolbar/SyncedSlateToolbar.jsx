@@ -14,12 +14,12 @@ import { isSlateFieldType, isBlockPositionLocked, isBlockReadonly, getFieldValue
 import { useDispatch, useSelector } from 'react-redux';
 import FormatDropdown from './FormatDropdown';
 import DropdownMenu from './DropdownMenu';
+import TemplateLockToggle from './TemplateLockToggle';
 import linkSVG from '@plone/volto/icons/link.svg';
 import imageSVG from '@plone/volto/icons/image.svg';
 import clearSVG from '@plone/volto/icons/clear.svg';
 import upSVG from '@plone/volto/icons/up.svg';
 import lockSVG from '@plone/volto/icons/lock.svg';
-import unlockSVG from '@plone/volto/icons/unlock.svg';
 import AddLinkForm from '@plone/volto/components/manage/AnchorPlugin/components/LinkButton/AddLinkForm';
 import { ImageInput } from '@plone/volto/components/manage/Widgets/ImageWidget';
 import { createLog } from '../../utils/log';
@@ -1413,33 +1413,16 @@ const SyncedSlateToolbar = ({
           !!instanceId && !!onToggleTemplateEditMode && canEditToolbarTemplate;
         if (canToggleTemplate && (isPositionLocked || isEditingToolbarTemplate)) {
           const editing = isEditingToolbarTemplate;
+          // The ONE shared template lock/unlock control (same component the sidebar
+          // renders) — a whole-template action.
           const toggle = (
-            <button
-              type="button"
-              className="lock-icon template-lock-toggle"
-              aria-pressed={editing}
-              title={editing ? 'Lock template (review & save changes)' : 'Click to edit this template'}
-              aria-label={editing ? 'Lock template' : 'Unlock template to edit'}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleTemplateEditMode(instanceId);
-              }}
-              style={{
-                padding: '4px 6px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                pointerEvents: 'auto',
-                cursor: 'pointer',
-                color: '#999',
-                fontSize: '14px',
-                background: '#f5f5f5',
-                border: 'none',
-                borderRadius: '2px',
-              }}
-            >
-              <Icon name={editing ? unlockSVG : lockSVG} size="16px" color="#684cc9" />
-            </button>
+            <TemplateLockToggle
+              instanceId={instanceId}
+              editing={editing}
+              canEdit={canEditToolbarTemplate}
+              onToggle={onToggleTemplateEditMode}
+              variant="toolbar"
+            />
           );
           // While editing the block is movable — the drag handle keeps its canonical
           // (leftmost) position so DnD alignment is unaffected; the toggle sits to its
