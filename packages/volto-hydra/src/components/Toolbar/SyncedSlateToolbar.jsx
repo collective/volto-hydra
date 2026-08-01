@@ -1443,10 +1443,14 @@ const SyncedSlateToolbar = ({
               <Icon name={editing ? unlockSVG : lockSVG} size="16px" color="#684cc9" />
             </button>
           );
-          // While editing the block is movable — the drag handle keeps its canonical
-          // (leftmost) position so DnD alignment is unaffected; the toggle sits to its
-          // right, next to it.
-          return editing ? (
+          // An editable member is movable, so it keeps its drag handle alongside the
+          // toggle — whether the template is being edited OR still locked (a locked
+          // editable member is normal movable content that can also be unlocked). Only
+          // a LOCKED fixed/"chrome" block is immovable, so it shows the unlock toggle
+          // alone. The drag handle keeps its canonical (leftmost) position so DnD
+          // alignment is unaffected; the toggle sits to its right.
+          const movable = editing || !isPositionLocked;
+          return movable ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
               {dragHandle}
               {toggle}
