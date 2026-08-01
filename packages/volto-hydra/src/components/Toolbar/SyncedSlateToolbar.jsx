@@ -14,12 +14,12 @@ import { isSlateFieldType, isBlockPositionLocked, isBlockReadonly, getFieldValue
 import { useDispatch, useSelector } from 'react-redux';
 import FormatDropdown from './FormatDropdown';
 import DropdownMenu from './DropdownMenu';
+import TemplateLockToggle from './TemplateLockToggle';
 import linkSVG from '@plone/volto/icons/link.svg';
 import imageSVG from '@plone/volto/icons/image.svg';
 import clearSVG from '@plone/volto/icons/clear.svg';
 import upSVG from '@plone/volto/icons/up.svg';
 import lockSVG from '@plone/volto/icons/lock.svg';
-import unlockSVG from '@plone/volto/icons/unlock.svg';
 import AddLinkForm from '@plone/volto/components/manage/AnchorPlugin/components/LinkButton/AddLinkForm';
 import { ImageInput } from '@plone/volto/components/manage/Widgets/ImageWidget';
 import { createLog } from '../../utils/log';
@@ -1404,53 +1404,30 @@ const SyncedSlateToolbar = ({
           </div>
         );
 
-        // The lock/unlock toggle shows for ANY block belonging to an editable
-        // template instance — the SAME availability as the settings-sidebar
-        // template toggle (unlock is one action; it shouldn't depend on which
-        // surface renders it, nor on whether the selected member is fixed chrome
-        // or editable slot content). Locked → 🔒 (tap to edit); unlocked → 🔓 (tap
-        // to lock & save). Editable members keep their drag handle (below) too.
+        // The lock/unlock toggle shows for the template's fixed "chrome" (🔒, tap to
+        // edit) and for ANY block while its template is unlocked (🔓, tap to lock &
+        // save). Editable slot content in a LOCKED template is just normal movable
+        // content — it keeps the drag handle (below), no toggle.
         const isPositionLocked = isBlockPositionLocked(block, templateEditMode);
         const canToggleTemplate =
           !!instanceId && !!onToggleTemplateEditMode && canEditToolbarTemplate;
-        if (canToggleTemplate) {
+        if (canToggleTemplate && (isPositionLocked || isEditingToolbarTemplate)) {
           const editing = isEditingToolbarTemplate;
+          // The ONE shared template lock/unlock control (same component the sidebar
+          // renders) — a whole-template action.
           const toggle = (
-            <button
-              type="button"
-              className="lock-icon template-lock-toggle"
-              aria-pressed={editing}
-              title={editing ? 'Lock template (review & save changes)' : 'Click to edit this template'}
-              aria-label={editing ? 'Lock template' : 'Unlock template to edit'}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleTemplateEditMode(instanceId);
-              }}
-              style={{
-                padding: '4px 6px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                pointerEvents: 'auto',
-                cursor: 'pointer',
-                color: '#999',
-                fontSize: '14px',
-                background: '#f5f5f5',
-                border: 'none',
-                borderRadius: '2px',
-              }}
-            >
-              <Icon name={editing ? unlockSVG : lockSVG} size="16px" color="#684cc9" />
-            </button>
+            <TemplateLockToggle
+              instanceId={instanceId}
+              editing={editing}
+              canEdit={canEditToolbarTemplate}
+              onToggle={onToggleTemplateEditMode}
+              variant="toolbar"
+            />
           );
-          // An editable member is movable, so it keeps its drag handle alongside the
-          // toggle — whether the template is being edited OR still locked (a locked
-          // editable member is normal movable content that can also be unlocked). Only
-          // a LOCKED fixed/"chrome" block is immovable, so it shows the unlock toggle
-          // alone. The drag handle keeps its canonical (leftmost) position so DnD
-          // alignment is unaffected; the toggle sits to its right.
-          const movable = editing || !isPositionLocked;
-          return movable ? (
+          // While editing the block is movable — the drag handle keeps its canonical
+          // (leftmost) position so DnD alignment is unaffected; the toggle sits to its
+          // right, next to it.
+          return editing ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
               {dragHandle}
               {toggle}

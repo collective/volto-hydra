@@ -31,8 +31,7 @@ import config from '@plone/volto/registry';
 import { BlockDataForm } from '@plone/volto/components/manage/Form';
 import { Icon } from '@plone/volto/components';
 import leftArrowSVG from '@plone/volto/icons/left-key.svg';
-import lockSVG from '@plone/volto/icons/lock.svg';
-import unlockSVG from '@plone/volto/icons/unlock.svg';
+import TemplateLockToggle from '../Toolbar/TemplateLockToggle';
 import { SidebarPortalTargetContext } from './SidebarPortalTargetContext';
 import DropdownMenu from '../Toolbar/DropdownMenu';
 import ReadOnlyForm from './ReadOnlyForm';
@@ -330,45 +329,16 @@ const ParentBlockSection = ({
               </div>
             );
           })()}
-          {/* Lock/unlock toggle for a top-level template instance — the obvious,
-              consistent replacement for the old standalone Edit-template button.
-              lock = locked (not editing) → click to unlock & edit; unlock = editing →
-              click to lock (exit). Keeps the .edit-template-toggle contract. */}
+          {/* The ONE shared template lock/unlock control (same component the quanta
+              toolbar renders) — a whole-template action shown on the instance's row. */}
           {isThisTemplateInstance && onToggleTemplateEditMode && (
-            <button
-              type="button"
-              className={`edit-template-toggle${isEditingThisTemplate ? ' edit-template-toggle--active' : ''}`}
-              aria-pressed={isEditingThisTemplate}
-              aria-label={isEditingThisTemplate ? 'Lock template (stop editing)' : 'Unlock template to edit'}
-              disabled={!canEditTemplate}
-              title={
-                canEditTemplate
-                  ? isEditingThisTemplate
-                    ? 'Locking exits template edit mode'
-                    : 'Unlock to edit this template’s structure'
-                  : 'You don’t have permission to edit this template (requires “Modify portal content”).'
-              }
-              onClick={toggleTemplateEdit}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: '4px',
-                cursor: canEditTemplate ? 'pointer' : 'not-allowed',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '2px',
-                opacity: canEditTemplate ? 1 : 0.5,
-              }}
-              onMouseEnter={(e) => canEditTemplate && (e.currentTarget.style.background = '#e8e8e8')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-            >
-              <Icon
-                name={isEditingThisTemplate ? unlockSVG : lockSVG}
-                size="20px"
-                color={isEditingThisTemplate ? '#0b78d0' : '#684cc9'}
-              />
-            </button>
+            <TemplateLockToggle
+              instanceId={blockId}
+              editing={isEditingThisTemplate}
+              canEdit={canEditTemplate}
+              onToggle={onToggleTemplateEditMode}
+              variant="sidebar"
+            />
           )}
           <button
             ref={menuButtonRef}

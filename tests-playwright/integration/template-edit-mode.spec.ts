@@ -1972,14 +1972,15 @@ test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commi
     await helper.waitForBlockReadonly(i2Header);
     await helper.waitForBlockEditable(PAGE_TOP);
 
-    // Unlock instance 1 → only its fixed block becomes editable; instance 2 stays locked.
-    await helper.unlockTemplate(I1_CONTENT);
+    // Unlock instance 1 via its fixed chrome (the toolbar lock toggle lives on the
+    // template's fixed blocks) → only its fixed block becomes editable; instance 2 stays locked.
+    await helper.unlockTemplate(i1Header);
     await helper.waitForBlockEditable(i1Header);
     await helper.waitForBlockReadonly(i2Header);
     await helper.waitForBlockEditable(PAGE_MID); // page still editable
 
-    // Unlock instance 2 as well → BOTH are now editable simultaneously.
-    await helper.unlockTemplate(I2_CONTENT);
+    // Unlock instance 2 as well (via its fixed chrome) → BOTH are now editable simultaneously.
+    await helper.unlockTemplate(i2Header);
     await helper.waitForBlockEditable(i2Header);
     await helper.waitForBlockEditable(i1Header); // instance 1 stayed unlocked
   });
@@ -2059,7 +2060,8 @@ test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commi
     const { blockId: i1Footer } = await helper.waitForBlockByContent(I1_FOOTER);
     const footerLoc = iframe.locator(`[data-block-uid]`).filter({ hasText: I1_FOOTER });
 
-    await helper.unlockTemplate(I1_CONTENT);
+    // Unlock via the fixed chrome footer (where the toolbar lock toggle lives).
+    await helper.unlockTemplate(i1Footer);
 
     // Structural template edit: delete a fixed template block of instance 1.
     await helper.clickBlockInIframe(i1Footer);
@@ -2105,7 +2107,7 @@ test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commi
     });
 
     const { blockId: i1Footer } = await helper.waitForBlockByContent(I1_FOOTER);
-    await helper.unlockTemplate(I1_CONTENT);
+    await helper.unlockTemplate(i1Footer);
 
     // Make a template edit.
     await helper.clickBlockInIframe(i1Footer);
