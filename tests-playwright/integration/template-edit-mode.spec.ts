@@ -2057,11 +2057,13 @@ test.describe('Template Edit Mode v2 - multi-unlock, no page lock, lock-to-commi
     await helper.navigateToEdit('/two-template-page');
 
     const iframe = helper.getIframe();
+    const { blockId: i1Header } = await helper.waitForBlockByContent(I1_HEADER);
     const { blockId: i1Footer } = await helper.waitForBlockByContent(I1_FOOTER);
     const footerLoc = iframe.locator(`[data-block-uid]`).filter({ hasText: I1_FOOTER });
 
-    // Unlock via the fixed chrome footer (where the toolbar lock toggle lives).
-    await helper.unlockTemplate(i1Footer);
+    // Unlock via the fixed chrome header (where the toolbar lock toggle lives — the
+    // header renders as template chrome on every frontend, incl. the Nuxt example).
+    await helper.unlockTemplate(i1Header);
 
     // Structural template edit: delete a fixed template block of instance 1.
     await helper.clickBlockInIframe(i1Footer);

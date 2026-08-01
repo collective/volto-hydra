@@ -16,10 +16,11 @@ import unlockSVG from '@plone/volto/icons/unlock.svg';
  * Unlocked → 🔓, click to lock (review & save). The click always toggles the whole
  * instance via `onToggle(instanceId)`.
  *
- * Both legacy contract classes are kept — `template-lock-toggle` (toolbar tests +
- * AdminUIHelper) and `edit-template-toggle` (sidebar tests) — so selectors resolve
- * to this one button wherever it renders. `variant` only tweaks presentation
- * (size / background), never behaviour.
+ * Each surface keeps its own contract class so unscoped selectors stay unambiguous:
+ * the toolbar variant renders `template-lock-toggle lock-icon` (toolbar tests +
+ * AdminUIHelper), the sidebar variant renders `edit-template-toggle` (sidebar
+ * tests). `variant` only tweaks class + presentation (size / background), never
+ * behaviour.
  *
  * @param {string} instanceId - the template instance this toggles
  * @param {boolean} editing - is the instance currently unlocked/being edited
@@ -38,9 +39,13 @@ export default function TemplateLockToggle({
   return (
     <button
       type="button"
-      className={`template-lock-toggle edit-template-toggle${
-        toolbar ? ' lock-icon' : ''
-      }${editing ? ' edit-template-toggle--active' : ''}`}
+      className={
+        toolbar
+          ? 'template-lock-toggle lock-icon'
+          : `edit-template-toggle${
+              editing ? ' edit-template-toggle--active' : ''
+            }`
+      }
       aria-pressed={editing}
       aria-label={editing ? 'Lock template' : 'Unlock template to edit'}
       disabled={!canEdit}
